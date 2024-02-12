@@ -24,7 +24,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text
 from pants.vcs.git import GitWorktree
-from pants.vcs.hunk import Hunk
+from pants.vcs.hunk import Block, Hunk
 
 
 class DependentsOption(Enum):
@@ -37,8 +37,7 @@ class DependentsOption(Enum):
 class ChangedRequest:
     sources: tuple[str, ...]
     dependents: DependentsOption
-    files_with_line_numbers: tuple[str, ...]
-    diff_hunks: FrozenDict[str, Hunk]
+    blocks: FrozenDict[str, tuple[Block, ...]]
 
 
 class ChangedAddresses(Collection[Address]):
@@ -61,8 +60,7 @@ async def find_changed_owners(
             filter_by_global_options=no_dependents,
             # Changing a BUILD file might impact the targets it defines.
             match_if_owning_build_file_included_in_sources=True,
-            changed_files_with_line_numbers=request.files_with_line_numbers,
-            diff_hunks=request.diff_hunks,
+            blocks=request.blocks,
         ),
     )
 
@@ -146,7 +144,7 @@ class ChangedOptions:
 
         More info on universal diff: https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
         """
-        if self.files_with_line_numbers is None:
+        if not self.files_with_line_numbers:
             return {}
 
         changes_since = self.since or git_worktree.current_rev_identifier

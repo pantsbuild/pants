@@ -100,7 +100,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list, pluralize, softwrap
-from pants.vcs.hunk import Hunk
+from pants.vcs.hunk import Block
 
 logger = logging.getLogger(__name__)
 
@@ -943,13 +943,13 @@ def _log_or_raise_unmatched_owners(
 
 @union
 @dataclass(frozen=True)
-class HunkOwnersRequest(abc.ABC):
-    """Union for universal diff hunk owners requests.
+class BlockOwnersRequest(abc.ABC):
+    """Union for file block owners requests.
 
     Define a subclass if you want to use `--changed-files-with-line-numbers` flag.
     """
 
-    hunks: FrozenDict[str, Hunk]
+    blocks: FrozenDict[str, tuple[Block, ...]]
 
 
 @dataclass(frozen=True)
@@ -964,8 +964,7 @@ class OwnersRequest:
     owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
-    changed_files_with_line_numbers: tuple[str, ...] = ()
-    diff_hunks: FrozenDict[str, Hunk] = FrozenDict()
+    blocks: FrozenDict[str, tuple[Block, ...]] = FrozenDict()
 
 
 class Owners(FrozenOrderedSet[Address]):
@@ -978,23 +977,21 @@ async def find_owners(
     local_environment_name: ChosenLocalEnvironmentName,
     union_membership: UnionMembership,
 ) -> Owners:
-    # If we need to process a file with line numbers, we delegate the logic to plugins.
-    sources = set(owners_request.sources).difference(owners_request.changed_files_with_line_numbers)
-
-    if len(owners_request.changed_files_with_line_numbers) > 0:
-        request_types = union_membership[HunkOwnersRequest]
-        hunk_owners = await MultiGet(
-            Get(Owners, HunkOwnersRequest, request_type(owners_request.diff_hunks))
-            for request_type in request_types
+    block_owners: tuple[Owners, ...] = (
+        # If we need to process blocks, we delegate the logic to plugins.
+        await MultiGet(
+            Get(Owners, BlockOwnersRequest, request_type(owners_request.blocks))
+            for request_type in union_membership[BlockOwnersRequest]
         )
-    else:
-        hunk_owners = []
+        if owners_request.blocks
+        else ()
+    )
 
     # Determine which of the sources are live and which are deleted.
-    sources_paths = await Get(Paths, PathGlobs(sources))
+    sources_paths = await Get(Paths, PathGlobs(owners_request.sources))
 
     live_files = FrozenOrderedSet(sources_paths.files)
-    deleted_files = FrozenOrderedSet(s for s in sources if s not in live_files)
+    deleted_files = FrozenOrderedSet(s for s in owners_request.sources if s not in live_files)
     live_dirs = FrozenOrderedSet(os.path.dirname(s) for s in live_files)
     deleted_dirs = FrozenOrderedSet(os.path.dirname(s) for s in deleted_files)
 
@@ -1037,7 +1034,7 @@ async def find_owners(
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
     result = set()
-    unmatched_sources = set(sources)
+    unmatched_sources = set(owners_request.sources)
     for live in (True, False):
         candidate_tgts: Sequence[Target]
         if live:
@@ -1079,7 +1076,7 @@ async def find_owners(
             [PurePath(path) for path in unmatched_sources], owners_request.owners_not_found_behavior
         )
 
-    return Owners(functools.reduce(set.union, map(set, hunk_owners), result))
+    return Owners(result.union(*block_owners))
 
 
 # -----------------------------------------------------------------------------------------------

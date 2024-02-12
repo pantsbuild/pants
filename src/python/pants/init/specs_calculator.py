@@ -68,22 +68,33 @@ def calculate_specs(
             "The `--changed-*` options are only available if Git is used for the repository."
         )
 
-    changed_files = tuple(changed_options.changed_files(maybe_git_worktree.git_worktree))
-    files_with_line_numbers = changed_options.files_with_line_numbers or []
-    file_literal_specs = tuple(
-        FileLiteralSpec(f) for f in changed_files if f not in files_with_line_numbers
+    files_with_line_numbers = set(changed_options.files_with_line_numbers or [])
+    changed_files = tuple(
+        file
+        for file in changed_options.changed_files(maybe_git_worktree.git_worktree)
+        # We want to exclude file from normal processing flow if it was specified
+        # in --changed-files-with-line-numbers. These files are handled with special
+        # logic.
+        if file not in files_with_line_numbers
     )
+    file_literal_specs = tuple(FileLiteralSpec(f) for f in changed_files)
 
-    if changed_options.files_with_line_numbers:
-        diff_hunks = changed_options.diff_hunks(maybe_git_worktree.git_worktree)
-    else:
-        diff_hunks = {}
+    blocks = FrozenDict(
+        {
+            # Hunk stores information about the old block and the new block.
+            # Here we only care about the final state, so we take `hunk.right`.
+            path: tuple(hunk.right for hunk in hunks)
+            for path, hunks in changed_options.diff_hunks(maybe_git_worktree.git_worktree).items()
+        }
+        if changed_options.files_with_line_numbers
+        else {}
+    )
+    logger.debug("changed blocks: %s", blocks)
 
     changed_request = ChangedRequest(
         sources=changed_files,
         dependents=changed_options.dependents,
-        files_with_line_numbers=tuple(changed_options.files_with_line_numbers),
-        diff_hunks=FrozenDict(diff_hunks),
+        blocks=blocks,
     )
     (changed_addresses,) = session.product_request(
         ChangedAddresses,

@@ -18,7 +18,7 @@ from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException,
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
-from pants.vcs.hunk import Hunk
+from pants.vcs.hunk import Block, Hunk
 
 logger = logging.getLogger(__name__)
 
@@ -142,10 +142,14 @@ class GitWorktree(EngineAwareReturnType):
             g = match.groups()
             try:
                 hunk = Hunk(
-                    left_start=int(g[0]),
-                    left_count=int(g[2]) if g[2] is not None else 1,
-                    right_start=int(g[3]),
-                    right_count=int(g[5]) if g[5] is not None else 1,
+                    left=Block(
+                        start=int(g[0]),
+                        count=int(g[2]) if g[2] is not None else 1,
+                    ),
+                    right=Block(
+                        start=int(g[3]),
+                        count=int(g[5]) if g[5] is not None else 1,
+                    ),
                 )
             except ValueError as e:
                 raise ValueError(f"Failed to parse hunk: {line}") from e

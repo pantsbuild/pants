@@ -16,7 +16,8 @@ from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException,
 from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
-from pants.vcs.git import GitWorktree, GitWorktreeRequest, Hunk, MaybeGitWorktree, get_git_worktree
+from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, get_git_worktree
+from pants.vcs.hunk import Block, Hunk
 
 
 def init_repo(remote_name: str, remote: PurePath) -> None:
@@ -385,7 +386,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +two
                 """
             ),
-            (Hunk(1, 0, 2, 1),),
+            (Hunk(Block(1, 0), Block(2, 1)),),
         ],
         [
             dedent(
@@ -396,7 +397,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 -two
                 """
             ),
-            (Hunk(2, 1, 1, 0),),
+            (Hunk(Block(2, 1), Block(1, 0)),),
         ],
         [
             dedent(
@@ -408,7 +409,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +four
                 """
             ),
-            (Hunk(2, 1, 2, 1),),
+            (Hunk(Block(2, 1), Block(2, 1)),),
         ],
         [
             dedent(
@@ -422,11 +423,11 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +six
                 """
             ),
-            (Hunk(2, 2, 2, 2),),
+            (Hunk(Block(2, 2), Block(2, 2)),),
         ],
     ],
 )
 def test_parse_unified_diff(diff, expected):
-    wt = GitWorktree(None)  # type: ignore
+    wt = GitWorktree(None)
     actual = wt._parse_unified_diff(diff)
     assert actual == expected
