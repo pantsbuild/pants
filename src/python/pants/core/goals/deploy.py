@@ -3,20 +3,32 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from abc import ABCMeta
 from dataclasses import dataclass
+from enum import Enum, unique
 from itertools import chain
-from typing import Iterable
+from typing import Iterable, Iterator
 
 from pants.core.goals.package import PackageFieldSet
-from pants.core.goals.publish import PublishFieldSet, PublishProcesses, PublishProcessesRequest
+from pants.core.goals.publish import (
+    PublishFieldSet,
+    PublishPackages,
+    PublishProcesses,
+    PublishProcessesRequest,
+)
+from pants.engine.addresses import Address, Addresses
+from pants.engine.collection import Collection
 from pants.engine.console import Console
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
+    CoarsenedTarget,
+    CoarsenedTargets,
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
@@ -26,7 +38,9 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import union
-from pants.util.strutil import pluralize
+from pants.util.logging import LogLevel
+from pants.util.memo import memoized_property
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +129,7 @@ async def publish_process_for_target(
     )
 
 
-async def _all_publish_processes(targets: Iterable[Target]) -> PublishProcesses:
+async def _publish_processes_for_targets(targets: Iterable[Target]) -> PublishProcesses:
     processes_per_target = await MultiGet(
         Get(PublishProcesses, _PublishProcessesForTargetRequest(target)) for target in targets
     )
@@ -123,43 +137,286 @@ async def _all_publish_processes(targets: Iterable[Target]) -> PublishProcesses:
     return PublishProcesses(chain.from_iterable(processes_per_target))
 
 
-async def _invoke_process(
-    console: Console,
-    process: InteractiveProcess | None,
-    *,
-    names: Iterable[str],
-    success_status: str,
-    description: str | None = None,
-) -> tuple[int, tuple[str, ...]]:
-    results = []
+@dataclass(frozen=True)
+class _DeployTargetRequest(EngineAwareParameter):
+    target: CoarsenedTarget
+    dependent: Address | None = None
 
-    if not process:
-        sigil = console.sigil_skipped()
-        status = "skipped"
-        if description:
-            status += f" {description}"
-        for name in names:
-            results.append(f"{sigil} {name} {status}.")
-        return 0, tuple(results)
+    def debug_hint(self) -> str:
+        result = self.target.representative.address.spec
+        if self.dependent:
+            result += f" from {self.dependent}"
+        return result
 
-    logger.debug(f"Execute {process}")
-    res = await Effect(InteractiveProcessResult, InteractiveProcess, process)
-    if res.exit_code == 0:
-        sigil = console.sigil_succeeded()
-        status = success_status
-        prep = "to"
-    else:
-        sigil = console.sigil_failed()
-        status = "failed"
-        prep = "for"
 
-    if description:
-        status += f" {prep} {description}"
+class _DeployTargetRequests(Collection[_DeployTargetRequest]):
+    pass
 
-    for name in names:
-        results.append(f"{sigil} {name} {status}")
 
-    return res.exit_code, tuple(results)
+@dataclass(frozen=True)
+class _DeployTargetDependenciesRequest(EngineAwareParameter):
+    target: CoarsenedTarget
+
+    def debug_hint(self) -> str | None:
+        return self.target.representative.address.spec
+
+
+class _DeployStepAction(Enum):
+    PUBLISH_PACKAGE = 0
+    DEPLOYMENT = 1
+
+
+@unique
+class _DeployStepOutcome(Enum):
+    SKIPPED = 0
+    SUCCESS = 1
+    FAILURE = 2
+    FAILED_DEPENDENCIES = 3
+
+
+@dataclass(frozen=True)
+class _DeployStepResult(EngineAwareReturnType):
+    exit_code: int
+    action: _DeployStepAction
+    outcome: _DeployStepOutcome
+
+    names: tuple[str, ...] = ()
+    description: str | None = dataclasses.field(default=None, compare=False)
+    substeps: tuple[_DeployStepResult, ...] = ()
+
+    @classmethod
+    def from_publish_process_result(
+        cls,
+        result: FallibleProcessResult,
+        publish: PublishPackages,
+    ) -> _DeployStepResult:
+        return _DeployStepResult(
+            exit_code=result.exit_code,
+            outcome=_DeployStepResult._determine_outcome(result),
+            action=_DeployStepAction.PUBLISH_PACKAGE,
+            names=publish.names,
+            description=publish.description,
+        )
+
+    @classmethod
+    def from_deploy_process_result(
+        cls,
+        result: FallibleProcessResult,
+        deploy: DeployProcess,
+        substeps: Iterable[_DeployStepResult] | None = None,
+    ) -> _DeployStepResult:
+        return _DeployStepResult(
+            exit_code=result.exit_code,
+            outcome=_DeployStepResult._determine_outcome(result),
+            action=_DeployStepAction.DEPLOYMENT,
+            names=(deploy.name,),
+            description=deploy.description,
+            substeps=tuple(substeps or []),
+        )
+
+    @classmethod
+    def failed_dependencies(
+        cls, deploy: DeployProcess, results: _DeployStepResults
+    ) -> _DeployStepResult:
+        assert results.exit_code != 0
+        return _DeployStepResult(
+            exit_code=results.exit_code,
+            action=_DeployStepAction.DEPLOYMENT,
+            outcome=_DeployStepOutcome.FAILED_DEPENDENCIES,
+            names=(deploy.name,),
+            description=deploy.description,
+            substeps=results,
+        )
+
+    @staticmethod
+    def _determine_outcome(result: FallibleProcessResult) -> _DeployStepOutcome:
+        return _DeployStepOutcome.SUCCESS if result.exit_code == 0 else _DeployStepOutcome.FAILURE
+
+    @classmethod
+    def skipped(
+        cls,
+        *,
+        action: _DeployStepAction,
+        names: Iterable[str] | None = None,
+        description: str | None = None,
+        substeps: Iterable[_DeployStepResult] | None = None,
+    ) -> _DeployStepResult:
+        return _DeployStepResult(
+            exit_code=0,
+            outcome=_DeployStepOutcome.SKIPPED,
+            action=action,
+            names=tuple(names or []),
+            description=description,
+            substeps=tuple(substeps or []),
+        )
+
+    def level(self) -> LogLevel | None:
+        return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
+
+    def message(self) -> str | None:
+        if self.output:
+            return "\n".join(self.output)
+
+        return None
+
+    @memoized_property
+    def output(self) -> tuple[str, ...]:
+        if self.outcome == _DeployStepOutcome.SKIPPED:
+            status = "skipped"
+            if self.description:
+                status += f" {self.description}"
+        else:
+            if self.outcome == _DeployStepOutcome.SUCCESS:
+                status = (
+                    "published" if self.action == _DeployStepAction.PUBLISH_PACKAGE else "deployed"
+                )
+                prep = "to"
+            else:
+                status = (
+                    "failed"
+                    if self.outcome == _DeployStepOutcome.FAILURE
+                    else "failed dependencies"
+                )
+                prep = "for"
+
+            if self.description:
+                status += f" {prep} {self.description}"
+
+        result = []
+        for name in self.names:
+            result.append(f"{name} {status}")
+
+        return tuple(result)
+
+    @property
+    def closure(self) -> Iterator[_DeployStepResult]:
+        for substep in self.substeps:
+            yield from substep.closure
+
+        yield self
+
+
+class _DeployStepResults(Collection[_DeployStepResult]):
+    @memoized_property
+    def exit_code(self) -> int:
+        if len(self) == 0:
+            return 0
+
+        return max(result.exit_code for result in self)
+
+    @property
+    def closure(self) -> Iterator[_DeployStepResult]:
+        for result in self:
+            yield from result.closure
+
+
+@rule(desc="Publish package dependencies", level=LogLevel.DEBUG)
+async def _run_publish_process(publish: PublishPackages) -> _DeployStepResult:
+    if publish.process:
+        # TODO cheating here, but only by invoking the underly process I can run this in a `@rule`
+        result = await Get(FallibleProcessResult, Process, publish.process.process)
+        return _DeployStepResult.from_publish_process_result(result, publish)
+
+    return _DeployStepResult.skipped(
+        action=_DeployStepAction.PUBLISH_PACKAGE,
+        names=publish.names,
+        description=publish.description,
+    )
+
+
+@rule(desc="Run deployment step", level=LogLevel.DEBUG)
+async def _run_deploy_process(deploy: DeployProcess) -> _DeployStepResult:
+    publish_results: Iterable[_DeployStepResult] = []
+    if deploy.publish_dependencies:
+        publish_processes = await _publish_processes_for_targets(deploy.publish_dependencies)
+        publish_results = _DeployStepResults(
+            await MultiGet(
+                Get(_DeployStepResult, PublishPackages, process) for process in publish_processes
+            )
+        )
+
+        if publish_results.exit_code != 0:
+            return _DeployStepResult.failed_dependencies(deploy, publish_results)
+
+    if deploy.process:
+        # TODO cheating here, but only by invoking the underly process I can run this in a `@rule`
+        result = await Get(FallibleProcessResult, Process, deploy.process.process)
+        return _DeployStepResult.from_deploy_process_result(
+            result,
+            deploy,
+            substeps=publish_results,
+        )
+
+    return _DeployStepResult.skipped(
+        action=_DeployStepAction.DEPLOYMENT,
+        names=(deploy.name,),
+        description=deploy.description,
+        substeps=publish_results,
+    )
+
+
+@rule(desc="Deploy target dependencies", level=LogLevel.DEBUG)
+async def _deploy_target_dependencies(
+    request: _DeployTargetDependenciesRequest,
+) -> _DeployTargetRequests:
+    return _DeployTargetRequests(
+        [
+            _DeployTargetRequest(dep, dependent=request.target.representative.address)
+            for dep in request.target.dependencies
+        ]
+    )
+
+
+@rule
+async def _deploy_targets(requests: _DeployTargetRequests) -> _DeployStepResults:
+    result = await MultiGet(
+        Get(_DeployStepResult, _DeployTargetRequest, request) for request in requests
+    )
+    return _DeployStepResults(result)
+
+
+@rule(desc="Deploy target", level=LogLevel.DEBUG)
+async def _deploy_coarsened_target(request: _DeployTargetRequest) -> _DeployStepResult:
+    dependency_results = await Get(
+        _DeployStepResults, _DeployTargetDependenciesRequest(request.target)
+    )
+    if dependency_results.exit_code != 0:
+        return _DeployStepResult(
+            exit_code=dependency_results.exit_code,
+            action=_DeployStepAction.DEPLOYMENT,
+            outcome=_DeployStepOutcome.FAILED_DEPENDENCIES,
+            substeps=dependency_results,
+        )
+
+    field_sets_per_target = await Get(
+        FieldSetsPerTarget, FieldSetsPerTargetRequest(DeployFieldSet, request.target.members)
+    )
+    deploy_processes = await MultiGet(
+        Get(DeployProcess, DeployFieldSet, field_set)
+        for field_set in field_sets_per_target.field_sets
+    )
+
+    deploy_results = _DeployStepResults(
+        await MultiGet(
+            Get(_DeployStepResult, DeployProcess, process) for process in deploy_processes
+        )
+    )
+
+    all_results = [*dependency_results, *deploy_results]
+    if deploy_results.exit_code > 0:
+        return _DeployStepResult(
+            exit_code=deploy_results.exit_code,
+            action=_DeployStepAction.DEPLOYMENT,
+            outcome=_DeployStepOutcome.FAILURE,
+            substeps=tuple(all_results),
+        )
+
+    return _DeployStepResult(
+        exit_code=0,
+        action=_DeployStepAction.DEPLOYMENT,
+        outcome=_DeployStepOutcome.SUCCESS,
+        substeps=tuple(all_results),
+    )
 
 
 @goal_rule
@@ -173,60 +430,56 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
         ),
     )
 
-    deploy_processes = await MultiGet(
-        Get(DeployProcess, DeployFieldSet, field_set)
-        for field_set in target_roots_to_deploy_field_sets.field_sets
+    if not target_roots_to_deploy_field_sets.targets:
+        return Deploy(exit_code=0)
+
+    coarsened_targets = await Get(
+        CoarsenedTargets,
+        Addresses([tgt.address for tgt in target_roots_to_deploy_field_sets.targets]),
+    )
+    # Validate that there aren't any dependency cycles among the targets
+    for ct in coarsened_targets.coarsened_closure():
+        if len(ct.members) > 1:
+            raise Exception(
+                softwrap(
+                    f"""
+                Found dependency cycle between the following targets:
+
+                {bullet_list([tgt.address.spec for tgt in ct.members])}
+
+                Deployable targets can not have dependency cylces between them. Please, clear the cycle
+                before proceeding again.
+                """
+                )
+            )
+
+    results = _DeployStepResults(
+        await MultiGet(
+            Get(_DeployStepResult, _DeployTargetRequest(tgt)) for tgt in coarsened_targets
+        )
     )
 
-    publish_targets = set(
-        chain.from_iterable([deploy.publish_dependencies for deploy in deploy_processes])
-    )
-    logger.debug(f"Found {pluralize(len(publish_targets), 'dependency')}")
-    publish_processes = await _all_publish_processes(publish_targets)
+    outputs: list[str] = []
+    for step in results.closure:
+        if step.outcome == _DeployStepOutcome.SKIPPED:
+            sigil = console.sigil_skipped()
+        elif step.outcome == _DeployStepOutcome.SUCCESS:
+            sigil = console.sigil_succeeded()
+        else:
+            sigil = console.sigil_failed()
 
-    exit_code: int = 0
-    results: list[str] = []
-
-    if publish_processes:
-        logger.info(f"Publishing {pluralize(len(publish_processes), 'dependency')}...")
-
-        # Publish all deployment dependencies first.
-        for publish in publish_processes:
-            ec, statuses = await _invoke_process(
-                console,
-                publish.process,
-                names=publish.names,
-                description=publish.description,
-                success_status="published",
-            )
-            exit_code = ec if ec != 0 else exit_code
-            results.extend(statuses)
-
-    # Only proceed to deploy of all dependencies have been successfully published
-    if exit_code == 0 and deploy_processes:
-        logger.info("Deploying targets...")
-
-        for deploy in deploy_processes:
-            # Invoke the deployment.
-            ec, statuses = await _invoke_process(
-                console,
-                deploy.process,
-                names=[deploy.name],
-                success_status="deployed",
-                description=deploy.description,
-            )
-            exit_code = ec if ec != 0 else exit_code
-            results.extend(statuses)
+        for out in step.output:
+            outputs.append(f"{sigil} {out}")
 
     console.print_stderr("")
-    if not results:
+    if not outputs:
         sigil = console.sigil_skipped()
         console.print_stderr(f"{sigil} Nothing deployed.")
 
-    for line in results:
+    for line in outputs:
         console.print_stderr(line)
 
-    return Deploy(exit_code)
+    return Deploy(results.exit_code)
 
 
 def rules():

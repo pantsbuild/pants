@@ -1,6 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import shlex
 from dataclasses import dataclass
 from textwrap import dedent
 
@@ -93,7 +94,7 @@ class MockDeployFieldSet(DeployFieldSet):
 @rule
 async def mock_package(request: MockPackageFieldSet) -> BuiltPackage:
     artifact = BuiltPackageArtifact(
-        relpath=request.address.path_safe_spec,
+        relpath=request.address.spec,
         extra_log_lines=tuple(
             [f"test package into: {repo}" for repo in request.repositories.value]
             if request.repositories.value
@@ -116,7 +117,9 @@ async def mock_publish(request: MockPublishRequest) -> PublishProcesses:
                 for artifact in pkg.artifacts
                 if artifact.relpath
             ),
-            process=None if repo == "skip" else InteractiveProcess(["echo", repo]),
+            process=None
+            if repo == "skip"
+            else InteractiveProcess(["/bin/sh", "-c", "echo", shlex.quote(repo)]),
             description="(requested)" if repo == "skip" else repo,
         )
         for repo in request.field_set.repositories.value
@@ -126,17 +129,19 @@ async def mock_publish(request: MockPublishRequest) -> PublishProcesses:
 @rule
 async def mock_deploy(field_set: MockDeployFieldSet) -> DeployProcess:
     if not field_set.destination.value:
-        return DeployProcess(name="test-deploy", publish_dependencies=(), process=None)
+        return DeployProcess(name=field_set.address.spec, publish_dependencies=(), process=None)
 
     dependencies = await Get(Targets, DependenciesRequest(field_set.dependencies))
     dest = field_set.destination.value
     return DeployProcess(
-        name="test-deploy",
+        name=field_set.address.spec,
         publish_dependencies=tuple(dependencies),
-        description="(requested)" if dest == "skip" else None,
+        description="(requested)" if dest == "skip" else field_set.destination.value,
         process=None
         if dest == "skip"
-        else InteractiveProcess(["echo", dest], run_in_workspace=True),
+        else InteractiveProcess(
+            ["/bin/sh", "-c", "echo", shlex.quote(dest)], run_in_workspace=True
+        ),
     )
 
 
@@ -186,33 +191,41 @@ def test_skip_deploy(rule_runner: RuleRunner) -> None:
     result = rule_runner.run_goal_rule(Deploy, args=("src:inst",))
 
     assert result.exit_code == 0
-    assert "test-deploy skipped (requested)." in result.stderr
+    assert "src:inst skipped (requested)" in result.stderr
 
 
-@pytest.mark.skip("Can not run interactive process from test..?")
-@pytest.mark.no_error_if_skipped
 def test_mocked_deploy(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/BUILD": dedent(
                 """\
-            mock_package(
-                name="dependency",
-                repositories=["https://www.example.com"],
-            )
+                mock_package(
+                    name="pkg_dependency",
+                    repositories=["https://www.example.com"],
+                )
 
-            mock_deploy(
-                name="main",
-                dependencies=[":dependency"],
-                destination="production",
-            )
-            """
+                mock_deploy(
+                    name="deploy_dependency",
+                    destination="foo",
+                )
+
+                mock_deploy(
+                    name="main",
+                    dependencies=[":pkg_dependency", ":deploy_dependency"],
+                    destination="bar",
+                )
+                """
             )
         }
     )
 
     result = rule_runner.run_goal_rule(Deploy, args=("src:main",))
-
     assert result.exit_code == 0
-    assert "https://www.example.com" in result.stderr
-    assert "production" in result.stderr
+    assert not result.stdout
+
+    stderr_lines = result.stderr.splitlines()
+    assert stderr_lines[-3:] == [
+        "✓ src:deploy_dependency deployed to foo",
+        "✓ src:pkg_dependency published to https://www.example.com",
+        "✓ src:main deployed to bar",
+    ]
