@@ -198,7 +198,7 @@ If you have an operation that you perform often on a certain group of targets, y
 publish-libraries = "--filter-target-type=python_distribution --filter-address-regex=\"['^src/libA/,^src/libB/']\" publish src::"
 ```
 
-would you let run `pants publish-libraries` to publish all Python distributions declared in the `src/libA` and `src/libB`
+would let you run `pants publish-libraries` to publish all Python distributions declared in the `src/libA` and `src/libB`
 directories. You can use any argument or goal, and the alias doesn't need to be a "full" invocation of Pants.
 For instance, you could combine filtering arguments along with `--changed-since` flag and a tag to refer to long-running
 integration tests that have been recently modified:
