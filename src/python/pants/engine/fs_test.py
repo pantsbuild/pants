@@ -1316,7 +1316,7 @@ def test_invalidated_after_rewrite(rule_runner: RuleRunner) -> None:
 
 
 def test_invalidated_after_parent_deletion(rule_runner: RuleRunner) -> None:
-    """Test that FileContent is invalidated after deleting parent directory."""
+    """Test that FileContent is invalidated after deleting the parent directory."""
     setup_fs_test_tar(rule_runner)
 
     def read_file() -> Optional[str]:

@@ -455,7 +455,7 @@ class PexPlatformsField(StringSequenceField):
     alias = "platforms"
     removal_version = "2.22.0.dev0"
     removal_hint = softwrap(
-        """\
+        f"""\
     The platforms field is a hack. The abbreviated information it provides is sometimes insufficient,
     leading to hard-to-debug build issues. Use complete_platforms instead.
     See {doc_url('pex')} for details.

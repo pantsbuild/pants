@@ -184,7 +184,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         # Global-level imports are conditional, we need to re-import here for runtime use
         from pants.engine.rules import TaskRule
 
-        partial_construct_subsystem: Any = functools.partial(_construct_subsytem, cls)
+        partial_construct_subsystem: Any = functools.partial(_construct_subsystem, cls)
 
         # NB: We must populate several dunder methods on the partial function because partial
         # functions do not have these defined by default and the engine uses these values to
@@ -314,7 +314,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         return bool(self.options == other.options)
 
 
-async def _construct_subsytem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
+async def _construct_subsystem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
     scoped_options = await Get(ScopedOptions, Scope(str(subsystem_typ.options_scope)))
     return subsystem_typ(scoped_options.options)
 

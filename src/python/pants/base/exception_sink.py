@@ -30,7 +30,7 @@ class SignalHandler:
     pantsd is enabled. The default behavior is to exit "gracefully" by leaving a detailed log of which
     signal was received, then exiting with failure.
 
-    Note that the terminal will convert a ctrl-c from the user into a SIGINT.
+    Note that the terminal converts a ctrl-c from the user into a SIGINT.
     """
 
     @property
@@ -323,7 +323,7 @@ class ExceptionSink:
 
         We currently only use this to implement disabling catching SIGINT while an
         InteractiveProcess is running (where we want that process to catch it), and only when pantsd
-        is not enabled (if pantsd is enabled, the client will actually catch SIGINT and forward it
+        is not enabled. If pantsd is enabled, the client will actually catch SIGINT and forward it
         to the server, so we don't want the server process to ignore it.
         """
 

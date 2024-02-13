@@ -98,7 +98,7 @@ async def run_pep660_build(
 ) -> PEP660BuildResult:
     """Run our PEP 517 / PEP 660 wrapper script to generate an editable wheel.
 
-    The PEP 517 / PEP 660 wraper script is responsible for building the editable wheel.
+    The PEP 517 / PEP 660 wrapper script is responsible for building the editable wheel.
     The backend wrapper script, along with the commands that install the editable wheel,
     need to conform to the following specs so that Pants is a PEP 660 compliant frontend,
     a PEP 660 compliant backend, and that it builds a compliant wheel and install.

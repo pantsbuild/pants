@@ -131,7 +131,7 @@ class RequestedUserResolveNames(Collection[str]):
 
 
 class PackageVersion(Protocol):
-    """Protocol for backend specific implementations, to support language ecosystem specific version
+    """Protocol for backend specific implementations, to support language-ecosystem-specific version
     formats and sort rules.
 
     May support the `int` properties `major`, `minor` and `micro` to color diff based on semantic
@@ -546,7 +546,7 @@ async def generate_lockfiles_goal(
     )
 
     # Execute the actual lockfile generation in each request's environment.
-    # Currently, since resolves specify a single filename for output, we pick a resonable
+    # Currently, since resolves specify a single filename for output, we pick a reasonable
     # environment to execute the request in. Currently we warn if multiple environments are
     # specified.
     all_requests: Iterator[GenerateLockfile] = itertools.chain(

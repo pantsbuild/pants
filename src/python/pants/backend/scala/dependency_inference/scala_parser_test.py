@@ -687,7 +687,7 @@ def test_types_at_toplevel_package(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_type_constaint(rule_runner: RuleRunner) -> None:
+def test_type_constraint(rule_runner: RuleRunner) -> None:
     analysis = _analyze(
         rule_runner,
         textwrap.dedent(

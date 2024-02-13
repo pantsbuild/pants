@@ -82,7 +82,7 @@ class BuildTarget:
     # The target’s unique identifier
     id: BuildTargetIdentifier
 
-    # A human readable name for this target.
+    # A human-readable name for this target.
     # May be presented in the user interface.
     # Should be unique if possible.
     # The id.uri is used if None.

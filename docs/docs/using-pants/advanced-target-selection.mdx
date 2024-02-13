@@ -145,7 +145,7 @@ Whereas `tags` are useful for _decentralized_ allow/block lists, `--spec-files` 
 To pipe a Pants run, use your shell's `|` pipe operator and `xargs`:
 
 ```bash
-pants dependents helloworld/util | xargs pants  list
+pants dependents helloworld/util | xargs pants list
 ```
 
 You can, of course, pipe multiple times:
@@ -165,6 +165,14 @@ For example:
 ```bash
 $ pants dependencies helloworld/util > util_dependencies.txt
 $ pants --spec-files=util_dependencies.txt lint
+```
+
+Using spec files is also more robust because when piping output of a Pants goal to `xargs`, the specified command
+may be invoked by `xargs` as many times as necessary to use up the list of input items.
+This may break the structured data output, for instance, when you want to `peek` the targets as JSON:
+
+```bash
+$ pants list --filter-target-type=resource :: | xargs pants peek
 ```
 
 If you don't want to save the output to an actual file—such as to not pollute version control—you can use a variable and a named pipe:

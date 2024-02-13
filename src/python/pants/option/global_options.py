@@ -69,7 +69,7 @@ GIGABYTES = 1_000 * MEGABYTES
 
 
 class DynamicUIRenderer(Enum):
-    """Which renderer to use for dyanmic UI."""
+    """Which renderer to use for dynamic UI."""
 
     indicatif_spinner = "indicatif-spinner"
     experimental_prodash = "experimental-prodash"
@@ -1458,7 +1458,7 @@ class BootstrapOptions:
             """
             The cache namespace for process execution.
             Change this value to invalidate every artifact's execution, or to prevent
-            process cache entries from being (re)used for different usecases or users.
+            process cache entries from being (re)used for different use-cases or users.
             """
         ),
     )
