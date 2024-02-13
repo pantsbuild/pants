@@ -168,8 +168,7 @@ Transitive excludes can only be used in target types that conventionally are not
 
 ## Referring to a group of targets
 
-If you want to group multiple targets to refer to them as dependencies, you can create a generic target with no
-specific type named [`target`](../../reference/targets/target):
+If you want to group multiple targets to refer to them as a unit (a single dependency) to reduce repetition, you can use the generic [`target`](../../reference/targets/target):
 
 ```python title="BUILD"
 target(
