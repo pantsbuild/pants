@@ -194,6 +194,7 @@ If you have an operation that you perform often on a certain group of targets, y
 [cli](../../reference/subsystems/cli) subsystem options to create shortcuts. For instance, this alias
 
 ```toml title="pants.toml"
+[cli.alias]
 publish-libraries = "--filter-target-type=python_distribution --filter-address-regex=\"['^src/libA/,^src/libB/']\" publish src::"
 ```
 
