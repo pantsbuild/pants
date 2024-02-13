@@ -67,7 +67,7 @@ def _log_or_write_to_file(output_file: Optional[str], text: str) -> None:
     """Send text to the stdout or write to the output file."""
     if text:
         if output_file:
-            with open(output_file, "w") as fh:
+            with safe_open(output_file, "w") as fh:
                 fh.write(text)
             logger.info(f"Wrote Pants stats to {output_file}")
         else:
