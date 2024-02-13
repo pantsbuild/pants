@@ -166,9 +166,15 @@ You can use the prefix `!!` to transitively exclude a dependency, meaning that e
 Transitive excludes can only be used in target types that conventionally are not depended upon by other targets, such as `pex_binary`, `python_distribution`, and `python_test` / `python_tests`. This is meant to limit confusion, as using `!!` in something like a `python_source` / `python_sources` target could result in surprising behavior for everything that depends on it. (Pants will print a helpful error when using `!!` when it's not legal.)
 :::
 
-## Referring to a group of targets
+## Using the generic `target`
 
-If you want to group multiple targets to refer to them as a unit (a single dependency) to reduce repetition, you can use the generic [`target`](../../reference/targets/target):
+[`target`](../../..reference/targets/target) is a generic target with no specific type.
+It can be used as a generic collection of targets to group related, but distinct targets into one single target.
+
+### Referring to a group of targets
+
+You could use the generic `target` when you need to group multiple targets to refer to them as a unit
+(a single dependency) to reduce repetition:
 
 ```python title="BUILD"
 target(
@@ -183,7 +189,7 @@ If declared in the root of your workspace, you can now address the Python librar
 $ pants dependencies //:python-libs
 ````
 
-## Creating aliases for targets
+### Creating aliases for targets
 
 If you have some targets declared in BUILD files that are stored deep within the directory structure of your workspace,
 you can make it easier to refer to that target when listing that target among dependencies of other targets.
