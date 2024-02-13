@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import base64
+import datetime
 import logging
 from collections import Counter
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 from pants.engine.internals.scheduler import Workunit
@@ -69,7 +71,7 @@ def _log_or_write_to_file(output_file: Optional[str], lines: list[str]) -> None:
     if lines:
         text = "\n".join(lines)
         if output_file:
-            with safe_open(output_file, "w") as fh:
+            with safe_open(output_file, "a") as fh:
                 fh.write(text)
             logger.info(f"Wrote Pants stats to {output_file}")
         else:
@@ -103,6 +105,13 @@ class StatsAggregatorCallback(WorkunitsCallback):
             return
 
         output_lines = []
+        if self.output_file:
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # have an empty line between stats of different Pants invocations
+            space = "\n\n" if Path(self.output_file).exists() else ""
+            output_lines.append(
+                f"{space}{timestamp} Executing goals: {','.join(context._run_tracker.goals)}"
+            )
 
         if self.log:
             # Capture global counters.

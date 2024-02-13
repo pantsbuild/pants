@@ -59,6 +59,18 @@ def test_writing_to_output_file() -> None:
             "roots",
         ]
         run_pants(argv).assert_success()
+        argv = [
+            "--backend-packages=['pants.backend.python']",
+            "--stats-log",
+            "--stats-memory-summary",
+            "--stats-output-file=stats.txt",
+            "list",
+            "::",
+        ]
+        run_pants(argv).assert_success()
         output_file_contents = Path("stats.txt").read_text()
         for item in ("Counters:", "Memory summary"):
+            assert output_file_contents.count(item) == 2
+
+        for item in ("roots", "list"):
             assert item in output_file_contents
