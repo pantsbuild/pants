@@ -81,7 +81,7 @@ registries_help = help_text(
     A configured registry is marked as default either by setting `default = true`
     or with an alias of `"default"`.
 
-    Registries also participate in resolving third party Helm charts uplodaded to those registries.
+    Registries also participate in resolving third party Helm charts uploaded to those registries.
     """
 )
 

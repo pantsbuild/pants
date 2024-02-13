@@ -94,7 +94,7 @@ class per_platform(Generic[_T]):
             address: Address,
         ) -> Optional[Union[str, per_platform[str]]]:
             if isinstance(raw_value, per_platform):
-                # NOTE: Ensure the values are homogenous
+                # NOTE: Ensure the values are homogeneous
                 raw_value.check_types(str)
 
             return raw_value
@@ -111,7 +111,7 @@ class per_platform(Generic[_T]):
         ...
     ```
 
-    NOTE: Support for this object should be heavily weighed, as it would be innaproriate to use in
+    NOTE: Support for this object should be heavily weighed, as it would be inappropriate to use in
     certain contexts (such as the `source` field in a `foo_source` target, where the intent is to
     support differing source files based on platform. The result would be that dependency inference
     (and therefore the dependencies field) wouldn't be knowable on the host, which is not something

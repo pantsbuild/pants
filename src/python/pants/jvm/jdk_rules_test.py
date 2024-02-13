@@ -130,13 +130,13 @@ def test_parse_java_version() -> None:
 
 
 @maybe_skip_jdk_test
-def test_inclue_default_heap_size_in_jvm_options(rule_runner: RuleRunner) -> None:
+def test_include_default_heap_size_in_jvm_options(rule_runner: RuleRunner) -> None:
     proc = javac_version_proc(rule_runner)
     assert "-Xmx512m" in proc.argv
 
 
 @maybe_skip_jdk_test
-def test_inclue_child_mem_constraint_in_jvm_options(rule_runner: RuleRunner) -> None:
+def test_include_child_mem_constraint_in_jvm_options(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         ["--process-per-child-memory-usage=1GiB"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,

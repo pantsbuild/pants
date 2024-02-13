@@ -97,7 +97,7 @@ class OrderedSet:
 
 ### TODOs
 
-When creating a TODO, first [create an issue](https://github.com/pantsbuild/pants/issues/new) in GitHub. Then, link to the issue # in parantheses and add a brief description.
+When creating a TODO, first [create an issue](https://github.com/pantsbuild/pants/issues/new) in GitHub. Then, link to the issue # in parentheses and add a brief description.
 
 For example:
 

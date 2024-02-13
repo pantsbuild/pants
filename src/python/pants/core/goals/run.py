@@ -44,8 +44,8 @@ _T = TypeVar("_T")
 
 
 class RunInSandboxBehavior(Enum):
-    """Defines the behavhior of rules that act on a `RunFieldSet` subclass with regards to use in
-    the sandbox.
+    """Defines the behavior of rules that act on a `RunFieldSet` subclass with regards to use in the
+    sandbox.
 
     This is used to automatically generate rules used to fulfill `experimental_run_in_sandbox`
     targets.
@@ -53,7 +53,7 @@ class RunInSandboxBehavior(Enum):
     The behaviors are as follows:
 
     * `RUN_REQUEST_HERMETIC`: Use the existing `RunRequest`-generating rule, and enable cacheing.
-       Use this if you are confident the behaviour of the rule relies only on state that is
+       Use this if you are confident the behavior of the rule relies only on state that is
        captured by pants (e.g. binary paths are found using `EnvironmentVarsRequest`), and that
        the rule only refers to files in the sandbox.
     * `RUN_REQUEST_NOT_HERMETIC`: Use the existing `RunRequest`-generating rule, and do not
@@ -231,7 +231,7 @@ async def run(
     run_subsystem: RunSubsystem,
     debug_adapter: DebugAdapterSubsystem,
     global_options: GlobalOptions,
-    workspace: Workspace,  # Needed to enable sideeffecting.
+    workspace: Workspace,  # Needed to enable side-effecting.
     complete_env: CompleteEnvironmentVars,
 ) -> Run:
     field_set, target = await _find_what_to_run("the `run` goal")

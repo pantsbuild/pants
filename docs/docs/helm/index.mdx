@@ -111,7 +111,7 @@ pants package ::
 Built Helm chart artifact: testprojects.src.helm.example/example/example-0.2.0.tgz
 ```
 
-The final output folder can customised using the `output_path` field in the `helm_chart` target. Run `pants help helm_chart` for more information.
+The final output folder can be customised using the `output_path` field in the `helm_chart` target. Run `pants help helm_chart` for more information.
 
 #### Helm chart version
 
@@ -356,7 +356,7 @@ Use the option `pants test --no-timeouts` to temporarily disable timeouts, e.g. 
 
 Pants only supports publishing Helm charts to OCI registries, a feature that was made generally available in Helm 3.8.
 
-The publishing is done with Pants' `publish` goal but first you will need to tell Pants what are the possible destination registries where to upload your charts.
+The publishing is done with Pants' `publish` goal, but first you will need to tell Pants what are the possible destination registries where to upload your charts.
 
 ### Configuring OCI registries
 

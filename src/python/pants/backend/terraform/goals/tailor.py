@@ -33,7 +33,7 @@ class PutativeTerraformTargetsRequest(PutativeTargetsRequest):
 
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Terraform targets to create")
-async def find_putative_terrform_module_targets(
+async def find_putative_terraform_module_targets(
     request: PutativeTerraformTargetsRequest,
     terraform: TerraformTool,
     all_owned_sources: AllOwnedSources,

@@ -250,6 +250,10 @@ pants dependents  helloworld/main.py:lib | xargs pants peek --exclude-defaults
 ]
 ```
 
+Keep in mind, however, that the `peek` goal may be invoked by `xargs` as many times as necessary to use up the list
+of input items. This may break the structured data output, so it may be safer to use the
+[`--spec-files`](../../reference/global-options#spec_files) option.
+
 :::
 
 ## `paths` - find dependency paths

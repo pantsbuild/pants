@@ -399,7 +399,7 @@ async def resolve_python_distribution_entry_points(
         entry_point_str for is_target, _, _, entry_point_str in classified_entry_points if is_target
     ]
 
-    # Intermediate step, as Get(Targets) returns a deduplicated set.. which breaks in case of
+    # Intermediate step, as Get(Targets) returns a deduplicated set which breaks in case of
     # multiple input refs that maps to the same target.
     target_addresses = await Get(
         Addresses,

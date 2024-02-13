@@ -121,6 +121,6 @@ Dumping thread stacks:
    - Run: `gdb /path/to/python/binary PROCESS_ID`
 3. Enable logging to write the thread dump to `gdb.txt`: `set logging on`
 4. Dump all thread backtraces: `thread apply all bt`
-5. If you use pyenv to mange your Python install, a gdb script will exist in the same directory as the Python binary. Source it into gdb:
+5. If you use pyenv to manage your Python install, a gdb script will exist in the same directory as the Python binary. Source it into gdb:
    - `source ~/.pyenv/versions/3.8.5/bin/python3.8-gdb.py` (if using version 3.8.5)
 6. Dump all Python stacks: `thread apply all py-bt`

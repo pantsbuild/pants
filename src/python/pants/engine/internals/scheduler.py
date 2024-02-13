@@ -210,7 +210,7 @@ class Scheduler:
             lease_time_millis=LOCAL_STORE_LEASE_TIME_SECS * 1000,
             shard_count=local_store_options.shard_count,
         )
-        exec_stategy_opts = PyExecutionStrategyOptions(
+        exec_strategy_opts = PyExecutionStrategyOptions(
             local_cache=execution_options.local_cache,
             remote_cache_read=execution_options.remote_cache_read,
             remote_cache_write=execution_options.remote_cache_write,
@@ -236,7 +236,7 @@ class Scheduler:
             watch_filesystem,
             remoting_options,
             py_local_store_options,
-            exec_stategy_opts,
+            exec_strategy_opts,
             ca_certs_path,
         )
 
