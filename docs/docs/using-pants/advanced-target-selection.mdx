@@ -193,3 +193,28 @@ For other goals, you can leverage shell piping to partition the input targets in
 ```bash
 pants list :: | awk 'NR % 5 == 0' | xargs pants package
 ```
+
+## Using CLI aliases
+
+If setting tags on individual targets is not feasible, there are a few other options available to refer to multiple targets.
+
+If you have an operation that you perform often on a certain group of targets, you can use the
+[cli](../../reference/subsystems/cli) subsystem options to create shortcuts. For instance, this alias
+would let you run `pants publish-libraries` to publish all Python distributions declared in the `src/libA` and `src/libB`
+directories.
+
+```toml title="pants.toml"
+[cli.alias]
+publish-libraries = "--filter-target-type=python_distribution --filter-address-regex=\"['^src/libA/,^src/libB/']\" publish src::"
+```
+
+You can use any argument or goal, and the alias doesn't need to be a "full" invocation of Pants.
+For instance, you could combine filtering arguments along with `--changed-since` flag and a tag to refer to long-running
+integration tests that have been recently modified:
+
+```toml title="pants.toml"
+[cli.alias]
+--integration-long = "--changed-since --filter-target-type=python_test --tag=long"
+```
+
+You can now invoke `pants --integration-long test tests::` to run the relevant tests.
