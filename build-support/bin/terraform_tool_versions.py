@@ -189,7 +189,7 @@ def fetch_platforms_for_version(
 ) -> Optional[List[ExternalToolVersion]]:
     """Fetch platform binary information for a particular Terraform version."""
     logging.info(
-        f"processiong version {version_slug} with {len(version_links.binary_links)} binaries"
+        f"processing version {version_slug} with {len(version_links.binary_links)} binaries"
     )
 
     if is_prerelease(version_slug):

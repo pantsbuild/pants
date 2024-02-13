@@ -14,7 +14,7 @@ from pants.engine.internals.scheduler import SchedulerSession
 class Console(SideEffecting):
     """Class responsible for writing text to the console while Pants is running.
 
-    A SchedulerSession should always be set in production usage, in order to track side-effects, and
+    A SchedulerSession should always be set in production usage, in order to track side effects, and
     tear down any running UI before stdio is rendered.
     """
 

@@ -184,7 +184,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         NB: Because Python targets validate that they have ICs which are a subset of their
         dependencies, merging constraints like this is only necessary when you are _mixing_ code
-        which might not have any inter-dependencies, such as when you're merging un-related roots.
+        which might not have any interdependencies, such as when you're merging unrelated roots.
         """
         fields = [
             tgt[InterpreterConstraintsField]

@@ -226,7 +226,7 @@ async def do_export(
             PostProcessingCommand(["rm", "-rf", tmpdir_under_digest_root]),
         ]
 
-        # Insert editable wheel post processing commands if needed.
+        # Insert editable wheel post-processing commands if needed.
         if req.editable_local_dists_digest is not None:
             # We need the snapshot to get the wheel file names which are something like:
             #   - pkg_name-1.2.3-0.editable-py3-none-any.whl

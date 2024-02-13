@@ -117,7 +117,7 @@ class OptionsBootstrapper:
         :param args: An args array.
         :param allow_pantsrc: True to allow pantsrc files to be used. Unless tests are expecting to
           consume pantsrc files, they should pass False in order to avoid reading files from
-          absolute paths. Production usecases should pass True to allow options values to make the
+          absolute paths. Production use-cases should pass True to allow options values to make the
           decision of whether to respect pantsrc files.
         """
         with warnings.catch_warnings(record=True):

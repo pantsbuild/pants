@@ -12,9 +12,9 @@ from pants.util.meta import SingletonMetaclass
 class BuildRoot(metaclass=SingletonMetaclass):
     """Represents the global workspace build root.
 
-    By default a Pants workspace is defined by a root directory where one of multiple sentinel files
-    reside, such as `pants.toml` or `BUILD_ROOT`. This path can also be manipulated through this
-    interface for re-location of the build root in tests.
+    By default, a Pants workspace is defined by a root directory where one of multiple sentinel
+    files resides, such as `pants.toml` or `BUILD_ROOT`. This path can also be manipulated through
+    this interface for re-location of the build root in tests.
     """
 
     sentinel_files = ["pants.toml", "pants", "BUILDROOT", "BUILD_ROOT"]

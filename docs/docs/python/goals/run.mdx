@@ -54,9 +54,9 @@ Running a `python_source` with the `run_goal_use_sandbox` field set to `False` i
 
 ## Watching the filesystem
 
-If the app that you are running is long lived and safe to restart (including web apps like Django and Flask or other types of servers/services), you can set `restartable=True` on your `pex_binary` target to indicate this to Pants. The `run` goal will then automatically restart the app when its input files change!
+If the app that you are running is long-lived and safe to restart (including web apps like Django and Flask or other types of servers/services), you can set `restartable=True` on your `pex_binary` target to indicate this to Pants. The `run` goal will then automatically restart the app when its input files change!
 
-On the other hand, if your app is short lived (like a script) and you'd like to re-run it when files change but never interrupt an ongoing run, consider using `pants --loop run` instead. See [Goals](../../using-pants/key-concepts/goals.mdx#running-goals) for more information on `--loop`.
+On the other hand, if your app is short-lived (like a script) and you'd like to re-run it when files change but never interrupt an ongoing run, consider using `pants --loop run` instead. See [Goals](../../using-pants/key-concepts/goals.mdx#running-goals) for more information on `--loop`.
 
 ## Debugging
 

@@ -98,7 +98,7 @@ async def _generate_argv(
     mypy_info = mypy_pex_info.find("mypy")
     assert mypy_info is not None
     if mypy_info.version > packaging.version.Version("0.700") and python_version is not None:
-        # Skip mtime checks because we don't propogate mtime when materialzing the sandbox, so the
+        # Skip mtime checks because we don't propagate mtime when materializing the sandbox, so the
         # mtime checks will always fail otherwise.
         args.append("--skip-cache-mtime-check")
         # See "__run_wrapper.sh" below for explanation

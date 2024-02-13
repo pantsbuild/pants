@@ -12,7 +12,7 @@ from pants.bsp.utils import freeze_json
 @dataclass(frozen=True)
 class BuildClientCapabilities:
     # The languages that this client supports.
-    # The ID strings for each language is defined in the LSP.
+    # The ID strings for each language are defined in the LSP.
     # The server must never respond with build targets for other
     # languages than those that appear in this list.
     language_ids: tuple[str, ...]
@@ -149,7 +149,7 @@ class BuildServerCapabilities:
     # via method buildTarget/dependencySources
     dependency_sources_provider: bool | None
 
-    # The server cam provide a list of dependency modules (libraries with meta information)
+    # The server can provide a list of dependency modules (libraries with meta information)
     # via method buildTarget/dependencyModules
     dependency_modules_provider: bool | None
 
