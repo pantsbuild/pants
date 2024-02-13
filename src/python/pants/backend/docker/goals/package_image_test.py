@@ -275,7 +275,7 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
                 docker_image(
                   name="test6",
                   image_tags=["1.2.3"],
-                  repository="xyz/{build_file_path}/{name}",
+                  repository="xyz/{full_directory}/{name}",
                 )
                 docker_image(
                   name="err1",
@@ -379,7 +379,7 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
     err1 = (
         r"Invalid value for the `repository` field of the `docker_image` target at "
         r"docker/test:err1: '{bad_template}'\.\n\nThe placeholder 'bad_template' is unknown\. "
-        r"Try with one of: build_args, build_file_path, default_repository, directory, name, pants, "
+        r"Try with one of: build_args, full_directory, default_repository, directory, name, pants, "
         r"parent_directory, tags, target_repository\."
     )
     with pytest.raises(DockerRepositoryNameError, match=err1):
