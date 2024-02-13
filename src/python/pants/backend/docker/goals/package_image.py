@@ -94,9 +94,9 @@ class DockerPackageFieldSet(PackageFieldSet):
     ) -> str:
         repository_context = InterpolationContext.from_dict(
             {
+                "name": self.address.target_name,
                 "directory": os.path.basename(self.address.spec_path),
                 "full_directory": self.address.spec_path,
-                "name": self.address.target_name,
                 "parent_directory": os.path.basename(os.path.dirname(self.address.spec_path)),
                 "default_repository": default_repository,
                 "target_repository": self.repository.value or default_repository,
