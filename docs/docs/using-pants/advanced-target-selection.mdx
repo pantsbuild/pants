@@ -204,7 +204,8 @@ For instance, you could combine filtering arguments along with `--changed-since`
 integration tests that have been recently modified:
 
 ```toml title="pants.toml"
-integration-long = "--changed-since --filter-target-type=python_test --tag=long"
+[cli.alias]
+--integration-long = "--changed-since --filter-target-type=python_test --tag=long"
 ```
 
 and invoke `pants integration-long test tests::` to run the relevant tests.
