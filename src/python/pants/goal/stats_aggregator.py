@@ -21,6 +21,7 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.collections import deep_getsizeof
+from pants.util.dirutil import safe_open
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
