@@ -64,9 +64,10 @@ class StatsAggregatorSubsystem(Subsystem):
     )
 
 
-def _log_or_write_to_file(output_file: Optional[str], text: str) -> None:
+def _log_or_write_to_file(output_file: Optional[str], lines: list[str]) -> None:
     """Send text to the stdout or write to the output file."""
-    if text:
+    if lines:
+        text = "\n".join(lines)
         if output_file:
             with safe_open(output_file, "w") as fh:
                 fh.write(text)
@@ -101,7 +102,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
         if not finished:
             return
 
-        output_contents = ""
+        output_lines = []
 
         if self.log:
             # Capture global counters.
@@ -116,7 +117,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
             counter_lines = "\n".join(
                 f"  {name}: {count}" for name, count in sorted(counters.items())
             )
-            output_contents += f"Counters:\n{counter_lines}"
+            output_lines.append(f"Counters:\n{counter_lines}")
 
         if self.memory:
             ids: set[int] = set()
@@ -138,23 +139,23 @@ class StatsAggregatorCallback(WorkunitsCallback):
             memory_lines = "\n".join(
                 f"  {size}\t\t{count}\t\t{name}" for size, count, name in sorted(entries)
             )
-            output_contents += (
-                f"\nMemory summary (total size in bytes, count, name):\n{memory_lines}"
+            output_lines.append(
+                f"Memory summary (total size in bytes, count, name):\n{memory_lines}"
             )
 
         if not (self.log and self.has_histogram_module):
-            _log_or_write_to_file(self.output_file, output_contents)
+            _log_or_write_to_file(self.output_file, output_lines)
             return
 
         from hdrh.histogram import HdrHistogram  # pants: no-infer-dep
 
         histograms = context.get_observation_histograms()["histograms"]
         if not histograms:
-            output_contents += "\nNo observation histogram were recorded."
-            _log_or_write_to_file(self.output_file, output_contents)
+            output_lines.append("No observation histogram were recorded.")
+            _log_or_write_to_file(self.output_file, output_lines)
             return
 
-        output_contents += "\nObservation histogram summaries:"
+        output_lines.append("Observation histogram summaries:")
         for name, encoded_histogram in histograms.items():
             # Note: The Python library for HDR Histogram will only decode compressed histograms
             # that are further encoded with base64. See
@@ -166,8 +167,8 @@ class StatsAggregatorCallback(WorkunitsCallback):
                     [25, 50, 75, 90, 95, 99]
                 ).items()
             )
-            output_contents += (
-                f"\nSummary of `{name}` observation histogram:\n"
+            output_lines.append(
+                f"Summary of `{name}` observation histogram:\n"
                 f"  min: {histogram.get_min_value()}\n"
                 f"  max: {histogram.get_max_value()}\n"
                 f"  mean: {histogram.get_mean_value():.3f}\n"
@@ -176,7 +177,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
                 f"  sum: {int(histogram.get_mean_value() * histogram.total_count)}\n"
                 f"{percentile_to_vals}"
             )
-        _log_or_write_to_file(self.output_file, output_contents)
+        _log_or_write_to_file(self.output_file, output_lines)
 
 
 @dataclass(frozen=True)
