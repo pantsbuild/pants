@@ -2,14 +2,28 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::{
-    option_id, Args, DictEdit, DictEditAction, Env, ListEdit, ListEditAction, OptionParser, Source,
-    Val,
+    option_id, Args, BuildRoot, DictEdit, DictEditAction, Env, ListEdit, ListEditAction,
+    OptionParser, Source, Val,
 };
 use maplit::hashmap;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use tempfile::TempDir;
+
+fn config_source() -> Source {
+    Source::Config {
+        ordinal: 0,
+        path: "pants.toml".to_string(),
+    }
+}
+
+fn extra_config_source() -> Source {
+    Source::Config {
+        ordinal: 1,
+        path: "pants_extra.toml".to_string(),
+    }
+}
 
 fn with_setup(
     args: Vec<&'static str>,
@@ -53,6 +67,7 @@ fn with_setup(
         ]),
         false,
         true,
+        Some(BuildRoot::find_from(buildroot.path()).unwrap()),
     )
     .unwrap();
     do_check(option_parser);
@@ -79,7 +94,7 @@ fn test_parse_single_valued_options() {
         3,
         vec![
             (Source::Default, 0),
-            (Source::Config, 1),
+            (config_source(), 1),
             (Source::Env, 2),
             (Source::Flag, 3),
         ],
@@ -96,14 +111,18 @@ fn test_parse_single_valued_options() {
     );
     check(
         3,
-        vec![(Source::Default, 0), (Source::Config, 1), (Source::Flag, 3)],
+        vec![
+            (Source::Default, 0),
+            (config_source(), 1),
+            (Source::Flag, 3),
+        ],
         vec!["--scope-foo=3"],
         vec![],
         "[scope]\nfoo = 1",
     );
     check(
         2,
-        vec![(Source::Default, 0), (Source::Config, 1), (Source::Env, 2)],
+        vec![(Source::Default, 0), (config_source(), 1), (Source::Env, 2)],
         vec![],
         vec![("PANTS_SCOPE_FOO", "2")],
         "[scope]\nfoo = 1",
@@ -117,7 +136,7 @@ fn test_parse_single_valued_options() {
     );
     check(
         1,
-        vec![(Source::Default, 0), (Source::Config, 1)],
+        vec![(Source::Default, 0), (config_source(), 1)],
         vec![],
         vec![],
         "[scope]\nfoo = 1",
@@ -168,7 +187,7 @@ fn test_parse_list_options() {
         vec![0, 1, 2, 3, 4, 5, 6, 7],
         vec![
             (Source::Default, vec![replace(vec![0])]),
-            (Source::Config, vec![add(vec![1, 2])]),
+            (config_source(), vec![add(vec![1, 2])]),
             (Source::Env, vec![add(vec![3, 4])]),
             (Source::Flag, vec![add(vec![5, 6, 7])]),
         ],
@@ -182,7 +201,7 @@ fn test_parse_list_options() {
         vec![1, 2, 3, 4, 5, 6, 7],
         vec![
             (Source::Default, vec![replace(vec![0])]),
-            (Source::Config, vec![replace(vec![1, 2])]),
+            (config_source(), vec![replace(vec![1, 2])]),
             (Source::Env, vec![add(vec![3, 4])]),
             (Source::Flag, vec![add(vec![5, 6, 7])]),
         ],
@@ -196,7 +215,7 @@ fn test_parse_list_options() {
         vec![3, 4, 5, 6, 7],
         vec![
             (Source::Default, vec![replace(vec![0])]),
-            (Source::Config, vec![add(vec![1, 2])]),
+            (config_source(), vec![add(vec![1, 2])]),
             (Source::Env, vec![replace(vec![3, 4])]),
             (Source::Flag, vec![add(vec![5, 6, 7])]),
         ],
@@ -210,7 +229,7 @@ fn test_parse_list_options() {
         vec![5, 6, 7],
         vec![
             (Source::Default, vec![replace(vec![0])]),
-            (Source::Config, vec![add(vec![1, 2])]),
+            (config_source(), vec![add(vec![1, 2])]),
             (Source::Env, vec![add(vec![3, 4])]),
             (Source::Flag, vec![replace(vec![5, 6, 7])]),
         ],
@@ -224,7 +243,8 @@ fn test_parse_list_options() {
         vec![0, 1, 2, 11, 22, 3, 4],
         vec![
             (Source::Default, vec![replace(vec![0])]),
-            (Source::Config, vec![add(vec![1, 2]), add(vec![11, 22])]),
+            (config_source(), vec![add(vec![1, 2])]),
+            (extra_config_source(), vec![add(vec![11, 22])]),
             (Source::Env, vec![add(vec![3, 4])]),
         ],
         vec![],
@@ -237,10 +257,8 @@ fn test_parse_list_options() {
         vec![1, 3, 4],
         vec![
             (Source::Default, vec![replace(vec![0])]),
-            (
-                Source::Config,
-                vec![replace(vec![1, 2]), remove(vec![2, 4])],
-            ),
+            (config_source(), vec![replace(vec![1, 2])]),
+            (extra_config_source(), vec![remove(vec![2, 4])]),
             (Source::Env, vec![add(vec![3, 4])]),
         ],
         vec![],
@@ -265,7 +283,7 @@ fn test_parse_list_options() {
         vec![0, 1, 3, 4, 5, 6, 7],
         vec![
             (Source::Default, vec![replace(vec![0])]),
-            (Source::Config, vec![add(vec![1, 2])]),
+            (config_source(), vec![add(vec![1, 2])]),
             (Source::Env, vec![remove(vec![2]), add(vec![3, 4])]),
             (Source::Flag, vec![add(vec![5, 6, 7])]),
         ],
@@ -296,7 +314,7 @@ fn test_parse_dict_options() {
 
     fn check(
         expected: HashMap<&str, Val>,
-        expected_derivation: Vec<(Source, Vec<DictEdit>)>,
+        expected_derivation: Vec<(Source, DictEdit)>,
         args: Vec<&'static str>,
         env: Vec<(&'static str, &'static str)>,
         config: &'static str,
@@ -331,9 +349,7 @@ fn test_parse_dict_options() {
 
     let default_derivation = (
         Source::Default,
-        vec![replace(
-            hashmap! {"key1" => Val::Int(1), "key2" => Val::String("val2".to_string())},
-        )],
+        replace(hashmap! {"key1" => Val::Int(1), "key2" => Val::String("val2".to_string())}),
     );
 
     check(
@@ -347,15 +363,10 @@ fn test_parse_dict_options() {
         },
         vec![
             default_derivation.clone(),
-            (
-                Source::Config,
-                vec![
-                    add(hashmap! {"key5" => Val::Bool(true)}),
-                    add(hashmap! {"key6" => Val::Int(6)}),
-                ],
-            ),
-            (Source::Env, vec![add(hashmap! {"key4" => Val::Float(4.0)})]),
-            (Source::Flag, vec![add(hashmap! {"key3" => Val::Int(3)})]),
+            (config_source(), add(hashmap! {"key5" => Val::Bool(true)})),
+            (extra_config_source(), add(hashmap! {"key6" => Val::Int(6)})),
+            (Source::Env, add(hashmap! {"key4" => Val::Float(4.0)})),
+            (Source::Flag, add(hashmap! {"key3" => Val::Int(3)})),
         ],
         vec!["--scope-foo=+{'key3': 3}"],
         vec![("PANTS_SCOPE_FOO", "+{'key4': 4.0}")],
@@ -371,15 +382,13 @@ fn test_parse_dict_options() {
         },
         vec![
             default_derivation.clone(),
+            (config_source(), add(hashmap! {"key5" => Val::Bool(true)})),
             (
-                Source::Config,
-                vec![
-                    add(hashmap! {"key5" => Val::Bool(true)}),
-                    replace(hashmap! {"key6" => Val::Int(6)}),
-                ],
+                extra_config_source(),
+                replace(hashmap! {"key6" => Val::Int(6)}),
             ),
-            (Source::Env, vec![add(hashmap! {"key4" => Val::Float(4.0)})]),
-            (Source::Flag, vec![add(hashmap! {"key3" => Val::Int(3)})]),
+            (Source::Env, add(hashmap! {"key4" => Val::Float(4.0)})),
+            (Source::Flag, add(hashmap! {"key3" => Val::Int(3)})),
         ],
         vec!["--scope-foo=+{'key3': 3}"],
         vec![("PANTS_SCOPE_FOO", "+{'key4': 4.0}")],
@@ -394,18 +403,13 @@ fn test_parse_dict_options() {
         },
         vec![
             default_derivation.clone(),
+            (config_source(), add(hashmap! {"key5" => Val::Bool(true)})),
             (
-                Source::Config,
-                vec![
-                    add(hashmap! {"key5" => Val::Bool(true)}),
-                    replace(hashmap! {"key6" => Val::Int(6)}),
-                ],
+                extra_config_source(),
+                replace(hashmap! {"key6" => Val::Int(6)}),
             ),
-            (
-                Source::Env,
-                vec![replace(hashmap! {"key4" => Val::Float(4.0)})],
-            ),
-            (Source::Flag, vec![add(hashmap! {"key3" => Val::Int(3)})]),
+            (Source::Env, replace(hashmap! {"key4" => Val::Float(4.0)})),
+            (Source::Flag, add(hashmap! {"key3" => Val::Int(3)})),
         ],
         vec!["--scope-foo=+{'key3': 3}"],
         vec![("PANTS_SCOPE_FOO", "{'key4': 4.0}")],
@@ -419,21 +423,13 @@ fn test_parse_dict_options() {
         },
         vec![
             default_derivation.clone(),
+            (config_source(), add(hashmap! {"key5" => Val::Bool(true)})),
             (
-                Source::Config,
-                vec![
-                    add(hashmap! {"key5" => Val::Bool(true)}),
-                    replace(hashmap! {"key6" => Val::Int(6)}),
-                ],
+                extra_config_source(),
+                replace(hashmap! {"key6" => Val::Int(6)}),
             ),
-            (
-                Source::Env,
-                vec![replace(hashmap! {"key4" => Val::Float(4.0)})],
-            ),
-            (
-                Source::Flag,
-                vec![replace(hashmap! {"key3" => Val::Int(3)})],
-            ),
+            (Source::Env, replace(hashmap! {"key4" => Val::Float(4.0)})),
+            (Source::Flag, replace(hashmap! {"key3" => Val::Int(3)})),
         ],
         vec!["--scope-foo={'key3': 3}"],
         vec![("PANTS_SCOPE_FOO", "{'key4': 4.0}")],

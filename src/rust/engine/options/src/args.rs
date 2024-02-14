@@ -143,10 +143,10 @@ impl OptionsSource for Args {
         self.get_list(id, parse_string_list)
     }
 
-    fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
+    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
         match self.find_flag(Self::arg_names(id, Negate::False))? {
             Some((name, ref value, _)) => parse_dict(value)
-                .map(|e| Some(vec![e]))
+                .map(|e| Some(e))
                 .map_err(|e| e.render(name)),
             None => Ok(None),
         }

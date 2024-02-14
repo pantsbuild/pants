@@ -186,15 +186,15 @@ pub(crate) trait OptionsSource {
     /// Get the dict option identified by `id` from this source.
     /// Errors when this source has an option value for `id` but that value is not a dict.
     ///
-    fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String>;
+    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String>;
 }
 
-#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Source {
-    Flag,
-    Env,
-    Config,
     Default,
+    Config { ordinal: usize, path: String },
+    Env,
+    Flag,
 }
 
 #[derive(Debug)]
@@ -214,7 +214,7 @@ pub struct ListOptionValue<T> {
 
 #[derive(Debug)]
 pub struct DictOptionValue {
-    pub derivation: Option<Vec<(Source, Vec<DictEdit>)>>,
+    pub derivation: Option<Vec<(Source, DictEdit)>>,
     pub value: HashMap<String, Val>,
 }
 
@@ -232,8 +232,9 @@ impl OptionParser {
         config_paths: Option<Vec<&str>>,
         allow_pantsrc: bool,
         include_derivation: bool,
+        buildroot: Option<BuildRoot>,
     ) -> Result<OptionParser, String> {
-        let buildroot = BuildRoot::find()?;
+        let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
         let buildroot_string = String::from_utf8(buildroot.as_os_str().as_bytes().to_vec())
             .map_err(|e| {
                 format!(
@@ -257,8 +258,23 @@ impl OptionParser {
             include_derivation: false,
         };
 
-        fn path_join(a: &str, b: &str) -> String {
-            format!("{}{}{}", a, path::MAIN_SEPARATOR, b)
+        fn path_join(prefix: &str, suffix: &str) -> String {
+            if prefix.ends_with(path::MAIN_SEPARATOR) {
+                format!("{}{}", prefix, suffix)
+            } else {
+                format!("{}{}{}", prefix, path::MAIN_SEPARATOR, suffix)
+            }
+        }
+
+        fn path_strip(prefix: &str, path: &str) -> String {
+            match path.strip_prefix(prefix) {
+                Some(suffix) => match suffix.strip_prefix(path::MAIN_SEPARATOR) {
+                    Some(suffix_suffix) => suffix_suffix,
+                    _ => suffix,
+                },
+                _ => path,
+            }
+            .to_string()
         }
 
         let repo_config_files = match config_paths {
@@ -292,8 +308,18 @@ impl OptionParser {
             ("pants_distdir".to_string(), subdir("distdir", "dist")?),
         ]);
 
-        let mut config = Config::parse(&repo_config_files, &seed_values)?;
-        sources.insert(Source::Config, Rc::new(config.clone()));
+        let mut ordinal: usize = 0;
+        for path in repo_config_files.iter() {
+            let config = Config::parse(path, &seed_values)?;
+            sources.insert(
+                Source::Config {
+                    ordinal,
+                    path: path_strip(&buildroot_string, path),
+                },
+                Rc::new(config.clone()),
+            );
+            ordinal += 1;
+        }
         parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
@@ -313,12 +339,18 @@ impl OptionParser {
             {
                 let rcfile_path = Path::new(&rcfile);
                 if rcfile_path.exists() {
-                    let rc_config = Config::parse(&[rcfile_path], &seed_values)?;
-                    config = config.merge(rc_config);
+                    let rc_config = Config::parse(rcfile_path, &seed_values)?;
+                    sources.insert(
+                        Source::Config {
+                            ordinal,
+                            path: rcfile,
+                        },
+                        Rc::new(rc_config),
+                    );
+                    ordinal += 1;
                 }
             }
         }
-        sources.insert(Source::Config, Rc::new(config));
         Ok(OptionParser {
             sources,
             include_derivation,
@@ -335,18 +367,18 @@ impl OptionParser {
         let mut derivation = None;
         if self.include_derivation {
             let mut derivations = vec![(Source::Default, default.to_owned())];
-            for (source_type, source) in self.sources.iter().rev() {
+            for (source_type, source) in self.sources.iter() {
                 if let Some(val) = getter(source, id)? {
-                    derivations.push((*source_type, val));
+                    derivations.push((source_type.clone(), val));
                 }
             }
             derivation = Some(derivations);
         }
-        for (source_type, source) in self.sources.iter() {
+        for (source_type, source) in self.sources.iter().rev() {
             if let Some(value) = getter(source, id)? {
                 return Ok(OptionValue {
                     derivation,
-                    source: *source_type,
+                    source: source_type.clone(),
                     value,
                 });
             }
@@ -396,16 +428,16 @@ impl OptionParser {
                     items: list.clone(),
                 }],
             )];
-            for (source_type, source) in self.sources.iter().rev() {
+            for (source_type, source) in self.sources.iter() {
                 if let Some(list_edits) = getter(source, id)? {
                     if !list_edits.is_empty() {
-                        derivations.push((*source_type, list_edits));
+                        derivations.push((source_type.clone(), list_edits));
                     }
                 }
             }
             derivation = Some(derivations);
         }
-        for (_source_type, source) in self.sources.iter().rev() {
+        for (_source_type, source) in self.sources.iter() {
             if let Some(list_edits) = getter(source, id)? {
                 for list_edit in list_edits {
                     match list_edit.action {
@@ -495,25 +527,23 @@ impl OptionParser {
         if self.include_derivation {
             let mut derivations = vec![(
                 Source::Default,
-                vec![DictEdit {
+                DictEdit {
                     action: DictEditAction::Replace,
                     items: dict.clone(),
-                }],
+                },
             )];
-            for (source_type, source) in self.sources.iter().rev() {
-                if let Some(dict_edits) = source.get_dict(id)? {
-                    derivations.push((*source_type, dict_edits));
+            for (source_type, source) in self.sources.iter() {
+                if let Some(dict_edit) = source.get_dict(id)? {
+                    derivations.push((source_type.clone(), dict_edit));
                 }
             }
             derivation = Some(derivations);
         }
-        for (_, source) in self.sources.iter().rev() {
-            if let Some(dict_edits) = source.get_dict(id)? {
-                for dict_edit in dict_edits {
-                    match dict_edit.action {
-                        DictEditAction::Replace => dict = dict_edit.items,
-                        DictEditAction::Add => dict.extend(dict_edit.items),
-                    }
+        for (_, source) in self.sources.iter() {
+            if let Some(dict_edit) = source.get_dict(id)? {
+                match dict_edit.action {
+                    DictEditAction::Replace => dict = dict_edit.items,
+                    DictEditAction::Add => dict.extend(dict_edit.items),
                 }
             }
         }
