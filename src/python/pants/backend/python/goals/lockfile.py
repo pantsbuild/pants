@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import itertools
+import logging
 import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from operator import itemgetter
+from typing import List
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -17,9 +19,15 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
-from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
+from pants.backend.python.util_rules.lockfile_metadata import (
+    PythonLockfileMetadata,
+    PythonLockfileMetadataV3,
+)
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.pex_requirements import (
+    LoadedLockfile,
+    LoadedLockfileRequest,
+    Lockfile,
     PexRequirements,
     ResolvePexConfig,
     ResolvePexConfigRequest,
@@ -35,17 +43,63 @@ from pants.core.goals.generate_lockfiles import (
     WrappedGenerateLockfile,
 )
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    DigestContents,
+    DigestEntries,
+    FileContent,
+    FileEntry,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+)
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
+from pants.option.option_types import BoolOption, StrListOption
+from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.pip_requirement import PipRequirement
+from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
+
+
+class PexLockSubsystem(Subsystem):
+    options_scope = "pex-lock"
+    help = "Pex lock specific Python lockfile options."
+
+    update = BoolOption(
+        default=False,
+        advanced=False,
+        help=softwrap(
+            """
+            update instead of creating a new lockfile
+            """
+        ),
+    )
+
+    project = StrListOption(
+        advanced=False,
+        help=softwrap(
+            """ Just attempt to update the given projects in the lock,
+            leaving all others unchanged.  If the projects aren't already in
+            the lock, attempt to add them as top-level requirements leaving
+            all others unchanged.
+
+            Implies `update`
+            """
+        ),
+    )
+
+    def use_pex_update_subcmd(self):
+        return self.update or self.project
 
 
 @dataclass(frozen=True)
@@ -58,6 +112,16 @@ class GeneratePythonLockfile(GenerateLockfile):
     def requirements_hex_digest(self) -> str:
         """Produces a hex digest of the requirements input for this lockfile."""
         return calculate_invalidation_digest(self.requirements)
+
+
+@dataclass(frozen=True)
+class NewPythonLockfileRequest:
+    gen_req: GeneratePythonLockfile
+
+
+@dataclass(frozen=True)
+class UpdatePythonLockfileRequest:
+    gen_req: GeneratePythonLockfile
 
 
 @rule
@@ -98,16 +162,16 @@ async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAnd
     return _PipArgsAndConstraintsSetup(resolve_config, tuple(args), input_digest)
 
 
-@rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
-async def generate_lockfile(
-    req: GeneratePythonLockfile,
+@rule
+async def generate_new_lockfile(
+    new_req: NewPythonLockfileRequest,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     python_setup: PythonSetup,
-) -> GenerateLockfileResult:
+) -> ProcessResult:
+    req = new_req.gen_req
     pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
 
-    header_delimiter = "//"
-    result = await Get(
+    return await Get(
         ProcessResult,
         PexCliProcess(
             subcommand=("lock", "create"),
@@ -157,6 +221,140 @@ async def generate_lockfile(
             cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
+
+
+@rule
+async def generate_updated_lockfile(
+    update_req: UpdatePythonLockfileRequest,
+    generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+    pex_lock_subsystem: PexLockSubsystem,
+    python_setup: PythonSetup,
+) -> ProcessResult:
+    req = update_req.gen_req
+    resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(req.resolve_name))
+
+    for project in pex_lock_subsystem.project:
+        if PipRequirement.parse(project).project_name != project:
+            raise ValueError(
+                f"project {project} is not a bare name; specifier, markers must be specified in Pants targets"
+            )
+
+    # Assuming that any lockfile we are trying to update has a destination
+    # that is a file and not an embedded read only resource.  See
+    # pex_requirements.py
+    maybe_lockfile = await Get(
+        Digest,
+        PathGlobs(
+            [req.lockfile_dest],
+            glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+        ),
+    )
+    if maybe_lockfile.serialized_bytes_length == 0:
+        raise ValueError(
+            f"Empty or non-existent lockfile at {req.lockfile_dest}. Unable to update in place"
+        )
+
+    original_loaded_lockfile = await Get(
+        LoadedLockfile,
+        LoadedLockfileRequest(
+            Lockfile(
+                url=req.lockfile_dest,
+                url_description_of_origin=f"existing lockfile from {req.resolve_name}",
+                resolve_name=req.resolve_name,
+            )
+        ),
+    )
+
+    if not (
+        original_loaded_lockfile.metadata
+        and isinstance(original_loaded_lockfile.metadata, (PythonLockfileMetadataV3))
+    ):
+        raise ValueError(
+            f"Pants metadata for lockfile at {req.lockfile_dest} is in old <V3 format. Unable to update in place."
+        )
+    elif set(resolve_config.no_binary) != original_loaded_lockfile.metadata.no_binary:
+        raise ValueError(
+            f"Resolve Config no_binary {set(resolve_config.no_binary)} does not match {original_loaded_lockfile.metadata.no_binary} in last lockfile, can not update in place"
+        )
+    elif set(resolve_config.only_binary) != original_loaded_lockfile.metadata.only_binary:
+        raise ValueError(
+            f"Resolve Config only_binary {set(resolve_config.only_binary)} does not match {original_loaded_lockfile.metadata.only_binary} in last lockfile, can not update in place"
+        )
+
+    # Make sure to keep Pant's record of the specifier as the source of truth
+    # and not introduce inconsistencies with CLI arguments
+    requirements_projects_to_update: List[str] = []
+    requirements_projects = {
+        PipRequirement.parse(requirement).project_name: requirement
+        for requirement in req.requirements
+    }
+    for project in pex_lock_subsystem.project:
+        if project not in requirements_projects:
+            raise ValueError(
+                f"project {project} not found among known requirements. Projects msut be listed in known Pants targets"
+            )
+        requirements_projects_to_update.append(requirements_projects[project])
+    if len(requirements_projects_to_update):
+        logger.info(f"Updating requirements for lockfile: {requirements_projects_to_update}")
+
+    inferred_new_projects: List[str] = []
+    for maybe_new_requirement in req.requirements:
+        maybe_new_pip_req = PipRequirement.parse(maybe_new_requirement)
+        if (
+            maybe_new_pip_req not in original_loaded_lockfile.metadata.requirements
+            and str(maybe_new_requirement) not in requirements_projects_to_update
+        ):
+            inferred_new_projects.append(maybe_new_requirement)
+    if len(inferred_new_projects) > 0:
+        logger.info(f"Inferred new requirements for lockfile update: {inferred_new_projects}")
+
+    original_loaded_lockfile_entries = await Get(
+        DigestEntries, Digest, original_loaded_lockfile.lockfile_digest
+    )
+    assert len(original_loaded_lockfile_entries) == 1
+    assert isinstance(original_loaded_lockfile_entries[0], FileEntry)
+    old_lockfile_digest = await Get(
+        Digest,
+        CreateDigest([FileEntry("lock.json", original_loaded_lockfile_entries[0].file_digest)]),
+    )
+
+    return await Get(
+        ProcessResult,
+        PexCliProcess(
+            subcommand=("lock", "update"),
+            extra_args=(
+                "--no-emit-warnings",
+                "--indent=2",
+                *(f"--find-links={link}" for link in req.find_links),
+                *resolve_config.pex_args(),
+                *req.interpreter_constraints.generate_pex_arg_list(),
+                *(f"--project={project}" for project in requirements_projects_to_update),
+                *(f"--project={project}" for project in inferred_new_projects),
+                "lock.json",
+            ),
+            additional_input_digest=old_lockfile_digest,
+            output_files=("lock.json",),
+            description=f"Generate lockfile for {req.resolve_name}",
+            # See generate_new_lockfile caching note
+            cache_scope=ProcessCacheScope.PER_SESSION,
+        ),
+    )
+
+
+@rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
+async def generate_lockfile(
+    req: GeneratePythonLockfile,
+    generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+    pex_lock_subsystem: PexLockSubsystem,
+    python_setup: PythonSetup,
+) -> GenerateLockfileResult:
+    header_delimiter = "//"
+    pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
+
+    if pex_lock_subsystem.use_pex_update_subcmd():
+        result = await Get(ProcessResult, UpdatePythonLockfileRequest(req))
+    else:
+        result = await Get(ProcessResult, NewPythonLockfileRequest(req))
 
     initial_lockfile_digest_contents = await Get(DigestContents, Digest, result.output_digest)
     metadata = PythonLockfileMetadata.new(
