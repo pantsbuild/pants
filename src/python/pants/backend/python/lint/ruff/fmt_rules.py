@@ -1,6 +1,8 @@
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 from typing import Optional
 
-from pants.backend.python.lint.ruff.rules import _RunRuffRequest, _run_ruff
+from pants.backend.python.lint.ruff.rules import _run_ruff, _RunRuffRequest
 from pants.backend.python.lint.ruff.subsystem import Ruff, RuffFieldSet, RuffMode
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
