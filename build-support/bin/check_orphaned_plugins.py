@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from typing import cast
 
 NOT_DISTRIBUTED_BACKENDS = {
     "internal_plugins.releases",
@@ -20,7 +21,7 @@ def main() -> None:
     orphaned_backends = discovered_backends - distributed_backends
     if orphaned_backends:
         print(
-            f"These are discovered backends, which are not included in the pantsbuild.pants distribution:\n  * "
+            "These are discovered backends, which are not included in the pantsbuild.pants distribution:\n  * "
             + "\n  * ".join(
                 f"  ({be} - intentionally excluded)" if be in NOT_DISTRIBUTED_BACKENDS else be
                 for be in sorted(orphaned_backends)
@@ -48,12 +49,15 @@ def get_help_info() -> dict:
 
 
 def run_pants(*args: str) -> dict:
-    return json.loads(
-        subprocess.run(
-            ["pants", *args],
-            stdout=subprocess.PIPE,
-            check=True,
-        ).stdout.decode()
+    return cast(
+        "dict",
+        json.loads(
+            subprocess.run(
+                ["pants", *args],
+                stdout=subprocess.PIPE,
+                check=True,
+            ).stdout.decode()
+        ),
     )
 
 
