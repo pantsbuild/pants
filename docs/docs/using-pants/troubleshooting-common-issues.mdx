@@ -206,7 +206,7 @@ This can be fixed by setting `ulimit -n 10000`. (10,000 should work in all cases
 :::note Tip: permanently configuring `ulimit -n`
 We recommend permanently setting this by either:
 
-1. Adding `ulimit -n 10000` to your `pants.bootstrap` script.
+1. Adding `ulimit -n 10000` to your [`.pants.bootstrap`](../using-pants/key-concepts/options.mdx#pantsbootstrap-file) script.
 2. Adding `ulimit -n 10000` to your global `.bashrc` or equivalent.
 
 The first two approaches have the benefit that they will be checked into version control, so every developer at your organization can use the same setting.
