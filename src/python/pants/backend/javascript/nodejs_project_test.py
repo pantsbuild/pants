@@ -77,7 +77,9 @@ def test_immutable_install_args_property(rule_runner: RuleRunner) -> None:
             "src/js/foo/BUILD": "package_json()",
             "src/js/foo/package.json": given_package("foo", "0.0.1"),
             "src/js/bar/BUILD": "package_json()",
-            "src/js/bar/package.json": given_package("bar", "0.0.2", package_manager="yarn@1.22.19"),
+            "src/js/bar/package.json": given_package(
+                "bar", "0.0.2", package_manager="yarn@1.22.19"
+            ),
             "src/js/baz/BUILD": "package_json()",
             "src/js/baz/package.json": given_package("baz", "0.0.3", package_manager="yarn@2.4.3"),
             "src/js/qux/BUILD": "package_json()",
