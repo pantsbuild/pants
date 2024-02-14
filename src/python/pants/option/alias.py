@@ -46,8 +46,7 @@ class CliOptions(Subsystem):
 
                 [cli.alias]
                 green = "fmt lint check"
-                all-changed = "--changed-since=HEAD --changed-dependents=transitive"
-                --troubleshoot = "--test-debug --test-force --test-timeout-maximum=300"
+                --all-changed = "--changed-since=HEAD --changed-dependents=transitive"
 
 
             This would allow you to run `{bin_name()} green all-changed`, which is shorthand for
