@@ -51,7 +51,6 @@ class CliOptions(Subsystem):
 
             This would allow you to run `{bin_name()} green --all-changed`, which is shorthand for
             `{bin_name()} fmt lint check --changed-since=HEAD --changed-dependents=transitive`.
-            You can also now run `{bin_name()} test --troubleshoot ::` to debug tests.
 
             Notice: this option must be placed in a config file (e.g. `pants.toml` or `pantsrc`)
             to have any effect.
