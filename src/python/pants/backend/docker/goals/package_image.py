@@ -522,6 +522,8 @@ def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: byte
                 (
                     # BuildKit output.
                     r"(writing image (?P<digest>sha256:\S+) done)",
+                    # BuildKit with containerd-snapshotter output.
+                    r"(exporting manifest list (?P<manifest_list>sha256:\S+) done)",
                     # Docker output.
                     r"(Successfully built (?P<short_id>\S+))",
                 ),
@@ -540,7 +542,11 @@ def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: byte
                 None,
             )
             if image_id_match:
-                image_id = image_id_match.group("digest") or image_id_match.group("short_id")
+                image_id = (
+                    image_id_match.group("digest")
+                    or image_id_match.group("short_id")
+                    or image_id_match.group("manifest_list")
+                )
                 return image_id
 
     return "<unknown>"
