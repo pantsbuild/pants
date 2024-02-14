@@ -363,39 +363,6 @@ impl Config {
         }
         Ok(Some(list_edits))
     }
-
-    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
-        if let Some(table) = self.value.get(id.scope()) {
-            let option_name = Self::option_name(id);
-            if let Some(value) = table.get(&option_name) {
-                match value {
-                    Value::Table(sub_table) => {
-                        if let Some(add) = sub_table.get("add") {
-                            if sub_table.len() == 1 && add.is_table() {
-                                return Ok(Some(DictEdit {
-                                    action: DictEditAction::Add,
-                                    items: toml_table_to_dict(add),
-                                }));
-                            }
-                        }
-                        return Ok(Some(DictEdit {
-                            action: DictEditAction::Replace,
-                            items: toml_table_to_dict(value),
-                        }));
-                    }
-                    Value::String(v) => {
-                        return Ok(Some(parse_dict(v).map_err(|e| e.render(option_name))?));
-                    }
-                    _ => {
-                        return Err(format!(
-                            "Expected {option_name} to be a toml table or Python dict, but given {value}."
-                        ));
-                    }
-                }
-            }
-        }
-        Ok(None)
-    }
 }
 
 impl OptionsSource for Config {
@@ -436,6 +403,35 @@ impl OptionsSource for Config {
     }
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
-        self.get_dict(id)
+        if let Some(table) = self.value.get(id.scope()) {
+            let option_name = Self::option_name(id);
+            if let Some(value) = table.get(&option_name) {
+                match value {
+                    Value::Table(sub_table) => {
+                        if let Some(add) = sub_table.get("add") {
+                            if sub_table.len() == 1 && add.is_table() {
+                                return Ok(Some(DictEdit {
+                                    action: DictEditAction::Add,
+                                    items: toml_table_to_dict(add),
+                                }));
+                            }
+                        }
+                        return Ok(Some(DictEdit {
+                            action: DictEditAction::Replace,
+                            items: toml_table_to_dict(value),
+                        }));
+                    }
+                    Value::String(v) => {
+                        return Ok(Some(parse_dict(v).map_err(|e| e.render(option_name))?));
+                    }
+                    _ => {
+                        return Err(format!(
+                            "Expected {option_name} to be a toml table or Python dict, but given {value}."
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(None)
     }
 }
