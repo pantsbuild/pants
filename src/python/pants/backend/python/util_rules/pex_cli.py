@@ -211,10 +211,10 @@ async def setup_pex_cli_process(
 def maybe_log_pex_stderr(stderr: bytes, pex_verbosity: int) -> None:
     """Forward Pex's stderr to a Pants logger if conditions are met."""
     log_output = stderr.decode()
-    if log_output and pex_verbosity > 0:
-        logger.info("%s", log_output)
-    elif log_output and "PEXWarning:" in log_output:
+    if log_output and "PEXWarning:" in log_output:
         logger.warning("%s", log_output)
+    elif log_output and pex_verbosity > 0:
+        logger.info("%s", log_output)
 
 
 def rules():
