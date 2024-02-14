@@ -157,7 +157,8 @@ class PythonRunGoalUseSandboxField(TriBoolField):
     alias = "run_goal_use_sandbox"
     help = help_text(
         """
-        Whether to use a sandbox when `run`ning this target. Defaults to `[python].run_goal_use_sandbox`.
+        Whether to use a sandbox when `run`ning this target. Defaults to 
+        `[python].default_run_goal_use_sandbox`.
 
         If true, runs of this target with the `run` goal will copy the needed first-party sources
         into a temporary sandbox and run from there.
