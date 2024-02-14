@@ -110,7 +110,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
             # have an empty line between stats of different Pants invocations
             space = "\n\n" if Path(self.output_file).exists() else ""
             output_lines.append(
-                f"{space}{timestamp} Executing goals: {','.join(context._run_tracker.goals)}"
+                f"{space}{timestamp} Command: {context.run_tracker.run_information().get('cmd_line')}"
             )
 
         if self.log:
