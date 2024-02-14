@@ -101,7 +101,7 @@ def test_creates_yarn_run_requests_package_json_scripts(rule_runner: RuleRunner)
                         "transpile": "babel ./lib -d dist",
                         "compile": "tsc ./lib --emit -d bin",
                     },
-                    "packageManager": "yarn@1.22.19"
+                    "packageManager": "yarn@1.22.19",
                 }
             ),
             "src/js/yarn.lock": "",
