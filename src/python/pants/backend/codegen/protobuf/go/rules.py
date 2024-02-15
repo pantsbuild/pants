@@ -579,7 +579,7 @@ async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
         ),
     )
 
-    download_sources_result = await Get(
+    await Get(
         ProcessResult,
         GoSdkProcess(
             ["mod", "download", "all"],
