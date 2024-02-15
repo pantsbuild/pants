@@ -22,7 +22,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Configure Git
       run: git config --global safe.directory "$GITHUB_WORKSPACE"
@@ -95,7 +95,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Configure Git
       run: git config --global safe.directory "$GITHUB_WORKSPACE"
@@ -178,7 +178,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
@@ -262,7 +262,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9

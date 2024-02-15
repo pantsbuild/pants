@@ -22,6 +22,7 @@ from pants.backend.python.target_types import (
     PythonSourceField,
     VCSVersion,
     VCSVersionDummySourceField,
+    VersionLocalSchemeField,
     VersionGenerateToField,
     VersionLocalSchemeField,
     VersionTagRegexField,

@@ -22,6 +22,15 @@ python_requirements(
     resolve="mypy",
 )
 
+python_requirement(
+    name="setuptools-scm",
+    requirements=[
+        # NB: Keep in sync with 3rdparty/python/pants_dev_requirements.txt until we use off-the-shelf
+        "setuptools_scm @ git+https://github.com/pypa/setuptools_scm.git@a23d5fe61d9dc421666d5f23334d454426ad311c"
+    ],
+    resolve="setuptools-scm",
+)
+
 python_requirements(
     name="pytest",
     source="pytest-requirements.txt",
