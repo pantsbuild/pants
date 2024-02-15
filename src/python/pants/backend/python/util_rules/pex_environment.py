@@ -81,6 +81,14 @@ class PexSubsystem(Subsystem):
         ),
         advanced=True,
     )
+    emit_warnings = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            If warnings from Pex should be logged by Pants to the console.
+            """
+        ),
+    )
 
     @property
     def verbosity(self) -> int:
