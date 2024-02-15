@@ -6,7 +6,7 @@ from __future__ import annotations
 import os.path
 import re
 from textwrap import dedent
-from typing import Generator
+from typing import Iterator
 
 import pytest
 
@@ -31,7 +31,7 @@ from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysisRequest,
 )
 from pants.build_graph.address import Address
-from pants.engine.fs import EMPTY_DIGEST, Digest, Snapshot
+from pants.engine.fs import Digest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
@@ -40,7 +40,7 @@ from pants.util.contextutil import temporary_dir
 
 
 @pytest.fixture(scope="module")
-def named_caches_dir() -> Generator[str]:
+def named_caches_dir() -> Iterator[str]:
     with temporary_dir(prefix="test_tpp_cache_") as tmpdir:
         yield tmpdir
 
@@ -194,8 +194,7 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
             rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
         )
         expected_files = {
-            os.path.join(dir_path, file_name)
-            for file_name in (*go_files, *extra_files)
+            os.path.join(dir_path, file_name) for file_name in (*go_files, *extra_files)
         }
         seen_files = set()
 

@@ -321,7 +321,6 @@ async def _check_go_sum_has_not_changed(
                 )
             )
             go_sum_diff_rendered = "\n".join(line.rstrip() for line in go_sum_diff)
-
             raise ValueError(
                 f"For `{GoModTarget.alias}` target `{go_mod_address}`, the go.sum file is incomplete "
                 f"because it was updated while processing third-party dependency `{import_path}`. "
@@ -437,7 +436,6 @@ async def analyze_go_third_party_module(
         Process(
             [os.path.join(analyzer_relpath, analyzer.path), *chosen_paths],
             append_only_caches=gosdk.sdk_cache(),
-            input_digest=EMPTY_DIGEST,
             immutable_input_digests={
                 analyzer_relpath: analyzer.digest,
             },
@@ -478,9 +476,10 @@ async def analyze_go_third_party_module(
 async def analyze_go_third_party_package(
     request: AnalyzeThirdPartyPackageRequest,
 ) -> FallibleThirdPartyPkgAnalysis:
-    """Return an analysis for a given package. The analysis object corresponds to the output.
+    """Return an analysis for a given package.
 
-    of `go list` - combining the location, imports and build details for a package.
+    The analysis object corresponds to the -json output of `go list` - combining the location,
+    imports and build details for a package.
     """
     if not request.package_path.startswith(request.module_sources_path):
         raise AssertionError(

@@ -669,9 +669,10 @@ async def cgo_compile_request(
     dir_path = request.dir_path if request.dir_path else "."
 
     obj_dir_path = (
-        # avoid writing under gopath (digests overwrite the symlink)
-        # and avoid writing under stdlib (outside the sandbox)
-        # the root of the sandbox (".") is used for the primary package
+        # This represents three cases, some of which do or do not write under dir_path:
+        # 1. avoid writing under gopath (digests overwrite the symlink)
+        # 2. avoid writing under stdlib (it's outside the sandbox)
+        # 3. otherwise, the root of the sandbox (".") is used, to build the 'main' package.
         f"_objdir/{request.import_path}"
         if dir_path != "."
         else dir_path
