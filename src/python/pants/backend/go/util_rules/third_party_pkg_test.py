@@ -47,6 +47,7 @@ def named_caches_dir() -> Iterator[str]:
 
 @pytest.fixture
 def rule_runner(named_caches_dir: str) -> RuleRunner:
+    _bootstrap_args = [f"--named-caches-dir={named_caches_dir}"]
     rule_runner = RuleRunner(
         rules=[
             *sdk.rules(),
@@ -63,9 +64,13 @@ def rule_runner(named_caches_dir: str) -> RuleRunner:
             QueryRule(ThirdPartyPkgAnalysis, [ThirdPartyPkgAnalysisRequest]),
         ],
         target_types=[GoModTarget],
-        bootstrap_args=[f"--named-caches-dir={named_caches_dir}"],
+        bootstrap_args=_bootstrap_args,
     )
-    rule_runner.set_options(["--golang-cgo-enabled"], env_inherit={"PATH"})
+    # set_options would overwrite bootstrap_args, so add them again.
+    rule_runner.set_options(
+        ["--golang-cgo-enabled"] + _bootstrap_args,
+        env_inherit={"PATH"},
+    )
     return rule_runner
 
 
@@ -101,7 +106,7 @@ def set_up_go_mod(rule_runner: RuleRunner, go_mod: str, go_sum: str) -> Digest:
     return rule_runner.make_snapshot({"go.mod": go_mod, "go.sum": go_sum}).digest
 
 
-def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
+def test_download_and_analyze_all_packages(rule_runner: RuleRunner, named_caches_dir: str) -> None:
     input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
     all_packages = rule_runner.request(
         AllThirdPartyPackages,
@@ -190,9 +195,6 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
         assert not pkg_info.s_files
         assert pkg_info.minimum_go_version == minimum_go_version
 
-        named_caches_dir = (
-            rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
-        )
         expected_files = {
             os.path.join(dir_path, file_name) for file_name in (*go_files, *extra_files)
         }

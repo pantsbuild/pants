@@ -926,7 +926,7 @@ def test_single_rules_declaration_per_build_file(rule_runner: RuleRunner) -> Non
     )
 
     msg = "BuildFileVisibilityRulesError: There must be at most one each"
-    with engine_error(MappingError, contains=msg):
+    with engine_error(MappingError, contains=msg, normalize_tracebacks=True):
         assert_dependency_rules(
             rule_runner,
             "test",
