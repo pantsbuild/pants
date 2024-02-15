@@ -3,7 +3,7 @@
 
 from typing import Optional
 
-from pants.backend.python.lint.ruff.rules import _run_ruff, _RunRuffRequest
+from pants.backend.python.lint.ruff.check_rules import _run_ruff, _RunRuffRequest
 from pants.backend.python.lint.ruff.subsystem import Ruff, RuffFieldSet, RuffMode
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints

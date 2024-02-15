@@ -6,7 +6,7 @@
 See https://www.pantsbuild.org/docs/python-linters-and-formatters and https://docs.astral.sh/ruff/
 """
 
-from pants.backend.python.lint.ruff import rules as ruff_rules
+from pants.backend.python.lint.ruff import check_rules as ruff_rules
 from pants.backend.python.lint.ruff import skip_field, subsystem
 
 

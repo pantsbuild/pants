@@ -11,8 +11,8 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.lint.ruff import skip_field
 from pants.backend.python.lint.ruff.fmt_rules import RuffFormatRequest
 from pants.backend.python.lint.ruff.fmt_rules import rules as ruff_fmt_rules
-from pants.backend.python.lint.ruff.rules import RuffFixRequest, RuffLintRequest
-from pants.backend.python.lint.ruff.rules import rules as ruff_rules
+from pants.backend.python.lint.ruff.check_rules import RuffFixRequest, RuffLintRequest
+from pants.backend.python.lint.ruff.check_rules import rules as ruff_rules
 from pants.backend.python.lint.ruff.subsystem import RuffFieldSet
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
