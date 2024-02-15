@@ -146,7 +146,7 @@ impl OptionsSource for Args {
     fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
         match self.find_flag(Self::arg_names(id, Negate::False))? {
             Some((name, ref value, _)) => parse_dict(value)
-                .map(|e| Some(e))
+                .map(Some)
                 .map_err(|e| e.render(name)),
             None => Ok(None),
         }

@@ -138,7 +138,7 @@ impl OptionsSource for Env {
     fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
         if let Some(value) = self.get_string(id)? {
             parse_dict(&value)
-                .map(|de| Some(de))
+                .map(Some)
                 .map_err(|e| e.render(self.display(id)))
         } else {
             Ok(None)
