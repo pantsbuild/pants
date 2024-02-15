@@ -37,7 +37,7 @@ __dependents_rules__(
             "[/python/lint/black/rules.py]",
             "[/python/lint/black/subsystem.py]",
             "[/python/lint/ruff/fmt_rules.py]",
-            "[/python/lint/ruff/rules.py]",
+            "[/python/lint/ruff/check_rules.py]",
             "[/python/lint/ruff/subsystem.py]",
             "[/python/lint/yapf/rules.py]",
             "[/python/lint/yapf/subsystem.py]",
