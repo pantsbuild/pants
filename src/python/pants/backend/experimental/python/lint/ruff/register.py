@@ -17,4 +17,4 @@ def rules():
         hint="Use `pants.backend.experimental.python.lint.ruff.check` instead.",
         start_version="2.20.0.dev7",
     )
-    return ruff_check_rules.rules()
+    return ruff_check.rules()
