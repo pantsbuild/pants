@@ -6,8 +6,8 @@
 See https://www.pantsbuild.org/docs/python-linters-and-formatters and https://docs.astral.sh/ruff/
 """
 
-from pants.base.deprecated import warn_or_error
 from pants.backend.experimental.python.lint.ruff.check import register as ruff_check_rules
+from pants.base.deprecated import warn_or_error
 
 
 def rules():
