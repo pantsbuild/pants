@@ -26,7 +26,8 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import union
-from pants.util.strutil import pluralize
+from pants.option.option_types import BoolOption
+from pants.util.strutil import pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,16 @@ class DeployProcess:
 class DeploySubsystem(GoalSubsystem):
     name = "experimental-deploy"
     help = "Perform a deployment process."
+
+    dry_run = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            If true, perform a dry run without deploying anything.
+            For example, when deploying a terraform_deployment, a plan will be executed instead of an apply.
+            """
+        ),
+    )
 
     required_union_implementation = (DeployFieldSet,)
 
