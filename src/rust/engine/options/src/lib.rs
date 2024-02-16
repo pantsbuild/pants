@@ -266,9 +266,9 @@ impl OptionParser {
         fn path_strip(prefix: &str, path: &str) -> String {
             // TODO: The calling code should traffic in Path, or OsString, not String.
             //  For now we assume the paths are valid UTF8 strings, via unwrap().
-            Path::new(path)
-                .strip_prefix(prefix)
-                .unwrap()
+            let path = Path::new(path);
+            path.strip_prefix(prefix)
+                .unwrap_or(path)
                 .to_str()
                 .unwrap()
                 .to_string()
