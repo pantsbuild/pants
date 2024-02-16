@@ -74,6 +74,33 @@ fn with_setup(
 }
 
 #[test]
+fn test_source_ordering() {
+    assert!(
+        Source::Default
+            < Source::Config {
+                ordinal: 0,
+                path: "pants.toml".to_string()
+            }
+    );
+    assert!(
+        Source::Config {
+            ordinal: 0,
+            path: "pants.toml".to_string()
+        } < Source::Config {
+            ordinal: 1,
+            path: "extra_pants.toml".to_string()
+        }
+    );
+    assert!(
+        Source::Config {
+            ordinal: 1,
+            path: "extra_pants.toml".to_string()
+        } < Source::Env
+    );
+    assert!(Source::Env < Source::Flag);
+}
+
+#[test]
 fn test_parse_single_valued_options() {
     fn check(
         expected: i64,

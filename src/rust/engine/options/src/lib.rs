@@ -34,7 +34,6 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::os::unix::ffi::OsStrExt;
-use std::path;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -259,22 +258,20 @@ impl OptionParser {
         };
 
         fn path_join(prefix: &str, suffix: &str) -> String {
-            if prefix.ends_with(path::MAIN_SEPARATOR) {
-                format!("{}{}", prefix, suffix)
-            } else {
-                format!("{}{}{}", prefix, path::MAIN_SEPARATOR, suffix)
-            }
+            // TODO: The calling code should traffic in Path, or OsString, not String.
+            //  For now we assume the paths are valid UTF8 strings, via unwrap().
+            Path::new(prefix).join(suffix).to_str().unwrap().to_string()
         }
 
         fn path_strip(prefix: &str, path: &str) -> String {
-            match path.strip_prefix(prefix) {
-                Some(suffix) => match suffix.strip_prefix(path::MAIN_SEPARATOR) {
-                    Some(suffix_suffix) => suffix_suffix,
-                    _ => suffix,
-                },
-                _ => path,
-            }
-            .to_string()
+            // TODO: The calling code should traffic in Path, or OsString, not String.
+            //  For now we assume the paths are valid UTF8 strings, via unwrap().
+            Path::new(path)
+                .strip_prefix(prefix)
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string()
         }
 
         let repo_config_files = match config_paths {
@@ -316,7 +313,7 @@ impl OptionParser {
                     ordinal,
                     path: path_strip(&buildroot_string, path),
                 },
-                Rc::new(config.clone()),
+                Rc::new(config),
             );
             ordinal += 1;
         }
