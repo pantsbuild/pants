@@ -13,7 +13,7 @@ from pants.backend.terraform.dependency_inference import (
 from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
 from pants.backend.terraform.tool import TerraformProcess, TerraformTool
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
-from pants.core.goals.deploy import DeployFieldSet, DeployProcess
+from pants.core.goals.deploy import DeployFieldSet, DeployProcess, DeploySubsystem
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.native_engine import Digest, MergeDigests
@@ -39,7 +39,9 @@ class TerraformDeploymentRequest(EngineAwareParameter):
 
 @rule
 async def prepare_terraform_deployment(
-    request: TerraformDeploymentRequest, terraform_subsystem: TerraformTool
+    request: TerraformDeploymentRequest,
+    terraform_subsystem: TerraformTool,
+    deploy_subsystem: DeploySubsystem,
 ) -> InteractiveProcess:
     initialised_terraform = await Get(
         TerraformInitResponse,
@@ -50,7 +52,8 @@ async def prepare_terraform_deployment(
         ),
     )
 
-    args = ["apply"]
+    terraform_command = "plan" if deploy_subsystem.dry_run else "apply"
+    args = [terraform_command]
 
     invocation_files = await Get(
         TerraformDeploymentInvocationFiles,
@@ -78,7 +81,7 @@ async def prepare_terraform_deployment(
         TerraformProcess(
             args=tuple(args),
             input_digest=with_vars,
-            description="Terraform apply",
+            description=f"Terraform {terraform_command}",
             chdir=initialised_terraform.chdir,
         ),
     )
