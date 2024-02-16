@@ -48,6 +48,7 @@ Created as part of the release process.
 + Chris Heisterkamp
 + Chris Livingston
 + Chris Pesto
++ Chris Smith
 + Chris Targett
 + Chris Williams
 + Christoph Proeschel
@@ -75,6 +76,7 @@ Created as part of the release process.
 + David Taylor
 + David Turner
 + Derek Young
++ Dimitar Kovachev
 + Dimitrios Bariamis
 + Divij Rajkumar
 + Dominic Hamon
@@ -83,6 +85,7 @@ Created as part of the release process.
 + Drew Rothstein
 + Dumitru Daniliuc
 + Dylan Herman
++ Dương Đỗ Minh Châu
 + Ebube Chuba
 + Eitan Adler
 + Ekaterina Tyurina
@@ -175,6 +178,7 @@ Created as part of the release process.
 + Kaushik Srenevasan
 + Ken Howard
 + Ken Kawamoto
++ Kevin Oliveira
 + Kevin Oliver
 + Kevin Sweeney
 + Koki Nishihara
@@ -262,6 +266,7 @@ Created as part of the release process.
 + Pierre Chevalier
 + Pierre DAL-PRA
 + Qicheng Ma
++ Ramon Buckland
 + Raph Estrada
 + Raúl Cuza
 + Rhuan Barreto
@@ -347,6 +352,7 @@ Created as part of the release process.
 + offsetcyan
 + olivercoleman-switchdin
 + philipp-sontag-by
++ purajit
 + sww
 + twunderlich-grapl
 + wimax-grapl
