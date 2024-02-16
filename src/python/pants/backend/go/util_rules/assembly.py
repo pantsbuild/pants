@@ -92,8 +92,11 @@ def _asm_args(
     # - https://cs.opensource.google/go/go/+/72946ae8674a295e7485982fe57c65c7142b2c14
     maybe_assembling_stdlib_runtime_args = (
         ["-compiling-runtime"]
-        if not goroot.is_compatible_version("1.22") and (import_path in ("runtime", "reflect", "syscall", "internal/bytealg")
-        or import_path.startswith("runtime/internal"))
+        if not goroot.is_compatible_version("1.22")
+        and (
+            import_path in ("runtime", "reflect", "syscall", "internal/bytealg")
+            or import_path.startswith("runtime/internal")
+        )
         else []
     )
 
