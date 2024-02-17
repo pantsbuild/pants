@@ -7,26 +7,19 @@ use std::fs::File;
 use std::io::Write;
 
 use crate::config::{interpolate_string, Config};
-use crate::{option_id, ListEdit, ListEditAction, OptionId, OptionsSource};
+use crate::{option_id, DictEdit, DictEditAction, ListEdit, ListEditAction, OptionsSource, Val};
 
 use tempfile::TempDir;
 
-fn maybe_config<I: IntoIterator<Item = &'static str>>(file_contents: I) -> Result<Config, String> {
+fn maybe_config(file_content: &'static str) -> Result<Config, String> {
     let dir = TempDir::new().unwrap();
-    let files = file_contents
-        .into_iter()
-        .enumerate()
-        .map(|(idx, file_content)| {
-            let path = dir.path().join(format!("{idx}.toml"));
-            File::create(&path)
-                .unwrap()
-                .write_all(file_content.as_bytes())
-                .unwrap();
-            path
-        })
-        .collect::<Vec<_>>();
+    let path = dir.path().join("pants.toml");
+    File::create(&path)
+        .unwrap()
+        .write_all(file_content.as_bytes())
+        .unwrap();
     Config::parse(
-        &files,
+        &path,
         &HashMap::from([
             ("seed1".to_string(), "seed1val".to_string()),
             ("seed2".to_string(), "seed2val".to_string()),
@@ -34,13 +27,13 @@ fn maybe_config<I: IntoIterator<Item = &'static str>>(file_contents: I) -> Resul
     )
 }
 
-fn config<I: IntoIterator<Item = &'static str>>(file_contents: I) -> Config {
-    maybe_config(file_contents).unwrap()
+fn config(file_content: &'static str) -> Config {
+    maybe_config(file_content).unwrap()
 }
 
 #[test]
 fn test_display() {
-    let config = config([]);
+    let config = config("");
     assert_eq!(
         "[GLOBAL] name".to_owned(),
         config.display(&option_id!("name"))
@@ -53,49 +46,6 @@ fn test_display() {
         "[scope] full_name".to_owned(),
         config.display(&option_id!(-'f', ["scope"], "full", "name"))
     );
-}
-
-#[test]
-fn test_multiple_sources() {
-    let config = config([
-        "[section]\n\
-     name = 'first'\n\
-     field1 = 'something'\n\
-     list='+[0,1]'",
-        "[section]\n\
-     name = 'second'\n\
-     field2 = 'something else'\n\
-     list='-[0],+[2, 3]'",
-    ]);
-
-    let assert_string = |expected: &str, id: &OptionId| {
-        assert_eq!(expected.to_owned(), config.get_string(id).unwrap().unwrap())
-    };
-
-    assert_string("second", &option_id!(["section"], "name"));
-    assert_string("something", &option_id!(["section"], "field1"));
-    assert_string("something else", &option_id!(["section"], "field2"));
-
-    assert_eq!(
-        vec![
-            ListEdit {
-                action: ListEditAction::Add,
-                items: vec![0, 1]
-            },
-            ListEdit {
-                action: ListEditAction::Remove,
-                items: vec![0]
-            },
-            ListEdit {
-                action: ListEditAction::Add,
-                items: vec![2, 3]
-            },
-        ],
-        config
-            .get_int_list(&option_id!(["section"], "list"))
-            .unwrap()
-            .unwrap()
-    )
 }
 
 #[test]
@@ -145,7 +95,8 @@ fn test_interpolate_string() {
 
 #[test]
 fn test_interpolate_config() {
-    let conf = config(["[DEFAULT]\n\
+    let conf = config(
+        "[DEFAULT]\n\
      field1 = 'something'\n\
      color = 'black'\n\
      [foo]\n\
@@ -156,7 +107,8 @@ fn test_interpolate_config() {
      berryprefix = 'straw'\n\
      stringlist.add = ['apple', '%(berryprefix)sberry', 'banana']\n\
      stringlist.remove = ['%(color)sberry', 'pear']\n\
-     inline_table = { fruit = '%(berryprefix)sberry', spice = '%(color)s pepper' }"]);
+     inline_table = { fruit = '%(berryprefix)sberry', spice = '%(color)s pepper' }",
+    );
 
     assert_eq!(
         "something else entirely seed2val",
@@ -185,16 +137,25 @@ fn test_interpolate_config() {
             .unwrap()
     );
 
-    // TODO: Uncomment when we implement get_dict.
-    // assert_eq!(
-    //     HashMap::from([("fruit", "strawberry"), ("spice", "black pepper")]),
-    //     conf.get_dict(&option_id!(["groceries"], "inline_table")).unwrap().unwrap()
-    // );
+    assert_eq!(
+        DictEdit {
+            action: DictEditAction::Replace,
+            items: HashMap::from([
+                ("fruit".to_string(), Val::String("strawberry".to_string())),
+                ("spice".to_string(), Val::String("black pepper".to_string()))
+            ])
+        },
+        conf.get_dict(&option_id!(["groceries"], "inline_table"))
+            .unwrap()
+            .unwrap()
+    );
 
-    let bad_conf = maybe_config(["[DEFAULT]\n\
+    let bad_conf = maybe_config(
+        "[DEFAULT]\n\
      field1 = 'something'\n\
      [foo]\n\
-     bad_field = '%(unknown)s'\n"]);
+     bad_field = '%(unknown)s'\n",
+    );
     let err_msg = bad_conf.err().unwrap();
     let pat =
         r"^Unknown value for placeholder `unknown` in config file .*, section foo, key bad_field$";
