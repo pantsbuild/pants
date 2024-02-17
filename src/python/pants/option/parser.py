@@ -567,6 +567,8 @@ class Parser:
 
         # Helper function to expand a fromfile=True value string, if needed.
         # May return a string or a dict/list decoded from a json/yaml file.
+        # If the fromfile is optional and the file does not exist then
+        # None will be returned.
         def expand(val_or_str):
             if (
                 kwargs.get("fromfile", True)
@@ -576,9 +578,15 @@ class Parser:
                 if val_or_str.startswith("@@"):  # Support a literal @ for fromfile values via @@.
                     return val_or_str[1:]
                 else:
-                    fromfile = val_or_str[1:]
+                    if val_or_str.startswith("@?"):  # Support an optional fromfile value via @?.
+                        fromfile, optional = val_or_str[2:], True
+                    else:
+                        fromfile, optional = val_or_str[1:], False
+                    fromfile_path = Path(get_buildroot(), fromfile)
                     try:
-                        contents = Path(get_buildroot(), fromfile).read_text()
+                        if optional and not fromfile_path.exists():
+                            return None
+                        contents = fromfile_path.read_text()
                         if fromfile.endswith(".json"):
                             return json.loads(contents)
                         elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
@@ -597,7 +605,9 @@ class Parser:
         def merge_in_rank(vals):
             if not vals:
                 return None
-            expanded_vals = [to_value_type(expand(x)) for x in vals]
+            expanded_vals = [to_value_type(v) for v in (expand(i) for i in vals) if v is not None]
+            if not expanded_vals:
+                return None
             if is_list_option(kwargs):
                 return ListValueComponent.merge(expanded_vals)
             if is_dict_option(kwargs):
