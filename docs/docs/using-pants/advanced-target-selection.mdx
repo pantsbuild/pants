@@ -145,7 +145,7 @@ Whereas `tags` are useful for _decentralized_ allow/block lists, `--spec-files` 
 To pipe a Pants run, use your shell's `|` pipe operator and `xargs`:
 
 ```bash
-pants dependents helloworld/util | xargs pants  list
+pants dependents helloworld/util | xargs pants list
 ```
 
 You can, of course, pipe multiple times:
@@ -167,6 +167,14 @@ $ pants dependencies helloworld/util > util_dependencies.txt
 $ pants --spec-files=util_dependencies.txt lint
 ```
 
+Using spec files is also more robust because when piping output of a Pants goal to `xargs`, the specified command
+may be invoked by `xargs` as many times as necessary to use up the list of input items.
+This may break the structured data output, for instance, when you want to `peek` the targets as JSON:
+
+```bash
+$ pants list --filter-target-type=resource :: | xargs pants peek
+```
+
 If you don't want to save the output to an actual file—such as to not pollute version control—you can use a variable and a named pipe:
 
 ```bash
@@ -185,3 +193,28 @@ For other goals, you can leverage shell piping to partition the input targets in
 ```bash
 pants list :: | awk 'NR % 5 == 0' | xargs pants package
 ```
+
+## Using CLI aliases
+
+If setting tags on individual targets is not feasible, there are a few other options available to refer to multiple targets.
+
+If you have an operation that you perform often on a certain group of targets, you can use the
+[cli](../../reference/subsystems/cli) subsystem options to create shortcuts. For instance, this alias
+would let you run `pants publish-libraries` to publish all Python distributions declared in the `src/libA` and `src/libB`
+directories.
+
+```toml title="pants.toml"
+[cli.alias]
+publish-libraries = "--filter-target-type=python_distribution --filter-address-regex=\"['^src/libA/,^src/libB/']\" publish src::"
+```
+
+You can use any argument or goal, and the alias doesn't need to be a "full" invocation of Pants.
+For instance, you could combine filtering arguments along with `--changed-since` flag and a tag to refer to long-running
+integration tests that have been recently modified:
+
+```toml title="pants.toml"
+[cli.alias]
+--integration-long = "--changed-since --filter-target-type=python_test --tag=long"
+```
+
+You can now invoke `pants --integration-long test tests::` to run the relevant tests.

@@ -78,6 +78,7 @@ def do_test_backend_wrapper(rule_runner: PythonRuleRunner, constraints: str) -> 
         build_sdist=True,
         input=input_digest,
         working_directory="",
+        dist_source_root=".",
         build_time_source_roots=tuple(),
         output_path="dist",
         wheel_config_settings=FrozenDict({"setting1": ("value1",), "setting2": ("value2",)}),

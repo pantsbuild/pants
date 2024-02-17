@@ -95,7 +95,7 @@ fn test_float() {
 
     assert_eq!(
         "Problem parsing --bad float value:\n1:swallow\n  ^\n\
-        Expected \"+\", \"-\" or ['0' ..= '9'] at line 1 column 1"
+        Expected \"+\", \"-\" or ['0'..='9'] at line 1 column 1"
             .to_owned(),
         args.get_float(&option_id!("bad")).unwrap_err()
     );

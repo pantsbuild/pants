@@ -94,8 +94,9 @@ class DockerPackageFieldSet(PackageFieldSet):
     ) -> str:
         repository_context = InterpolationContext.from_dict(
             {
-                "directory": os.path.basename(self.address.spec_path),
                 "name": self.address.target_name,
+                "directory": os.path.basename(self.address.spec_path),
+                "full_directory": self.address.spec_path,
                 "parent_directory": os.path.basename(os.path.dirname(self.address.spec_path)),
                 "default_repository": default_repository,
                 "target_repository": self.repository.value or default_repository,
@@ -521,6 +522,8 @@ def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: byte
                 (
                     # BuildKit output.
                     r"(writing image (?P<digest>sha256:\S+) done)",
+                    # BuildKit with containerd-snapshotter output.
+                    r"(exporting manifest list (?P<manifest_list>sha256:\S+) done)",
                     # Docker output.
                     r"(Successfully built (?P<short_id>\S+))",
                 ),
@@ -539,7 +542,11 @@ def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: byte
                 None,
             )
             if image_id_match:
-                image_id = image_id_match.group("digest") or image_id_match.group("short_id")
+                image_id = (
+                    image_id_match.group("digest")
+                    or image_id_match.group("short_id")
+                    or image_id_match.group("manifest_list")
+                )
                 return image_id
 
     return "<unknown>"

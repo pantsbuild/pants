@@ -90,7 +90,7 @@ class Tool(Generic[ToolBaseT]):
 
 @dataclass
 class PythonTool(Tool[PythonToolRequirementsBase]):
-    interpreter_constraints: str = default_python_interpreter_constraints
+    ...
 
 
 @dataclass
@@ -124,9 +124,7 @@ all_python_tools = tuple(
             PythonTool(Pylint, "pants.backend.python.lint.pylint"),
             PythonTool(PythonProtobufMypyPlugin, "pants.backend.codegen.protobuf.python"),
             PythonTool(PythonProtobufGrpclibPlugin, "pants.backend.codegen.protobuf.python"),
-            PythonTool(
-                Pytype, "pants.backend.experimental.python.typecheck.pytype", "CPython>=3.7,<3.11"
-            ),
+            PythonTool(Pytype, "pants.backend.experimental.python.typecheck.pytype"),
             PythonTool(PyOxidizer, "pants.backend.experimental.python.packaging.pyoxidizer"),
             PythonTool(Ruff, "pants.backend.experimental.python.lint.ruff"),
             PythonTool(SemgrepSubsystem, "pants.backend.experimental.tools.semgrep"),
@@ -227,7 +225,7 @@ def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -
                     )
                 )
         resolves = {tool.resolve: tool.lockfile_name for tool in tools}
-        resolves_to_ics = {tool.resolve: [tool.interpreter_constraints] for tool in tools}
+        resolves_to_ics = {tool.resolve: tool.cls.default_interpreter_constraints for tool in tools}
         for file in resolves.values():
             touch(os.path.join(tmp_buildroot, file))  # Prevent "Unmatched glob" warning.
         python_args = [

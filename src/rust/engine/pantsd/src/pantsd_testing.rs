@@ -30,6 +30,8 @@ pub fn launch_pantsd() -> (BuildRoot, OptionParser, TempDir) {
         Env::new(HashMap::new()),
         None,
         true,
+        false,
+        None,
     )
     .unwrap();
 

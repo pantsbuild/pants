@@ -163,7 +163,10 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_raises_error_when_using_invalid_passthrough_args(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("invalid_passthrough_args", [["--namespace", "foo"], ["--dry-run"]])
+def test_raises_error_when_using_invalid_passthrough_args(
+    rule_runner: RuleRunner, invalid_passthrough_args: list[str]
+) -> None:
     rule_runner.write_files(
         {
             "src/chart/BUILD": """helm_chart(registries=["oci://www.example.com/external"])""",
@@ -182,10 +185,12 @@ def test_raises_error_when_using_invalid_passthrough_args(rule_runner: RuleRunne
     )
 
     source_root_patterns = ["/src/*"]
-    deploy_args = ["--force", "--debug", "--kubeconfig=./kubeconfig", "--namespace", "foo"]
+    deploy_args = ["--force", "--debug", "--kubeconfig=./kubeconfig", *invalid_passthrough_args]
 
+    invalid_passthrough_args_as_string = " ".join(invalid_passthrough_args)
     with pytest.raises(
-        ExecutionError, match="The following command line arguments are not valid: --namespace foo."
+        ExecutionError,
+        match=f"The following command line arguments are not valid: {invalid_passthrough_args_as_string}.",
     ):
         _run_deployment(
             rule_runner,
@@ -226,3 +231,47 @@ def test_can_deploy_3rd_party_chart(rule_runner: RuleRunner) -> None:
 
     assert deploy_process.process
     assert len(deploy_process.publish_dependencies) == 0
+
+
+@pytest.mark.parametrize(
+    "dry_run_args,expected",
+    [
+        ([], False),
+        (["--experimental-deploy-dry-run=False"], False),
+        (["--experimental-deploy-dry-run"], True),
+    ],
+)
+def test_run_helm_deploy_adheres_to_dry_run_flag(
+    rule_runner: RuleRunner, dry_run_args: list[str], expected: bool
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/chart/BUILD": """helm_chart(registries=["oci://www.example.com/external"])""",
+            "src/chart/Chart.yaml": HELM_CHART_FILE,
+            "src/deployment/BUILD": dedent(
+                """\
+              helm_deployment(
+                name="bar",
+                namespace="uat",
+                chart="//src/chart",
+                sources=["*.yaml", "subdir/*.yml"]
+              )
+              """
+            ),
+        }
+    )
+
+    expected_build_number = "34"
+    expected_ns_suffix = "quxx"
+
+    deploy_args = ["--kubeconfig", "./kubeconfig", "--create-namespace"]
+    deploy_process = _run_deployment(
+        rule_runner,
+        "src/deployment",
+        "bar",
+        args=[f"--helm-args={repr(deploy_args)}", *dry_run_args],
+        env={"BUILD_NUMBER": expected_build_number, "NS_SUFFIX": expected_ns_suffix},
+    )
+
+    assert deploy_process.process
+    assert ("--dry-run" in deploy_process.process.process.argv) == expected

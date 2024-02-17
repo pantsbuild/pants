@@ -10,7 +10,7 @@ Create a Lambda with Python code.
 Pants can create a Lambda-compatible zip file from your Python code, allowing you to develop your Lambda functions and layers in your repository instead of using the online Cloud9 editor.
 
 :::note FYI: how Pants does this
-Under-the-hood, Pants uses the [PEX](https://github.com/pantsbuild/pex) project, to select the appropriate third-party requirements and first-party sources and lay them out in a zip file, in the format recommended by AWS.
+Under-the-hood, Pants uses the [PEX](https://github.com/pex-tool/pex) project, to select the appropriate third-party requirements and first-party sources and lay them out in a zip file, in the format recommended by AWS.
 :::
 
 ## Step 1: Activate the Python AWS Lambda backend
@@ -137,7 +137,7 @@ For example, one use of layers is splitting the deployment package for a Lambda 
 1. a function artifact with only the code in your repository (first-party sources)
 2. a layer artifact with the third-party requirements that the function imports
 
-This split means making a change to first-party sources only requires rebuilding and re-deploying the function artifact. Since this artifact doesn't need to include all of the third-party requirements, rebuilding is likely to much faster and the resulting package will be smaller. The layer will only need to be rebuilt and redeployed if the third-party dependencies change, like a version upgrade or an additional `import`.
+This split means making a change to first-party sources only requires rebuilding and re-deploying the function artifact. Since this artifact doesn't need to include all of the third-party requirements, rebuilding is likely to be much faster and the resulting package will be smaller. The layer will only need to be rebuilt and redeployed if the third-party dependencies change, like a version upgrade or an additional `import`.
 
 ```python tab={"label":"project/BUILD"}
 python_sources(name="lib")

@@ -176,7 +176,7 @@ def test_create_tar_archive_in_root_dir(rule_runner: RuleRunner, format: Archive
     The specific requirements of creating a tar led to a situation where the CreateArchive code
     assumed the output file had a directory component, attempting to create a directory called ""
     if this assumption didn't hold. In 2.14 creating the "" directory became an error, which meant
-    CreateArchive broke. This guards against that break reoccuring.
+    CreateArchive broke. This guards against that break reoccurring.
 
     Issue: https://github.com/pantsbuild/pants/issues/17545
     """

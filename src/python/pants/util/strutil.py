@@ -264,7 +264,7 @@ def softwrap(text: str) -> str:
     """
     if not text:
         return text
-    # If callers didn't use a leading "\" thats OK.
+    # If callers didn't use a leading "\" that's OK.
     if text[0] == "\n":
         text = text[1:]
 

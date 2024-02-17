@@ -469,7 +469,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     workdir="/",
                 )
 
-                # Succeeds becuase `a1` and `a2` are requested directly and `output_dependencies`
+                # Succeeds because `a1` and `a2` are requested directly and `output_dependencies`
                 # are made available at runtime
                 shell_command(
                     name="expect_success_2",

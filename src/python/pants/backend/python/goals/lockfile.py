@@ -18,7 +18,8 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
-from pants.backend.python.util_rules.pex_cli import PexCliProcess
+from pants.backend.python.util_rules.pex_cli import PexCliProcess, maybe_log_pex_stderr
+from pants.backend.python.util_rules.pex_environment import PexSubsystem
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
     ResolvePexConfig,
@@ -103,6 +104,7 @@ async def generate_lockfile(
     req: GeneratePythonLockfile,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     python_setup: PythonSetup,
+    pex_subsystem: PexSubsystem,
 ) -> GenerateLockfileResult:
     pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
 
@@ -113,7 +115,6 @@ async def generate_lockfile(
             subcommand=("lock", "create"),
             extra_args=(
                 "--output=lock.json",
-                "--no-emit-warnings",
                 # See https://github.com/pantsbuild/pants/issues/12458. For now, we always
                 # generate universal locks because they have the best compatibility. We may
                 # want to let users change this, as `style=strict` is safer.
@@ -123,10 +124,10 @@ async def generate_lockfile(
                 "--resolver-version",
                 "pip-2020-resolver",
                 # PEX files currently only run on Linux and Mac machines; so we hard code this
-                # limit on lock universaility to avoid issues locking due to irrelevant
+                # limit on lock universality to avoid issues locking due to irrelevant
                 # Windows-only dependency issues. See this Pex issue that originated from a
                 # Pants user issue presented in Slack:
-                #   https://github.com/pantsbuild/pex/issues/1821
+                #   https://github.com/pex-tool/pex/issues/1821
                 #
                 # At some point it will probably make sense to expose `--target-system` for
                 # configuration.
@@ -157,6 +158,8 @@ async def generate_lockfile(
             cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
+
+    maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 
     initial_lockfile_digest_contents = await Get(DigestContents, Digest, result.output_digest)
     metadata = PythonLockfileMetadata.new(
