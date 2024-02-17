@@ -11,10 +11,7 @@ git diff main docs/ > "${DIFF_FILE}"
 
 cd ../pantsbuild.org
 
-if [[ $(git diff --stat) != '' ]]; then
-  echo "Expected clean git state in the pantsbuild/pantsbuild.org repo"
-  exit 1
-fi
+git diff --stat --exit-code > /dev/null || (echo "Expected clean git state in the pantsbuild/pantsbuild.org repo" && exit 1)
 
 git checkout main
 
