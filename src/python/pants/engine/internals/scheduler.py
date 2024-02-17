@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
-from typing import Any, Dict, Iterable, NoReturn, Sequence, cast
+from typing import Any, Callable, Dict, Iterable, NoReturn, Sequence, cast
 
 from typing_extensions import TypedDict
 
@@ -404,6 +404,9 @@ class SchedulerSession:
 
     def visualize_rule_graph_to_file(self, filename: str) -> None:
         self._scheduler.visualize_rule_graph_to_file(filename)
+
+    def rule_graph_rule_gets(self) -> dict[Callable, list[tuple[type, list[type], Callable]]]:
+        return native_engine.rule_graph_rule_gets(self.py_scheduler)
 
     def execution_request(
         self,

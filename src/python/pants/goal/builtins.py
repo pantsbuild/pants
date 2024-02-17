@@ -8,6 +8,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.goal import help
 from pants.goal.builtin_goal import BuiltinGoal
 from pants.goal.explorer import ExplorerBuiltinGoal
+from pants.goal.migrate_call_by_name import MigrateCallByNameBuiltinGoal
 
 
 def register_builtin_goals(build_configuration: BuildConfiguration.Builder) -> None:
@@ -18,6 +19,7 @@ def builtin_goals() -> tuple[type[BuiltinGoal], ...]:
     return (
         BSPGoal,
         ExplorerBuiltinGoal,
+        MigrateCallByNameBuiltinGoal,
         help.AllHelpBuiltinGoal,
         help.NoGoalHelpBuiltinGoal,
         help.ThingHelpBuiltinGoal,
