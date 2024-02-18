@@ -37,7 +37,7 @@ class TextBlock:
         )
 
     @classmethod
-    def from_count(cls, *, start: int, count: int) -> TextBlock:
+    def from_count(cls, start: int, count: int) -> TextBlock:
         return cls(start=start, end=start + count)
 
 

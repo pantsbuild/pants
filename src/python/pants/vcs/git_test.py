@@ -390,7 +390,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +two
                 """
             ),
-            (Hunk(TextBlock(1, 0), TextBlock(2, 1)),),
+            (Hunk(TextBlock.from_count(1, 0), TextBlock.from_count(2, 1)),),
         ],
         [
             dedent(
@@ -401,7 +401,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 -two
                 """
             ),
-            (Hunk(TextBlock(2, 1), TextBlock(1, 0)),),
+            (Hunk(TextBlock.from_count(2, 1), TextBlock.from_count(1, 0)),),
         ],
         [
             dedent(
@@ -413,7 +413,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +four
                 """
             ),
-            (Hunk(TextBlock(2, 1), TextBlock(2, 1)),),
+            (Hunk(TextBlock.from_count(2, 1), TextBlock.from_count(2, 1)),),
         ],
         [
             dedent(
@@ -427,7 +427,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +six
                 """
             ),
-            (Hunk(TextBlock(2, 2), TextBlock(2, 2)),),
+            (Hunk(TextBlock.from_count(2, 2), TextBlock.from_count(2, 2)),),
         ],
     ],
 )
