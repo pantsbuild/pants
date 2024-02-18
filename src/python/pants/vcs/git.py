@@ -113,7 +113,7 @@ class GitWorktree(EngineAwareReturnType):
 
     def changed_files_lines(
         self,
-        paths: list[str],
+        paths: Iterable[str],
         from_commit: str,
         relative_to: PurePath | str | None = None,
     ) -> dict[str, tuple[Hunk, ...]]:

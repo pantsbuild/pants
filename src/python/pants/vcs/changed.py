@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Iterable
 
 from pants.backend.project_info import dependents
 from pants.backend.project_info.dependents import Dependents, DependentsRequest
@@ -17,7 +18,7 @@ from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.internals.target_adaptor import TextBlocks
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import UnexpandedTargets
-from pants.option.option_types import EnumOption, StrListOption, StrOption
+from pants.option.option_types import EnumOption, StrOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
@@ -111,7 +112,6 @@ class ChangedOptions:
 
     since: str | None
     diffspec: str | None
-    files_with_line_numbers: list[str] | None
     dependents: DependentsOption
 
     @classmethod
@@ -124,7 +124,7 @@ class ChangedOptions:
             old_container=options,
             new_container=options,
         )
-        return cls(options.since, options.diffspec, options.files_with_line_numbers, dependents)
+        return cls(options.since, options.diffspec, dependents)
 
     @property
     def provided(self) -> bool:
@@ -140,17 +140,16 @@ class ChangedOptions:
             from_commit=changes_since, include_untracked=True, relative_to=get_buildroot()
         )
 
-    def diff_hunks(self, git_worktree: GitWorktree) -> dict[str, tuple[Hunk, ...]]:
+    def diff_hunks(
+        self, git_worktree: GitWorktree, paths: Iterable[str]
+    ) -> dict[str, tuple[Hunk, ...]]:
         """Determines the universal diff hunks changed according to SCM/workspace and options.
 
         More info on universal diff: https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
         """
-        if not self.files_with_line_numbers:
-            return {}
-
         changes_since = self.since or git_worktree.current_rev_identifier
         return git_worktree.changed_files_lines(
-            paths=self.files_with_line_numbers,
+            paths=paths,
             from_commit=changes_since,
             relative_to=get_buildroot(),
         )
@@ -173,10 +172,6 @@ class Changed(Subsystem):
     diffspec = StrOption(
         default=None,
         help="Calculate changes contained within a given Git spec (commit range/SHA/ref).",
-    )
-    files_with_line_numbers = StrListOption(
-        default=None,
-        help="Calculate changes with line numbers for the specified list of files.",
     )
     dependents = EnumOption(
         default=DependentsOption.NONE,

@@ -12,7 +12,7 @@ import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, DefaultDict, Iterable, Iterator, NamedTuple, Sequence, Type, cast
+from typing import Any, DefaultDict, FrozenSet, Iterable, Iterator, NamedTuple, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -960,6 +960,15 @@ def calc_text_block_mapping(targets: AllTargets) -> TextBlockMapping:
             )
 
     return TextBlockMapping((filename, tuple(blocks)) for filename, blocks in result.items())
+
+
+class FilesWithTextBlocks(FrozenSet[str]):
+    pass
+
+
+@rule
+def calc_files_with_text_blocks(mapping: TextBlockMapping) -> FilesWithTextBlocks:
+    return FilesWithTextBlocks(mapping.keys())
 
 
 @dataclass(frozen=True)

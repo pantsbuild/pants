@@ -11,6 +11,7 @@ from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.core.util_rules.system_binaries import GitBinary
 from pants.engine.addresses import AddressInput
 from pants.engine.environment import EnvironmentName
+from pants.engine.internals.graph import FilesWithTextBlocks
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.target_adaptor import TextBlocks
@@ -70,26 +71,29 @@ def calculate_specs(
             "The `--changed-*` options are only available if Git is used for the repository."
         )
 
-    files_with_line_numbers = set(changed_options.files_with_line_numbers or [])
+    (files_with_text_blocks,) = session.product_request(
+        FilesWithTextBlocks, [Params(bootstrap_environment)]
+    )
     changed_files = tuple(
         file
         for file in changed_options.changed_files(maybe_git_worktree.git_worktree)
-        # We want to exclude the file from the normal processing flow if it was specified
-        # in --changed-files-with-line-numbers. These files are handled with special
-        # logic.
-        if file not in files_with_line_numbers
+        # We want to exclude the file from the normal processing flow if it has associated
+        # targets with text blocks. These files are handled with special logic.
+        if file not in files_with_text_blocks
     )
     file_literal_specs = tuple(FileLiteralSpec(f) for f in changed_files)
 
     text_blocks = FrozenDict(
-        {
+        (
+            path,
             # Hunk stores information about the old block and the new block.
             # Here we only care about the final state, so we take `hunk.right`.
-            path: TextBlocks(hunk.right for hunk in hunks)
-            for path, hunks in changed_options.diff_hunks(maybe_git_worktree.git_worktree).items()
-        }
-        if changed_options.files_with_line_numbers
-        else {}
+            TextBlocks(hunk.right for hunk in hunks),
+        )
+        for path, hunks in changed_options.diff_hunks(
+            maybe_git_worktree.git_worktree,
+            files_with_text_blocks,
+        ).items()
     )
     logger.debug("changed text blocks: %s", text_blocks)
 
@@ -140,4 +144,5 @@ def rules():
         QueryRule(ChangedAddresses, [ChangedRequest, EnvironmentName]),
         QueryRule(GitBinary, [EnvironmentName]),
         QueryRule(MaybeGitWorktree, [GitWorktreeRequest, GitBinary, EnvironmentName]),
+        QueryRule(FilesWithTextBlocks, [EnvironmentName]),
     ]
