@@ -963,7 +963,7 @@ class OwnersRequest:
     owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
-    blocks: FrozenDict[str, tuple[TextBlock, ...]] = FrozenDict()
+    text_blocks: FrozenDict[str, tuple[TextBlock, ...]] = FrozenDict()
 
 
 class Owners(FrozenOrderedSet[Address]):
@@ -979,10 +979,10 @@ async def find_owners(
     block_owners: tuple[Owners, ...] = (
         # If we need to process blocks, we delegate the logic to plugins.
         await MultiGet(
-            Get(Owners, BlockOwnersRequest, request_type(owners_request.blocks))
+            Get(Owners, BlockOwnersRequest, request_type(owners_request.text_blocks))
             for request_type in union_membership[BlockOwnersRequest]
         )
-        if owners_request.blocks
+        if owners_request.text_blocks
         else ()
     )
 

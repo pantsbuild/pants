@@ -73,14 +73,14 @@ def calculate_specs(
     changed_files = tuple(
         file
         for file in changed_options.changed_files(maybe_git_worktree.git_worktree)
-        # We want to exclude file from normal processing flow if it was specified
+        # We want to exclude the file from the normal processing flow if it was specified
         # in --changed-files-with-line-numbers. These files are handled with special
         # logic.
         if file not in files_with_line_numbers
     )
     file_literal_specs = tuple(FileLiteralSpec(f) for f in changed_files)
 
-    blocks = FrozenDict(
+    text_blocks = FrozenDict(
         {
             # Hunk stores information about the old block and the new block.
             # Here we only care about the final state, so we take `hunk.right`.
@@ -90,12 +90,12 @@ def calculate_specs(
         if changed_options.files_with_line_numbers
         else {}
     )
-    logger.debug("changed blocks: %s", blocks)
+    logger.debug("changed text blocks: %s", text_blocks)
 
     changed_request = ChangedRequest(
         sources=changed_files,
         dependents=changed_options.dependents,
-        blocks=blocks,
+        text_blocks=text_blocks,
     )
     (changed_addresses,) = session.product_request(
         ChangedAddresses,

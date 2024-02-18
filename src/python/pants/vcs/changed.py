@@ -38,7 +38,7 @@ class DependentsOption(Enum):
 class ChangedRequest:
     sources: tuple[str, ...]
     dependents: DependentsOption
-    blocks: FrozenDict[str, tuple[TextBlock, ...]]
+    text_blocks: FrozenDict[str, tuple[TextBlock, ...]]
 
 
 class ChangedAddresses(Collection[Address]):
@@ -61,7 +61,7 @@ async def find_changed_owners(
             filter_by_global_options=no_dependents,
             # Changing a BUILD file might impact the targets it defines.
             match_if_owning_build_file_included_in_sources=True,
-            blocks=request.blocks,
+            text_blocks=request.text_blocks,
         ),
     )
 
