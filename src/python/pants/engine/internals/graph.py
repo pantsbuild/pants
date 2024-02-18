@@ -3,16 +3,16 @@
 
 from __future__ import annotations
 
-import abc
 import dataclasses
 import functools
 import itertools
 import json
 import logging
 import os.path
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Type, cast
+from typing import Any, DefaultDict, Iterable, Iterator, NamedTuple, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -37,7 +37,7 @@ from pants.engine.internals.parametrize import (  # noqa: F401
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizationsRequest as _TargetParametrizationsRequest,
 )
-from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest, TextBlock
+from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest, TextBlocks
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
@@ -92,7 +92,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
     _generate_file_level_targets,
 )
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, UnmatchedBuildFileGlobs
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
@@ -940,15 +940,26 @@ def _log_or_raise_unmatched_owners(
         raise ResolveError(msg)
 
 
-@union
 @dataclass(frozen=True)
-class BlockOwnersRequest(abc.ABC):
-    """Union for file block owners requests.
+class TargetTextBlocks:
+    address: Address
+    text_blocks: TextBlocks
 
-    Define a subclass if you want to use `--changed-files-with-line-numbers` flag.
-    """
 
-    blocks: FrozenDict[str, tuple[TextBlock, ...]]
+class TextBlockMapping(FrozenDict[str, tuple[TargetTextBlocks, ...]]):
+    pass
+
+
+@rule
+def calc_text_block_mapping(targets: AllTargets) -> TextBlockMapping:
+    result: DefaultDict[str, list[TargetTextBlocks]] = defaultdict(list)
+    for target in targets:
+        for filename, text_blocks in target.origin_text_blocks.items():
+            result[filename].append(
+                TargetTextBlocks(address=target.address, text_blocks=text_blocks)
+            )
+
+    return TextBlockMapping((filename, tuple(blocks)) for filename, blocks in result.items())
 
 
 @dataclass(frozen=True)
@@ -963,7 +974,15 @@ class OwnersRequest:
     owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
-    text_blocks: FrozenDict[str, tuple[TextBlock, ...]] = FrozenDict()
+    text_blocks: FrozenDict[str, TextBlocks] = FrozenDict()
+
+
+@dataclass(frozen=True)
+class BlockOwnersRequest:
+    """Request for file text block owners."""
+
+    filename: str
+    blocks: TextBlocks
 
 
 class Owners(FrozenOrderedSet[Address]):
@@ -974,13 +993,12 @@ class Owners(FrozenOrderedSet[Address]):
 async def find_owners(
     owners_request: OwnersRequest,
     local_environment_name: ChosenLocalEnvironmentName,
-    union_membership: UnionMembership,
 ) -> Owners:
     block_owners: tuple[Owners, ...] = (
         # If we need to process blocks, we delegate the logic to plugins.
         await MultiGet(
-            Get(Owners, BlockOwnersRequest, request_type(owners_request.text_blocks))
-            for request_type in union_membership[BlockOwnersRequest]
+            Get(Owners, BlockOwnersRequest(filename, blocks))
+            for filename, blocks in owners_request.text_blocks.items()
         )
         if owners_request.text_blocks
         else ()
@@ -1076,6 +1094,25 @@ async def find_owners(
         )
 
     return Owners(result.union(*block_owners))
+
+
+@rule
+def find_block_owners(request: BlockOwnersRequest, mapping: TextBlockMapping) -> Owners:
+    file_blocks = mapping.get(request.filename)
+    if not file_blocks:
+        return Owners()
+
+    owners = set()
+
+    # TODO Use interval tree?
+    for request_block, target_blocks in itertools.product(request.blocks, file_blocks):
+        for target_block in target_blocks.text_blocks:
+            if request_block.intersection(target_block) is None:
+                continue
+            owners.add(target_blocks.address)
+            break  # continue outer loop
+
+    return Owners(owners)
 
 
 # -----------------------------------------------------------------------------------------------

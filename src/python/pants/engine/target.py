@@ -60,7 +60,7 @@ from pants.engine.internals.dep_rules import (
 )
 from pants.engine.internals.native_engine import NO_VALUE as NO_VALUE  # noqa: F401
 from pants.engine.internals.native_engine import Field as Field
-from pants.engine.internals.target_adaptor import TextBlock  # noqa: F401
+from pants.engine.internals.target_adaptor import TextBlock, TextBlocks  # noqa: F401
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec, FilespecMatcher
@@ -269,7 +269,7 @@ class Target:
     residence_dir: str
     name_explicitly_set: bool
     description_of_origin: str
-    origin_text_blocks: tuple[TextBlock, ...]
+    origin_text_blocks: FrozenDict[str, TextBlocks]
 
     @final
     def __init__(
@@ -285,7 +285,7 @@ class Target:
         residence_dir: str | None = None,
         ignore_unrecognized_fields: bool = False,
         description_of_origin: str | None = None,
-        origin_text_blocks: tuple[TextBlock, ...] = (),
+        origin_text_blocks: FrozenDict[str, TextBlocks] = FrozenDict(),
     ) -> None:
         """Create a target.
 

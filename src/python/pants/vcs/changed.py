@@ -14,7 +14,7 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.mapper import SpecsFilter
-from pants.engine.internals.target_adaptor import TextBlock
+from pants.engine.internals.target_adaptor import TextBlocks
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import UnexpandedTargets
 from pants.option.option_types import EnumOption, StrListOption, StrOption
@@ -38,7 +38,7 @@ class DependentsOption(Enum):
 class ChangedRequest:
     sources: tuple[str, ...]
     dependents: DependentsOption
-    text_blocks: FrozenDict[str, tuple[TextBlock, ...]]
+    text_blocks: FrozenDict[str, TextBlocks]
 
 
 class ChangedAddresses(Collection[Address]):

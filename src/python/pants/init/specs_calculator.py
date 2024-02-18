@@ -13,6 +13,7 @@ from pants.engine.addresses import AddressInput
 from pants.engine.environment import EnvironmentName
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
+from pants.engine.internals.target_adaptor import TextBlocks
 from pants.engine.rules import QueryRule
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -84,7 +85,7 @@ def calculate_specs(
         {
             # Hunk stores information about the old block and the new block.
             # Here we only care about the final state, so we take `hunk.right`.
-            path: tuple(hunk.right for hunk in hunks)
+            path: TextBlocks(hunk.right for hunk in hunks)
             for path, hunks in changed_options.diff_hunks(maybe_git_worktree.git_worktree).items()
         }
         if changed_options.files_with_line_numbers

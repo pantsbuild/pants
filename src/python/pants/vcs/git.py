@@ -143,11 +143,11 @@ class GitWorktree(EngineAwareReturnType):
             g = match.groups()
             try:
                 hunk = Hunk(
-                    left=TextBlock(
+                    left=TextBlock.from_count(
                         start=int(g[0]),
                         count=int(g[2]) if g[2] is not None else 1,
                     ),
-                    right=TextBlock(
+                    right=TextBlock.from_count(
                         start=int(g[3]),
                         count=int(g[5]) if g[5] is not None else 1,
                     ),
