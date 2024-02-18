@@ -7,13 +7,14 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, ClassVar, Iterable, Sequence
+from typing import Callable, ClassVar, Iterable, Sequence, Tuple
 
 from pants.engine.collection import Collection
-from pants.engine.environment import EnvironmentName
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
-from pants.engine.unions import union
+from pants.engine.unions import UnionMembership, union
 from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list, softwrap
 
@@ -331,7 +332,23 @@ class WrappedGenerateLockfile:
     request: GenerateLockfile
 
 
-async def determine_requested_resolves(requested_resolves, local_environment, union_membership):
+@dataclass(frozen=True)
+class RequestedResolvesNames:
+    val: Tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RequestedResolves:
+    user_requests: Tuple[UserGenerateLockfiles, ...]
+    tool_requests: Tuple[WrappedGenerateLockfile, ...]
+
+
+@rule
+async def determine_requested_resolves(
+    requested_resolves: RequestedResolvesNames,
+    local_environment: ChosenLocalEnvironmentName,
+    union_membership: UnionMembership,
+) -> RequestedResolves:
     known_user_resolve_names = await MultiGet(
         Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
         for request in union_membership.get(KnownUserResolveNamesRequest)
@@ -340,7 +357,7 @@ async def determine_requested_resolves(requested_resolves, local_environment, un
     requested_user_resolve_names, requested_tool_sentinels = determine_resolves_to_generate(
         known_user_resolve_names,
         union_membership.get(GenerateToolLockfileSentinel),
-        set(requested_resolves),
+        set(requested_resolves.val),
     )
     # This is the "planning" phase of lockfile generation. Currently this is all done in the local
     # environment, since there's not currently a clear mechanism to prescribe an environment.
@@ -359,4 +376,8 @@ async def determine_requested_resolves(requested_resolves, local_environment, un
         )
         for sentinel in requested_tool_sentinels
     )
-    return all_specified_user_requests, specified_tool_requests
+    return RequestedResolves(all_specified_user_requests, specified_tool_requests)
+
+
+def rules():
+    return collect_rules()

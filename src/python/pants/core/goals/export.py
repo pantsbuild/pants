@@ -15,15 +15,16 @@ from pants.core.goals.resolve_helpers import (
     GenerateToolLockfileSentinel,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
+    RequestedResolves,
+    RequestedResolvesNames,
     UnrecognizedResolveNamesError,
-    determine_requested_resolves,
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Effect, Get, MultiGet
@@ -148,11 +149,13 @@ async def export(
     build_root: BuildRoot,
     dist_dir: DistDir,
     export_subsys: ExportSubsystem,
-    local_environment: ChosenLocalEnvironmentName,
 ) -> Export:
-    all_specified_user_requests, specified_tool_requests = await determine_requested_resolves(
-        export_subsys.resolve, local_environment, union_membership
+    requested_resolve_names = await Get(
+        RequestedResolves,
+        RequestedResolvesNames(tuple(export_subsys.resolve)),
     )
+    all_specified_user_requests = requested_resolve_names.user_requests
+    specified_tool_requests = requested_resolve_names.tool_requests
 
     applicable_tool_requests = [req.request for req in specified_tool_requests]
 

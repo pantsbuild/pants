@@ -12,8 +12,9 @@ from pants.core.goals.resolve_helpers import (
     GenerateLockfile,
     GenerateToolLockfileSentinel,
     KnownUserResolveNamesRequest,
+    RequestedResolves,
+    RequestedResolvesNames,
     WrappedGenerateLockfile,
-    determine_requested_resolves,
 )
 from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
@@ -306,11 +307,12 @@ async def generate_lockfiles_goal(
     console: Console,
     global_options: GlobalOptions,
 ) -> GenerateLockfilesGoal:
-    all_specified_user_requests, specified_tool_requests = await determine_requested_resolves(
-        generate_lockfiles_subsystem.resolve, local_environment, union_membership
+    requested_resolves = await Get(
+        RequestedResolves,
+        RequestedResolvesNames(tuple(generate_lockfiles_subsystem.resolve)),
     )
     applicable_tool_requests = filter_tool_lockfile_requests(
-        specified_tool_requests,
+        requested_resolves.tool_requests,
         resolve_specified=bool(generate_lockfiles_subsystem.resolve),
     )
 
@@ -319,7 +321,7 @@ async def generate_lockfiles_goal(
     # environment to execute the request in. Currently we warn if multiple environments are
     # specified.
     all_requests: Iterator[GenerateLockfile] = itertools.chain(
-        *all_specified_user_requests, applicable_tool_requests
+        *(requested_resolves.user_requests), applicable_tool_requests
     )
     if generate_lockfiles_subsystem.request_diffs:
         all_requests = (replace(req, diff=True) for req in all_requests)
@@ -375,11 +377,6 @@ def _preferred_environment(request: GenerateLockfile, default: EnvironmentName) 
     )
 
     return ret
-
-
-# -----------------------------------------------------------------------------------------------
-# Helpers for determining the resolve
-# -----------------------------------------------------------------------------------------------
 
 
 def rules():
