@@ -12,6 +12,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
+from pants.engine.internals import target_adaptor
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.rules import Get, collect_rules, rule
@@ -25,7 +26,6 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text
 from pants.vcs.git import GitWorktree
 from pants.vcs.hunk import Hunk
-from pants.engine.internals import target_adaptor
 
 
 class DependentsOption(Enum):

@@ -13,12 +13,12 @@ from typing import Iterator
 import pytest
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
+from pants.engine.internals.target_adaptor import TextBlock
 from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
 from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, get_git_worktree
 from pants.vcs.hunk import Hunk
-from pants.engine.internals.target_adaptor import TextBlock
 
 
 def init_repo(remote_name: str, remote: PurePath) -> None:

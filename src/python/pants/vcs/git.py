@@ -16,10 +16,10 @@ from typing import Any, Iterable
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
 from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.internals import target_adaptor
 from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
 from pants.vcs.hunk import Hunk
-from pants.engine.internals import target_adaptor
 
 logger = logging.getLogger(__name__)
 

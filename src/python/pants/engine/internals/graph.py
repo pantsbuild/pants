@@ -37,7 +37,7 @@ from pants.engine.internals.parametrize import (  # noqa: F401
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizationsRequest as _TargetParametrizationsRequest,
 )
-from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
+from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest, TextBlock
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
@@ -100,7 +100,6 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list, pluralize, softwrap
-from pants.engine.internals.target_adaptor import TextBlock
 
 logger = logging.getLogger(__name__)
 
