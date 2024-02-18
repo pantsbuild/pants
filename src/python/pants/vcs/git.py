@@ -16,7 +16,7 @@ from typing import Any, Iterable
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.internals import target_adaptor
+from pants.engine.internals.target_adaptor import TextBlock
 from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
 from pants.vcs.hunk import Hunk
@@ -143,11 +143,11 @@ class GitWorktree(EngineAwareReturnType):
             g = match.groups()
             try:
                 hunk = Hunk(
-                    left=target_adaptor.Block(
+                    left=TextBlock(
                         start=int(g[0]),
                         count=int(g[2]) if g[2] is not None else 1,
                     ),
-                    right=target_adaptor.Block(
+                    right=TextBlock(
                         start=int(g[3]),
                         count=int(g[5]) if g[5] is not None else 1,
                     ),

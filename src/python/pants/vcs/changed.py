@@ -12,9 +12,9 @@ from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
-from pants.engine.internals import target_adaptor
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.mapper import SpecsFilter
+from pants.engine.internals.target_adaptor import TextBlock
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import UnexpandedTargets
 from pants.option.option_types import EnumOption, StrListOption, StrOption
@@ -38,7 +38,7 @@ class DependentsOption(Enum):
 class ChangedRequest:
     sources: tuple[str, ...]
     dependents: DependentsOption
-    blocks: FrozenDict[str, tuple[target_adaptor.Block, ...]]
+    blocks: FrozenDict[str, tuple[TextBlock, ...]]
 
 
 class ChangedAddresses(Collection[Address]):
