@@ -18,7 +18,8 @@ from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException,
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
-from pants.vcs.hunk import Block, Hunk
+from pants.vcs.hunk import Hunk
+from pants.engine.internals import target_adaptor
 
 logger = logging.getLogger(__name__)
 
@@ -142,11 +143,11 @@ class GitWorktree(EngineAwareReturnType):
             g = match.groups()
             try:
                 hunk = Hunk(
-                    left=Block(
+                    left=target_adaptor.Block(
                         start=int(g[0]),
                         count=int(g[2]) if g[2] is not None else 1,
                     ),
-                    right=Block(
+                    right=target_adaptor.Block(
                         start=int(g[3]),
                         count=int(g[5]) if g[5] is not None else 1,
                     ),

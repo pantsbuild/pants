@@ -2,13 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
 
-
-@dataclass(frozen=True)
-class Block:
-    """Block of lines in a file."""
-
-    start: int
-    count: int
+from pants.engine.internals.target_adaptor import Block
 
 
 @dataclass(frozen=True)

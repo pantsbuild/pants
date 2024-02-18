@@ -14,6 +14,14 @@ from pants.engine.engine_aware import EngineAwareParameter
 
 
 @dataclass(frozen=True)
+class TextBlock:
+    """Block of lines in a file."""
+
+    start: int
+    count: int
+
+
+@dataclass(frozen=True)
 class TargetAdaptorRequest(EngineAwareParameter):
     """Lookup the TargetAdaptor for an Address."""
 
@@ -32,7 +40,11 @@ class TargetAdaptor:
     __slots__ = ("type_alias", "name", "kwargs", "description_of_origin")
 
     def __init__(
-        self, type_alias: str, name: str | None, __description_of_origin__: str, **kwargs: Any
+        self,
+        type_alias: str,
+        name: str | None,
+        __description_of_origin__: str,
+        **kwargs: Any,
     ) -> None:
         self.type_alias = type_alias
         self.name = name

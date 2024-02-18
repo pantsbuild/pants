@@ -17,7 +17,8 @@ from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
 from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, get_git_worktree
-from pants.vcs.hunk import Block, Hunk
+from pants.vcs.hunk import Hunk
+from pants.engine.internals.target_adaptor import TextBlock
 
 
 def init_repo(remote_name: str, remote: PurePath) -> None:
@@ -389,7 +390,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +two
                 """
             ),
-            (Hunk(Block(1, 0), Block(2, 1)),),
+            (Hunk(TextBlock(1, 0), TextBlock(2, 1)),),
         ],
         [
             dedent(
@@ -400,7 +401,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 -two
                 """
             ),
-            (Hunk(Block(2, 1), Block(1, 0)),),
+            (Hunk(TextBlock(2, 1), TextBlock(1, 0)),),
         ],
         [
             dedent(
@@ -412,7 +413,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +four
                 """
             ),
-            (Hunk(Block(2, 1), Block(2, 1)),),
+            (Hunk(TextBlock(2, 1), TextBlock(2, 1)),),
         ],
         [
             dedent(
@@ -426,7 +427,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +six
                 """
             ),
-            (Hunk(Block(2, 2), Block(2, 2)),),
+            (Hunk(TextBlock(2, 2), TextBlock(2, 2)),),
         ],
     ],
 )

@@ -24,7 +24,8 @@ from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text
 from pants.vcs.git import GitWorktree
-from pants.vcs.hunk import Block, Hunk
+from pants.vcs.hunk import Hunk
+from pants.engine.internals import target_adaptor
 
 
 class DependentsOption(Enum):
@@ -37,7 +38,7 @@ class DependentsOption(Enum):
 class ChangedRequest:
     sources: tuple[str, ...]
     dependents: DependentsOption
-    blocks: FrozenDict[str, tuple[Block, ...]]
+    blocks: FrozenDict[str, tuple[target_adaptor.Block, ...]]
 
 
 class ChangedAddresses(Collection[Address]):

@@ -100,7 +100,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list, pluralize, softwrap
-from pants.vcs.hunk import Block
+from pants.engine.internals.target_adaptor import TextBlock
 
 logger = logging.getLogger(__name__)
 
@@ -949,7 +949,7 @@ class BlockOwnersRequest(abc.ABC):
     Define a subclass if you want to use `--changed-files-with-line-numbers` flag.
     """
 
-    blocks: FrozenDict[str, tuple[Block, ...]]
+    blocks: FrozenDict[str, tuple[TextBlock, ...]]
 
 
 @dataclass(frozen=True)
@@ -964,7 +964,7 @@ class OwnersRequest:
     owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
-    blocks: FrozenDict[str, tuple[Block, ...]] = FrozenDict()
+    blocks: FrozenDict[str, tuple[TextBlock, ...]] = FrozenDict()
 
 
 class Owners(FrozenOrderedSet[Address]):
