@@ -233,9 +233,7 @@ async def update_build_files(
     if not chosen_formatter_request_class:
         raise ValueError(f"Unrecognized formatter: {update_build_files_subsystem.formatter}")
 
-    logger.info("Chosen formatter request class: %s", chosen_formatter_request_class.__name__)
     for request in union_membership[RewrittenBuildFileRequest]:
-        # 18:12:24.29 [INFO] Using BLACK formatter to format BUILD files for subsystem update-build-files and request class <class 'abc.ABCMeta'>.
         if update_build_files_subsystem.fmt and issubclass(request, chosen_formatter_request_class):
             rewrite_request_classes.append(request)
 
