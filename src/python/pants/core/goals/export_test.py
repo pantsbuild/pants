@@ -10,7 +10,7 @@ from typing import Iterable, List, Tuple
 
 import pytest
 
-from pants.backend.python.goals.lockfile import RequestedPythonUserResolveNames
+from pants.backend.python.goals.lockfile_generation import RequestedPythonUserResolveNames
 from pants.base.build_root import BuildRoot
 from pants.core.goals.export import (
     Export,

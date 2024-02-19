@@ -16,8 +16,8 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pkg_resources import Requirement
 
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals import lockfile, lockfile_generation
+from pants.backend.python.goals.lockfile_generation import GeneratePythonLockfile
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex_test_utils
@@ -461,6 +461,7 @@ def test_local_requirements_and_path_mappings(
             *pex_test_utils.rules(),
             *pex_rules(),
             *lockfile.rules(),
+            *lockfile_generation.rules(),
             QueryRule(GenerateLockfileResult, [GeneratePythonLockfile]),
             QueryRule(PexResolveInfo, (Pex,)),
         ],

@@ -12,6 +12,7 @@ from pants.backend.python.goals import (
     coverage_py,
     export,
     lockfile,
+    lockfile_generation,
     package_dists,
     package_pex_binary,
     pytest_runner,
@@ -87,6 +88,7 @@ def rules():
         *local_dists.rules(),
         *export.rules(),
         *lockfile.rules(),
+        *lockfile_generation.rules(),
         # Macros.
         *pipenv_requirements.rules(),
         *poetry_requirements.rules(),
