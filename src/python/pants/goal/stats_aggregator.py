@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import base64
+import datetime
 import logging
 from collections import Counter
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
 
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
@@ -17,9 +20,10 @@ from pants.engine.streaming_workunit_handler import (
     WorkunitsCallbackFactoryRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.option.option_types import BoolOption
+from pants.option.option_types import BoolOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.collections import deep_getsizeof
+from pants.util.dirutil import safe_open
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -55,13 +59,33 @@ class StatsAggregatorSubsystem(Subsystem):
         ),
         advanced=True,
     )
+    output_file = StrOption(
+        default=None,
+        metavar="<path>",
+        help="Output the stats to this file. If unspecified, outputs to stdout.",
+    )
+
+
+def _log_or_write_to_file(output_file: Optional[str], lines: list[str]) -> None:
+    """Send text to the stdout or write to the output file."""
+    if lines:
+        text = "\n".join(lines)
+        if output_file:
+            with safe_open(output_file, "a") as fh:
+                fh.write(text)
+            logger.info(f"Wrote Pants stats to {output_file}")
+        else:
+            logger.info(text)
 
 
 class StatsAggregatorCallback(WorkunitsCallback):
-    def __init__(self, *, log: bool, memory: bool, has_histogram_module: bool) -> None:
+    def __init__(
+        self, *, log: bool, memory: bool, output_file: Optional[str], has_histogram_module: bool
+    ) -> None:
         super().__init__()
         self.log = log
         self.memory = memory
+        self.output_file = output_file
         self.has_histogram_module = has_histogram_module
 
     @property
@@ -80,6 +104,15 @@ class StatsAggregatorCallback(WorkunitsCallback):
         if not finished:
             return
 
+        output_lines = []
+        if self.output_file:
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # have an empty line between stats of different Pants invocations
+            space = "\n\n" if Path(self.output_file).exists() else ""
+            output_lines.append(
+                f"{space}{timestamp} Command: {context.run_tracker.run_information().get('cmd_line')}"
+            )
+
         if self.log:
             # Capture global counters.
             counters = Counter(context.get_metrics())
@@ -93,7 +126,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
             counter_lines = "\n".join(
                 f"  {name}: {count}" for name, count in sorted(counters.items())
             )
-            logger.info(f"Counters:\n{counter_lines}")
+            output_lines.append(f"Counters:\n{counter_lines}")
 
         if self.memory:
             ids: set[int] = set()
@@ -115,18 +148,23 @@ class StatsAggregatorCallback(WorkunitsCallback):
             memory_lines = "\n".join(
                 f"  {size}\t\t{count}\t\t{name}" for size, count, name in sorted(entries)
             )
-            logger.info(f"Memory summary (total size in bytes, count, name):\n{memory_lines}")
+            output_lines.append(
+                f"Memory summary (total size in bytes, count, name):\n{memory_lines}"
+            )
 
         if not (self.log and self.has_histogram_module):
+            _log_or_write_to_file(self.output_file, output_lines)
             return
+
         from hdrh.histogram import HdrHistogram  # pants: no-infer-dep
 
         histograms = context.get_observation_histograms()["histograms"]
         if not histograms:
-            logger.info("No observation histogram were recorded.")
+            output_lines.append("No observation histogram were recorded.")
+            _log_or_write_to_file(self.output_file, output_lines)
             return
 
-        logger.info("Observation histogram summaries:")
+        output_lines.append("Observation histogram summaries:")
         for name, encoded_histogram in histograms.items():
             # Note: The Python library for HDR Histogram will only decode compressed histograms
             # that are further encoded with base64. See
@@ -138,7 +176,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
                     [25, 50, 75, 90, 95, 99]
                 ).items()
             )
-            logger.info(
+            output_lines.append(
                 f"Summary of `{name}` observation histogram:\n"
                 f"  min: {histogram.get_min_value()}\n"
                 f"  max: {histogram.get_max_value()}\n"
@@ -148,6 +186,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
                 f"  sum: {int(histogram.get_mean_value() * histogram.total_count)}\n"
                 f"{percentile_to_vals}"
             )
+        _log_or_write_to_file(self.output_file, output_lines)
 
 
 @dataclass(frozen=True)
@@ -178,6 +217,7 @@ def construct_callback(
             StatsAggregatorCallback(
                 log=subsystem.log,
                 memory=subsystem.memory_summary,
+                output_file=subsystem.output_file,
                 has_histogram_module=has_histogram_module,
             )
             if subsystem.log or subsystem.memory_summary

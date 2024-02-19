@@ -3,7 +3,7 @@
 
 from pants.backend.build_files.fmt.base import FmtBuildFilesRequest
 from pants.backend.python.lint.ruff import subsystem as ruff_subsystem
-from pants.backend.python.lint.ruff.rules import _run_ruff_fmt
+from pants.backend.python.lint.ruff.fmt_rules import _run_ruff_fmt
 from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.subsystems.python_tool_base import get_lockfile_interpreter_constraints
 from pants.core.goals.fmt import FmtResult
