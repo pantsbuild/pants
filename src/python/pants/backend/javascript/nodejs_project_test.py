@@ -95,6 +95,21 @@ def test_immutable_install_args_property(rule_runner: RuleRunner) -> None:
     }
 
 
+def test_immutable_install_args_property_with_unsupported_package_manager(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/foo/BUILD": "package_json()",
+            "src/js/foo/package.json": given_package("foo", "0.0.1", package_manager="bar@2.4.3"),
+        }
+    )
+    projects = rule_runner.request(AllNodeJSProjects, [])
+    expected_error = "Unsupported package manager: bar"
+    with pytest.raises(ValueError, match=expected_error):
+        {project.immutable_install_args for project in projects}
+
+
 def test_root_package_json_is_supported(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

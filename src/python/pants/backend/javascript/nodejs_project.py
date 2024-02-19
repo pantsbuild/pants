@@ -80,11 +80,13 @@ class NodeJSProject:
     def immutable_install_args(self) -> tuple[str, ...]:
         if self.package_manager == "npm":
             return ("clean-install",)
+        if self.package_manager == "pnpm":
+            return ("install", "--frozen-lockfile")
         if self.package_manager == "yarn":
             if nodesemver.satisfies(self.package_manager_version, "1.x"):
                 return ("install", "--frozen-lockfile")
             return ("install", "--immutable")
-        return ("install", "--frozen-lockfile")
+        raise ValueError(f"Unsupported package manager: {self.package_manager}")
 
     @property
     def workspace_specifier_arg(self) -> str:
