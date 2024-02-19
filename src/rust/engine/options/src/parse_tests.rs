@@ -89,13 +89,13 @@ fn test_parse_int() {
     check_int(9223372036854775807, "9223372036854775807");
     check_int(-9223372036854775808, "-9223372036854775808");
     assert_eq!(
-        "Problem parsing foo int value:\n1:badint\n  ^\nExpected \"+\", \"-\" or ['0' ..= '9'] \
+        "Problem parsing foo int value:\n1:badint\n  ^\nExpected \"+\", \"-\" or ['0'..='9'] \
                at line 1 column 1"
             .to_owned(),
         parse_int("badint").unwrap_err().render("foo")
     );
     assert_eq!(
-        "Problem parsing foo int value:\n1:12badint\n  --^\nExpected \"_\", EOF or ['0' ..= '9'] \
+        "Problem parsing foo int value:\n1:12badint\n  --^\nExpected \"_\", EOF or ['0'..='9'] \
                at line 1 column 3"
             .to_owned(),
         parse_int("12badint").unwrap_err().render("foo")

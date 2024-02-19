@@ -32,7 +32,7 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
     let (env, dropped) = Env::capture_lossy();
     let env_items = (&env).into();
     let argv = env::args().collect::<Vec<_>>();
-    let options_parser = OptionParser::new(Args::argv(), env, None, true, false)?;
+    let options_parser = OptionParser::new(Args::argv(), env, None, true, false, None)?;
 
     let use_pantsd = options_parser.parse_bool(&option_id!("pantsd"), true)?;
     if !use_pantsd.value {

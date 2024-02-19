@@ -175,3 +175,9 @@ Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
 ```
 
 You can set auto approve by adding `-auto-approve` to the `[download-terraform].args` setting in `pants.toml`. You can also set it for a single pants invocation with `--download-terraform-args='-auto-approve'`, for example `pants experimental-deploy "--download-terraform-args='-auto-approve'"`.
+
+To run `terraform plan`, use the `--dry-run` flag of the `experimental-deploy` goal.
+
+```
+pants experimental-deploy --dry-run ::
+```

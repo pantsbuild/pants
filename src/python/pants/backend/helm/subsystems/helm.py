@@ -25,7 +25,6 @@ _VALID_PASSTHROUGH_FLAGS = [
     "--cleanup-on-fail",
     "--create-namespace",
     "--debug",
-    "--dry-run",
     "--force",
     "--wait",
     "--wait-for-jobs",
@@ -165,7 +164,7 @@ class HelmSubsystem(TemplatedExternalTool):
     )
 
     args = ArgsListOption(
-        example="--dry-run",
+        example="--force",
         passthrough=True,
         extra_help=softwrap(
             f"""
@@ -180,6 +179,8 @@ class HelmSubsystem(TemplatedExternalTool):
 
             Before attempting to use passthrough arguments, check the reference of each of the available target types
             to see what fields are accepted in each of them.
+
+            To pass `--dry-run`, use the `--experimental-deploy-dry-run` flag.
             """
         ),
     )

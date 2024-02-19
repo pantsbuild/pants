@@ -178,9 +178,9 @@ class WorkunitsCallback(ABC):
         completed?
 
         The main reason to `return False` is if your callback logs in its final call, when
-        `finished=True`, as it may end up logging to `.pantsd.d/pants.log` instead of the console,
-        which is harder for users to find. Otherwise, most callbacks should return `True` to avoid
-        slowing down Pants from finishing the run.
+        `finished=True`, as it may end up logging to `.pants.d/workdir/pants.log` instead of the
+        console, which is harder for users to find. Otherwise, most callbacks should return `True`
+        to avoid slowing down Pants from finishing the run.
         """
 
 

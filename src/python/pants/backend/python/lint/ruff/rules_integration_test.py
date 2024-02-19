@@ -9,8 +9,10 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.lint.ruff import skip_field
-from pants.backend.python.lint.ruff.rules import RuffFixRequest, RuffFormatRequest, RuffLintRequest
-from pants.backend.python.lint.ruff.rules import rules as ruff_rules
+from pants.backend.python.lint.ruff.check_rules import RuffFixRequest, RuffLintRequest
+from pants.backend.python.lint.ruff.check_rules import rules as ruff_rules
+from pants.backend.python.lint.ruff.fmt_rules import RuffFormatRequest
+from pants.backend.python.lint.ruff.fmt_rules import rules as ruff_fmt_rules
 from pants.backend.python.lint.ruff.subsystem import RuffFieldSet
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
@@ -35,6 +37,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *ruff_rules(),
+            *ruff_fmt_rules(),
             *skip_field.rules(),
             *ruff_subsystem_rules(),
             *config_files.rules(),
