@@ -161,17 +161,17 @@ to process the exported graph. For instance, you could:
 ```bash
 $ pants dependencies --filter-target-type=python_test --format=json :: \
   | jq -r 'to_entries[] | "\(.key)\t\(.value | length)"' \
-  | sort -k2
+  | sort -k2 -n
 ```
 
-* find build targets that no one depends on
+* find resources that only a few other targets depend on
 
 ```bash
 $ pants dependents --filter-target-type=resource --format=json :: \
-  jq -r 'to_entries[] | select(.value | length == 0)'
+  | jq -r 'to_entries[] | select(.value | length < 2)'
 ```
 
-* find project source files that transitively lead to most tests
+* find files within the `src/` directory that transitively lead to the most tests
 
 ```python
 # depgraph.py
@@ -185,8 +185,8 @@ for source, dependents in data.items():
 ```
 
 ```bash
-$ pants dependents --transitive --format=json cheeseshop:: > data.json
-$ python3 depgraph.py | sort -k2
+$ pants dependents --transitive --format=json src:: > data.json
+$ python3 depgraph.py | sort -k2 -n
 ```
 
 For more sophisticated graph querying, you may want to look into graph libraries such as [`networkx`](https://networkx.org/).
