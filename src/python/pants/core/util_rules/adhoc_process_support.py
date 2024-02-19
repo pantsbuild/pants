@@ -411,7 +411,7 @@ async def create_tool_runner(
         Get(
             ResolvedExecutionDependencies,
             ResolveExecutionDependenciesRequest(
-                address=runnable_address,
+                address=request.target.address,
                 execution_dependencies=request.execution_dependencies,
                 runnable_dependencies=request.runnable_dependencies,
             ),
