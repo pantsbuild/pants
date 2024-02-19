@@ -36,4 +36,4 @@ def test_scala_version_parser(
     ],
 )
 def test_scala_version_greater_than(lhs: ScalaVersion, rhs: ScalaVersion, expected: bool) -> None:
-    assert lhs > rhs if expected else True
+    assert (lhs > rhs) == expected
