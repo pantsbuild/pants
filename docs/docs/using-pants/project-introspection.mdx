@@ -127,6 +127,72 @@ To include the original target itself, use `--closed`:
 helloworld/main.py:lib
 ```
 
+## Export dependency graph
+
+Both `dependencies` and `dependents` goals have the `--format` option allowing you to export data in multiple formats.
+Exporting information about the dependencies and dependents in JSON format will produce the
+[adjacency list](https://en.wikipedia.org/wiki/Adjacency_list) of your dependency graph:
+
+```bash
+$ pants dependencies --format=json \
+  helloworld/greet/greeting.py \
+  helloworld/translator/translator_test.py
+
+{
+    "helloworld/greet/greeting.py:lib": [
+        "//:reqs#setuptools",
+        "//:reqs#types-setuptools",
+        "helloworld/greet:translations",
+        "helloworld/translator/translator.py:lib"
+    ],
+    "helloworld/translator/translator_test.py:tests": [
+        "//:reqs#pytest",
+        "helloworld/translator/translator.py:lib"
+    ]
+}
+```
+
+This has various applications, and you could analyze, visualize, and process the data further. Sometimes, a fairly
+straightforward `jq` query would suffice, but for anything more complex, it may make sense to write a small program
+to process the exported graph. For instance, you could:
+
+* find tests with most transitive dependencies
+
+```bash
+$ pants dependencies --filter-target-type=python_test --format=json :: \
+  | jq -r 'to_entries[] | "\(.key)\t\(.value | length)"' \
+  | sort -k2 -n
+```
+
+* find resources that only a few other targets depend on
+
+```bash
+$ pants dependents --filter-target-type=resource --format=json :: \
+  | jq -r 'to_entries[] | select(.value | length < 2)'
+```
+
+* find files within the `src/` directory that transitively lead to the most tests
+
+```python
+# depgraph.py
+import json
+
+with open("data.json") as fh:
+    data = json.load(fh)
+
+for source, dependents in data.items():
+    print(source, len([d for d in dependents if d.startswith("tests/")]))
+```
+
+```bash
+$ pants dependents --transitive --format=json src:: > data.json
+$ python3 depgraph.py | sort -k2 -n
+```
+
+For more sophisticated graph querying, you may want to look into graph libraries such as [`networkx`](https://networkx.org/).
+In a larger repository, it may make sense to track the health of the dependency graph and use the output
+of the graph export to identify parts of your codebase that would benefit from refactoring.
+
 ## `filedeps` - find which files a target owns
 
 `filedeps` outputs all of the files belonging to a target, based on its `sources` field.
