@@ -1786,6 +1786,6 @@ class VCSVersion(Target):
         a subset of that config in this target's fields.
 
         If you need functionality that is not currently exposed here, please reach out to us at
-        {doc_url("community/getting-help", versioned=False)}.
+        {doc_url("community/getting-help")}.
         """
     )
