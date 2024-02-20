@@ -77,7 +77,6 @@ def generic_goal_rule_runner() -> RuleRunner:
             update_build_files,
             add_line,
             reverse_lines,
-            *UpdateBuildFilesSubsystem.rules(),
             # Ruff and Yapf are included, but Black is not because
             # that's the formatter we enable in pants.toml.
             # These tests check that Ruff and Yapf are NOT invoked.
