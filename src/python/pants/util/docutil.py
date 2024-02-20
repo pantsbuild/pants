@@ -16,7 +16,7 @@ def terminal_width(*, fallback: int = 96, padding: int = 2) -> int:
     return shutil.get_terminal_size(fallback=(fallback, 24)).columns - padding
 
 
-_VERSIONED_PREFICES = ("docs/", "reference/")
+_VERSIONED_PREFIXES = ("docs/", "reference/")
 
 
 def doc_url(path: str) -> str:
@@ -30,7 +30,7 @@ def doc_url(path: str) -> str:
       https://www.pantsbuild.org/2.19/docs/python/overview/enabling-python-support, pass
       `"docs/python/overview/enabling-python-support"`
     """
-    versioned = any(path.startswith(prefix) for prefix in _VERSIONED_PREFICES)
+    versioned = any(path.startswith(prefix) for prefix in _VERSIONED_PREFIXES)
     version_info = f"{MAJOR_MINOR}/" if versioned else ""
     return f"https://www.pantsbuild.org/{version_info}{path}"
 
