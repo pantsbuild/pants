@@ -216,12 +216,20 @@ def black_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
             format_build_file_with_black,
+            format_build_file_with_ruff,
+            format_build_file_with_yapf,
             update_build_files,
             *config_files.rules(),
             *pex.rules(),
             *Black.rules(),
+            # Even though Ruff and Yapf are included here,
+            # only Black should be used for formatting.
+            *Ruff.rules(),
+            *Yapf.rules(),
             *UpdateBuildFilesSubsystem.rules(),
             UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
+            UnionRule(RewrittenBuildFileRequest, FormatWithRuffRequest),
+            UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
         ),
         target_types=[GenericTarget],
     )
