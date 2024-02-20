@@ -242,6 +242,13 @@ async def update_build_files(
         ):
             rewrite_request_classes.append(request)
 
+        # If there are other types of formatters that aren't the standard backends
+        # or deprecation fixers, add them here.
+        if request not in formatter_to_request_class.values() and not issubclass(
+            request, DeprecationFixerRequest
+        ):
+            rewrite_request_classes.append(request)
+
     build_file_to_lines = {
         build_file.path: tuple(build_file.content.decode("utf-8").splitlines())
         for build_file in specified_build_files
