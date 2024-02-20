@@ -79,11 +79,12 @@ def generic_goal_rule_runner() -> RuleRunner:
             format_build_file_with_ruff,
             format_build_file_with_yapf,
             update_build_files,
-            # Ruff and Yapf are included, but Black is not because
-            # that's the formatter we enable in pants.toml.
-            # These tests check that Ruff and Yapf are NOT invoked.
             *config_files.rules(),
             *pex.rules(),
+            # Ruff and Yapf are included, but Black isn't because
+            # that's the formatter we enable in pants.toml.
+            # These tests check that Ruff and Yapf are NOT invoked,
+            # but the other rewrite targets are invoked.
             *Ruff.rules(),
             *Yapf.rules(),
             *UpdateBuildFilesSubsystem.rules(),
