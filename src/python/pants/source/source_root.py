@@ -43,7 +43,9 @@ class SourceRootError(Exception):
     """An error related to SourceRoot computation."""
 
     def __init__(self, msg: str):
-        super().__init__(f"{msg}See {doc_url('docs/using-pants/key-concepts/source-roots')} for how to define source roots.")
+        super().__init__(
+            f"{msg}See {doc_url('docs/using-pants/key-concepts/source-roots')} for how to define source roots."
+        )
 
 
 class InvalidSourceRootPatternError(SourceRootError):
