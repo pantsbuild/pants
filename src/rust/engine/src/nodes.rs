@@ -1593,7 +1593,7 @@ impl Node for NodeKey {
             path.push(path[0].clone());
         }
         let url = Python::with_gil(|py| {
-            externs::doc_url(py, "targets#dependencies-and-dependency-inference")
+            externs::doc_url(py, "docs/using-pants/key-concepts/targets-and-build-files#dependencies-and-dependency-inference")
         });
         throw(format!(
             "The dependency graph contained a cycle:\

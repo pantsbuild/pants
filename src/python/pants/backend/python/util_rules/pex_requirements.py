@@ -626,13 +626,13 @@ def _invalid_lockfile_error(
             (see below).
             """
         )
-        yield f"\n\nSee {doc_url('python-interpreter-compatibility')} for details."
+        yield f"\n\nSee {doc_url('docs/python/overview/interpreter-compatibility')} for details."
 
     yield "\n\n"
     yield from _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)
     yield "To regenerate your lockfile, "
     yield f"run `{bin_name()} generate-lockfiles --resolve={resolve}`."
-    yield f"\n\nSee {doc_url('python-third-party-dependencies')} for details.\n\n"
+    yield f"\n\nSee {doc_url('docs/python/overview/third-party-dependencies')} for details.\n\n"
 
 
 def rules():
