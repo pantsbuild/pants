@@ -74,12 +74,24 @@ def reverse_lines(request: MockRewriteReverseLines) -> RewrittenBuildFile:
 def generic_goal_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
-            update_build_files,
             add_line,
             reverse_lines,
+            format_build_file_with_ruff,
+            format_build_file_with_yapf,
+            update_build_files,
+            *config_files.rules(),
+            *pex.rules(),
+            # Ruff and Yapf are included, but Black isn't because
+            # that's the formatter we enable in pants.toml.
+            # These tests check that Ruff and Yapf are NOT invoked,
+            # but the other rewrite targets are invoked.
+            *Ruff.rules(),
+            *Yapf.rules(),
             *UpdateBuildFilesSubsystem.rules(),
             UnionRule(RewrittenBuildFileRequest, MockRewriteAddLine),
             UnionRule(RewrittenBuildFileRequest, MockRewriteReverseLines),
+            UnionRule(RewrittenBuildFileRequest, FormatWithRuffRequest),
+            UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
         )
     )
 
@@ -204,12 +216,20 @@ def black_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
             format_build_file_with_black,
+            format_build_file_with_ruff,
+            format_build_file_with_yapf,
             update_build_files,
             *config_files.rules(),
             *pex.rules(),
             *Black.rules(),
+            # Even though Ruff and Yapf are included here,
+            # only Black should be used for formatting.
+            *Ruff.rules(),
+            *Yapf.rules(),
             *UpdateBuildFilesSubsystem.rules(),
             UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
+            UnionRule(RewrittenBuildFileRequest, FormatWithRuffRequest),
+            UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
         ),
         target_types=[GenericTarget],
     )
