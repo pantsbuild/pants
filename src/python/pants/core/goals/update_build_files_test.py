@@ -108,7 +108,7 @@ def test_goal_rewrite_mode(generic_goal_rule_runner: RuleRunner) -> None:
     )
 
 
-def test_goal_check_mode(generic_goal_rule_runner: RuleRunner) -> None:
+def test_multi_formatter_goal_check_mode(generic_goal_rule_runner: RuleRunner) -> None:
     """Checks that we correctly set the exit code and pipe fixers to each other."""
     generic_goal_rule_runner.write_files({"BUILD": "# line\n", "dir/BUILD": "# line 1\n# line 2\n"})
     result = generic_goal_rule_runner.run_goal_rule(
@@ -365,3 +365,82 @@ def test_yapf_fixer_noops() -> None:
     assert result.exit_code == 0
     assert not result.stdout
     assert build == 'target(name="t")\n'
+
+
+# ------------------------------------------------------------------------------------------
+# Test with multiple formatters enabled
+# ------------------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def multi_formatter_rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=(
+            update_build_files,
+            add_line,
+            reverse_lines,
+            *config_files.rules(),
+            *pex.rules(),
+            # Ruff and Yapf are included, but Black is not because
+            # that's the formatter we enable in pants.toml.
+            # The tests should ensure that Ruff and Yapf do NOT run on these files.
+            *Ruff.rules(),
+            *Yapf.rules(),
+            *UpdateBuildFilesSubsystem.rules(),
+            UnionRule(RewrittenBuildFileRequest, MockRewriteAddLine),
+            UnionRule(RewrittenBuildFileRequest, MockRewriteReverseLines),
+            UnionRule(RewrittenBuildFileRequest, FormatWithRuffRequest),
+            UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
+        )
+    )
+
+
+def test_multi_formatter_goal_rewrite_mode(generic_goal_rule_runner: RuleRunner) -> None:
+    """Checks that we correctly write the changes and pipe fixers to each other."""
+    generic_goal_rule_runner.write_files({"BUILD": "# line\n", "dir/BUILD": "# line 1\n# line 2\n"})
+    result = generic_goal_rule_runner.run_goal_rule(UpdateBuildFilesGoal, args=["::"])
+    assert result.exit_code == 0
+    assert result.stdout == dedent(
+        """\
+        Updated BUILD:
+          - Add a new line
+          - Reverse lines
+        Updated dir/BUILD:
+          - Add a new line
+          - Reverse lines
+        """
+    )
+    assert (
+        Path(generic_goal_rule_runner.build_root, "BUILD").read_text() == "# added line\n# line\n"
+    )
+    assert (
+        Path(generic_goal_rule_runner.build_root, "dir/BUILD").read_text()
+        == "# added line\n# line 2\n# line 1\n"
+    )
+
+
+def test_multi_formatter_goal_check_mode(generic_goal_rule_runner: RuleRunner) -> None:
+    """Checks that we correctly set the exit code and pipe fixers to each other."""
+    generic_goal_rule_runner.write_files({"BUILD": "# line\n", "dir/BUILD": "# line 1\n# line 2\n"})
+    result = generic_goal_rule_runner.run_goal_rule(
+        UpdateBuildFilesGoal,
+        global_args=["--pants-bin-name=./custom_pants"],
+        args=["--check", "::"],
+    )
+    assert result.exit_code == 1
+    assert result.stdout == dedent(
+        """\
+        Would update BUILD:
+          - Add a new line
+          - Reverse lines
+        Would update dir/BUILD:
+          - Add a new line
+          - Reverse lines
+
+        To fix `update-build-files` failures, run `./custom_pants update-build-files`.
+        """
+    )
+    assert Path(generic_goal_rule_runner.build_root, "BUILD").read_text() == "# line\n"
+    assert (
+        Path(generic_goal_rule_runner.build_root, "dir/BUILD").read_text() == "# line 1\n# line 2\n"
+    )

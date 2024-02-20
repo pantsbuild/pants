@@ -234,7 +234,7 @@ async def update_build_files(
         raise ValueError(f"Unrecognized formatter: {update_build_files_subsystem.formatter}")
 
     for request in union_membership[RewrittenBuildFileRequest]:
-        if update_build_files_subsystem.fmt and issubclass(request, chosen_formatter_request_class):
+        if update_build_files_subsystem.fmt and request == chosen_formatter_request_class:
             rewrite_request_classes.append(request)
 
         if update_build_files_subsystem.fix_safe_deprecations and issubclass(
@@ -242,8 +242,8 @@ async def update_build_files(
         ):
             rewrite_request_classes.append(request)
 
-        # If there are other types of formatters that aren't the standard backends
-        # or deprecation fixers, add them here.
+        # If there are other types of requests that aren't the standard formatter
+        # backends or deprecation fixers, add them here.
         if request not in formatter_to_request_class.values() and not issubclass(
             request, DeprecationFixerRequest
         ):
