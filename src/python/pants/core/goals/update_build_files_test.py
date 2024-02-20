@@ -74,12 +74,16 @@ def reverse_lines(request: MockRewriteReverseLines) -> RewrittenBuildFile:
 def generic_goal_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
-            update_build_files,
             add_line,
             reverse_lines,
+            format_build_file_with_ruff,
+            format_build_file_with_yapf,
+            update_build_files,
             # Ruff and Yapf are included, but Black is not because
             # that's the formatter we enable in pants.toml.
             # These tests check that Ruff and Yapf are NOT invoked.
+            *config_files.rules(),
+            *pex.rules(),
             *Ruff.rules(),
             *Yapf.rules(),
             *UpdateBuildFilesSubsystem.rules(),
