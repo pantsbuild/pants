@@ -73,7 +73,13 @@ class ScalaVersion:
 
     def __gt__(self, other: Any) -> bool:
         if isinstance(other, ScalaVersion):
-            return self.major > other.major or self.minor > other.minor or self.patch > other.patch
+            if self.major > other.major:
+                return True
+            elif (self.major == other.major) and (self.minor > other.minor):
+                return True
+            elif (self.major == other.major) and (self.minor == other.minor):
+                return self.patch > other.patch
+            return False
         return False
 
     def __str__(self) -> str:
