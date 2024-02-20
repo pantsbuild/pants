@@ -16,8 +16,15 @@ def terminal_width(*, fallback: int = 96, padding: int = 2) -> int:
     return shutil.get_terminal_size(fallback=(fallback, 24)).columns - padding
 
 
-def doc_url(slug: str) -> str:
-    return f"https://www.pantsbuild.org/v{MAJOR_MINOR}/docs/{slug}"
+def doc_url(path: str, versioned: bool = True) -> str:
+    """Return a URL to the specified `path` on the Pants website.
+
+    Most URLs are associated with a particular pants version (e.g. docs for a backend), indicated
+    with `versioned == True`, while some are ever-green and unversioned (e.g. info about the project
+    governance).
+    """
+    version_info = f"{MAJOR_MINOR}/" if versioned else ""
+    return f"https://www.pantsbuild.org/{version_info}{path}"
 
 
 def git_url(fp: str) -> str:

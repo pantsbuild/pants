@@ -9,9 +9,13 @@ from pants.util import docutil
 from pants.util.docutil import doc_url, git_url
 
 
-def test_doc_url(monkeypatch) -> None:
+def test_doc_url_when_versioned(monkeypatch) -> None:
     monkeypatch.setattr(docutil, "MAJOR_MINOR", "1.29")
-    assert doc_url("some-slug") == "https://www.pantsbuild.org/v1.29/docs/some-slug"
+    assert doc_url("some/path") == "https://www.pantsbuild.org/1.29/some/path"
+
+
+def test_doc_url_when_not_versioned(monkeypatch) -> None:
+    assert doc_url("some/path", versioned=False) == "https://www.pantsbuild.org/some/path"
 
 
 def test_git_url(monkeypatch) -> None:
