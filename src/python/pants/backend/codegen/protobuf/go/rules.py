@@ -579,6 +579,7 @@ async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
         ),
     )
 
+    # Called for the side effect downloading modules to the local cache
     await Get(
         ProcessResult,
         GoSdkProcess(

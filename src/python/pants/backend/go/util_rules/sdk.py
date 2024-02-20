@@ -22,21 +22,20 @@ from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
-SANDBOX_CACHE = "gopath"
-NAMED_CACHE = "gopath_cache"
+SANDBOX_CACHE_RELPATH = "gopath"
+NAMED_CACHE_RELPATH = "gopath_cache"
 
 
-def sdk_cache() -> dict[str, str]:
+def sdk_append_only_caches() -> dict[str, str]:
     """Returns the append_only_caches config used to populate ./gopath in a sandbox.
 
     Other processes that build go may need to use the same cache
     """
-    return {NAMED_CACHE: SANDBOX_CACHE}
+    return {NAMED_CACHE_RELPATH: SANDBOX_CACHE_RELPATH}
 
 
 @dataclass(frozen=True)
 class GoSdkProcess:
-    cache_scope: ProcessCacheScope
     command: tuple[str, ...]
     description: str
     env: FrozenDict[str, str]
@@ -45,6 +44,7 @@ class GoSdkProcess:
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
     replace_sandbox_root_in_args: bool
+    cache_scope: ProcessCacheScope
 
     def __init__(
         self,
@@ -101,7 +101,7 @@ async def go_sdk_invoke_setup(
             f"""\
             export GOROOT={goroot.path}
             sandbox_root="$(/bin/pwd)"
-            export GOPATH="${{sandbox_root}}/{SANDBOX_CACHE}"
+            export GOPATH="${{sandbox_root}}/{SANDBOX_CACHE_RELPATH}"
             export GOCACHE="${{sandbox_root}}/cache"
             # go install targets GOBIN, updated here to keep binaries outside of the cached GOPATH
             export GOBIN="${{sandbox_root}}/gobin"
@@ -163,7 +163,7 @@ async def setup_go_sdk_process(
 
     return Process(
         # cache gopath to capture all downloaded go modules
-        append_only_caches=sdk_cache(),
+        append_only_caches=sdk_append_only_caches(),
         argv=[bash.path, go_sdk_run.script.path, *request.command],
         env=env,
         input_digest=input_digest,

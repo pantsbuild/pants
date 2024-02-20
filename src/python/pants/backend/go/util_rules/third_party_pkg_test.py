@@ -200,7 +200,7 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner, named_caches
         }
         seen_files = set()
 
-        path_in_named_cache = dir_path.replace(sdk.SANDBOX_CACHE, sdk.NAMED_CACHE)
+        path_in_named_cache = dir_path.replace(sdk.SANDBOX_CACHE_RELPATH, sdk.NAMED_CACHE_RELPATH)
         cache_path = os.path.join(named_caches_dir, path_in_named_cache)
         for _root, _dirs, files in os.walk(cache_path):
             for name in files:

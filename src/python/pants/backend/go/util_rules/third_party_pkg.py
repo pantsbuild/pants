@@ -109,8 +109,8 @@ class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgAnalysis]):
     """All the packages downloaded from a go.mod.
 
     There is no longer a digest included, as the packages are downloaded as to a named_cache. Later
-    processes may use the file contents via append_only_caches=sdk.sdk_cache(). The simlink will
-    create the gopath such that go will properly consume it.
+    processes may use the file contents via append_only_caches=sdk.sdk_append_only_caches(). The
+    symlink will create the gopath such that go will properly consume it.
     """
 
     import_paths_to_pkg_info: FrozenDict[str, ThirdPartyPkgAnalysis]
@@ -143,6 +143,12 @@ class ModuleDescriptor:
 class ModuleDescriptors:
     modules: FrozenOrderedSet[ModuleDescriptor]
     go_mods_digest: Digest
+
+
+@dataclass(frozen=True)
+class ProcessFindSetup:
+    digest: Digest
+    script: FileContent
 
 
 @dataclass(frozen=True)
@@ -331,10 +337,28 @@ async def _check_go_sum_has_not_changed(
 
 
 @rule
+async def process_find_setup(
+    find: FindBinary,
+) -> ProcessFindSetup:
+    """Setup a script to find .go files under an argument path."""
+    find_script = FileContent(
+        "__run_find.sh",
+        textwrap.dedent(
+            f"""\
+            {find.path} "$@" -type f -name '*.go'
+            """
+        ).encode("utf-8"),
+    )
+
+    digest = await Get(Digest, CreateDigest([find_script]))
+    return ProcessFindSetup(digest, find_script)
+
+
+@rule
 async def process_find_go_packages(
     request: ModulePackageListRequest,
     bash: BashBinary,
-    find: FindBinary,
+    find_setup: ProcessFindSetup,
 ) -> ModulePackageList:
     """This connects the (cached) go mod download steps with the package analyzer steps by finding
     likely package directories within a module."""
@@ -342,39 +366,33 @@ async def process_find_go_packages(
     # As background, several other options did not work for this layer:
     # - `go list` provides the same package paths, but fails on modules which do not use go.sum
     # - `os.walk` could process the named cache folder directly, but running a Process allows caching
-
-    find_script = FileContent(
-        "__run_find.sh",
-        textwrap.dedent(
-            f"""\
-            {find.path} {request.path} -type f -name '*.go'
-            """
-        ).encode("utf-8"),
-    )
-
-    digest = await Get(Digest, CreateDigest([find_script]))
+    # -           os.walk is also rejected because sandboxes must use Digest to track which files
+    #             are used - and better not to leave bad examples to copy.
 
     list_pkg_result = await Get(
-        FallibleProcessResult,
+        ProcessResult,
         Process(
             # Use a named_cache symlink to reference downloaded go modules
-            append_only_caches=gosdk.sdk_cache(),
-            argv=[bash.path, find_script.path],
-            input_digest=digest,
+            append_only_caches=gosdk.sdk_append_only_caches(),
+            argv=[bash.path, find_setup.script.path, request.path],
+            input_digest=find_setup.digest,
             description=f"find .go files for {request.path}",
             level=LogLevel.DEBUG,
         ),
     )
 
     all_dirs = set()
-    if list_pkg_result.exit_code != 0 or len(list_pkg_result.stdout) == 0:
-        logger.warning(f"failed to list {request.path}: {list_pkg_result.stderr.decode()}")
-    else:
-        output = list_pkg_result.stdout.decode("utf-8")
-        for line in output.split("\n"):
-            # get the parent directory, ignore the empty path
-            if dirname := os.path.dirname(line):
-                all_dirs.add(dirname)
+    output = list_pkg_result.stdout.decode("utf-8")
+    for line in output.splitlines():
+        filename = os.path.basename(line)
+        # skip go files that start with . or _ -
+        # https://github.com/golang/go/blob/f005df8b582658d54e63d59953201299d6fee880/src/go/build/build.go#L526
+        if filename.startswith(("_", ".")):
+            continue
+
+        # get the parent directory, ignore the empty path
+        if dirname := os.path.dirname(line):
+            all_dirs.add(dirname)
 
     to_remove = [d for d in all_dirs if "testdata" in d.split("/")]
     all_dirs = all_dirs.difference(to_remove)
@@ -435,7 +453,7 @@ async def analyze_go_third_party_module(
         ProcessResult,
         Process(
             [os.path.join(analyzer_relpath, analyzer.path), *chosen_paths],
-            append_only_caches=gosdk.sdk_cache(),
+            append_only_caches=gosdk.sdk_append_only_caches(),
             immutable_input_digests={
                 analyzer_relpath: analyzer.digest,
             },
@@ -478,8 +496,8 @@ async def analyze_go_third_party_package(
 ) -> FallibleThirdPartyPkgAnalysis:
     """Return an analysis for a given package.
 
-    The analysis object corresponds to the -json output of `go list` - combining the location,
-    imports and build details for a package.
+    The analysis object combines the location, imports and build details of a package.  This is
+    similar to the -json output of `go list`.
     """
     if not request.package_path.startswith(request.module_sources_path):
         raise AssertionError(
@@ -578,7 +596,7 @@ async def analyze_go_third_party_package(
             FallibleProcessResult,
             Process(
                 ("./embedder", "patterns.json", request.package_path),
-                append_only_caches=gosdk.sdk_cache(),
+                append_only_caches=gosdk.sdk_append_only_caches(),
                 input_digest=input_digest,
                 description=f"Create embed mapping for {import_path}",
                 level=LogLevel.DEBUG,

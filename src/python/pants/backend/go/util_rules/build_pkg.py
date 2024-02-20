@@ -752,6 +752,8 @@ async def build_go_package(
     # about the Go code that can be used by assembly files.
     asm_header_path: str | None = None
     if s_files:
+        # Ideally, this would follow convention that generated files live in _objdir/{file} - but changing go_asm.h
+        # fails standard library builds when used in a subdir.
         asm_header_path = str(PurePath("go_asm.h"))
         compile_args.extend(["-asmhdr", asm_header_path])
 

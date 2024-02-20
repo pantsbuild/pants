@@ -356,7 +356,7 @@ async def _cc(
         src_file,
     ]
     return Process(
-        append_only_caches=gosdk.sdk_cache(),
+        append_only_caches=gosdk.sdk_append_only_caches(),
         argv=args,
         env={"TERM": "dumb", **env},
         input_digest=input_digest,
@@ -409,7 +409,7 @@ async def _gccld(
     result = await Get(
         FallibleProcessResult,
         Process(
-            append_only_caches=gosdk.sdk_cache(),
+            append_only_caches=gosdk.sdk_append_only_caches(),
             argv=args,
             env={"TERM": "dumb", **env},
             input_digest=input_digest,
