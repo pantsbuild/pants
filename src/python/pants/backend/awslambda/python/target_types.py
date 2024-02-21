@@ -191,7 +191,7 @@ class PythonAWSLambda(_AWSLambdaBaseTarget):
         f"""
         A self-contained Python function suitable for uploading to AWS Lambda.
 
-        See {doc_url('awslambda-python')}.
+        See {doc_url('docs/python/integrations/aws-lambda')}.
         """
     )
 
@@ -207,7 +207,7 @@ class PythonAWSLambdaLayer(_AWSLambdaBaseTarget):
         f"""
         A Python layer suitable for uploading to AWS Lambda.
 
-        See {doc_url('awslambda-python')}.
+        See {doc_url('docs/python/integrations/aws-lambda')}.
         """
     )
 
