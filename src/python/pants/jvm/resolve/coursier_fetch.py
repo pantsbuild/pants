@@ -99,7 +99,7 @@ class NoCompatibleResolve(Exception):
             f"{msg_prefix}:\n\n"
             f"{formatted_resolve_lists}\n\n"
             "Targets which will be merged onto the same classpath must share a resolve (from the "
-            f"[resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) field)."
+            f"[resolve]({doc_url('reference/targets/deploy_jar#resolve')}) field)."
         )
 
 

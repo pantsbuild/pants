@@ -119,7 +119,7 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
 
         This does not handle the full Pants upgrade. You must still manually change
         `pants_version` in `pants.toml` and you may need to manually address some deprecations.
-        See {doc_url('upgrade-tips')} for upgrade tips.
+        See {doc_url('docs/releases/upgrade-tips')} for upgrade tips.
 
         This goal is run without arguments. It will run over all BUILD files in your
         project.
@@ -234,10 +234,17 @@ async def update_build_files(
         raise ValueError(f"Unrecognized formatter: {update_build_files_subsystem.formatter}")
 
     for request in union_membership[RewrittenBuildFileRequest]:
-        if update_build_files_subsystem.fmt and issubclass(request, chosen_formatter_request_class):
+        if update_build_files_subsystem.fmt and request == chosen_formatter_request_class:
             rewrite_request_classes.append(request)
 
-        if update_build_files_subsystem.fix_safe_deprecations or not issubclass(
+        if update_build_files_subsystem.fix_safe_deprecations and issubclass(
+            request, DeprecationFixerRequest
+        ):
+            rewrite_request_classes.append(request)
+
+        # If there are other types of requests that aren't the standard formatter
+        # backends or deprecation fixers, add them here.
+        if request not in formatter_to_request_class.values() and not issubclass(
             request, DeprecationFixerRequest
         ):
             rewrite_request_classes.append(request)
@@ -275,7 +282,7 @@ async def update_build_files(
             msg += softwrap(
                 f"""
                 However, there may still be deprecations that `update-build-files` doesn't know
-                how to fix. See {doc_url('upgrade-tips')} for upgrade tips.
+                how to fix. See {doc_url('docs/releases/upgrade-tips')} for upgrade tips.
                 """
             )
         logger.info(msg)

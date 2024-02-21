@@ -58,7 +58,7 @@ class PythonToolRequirementsBase(Subsystem):
             If specified, install the tool using the lockfile for this named resolve.
 
             This resolve must be defined in `[python].resolves`, as described in
-            {doc_url("python-third-party-dependencies#user-lockfiles")}.
+            {doc_url("docs/python/overview/third-party-dependencies#user-lockfiles")}.
 
             The resolve's entire lockfile will be installed, unless specific requirements are
             listed via the `requirements` option, in which case only those requirements

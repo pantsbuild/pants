@@ -269,7 +269,7 @@ async def choose_python_resolve(
             raise NoCompatibleResolveException.bad_input_roots(
                 transitive_targets.roots,
                 maybe_get_resolve=maybe_get_resolve,
-                doc_url_slug="python-third-party-dependencies#multiple-lockfiles",
+                doc_url_slug="docs/python/overview/lockfiles#multiple-lockfiles",
                 workaround=None,
             )
 
@@ -283,7 +283,7 @@ async def choose_python_resolve(
             ):
                 raise NoCompatibleResolveException.bad_dependencies(
                     maybe_get_resolve=maybe_get_resolve,
-                    doc_url_slug="python-third-party-dependencies#multiple-lockfiles",
+                    doc_url_slug="docs/python/overview/lockfiles#multiple-lockfiles",
                     root_resolve=chosen_resolve,
                     root_targets=transitive_targets.roots,
                     dependencies=transitive_targets.dependencies,
@@ -475,7 +475,7 @@ async def _determine_requirements_for_pex_from_targets(
                     f"""
                     [python].run_against_entire_lockfile was set, but could not find a
                     lockfile or constraints file for this target set. See
-                    {doc_url('python-third-party-dependencies')} for details.
+                    {doc_url('docs/python/overview/third-party-dependencies')} for details.
                     """
                 )
             )

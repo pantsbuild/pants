@@ -114,7 +114,7 @@ class MyPy(PythonToolBase):
 
             To instead load third-party plugins, set the option `[mypy].install_from_resolve`
             to a resolve whose lockfile includes those plugins, and set the `plugins` option
-            in `mypy.ini`.  See {doc_url('python-check-goal')}.
+            in `mypy.ini`.  See {doc_url('docs/python/goals/check')}.
             """
         ),
     )
@@ -161,7 +161,7 @@ class MyPy(PythonToolBase):
                     f"""
                     You set {formatted_configured}. Normally, Pants would automatically set this
                     for you based on your code's interpreter constraints
-                    ({doc_url('python-interpreter-compatibility')}). Instead, it will
+                    ({doc_url('docs/python/overview/interpreter-compatibility')}). Instead, it will
                     use what you set.
 
                     (Allowing Pants to automatically set the option allows Pants to partition your
