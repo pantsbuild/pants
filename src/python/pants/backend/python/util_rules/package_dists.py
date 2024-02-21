@@ -94,7 +94,7 @@ logger = logging.getLogger(__name__)
 
 class SetupPyError(Exception):
     def __init__(self, msg: str):
-        super().__init__(f"{msg} See {doc_url('python-distributions')}.")
+        super().__init__(f"{msg} See {doc_url('docs/python/overview/building-distributions')}.")
 
 
 class InvalidSetupPyArgs(SetupPyError):
@@ -116,7 +116,7 @@ class OwnershipError(SetupPyError):
         super().__init__(
             softwrap(
                 f"""
-                {msg} See {doc_url('python-distributions')} for
+                {msg} See {doc_url('docs/python/overview/building-distributions')} for
                 how python_sources targets are mapped to distributions.
                 """
             )

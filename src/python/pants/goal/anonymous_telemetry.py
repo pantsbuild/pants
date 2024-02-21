@@ -12,7 +12,7 @@ from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
-_telemetry_docs_referral = f"See {doc_url('anonymous-telemetry')} for details"
+_telemetry_docs_referral = f"See {doc_url('docs/using-pants/anonymous-telemetry')} for details"
 
 
 # This subsystem is orphaned (but not quite deprecated/removed).

@@ -1687,7 +1687,7 @@ class UnrecognizedTargetTypeException(InvalidTargetException):
                 All valid target types: {sorted(registered_target_types.aliases)}
 
                 (If {target_type!r} is a custom target type, refer to
-                {doc_url('target-api-concepts')} for getting it registered with Pants.)
+                {doc_url('docs/writing-plugins/the-target-api/concepts')} for getting it registered with Pants.)
 
                 """
             ),
@@ -2517,7 +2517,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
         `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
         result.
 
-        See {doc_url('targets')} for more about how addresses are formed, including for generated
+        See {doc_url('docs/using-pants/key-concepts/targets-and-build-files')} for more about how addresses are formed, including for generated
         targets. You can also run `{bin_name()} list ::` to find all addresses in your project, or
         `{bin_name()} list dir` to find all addresses defined in that directory.
 
@@ -2658,7 +2658,7 @@ class ExplicitlyProvidedDependencies:
             f"with `!` or `!!` so that one or no targets are left."
             f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
             f"targets so that only 1 target owns this {import_reference}. Refer to "
-            f"{doc_url('troubleshooting#import-errors-and-missing-dependencies')}."
+            f"{doc_url('docs/using-pants/troubleshooting-common-issues#import-errors-and-missing-dependencies')}."
         )
 
     def disambiguated(
