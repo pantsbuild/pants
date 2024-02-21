@@ -71,28 +71,34 @@ def test_parses_projects(rule_runner: RuleRunner) -> None:
     assert {project.root_dir for project in projects} == {"src/js/foo", "src/js/bar"}
 
 
-def test_immutable_install_args_property(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    ("package_manager", "expected_immutable_install_args"),
+    [
+        (None, ("clean-install",)),
+        ("npm@10.2.4", ("clean-install",)),
+        ("pnpm@7.5.0", ("install", "--frozen-lockfile")),
+        ("yarn@1.22.19", ("install", "--frozen-lockfile")),
+        ("yarn@2.4.3", ("install", "--immutable")),
+        ("yarn@3.6.4", ("install", "--immutable")),
+    ],
+)
+def test_immutable_install_args_property(
+    package_manager: None | str,
+    expected_immutable_install_args: tuple[str],
+    rule_runner: RuleRunner,
+) -> None:
     rule_runner.write_files(
         {
             "src/js/foo/BUILD": "package_json()",
-            "src/js/foo/package.json": given_package("foo", "0.0.1"),
-            "src/js/bar/BUILD": "package_json()",
-            "src/js/bar/package.json": given_package(
-                "bar", "0.0.2", package_manager="yarn@1.22.19"
+            "src/js/foo/package.json": given_package(
+                name="foo",
+                version="0.0.1",
+                package_manager=package_manager,
             ),
-            "src/js/baz/BUILD": "package_json()",
-            "src/js/baz/package.json": given_package("baz", "0.0.3", package_manager="yarn@2.4.3"),
-            "src/js/qux/BUILD": "package_json()",
-            "src/js/qux/package.json": given_package("qux", "0.0.4", package_manager="pnpm@7.5.0"),
         }
     )
     projects = rule_runner.request(AllNodeJSProjects, [])
-    assert {project.immutable_install_args for project in projects} == {
-        ("clean-install",),
-        ("install", "--frozen-lockfile"),
-        ("install", "--immutable"),
-        ("install", "--frozen-lockfile"),
-    }
+    assert projects[0].immutable_install_args == expected_immutable_install_args
 
 
 def test_immutable_install_args_property_with_unsupported_package_manager(
