@@ -928,7 +928,7 @@ def _log_or_raise_unmatched_owners(
             f"target whose `sources` field includes the file."
         )
     msg = (
-        f"{prefix} See {doc_url('targets')} for more information on target definitions."
+        f"{prefix} See {doc_url('docs/using-pants/key-concepts/targets-and-build-files')} for more information on target definitions."
         f"\n\nYou may want to run `{bin_name()} tailor` to autogenerate your BUILD files. See "
         f"{doc_url('create-initial-build-files')}.{option_msg}"
     )

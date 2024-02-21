@@ -149,7 +149,7 @@ class DockerImageTagsField(StringSequenceField):
 
         {_interpolation_help.format(kind="tag")}
 
-        See {doc_url('tagging-docker-images')}.
+        See {doc_url('docs/docker/tagging-docker-images')}.
         """
     )
 

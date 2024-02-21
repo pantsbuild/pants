@@ -195,7 +195,7 @@ class ParseState(threading.local):
     @docstring(
         f"""Provide default field values.
 
-        Learn more {doc_url("targets#field-default-values")}
+        Learn more {doc_url("docs/using-pants/key-concepts/targets-and-build-files#field-default-values")}
         """
     )
     def set_defaults(
@@ -442,7 +442,7 @@ class Parser:
             help_str = softwrap(
                 f"""
                 If you expect to see more symbols activated in the below list, refer to
-                {doc_url('enabling-backends')} for all available backends to activate.
+                {doc_url('docs/using-pants/key-concepts/backends')} for all available backends to activate.
                 """
             )
             valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
@@ -479,7 +479,7 @@ def error_on_imports(build_file_content: str, filepath: str) -> None:
             f"Import used in {filepath} at line {lineno}. Import statements are banned in "
             "BUILD files and macros (that act like a normal BUILD file) because they can easily "
             "break Pants caching and lead to stale results. "
-            f"\n\nInstead, consider writing a plugin ({doc_url('plugins-overview')})."
+            f"\n\nInstead, consider writing a plugin ({doc_url('docs/writing-plugins/overview')})."
         )
 
 
