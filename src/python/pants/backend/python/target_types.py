@@ -113,7 +113,7 @@ class InterpreterConstraintsField(StringSequenceField):
 
         If the field is not set, it will default to the option `[python].interpreter_constraints`.
 
-        See {doc_url('python-interpreter-compatibility')} for how these interpreter
+        See {doc_url('docs/python/overview/interpreter-compatibility')} for how these interpreter
         constraints are merged with the constraints of dependencies.
         """
     )
@@ -459,7 +459,7 @@ class PexPlatformsField(StringSequenceField):
         f"""\
     The platforms field is a hack. The abbreviated information it provides is sometimes insufficient,
     leading to hard-to-debug build issues. Use complete_platforms instead.
-    See {doc_url('pex')} for details.
+    See {doc_url('docs/python/overview/pex')} for details.
     """
     )
     help = help_text(
@@ -508,7 +508,7 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
         complete platform JSON as described by Pex
         (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
 
-        See {doc_url('pex')} for details.
+        See {doc_url('docs/python/overview/pex')} for details.
         """
     )
 
@@ -797,7 +797,7 @@ class PexBinary(Target):
         A Python target that can be converted into an executable PEX file.
 
         PEX files are self-contained executable files that contain a complete Python environment
-        capable of running the target. For more information, see {doc_url('pex')}.
+        capable of running the target. For more information, see {doc_url('docs/python/overview/pex')}.
         """
     )
 
@@ -1059,7 +1059,7 @@ class PythonTestTarget(Target):
         target and then be included in the `dependencies` field. (You can use the
         `python_test_utils` target to generate these `python_source` targets.)
 
-        See {doc_url('python-test-goal')}
+        See {doc_url('docs/python/goals/test')}
         """
     )
 
@@ -1398,7 +1398,7 @@ class PythonRequirementTarget(Target):
         requirement into a `python_requirement` target automatically. For Poetry, use
         `poetry_requirements`.
 
-        See {doc_url('python-third-party-dependencies')}.
+        See {doc_url('docs/python/overview/third-party-dependencies')}.
         """
     )
 
@@ -1443,7 +1443,7 @@ class PythonProvidesField(ScalarField, AsyncFieldMixin):
         in the `setup()` function:
         (https://packaging.python.org/guides/distributing-packages-using-setuptools/#setup-args).
 
-        See {doc_url('plugins-setup-py')} for how to write a plugin to dynamically generate kwargs.
+        See {doc_url('docs/writing-plugins/common-plugin-tasks/custom-python-artifact-kwargs')} for how to write a plugin to dynamically generate kwargs.
         """
     )
 
@@ -1677,7 +1677,7 @@ class PythonDistribution(Target):
         f"""
         A publishable Python setuptools distribution (e.g. an sdist or wheel).
 
-        See {doc_url('python-distributions')}.
+        See {doc_url('docs/python/overview/building-distributions')}.
         """
     )
 
@@ -1786,6 +1786,6 @@ class VCSVersion(Target):
         a subset of that config in this target's fields.
 
         If you need functionality that is not currently exposed here, please reach out to us at
-        {doc_url("getting-help")}.
+        {doc_url("community/getting-help")}.
         """
     )

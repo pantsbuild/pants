@@ -73,7 +73,7 @@ async def isolate_local_dist_wheels(
                 code will be used directly from sources, without a distribution being built,
                 and any native extensions in it will not be built.
 
-                See {doc_url('python-distributions')} for details on how to set up a
+                See {doc_url('docs/python/overview/building-distributions')} for details on how to set up a
                 {tgt.target.alias} target to produce a wheel.
                 """
             )
