@@ -134,6 +134,8 @@ fmt = false
 
 [pex]
 venv_use_symlinks = true
+# This is off by default, but we want to dogfood it before switching on for everyone.
+emit_warnings = true
 
 [python]
 # N.B.: When upgrading to a new Python version, you must update the Pants
