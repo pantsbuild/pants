@@ -10,8 +10,9 @@ python_tests(name="tests", timeout=240)
 scala_sources(
     name="scala_parser",
     resolve="scala_parser_dev",
-    # TODO: Allow the parser files to be formatted.
+    # TODO: Allow the parser files to be formatted and linted.
     skip_scalafmt=True,
+    skip_scalafix=True,
 )
 
 jvm_artifact(

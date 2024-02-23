@@ -7,4 +7,4 @@ deploy_jar(
     dependencies=[":app"],
 )
 
-scala_sources()
+scala_sources(scalac_plugins=["semanticdb"])

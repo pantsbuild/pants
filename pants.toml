@@ -32,6 +32,7 @@ backend_packages.add = [
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
+  "pants.backend.experimental.scala.lint.scalafix",
   "pants.backend.experimental.scala.debug_goals",
   "pants.backend.experimental.tools.workunit_logger",
   "pants.backend.experimental.visibility",
@@ -233,6 +234,9 @@ jar_tool_dev = "src/python/pants/jvm/jar_tool/jar_tool.lock"
 
 [scala]
 version_for_resolve = { "scala_parser_dev" = "2.13.8" }
+
+[scalac]
+args = ["-Yrangepos", "-Xlint:unused"]
 
 [scala-infer]
 force_add_siblings_as_dependencies = false

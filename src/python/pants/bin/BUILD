@@ -69,6 +69,7 @@ target(
         "src/python/pants/backend/experimental/rust",
         "src/python/pants/backend/experimental/scala",
         "src/python/pants/backend/experimental/scala/debug_goals",
+        "src/python/pants/backend/experimental/scala/lint/scalafix",
         "src/python/pants/backend/experimental/scala/lint/scalafmt",
         "src/python/pants/backend/experimental/swift",
         "src/python/pants/backend/experimental/terraform",
