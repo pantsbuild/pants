@@ -1,17 +1,14 @@
-// Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+// Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-//use pyo3::exceptions;
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyException, PyValueError};
-use pyo3::types::{PyDict, PyList, PyTuple};
+use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 
-//use options::{Args, Config, Env, OptionId, OptionParser, Scope, Source, Val};
 use options::{Args, Env, Val, OptionId, OptionParser, OptionValue, Scope, ListOptionValue};
 
 use std::collections::HashMap;
-
-//use crate::Key;
+use log::warn;
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
     m.add_class::<PyOptionId>()?;
@@ -19,8 +16,7 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
-#[allow(dead_code)]
-fn val_to_py_object(py: Python, val: Val) -> PyResult<PyObject> {
+fn val_to_py_object(py: Python, val: &Val) -> PyResult<PyObject> {
     let res = match val {
         Val::Bool(b) => b.into_py(py),
         Val::Int(i) => i.into_py(py),
@@ -42,6 +38,42 @@ fn val_to_py_object(py: Python, val: Val) -> PyResult<PyObject> {
         }
     };
     Ok(res)
+}
+
+pub(crate) fn py_object_to_val(obj: &PyAny) -> Result<Val, PyErr> {
+    // TODO: If this is_instance_of chain shows up as significant in CPU profiles,
+    //  we can use a lookup table of PyTypeObject -> conversion func instead.
+    //  Alternatively, we could type-parameterize DictEdit to create a variant that contains
+    //  Py* types directly,instead of Vals, for when dict-valued options are consumed by
+    //  Python code, while retaining the current Val-based DictEdit for when dict-valued
+    //  options are consumed in Rust code.
+    //  However we don't have many dict-typed options, and even fewer with non-empty or non-tiny
+    //  defaults (this function is only used to convert option default values), so it's
+    //  very unlikely that this is a problem in practice.
+
+    // NB: We check these in rough order of likelihood of the type appearing in a dict value,
+    // but it is vital that we check bool before int, because bool is a subclass of int.
+    if obj.is_instance_of::<PyString>() {
+        return Ok(Val::String(obj.extract()?));
+    } else if obj.is_instance_of::<PyBool>() {
+        return Ok(Val::Bool(obj.extract()?));
+    } else if obj.is_instance_of::<PyInt>() {
+        return Ok(Val::Int(obj.extract()?));
+    } else if obj.is_instance_of::<PyFloat>() {
+        return Ok(Val::Float(obj.extract()?));
+    } else if obj.is_instance_of::<PyDict>() {
+        return Ok(Val::Dict(obj.downcast::<PyDict>()?.iter().map(|(k, v)| {
+            Ok::<(String, Val), PyErr>((k.extract::<String>()?, py_object_to_val(v)?))
+        }).collect::<Result<HashMap<_, _>,_>>()?))
+    } else if obj.is_instance_of::<PyList>() || obj.is_instance_of::<PyTuple>() {
+        warn!("{:?} is a list", obj);
+    } else {
+        return Err(PyValueError::new_err(format!(
+            "Unsupported Python type in option default: {}",
+            obj.get_type().name()?
+        )));
+    }
+    Ok(Val::String("OKIDOKI".to_owned()))
 }
 
 #[pyclass]
@@ -86,8 +118,8 @@ impl PyOptionParser {
     }
 
     fn get_list<T: ToOwned + ?Sized>(
-        &self, option_id: &PyOptionId, default: &Vec<T::Owned>,
-        getter: fn(&OptionParser, &OptionId, &Vec<T::Owned>) -> Result<ListOptionValue<T::Owned>, String>,) -> PyResult<Vec<T::Owned>> {
+        &self, option_id: &PyOptionId, default: Vec<T::Owned>,
+        getter: fn(&OptionParser, &OptionId, Vec<T::Owned>) -> Result<ListOptionValue<T::Owned>, String>,) -> PyResult<Vec<T::Owned>> {
         let opt_val = getter(&self.0, &option_id.0, default)
             .map_err(PyException::new_err)?;
         Ok(opt_val.value)
@@ -97,14 +129,15 @@ impl PyOptionParser {
 #[pymethods]
 impl PyOptionParser {
     #[new]
-    fn __new__(args: Vec<String>, env: &PyDict, configs: Vec<&str>, allow_pantsrc: bool) -> PyResult<Self> {
+    #[pyo3(signature = (args, env, configs, allow_pantsrc, include_derivation))]
+    fn __new__(args: Vec<String>, env: &PyDict, configs: Option<Vec<&str>>, allow_pantsrc: bool, include_derivation: bool) -> PyResult<Self> {
         let env = env
             .items()
             .into_iter()
             .map(|kv_pair| kv_pair.extract::<(String, String)>())
             .collect::<Result<HashMap<_, _>, _>>()?;
 
-        let option_parser = OptionParser::new(Args::new(args), Env::new(env), Some(configs), allow_pantsrc, false, None)
+        let option_parser = OptionParser::new(Args::new(args), Env::new(env), configs, allow_pantsrc, include_derivation, None)
             .map_err(PyValueError::new_err)?;
         Ok(Self(option_parser))
     }
@@ -130,7 +163,7 @@ impl PyOptionParser {
         option_id: &PyOptionId,
         default: Vec<bool>,
     ) -> PyResult<Vec<bool>> {
-        self.get_list::<bool>(option_id, &default, |op, oid, def| op.parse_bool_list(oid, def))
+        self.get_list::<bool>(option_id, default, |op, oid, def| op.parse_bool_list(oid, def))
     }
 
     fn get_int_list(
@@ -138,7 +171,7 @@ impl PyOptionParser {
         option_id: &PyOptionId,
         default: Vec<i64>,
     ) -> PyResult<Vec<i64>> {
-        self.get_list::<i64>(option_id, &default, |op, oid, def| op.parse_int_list(oid, def))
+        self.get_list::<i64>(option_id, default, |op, oid, def| op.parse_int_list(oid, def))
     }
 
     fn get_float_list(
@@ -146,7 +179,7 @@ impl PyOptionParser {
         option_id: &PyOptionId,
         default: Vec<f64>,
     ) -> PyResult<Vec<f64>> {
-        self.get_list::<f64>(option_id, &default, |op, oid, def| op.parse_float_list(oid, def))
+        self.get_list::<f64>(option_id, default, |op, oid, def| op.parse_float_list(oid, def))
     }
 
     fn get_string_list(
@@ -154,16 +187,8 @@ impl PyOptionParser {
         option_id: &PyOptionId,
         default: Vec<String>,
     ) -> PyResult<Vec<String>> {
-        self.get_list::<String>(option_id, &default, |op, oid, def| op.parse_string_list(oid, def))
+        self.get_list::<String>(option_id, default, |op, oid, def| op.parse_string_list(oid, def))
     }
-
-    // fn get_string_list(
-    //     &self,
-    //     option_id: &PyOptionId,
-    //     default: Vec<&str>,
-    // ) -> PyResult<(Vec<String>, String)> {
-    //
-    // }
 
     // fn parse_from_string_list<'a>(
     //     &self,
@@ -193,6 +218,29 @@ impl PyOptionParser {
     //     Ok((value, format!("{:?}", opt_val.source)))
     // }
     //
+
+    fn get_dict<'a>(
+        &self,
+        py: Python,
+        option_id: &PyOptionId,
+        default: &'a PyDict,
+    ) -> PyResult<HashMap<String, PyObject>> {
+        warn!("DDDDD1 {:?}", default);
+        let default = default.items().into_iter()
+            .map(|kv_pair| {
+                let (k, v) = kv_pair.extract::<(String, &'a PyAny)>()?;
+                Ok::<(String, Val), PyErr>((k, py_object_to_val(v)?))
+            }).collect::<Result<HashMap<_, _>, _>>()?;
+        warn!("DDDDD2 {:?}", default);
+        let opt_val = self.0.parse_dict(&option_id.0, default).map_err(PyException::new_err)?.value;
+        opt_val.into_iter().map(|(k, v)| {
+            match val_to_py_object(py, &v) {
+                Ok(pyobj) => Ok((k, pyobj)),
+                Err(err) => Err(err),
+            }
+        }).collect()
+    }
+
     // fn parse_from_string_dict<'a>(
     //     &self,
     //     py: Python,

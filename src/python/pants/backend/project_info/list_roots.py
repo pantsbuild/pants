@@ -4,6 +4,7 @@
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import collect_rules, goal_rule
+from pants.option.rust_options import foo
 from pants.source.source_root import AllSourceRoots
 
 
@@ -24,6 +25,7 @@ async def list_roots(
     with roots_subsystem.line_oriented(console) as print_stdout:
         for src_root in asr:
             print_stdout(src_root.path or ".")
+    foo()
     return Roots(exit_code=0)
 
 

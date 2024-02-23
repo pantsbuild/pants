@@ -39,6 +39,7 @@ mod stdio;
 mod target;
 pub mod testutil;
 pub mod workunits;
+mod options_test;
 
 pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyFailure>()?;

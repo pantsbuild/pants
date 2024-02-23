@@ -297,9 +297,8 @@ pub fn fingerprint_compute(
                 Digest::update(&mut hasher, val.value.as_bytes());
             }
             OptionType::StringList(default) => {
-                let default = default.iter().map(|s| s.as_str()).collect::<Vec<_>>();
                 let val = options_parser
-                    .parse_string_list(&option.id, &default)?
+                    .parse_string_list(&option.id, default)?
                     .value;
                 for item in val {
                     Digest::update(&mut hasher, item.as_bytes());

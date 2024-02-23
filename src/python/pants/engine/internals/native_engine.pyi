@@ -17,7 +17,7 @@ from typing import (
     TextIO,
     Tuple,
     TypeVar,
-    overload,
+    overload, Optional,
 )
 
 from typing_extensions import Self
@@ -532,6 +532,28 @@ class PantsdConnectionException(Exception):
 
 class PantsdClientException(Exception):
     pass
+
+# ------------------------------------------------------------------------------
+# Options
+# ------------------------------------------------------------------------------
+
+class PyOptionId:
+    def __init__(
+            self, *components: str, scope: str | None = None, switch: str | None = None
+    ) -> None: ...
+
+class PyOptionParser:
+    def __init__(self,
+                 args: Optional[Sequence[str]],
+                 env: dict[str, str],
+                 configs: Optional[Sequence[str]],
+                 allow_pantsrc: bool,
+                 include_derivation: bool) -> None: ...
+    def get_bool(self, option_id: PyOptionId, default: bool) -> tuple[bool, str]: ...
+    def get_int(self, option_id: PyOptionId, default: int) -> tuple[int, str]: ...
+    def get_float(self, option_id: PyOptionId, default: float) -> tuple[float, str]: ...
+    def get_string(self, option_id: PyOptionId, default: str) -> tuple[str, str]: ...
+
 
 # ------------------------------------------------------------------------------
 # Testutil

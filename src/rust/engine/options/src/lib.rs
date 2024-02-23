@@ -281,7 +281,7 @@ impl OptionParser {
                 parser
                     .parse_string_list(
                         &option_id!("pants", "config", "files"),
-                        &[&default_config_path],
+                        vec![default_config_path],
                     )?
                     .value
             }
@@ -326,10 +326,10 @@ impl OptionParser {
             for rcfile in parser
                 .parse_string_list(
                     &option_id!("pantsrc", "files"),
-                    &[
-                        "/etc/pantsrc",
-                        shellexpand::tilde("~/.pants.rc").as_ref(),
-                        ".pants.rc",
+                    vec![
+                        "/etc/pantsrc".to_string(),
+                        shellexpand::tilde("~/.pants.rc").to_string(),
+                        ".pants.rc".to_string(),
                     ],
                 )?
                 .value
@@ -473,28 +473,28 @@ impl OptionParser {
     pub fn parse_bool_list(
         &self,
         id: &OptionId,
-        default: &[bool],
+        default: Vec<bool>,
     ) -> Result<ListOptionValue<bool>, String> {
-        self.parse_list_hashable(id, default.to_vec(), |source, id| source.get_bool_list(id))
+        self.parse_list_hashable(id, default, |source, id| source.get_bool_list(id))
     }
 
     pub fn parse_int_list(
         &self,
         id: &OptionId,
-        default: &[i64],
+        default: Vec<i64>,
     ) -> Result<ListOptionValue<i64>, String> {
-        self.parse_list_hashable(id, default.to_vec(), |source, id| source.get_int_list(id))
+        self.parse_list_hashable(id, default, |source, id| source.get_int_list(id))
     }
 
     // Floats are not Eq or Hash, so we fall back to the brute-force O(N*M) lookups.
     pub fn parse_float_list(
         &self,
         id: &OptionId,
-        default: &[f64],
+        default: Vec<f64>,
     ) -> Result<ListOptionValue<f64>, String> {
         self.parse_list(
             id,
-            default.to_vec(),
+            default,
             |source, id| source.get_float_list(id),
             |list, to_remove| {
                 list.retain(|item| !to_remove.contains(item));
@@ -505,11 +505,11 @@ impl OptionParser {
     pub fn parse_string_list(
         &self,
         id: &OptionId,
-        default: &[&str],
+        default: Vec<String>,
     ) -> Result<ListOptionValue<String>, String> {
         self.parse_list_hashable::<String>(
             id,
-            default.iter().map(|s| s.to_string()).collect(),
+            default,
             |source, id| source.get_string_list(id),
         )
     }
