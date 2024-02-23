@@ -32,6 +32,7 @@ mod interface;
 mod interface_tests;
 pub mod nailgun;
 mod options;
+mod options_test;
 mod pantsd;
 pub mod process;
 pub mod scheduler;
@@ -39,7 +40,6 @@ mod stdio;
 mod target;
 pub mod testutil;
 pub mod workunits;
-mod options_test;
 
 pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyFailure>()?;

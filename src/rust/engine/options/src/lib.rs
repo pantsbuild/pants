@@ -507,11 +507,7 @@ impl OptionParser {
         id: &OptionId,
         default: Vec<String>,
     ) -> Result<ListOptionValue<String>, String> {
-        self.parse_list_hashable::<String>(
-            id,
-            default,
-            |source, id| source.get_string_list(id),
-        )
+        self.parse_list_hashable::<String>(id, default, |source, id| source.get_string_list(id))
     }
 
     pub fn parse_dict(
