@@ -29,6 +29,7 @@ from pants.engine.target import (
     DictStringToStringField,
     Field,
     InvalidFieldException,
+    ListOfDictStringToStringField,
     OptionalSingleSourceField,
     StringField,
     StringSequenceField,
@@ -312,6 +313,21 @@ class DockerBuildOptionFieldMultiValueDictMixin(DictStringToStringField):
             )
 
 
+class DockerBuildOptionFieldListOfMultiValueDictMixin(ListOfDictStringToStringField):
+    """Inherit this mixin class to provide options in the form of `--flag=key1=value1,key2=value2
+    --flag=key3=value3,key4=value4` to `docker build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
+        if self.value:
+            for item in self.value:
+                yield f"{self.docker_build_option}=" + ",".join(
+                    f"{key}={value_formatter(value)}" for key, value in item.items()
+                )
+
+
 class DockerBuildKitOptionField:
     """Mixin to indicate a BuildKit-specific option."""
 
@@ -353,7 +369,9 @@ class DockerImageBuildImageCacheToField(
 
 
 class DockerImageBuildImageCacheFromField(
-    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
+    DockerBuildOptionFieldListOfMultiValueDictMixin,
+    ListOfDictStringToStringField,
+    DockerBuildKitOptionField,
 ):
     alias = "cache_from"
     help = help_text(
@@ -368,12 +386,18 @@ class DockerImageBuildImageCacheFromField(
                 name="example-local-cache-backend",
                 cache_to={{
                     "type": "local",
-                    "dest": "/tmp/docker-cache/example"
+                    "dest": "/tmp/docker-cache/primary"
                 }},
-                cache_from={{
-                    "type": "local",
-                    "src": "/tmp/docker-cache/example"
-                }}
+                cache_from=[
+                    {{
+                        "type": "local",
+                        "src": "/tmp/docker-cache/primary"
+                    }},
+                    {{
+                        "type": "local",
+                        "src": "/tmp/docker-cache/secondary"
+                    }}
+                ]
             )
 
         {_interpolation_help.format(kind="Values")}
