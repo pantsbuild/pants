@@ -210,16 +210,15 @@ async def parse_python_dependencies(
 
         if python_infer_subsystem.string_imports or python_infer_subsystem.assets:
             for string, line in native_result.string_candidates.items():
-                slash_count = string.count("/")
                 if (
                     python_infer_subsystem.string_imports
-                    and not slash_count
                     and string.count(".") >= python_infer_subsystem.string_imports_min_dots
+                    and all(part.isidentifier() for part in string.split("."))
                 ):
                     imports.setdefault(string, (line, True))
                 if (
                     python_infer_subsystem.assets
-                    and slash_count >= python_infer_subsystem.assets_min_slashes
+                    and string.count("/") >= python_infer_subsystem.assets_min_slashes
                 ):
                     assets.add(string)
 
