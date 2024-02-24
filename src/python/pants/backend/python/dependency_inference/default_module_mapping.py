@@ -175,6 +175,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
     "progressbar2": ("progressbar",),
     "protobuf": ("google.protobuf",),
     "psycopg2-binary": ("psycopg2",),
+    "py-healthcheck": ("healthcheck",),
     "pycrypto": ("Crypto",),
     "pygithub": ("github",),
     "pygobject": ("gi",),
