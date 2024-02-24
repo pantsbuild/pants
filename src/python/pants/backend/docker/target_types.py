@@ -314,8 +314,10 @@ class DockerBuildOptionFieldMultiValueDictMixin(DictStringToStringField):
 
 
 class DockerBuildOptionFieldListOfMultiValueDictMixin(ListOfDictStringToStringField):
-    """Inherit this mixin class to provide options in the form of `--flag=key1=value1,key2=value2
-    --flag=key3=value3,key4=value4` to `docker build`."""
+    """Inherit this mixin class to provide options in the form of `--flag=key1=value1,key2=value2.
+
+    --flag=key3=value3,key4=value4` to `docker build`.
+    """
 
     docker_build_option: ClassVar[str]
 
