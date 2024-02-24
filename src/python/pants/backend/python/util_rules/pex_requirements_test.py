@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import textwrap
 
@@ -347,3 +348,78 @@ def test_pex_lockfile_requirement_count() -> None:
         )
         == 3
     )
+
+
+class TestResolvePexConfigPexArgs:
+    def pairwise(self, iterable):
+        # Drop once on 3.10
+        # https://docs.python.org/3/library/itertools.html#itertools.pairwise
+        a, b = itertools.tee(iterable)
+        next(b, None)
+        return zip(a, b)
+
+    def simple_config_args(self, manylinux=None, only_binary=None, no_binary=None):
+        return tuple(
+            ResolvePexConfig(
+                indexes=[],
+                find_links=[],
+                manylinux=manylinux,
+                constraints_file=None,
+                no_binary=FrozenOrderedSet(no_binary) if no_binary else FrozenOrderedSet(),
+                only_binary=FrozenOrderedSet(only_binary) if only_binary else FrozenOrderedSet(),
+                path_mappings=[],
+            ).pex_args()
+        )
+
+    def test_minimal(self):
+        args = self.simple_config_args()
+        assert len(args) == 2
+
+    def test_manylinux(self):
+        assert "--no-manylinux" in self.simple_config_args()
+
+        many = "manylinux2014_ppc64le"
+        args = self.simple_config_args(manylinux=many)
+        assert len(args) == 3
+        assert ("--manylinux", many) in self.pairwise(args)
+
+    def test_only_binary(self):
+        assert "--only-binary=foo" in self.simple_config_args(only_binary=["foo"])
+        assert ("--only-binary=foo", "--only-binary=bar") in self.pairwise(
+            self.simple_config_args(only_binary=["foo", "bar"])
+        )
+
+    def test_only_binary_all(self):
+        args = self.simple_config_args(only_binary=[":all:"])
+        assert "--wheel" in args
+        assert "--no-build" in args
+        assert "--only-binary" not in " ".join(self.simple_config_args(only_binary=[":all:"]))
+
+        args = self.simple_config_args(only_binary=["foo", ":all:"])
+        assert "--wheel" in args
+        assert "--no-build" in args
+        assert "--only-binary" not in " ".join(args)
+
+    def test_only_binary_none(self):
+        assert "--wheel" not in self.simple_config_args(only_binary=[":none:"])
+        assert "--only-binary" not in " ".join(self.simple_config_args(only_binary=[":none:"]))
+        assert "--build" in self.simple_config_args(only_binary=[":none:"])
+
+    def test_no_binary(self):
+        assert "--only-build=foo" in self.simple_config_args(no_binary=["foo"])
+        assert ("--only-build=foo", "--only-build=bar") in self.pairwise(
+            self.simple_config_args(no_binary=["foo", "bar"])
+        )
+
+    def test_no_binary_all(self):
+        args = self.simple_config_args(no_binary=[":all:"])
+        assert "--build" in args
+        assert "--no-wheel" in args
+        assert "--no-binary" not in args
+
+    def test_no_binary_none(self):
+        assert "--wheel" in self.simple_config_args(no_binary=[":none:"])
+        assert "--only-build" not in " ".join(self.simple_config_args(no_binary=[":none:"]))
+
+        assert "--wheel" in self.simple_config_args(no_binary=["foo", ":none:"])
+        assert "--only-build" not in " ".join(self.simple_config_args(no_binary=["foo", ":none:"]))

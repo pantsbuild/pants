@@ -79,18 +79,6 @@ async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAnd
     args = list(resolve_config.pex_args())
     digests = []
 
-    if resolve_config.no_binary or resolve_config.only_binary:
-        pip_args_file = "__pip_args.txt"
-        args.extend(["-r", pip_args_file])
-        pip_args_file_content = "\n".join(
-            [f"--no-binary {pkg}" for pkg in resolve_config.no_binary]
-            + [f"--only-binary {pkg}" for pkg in resolve_config.only_binary]
-        )
-        pip_args_digest = await Get(
-            Digest, CreateDigest([FileContent(pip_args_file, pip_args_file_content.encode())])
-        )
-        digests.append(pip_args_digest)
-
     if resolve_config.constraints_file:
         args.append(f"--constraints={resolve_config.constraints_file.path}")
         digests.append(resolve_config.constraints_file.digest)
