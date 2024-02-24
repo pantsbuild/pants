@@ -7,7 +7,6 @@ use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 
 use options::{Args, Env, ListOptionValue, OptionId, OptionParser, OptionValue, Scope, Val};
 
-use log::warn;
 use std::collections::HashMap;
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
@@ -54,34 +53,34 @@ pub(crate) fn py_object_to_val(obj: &PyAny) -> Result<Val, PyErr> {
     // NB: We check these in rough order of likelihood of the type appearing in a dict value,
     // but it is vital that we check bool before int, because bool is a subclass of int.
     if obj.is_instance_of::<PyString>() {
-        return Ok(Val::String(obj.extract()?));
+        Ok(Val::String(obj.extract()?))
     } else if obj.is_instance_of::<PyBool>() {
-        return Ok(Val::Bool(obj.extract()?));
+        Ok(Val::Bool(obj.extract()?))
     } else if obj.is_instance_of::<PyInt>() {
-        return Ok(Val::Int(obj.extract()?));
+        Ok(Val::Int(obj.extract()?))
     } else if obj.is_instance_of::<PyFloat>() {
-        return Ok(Val::Float(obj.extract()?));
+        Ok(Val::Float(obj.extract()?))
     } else if obj.is_instance_of::<PyDict>() {
-        return Ok(Val::Dict(
+        Ok(Val::Dict(
             obj.downcast::<PyDict>()?
                 .iter()
                 .map(|(k, v)| {
                     Ok::<(String, Val), PyErr>((k.extract::<String>()?, py_object_to_val(v)?))
                 })
                 .collect::<Result<HashMap<_, _>, _>>()?,
-        ));
+        ))
     } else if obj.is_instance_of::<PyList>() || obj.is_instance_of::<PyTuple>() {
-        return Ok(Val::List(
+        Ok(Val::List(
             obj.downcast::<PyList>()?
                 .iter()
                 .map(py_object_to_val)
                 .collect::<Result<Vec<_>, _>>()?,
-        ));
+        ))
     } else {
-        return Err(PyValueError::new_err(format!(
+        Err(PyValueError::new_err(format!(
             "Unsupported Python type in option default: {}",
             obj.get_type().name()?
-        )));
+        )))
     }
 }
 
@@ -97,7 +96,7 @@ impl PyOptionId {
             .iter()
             .map(|c| c.extract::<String>())
             .collect::<Result<Vec<_>, _>>()?;
-        let scope = scope.map(|s| Scope::named(&s)).unwrap_or(Scope::Global);
+        let scope = scope.map(Scope::named).unwrap_or(Scope::Global);
         let switch = match switch {
             Some(switch) if switch.len() == 1 => switch.chars().next(),
             None => None,
@@ -117,6 +116,7 @@ impl PyOptionId {
 #[pyclass]
 struct PyOptionParser(OptionParser);
 
+#[allow(clippy::type_complexity)]
 impl PyOptionParser {
     fn get_scalar<T: ToOwned + ?Sized>(
         &self,
@@ -218,51 +218,20 @@ impl PyOptionParser {
         })
     }
 
-    // fn parse_from_string_list<'a>(
-    //     &self,
-    //     py: Python<'a>,
-    //     option_id: &PyOptionId,
-    //     default: Vec<&'a PyAny>,
-    //     member_parser: &'a PyFunction,
-    // ) -> PyResult<(Vec<&'a PyAny>, String)> {
-    //     let default = default
-    //         .into_iter()
-    //         .map(|s| Key::from_value(s.extract()?))
-    //         .collect::<Result<Vec<Key>, _>>()?;
-    //     let opt_val = self
-    //         .0
-    //         .parse_from_string_list(&option_id.0, &default, |s| {
-    //             member_parser
-    //                 .call((s,), None)
-    //                 .and_then(|s| Key::from_value(s.extract()?))
-    //                 .map_err(|e| e.to_string())
-    //         })
-    //         .map_err(exceptions::PyException::new_err)?;
-    //     let value = opt_val
-    //         .value
-    //         .into_iter()
-    //         .map(|k| k.value.consume_into_py_object(py).into_ref(py))
-    //         .collect();
-    //     Ok((value, format!("{:?}", opt_val.source)))
-    // }
-    //
-
-    fn get_dict<'a>(
+    fn get_dict(
         &self,
         py: Python,
         option_id: &PyOptionId,
-        default: &'a PyDict,
+        default: &PyDict,
     ) -> PyResult<HashMap<String, PyObject>> {
-        warn!("DDDDD1 {:?}", default);
         let default = default
             .items()
             .into_iter()
             .map(|kv_pair| {
-                let (k, v) = kv_pair.extract::<(String, &'a PyAny)>()?;
+                let (k, v) = kv_pair.extract::<(String, &PyAny)>()?;
                 Ok::<(String, Val), PyErr>((k, py_object_to_val(v)?))
             })
             .collect::<Result<HashMap<_, _>, _>>()?;
-        warn!("DDDDD2 {:?}", default);
         let opt_val = self
             .0
             .parse_dict(&option_id.0, default)
@@ -276,40 +245,4 @@ impl PyOptionParser {
             })
             .collect()
     }
-
-    // fn parse_from_string_dict<'a>(
-    //     &self,
-    //     py: Python,
-    //     option_id: &'a PyOptionId,
-    //     default: &'a PyDict,
-    //     member_parser: &'a PyFunction,
-    //     literal_parser: &'a PyFunction,
-    // ) -> PyResult<(HashMap<String, &'a PyAny>, String)> {
-    //     let default = default
-    //         .items()
-    //         .into_iter()
-    //         .map(|kv_pair| kv_pair.extract::<(String, &'a PyAny)>())
-    //         .collect::<Result<HashMap<_, _>, _>>()?;
-    //     let opt_val = self
-    //         .0
-    //         .parse_from_string_dict(
-    //             &option_id.0,
-    //             &default,
-    //             |v| {
-    //                 let py_obj =
-    //                     toml_value_to_py_object(py, v).map_err(|e| format!("Could not decode toml: {e}"))?;
-    //                 member_parser
-    //                     .call((py_obj,), None)
-    //                     .map_err(|e| e.to_string())
-    //             },
-    //             |s| {
-    //                 literal_parser
-    //                     .call((s,), None)
-    //                     .and_then(|v| v.extract::<HashMap<String, &'a PyAny>>())
-    //                     .map_err(|e| e.to_string())
-    //             },
-    //         )
-    //         .map_err(exceptions::PyException::new_err)?;
-    //     Ok((opt_val.value, format!("{:?}", opt_val.source)))
-    // }
 }
