@@ -26,6 +26,11 @@ class DockerRunFieldSet(RunFieldSet):
     required_fields = (DockerImageSourceField,)
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
+    extra_run_args: DockerImageRunExtraArgsField
+
+    def get_run_args(self, options: DockerOptions) -> tuple[str, ...]:
+        return tuple(options.run_args + (self.extra_run_args.value or ()))
+
 
 @rule
 async def docker_image_run_request(
@@ -54,13 +59,10 @@ async def docker_image_run_request(
         Get(BuiltPackage, PackageFieldSet, build_request),
     )
 
-    docker_run_args = options.run_args + (
-        wrapped_target.target.get(DockerImageRunExtraArgsField).value or ()
-    )
     tag = cast(BuiltDockerImage, image.artifacts[0]).tags[0]
     run = docker.run_image(
         tag,
-        docker_run_args=docker_run_args,
+        docker_run_args=field_set.get_run_args(options),
         env=env,
     )
 

@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.docker.target_types import DockerImageRunExtraArgsField
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 
 
@@ -31,7 +32,11 @@ def test_docker_run(override_run_args) -> None:
     """
 
     expected_value = "override" if override_run_args else "build"
-    docker_run_args_attribute = 'run_args=["-e", "mykey=override"]' if override_run_args else ""
+    docker_run_args_attribute = (
+        f'{DockerImageRunExtraArgsField.alias}=["-e", "mykey=override"]'
+        if override_run_args
+        else ""
+    )
 
     sources = {
         "BUILD": f"docker_image(name='run-image', {docker_run_args_attribute})",

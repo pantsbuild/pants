@@ -561,7 +561,7 @@ class DockerImageBuildPlatformOptionField(
 
 
 class DockerImageRunExtraArgsField(StringSequenceField):
-    alias: ClassVar[str] = "run_args"
+    alias: ClassVar[str] = "extra_run_args"
     default = ()
     help = help_text(
         lambda: f"Extra arguments to pass into the invocation of `docker run`. These are in addition to those at the `[{DockerOptions.options_scope}].run_args`"
