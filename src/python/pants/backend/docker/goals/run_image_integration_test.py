@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from textwrap import dedent
 
+import pytest
+
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 
 
@@ -20,22 +22,33 @@ def run_pants_with_sources(sources: dict[str, str], *args: str) -> PantsResult:
         )
 
 
-def test_docker_run() -> None:
+@pytest.mark.parametrize("override_run_args", [True, False])
+def test_docker_run(override_run_args) -> None:
+    """This test exercises overriding the run args at the target level.
+
+    It works by setting a default value for an envvar in the Dockerfile with the `ENV` statement,
+    and then overriding that envvar with the `-e` option on the target level.
+    """
+
+    expected_value = "override" if override_run_args else "build"
+    docker_run_args_attribute = 'run_args=["-e", "mykey=override"]' if override_run_args else ""
+
     sources = {
-        "BUILD": "docker_image(name='run-image')",
+        "BUILD": f"docker_image(name='run-image', {docker_run_args_attribute})",
         "Dockerfile": dedent(
             """\
             FROM alpine
-            CMD echo "Hello from Docker image"
+            ENV mykey=build
+            CMD echo "Hello from Docker image with mykey=$mykey"
             """
         ),
     }
+
     result = run_pants_with_sources(
         sources,
         "run",
         "{tmpdir}:run-image",
     )
-
     print("pants stderr\n", result.stderr)
-    assert "Hello from Docker image\n" == result.stdout
+    assert f"Hello from Docker image with mykey={expected_value}\n" == result.stdout
     result.assert_success()
