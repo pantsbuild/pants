@@ -21,6 +21,7 @@ Created as part of the release process.
 + Antoine Tollenaere
 + Asher Foa
 + Aurelien Didier
++ Axel Goblet
 + Baptiste Gentholz
 + Bardur Arantsson
 + Bastian Wegge
@@ -101,6 +102,7 @@ Created as part of the release process.
 + Facetoe
 + Fatin H
 + Fedor Korotkov
++ Filip Nikolovski
 + Fiona Condone
 + Flo
 + Florian Leibert
