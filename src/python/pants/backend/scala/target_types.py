@@ -435,7 +435,6 @@ class ScalaArtifactCrossversionField(StringField):
                 "2.23.0.dev0",
                 f"Scala cross version value '{computed_value}' in target: {address}",
                 "Use value `binary` instead",
-                start_version="2.20.0",
             )
         return computed_value
 
@@ -470,7 +469,6 @@ class ScalaArtifactExclusion(JvmArtifactExclusion):
                 "2.23.0.dev0",
                 f"Scala cross version value '{self.crossversion}' in list of exclusions at target: {address}",
                 "Use value `binary` instead",
-                start_version="2.20.0",
             )
         return errors
 
