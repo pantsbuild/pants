@@ -1925,7 +1925,7 @@ class ListOfDictStringToStringField(Field):
     @classmethod
     def compute_value(
         cls, raw_value: Optional[list[Dict[str, str]]], address: Address
-    ) -> Optional[Tuple[FrozenDict[str, str]]]:
+    ) -> Optional[Tuple[FrozenDict[str, str], ...]]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
@@ -1939,7 +1939,7 @@ class ListOfDictStringToStringField(Field):
         if not isinstance(value_or_default, list):
             raise invalid_type_exception
 
-        result_lst = []
+        result_lst: list[FrozenDict[str, str]] = []
         for item in value_or_default:
             if not isinstance(item, collections.abc.Mapping):
                 raise invalid_type_exception
@@ -1951,8 +1951,8 @@ class ListOfDictStringToStringField(Field):
 
 
 class NestedDictStringToStringField(Field):
-    value: Optional[Tuple[FrozenDict[str, FrozenDict[str, str]]]]
-    default: ClassVar[Optional[Tuple[FrozenDict[str, FrozenDict[str, str]]]]] = None
+    value: Optional[FrozenDict[str, FrozenDict[str, str]]]
+    default: ClassVar[Optional[FrozenDict[str, FrozenDict[str, str]]]] = None
 
     @classmethod
     def compute_value(
