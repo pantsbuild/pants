@@ -753,7 +753,7 @@ async def build_go_package(
     asm_header_path: str | None = None
     if s_files:
         # Ideally, this would follow convention that generated files live in _objdir/{file} - but changing go_asm.h
-        # fails standard library builds when used in a subdir.
+        # fails standard library builds when used in a subdir. Tracked by bug #20618
         asm_header_path = str(PurePath("go_asm.h"))
         compile_args.extend(["-asmhdr", asm_header_path])
 
