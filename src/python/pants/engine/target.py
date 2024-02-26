@@ -1920,7 +1920,7 @@ class DictStringToStringField(Field):
 
 class ListOfDictStringToStringField(Field):
     value: Optional[Tuple[FrozenDict[str, str]]]
-    default: ClassVar[Optional[Tuple[FrozenDict[str, str]]]] = None
+    default: ClassVar[Optional[list[FrozenDict[str, str]]]] = None
 
     @classmethod
     def compute_value(

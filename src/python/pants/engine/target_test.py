@@ -892,7 +892,7 @@ def test_list_of_dict_string_to_string_field() -> None:
     class ExampleDefault(ListOfDictStringToStringField):
         alias = "example"
         # Note that we use `FrozenDict` so that the object can be hashable.
-        default = (FrozenDict({"default": "val"}),)
+        default = [FrozenDict({"default": "val"})]
 
     assert ExampleDefault(None, addr).value == (FrozenDict({"default": "val"}),)
 
