@@ -112,6 +112,11 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
     "beautifulsoup4": ("bs4",),
     "bitvector": ("BitVector",),
     "cattrs": ("cattr", "cattrs"),
+    "databricks-sdk": ("databricks.sdk",),
+    "databricks-sql-connector": (
+        "databricks.sql",
+        "databricks.sqlalchemy",
+    ),
     "django-cors-headers": ("corsheaders",),
     "django-countries": ("django_countries",),
     "django-filter": ("django_filters",),
