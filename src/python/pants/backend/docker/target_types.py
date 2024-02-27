@@ -314,9 +314,9 @@ class DockerBuildOptionFieldMultiValueDictMixin(DictStringToStringField):
 
 
 class DockerBuildOptionFieldListOfMultiValueDictMixin(ListOfDictStringToStringField):
-    """Inherit this mixin class to provide options in the form of `--flag=key1=value1,key2=value2.
+    """Inherit this mixin class to provide multiple key-value options to docker build:
 
-    --flag=key3=value3,key4=value4` to `docker build`.
+    `--flag=key1=value1,key2=value2 --flag=key3=value3,key4=value4`
     """
 
     docker_build_option: ClassVar[str]
@@ -378,7 +378,7 @@ class DockerImageBuildImageCacheFromField(
     alias = "cache_from"
     help = help_text(
         f"""
-        Use an external cache source when building the image.
+        Use external cache sources when building the image.
 
         {DockerBuildKitOptionField.required_help}
 
