@@ -1596,7 +1596,7 @@ class BootstrapOptions:
             dynamically set the relevant headers. Otherwise, no authorization will be performed.
             """
         ),
-        removal_version="2.21.0.dev0",
+        removal_version="2.23.0.dev0",
         removal_hint=f'use `[GLOBAL].remote_oauth_bearer_token = "@/path/to/token.txt"` instead, see {doc_url("reference/global-options#remote_oauth_bearer_token")}',
     )
 

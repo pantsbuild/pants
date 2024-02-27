@@ -432,10 +432,9 @@ class ScalaArtifactCrossversionField(StringField):
         computed_value = super().compute_value(raw_value, address)
         if computed_value == ScalaCrossVersionMode.PARTIAL.value:
             warn_or_error(
-                "2.21.0",
+                "2.23.0.dev0",
                 f"Scala cross version value '{computed_value}' in target: {address}",
                 "Use value `binary` instead",
-                start_version="2.20.0",
             )
         return computed_value
 
@@ -467,10 +466,9 @@ class ScalaArtifactExclusion(JvmArtifactExclusion):
             )
         if self.crossversion == ScalaCrossVersionMode.PARTIAL.value:
             warn_or_error(
-                "2.21.0",
+                "2.23.0.dev0",
                 f"Scala cross version value '{self.crossversion}' in list of exclusions at target: {address}",
                 "Use value `binary` instead",
-                start_version="2.20.0",
             )
         return errors
 
