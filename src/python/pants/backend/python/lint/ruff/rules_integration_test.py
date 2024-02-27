@@ -63,16 +63,8 @@ def run_ruff(
     args = ["--backend-packages=pants.backend.python.lint.ruff", *(extra_args or ())]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
-    check_field_sets = [
-        RuffCheckFieldSet.create(tgt)
-        for tgt in targets
-        if not RuffCheckFieldSet.opt_out(tgt)
-    ]
-    format_field_sets = [
-        RuffFormatFieldSet.create(tgt)
-        for tgt in targets
-        if not RuffFormatFieldSet.opt_out(tgt)
-    ]
+    check_field_sets = [RuffCheckFieldSet.create(tgt) for tgt in targets]
+    format_field_sets = [RuffFormatFieldSet.create(tgt) for tgt in targets]
     source_reqs = [SourceFilesRequest(field_set.source for field_set in check_field_sets)]
     input_sources = rule_runner.request(SourceFiles, source_reqs)
 
@@ -192,10 +184,6 @@ def test_skip_check_field(rule_runner: RuleRunner) -> None:
 
     fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
     assert lint_result.exit_code == 1
-    print(lint_result.stdout)
-    print(lint_result.stderr)
-    print(fix_result.stdout)
-    print(fix_result.stderr)
     assert fix_result.output == rule_runner.make_snapshot(
         {"good.py": GOOD_FILE, "bad.py": GOOD_FILE, "unformatted.py": UNFORMATTED_FILE}
     )
