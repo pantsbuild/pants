@@ -1,21 +1,42 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
 from typing import Optional
 
 from pants.backend.python.lint.ruff.check_rules import _run_ruff, _RunRuffRequest
-from pants.backend.python.lint.ruff.subsystem import Ruff, RuffFieldSet, RuffMode
+from pants.backend.python.lint.ruff.skip_field import SkipRuffFormatField
+from pants.backend.python.lint.ruff.subsystem import Ruff, RuffMode
+from pants.backend.python.target_types import (
+    InterpreterConstraintsField,
+    PythonResolveField,
+    PythonSourceField,
+)
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.fmt import AbstractFmtRequest, FmtResult, FmtTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.rules import collect_rules, rule
+from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
 
+@dataclass(frozen=True)
+class RuffFormatFieldSet(FieldSet):
+    required_fields = (PythonSourceField,)
+
+    source: PythonSourceField
+    resolve: PythonResolveField
+    interpreter_constraints: InterpreterConstraintsField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipRuffFormatField).value
+
+
 class RuffFormatRequest(FmtTargetsRequest):
-    field_set_type = RuffFieldSet
+    field_set_type = RuffFormatFieldSet
     tool_subsystem = Ruff
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 

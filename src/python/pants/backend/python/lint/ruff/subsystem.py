@@ -4,33 +4,16 @@
 from __future__ import annotations
 
 import os.path
-from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable
 
-from pants.backend.python.lint.ruff.skip_field import SkipRuffCheckField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.target_types import (
-    ConsoleScript,
-    InterpreterConstraintsField,
-    PythonResolveField,
-    PythonSourceField,
-)
+from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules import python_sources
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules
-from pants.engine.target import FieldSet, Target
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
-
-
-@dataclass(frozen=True)
-class RuffFieldSet(FieldSet):
-    required_fields = (PythonSourceField,)
-
-    source: PythonSourceField
-    resolve: PythonResolveField
-    interpreter_constraints: InterpreterConstraintsField
 
 
 class RuffMode(str, Enum):

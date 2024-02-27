@@ -9,11 +9,14 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.lint.ruff import skip_field
-from pants.backend.python.lint.ruff.check_rules import RuffFixRequest, RuffLintRequest
+from pants.backend.python.lint.ruff.check_rules import (
+    RuffCheckFieldSet,
+    RuffFixRequest,
+    RuffLintRequest,
+)
 from pants.backend.python.lint.ruff.check_rules import rules as ruff_rules
 from pants.backend.python.lint.ruff.fmt_rules import RuffFormatRequest
 from pants.backend.python.lint.ruff.fmt_rules import rules as ruff_fmt_rules
-from pants.backend.python.lint.ruff.subsystem import RuffFieldSet
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fix import FixResult
@@ -60,7 +63,7 @@ def run_ruff(
     args = ["--backend-packages=pants.backend.python.lint.ruff", *(extra_args or ())]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
-    field_sets = [RuffFieldSet.create(tgt) for tgt in targets]
+    field_sets = [RuffCheckFieldSet.create(tgt) for tgt in targets]
     source_reqs = [SourceFilesRequest(field_set.source for field_set in field_sets)]
     input_sources = rule_runner.request(SourceFiles, source_reqs)
 
@@ -149,6 +152,35 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.py")),
     ]
+    fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
+    assert lint_result.exit_code == 1
+    assert fix_result.output == rule_runner.make_snapshot(
+        {"good.py": GOOD_FILE, "bad.py": GOOD_FILE, "unformatted.py": UNFORMATTED_FILE}
+    )
+    assert fix_result.did_change is True
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "unformatted.py": GOOD_FILE}
+    )
+    assert fmt_result.did_change is True
+
+
+def test_skip_check_field(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "good.py": GOOD_FILE,
+            "bad.py": BAD_FILE,
+            "unformatted.py": UNFORMATTED_FILE,
+            "BUILD": "python_sources(name='t', skip_ruff_check=True)",
+        }
+    )
+    tgts = [
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.py")),
+    ]
+    for tgt in tgts:
+        assert tgt.get(skip_field.SkipRuffCheckField).value is True
+
     fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
     assert lint_result.exit_code == 1
     assert fix_result.output == rule_runner.make_snapshot(

@@ -8,7 +8,13 @@ from typing import Any, Optional, Tuple
 
 from typing_extensions import assert_never
 
-from pants.backend.python.lint.ruff.subsystem import Ruff, RuffFieldSet, RuffMode
+from pants.backend.python.lint.ruff.skip_field import SkipRuffCheckField
+from pants.backend.python.lint.ruff.subsystem import Ruff, RuffMode
+from pants.backend.python.target_types import (
+    InterpreterConstraintsField,
+    PythonResolveField,
+    PythonSourceField,
+)
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -21,13 +27,27 @@ from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
 
 
+@dataclass(frozen=True)
+class RuffCheckFieldSet(FieldSet):
+    required_fields = (PythonSourceField,)
+
+    source: PythonSourceField
+    resolve: PythonResolveField
+    interpreter_constraints: InterpreterConstraintsField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipRuffCheckField).value
+
+
 class RuffLintRequest(LintTargetsRequest):
-    field_set_type = RuffFieldSet
+    field_set_type = RuffCheckFieldSet
     tool_subsystem = Ruff
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
@@ -41,7 +61,7 @@ class RuffLintRequest(LintTargetsRequest):
 
 
 class RuffFixRequest(FixTargetsRequest):
-    field_set_type = RuffFieldSet
+    field_set_type = RuffCheckFieldSet
     tool_subsystem = Ruff
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
@@ -127,7 +147,9 @@ async def ruff_fix(request: RuffFixRequest.Batch, ruff: Ruff) -> FixResult:
 
 
 @rule(desc="Lint with `ruff check`", level=LogLevel.DEBUG)
-async def ruff_lint(request: RuffLintRequest.Batch[RuffFieldSet, Any], ruff: Ruff) -> LintResult:
+async def ruff_lint(
+    request: RuffLintRequest.Batch[RuffCheckFieldSet, Any], ruff: Ruff
+) -> LintResult:
     source_files = await Get(
         SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
     )
