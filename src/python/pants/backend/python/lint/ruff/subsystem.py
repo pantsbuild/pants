@@ -32,10 +32,6 @@ class RuffFieldSet(FieldSet):
     resolve: PythonResolveField
     interpreter_constraints: InterpreterConstraintsField
 
-    @classmethod
-    def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipRuffCheckField).value
-
 
 class RuffMode(str, Enum):
     FIX = "check --fix"

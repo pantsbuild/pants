@@ -17,7 +17,7 @@ class SkipRuffCheckField(BoolField):
     help = "If true, don't run the ruff checker on this target's code."
 
     deprecated_alias = "skip_ruff"
-    deprecated_alias_removal_version = "2.22.0.dev0"
+    deprecated_alias_removal_version = "2.23.0.dev0"
 
 
 class SkipRuffFormatField(BoolField):
