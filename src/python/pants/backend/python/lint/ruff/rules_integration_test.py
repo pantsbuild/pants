@@ -15,7 +15,7 @@ from pants.backend.python.lint.ruff.check_rules import (
     RuffLintRequest,
 )
 from pants.backend.python.lint.ruff.check_rules import rules as ruff_rules
-from pants.backend.python.lint.ruff.fmt_rules import RuffFormatRequest
+from pants.backend.python.lint.ruff.fmt_rules import RuffFormatFieldSet, RuffFormatRequest
 from pants.backend.python.lint.ruff.fmt_rules import rules as ruff_fmt_rules
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
@@ -63,8 +63,17 @@ def run_ruff(
     args = ["--backend-packages=pants.backend.python.lint.ruff", *(extra_args or ())]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
-    field_sets = [RuffCheckFieldSet.create(tgt) for tgt in targets]
-    source_reqs = [SourceFilesRequest(field_set.source for field_set in field_sets)]
+    check_field_sets = [
+        RuffCheckFieldSet.create(tgt)
+        for tgt in targets
+        if not tgt.get(skip_field.SkipRuffCheckField).value
+    ]
+    format_field_sets = [
+        RuffFormatFieldSet.create(tgt)
+        for tgt in targets
+        if not tgt.get(skip_field.SkipRuffFormatField).value
+    ]
+    source_reqs = [SourceFilesRequest(field_set.source for field_set in check_field_sets)]
     input_sources = rule_runner.request(SourceFiles, source_reqs)
 
     fix_result = rule_runner.request(
@@ -72,8 +81,8 @@ def run_ruff(
         [
             RuffFixRequest.Batch(
                 "",
-                input_sources.snapshot.files,
-                partition_metadata=None,
+                tuple(check_field_sets),
+                partition_metadata=_EmptyMetadata(),
                 snapshot=input_sources.snapshot,
             ),
         ],
@@ -83,7 +92,7 @@ def run_ruff(
         [
             RuffLintRequest.Batch(
                 "",
-                tuple(field_sets),
+                tuple(check_field_sets),
                 partition_metadata=_EmptyMetadata(),
             ),
         ],
@@ -93,8 +102,8 @@ def run_ruff(
         [
             RuffFormatRequest.Batch(
                 "",
-                input_sources.snapshot.files,
-                partition_metadata=None,
+                tuple(format_field_sets),
+                partition_metadata=_EmptyMetadata(),
                 snapshot=input_sources.snapshot,
             )
         ],
@@ -182,7 +191,10 @@ def test_skip_check_field(rule_runner: RuleRunner) -> None:
         assert tgt.get(skip_field.SkipRuffCheckField).value is True
 
     fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
-    assert lint_result.exit_code == 1
+    print(lint_result.stdout)
+    print(lint_result.stderr)
+    assert lint_result.exit_code == 0
+
     assert fix_result.output == rule_runner.make_snapshot(
         {"good.py": GOOD_FILE, "bad.py": GOOD_FILE, "unformatted.py": UNFORMATTED_FILE}
     )
