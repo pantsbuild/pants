@@ -393,7 +393,7 @@ class TestResolvePexConfigPexArgs:
         args = self.simple_config_args(only_binary=[":all:"])
         assert "--wheel" in args
         assert "--no-build" in args
-        assert "--only-binary" not in " ".join(self.simple_config_args(only_binary=[":all:"]))
+        assert "--only-binary" not in " ".join(args)
 
         args = self.simple_config_args(only_binary=["foo", ":all:"])
         assert "--wheel" in args
