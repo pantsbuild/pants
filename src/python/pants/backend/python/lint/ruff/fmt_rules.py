@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from pants.backend.python.lint.ruff.check_rules import _run_ruff, _RunRuffRequest
+from pants.backend.python.lint.ruff.common import RunRuffRequest, run_ruff
 from pants.backend.python.lint.ruff.skip_field import SkipRuffFormatField
 from pants.backend.python.lint.ruff.subsystem import Ruff, RuffMode
 from pants.backend.python.target_types import (
@@ -56,12 +56,12 @@ async def _run_ruff_fmt(
     ruff: Ruff,
     interpreter_constraints: Optional[InterpreterConstraints] = None,
 ) -> FmtResult:
-    run_ruff_request = _RunRuffRequest(
+    run_ruff_request = RunRuffRequest(
         snapshot=request.snapshot,
         mode=RuffMode.FORMAT,
         interpreter_constraints=interpreter_constraints,
     )
-    result = await _run_ruff(run_ruff_request, ruff)
+    result = await run_ruff(run_ruff_request, ruff)
     return await FmtResult.create(request, result)
 
 
