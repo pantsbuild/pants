@@ -11,17 +11,31 @@ from pants.backend.python.target_types import (
 from pants.engine.target import BoolField
 
 
-class SkipRuffField(BoolField):
-    alias = "skip_ruff"
+class SkipRuffCheckField(BoolField):
+    alias = "skip_ruff_check"
     default = False
-    help = "If true, don't run ruff on this target's code."
+    help = "If true, don't run the ruff checker on this target's code."
+
+    deprecated_alias = "skip_ruff"
+    deprecated_alias_removal_version = "2.22.0.dev0"
+
+
+class SkipRuffFormatField(BoolField):
+    alias = "skip_ruff_format"
+    default = False
+    help = "If true, don't run the ruff formatter on this target's code."
 
 
 def rules():
     return [
-        PythonSourcesGeneratorTarget.register_plugin_field(SkipRuffField),
-        PythonSourceTarget.register_plugin_field(SkipRuffField),
-        PythonTestsGeneratorTarget.register_plugin_field(SkipRuffField),
-        PythonTestTarget.register_plugin_field(SkipRuffField),
-        PythonTestUtilsGeneratorTarget.register_plugin_field(SkipRuffField),
+        PythonSourcesGeneratorTarget.register_plugin_field(SkipRuffCheckField),
+        PythonSourcesGeneratorTarget.register_plugin_field(SkipRuffFormatField),
+        PythonSourceTarget.register_plugin_field(SkipRuffCheckField),
+        PythonSourceTarget.register_plugin_field(SkipRuffFormatField),
+        PythonTestsGeneratorTarget.register_plugin_field(SkipRuffCheckField),
+        PythonTestsGeneratorTarget.register_plugin_field(SkipRuffFormatField),
+        PythonTestTarget.register_plugin_field(SkipRuffCheckField),
+        PythonTestTarget.register_plugin_field(SkipRuffFormatField),
+        PythonTestUtilsGeneratorTarget.register_plugin_field(SkipRuffCheckField),
+        PythonTestUtilsGeneratorTarget.register_plugin_field(SkipRuffFormatField),
     ]

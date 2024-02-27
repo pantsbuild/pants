@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable
 
-from pants.backend.python.lint.ruff.skip_field import SkipRuffField
+from pants.backend.python.lint.ruff.skip_field import SkipRuffCheckField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -34,7 +34,7 @@ class RuffFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipRuffField).value
+        return tgt.get(SkipRuffCheckField).value
 
 
 class RuffMode(str, Enum):
