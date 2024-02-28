@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.backend.python.lint.ruff.common import RunRuffRequest, run_ruff
-from pants.backend.python.lint.ruff.skip_field import SkipRuffCheckField
+from pants.backend.python.lint.ruff.check.skip_field import SkipRuffCheckField
 from pants.backend.python.lint.ruff.subsystem import Ruff, RuffMode
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
