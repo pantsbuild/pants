@@ -6,6 +6,7 @@ from typing import Optional
 
 from pants.backend.python.lint.ruff.common import RunRuffRequest, run_ruff
 from pants.backend.python.lint.ruff.format.skip_field import SkipRuffFormatField
+from pants.backend.python.lint.ruff.skip_field import SkipRuffField
 from pants.backend.python.lint.ruff.subsystem import Ruff, RuffMode
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
@@ -32,7 +33,7 @@ class RuffFormatFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipRuffFormatField).value
+        return tgt.get(SkipRuffFormatField).value or tgt.get(SkipRuffField).value
 
 
 class RuffFormatRequest(FmtTargetsRequest):

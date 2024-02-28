@@ -8,6 +8,7 @@ from typing import Any
 
 from pants.backend.python.lint.ruff.common import RunRuffRequest, run_ruff
 from pants.backend.python.lint.ruff.check.skip_field import SkipRuffCheckField
+from pants.backend.python.lint.ruff.skip_field import SkipRuffField
 from pants.backend.python.lint.ruff.subsystem import Ruff, RuffMode
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
@@ -35,7 +36,7 @@ class RuffCheckFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipRuffCheckField).value
+        return tgt.get(SkipRuffCheckField).value or tgt.get(SkipRuffField).value
 
 
 class RuffLintRequest(LintTargetsRequest):
