@@ -3,6 +3,7 @@
 
 from pants.backend.build_files.fmt.base import FmtBuildFilesRequest
 from pants.backend.python.lint.ruff import subsystem as ruff_subsystem
+from pants.backend.python.lint.ruff.format import rules as ruff_fmt_backend
 from pants.backend.python.lint.ruff.format.rules import _run_ruff_fmt
 from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.subsystems.python_tool_base import get_lockfile_interpreter_constraints
@@ -25,5 +26,6 @@ def rules():
     return [
         *collect_rules(),
         *RuffRequest.rules(),
+        *ruff_fmt_backend.rules(),
         *ruff_subsystem.rules(),
     ]
