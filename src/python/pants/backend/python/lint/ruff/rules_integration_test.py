@@ -7,8 +7,6 @@ from pathlib import Path
 
 import pytest
 
-import pants.backend.python.lint.ruff.check.skip_field
-import pants.backend.python.lint.ruff.format.skip_field
 from pants.backend.python import target_types_rules
 from pants.backend.python.lint.ruff import skip_field
 from pants.backend.python.lint.ruff.check import skip_field as ruff_check_skip_field
@@ -18,9 +16,11 @@ from pants.backend.python.lint.ruff.check.rules import (
     RuffLintRequest,
 )
 from pants.backend.python.lint.ruff.check.rules import rules as ruff_check_rules
+from pants.backend.python.lint.ruff.check.skip_field import SkipRuffCheckField
 from pants.backend.python.lint.ruff.format import skip_field as ruff_format_skip_field
 from pants.backend.python.lint.ruff.format.rules import RuffFormatFieldSet, RuffFormatRequest
 from pants.backend.python.lint.ruff.format.rules import rules as ruff_fmt_rules
+from pants.backend.python.lint.ruff.format.skip_field import SkipRuffFormatField
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fix import FixResult
@@ -193,10 +193,7 @@ def test_skip_check_field(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.py")),
     ]
     for tgt in tgts:
-        assert (
-            tgt.get(pants.backend.python.lint.ruff.check.skip_field.SkipRuffCheckField).value
-            is True
-        )
+        assert tgt.get(SkipRuffCheckField).value is True
 
     fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
 
@@ -224,10 +221,7 @@ def test_skip_format_field(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.py")),
     ]
     for tgt in tgts:
-        assert (
-            tgt.get(pants.backend.python.lint.ruff.format.skip_field.SkipRuffFormatField).value
-            is True
-        )
+        assert tgt.get(SkipRuffFormatField).value is True
 
     fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
 
