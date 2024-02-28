@@ -63,10 +63,13 @@ def run_ruff(
     args = ["--backend-packages=pants.backend.python.lint.ruff", *(extra_args or ())]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
-    check_field_sets = [RuffCheckFieldSet.create(tgt) for tgt in targets]
-    format_field_sets = [RuffFormatFieldSet.create(tgt) for tgt in targets]
-    source_reqs = [SourceFilesRequest(field_set.source for field_set in check_field_sets)]
-    input_sources = rule_runner.request(SourceFiles, source_reqs)
+    check_field_sets = [RuffCheckFieldSet.create(tgt) for tgt in targets if RuffCheckFieldSet.is_applicable(tgt)]
+    check_source_reqs = [SourceFilesRequest(field_set.source for field_set in check_field_sets)]
+    check_input_sources = rule_runner.request(SourceFiles, check_source_reqs)
+
+    format_field_sets = [RuffFormatFieldSet.create(tgt) for tgt in targets if RuffFormatFieldSet.is_applicable(tgt)]
+    format_source_reqs = [SourceFilesRequest(field_set.source for field_set in format_field_sets)]
+    format_input_sources = rule_runner.request(SourceFiles, format_source_reqs)
 
     fix_result = rule_runner.request(
         FixResult,
@@ -75,7 +78,7 @@ def run_ruff(
                 "",
                 tuple(check_field_sets),
                 partition_metadata=_EmptyMetadata(),
-                snapshot=input_sources.snapshot,
+                snapshot=check_input_sources.snapshot,
             ),
         ],
     )
@@ -96,7 +99,7 @@ def run_ruff(
                 "",
                 tuple(format_field_sets),
                 partition_metadata=_EmptyMetadata(),
-                snapshot=input_sources.snapshot,
+                snapshot=format_input_sources.snapshot,
             )
         ],
     )
@@ -183,15 +186,42 @@ def test_skip_check_field(rule_runner: RuleRunner) -> None:
         assert tgt.get(skip_field.SkipRuffCheckField).value is True
 
     fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
+
+    assert lint_result.exit_code == 1
+    assert fix_result.output == rule_runner.make_snapshot({})
+    assert fix_result.did_change is False
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "unformatted.py": GOOD_FILE}
+    )
+    assert fmt_result.did_change is True
+
+
+def test_skip_format_field(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "good.py": GOOD_FILE,
+            "bad.py": BAD_FILE,
+            "unformatted.py": UNFORMATTED_FILE,
+            "BUILD": "python_sources(name='t', skip_ruff_format=True)",
+        }
+    )
+    tgts = [
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.py")),
+    ]
+    for tgt in tgts:
+        assert tgt.get(skip_field.SkipRuffFormatField).value is True
+
+    fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
+
     assert lint_result.exit_code == 1
     assert fix_result.output == rule_runner.make_snapshot(
         {"good.py": GOOD_FILE, "bad.py": GOOD_FILE, "unformatted.py": UNFORMATTED_FILE}
     )
     assert fix_result.did_change is True
-    assert fmt_result.output == rule_runner.make_snapshot(
-        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "unformatted.py": GOOD_FILE}
-    )
-    assert fmt_result.did_change is True
+    assert fmt_result.output == rule_runner.make_snapshot({})
+    assert fmt_result.did_change is False
 
 
 @pytest.mark.parametrize(
