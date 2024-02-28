@@ -40,7 +40,7 @@ class PexCli(TemplatedExternalTool):
 
     default_version = "v2.2.1"
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.1.148,<3.0"
+    version_constraints = ">=2.1.161,<3.0"
 
     @classproperty
     def default_known_versions(cls):
