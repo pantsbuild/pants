@@ -63,11 +63,15 @@ def run_ruff(
     args = ["--backend-packages=pants.backend.python.lint.ruff", *(extra_args or ())]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
-    check_field_sets = [RuffCheckFieldSet.create(tgt) for tgt in targets if RuffCheckFieldSet.is_applicable(tgt)]
+    check_field_sets = [
+        RuffCheckFieldSet.create(tgt) for tgt in targets if RuffCheckFieldSet.is_applicable(tgt)
+    ]
     check_source_reqs = [SourceFilesRequest(field_set.source for field_set in check_field_sets)]
     check_input_sources = rule_runner.request(SourceFiles, check_source_reqs)
 
-    format_field_sets = [RuffFormatFieldSet.create(tgt) for tgt in targets if RuffFormatFieldSet.is_applicable(tgt)]
+    format_field_sets = [
+        RuffFormatFieldSet.create(tgt) for tgt in targets if RuffFormatFieldSet.is_applicable(tgt)
+    ]
     format_source_reqs = [SourceFilesRequest(field_set.source for field_set in format_field_sets)]
     format_input_sources = rule_runner.request(SourceFiles, format_source_reqs)
 
