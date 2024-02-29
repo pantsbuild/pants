@@ -21,6 +21,7 @@ from pants.backend.python.lint.ruff.format import skip_field as ruff_format_skip
 from pants.backend.python.lint.ruff.format.rules import RuffFormatFieldSet, RuffFormatRequest
 from pants.backend.python.lint.ruff.format.rules import rules as ruff_fmt_rules
 from pants.backend.python.lint.ruff.format.skip_field import SkipRuffFormatField
+from pants.backend.python.lint.ruff.skip_field import SkipRuffField
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fix import FixResult
@@ -176,6 +177,32 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "unformatted.py": GOOD_FILE}
     )
     assert fmt_result.did_change is True
+
+
+def test_skip_field(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "good.py": GOOD_FILE,
+            "bad.py": BAD_FILE,
+            "unformatted.py": UNFORMATTED_FILE,
+            "BUILD": "python_sources(name='t', skip_ruff=True)",
+        }
+    )
+    tgts = [
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.py")),
+    ]
+    for tgt in tgts:
+        assert tgt.get(SkipRuffField).value is True
+
+    fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
+
+    assert lint_result.exit_code == 1
+    assert fix_result.output == rule_runner.make_snapshot({})
+    assert fix_result.did_change is False
+    assert fmt_result.output == rule_runner.make_snapshot({})
+    assert fmt_result.did_change is False
 
 
 def test_skip_check_field(rule_runner: RuleRunner) -> None:
