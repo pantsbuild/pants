@@ -40,7 +40,18 @@ fn check_with_arg<T: PartialEq + Debug>(
 #[test]
 fn test_parse_quoted_string() {
     fn check_str(expected: &str, input: &str) {
-        check!(expected.to_string(), parse_quoted_string(input));
+        // This is slightly convoluted: quoted strings appear as list items,
+        // so we generate a list, and then extract the parsed string out of
+        // the Result<Vec<ListEdit<String>>, ...> returned by parse_list().
+        let parsed = String::parse_list(format!("[{}]", input).as_str())
+            .unwrap()
+            .first()
+            .unwrap()
+            .items
+            .first()
+            .unwrap()
+            .to_string();
+        check!(expected.to_string(), Ok(parsed));
     }
 
     check_str("", "''");

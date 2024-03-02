@@ -278,11 +278,6 @@ fn format_parse_error(
     ))
 }
 
-#[allow(dead_code)]
-pub(crate) fn parse_quoted_string(value: &str) -> Result<String, ParseError> {
-    option_value_parser::quoted_string(value).map_err(|e| format_parse_error("string", value, e))
-}
-
 pub(crate) fn parse_dict(value: &str) -> Result<DictEdit, ParseError> {
     option_value_parser::dict_edit(value).map_err(|e| format_parse_error("dict", value, e))
 }
