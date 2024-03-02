@@ -4,11 +4,8 @@
 use std::env;
 
 use super::id::{NameTransform, OptionId, Scope};
-use super::parse::{
-    parse_bool, parse_bool_list, parse_dict, parse_float_list, parse_int_list, ParseError,
-};
 use super::{DictEdit, OptionsSource};
-use crate::parse::parse_string_list;
+use crate::parse::{expand, expand_to_dict, expand_to_list, ListMember, Parseable};
 use crate::ListEdit;
 use std::collections::HashMap;
 
@@ -80,11 +77,7 @@ impl Args {
         Ok(None)
     }
 
-    fn get_list<T>(
-        &self,
-        id: &OptionId,
-        parse_list: fn(&str) -> Result<Vec<ListEdit<T>>, ParseError>,
-    ) -> Result<Option<Vec<ListEdit<T>>>, String> {
+    fn get_list<T: ListMember>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
         let arg_names = Self::arg_names(id, Negate::False);
         let mut edits = vec![];
         for arg in &self.args {
@@ -94,7 +87,11 @@ impl Args {
                     let value = components.next().ok_or_else(|| {
                         format!("Expected string list option {name} to have a value.")
                     })?;
-                    edits.extend(parse_list(value).map_err(|e| e.render(name))?)
+                    if let Some(es) =
+                        expand_to_list::<T>(value.to_string()).map_err(|e| e.render(name))?
+                    {
+                        edits.extend(es);
+                    }
                 }
             }
         }
@@ -112,40 +109,45 @@ impl OptionsSource for Args {
     }
 
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
-        self.find_flag(Self::arg_names(id, Negate::False))
-            .map(|value| value.map(|(_, v, _)| v))
+        match self.find_flag(Self::arg_names(id, Negate::False))? {
+            Some((name, value, _)) => expand(value).map_err(|e| e.render(name)),
+            _ => Ok(None),
+        }
     }
 
     fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
         let arg_names = Self::arg_names(id, Negate::True);
         match self.find_flag(arg_names)? {
             Some((_, s, negated)) if s.as_str() == "" => Ok(Some(!negated)),
-            Some((name, ref value, negated)) => parse_bool(value)
-                .map(|b| Some(b ^ negated))
-                .map_err(|e| e.render(name)),
-            None => Ok(None),
+            Some((name, value, negated)) => match expand(value).map_err(|e| e.render(&name))? {
+                Some(value) => bool::parse(&value)
+                    .map(|b| Some(b ^ negated))
+                    .map_err(|e| e.render(&name)),
+                _ => Ok(None),
+            },
+            _ => Ok(None),
         }
     }
 
     fn get_bool_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<bool>>>, String> {
-        self.get_list(id, parse_bool_list)
+        self.get_list::<bool>(id)
     }
 
     fn get_int_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<i64>>>, String> {
-        self.get_list(id, parse_int_list)
+        self.get_list::<i64>(id)
     }
 
     fn get_float_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<f64>>>, String> {
-        self.get_list(id, parse_float_list)
+        self.get_list::<f64>(id)
     }
 
     fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
-        self.get_list(id, parse_string_list)
+        self.get_list::<String>(id)
     }
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
         match self.find_flag(Self::arg_names(id, Negate::False))? {
-            Some((name, ref value, _)) => parse_dict(value).map(Some).map_err(|e| e.render(name)),
+            Some((name, value, _)) => expand_to_dict(value).map_err(|e| e.render(name)),
             None => Ok(None),
         }
     }

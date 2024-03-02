@@ -11,9 +11,7 @@ use toml::value::Table;
 use toml::Value;
 
 use super::id::{NameTransform, OptionId};
-use super::parse::{
-    parse_bool_list, parse_dict, parse_float_list, parse_int_list, parse_string_list, ParseError,
-};
+use super::parse::{expand, expand_to_dict, expand_to_list, ListMember, Parseable};
 use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, OptionsSource, Val};
 
 type InterpolationMap = HashMap<String, String>;
@@ -99,17 +97,28 @@ struct ValueConversionError<'a> {
     given_value: &'a Value,
 }
 
-trait FromValue: Sized {
+trait FromValue: Parseable {
     fn from_value(value: &Value) -> Result<Self, ValueConversionError>;
 
     fn from_config(config: &Config, id: &OptionId) -> Result<Option<Self>, String> {
         if let Some(value) = config.get_value(id) {
-            match Self::from_value(value) {
-                Ok(x) => Ok(Some(x)),
-                Err(verr) => Err(format!(
-                    "Expected {id} to be a {} but given {}",
-                    verr.expected_type, verr.given_value
-                )),
+            if value.is_str() {
+                match expand(value.as_str().unwrap().to_owned())
+                    .map_err(|e| e.render(config.display(id)))?
+                {
+                    Some(expanded_value) => Ok(Some(
+                        Self::parse(&expanded_value).map_err(|e| e.render(config.display(id)))?,
+                    )),
+                    _ => Ok(None),
+                }
+            } else {
+                match Self::from_value(value) {
+                    Ok(x) => Ok(Some(x)),
+                    Err(verr) => Err(format!(
+                        "Expected {id} to be a {} but given {}",
+                        verr.expected_type, verr.given_value
+                    )),
+                }
             }
         } else {
             Ok(None)
@@ -316,10 +325,9 @@ impl Config {
             .and_then(|table| table.get(Self::option_name(id)))
     }
 
-    fn get_list<T: FromValue>(
+    fn get_list<T: FromValue + ListMember>(
         &self,
         id: &OptionId,
-        parse_list: fn(&str) -> Result<Vec<ListEdit<T>>, ParseError>,
     ) -> Result<Option<Vec<ListEdit<T>>>, String> {
         let mut list_edits = vec![];
         if let Some(table) = self.value.get(id.scope()) {
@@ -352,7 +360,11 @@ impl Config {
                         }
                     }
                     Value::String(v) => {
-                        list_edits.extend(parse_list(v).map_err(|e| e.render(option_name))?);
+                        if let Some(es) = expand_to_list::<T>(v.to_string())
+                            .map_err(|e| e.render(self.display(id)))?
+                        {
+                            list_edits.extend(es);
+                        }
                     }
                     value => list_edits.push(ListEdit {
                         action: ListEditAction::Replace,
@@ -387,19 +399,19 @@ impl OptionsSource for Config {
     }
 
     fn get_bool_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<bool>>>, String> {
-        self.get_list(id, parse_bool_list)
+        self.get_list::<bool>(id)
     }
 
     fn get_int_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<i64>>>, String> {
-        self.get_list(id, parse_int_list)
+        self.get_list::<i64>(id)
     }
 
     fn get_float_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<f64>>>, String> {
-        self.get_list(id, parse_float_list)
+        self.get_list::<f64>(id)
     }
 
     fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
-        self.get_list(id, parse_string_list)
+        self.get_list::<String>(id)
     }
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
@@ -422,7 +434,8 @@ impl OptionsSource for Config {
                         }));
                     }
                     Value::String(v) => {
-                        return Ok(Some(parse_dict(v).map_err(|e| e.render(option_name))?));
+                        return expand_to_dict(v.to_owned())
+                            .map_err(|e| e.render(self.display(id)));
                     }
                     _ => {
                         return Err(format!(

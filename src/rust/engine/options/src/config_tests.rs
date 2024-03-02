@@ -1,17 +1,23 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use maplit::hashmap;
 use regex::Regex;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::Write;
 
-use crate::config::{interpolate_string, Config};
-use crate::{option_id, DictEdit, DictEditAction, ListEdit, ListEditAction, OptionsSource, Val};
+use crate::config::interpolate_string;
+use crate::{
+    option_id, DictEdit, DictEditAction, ListEdit, ListEditAction, OptionId, OptionsSource, Val,
+};
 
+use crate::config::Config;
+use crate::parse::test_util::write_fromfile;
 use tempfile::TempDir;
 
-fn maybe_config(file_content: &'static str) -> Result<Config, String> {
+fn maybe_config(file_content: &str) -> Result<Config, String> {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("pants.toml");
     File::create(&path)
@@ -27,7 +33,7 @@ fn maybe_config(file_content: &'static str) -> Result<Config, String> {
     )
 }
 
-fn config(file_content: &'static str) -> Config {
+fn config(file_content: &str) -> Config {
     maybe_config(file_content).unwrap()
 }
 
@@ -165,4 +171,116 @@ fn test_interpolate_config() {
         &err_msg,
         pat
     );
+}
+
+#[test]
+fn test_scalar_fromfile() {
+    fn do_test<T: PartialEq + Debug>(
+        content: &str,
+        expected: T,
+        getter: fn(&Config, &OptionId) -> Result<Option<T>, String>,
+    ) {
+        let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", content);
+        let conf = config(format!("[GLOBAL]\nfoo = '@{}'\n", fromfile_path.display()).as_str());
+        let actual = getter(&conf, &option_id!("foo")).unwrap().unwrap();
+        assert_eq!(expected, actual)
+    }
+
+    do_test("true", true, Config::get_bool);
+    do_test("-42", -42, Config::get_int);
+    do_test("3.14", 3.14, Config::get_float);
+    do_test("EXPANDED", "EXPANDED".to_owned(), Config::get_string);
+}
+
+#[test]
+fn test_list_fromfile() {
+    fn do_test(content: &str, expected: &[ListEdit<i64>], filename: &str) {
+        let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
+        let conf = config(format!("[GLOBAL]\nfoo = '@{}'\n", fromfile_path.display()).as_str());
+        let actual = conf.get_int_list(&option_id!("foo")).unwrap().unwrap();
+        assert_eq!(expected.to_vec(), actual)
+    }
+
+    do_test(
+        "-42",
+        &[ListEdit {
+            action: ListEditAction::Add,
+            items: vec![-42],
+        }],
+        "fromfile.txt",
+    );
+    do_test(
+        "[10, 12]",
+        &[ListEdit {
+            action: ListEditAction::Replace,
+            items: vec![10, 12],
+        }],
+        "fromfile.json",
+    );
+    do_test(
+        "- 22\n- 44\n",
+        &[ListEdit {
+            action: ListEditAction::Replace,
+            items: vec![22, 44],
+        }],
+        "fromfile.yaml",
+    );
+}
+
+#[test]
+fn test_dict_fromfile() {
+    fn do_test(content: &str, filename: &str) {
+        let expected = DictEdit {
+            action: DictEditAction::Replace,
+            items: hashmap! {
+            "FOO".to_string() => Val::Dict(hashmap! {
+                "BAR".to_string() => Val::Float(3.14),
+                "BAZ".to_string() => Val::Dict(hashmap! {
+                    "QUX".to_string() => Val::Bool(true),
+                    "QUUX".to_string() => Val::List(vec![ Val::Int(1), Val::Int(2)])
+                })
+            }),},
+        };
+
+        let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
+        let conf = config(format!("[GLOBAL]\nfoo = '@{}'\n", fromfile_path.display()).as_str());
+        let actual = conf.get_dict(&option_id!("foo")).unwrap().unwrap();
+        assert_eq!(expected, actual)
+    }
+
+    do_test(
+        "{'FOO': {'BAR': 3.14, 'BAZ': {'QUX': True, 'QUUX': [1, 2]}}}",
+        "fromfile.txt",
+    );
+    do_test(
+        "{\"FOO\": {\"BAR\": 3.14, \"BAZ\": {\"QUX\": true, \"QUUX\": [1, 2]}}}",
+        "fromfile.json",
+    );
+    do_test(
+        r#"
+        FOO:
+          BAR: 3.14
+          BAZ:
+            QUX: true
+            QUUX:
+              - 1
+              - 2
+        "#,
+        "fromfile.yaml",
+    );
+}
+
+#[test]
+fn test_nonexistent_required_fromfile() {
+    let conf = config("[GLOBAL]\nfoo = '@/does/not/exist'\n");
+    let err = conf.get_string(&option_id!("foo")).unwrap_err();
+    assert!(err.starts_with(
+        "Problem reading /does/not/exist for [GLOBAL] foo: No such file or directory"
+    ));
+}
+
+#[test]
+fn test_nonexistent_optional_fromfile() {
+    let conf = config("[GLOBAL]\nfoo = '@?/does/not/exist'\n");
+    assert!(conf.get_string(&option_id!("foo")).unwrap().is_none());
 }

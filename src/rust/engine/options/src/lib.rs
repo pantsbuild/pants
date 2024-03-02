@@ -37,10 +37,12 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::rc::Rc;
 
+use serde::Deserialize;
+
 pub use self::args::Args;
 use self::config::Config;
 pub use self::env::Env;
-use crate::parse::{parse_float, parse_int};
+use crate::parse::Parseable;
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
 pub use types::OptionType;
@@ -54,7 +56,8 @@ pub use types::OptionType;
 // We only use this for parsing values in dicts, as in other cases we know that the type must
 // be some scalar or string, or a uniform list of one type of scalar or string, so we can
 // parse as such.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(untagged)]
 pub enum Val {
     Bool(bool),
     Int(i64),
@@ -89,12 +92,6 @@ pub struct DictEdit {
     pub items: HashMap<String, Val>,
 }
 
-///
-/// A source of option values.
-///
-/// This is currently a subset of the types of options the Pants python option system handles.
-/// Implementations should mimic the behavior of the equivalent python source.
-///
 pub(crate) trait OptionsSource {
     ///
     /// Get a display version of the option `id` that most closely matches the syntax used to supply
@@ -124,7 +121,7 @@ pub(crate) trait OptionsSource {
     ///
     fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String> {
         if let Some(value) = self.get_string(id)? {
-            parse_int(&value)
+            i64::parse(&value)
                 .map(Some)
                 .map_err(|e| e.render(self.display(id)))
         } else {
@@ -142,12 +139,12 @@ pub(crate) trait OptionsSource {
     ///
     fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String> {
         if let Some(value) = self.get_string(id)? {
-            let parsed_as_float = parse_float(&value)
+            let parsed_as_float = f64::parse(&value)
                 .map(Some)
                 .map_err(|e| e.render(self.display(id)));
             if parsed_as_float.is_err() {
                 // See if we can parse as an int and coerce it to a float.
-                if let Ok(i) = parse_int(&value) {
+                if let Ok(i) = i64::parse(&value) {
                     return Ok(Some(i as f64));
                 }
             }
@@ -199,8 +196,6 @@ pub enum Source {
 #[derive(Debug)]
 pub struct OptionValue<T> {
     pub derivation: Option<Vec<(Source, T)>>,
-    // Scalar options are always set from a single source, so we provide that
-    // here, as it can be useful in user-facing messages.
     pub source: Source,
     pub value: T,
 }
@@ -208,12 +203,16 @@ pub struct OptionValue<T> {
 #[derive(Debug)]
 pub struct ListOptionValue<T> {
     pub derivation: Option<Vec<(Source, Vec<ListEdit<T>>)>>,
+    // The highest-priority source that provided edits for this value.
+    pub source: Source,
     pub value: Vec<T>,
 }
 
 #[derive(Debug)]
 pub struct DictOptionValue {
     pub derivation: Option<Vec<(Source, DictEdit)>>,
+    // The highest-priority source that provided edits for this value.
+    pub source: Source,
     pub value: HashMap<String, Val>,
 }
 
@@ -434,8 +433,10 @@ impl OptionParser {
             }
             derivation = Some(derivations);
         }
-        for (_source_type, source) in self.sources.iter() {
+        let mut highest_priority_source = Source::Default;
+        for (source_type, source) in self.sources.iter() {
             if let Some(list_edits) = getter(source, id)? {
+                highest_priority_source = source_type.clone();
                 for list_edit in list_edits {
                     match list_edit.action {
                         ListEditAction::Replace => list = list_edit.items,
@@ -447,6 +448,7 @@ impl OptionParser {
         }
         Ok(ListOptionValue {
             derivation,
+            source: highest_priority_source,
             value: list,
         })
     }
@@ -536,8 +538,10 @@ impl OptionParser {
             }
             derivation = Some(derivations);
         }
-        for (_, source) in self.sources.iter() {
+        let mut highest_priority_source = Source::Default;
+        for (source_type, source) in self.sources.iter() {
             if let Some(dict_edit) = source.get_dict(id)? {
+                highest_priority_source = source_type.clone();
                 match dict_edit.action {
                     DictEditAction::Replace => dict = dict_edit.items,
                     DictEditAction::Add => dict.extend(dict_edit.items),
@@ -546,6 +550,7 @@ impl OptionParser {
         }
         Ok(DictOptionValue {
             derivation,
+            source: highest_priority_source,
             value: dict,
         })
     }
