@@ -25,3 +25,19 @@ def test_scala_version_parser(
     assert parsed.crossversion(ScalaCrossVersionMode.PARTIAL) == parsed.crossversion(
         ScalaCrossVersionMode.BINARY
     )
+
+
+@pytest.mark.parametrize(
+    "lhs, rhs, expected",
+    [
+        (ScalaVersion(2, 2, 0), ScalaVersion(1, 0, 5), True),
+        (ScalaVersion(2, 2, 1), ScalaVersion(2, 2, 0), True),
+        (ScalaVersion(2, 2, 0), ScalaVersion(2, 2, 1), False),
+        (ScalaVersion(1, 1, 0), ScalaVersion(1, 0, 0), True),
+        (ScalaVersion(1, 0, 0), ScalaVersion(1, 0, 0), False),
+        (ScalaVersion(1, 0, 1), ScalaVersion(1, 1, 0), False),
+        (ScalaVersion(1, 2, 0), ScalaVersion(2, 0, 1), False),
+    ],
+)
+def test_scala_version_greater_than(lhs: ScalaVersion, rhs: ScalaVersion, expected: bool) -> None:
+    assert (lhs > rhs) == expected

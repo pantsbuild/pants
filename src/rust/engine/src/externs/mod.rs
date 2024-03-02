@@ -68,7 +68,7 @@ pub struct PyFailure(pub Failure);
 impl PyFailure {
     fn get_error(&self, py: Python) -> PyErr {
         match &self.0 {
-            Failure::Throw { val, .. } => val.into_py(py),
+            Failure::Throw { val, .. } => PyErr::from_value(val.as_ref().as_ref(py)),
             f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
                 EngineError::new_err(format!("{f}"))
             }

@@ -319,7 +319,7 @@ class TemplatedExternalToolOptionsMixin(ExternalToolOptionsMixin):
             (e.g. zip file). You can change this to point to your own hosted file, e.g. to
             work with proxies or for access via the filesystem through a `file:$abspath` URL (e.g.
             `file:/this/is/absolute`, possibly by
-            [templating the buildroot in a config file]({doc_url('options#config-file-entries')})).
+            [templating the buildroot in a config file]({doc_url('docs/using-pants/key-concepts/options#config-file-entries')})).
 
             Use `{{version}}` to have the value from `--version` substituted, and `{{platform}}` to
             have a value from `--url-platform-mapping` substituted in, depending on the

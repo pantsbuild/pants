@@ -96,7 +96,7 @@ class PantsRunner:
                         softwrap(
                             f"""
                             The `pants` launcher binary is now the only supported way of running Pants.
-                            See {doc_url("installation")} for details.
+                            See {doc_url("docs/getting-started/installing-pants")} for details.
                             """
                         ),
                     )
@@ -117,7 +117,7 @@ class PantsRunner:
                         f"using a `pants` launcher binary older than {MINIMUM_SCIE_PANTS_VERSION}",
                         softwrap(
                             f"""
-                            {current_version_text}, and see {doc_url("installation")} for how to upgrade.
+                            {current_version_text}, and see {doc_url("docs/getting-started/installing-pants")} for how to upgrade.
                             """
                         ),
                     )

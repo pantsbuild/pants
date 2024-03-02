@@ -126,6 +126,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
     m.add_function(wrap_pyfunction!(validate_reachability, m)?)?;
     m.add_function(wrap_pyfunction!(rule_graph_consumed_types, m)?)?;
+    m.add_function(wrap_pyfunction!(rule_graph_rule_gets, m)?)?;
     m.add_function(wrap_pyfunction!(rule_graph_visualize, m)?)?;
     m.add_function(wrap_pyfunction!(rule_subgraph_visualize, m)?)?;
 
@@ -1397,6 +1398,48 @@ fn rule_graph_consumed_types<'py>(
             .into_iter()
             .map(|type_id| type_id.as_py_type(py))
             .collect())
+    })
+}
+
+#[pyfunction]
+fn rule_graph_rule_gets<'p>(py: Python<'p>, py_scheduler: &PyScheduler) -> PyO3Result<&'p PyDict> {
+    let core = &py_scheduler.0.core;
+    core.executor.enter(|| {
+        let result = PyDict::new(py);
+        for (rule, rule_dependencies) in core.rule_graph.rule_dependencies() {
+            let Rule::Task(task) = rule else { continue };
+
+            let function = &task.func;
+            let mut dependencies = Vec::new();
+            for (dependency_key, rule) in rule_dependencies {
+                // NB: We are only migrating non-union Gets, which are those in the `gets` list
+                // which do not have `in_scope_params` marking them as being for unions, or a call
+                // signature marking them as already being call-by-name.
+                if dependency_key.call_signature.is_some()
+                    || dependency_key.in_scope_params.is_some()
+                    || !task.gets.contains(dependency_key)
+                {
+                    continue;
+                }
+                let Rule::Task(task) = rule else { continue };
+
+                let provided_params = dependency_key
+                    .provided_params
+                    .iter()
+                    .map(|p| p.as_py_type(py))
+                    .collect::<Vec<_>>();
+                dependencies.push((
+                    dependency_key.product.as_py_type(py),
+                    provided_params,
+                    task.func.0.value.into_py(py),
+                ));
+            }
+            if dependencies.is_empty() {
+                continue;
+            }
+            result.set_item(function.0.value.into_py(py), dependencies.into_py(py))?;
+        }
+        Ok(result)
     })
 }
 

@@ -12,6 +12,7 @@ from typing import Callable, ClassVar, Iterator, Optional, cast
 from typing_extensions import final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
+from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.base.build_environment import get_buildroot
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
@@ -149,7 +150,7 @@ class DockerImageTagsField(StringSequenceField):
 
         {_interpolation_help.format(kind="tag")}
 
-        See {doc_url('tagging-docker-images')}.
+        See {doc_url('docs/docker/tagging-docker-images')}.
         """
     )
 
@@ -559,6 +560,14 @@ class DockerImageBuildPlatformOptionField(
     docker_build_option = "--platform"
 
 
+class DockerImageRunExtraArgsField(StringSequenceField):
+    alias: ClassVar[str] = "extra_run_args"
+    default = ()
+    help = help_text(
+        lambda: f"Extra arguments to pass into the invocation of `docker run`. These are in addition to those at the `[{DockerOptions.options_scope}].run_args`"
+    )
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -584,6 +593,7 @@ class DockerImageTarget(Target):
         DockerImageBuildImageCacheToField,
         DockerImageBuildImageCacheFromField,
         DockerImageBuildImageOutputField,
+        DockerImageRunExtraArgsField,
         OutputPathField,
         RestartableField,
     )

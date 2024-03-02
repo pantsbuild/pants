@@ -378,15 +378,9 @@ impl From<PyObject> for Value {
     }
 }
 
-impl From<PyErr> for Value {
-    fn from(py_err: PyErr) -> Self {
-        Python::with_gil(|py| Value::new(py_err.into_py(py)))
-    }
-}
-
-impl IntoPy<PyErr> for &Value {
-    fn into_py(self, py: Python) -> PyErr {
-        PyErr::from_value((*self.0).as_ref(py))
+impl IntoPy<PyObject> for &Value {
+    fn into_py(self, py: Python) -> PyObject {
+        (*self.0).as_ref(py).into_py(py)
     }
 }
 
