@@ -1,8 +1,10 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use crate::parse::test_util::write_fromfile;
 use crate::parse::*;
 use crate::{DictEdit, DictEditAction, ListEdit, ListEditAction, Val};
+use maplit::hashmap;
 use std::collections::HashMap;
 use std::fmt::Debug;
 
@@ -38,7 +40,18 @@ fn check_with_arg<T: PartialEq + Debug>(
 #[test]
 fn test_parse_quoted_string() {
     fn check_str(expected: &str, input: &str) {
-        check!(expected.to_string(), parse_quoted_string(input));
+        // This is slightly convoluted: quoted strings appear as list items,
+        // so we generate a list, and then extract the parsed string out of
+        // the Result<Vec<ListEdit<String>>, ...> returned by parse_list().
+        let parsed = String::parse_list(format!("[{}]", input).as_str())
+            .unwrap()
+            .first()
+            .unwrap()
+            .items
+            .first()
+            .unwrap()
+            .to_string();
+        check!(expected.to_string(), Ok(parsed));
     }
 
     check_str("", "''");
@@ -54,7 +67,7 @@ fn test_parse_quoted_string() {
 #[test]
 fn test_parse_bool() {
     fn check_bool(expected: bool, input: &str) {
-        check!(expected, parse_bool(input));
+        check!(expected, bool::parse(input));
     }
 
     check_bool(true, "true");
@@ -69,14 +82,14 @@ fn test_parse_bool() {
         "Problem parsing foo bool value:\n1:1\n  ^\nExpected 'true' or 'false' \
         at line 1 column 1"
             .to_owned(),
-        parse_bool("1").unwrap_err().render("foo")
+        bool::parse("1").unwrap_err().render("foo")
     )
 }
 
 #[test]
 fn test_parse_int() {
     fn check_int(expected: i64, input: &str) {
-        check!(expected, parse_int(input));
+        check!(expected, i64::parse(input));
     }
     check_int(0, "0");
     check_int(1, "1");
@@ -92,20 +105,20 @@ fn test_parse_int() {
         "Problem parsing foo int value:\n1:badint\n  ^\nExpected \"+\", \"-\" or ['0'..='9'] \
                at line 1 column 1"
             .to_owned(),
-        parse_int("badint").unwrap_err().render("foo")
+        i64::parse("badint").unwrap_err().render("foo")
     );
     assert_eq!(
         "Problem parsing foo int value:\n1:12badint\n  --^\nExpected \"_\", EOF or ['0'..='9'] \
                at line 1 column 3"
             .to_owned(),
-        parse_int("12badint").unwrap_err().render("foo")
+        i64::parse("12badint").unwrap_err().render("foo")
     );
 }
 
 #[test]
 fn test_parse_float() {
     fn check_float(expected: f64, input: &str) {
-        check!(expected, parse_float(input));
+        check!(expected, f64::parse(input));
     }
     check_float(0.0, "0.0");
     check_float(0.0, "-0.0");
@@ -122,10 +135,10 @@ fn test_parse_float() {
 
 #[test]
 fn test_parse_list_from_empty_string() {
-    assert!(parse_string_list("").unwrap().is_empty());
-    assert!(parse_bool_list("").unwrap().is_empty());
-    assert!(parse_int_list("").unwrap().is_empty());
-    assert!(parse_float_list("").unwrap().is_empty());
+    assert!(String::parse_list("").unwrap().is_empty());
+    assert!(bool::parse_list("").unwrap().is_empty());
+    assert!(i64::parse_list("").unwrap().is_empty());
+    assert!(f64::parse_list("").unwrap().is_empty());
 }
 
 fn string_list_edit<I: IntoIterator<Item = &'static str>>(
@@ -154,15 +167,15 @@ const EMPTY_FLOAT_LIST: [f64; 0] = [];
 fn test_parse_string_list_replace() {
     check!(
         vec![string_list_edit(ListEditAction::Replace, EMPTY_STRING_LIST)],
-        parse_string_list("[]")
+        String::parse_list("[]")
     );
     check!(
         vec![string_list_edit(ListEditAction::Replace, ["foo"])],
-        parse_string_list("['foo']")
+        String::parse_list("['foo']")
     );
     check!(
         vec![string_list_edit(ListEditAction::Replace, ["foo", "bar"])],
-        parse_string_list("['foo','bar']")
+        String::parse_list("['foo','bar']")
     );
 }
 
@@ -170,15 +183,15 @@ fn test_parse_string_list_replace() {
 fn test_parse_bool_list_replace() {
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, EMPTY_BOOL_LIST)],
-        parse_bool_list("[]")
+        bool::parse_list("[]")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [true])],
-        parse_bool_list("[True]")
+        bool::parse_list("[True]")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [true, false])],
-        parse_bool_list("[True,FALSE]")
+        bool::parse_list("[True,FALSE]")
     );
 }
 
@@ -186,15 +199,15 @@ fn test_parse_bool_list_replace() {
 fn test_parse_int_list_replace() {
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, EMPTY_INT_LIST)],
-        parse_int_list("[]")
+        i64::parse_list("[]")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [42])],
-        parse_int_list("[42]")
+        i64::parse_list("[42]")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [42, -127])],
-        parse_int_list("[42,-127]")
+        i64::parse_list("[42,-127]")
     );
 }
 
@@ -202,15 +215,15 @@ fn test_parse_int_list_replace() {
 fn test_parse_float_list_replace() {
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, EMPTY_FLOAT_LIST)],
-        parse_float_list("[]")
+        f64::parse_list("[]")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [123456.78])],
-        parse_float_list("[123_456.78]")
+        f64::parse_list("[123_456.78]")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [42.0, -1.27e+7])],
-        parse_float_list("[42.0,-127.0e+5]")
+        f64::parse_list("[42.0,-127.0e+5]")
     );
 }
 
@@ -218,7 +231,7 @@ fn test_parse_float_list_replace() {
 fn test_parse_string_list_add() {
     check!(
         vec![string_list_edit(ListEditAction::Add, EMPTY_STRING_LIST)],
-        parse_string_list("+[]")
+        String::parse_list("+[]")
     );
 }
 
@@ -226,7 +239,7 @@ fn test_parse_string_list_add() {
 fn test_parse_scalar_list_add() {
     check!(
         vec![scalar_list_edit(ListEditAction::Add, EMPTY_INT_LIST)],
-        parse_int_list("+[]")
+        i64::parse_list("+[]")
     );
 }
 
@@ -234,7 +247,7 @@ fn test_parse_scalar_list_add() {
 fn test_parse_string_list_remove() {
     check!(
         vec![string_list_edit(ListEditAction::Remove, EMPTY_STRING_LIST)],
-        parse_string_list("-[]")
+        String::parse_list("-[]")
     );
 }
 
@@ -242,7 +255,7 @@ fn test_parse_string_list_remove() {
 fn test_parse_scalar_list_remove() {
     check!(
         vec![scalar_list_edit(ListEditAction::Remove, EMPTY_BOOL_LIST)],
-        parse_bool_list("-[]")
+        bool::parse_list("-[]")
     );
 }
 
@@ -254,7 +267,7 @@ fn test_parse_string_list_edits() {
             string_list_edit(ListEditAction::Add, ["baz"]),
             string_list_edit(ListEditAction::Remove, EMPTY_STRING_LIST),
         ],
-        parse_string_list("-['foo', 'bar'],+['baz'],-[]")
+        String::parse_list("-['foo', 'bar'],+['baz'],-[]")
     );
 }
 
@@ -266,7 +279,7 @@ fn test_parse_bool_list_edits() {
             scalar_list_edit(ListEditAction::Add, [false]),
             scalar_list_edit(ListEditAction::Remove, EMPTY_BOOL_LIST),
         ],
-        parse_bool_list("-[True, FALSE],+[false],-[]")
+        bool::parse_list("-[True, FALSE],+[false],-[]")
     );
 }
 
@@ -278,7 +291,7 @@ fn test_parse_int_list_edits() {
             scalar_list_edit(ListEditAction::Add, [42]),
             scalar_list_edit(ListEditAction::Remove, EMPTY_INT_LIST),
         ],
-        parse_int_list("-[-3, 4],+[42],-[]")
+        i64::parse_list("-[-3, 4],+[42],-[]")
     );
 }
 
@@ -290,7 +303,7 @@ fn test_parse_float_list_edits() {
             scalar_list_edit(ListEditAction::Add, [42.7]),
             scalar_list_edit(ListEditAction::Remove, EMPTY_FLOAT_LIST),
         ],
-        parse_float_list("-[-3.0, 4.1],+[42.7],-[]")
+        f64::parse_list("-[-3.0, 4.1],+[42.7],-[]")
     );
 }
 
@@ -301,7 +314,7 @@ fn test_parse_string_list_edits_whitespace() {
             string_list_edit(ListEditAction::Remove, ["foo"]),
             string_list_edit(ListEditAction::Add, ["bar"]),
         ],
-        parse_string_list(" - [ 'foo' , ] ,\n + [ 'bar' ] ")
+        String::parse_list(" - [ 'foo' , ] ,\n + [ 'bar' ] ")
     );
 }
 
@@ -312,7 +325,7 @@ fn test_parse_scalar_list_edits_whitespace() {
             scalar_list_edit(ListEditAction::Remove, [42.0]),
             scalar_list_edit(ListEditAction::Add, [-127.1, 0.0]),
         ],
-        parse_float_list(" - [ 42.0 , ] , + [ -127.1  ,0. ] ")
+        f64::parse_list(" - [ 42.0 , ] , + [ -127.1  ,0. ] ")
     );
 }
 
@@ -320,15 +333,15 @@ fn test_parse_scalar_list_edits_whitespace() {
 fn test_parse_string_list_implicit_add() {
     check!(
         vec![string_list_edit(ListEditAction::Add, vec!["foo"])],
-        parse_string_list("foo")
+        String::parse_list("foo")
     );
     check!(
         vec![string_list_edit(ListEditAction::Add, vec!["foo bar"])],
-        parse_string_list("foo bar")
+        String::parse_list("foo bar")
     );
     check!(
         vec![string_list_edit(ListEditAction::Add, ["--bar"])],
-        parse_string_list("--bar")
+        String::parse_list("--bar")
     );
 }
 
@@ -336,15 +349,15 @@ fn test_parse_string_list_implicit_add() {
 fn test_parse_scalar_list_implicit_add() {
     check!(
         vec![scalar_list_edit(ListEditAction::Add, vec![true])],
-        parse_bool_list("True")
+        bool::parse_list("True")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Add, vec![-127])],
-        parse_int_list("-127")
+        i64::parse_list("-127")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Add, vec![0.7])],
-        parse_float_list("0.7")
+        f64::parse_list("0.7")
     );
 }
 
@@ -352,22 +365,22 @@ fn test_parse_scalar_list_implicit_add() {
 fn test_parse_string_list_quoted_chars() {
     check!(
         vec![string_list_edit(ListEditAction::Add, vec!["[]"])],
-        parse_string_list(r"\[]"),
+        String::parse_list(r"\[]"),
         "Expected an implicit add of the literal string `[]` via an escaped opening `[`."
     );
     check!(
         vec![string_list_edit(ListEditAction::Add, vec![" "])],
-        parse_string_list(r"\ "),
+        String::parse_list(r"\ "),
         "Expected an implicit add of the literal string ` `."
     );
     check!(
         vec![string_list_edit(ListEditAction::Add, vec!["+"])],
-        parse_string_list(r"\+"),
+        String::parse_list(r"\+"),
         "Expected an implicit add of the literal string `+`."
     );
     check!(
         vec![string_list_edit(ListEditAction::Add, vec!["-"])],
-        parse_string_list(r"\-"),
+        String::parse_list(r"\-"),
         "Expected an implicit add of the literal string `-`."
     );
     check!(
@@ -375,7 +388,7 @@ fn test_parse_string_list_quoted_chars() {
             ListEditAction::Replace,
             vec!["'foo", r"\"]
         )],
-        parse_string_list(r"['\'foo', '\\']")
+        String::parse_list(r"['\'foo', '\\']")
     );
 }
 
@@ -383,12 +396,12 @@ fn test_parse_string_list_quoted_chars() {
 fn test_parse_string_list_quote_forms() {
     check!(
         vec![string_list_edit(ListEditAction::Replace, ["foo"])],
-        parse_string_list(r#"["foo"]"#),
+        String::parse_list(r#"["foo"]"#),
         "Expected double quotes to work."
     );
     check!(
         vec![string_list_edit(ListEditAction::Replace, ["foo", "bar"])],
-        parse_string_list(r#"["foo", 'bar']"#),
+        String::parse_list(r#"["foo", 'bar']"#),
         "Expected mixed quote forms to work."
     );
 }
@@ -397,11 +410,11 @@ fn test_parse_string_list_quote_forms() {
 fn test_parse_string_list_trailing_comma() {
     check!(
         vec![string_list_edit(ListEditAction::Replace, ["foo"])],
-        parse_string_list("['foo',]")
+        String::parse_list("['foo',]")
     );
     check!(
         vec![string_list_edit(ListEditAction::Replace, ["foo", "bar"])],
-        parse_string_list("['foo','bar',]")
+        String::parse_list("['foo','bar',]")
     );
 }
 
@@ -409,15 +422,15 @@ fn test_parse_string_list_trailing_comma() {
 fn test_parse_scalar_list_trailing_comma() {
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [false, true])],
-        parse_bool_list("[false,true,]")
+        bool::parse_list("[false,true,]")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [42])],
-        parse_int_list("[42,]")
+        i64::parse_list("[42,]")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [42.0, -127.1])],
-        parse_float_list("[42.0,-127.1,]")
+        f64::parse_list("[42.0,-127.1,]")
     );
 }
 
@@ -425,11 +438,11 @@ fn test_parse_scalar_list_trailing_comma() {
 fn test_parse_string_list_whitespace() {
     check!(
         vec![string_list_edit(ListEditAction::Replace, ["foo"])],
-        parse_string_list(" [ 'foo' ] ")
+        String::parse_list(" [ 'foo' ] ")
     );
     check!(
         vec![string_list_edit(ListEditAction::Replace, ["foo", "bar"])],
-        parse_string_list(" [ 'foo' , 'bar' , ] ")
+        String::parse_list(" [ 'foo' , 'bar' , ] ")
     );
 }
 
@@ -437,15 +450,15 @@ fn test_parse_string_list_whitespace() {
 fn test_parse_scalar_list_whitespace() {
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [true, false])],
-        parse_bool_list("  [  True,  False  ] ")
+        bool::parse_list("  [  True,  False  ] ")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [42])],
-        parse_int_list(" [ 42 ] ")
+        i64::parse_list(" [ 42 ] ")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [42.0, -127.1])],
-        parse_float_list(" [ 42.0 , -127.1 , ] ")
+        f64::parse_list(" [ 42.0 , -127.1 , ] ")
     );
 }
 
@@ -453,15 +466,15 @@ fn test_parse_scalar_list_whitespace() {
 fn test_parse_string_list_tuple() {
     check!(
         vec![string_list_edit(ListEditAction::Replace, EMPTY_STRING_LIST)],
-        parse_string_list("()")
+        String::parse_list("()")
     );
     check!(
         vec![string_list_edit(ListEditAction::Replace, ["foo"])],
-        parse_string_list(r#"("foo")"#)
+        String::parse_list(r#"("foo")"#)
     );
     check!(
         vec![string_list_edit(ListEditAction::Replace, ["foo", "bar"])],
-        parse_string_list(r#" ('foo', "bar",)"#)
+        String::parse_list(r#" ('foo', "bar",)"#)
     );
 }
 
@@ -469,15 +482,15 @@ fn test_parse_string_list_tuple() {
 fn test_parse_scalar_list_tuple() {
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, EMPTY_INT_LIST)],
-        parse_int_list("()")
+        i64::parse_list("()")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [true])],
-        parse_bool_list("(True)")
+        bool::parse_list("(True)")
     );
     check!(
         vec![scalar_list_edit(ListEditAction::Replace, [42.0, -127.1])],
-        parse_float_list(r#" (42.0, -127.1,)"#)
+        f64::parse_list(r#" (42.0, -127.1,)"#)
     );
 }
 
@@ -499,7 +512,7 @@ or '-' indicating `remove` at line 2 column 10"
         .to_owned();
     assert_eq!(
         expected_error_msg,
-        parse_string_list(bad_input).unwrap_err().render("foo")
+        String::parse_list(bad_input).unwrap_err().render("foo")
     )
 }
 
@@ -521,7 +534,7 @@ or '-' indicating `remove` at line 2 column 10"
         .to_owned();
     assert_eq!(
         expected_error_msg,
-        parse_int_list(bad_input).unwrap_err().render("foo")
+        i64::parse_list(bad_input).unwrap_err().render("foo")
     )
 }
 
@@ -647,4 +660,191 @@ fn test_parse_heterogeneous_dict() {
         "#
         )
     );
+}
+
+#[test]
+fn test_expand_fromfile() {
+    let (_tmpdir, fromfile_pathbuf) = write_fromfile("fromfile.txt", "FOO");
+    let fromfile_path_str = format!("{}", fromfile_pathbuf.display());
+    assert_eq!(
+        Ok(Some(fromfile_path_str.clone())),
+        expand(fromfile_path_str.clone())
+    );
+    assert_eq!(
+        Ok(Some("FOO".to_string())),
+        expand(format!("@{}", fromfile_path_str))
+    );
+    assert_eq!(Ok(None), expand("@?/does/not/exist".to_string()));
+    let err = expand("@/does/not/exist".to_string()).unwrap_err();
+    assert!(err
+        .render("XXX")
+        .starts_with("Problem reading /does/not/exist for XXX: No such file or directory"))
+}
+
+#[test]
+fn test_expand_fromfile_to_list() {
+    fn do_test<T: ListMember + Clone + Debug + PartialEq>(
+        content: &str,
+        expected: &[ListEdit<T>],
+        filename: &str,
+    ) {
+        let (_tmpdir, _) = write_fromfile(filename, content);
+        let res = expand_to_list(format!("@{}", _tmpdir.path().join(filename).display()));
+        assert_eq!(expected.to_vec(), res.unwrap().unwrap());
+    }
+
+    fn add<T>(items: Vec<T>) -> ListEdit<T> {
+        return ListEdit {
+            action: ListEditAction::Add,
+            items: items,
+        };
+    }
+
+    fn remove<T>(items: Vec<T>) -> ListEdit<T> {
+        return ListEdit {
+            action: ListEditAction::Remove,
+            items: items,
+        };
+    }
+
+    fn replace<T>(items: Vec<T>) -> ListEdit<T> {
+        return ListEdit {
+            action: ListEditAction::Replace,
+            items: items,
+        };
+    }
+
+    do_test(
+        "EXPANDED",
+        &[add(vec!["EXPANDED".to_string()])],
+        "fromfile.txt",
+    );
+    do_test(
+        "['FOO', 'BAR']",
+        &[replace(vec!["FOO".to_string(), "BAR".to_string()])],
+        "fromfile.txt",
+    );
+    do_test(
+        "+['FOO', 'BAR'],-['BAZ']",
+        &[
+            add(vec!["FOO".to_string(), "BAR".to_string()]),
+            remove(vec!["BAZ".to_string()]),
+        ],
+        "fromfile.txt",
+    );
+    do_test(
+        "[\"FOO\", \"BAR\"]",
+        &[replace(vec!["FOO".to_string(), "BAR".to_string()])],
+        "fromfile.json",
+    );
+    do_test(
+        "- FOO\n- BAR\n",
+        &[replace(vec!["FOO".to_string(), "BAR".to_string()])],
+        "fromfile.yaml",
+    );
+
+    do_test("true", &[add(vec![true])], "fromfile.txt");
+    do_test(
+        "[true, false]",
+        &[replace(vec![true, false])],
+        "fromfile.json",
+    );
+    do_test(
+        "- true\n- false\n",
+        &[replace(vec![true, false])],
+        "fromfile.yaml",
+    );
+
+    do_test("-42", &[add(vec![-42])], "fromfile.txt");
+    do_test("[10, 12]", &[replace(vec![10, 12])], "fromfile.json");
+    do_test("- 22\n- 44\n", &[replace(vec![22, 44])], "fromfile.yaml");
+
+    do_test("-5.6", &[add(vec![-5.6])], "fromfile.txt");
+    do_test("-[3.14]", &[remove(vec![3.14])], "fromfile.txt");
+    do_test("[3.14]", &[replace(vec![3.14])], "fromfile.json");
+    do_test(
+        "- 11.22\n- 33.44\n",
+        &[replace(vec![11.22, 33.44])],
+        "fromfile.yaml",
+    );
+
+    assert!(expand_to_list::<String>("@/does/not/exist".to_string())
+        .unwrap_err()
+        .render("XXX")
+        .starts_with("Problem reading /does/not/exist for XXX: No such file or directory"));
+
+    assert_eq!(
+        Ok(None),
+        expand_to_list::<String>("@?/does/not/exist".to_string())
+    );
+}
+
+#[test]
+fn test_expand_fromfile_to_dict() {
+    fn do_test(content: &str, expected: &DictEdit, filename: &str) {
+        let (_tmpdir, _) = write_fromfile(filename, content);
+        let res = expand_to_dict(format!("@{}", _tmpdir.path().join(filename).display()));
+        assert_eq!(*expected, res.unwrap().unwrap())
+    }
+
+    fn add(items: HashMap<String, Val>) -> DictEdit {
+        return DictEdit {
+            action: DictEditAction::Add,
+            items,
+        };
+    }
+
+    fn replace(items: HashMap<String, Val>) -> DictEdit {
+        return DictEdit {
+            action: DictEditAction::Replace,
+            items,
+        };
+    }
+
+    do_test(
+        "{'FOO': 42}",
+        &replace(hashmap! {"FOO".to_string() => Val::Int(42),}),
+        "fromfile.txt",
+    );
+
+    do_test(
+        "+{'FOO': [True, False]}",
+        &add(hashmap! {"FOO".to_string() => Val::List(vec![Val::Bool(true), Val::Bool(false)]),}),
+        "fromfile.txt",
+    );
+
+    let complex_obj = replace(hashmap! {
+    "FOO".to_string() => Val::Dict(hashmap! {
+        "BAR".to_string() => Val::Float(3.14),
+        "BAZ".to_string() => Val::Dict(hashmap! {
+            "QUX".to_string() => Val::Bool(true),
+            "QUUX".to_string() => Val::List(vec![ Val::Int(1), Val::Int(2)])
+        })
+    }),});
+
+    do_test(
+        "{\"FOO\": {\"BAR\": 3.14, \"BAZ\": {\"QUX\": true, \"QUUX\": [1, 2]}}}",
+        &complex_obj,
+        "fromfile.json",
+    );
+    do_test(
+        r#"
+        FOO:
+          BAR: 3.14
+          BAZ:
+            QUX: true
+            QUUX:
+              - 1
+              - 2
+        "#,
+        &complex_obj,
+        "fromfile.yaml",
+    );
+
+    assert!(expand_to_dict("@/does/not/exist".to_string())
+        .unwrap_err()
+        .render("XXX")
+        .starts_with("Problem reading /does/not/exist for XXX: No such file or directory"));
+
+    assert_eq!(Ok(None), expand_to_dict("@?/does/not/exist".to_string()));
 }
