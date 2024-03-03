@@ -18,6 +18,7 @@ import yaml
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
+from pants.engine.internals.native_engine import PyOptionParser
 from pants.option.config import DEFAULT_SECTION, Config
 from pants.option.custom_types import (
     DictValueComponent,
@@ -52,6 +53,7 @@ from pants.option.errors import (
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.ranked_value import Rank, RankedValue
+from pants.option.rust_options import NativeOptionParser
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.strutil import softwrap
 
@@ -192,6 +194,22 @@ class Parser:
                         flag_val = None
                 flag_value_map[key].append(flag_val)
             return flag_value_map
+
+    def parse_args_native(self, native_parser: NativeOptionParser) -> OptionValueContainer:
+        namespace = OptionValueContainerBuilder()
+        for args, kwargs in self._option_registrations:
+            self._validate(args, kwargs)
+            dest = self.parse_dest(*args, **kwargs)
+            default=kwargs.get("default")
+            option_type = kwargs.get("type")
+            if option_type not in {bool, int, float, str, list, dict}:
+                option_type = str  # For enum and other specialized types.
+                default = str(default)
+            val = native_parser.get(scope=self.scope, flags=args, default=default,
+                                    option_type=option_type, member_type=kwargs.get("member_type"))
+            # TODO: If the option is explicitly given, check deprecation and mutual exclusion.
+            setattr(namespace, dest, RankedValue(Rank.HARDCODED, val))
+        return namespace.build()
 
     def parse_args(self, parse_args_request: ParseArgsRequest) -> OptionValueContainer:
         """Set values for this parser's options on the namespace object.

@@ -15,6 +15,7 @@ from pants.option.errors import ConfigValidationError
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.parser import Parser
+from pants.option.rust_options import NativeOptionParser
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -352,6 +353,9 @@ class Options:
         flags_in_scope = self._scope_to_flags.get(scope, [])
         parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
         values = self.get_parser(scope).parse_args(parse_args_request)
+
+        native_parser = NativeOptionParser()
+        native_values = self.get_parser(scope).parse_args_native(native_parser)
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
