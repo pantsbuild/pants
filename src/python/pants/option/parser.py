@@ -8,6 +8,7 @@ import inspect
 import json
 import re
 import typing
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
@@ -54,6 +55,8 @@ from pants.option.option_value_container import OptionValueContainer, OptionValu
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -193,7 +196,9 @@ class Parser:
                 flag_value_map[key].append(flag_val)
             return flag_value_map
 
-    def parse_args(self, parse_args_request: ParseArgsRequest) -> OptionValueContainer:
+    def parse_args(
+        self, parse_args_request: ParseArgsRequest, log_warnings: bool = False
+    ) -> OptionValueContainer:
         """Set values for this parser's options on the namespace object.
 
         :raises: :class:`ParseError` if any flags weren't recognized.
@@ -250,7 +255,11 @@ class Parser:
             # Get the value for this option, falling back to defaults as needed.
             try:
                 value_history = self._compute_value(
-                    dest, kwargs, flag_vals, parse_args_request.passthrough_args
+                    dest,
+                    kwargs,
+                    flag_vals,
+                    parse_args_request.passthrough_args,
+                    log_warnings,
                 )
                 self._history[dest] = value_history
                 val = value_history.final_value
@@ -554,7 +563,7 @@ class Parser:
             env_vars = [f"PANTS_{sanitized_env_var_scope}_{udest}"]
         return env_vars
 
-    def _compute_value(self, dest, kwargs, flag_val_strs, passthru_arg_strs):
+    def _compute_value(self, dest, kwargs, flag_val_strs, passthru_arg_strs, log_warnings):
         """Compute the value to use for an option.
 
         The source of the value is chosen according to the ranking in Rank.
@@ -585,6 +594,8 @@ class Parser:
                     fromfile_path = Path(get_buildroot(), fromfile)
                     try:
                         if optional and not fromfile_path.exists():
+                            if log_warnings:
+                                logger.warning(f"Optional file config {fromfile!r} does not exist.")
                             return None
                         contents = fromfile_path.read_text()
                         if fromfile.endswith(".json"):
