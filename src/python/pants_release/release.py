@@ -666,6 +666,7 @@ def build_fs_util() -> None:
 def tag_release() -> None:
     banner("Tagging release")
 
+    check_head_commit()
     check_clean_git_branch()
     check_pgp()
 
@@ -673,6 +674,17 @@ def tag_release() -> None:
 
     run_tag_release()
     banner("Successfully tagged release")
+
+
+def check_head_commit() -> None:
+    banner("Checking current HEAD commit")
+    git("show", capture_stdout=False)
+
+    key_confirmation = input(
+        f"\nIs this the correct commit to tag for {CONSTANTS.pants_stable_version}? [Y/n]: "
+    )
+    if key_confirmation and key_confirmation.lower() != "y":
+        die("Please check out the appropriate commit first")
 
 
 def check_clean_git_branch() -> None:
