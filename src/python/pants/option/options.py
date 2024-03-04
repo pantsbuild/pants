@@ -240,7 +240,9 @@ class Options:
         section_to_valid_options = {}
         for scope in self.known_scope_to_info:
             section = GLOBAL_SCOPE_CONFIG_SECTION if scope == GLOBAL_SCOPE else scope
-            section_to_valid_options[section] = set(self.for_scope(scope, check_deprecations=False))
+            section_to_valid_options[section] = set(
+                self.for_scope(scope, check_deprecations=False, log_parser_warnings=True)
+            )
         global_config.verify(section_to_valid_options)
 
     def is_known_scope(self, scope: str) -> bool:
@@ -339,7 +341,9 @@ class Options:
 
     # TODO: Eagerly precompute backing data for this?
     @memoized_method
-    def for_scope(self, scope: str, check_deprecations: bool = True) -> OptionValueContainer:
+    def for_scope(
+        self, scope: str, check_deprecations: bool = True, log_parser_warnings: bool = False
+    ) -> OptionValueContainer:
         """Return the option values for the given scope.
 
         Values are attributes of the returned object, e.g., options.foo.
@@ -351,7 +355,9 @@ class Options:
         values_builder = OptionValueContainerBuilder()
         flags_in_scope = self._scope_to_flags.get(scope, [])
         parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
-        values = self.get_parser(scope).parse_args(parse_args_request)
+        values = self.get_parser(scope).parse_args(
+            parse_args_request, log_warnings=log_parser_warnings
+        )
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
