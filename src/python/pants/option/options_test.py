@@ -1538,6 +1538,27 @@ class OptionsTest(unittest.TestCase):
         options = self._parse(flags=r"fromfile --string=@@/does/not/exist")
         assert "@/does/not/exist" == options.for_scope("fromfile").string
 
+    def test_fromfile_config_with_optional(self) -> None:
+        def parse_func(dest, fromfile, passthru_flags):
+            return self._parse(
+                flags=f"fromfile -- {passthru_flags}",
+                config={"fromfile": {dest: f"@?{fromfile}"}},
+            )
+
+        self.assert_fromfile(parse_func)
+
+    def test_fromfile_with_optional_string(self) -> None:
+        options = self._parse(flags=r"fromfile --string=@?/does/not/exist")
+        assert options.for_scope("fromfile").string is None
+
+    def test_fromfile_with_optional_dict(self) -> None:
+        options = self._parse(flags=r"fromfile --dictvalue=@?/does/not/exist")
+        assert options.for_scope("fromfile").dictvalue == {}
+
+    def test_fromfile_with_optional_list(self) -> None:
+        options = self._parse(flags=r"fromfile --listvalue=@?/does/not/exist")
+        assert options.for_scope("fromfile").listvalue == []
+
     def test_ranked_value_equality(self) -> None:
         none = RankedValue(Rank.NONE, None)
         some = RankedValue(Rank.HARDCODED, "some")
