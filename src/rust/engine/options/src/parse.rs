@@ -339,11 +339,6 @@ impl Parseable for String {
 // Otherwise, the first component is None and the second is the original value.
 type ExpandedValue = (Option<PathBuf>, Option<String>);
 
-// fn mk_parse_err(err: impl Display, path_opt: Option<Path>) -> ParseError {
-//     let error_src = if let Some(path) = path_opt { format!("reading {path}") } else { "parsing value" };
-//     ParseError::new(format!("Problem {error_src} for {{name}}: {err}"))
-// }
-
 fn mk_parse_err(err: impl Display, path: &Path) -> ParseError {
     ParseError::new(format!(
         "Problem reading {path} for {{name}}: {err}",
