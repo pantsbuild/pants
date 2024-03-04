@@ -4,7 +4,7 @@
 use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, Val};
 use crate::render_choice;
 
-use serde::de::DeserializeOwned;
+use serde::de::{Deserialize, DeserializeOwned};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
@@ -282,7 +282,7 @@ pub(crate) fn parse_dict(value: &str) -> Result<DictEdit, ParseError> {
     option_value_parser::dict_edit(value).map_err(|e| format_parse_error("dict", value, e))
 }
 
-pub(crate) trait Parseable: Sized {
+pub(crate) trait Parseable: Sized + DeserializeOwned {
     fn parse(value: &str) -> Result<Self, ParseError>;
     fn parse_list(value: &str) -> Result<Vec<ListEdit<Self>>, ParseError>;
 }
@@ -331,16 +331,6 @@ impl Parseable for String {
     }
 }
 
-pub(crate) trait ListMember: Parseable + DeserializeOwned {}
-
-impl ListMember for bool {}
-
-impl ListMember for i64 {}
-
-impl ListMember for f64 {}
-
-impl ListMember for String {}
-
 // If the corresponding unexpanded value points to a @fromfile, then the
 // first component is the path to that file, and the second is the value from the file,
 // or None if the file doesn't exist and the @?fromfile syntax was used.
@@ -348,11 +338,15 @@ impl ListMember for String {}
 // Otherwise, the first component is None and the second is the original value.
 type ExpandedValue = (Option<PathBuf>, Option<String>);
 
+// fn mk_parse_err(err: impl Display, path_opt: Option<Path>) -> ParseError {
+//     let error_src = if let Some(path) = path_opt { format!("reading {path}") } else { "parsing value" };
+//     ParseError::new(format!("Problem {error_src} for {{name}}: {err}"))
+// }
+
 fn mk_parse_err(err: impl Display, path: &Path) -> ParseError {
     ParseError::new(format!(
-        "Problem reading {path} for {{name}}: {err_msg}",
-        path = path.display(),
-        err_msg = err,
+        "Problem reading {path} for {{name}}: {err}",
+        path = path.display()
     ))
 }
 
@@ -389,61 +383,72 @@ pub(crate) fn expand(value: String) -> Result<Option<String>, ParseError> {
     Ok(expanded_value)
 }
 
-pub(crate) fn expand_to_list<T: ListMember>(
+#[derive(Debug)]
+enum FromfileType {
+    Json,
+    Yaml,
+    Unknown,
+}
+
+impl FromfileType {
+    fn detect(path: &Path) -> FromfileType {
+        if let Some(ext) = path.extension() {
+            if ext == "json" {
+                return FromfileType::Json;
+            } else if ext == "yml" || ext == "yaml" {
+                return FromfileType::Yaml;
+            };
+        }
+        FromfileType::Unknown
+    }
+}
+
+fn try_deserialize<'a, DE: Deserialize<'a>>(
+    value: &'a str,
+    path_opt: Option<PathBuf>,
+) -> Result<Option<DE>, ParseError> {
+    if let Some(path) = path_opt {
+        match FromfileType::detect(&path) {
+            FromfileType::Json => serde_json::from_str(value).map_err(|e| mk_parse_err(e, &path)),
+            FromfileType::Yaml => serde_yaml::from_str(value).map_err(|e| mk_parse_err(e, &path)),
+            _ => Ok(None),
+        }
+    } else {
+        Ok(None)
+    }
+}
+
+pub(crate) fn expand_to_list<T: Parseable>(
     value: String,
 ) -> Result<Option<Vec<ListEdit<T>>>, ParseError> {
     let (path_opt, value_opt) = maybe_expand(value)?;
-    if value_opt.is_none() {
-        return Ok(None);
-    }
-    let value = value_opt.unwrap();
-    let mut deserialized_items: Option<Vec<T>> = None;
-    if let Some(path) = path_opt {
-        if let Some(ext) = path.extension() {
-            if ext == "json" {
-                deserialized_items =
-                    Some(serde_json::from_str(&value).map_err(|e| mk_parse_err(e, &path))?)
-            } else if ext == "yml" || ext == "yaml" {
-                deserialized_items =
-                    Some(serde_yaml::from_str(&value).map_err(|e| mk_parse_err(e, &path))?)
-            }
+    if let Some(value) = value_opt {
+        if let Some(items) = try_deserialize(&value, path_opt)? {
+            Ok(Some(vec![ListEdit {
+                action: ListEditAction::Replace,
+                items,
+            }]))
+        } else {
+            T::parse_list(&value).map(Some)
         }
-    }
-    if let Some(items) = deserialized_items {
-        Ok(Some(vec![ListEdit {
-            action: ListEditAction::Replace,
-            items,
-        }]))
     } else {
-        T::parse_list(&value).map(Some)
+        Ok(None)
     }
 }
 
 pub(crate) fn expand_to_dict(value: String) -> Result<Option<DictEdit>, ParseError> {
     let (path_opt, value_opt) = maybe_expand(value)?;
-    if value_opt.is_none() {
-        return Ok(None);
-    }
-    let value = value_opt.unwrap();
-    let mut deserialized_items: Option<HashMap<String, Val>> = None;
-    if let Some(path) = path_opt {
-        if let Some(ext) = path.extension() {
-            if ext == "json" {
-                deserialized_items =
-                    Some(serde_json::from_str(&value).map_err(|e| mk_parse_err(e, &path))?)
-            } else if ext == "yml" || ext == "yaml" {
-                deserialized_items =
-                    Some(serde_yaml::from_str(&value).map_err(|e| mk_parse_err(e, &path))?)
-            }
+    if let Some(value) = value_opt {
+        if let Some(items) = try_deserialize(&value, path_opt)? {
+            Ok(Some(DictEdit {
+                action: DictEditAction::Replace,
+                items,
+            }))
+        } else {
+            parse_dict(&value).map(Some)
         }
-    }
-    if let Some(items) = deserialized_items {
-        Ok(Some(DictEdit {
-            action: DictEditAction::Replace,
-            items,
-        }))
     } else {
-        parse_dict(&value).map(Some)
+        Ok(None)
     }
 }
 

@@ -180,6 +180,16 @@ fn test_scalar_fromfile() {
     do_test("-42", -42, Args::get_int, false);
     do_test("3.14", 3.14, Args::get_float, false);
     do_test("EXPANDED", "EXPANDED".to_owned(), Args::get_string, false);
+
+    let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", "BAD INT");
+    let args = Args {
+        args: vec![format!("--foo=@{}", fromfile_path.display())],
+    };
+    assert_eq!(
+        args.get_int(&option_id!("foo")).unwrap_err(),
+        "Problem parsing --foo int value:\n1:BAD INT\n  ^\n\
+               Expected \"+\", \"-\" or ['0'..='9'] at line 1 column 1"
+    );
 }
 
 #[test]

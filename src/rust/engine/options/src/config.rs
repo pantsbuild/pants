@@ -11,7 +11,7 @@ use toml::value::Table;
 use toml::Value;
 
 use super::id::{NameTransform, OptionId};
-use super::parse::{expand, expand_to_dict, expand_to_list, ListMember, Parseable};
+use super::parse::{expand, expand_to_dict, expand_to_list, Parseable};
 use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, OptionsSource, Val};
 
 type InterpolationMap = HashMap<String, String>;
@@ -325,7 +325,7 @@ impl Config {
             .and_then(|table| table.get(Self::option_name(id)))
     }
 
-    fn get_list<T: FromValue + ListMember>(
+    fn get_list<T: FromValue + Parseable>(
         &self,
         id: &OptionId,
     ) -> Result<Option<Vec<ListEdit<T>>>, String> {
