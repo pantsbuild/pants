@@ -21,7 +21,7 @@ from pants.engine.target import (
 )
 from pants.util.strutil import help_text
 
-JS_FILE_EXTENSIONS = (".js", ".cjs", ".mjs")
+JS_FILE_EXTENSIONS = (".js", ".cjs", ".mjs", ".jsx")
 JS_TEST_FILE_EXTENSIONS = tuple(f"*.test{ext}" for ext in JS_FILE_EXTENSIONS)
 
 

@@ -18,7 +18,7 @@ from pants.engine.target import (
 )
 from pants.util.strutil import help_text
 
-TS_FILE_EXTENSIONS = (".ts",)
+TS_FILE_EXTENSIONS = (".ts", ".tsx")
 TS_TEST_FILE_EXTENSIONS = tuple(f"*.test{ext}" for ext in TS_FILE_EXTENSIONS)
 
 
