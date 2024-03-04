@@ -4,6 +4,7 @@
 use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, Val};
 use crate::render_choice;
 
+use log::warn;
 use serde::de::{Deserialize, DeserializeOwned};
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -362,7 +363,10 @@ fn maybe_expand(value: String) -> Result<ExpandedValue, ParseError> {
                     let path = PathBuf::from(subsuffix);
                     match fs::read_to_string(&path) {
                         Ok(content) => Ok((Some(path), Some(content))),
-                        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok((Some(path), None)),
+                        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                            warn!("Optional file config '{}' does not exist.", path.display());
+                            Ok((Some(path), None))
+                        }
                         Err(err) => Err(mk_parse_err(err, &path)),
                     }
                 }
