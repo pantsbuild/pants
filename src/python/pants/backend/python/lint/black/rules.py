@@ -15,6 +15,7 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.util.contextutil import temporary_dir
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 
@@ -44,24 +45,27 @@ async def _run_black(
         Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
-    result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            black_pex,
-            argv=(
-                *(("--config", black.config) if black.config else ()),
-                "-W",
-                "{pants_concurrency}",
-                *black.args,
-                *request.files,
+    with temporary_dir() as black_cache_dir:
+        result = await Get(
+            ProcessResult,
+            VenvPexProcess(
+                black_pex,
+                argv=(
+                    *(("--config", black.config) if black.config else ()),
+                    "-W",
+                    "{pants_concurrency}",
+                    *black.args,
+                    *request.files,
+                ),
+                input_digest=input_digest,
+                output_files=request.files,
+                extra_env={"BLACK_CACHE_DIR": black_cache_dir},
+                concurrency_available=len(request.files),
+                description=f"Run Black on {pluralize(len(request.files), 'file')}.",
+                level=LogLevel.DEBUG,
             ),
-            input_digest=input_digest,
-            output_files=request.files,
-            concurrency_available=len(request.files),
-            description=f"Run Black on {pluralize(len(request.files), 'file')}.",
-            level=LogLevel.DEBUG,
-        ),
-    )
+        )
+
     return await FmtResult.create(request, result)
 
 
