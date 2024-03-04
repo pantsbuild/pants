@@ -45,30 +45,34 @@ async def _run_black(
         Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
-    with temporary_dir() as black_cache_dir:
-        result = await Get(
-            ProcessResult,
-            VenvPexProcess(
-                black_pex,
-                argv=(
-                    *(("--config", black.config) if black.config else ()),
-                    "-W",
-                    "{pants_concurrency}",
-                    *black.args,
-                    *request.files,
-                ),
-                input_digest=input_digest,
-                output_files=request.files,
-                # Note - the cache directory is not used by Pants,
-                # and we pass through a temporary directory to neutralize
-                # Black's caching behavior in favor of Pants' caching.
-                extra_env={"BLACK_CACHE_DIR": black_cache_dir},
-                concurrency_available=len(request.files),
-                description=f"Run Black on {pluralize(len(request.files), 'file')}.",
-                level=LogLevel.DEBUG,
+    result = await Get(
+        ProcessResult,
+        VenvPexProcess(
+            black_pex,
+            argv=(
+                *(("--config", black.config) if black.config else ()),
+                "-W",
+                "{pants_concurrency}",
+                *black.args,
+                *request.files,
             ),
-        )
-
+            input_digest=input_digest,
+            output_files=request.files,
+            # Note - the cache directory is not used by Pants,
+            # and we pass through a temporary directory to neutralize
+            # Black's caching behavior in favor of Pants' caching.
+            extra_env={"BLACK_CACHE_DIR": black_cache_dir},
+            concurrency_available=len(request.files),
+            description=f"Run Black on {pluralize(len(request.files), 'file')}.",
+            level=LogLevel.DEBUG,
+        ),
+        extra_env={"BLACK_CACHE_DIR": "__pants_black_cache_dir"},
+        input_digest=input_digest,
+        output_files=request.files,
+        concurrency_available=len(request.files),
+        description=f"Run Black on {pluralize(len(request.files), 'file')}.",
+        level=LogLevel.DEBUG,
+    )
     return await FmtResult.create(request, result)
 
 
