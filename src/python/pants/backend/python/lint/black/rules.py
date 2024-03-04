@@ -12,7 +12,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import AbstractFmtRequest, FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.contextutil import temporary_dir
@@ -38,11 +38,16 @@ async def _run_black(
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, black.config_request(request.snapshot.dirs)
     )
+    black_cache_dir = "__pants_black_cache"
+    black_cache_get = Get(Digest, CreateDigest([Directory(black_cache_dir)]))
 
-    black_pex, config_files = await MultiGet(black_pex_get, config_files_get)
+    black_pex, config_files, black_cache_digest = await MultiGet(
+        black_pex_get, config_files_get, black_cache_get
+    )
 
     input_digest = await Get(
-        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
+        Digest,
+        MergeDigests((request.snapshot.digest, config_files.snapshot.digest, black_cache_digest)),
     )
 
     result = await Get(
@@ -61,7 +66,7 @@ async def _run_black(
             # Note - the cache directory is not used by Pants,
             # and we pass through a temporary directory to neutralize
             # Black's caching behavior in favor of Pants' caching.
-            extra_env={"BLACK_CACHE_DIR": "__pants_black_cache_dir"},
+            extra_env={"BLACK_CACHE_DIR": black_cache_dir},
             concurrency_available=len(request.files),
             description=f"Run Black on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
