@@ -6,9 +6,9 @@ from __future__ import annotations
 import copy
 import inspect
 import json
+import logging
 import re
 import typing
-import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
