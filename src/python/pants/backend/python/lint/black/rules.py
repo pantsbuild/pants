@@ -15,7 +15,6 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.util.contextutil import temporary_dir
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 
