@@ -201,6 +201,23 @@ pub struct OptionValue<T> {
 }
 
 #[derive(Debug)]
+pub struct OptionalOptionValue<T> {
+    pub derivation: Option<Vec<(Source, T)>>,
+    pub source: Source,
+    pub value: Option<T>,
+}
+
+impl<T> OptionalOptionValue<T> {
+    fn unwrap(self) -> OptionValue<T> {
+        OptionValue {
+            derivation: self.derivation,
+            source: self.source,
+            value: self.value.unwrap(),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct ListOptionValue<T> {
     pub derivation: Option<Vec<(Source, Vec<ListEdit<T>>)>>,
     // The highest-priority source that provided edits for this value.
@@ -357,12 +374,15 @@ impl OptionParser {
     fn parse_scalar<T: ToOwned + ?Sized>(
         &self,
         id: &OptionId,
-        default: &T,
+        default: Option<&T>,
         getter: fn(&Arc<dyn OptionsSource>, &OptionId) -> Result<Option<T::Owned>, String>,
-    ) -> Result<OptionValue<T::Owned>, String> {
+    ) -> Result<OptionalOptionValue<T::Owned>, String> {
         let mut derivation = None;
         if self.include_derivation {
-            let mut derivations = vec![(Source::Default, default.to_owned())];
+            let mut derivations = vec![];
+            if let Some(def) = default {
+                derivations.push((Source::Default, def.to_owned()));
+            }
             for (source_type, source) in self.sources.iter() {
                 if let Some(val) = getter(source, id)? {
                     derivations.push((source_type.clone(), val));
@@ -372,30 +392,65 @@ impl OptionParser {
         }
         for (source_type, source) in self.sources.iter().rev() {
             if let Some(value) = getter(source, id)? {
-                return Ok(OptionValue {
+                return Ok(OptionalOptionValue {
                     derivation,
                     source: source_type.clone(),
-                    value,
+                    value: Some(value),
                 });
             }
         }
-        Ok(OptionValue {
+        Ok(OptionalOptionValue {
             derivation,
             source: Source::Default,
-            value: default.to_owned(),
+            value: default.map(|x| x.to_owned()),
         })
     }
 
+    pub fn parse_bool_optional(
+        &self,
+        id: &OptionId,
+        default: Option<bool>,
+    ) -> Result<OptionalOptionValue<bool>, String> {
+        self.parse_scalar(id, default.as_ref(), |source, id| source.get_bool(id))
+    }
+
+    pub fn parse_int_optional(
+        &self,
+        id: &OptionId,
+        default: Option<i64>,
+    ) -> Result<OptionalOptionValue<i64>, String> {
+        self.parse_scalar(id, default.as_ref(), |source, id| source.get_int(id))
+    }
+
+    pub fn parse_float_optional(
+        &self,
+        id: &OptionId,
+        default: Option<f64>,
+    ) -> Result<OptionalOptionValue<f64>, String> {
+        self.parse_scalar(id, default.as_ref(), |source, id| source.get_float(id))
+    }
+
+    pub fn parse_string_optional(
+        &self,
+        id: &OptionId,
+        default: Option<&str>,
+    ) -> Result<OptionalOptionValue<String>, String> {
+        self.parse_scalar(id, default, |source, id| source.get_string(id))
+    }
+
     pub fn parse_bool(&self, id: &OptionId, default: bool) -> Result<OptionValue<bool>, String> {
-        self.parse_scalar(id, &default, |source, id| source.get_bool(id))
+        self.parse_bool_optional(id, Some(default))
+            .map(OptionalOptionValue::unwrap)
     }
 
     pub fn parse_int(&self, id: &OptionId, default: i64) -> Result<OptionValue<i64>, String> {
-        self.parse_scalar(id, &default, |source, id| source.get_int(id))
+        self.parse_int_optional(id, Some(default))
+            .map(OptionalOptionValue::unwrap)
     }
 
     pub fn parse_float(&self, id: &OptionId, default: f64) -> Result<OptionValue<f64>, String> {
-        self.parse_scalar(id, &default, |source, id| source.get_float(id))
+        self.parse_float_optional(id, Some(default))
+            .map(OptionalOptionValue::unwrap)
     }
 
     pub fn parse_string(
@@ -403,7 +458,8 @@ impl OptionParser {
         id: &OptionId,
         default: &str,
     ) -> Result<OptionValue<String>, String> {
-        self.parse_scalar(id, default, |source, id| source.get_string(id))
+        self.parse_string_optional(id, Some(default))
+            .map(OptionalOptionValue::unwrap)
     }
 
     #[allow(clippy::type_complexity)]
