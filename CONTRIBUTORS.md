@@ -142,6 +142,7 @@ Created as part of the release process.
 + James Mouradian
 + Jan Berkel
 + Jan Paul Erkelens
++ Jason Barnett
 + Jason Jackson
 + Jason Song
 + Jay Crumb
@@ -295,6 +296,7 @@ Created as part of the release process.
 + Shuo Li
 + Simeon Franklin
 + Simon Biggs
++ Sion Kang
 + Srikanth Kotagiri
 + Stefan Sauer
 + Stephan Erb

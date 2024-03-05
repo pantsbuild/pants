@@ -6,6 +6,7 @@ from __future__ import annotations
 import copy
 import inspect
 import json
+import logging
 import re
 import typing
 from collections import defaultdict
@@ -56,6 +57,8 @@ from pants.option.ranked_value import Rank, RankedValue
 from pants.option.rust_options import NativeOptionParser
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -211,7 +214,9 @@ class Parser:
             setattr(namespace, dest, RankedValue(Rank.HARDCODED, val))
         return namespace.build()
 
-    def parse_args(self, parse_args_request: ParseArgsRequest) -> OptionValueContainer:
+    def parse_args(
+        self, parse_args_request: ParseArgsRequest, log_warnings: bool = False
+    ) -> OptionValueContainer:
         """Set values for this parser's options on the namespace object.
 
         :raises: :class:`ParseError` if any flags weren't recognized.
@@ -268,7 +273,11 @@ class Parser:
             # Get the value for this option, falling back to defaults as needed.
             try:
                 value_history = self._compute_value(
-                    dest, kwargs, flag_vals, parse_args_request.passthrough_args
+                    dest,
+                    kwargs,
+                    flag_vals,
+                    parse_args_request.passthrough_args,
+                    log_warnings,
                 )
                 self._history[dest] = value_history
                 val = value_history.final_value
@@ -572,7 +581,7 @@ class Parser:
             env_vars = [f"PANTS_{sanitized_env_var_scope}_{udest}"]
         return env_vars
 
-    def _compute_value(self, dest, kwargs, flag_val_strs, passthru_arg_strs):
+    def _compute_value(self, dest, kwargs, flag_val_strs, passthru_arg_strs, log_warnings):
         """Compute the value to use for an option.
 
         The source of the value is chosen according to the ranking in Rank.
@@ -585,6 +594,8 @@ class Parser:
 
         # Helper function to expand a fromfile=True value string, if needed.
         # May return a string or a dict/list decoded from a json/yaml file.
+        # If the fromfile is optional and the file does not exist then
+        # None will be returned.
         def expand(val_or_str):
             if (
                 kwargs.get("fromfile", True)
@@ -594,9 +605,17 @@ class Parser:
                 if val_or_str.startswith("@@"):  # Support a literal @ for fromfile values via @@.
                     return val_or_str[1:]
                 else:
-                    fromfile = val_or_str[1:]
+                    if val_or_str.startswith("@?"):  # Support an optional fromfile value via @?.
+                        fromfile, optional = val_or_str[2:], True
+                    else:
+                        fromfile, optional = val_or_str[1:], False
+                    fromfile_path = Path(get_buildroot(), fromfile)
                     try:
-                        contents = Path(get_buildroot(), fromfile).read_text()
+                        if optional and not fromfile_path.exists():
+                            if log_warnings:
+                                logger.warning(f"Optional file config {fromfile!r} does not exist.")
+                            return None
+                        contents = fromfile_path.read_text()
                         if fromfile.endswith(".json"):
                             return json.loads(contents)
                         elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
@@ -615,7 +634,9 @@ class Parser:
         def merge_in_rank(vals):
             if not vals:
                 return None
-            expanded_vals = [to_value_type(expand(x)) for x in vals]
+            expanded_vals = [to_value_type(v) for v in (expand(i) for i in vals) if v is not None]
+            if not expanded_vals:
+                return None
             if is_list_option(kwargs):
                 return ListValueComponent.merge(expanded_vals)
             if is_dict_option(kwargs):

@@ -19,6 +19,18 @@ macro_rules! check {
     ($left:expr, $right:expr, $($arg:tt)+) => { check_with_arg($left, $right, $($arg)+); };
 }
 
+macro_rules! check_err {
+    ($res:expr, $expected_suffix:expr $(,)?) => {
+        let actual_msg = $res.unwrap_err().render("XXX");
+        assert!(
+            actual_msg.ends_with($expected_suffix),
+            "Error message does not have expected suffix:\n{actual_msg}\nvs\n{:>width$}",
+            $expected_suffix,
+            width = actual_msg.len(),
+        )
+    };
+}
+
 fn check<T: PartialEq + Debug>(expected: T, res: Result<T, ParseError>) {
     match res {
         Ok(actual) => assert_eq!(expected, actual),
@@ -683,13 +695,24 @@ fn test_expand_fromfile() {
 
 #[test]
 fn test_expand_fromfile_to_list() {
-    fn do_test<T: ListMember + Clone + Debug + PartialEq>(
+    fn expand_fromfile<T: Parseable + Clone + Debug + PartialEq>(
+        content: &str,
+        prefix: &str,
+        filename: &str,
+    ) -> Result<Option<Vec<ListEdit<T>>>, ParseError> {
+        let (_tmpdir, _) = write_fromfile(filename, content);
+        expand_to_list(format!(
+            "{prefix}{}",
+            _tmpdir.path().join(filename).display()
+        ))
+    }
+
+    fn do_test<T: Parseable + Clone + Debug + PartialEq>(
         content: &str,
         expected: &[ListEdit<T>],
         filename: &str,
     ) {
-        let (_tmpdir, _) = write_fromfile(filename, content);
-        let res = expand_to_list(format!("@{}", _tmpdir.path().join(filename).display()));
+        let res = expand_fromfile(content, "@", filename);
         assert_eq!(expected.to_vec(), res.unwrap().unwrap());
     }
 
@@ -768,22 +791,62 @@ fn test_expand_fromfile_to_list() {
         "fromfile.yaml",
     );
 
-    assert!(expand_to_list::<String>("@/does/not/exist".to_string())
-        .unwrap_err()
-        .render("XXX")
-        .starts_with("Problem reading /does/not/exist for XXX: No such file or directory"));
+    check_err!(
+        expand_fromfile::<i64>("THIS IS NOT JSON", "@", "invalid.json"),
+        "expected value at line 1 column 1",
+    );
+
+    check_err!(
+        expand_fromfile::<i64>("{}", "@", "wrong_type.json"),
+        "invalid type: map, expected a sequence at line 1 column 0",
+    );
+
+    check_err!(
+        expand_fromfile::<i64>("[1, \"FOO\"]", "@", "wrong_type.json"),
+        "invalid type: string \"FOO\", expected i64 at line 1 column 9",
+    );
+
+    check_err!(
+        expand_fromfile::<i64>("THIS IS NOT YAML", "@", "invalid.yml"),
+        "invalid type: string \"THIS IS NOT YAML\", expected a sequence",
+    );
+
+    check_err!(
+        expand_fromfile::<i64>("- 1\n- true", "@", "wrong_type.yaml"),
+        "invalid type: boolean `true`, expected i64 at line 2 column 3",
+    );
+
+    check_err!(
+        expand_to_list::<String>("@/does/not/exist".to_string()),
+        "Problem reading /does/not/exist for XXX: No such file or directory (os error 2)",
+    );
 
     assert_eq!(
         Ok(None),
         expand_to_list::<String>("@?/does/not/exist".to_string())
     );
+
+    // Test an optional fromfile that does exist, to ensure we handle the `?` in this case.
+    let res = expand_fromfile::<i64>("[1, 2]", "@?", "fromfile.json");
+    assert_eq!(vec![replace(vec![1, 2])], res.unwrap().unwrap());
 }
 
 #[test]
 fn test_expand_fromfile_to_dict() {
-    fn do_test(content: &str, expected: &DictEdit, filename: &str) {
+    fn expand_fromfile(
+        content: &str,
+        prefix: &str,
+        filename: &str,
+    ) -> Result<Option<DictEdit>, ParseError> {
         let (_tmpdir, _) = write_fromfile(filename, content);
-        let res = expand_to_dict(format!("@{}", _tmpdir.path().join(filename).display()));
+        expand_to_dict(format!(
+            "{prefix}{}",
+            _tmpdir.path().join(filename).display()
+        ))
+    }
+
+    fn do_test(content: &str, expected: &DictEdit, filename: &str) {
+        let res = expand_fromfile(content, "@", filename);
         assert_eq!(*expected, res.unwrap().unwrap())
     }
 
@@ -841,10 +904,37 @@ fn test_expand_fromfile_to_dict() {
         "fromfile.yaml",
     );
 
-    assert!(expand_to_dict("@/does/not/exist".to_string())
-        .unwrap_err()
-        .render("XXX")
-        .starts_with("Problem reading /does/not/exist for XXX: No such file or directory"));
+    check_err!(
+        expand_fromfile("THIS IS NOT JSON", "@", "invalid.json"),
+        "expected value at line 1 column 1",
+    );
+
+    check_err!(
+        expand_fromfile("[1, 2]", "@", "wrong_type.json"),
+        "invalid type: sequence, expected a map at line 1 column 0",
+    );
+
+    check_err!(
+        expand_fromfile("THIS IS NOT YAML", "@", "invalid.yml"),
+        "invalid type: string \"THIS IS NOT YAML\", expected a map",
+    );
+
+    check_err!(
+        expand_fromfile("- 1\n- 2", "@", "wrong_type.yaml"),
+        "invalid type: sequence, expected a map",
+    );
+
+    check_err!(
+        expand_to_dict("@/does/not/exist".to_string()),
+        "Problem reading /does/not/exist for XXX: No such file or directory (os error 2)",
+    );
 
     assert_eq!(Ok(None), expand_to_dict("@?/does/not/exist".to_string()));
+
+    // Test an optional fromfile that does exist, to ensure we handle the `?` in this case.
+    let res = expand_fromfile("{'FOO': 42}", "@?", "fromfile.txt");
+    assert_eq!(
+        replace(hashmap! {"FOO".to_string() => Val::Int(42),}),
+        res.unwrap().unwrap()
+    );
 }

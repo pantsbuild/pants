@@ -7,7 +7,7 @@ use std::ffi::OsString;
 
 use super::id::{NameTransform, OptionId, Scope};
 use super::{DictEdit, OptionsSource};
-use crate::parse::{expand, expand_to_dict, expand_to_list, ListMember, Parseable};
+use crate::parse::{expand, expand_to_dict, expand_to_list, Parseable};
 use crate::ListEdit;
 
 #[derive(Debug)]
@@ -67,7 +67,7 @@ impl Env {
         names
     }
 
-    fn get_list<T: ListMember>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
+    fn get_list<T: Parseable>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
         for env_var_name in &Self::env_var_names(id) {
             if let Some(value) = self.env.get(env_var_name) {
                 return expand_to_list::<T>(value.to_owned())

@@ -5,7 +5,7 @@ use std::env;
 
 use super::id::{NameTransform, OptionId, Scope};
 use super::{DictEdit, OptionsSource};
-use crate::parse::{expand, expand_to_dict, expand_to_list, ListMember, Parseable};
+use crate::parse::{expand, expand_to_dict, expand_to_list, Parseable};
 use crate::ListEdit;
 use std::collections::HashMap;
 
@@ -77,7 +77,7 @@ impl Args {
         Ok(None)
     }
 
-    fn get_list<T: ListMember>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
+    fn get_list<T: Parseable>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
         let arg_names = Self::arg_names(id, Negate::False);
         let mut edits = vec![];
         for arg in &self.args {
