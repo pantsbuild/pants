@@ -880,6 +880,8 @@ def test_list_of_dict_string_to_string_field() -> None:
     assert Example(None, addr).value is None
     assert Example([{}], addr).value == (FrozenDict(),)
     assert Example([{"hello": "world"}], addr).value == (FrozenDict({"hello": "world"}),)
+    # Test support for single dict not passed in a list
+    assert Example({"hello": "world"}, addr).value == (FrozenDict({"hello": "world"}),)
 
     def assert_invalid_type(raw_value: Any) -> None:
         with pytest.raises(InvalidFieldTypeException):

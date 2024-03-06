@@ -1933,11 +1933,12 @@ class ListOfDictStringToStringField(Field):
             address,
             cls.alias,
             raw_value,
-            expected_type="a list of dictionaries of string -> string",
+            expected_type="a list of dictionaries (or a single dictionary) of string -> string",
         )
 
+        # Also support passing in a single dictionary by wrapping it
         if not isinstance(value_or_default, list):
-            raise invalid_type_exception
+            value_or_default = [value_or_default]
 
         result_lst: list[FrozenDict[str, str]] = []
         for item in value_or_default:
