@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import inspect
+from enum import Enum
 from typing import Any
 
 from pants.engine.internals import native_engine
+from pants.option.custom_types import shell_str, _flatten_shlexed_list
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
 
@@ -29,12 +32,42 @@ class NativeOptionParser:
         name_parts = flags[-1][2:].split('-')  # '--foo-bar' -> ['foo', 'bar']
         switch = flags[0][1:] if len(flags) > 1 else None  # '-d' -> 'd'
         option_id = native_engine.PyOptionId(*name_parts, scope=scope, switch=switch)
+
+        # TODO: Do any dict options set member_type? If not we can lose this line.
         member_type = None if option_type is dict else member_type
-        getter = self._getter_by_type.get((option_type, member_type))
+        # The Python code allows registering default=None for dicts/lists, and forces it to
+        # an empty dict/list at registration. Since here we only have access to what the user
+        # provided, we do the same.
+        # TODO: Pass in the final, munged, registration data, not what the user provided?
+        rust_member_type = member_type
+        if option_type is dict and default is None:
+            default = {}
+        if option_type is list:
+            if default is None:
+                default = []
+            if member_type == shell_str:
+                rust_member_type = str
+            elif callable(member_type):
+                rust_member_type = str
+                if inspect.isclass(member_type) and issubclass(member_type, Enum):
+                    default = [x.value for x in default]
+                else:
+                    default = [str(x) for x in default]
+
+        getter = self._getter_by_type.get((option_type, rust_member_type))
         if getter is None:
-            suffix = f"with member type {member_type}" if option_type is list else ""
+            suffix = f" with member type {member_type}" if option_type is list else ""
             raise OptionsError(f"Unsupported type: {option_type}{suffix}")
-        return getter(option_id, default)
+
+        val = getter(option_id, default)
+
+        if option_type is list:
+            if member_type == shell_str:
+                val = _flatten_shlexed_list(val)
+            elif callable(member_type):
+                val = [member_type(x) for x in default]
+
+        return val
 
 
 def foo() -> None:

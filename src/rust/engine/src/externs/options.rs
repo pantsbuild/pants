@@ -5,7 +5,7 @@ use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 
-use options::{Args, Env, ListOptionValue, OptionId, OptionParser, OptionValue, Scope, Val};
+use options::{Args, Env, ListOptionValue, OptionId, OptionParser, Scope, Val};
 
 use std::collections::HashMap;
 
@@ -69,9 +69,16 @@ pub(crate) fn py_object_to_val(obj: &PyAny) -> Result<Val, PyErr> {
                 })
                 .collect::<Result<HashMap<_, _>, _>>()?,
         ))
-    } else if obj.is_instance_of::<PyList>() || obj.is_instance_of::<PyTuple>() {
+    } else if obj.is_instance_of::<PyList>() {
         Ok(Val::List(
             obj.downcast::<PyList>()?
+                .iter()
+                .map(py_object_to_val)
+                .collect::<Result<Vec<_>, _>>()?,
+        ))
+    } else if obj.is_instance_of::<PyTuple>() {
+        Ok(Val::List(
+            obj.downcast::<PyTuple>()?
                 .iter()
                 .map(py_object_to_val)
                 .collect::<Result<Vec<_>, _>>()?,
@@ -118,16 +125,6 @@ struct PyOptionParser(OptionParser);
 
 #[allow(clippy::type_complexity)]
 impl PyOptionParser {
-    fn get_scalar<T: ToOwned + ?Sized>(
-        &self,
-        option_id: &PyOptionId,
-        default: &T,
-        getter: fn(&OptionParser, &OptionId, &T) -> Result<OptionValue<T::Owned>, String>,
-    ) -> PyResult<T::Owned> {
-        let opt_val = getter(&self.0, &option_id.0, default).map_err(PyException::new_err)?;
-        Ok(opt_val.value)
-    }
-
     fn get_list<T: ToOwned + ?Sized>(
         &self,
         option_id: &PyOptionId,
@@ -172,22 +169,20 @@ impl PyOptionParser {
         Ok(Self(option_parser))
     }
 
-    fn get_bool(&self, option_id: &PyOptionId, default: bool) -> PyResult<bool> {
-        self.get_scalar(option_id, &default, |op, oid, def| op.parse_bool(oid, *def))
+    fn get_bool(&self, option_id: &PyOptionId, default: Option<bool>) -> PyResult<Option<bool>> {
+        Ok(self.0.parse_bool_optional(&option_id.0, default).map_err(PyException::new_err)?.value)
     }
 
-    fn get_int(&self, option_id: &PyOptionId, default: i64) -> PyResult<i64> {
-        self.get_scalar(option_id, &default, |op, oid, def| op.parse_int(oid, *def))
+    fn get_int(&self, option_id: &PyOptionId, default: Option<i64>) -> PyResult<Option<i64>> {
+        Ok(self.0.parse_int_optional(&option_id.0, default).map_err(PyException::new_err)?.value)
     }
 
-    fn get_float(&self, option_id: &PyOptionId, default: f64) -> PyResult<f64> {
-        self.get_scalar(option_id, &default, |op, oid, def| {
-            op.parse_float(oid, *def)
-        })
+    fn get_float(&self, option_id: &PyOptionId, default: Option<f64>) -> PyResult<Option<f64>> {
+        Ok(self.0.parse_float_optional(&option_id.0, default).map_err(PyException::new_err)?.value)
     }
 
-    fn get_string(&self, option_id: &PyOptionId, default: &str) -> PyResult<String> {
-        self.get_scalar(option_id, default, |op, oid, def| op.parse_string(oid, def))
+    fn get_string(&self, option_id: &PyOptionId, default: Option<&str>) -> PyResult<Option<String>> {
+        Ok(self.0.parse_string_optional(&option_id.0, default).map_err(PyException::new_err)?.value)
     }
 
     fn get_bool_list(&self, option_id: &PyOptionId, default: Vec<bool>) -> PyResult<Vec<bool>> {

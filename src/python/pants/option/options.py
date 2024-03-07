@@ -360,8 +360,8 @@ class Options:
             parse_args_request, log_warnings=log_parser_warnings
         )
 
-        native_parser = NativeOptionParser()
-        native_values = self.get_parser(scope).parse_args_native(native_parser)
+        #native_parser = NativeOptionParser()
+        #native_values = self.get_parser(scope).parse_args_native(native_parser)
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
