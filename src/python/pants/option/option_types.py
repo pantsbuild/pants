@@ -429,7 +429,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
     """An Enum option.
 
     - If you provide a static non-None `default` parameter, the `enum_type` parameter will be
-        inferred from the type of the the default.
+        inferred from the type of the default.
     - If you provide a dynamic `default` or `default` is `None`, you must also provide `enum_type`.
 
     E.g.

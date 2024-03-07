@@ -6,14 +6,26 @@ from __future__ import annotations
 import pytest
 
 from pants.core.util_rules import config_files
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.config_files import (
+    ConfigFiles,
+    ConfigFilesRequest,
+    GatherConfigFilesByDirectoriesRequest,
+    GatheredConfigFilesByDirectories,
+)
+from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[*config_files.rules(), QueryRule(ConfigFiles, [ConfigFilesRequest])])
+    return RuleRunner(
+        rules=[
+            *config_files.rules(),
+            QueryRule(ConfigFiles, [ConfigFilesRequest]),
+            QueryRule(GatheredConfigFilesByDirectories, [GatherConfigFilesByDirectoriesRequest]),
+        ]
+    )
 
 
 def test_resolve_if_specified(rule_runner: RuleRunner) -> None:
@@ -57,3 +69,38 @@ def test_discover_config(rule_runner: RuleRunner) -> None:
     assert discover(["fake"], {"c4": b"bad"}) == ()
     # Explicitly specifying turns off auto-discovery.
     assert discover(["c1"], {}, specified="c2") == ("c2",)
+
+
+TEST_CONFIG_FILENAME = "myconfig.cfg"
+
+
+def test_gather_config_files(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            TEST_CONFIG_FILENAME: "",
+            f"foo/bar/{TEST_CONFIG_FILENAME}": "",
+            f"hello/{TEST_CONFIG_FILENAME}": "",
+            "hello/Foo.x": "",
+            "hello/world/Foo.x": "",
+            "foo/bar/Foo.x": "",
+            "foo/bar/xyyzzy/Foo.x": "",
+            "foo/blah/Foo.x": "",
+        }
+    )
+
+    snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.x"])])
+    request = rule_runner.request(
+        GatheredConfigFilesByDirectories,
+        [
+            GatherConfigFilesByDirectoriesRequest(
+                tool_name="test", config_filename=TEST_CONFIG_FILENAME, filepaths=snapshot.files
+            )
+        ],
+    )
+    assert sorted(request.source_dir_to_config_file.items()) == [
+        ("foo/bar", f"foo/bar/{TEST_CONFIG_FILENAME}"),
+        ("foo/bar/xyyzzy", f"foo/bar/{TEST_CONFIG_FILENAME}"),
+        ("foo/blah", TEST_CONFIG_FILENAME),
+        ("hello", f"hello/{TEST_CONFIG_FILENAME}"),
+        ("hello/world", f"hello/{TEST_CONFIG_FILENAME}"),
+    ]

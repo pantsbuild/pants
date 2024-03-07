@@ -6,10 +6,15 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-async-stream = "0.3"
-bytes = "1.2"
+async-stream = { workspace = true }
+bytes = { workspace = true }
 fs = { path = "../fs" }
 grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
-prost = "0.9"
+prost = { workspace = true }
 protos = { path = "../protos" }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

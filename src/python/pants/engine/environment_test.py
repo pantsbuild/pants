@@ -11,7 +11,7 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 @pytest.mark.parametrize(
     "input_strs, expected",
     [
-        # Test explicit variable and variable read from Pants' enivronment.
+        # Test explicit variable and variable read from Pants' environment.
         (["A=unrelated", "B"], {"A": "unrelated", "B": "b"}),
         # Test multi-word string.
         (["A=unrelated", "C=multi word"], {"A": "unrelated", "C": "multi word"}),

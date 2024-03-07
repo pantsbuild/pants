@@ -108,7 +108,7 @@ class Flake8(PythonToolBase):
             example, if your plugin is at `build-support/flake8/custom_plugin.py`, add
             `'build-support/flake8'` to `[source].root_patterns` in `pants.toml`. This is
             necessary for Pants to know how to tell Flake8 to discover your plugin. See
-            {doc_url('source-roots')}
+            {doc_url('docs/using-pants/key-concepts/source-roots')}
 
             You must also set `[flake8:local-plugins]` in your Flake8 config file.
 
@@ -123,7 +123,7 @@ class Flake8(PythonToolBase):
             directory or a subdirectory.
 
             To instead load third-party plugins, add them to a custom resolve alongside
-            flake8 itself, as described in {doc_url("python-lockfiles#lockfiles-for-tools")}.
+            flake8 itself, as described in {doc_url("docs/python/overview/lockfiles#lockfiles-for-tools")}.
             """
         ),
     )

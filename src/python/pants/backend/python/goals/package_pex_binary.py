@@ -8,10 +8,12 @@ from typing import Tuple
 from pants.backend.python.target_types import (
     PexArgsField,
     PexBinaryDefaults,
+    PexCheckField,
     PexCompletePlatformsField,
     PexEmitWarningsField,
     PexEntryPointField,
     PexEnvField,
+    PexExecutableField,
     PexExecutionMode,
     PexExecutionModeField,
     PexIgnoreErrorsField,
@@ -24,6 +26,7 @@ from pants.backend.python.target_types import (
     PexPlatformsField,
     PexResolveLocalPlatformsField,
     PexScriptField,
+    PexShBootField,
     PexShebangField,
     PexStripEnvField,
     PexVenvHermeticScripts,
@@ -57,6 +60,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
     entry_point: PexEntryPointField
     script: PexScriptField
+    executable: PexExecutableField
     args: PexArgsField
     env: PexEnvField
 
@@ -64,6 +68,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     emit_warnings: PexEmitWarningsField
     ignore_errors: PexIgnoreErrorsField
     inherit_path: PexInheritPathField
+    sh_boot: PexShBootField
     shebang: PexShebangField
     strip_env: PexStripEnvField
     platforms: PexPlatformsField
@@ -77,6 +82,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     venv_site_packages_copies: PexVenvSitePackagesCopies
     venv_hermetic_scripts: PexVenvHermeticScripts
     environment: EnvironmentField
+    check: PexCheckField
 
     @property
     def _execution_mode(self) -> PexExecutionMode:
@@ -86,12 +92,18 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
         args = []
         if self.emit_warnings.value_or_global_default(pex_binary_defaults) is False:
             args.append("--no-emit-warnings")
+        elif self.emit_warnings.value_or_global_default(pex_binary_defaults) is True:
+            args.append("--emit-warnings")
         if self.resolve_local_platforms.value_or_global_default(pex_binary_defaults) is True:
             args.append("--resolve-local-platforms")
         if self.ignore_errors.value is True:
             args.append("--ignore-errors")
         if self.inherit_path.value is not None:
             args.append(f"--inherit-path={self.inherit_path.value}")
+        if self.sh_boot.value is True:
+            args.append("--sh-boot")
+        if self.check.value is not None:
+            args.append(f"--check={self.check.value}")
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
         if self.strip_env.value is False:
@@ -137,7 +149,7 @@ async def package_pex_binary(
     request = PexFromTargetsRequest(
         addresses=[field_set.address],
         internal_only=False,
-        main=resolved_entry_point.val or field_set.script.value,
+        main=resolved_entry_point.val or field_set.script.value or field_set.executable.value,
         inject_args=field_set.args.value or [],
         inject_env=field_set.env.value or FrozenDict[str, str](),
         platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),

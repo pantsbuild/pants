@@ -113,7 +113,7 @@ def assert_files_generated(
 
 
 def test_extracts_go_package() -> None:
-    import_path = parse_go_package_option("""option go_package = "example.com/dir1";""".encode())
+    import_path = parse_go_package_option(b"""option go_package = "example.com/dir1";""")
     assert import_path == "example.com/dir1"
 
 
@@ -294,7 +294,7 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
-    assert "PASS: TestProtoGen" in result.stdout
+    assert b"PASS: TestProtoGen" in result.stdout_bytes
 
 
 @requires_go

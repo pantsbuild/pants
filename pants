@@ -26,10 +26,6 @@ source "${HERE}/build-support/common.sh"
 PY="$(determine_python)"
 export PY
 
-if is_macos_arm; then
-  export PANTS_PYTHON_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_INTERPRETER_CONSTRAINTS:-"['==3.9.*']"}"
-fi
-
 # Exposes:
 # + activate_pants_venv: Activate a virtualenv for pants requirements, creating it if needed.
 # shellcheck source=build-support/pants_venv

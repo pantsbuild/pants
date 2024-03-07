@@ -13,7 +13,7 @@ from pants.engine.rules import rule
 from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.goals.lockfile import rules as lockfile_rules
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.common import Coordinate
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase

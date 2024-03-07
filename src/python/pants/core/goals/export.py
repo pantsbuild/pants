@@ -31,6 +31,7 @@ from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import StrListOption
 from pants.util.dirutil import safe_rmtree
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 
 class ExportError(Exception):
@@ -104,7 +105,15 @@ class ExportResults(Collection[ExportResult]):
 
 class ExportSubsystem(GoalSubsystem):
     name = "export"
-    help = "Export Pants data for use in other tools, such as IDEs."
+    help = softwrap(
+        """
+        Export Pants data for use in other tools, such as IDEs.
+
+        :::caution Exporting tools requires creating a custom lockfile for them
+        Follow [the instructions for creating tool lockfiles](../../docs/python/overview/lockfiles#lockfiles-for-tools)
+        :::
+        """
+    )
 
     # NB: Only options that are relevant across many/most backends and languages
     #  should be defined here.  Backend-specific options should be defined in that backend
@@ -170,7 +179,7 @@ async def export(
             resolves_exported.add(result.resolve)
         console.print_stdout(f"Wrote {result.description} to {result_dir}")
 
-    unexported_resolves = sorted((set(export_subsys.resolve) - resolves_exported))
+    unexported_resolves = sorted(set(export_subsys.resolve) - resolves_exported)
     if unexported_resolves:
         all_known_user_resolve_names = await MultiGet(
             Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())

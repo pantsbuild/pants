@@ -8,10 +8,9 @@ import os
 import re
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any, Dict, Iterable, List, Mapping, Union, cast
+from typing import Any, Dict, Iterable, List, Mapping, Protocol, Union, cast
 
 import toml
-from typing_extensions import Protocol
 
 from pants.base.build_environment import get_buildroot
 from pants.option.errors import ConfigError, ConfigValidationError, InterpolationMissingOptionError
@@ -243,7 +242,7 @@ class _ConfigValues:
 
         # Handle dict options, along with the special `my_dict_option.add`, `my_list_option.add` and
         # `my_list_option.remove` syntax. We only treat `add` and `remove` as the special syntax
-        # if the values have the approprate type, to reduce the risk of incorrectly special casing.
+        # if the values have the appropriate type, to reduce the risk of incorrectly special casing.
         has_add_dict = isinstance(option_value.get("add"), dict)
         has_add_list = isinstance(option_value.get("add"), list)
         has_remove_list = isinstance(option_value.get("remove"), list)

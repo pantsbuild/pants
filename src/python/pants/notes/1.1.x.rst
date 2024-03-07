@@ -353,7 +353,7 @@ Refactoring, Improvements, and Tooling
   `RB #3951 <https://rbcommons.com/s/twitter/r/3951>`_
 
 * Bump pex requirement to 1.1.10.
-  `Issue #265 <https://github.com/pantsbuild/pex/issues/265>`_
+  `Issue #265 <https://github.com/pex-tool/pex/issues/265>`_
   `RB #3949 <https://rbcommons.com/s/twitter/r/3949>`_
 
 * Refactor and simplify go fetcher code.

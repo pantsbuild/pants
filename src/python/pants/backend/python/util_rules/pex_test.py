@@ -30,8 +30,8 @@ from pants.backend.python.util_rules.pex import (
     PexPlatforms,
     PexProcess,
     PexRequest,
+    PexRequirementsInfo,
     PexResolveInfo,
-    ReqStrings,
     VenvPex,
     VenvPexProcess,
     _build_pex_description,
@@ -418,7 +418,7 @@ def test_entry_point(rule_runner: RuleRunner) -> None:
 
 
 def test_interpreter_constraints(rule_runner: RuleRunner) -> None:
-    constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
+    constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6,<3.12"])
     pex_info = create_pex_and_get_pex_info(
         rule_runner, interpreter_constraints=constraints, internal_only=False
     )
@@ -505,6 +505,7 @@ def test_local_requirements_and_path_mappings(
             [
                 GeneratePythonLockfile(
                     requirements=FrozenOrderedSet([wheel_req_str]),
+                    find_links=FrozenOrderedSet([]),
                     interpreter_constraints=InterpreterConstraints([">=3.7,<4"]),
                     resolve_name="test",
                     lockfile_dest="test.lock",
@@ -702,6 +703,7 @@ def test_setup_pex_requirements() -> None:
         expected: _BuildPexRequirementsSetup,
         *,
         is_pex_lock: bool = True,
+        include_find_links: bool = False,
     ) -> None:
         request = PexRequest(
             output_filename="foo.pex",
@@ -723,12 +725,13 @@ def test_setup_pex_requirements() -> None:
                     mock=lambda _: create_loaded_lockfile(is_pex_lock),
                 ),
                 MockGet(
-                    output_type=ReqStrings,
+                    output_type=PexRequirementsInfo,
                     input_types=(PexRequirements,),
-                    mock=lambda _: ReqStrings(
+                    mock=lambda _: PexRequirementsInfo(
                         tuple(str(x) for x in requirements.req_strings_or_addrs)
                         if isinstance(requirements, PexRequirements)
-                        else tuple()
+                        else tuple(),
+                        ("imma/link",) if include_find_links else tuple(),
                     ),
                 ),
                 MockGet(
@@ -763,6 +766,11 @@ def test_setup_pex_requirements() -> None:
 
     # Normal resolves.
     assert_setup(PexRequirements(reqs), _BuildPexRequirementsSetup([], [*reqs, *pip_args], 2))
+    assert_setup(
+        PexRequirements(reqs),
+        _BuildPexRequirementsSetup([], [*reqs, *pip_args, "--find-links=imma/link"], 2),
+        include_find_links=True,
+    )
     assert_setup(
         PexRequirements(reqs, constraints_strings=["constraint"]),
         _BuildPexRequirementsSetup(

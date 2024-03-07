@@ -91,7 +91,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
             dir/BUILD:1: Name 'FAKE' is not defined.
 
             {dym}If you expect to see more symbols activated in the below list, refer to
-            {doc_url('enabling-backends')} for all available backends to activate.
+            {doc_url('docs/using-pants/key-concepts/backends')} for all available backends to activate.
 
             All registered symbols: [{fmt_extra_sym}'__defaults__', '__dependencies_rules__',
             '__dependents_rules__', 'build_file_dir', 'caof', 'env', 'obj', 'prelude', 'tgt']
@@ -171,6 +171,28 @@ def test_unrecognized_symbol_during_bootstrap_issue_19156(
         TestField(raw_field, Address(""))
 
 
+def test_unknown_target_for_defaults_during_bootstrap_issue_19445(
+    defaults_parser_state: BuildFileDefaultsParserState,
+) -> None:
+    parser = Parser(
+        build_root="",
+        registered_target_types=RegisteredTargetTypes({}),
+        union_membership=UnionMembership({}),
+        object_aliases=BuildFileAliases(),
+        ignore_unrecognized_symbols=True,
+    )
+    parser.parse(
+        "BUILD",
+        "__defaults__({'type_1': dict(), type_2: dict()})",
+        BuildFilePreludeSymbols.create({}, ()),
+        EnvironmentVars({}),
+        True,
+        defaults_parser_state,
+        dependents_rules=None,
+        dependencies_rules=None,
+    )
+
+
 @pytest.mark.parametrize("symbol", ["a", "bad", "BAD", "a___b_c", "a231", "áç"])
 def test_extract_symbol_from_name_error(symbol: str) -> None:
     assert _extract_symbol_from_name_error(NameError(f"name '{symbol}' is not defined")) == symbol
@@ -227,7 +249,7 @@ def test_unrecognized_symbol_in_prelude(
         Did you mean macro?
 
         If you expect to see more symbols activated in the below list, refer to
-        {doc_url('enabling-backends')} for all available backends to activate.
+        {doc_url('docs/using-pants/key-concepts/backends')} for all available backends to activate.
 
         All registered symbols: ['__defaults__', '__dependencies_rules__', '__dependents_rules__',
         'build_file_dir', 'caof', 'env', 'macro', 'obj']

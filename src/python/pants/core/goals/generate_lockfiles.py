@@ -8,9 +8,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Sequence, Tuple, cast
-
-from typing_extensions import Protocol
+from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Protocol, Sequence, Tuple, cast
 
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -133,7 +131,7 @@ class RequestedUserResolveNames(Collection[str]):
 
 
 class PackageVersion(Protocol):
-    """Protocol for backend specific implementations, to support language ecosystem specific version
+    """Protocol for backend specific implementations, to support language-ecosystem-specific version
     formats and sort rules.
 
     May support the `int` properties `major`, `minor` and `micro` to color diff based on semantic
@@ -298,9 +296,11 @@ class UnrecognizedResolveNamesError(Exception):
         super().__init__(
             softwrap(
                 f"""
-            Unrecognized resolve {name_description} from {description_of_origin}:
-            {unrecognized_str}\n\nAll valid resolve names: {sorted(all_valid_names)}
-            """
+                Unrecognized resolve {name_description} from {description_of_origin}:
+                {unrecognized_str}
+
+                All valid resolve names: {sorted(all_valid_names)}
+                """
             )
         )
 
@@ -420,14 +420,15 @@ def filter_tool_lockfile_requests(
             raise ValueError(
                 softwrap(
                     f"""
-                You requested to generate a lockfile for {resolve} because
-                you included it in `--generate-lockfiles-resolve`, but
-                `[{resolve}].lockfile` is set to `{req.lockfile_dest}`
-                so a lockfile will not be generated.\n\n
-                If you would like to generate a lockfile for {resolve}, please
-                set `[{resolve}].lockfile` to the path where it should be
-                generated and run again.
-                """
+                    You requested to generate a lockfile for {resolve} because
+                    you included it in `--generate-lockfiles-resolve`, but
+                    `[{resolve}].lockfile` is set to `{req.lockfile_dest}`
+                    so a lockfile will not be generated.
+
+                    If you would like to generate a lockfile for {resolve}, please
+                    set `[{resolve}].lockfile` to the path where it should be
+                    generated and run again.
+                    """
                 )
             )
 
@@ -478,7 +479,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
         ),
     )
     diff = BoolOption(
-        default=False,
+        default=True,
         help=softwrap(
             """
             Print a summary of changed distributions after generating the lockfile.
@@ -545,7 +546,7 @@ async def generate_lockfiles_goal(
     )
 
     # Execute the actual lockfile generation in each request's environment.
-    # Currently, since resolves specify a single filename for output, we pick a resonable
+    # Currently, since resolves specify a single filename for output, we pick a reasonable
     # environment to execute the request in. Currently we warn if multiple environments are
     # specified.
     all_requests: Iterator[GenerateLockfile] = itertools.chain(
@@ -637,11 +638,13 @@ class NoCompatibleResolveException(Exception):
         return NoCompatibleResolveException(
             softwrap(
                 f"""
-            The input targets did not have a resolve in common.\n\n
-            {formatted_resolve_lists}\n\n
-            Targets used together must use the same resolve, set by the `resolve` field. For more
-            information on 'resolves' (lockfiles), see {doc_url(doc_url_slug)}.
-            """
+                The input targets did not have a resolve in common.
+
+                {formatted_resolve_lists}
+
+                Targets used together must use the same resolve, set by the `resolve` field. For more
+                information on 'resolves' (lockfiles), see {doc_url(doc_url_slug)}.
+                """
             )
             + (f"\n\n{workaround}" if workaround else "")
         )

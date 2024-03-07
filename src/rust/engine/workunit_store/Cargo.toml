@@ -6,22 +6,24 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-bytes = "1.2"
+bytes = { workspace = true }
 concrete_time = { path = "../concrete_time" }
-# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
-deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
+deepsize = { workspace = true }
 hashing = { path = "../hashing" }
-hdrhistogram = "7.5"
-log = "0.4"
-parking_lot = "0.12"
-petgraph = "0.6"
-rand = "0.8"
+hdrhistogram = { workspace = true }
+log = { workspace = true }
+parking_lot = { workspace = true }
+petgraph = { workspace = true }
+rand = { workspace = true }
 smallvec = { version = "1", features = ["union"] }
-strum = "0.24"
-strum_macros = "0.24"
-tokio = { version = "1.28", features = ["rt", "sync"] }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+tokio = { workspace = true, features = ["rt", "sync"] }
 
 [dev-dependencies]
-futures = "0.3"
-internment = "0.6"
-tokio = { version = "1.28", features = ["macros"] }
+futures = { workspace = true }
+internment = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }
+
+[lints]
+workspace = true

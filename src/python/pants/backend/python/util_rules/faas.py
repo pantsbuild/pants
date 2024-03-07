@@ -21,7 +21,6 @@ from pants.backend.python.dependency_inference.subsystem import (
     AmbiguityResolution,
     PythonInferSubsystem,
 )
-from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexCompletePlatformsField,
@@ -29,14 +28,7 @@ from pants.backend.python.target_types import (
     PythonResolveField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import (
-    CompletePlatforms,
-    Pex,
-    PexPlatforms,
-    PexRequest,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.pex import CompletePlatforms, Pex, PexPlatforms
 from pants.backend.python.util_rules.pex_from_targets import (
     InterpreterConstraintsRequest,
     PexFromTargetsRequest,
@@ -56,8 +48,6 @@ from pants.engine.fs import (
     Paths,
     Snapshot,
 )
-from pants.engine.platform import Platform
-from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AsyncFieldMixin,
@@ -69,21 +59,32 @@ from pants.engine.target import (
     InferredDependencies,
     InvalidFieldException,
     InvalidTargetException,
-    SecondaryOwnerMixin,
     StringField,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
+    StringSequenceField,
 )
 from pants.engine.unions import UnionRule
-from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
-from pants.util.docutil import bin_name
 from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
 
-class PythonFaaSHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
+class PythonFaaSPex3VenvCreateExtraArgsField(StringSequenceField):
+    alias = "pex3_venv_create_extra_args"
+    default = ()
+    help = help_text(
+        """
+        Any extra arguments to pass to the `pex3 venv create` invocation that is used to create the
+        final zip file.
+
+        For example, `pex3_venv_create_extra_args=["--collisions-ok"]`, if using packages that have
+        colliding files that aren't required at runtime (errors like "Encountered collisions
+        populating ...").
+        """
+    )
+
+
+class PythonFaaSHandlerField(StringField, AsyncFieldMixin):
     alias = "handler"
     required = True
     value: str
@@ -92,8 +93,6 @@ class PythonFaaSHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
         You can specify a full module like `'path.to.module:handler_func'` or use a shorthand to
         specify a file name, using the same syntax as the `sources` field, e.g.
         `'cloud_function.py:handler_func'`.
-
-        You must use the file name shorthand for file arguments to work with this target.
         """
     )
 
@@ -106,14 +105,6 @@ class PythonFaaSHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
                 f"format `:my_handler_func`, but was {value}."
             )
         return value
-
-    @property
-    def filespec(self) -> Filespec:
-        path, _, func = self.value.partition(":")
-        if not path.endswith(".py"):
-            return {"includes": []}
-        full_glob = os.path.join(self.address.spec_path, path)
-        return {"includes": [full_glob]}
 
 
 @dataclass(frozen=True)
@@ -422,114 +413,6 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
 
 
 @dataclass(frozen=True)
-class BuildLambdexRequest:
-    address: Address
-    target_name: str
-
-    complete_platforms: PythonFaaSCompletePlatforms
-    handler: PythonFaaSHandlerField
-    output_path: OutputPathField
-    runtime: PythonFaaSRuntimeField
-
-    include_requirements: bool
-
-    script_handler: None | str
-    script_module: None | str
-
-    handler_log_message: str
-
-
-@rule
-async def build_lambdex(
-    request: BuildLambdexRequest,
-    lambdex: Lambdex,
-    platform: Platform,
-) -> BuiltPackage:
-    if platform.is_macos:
-        logger.warning(
-            f"`{request.target_name}` targets built on macOS may fail to build. If your function uses any"
-            " third-party dependencies without binary wheels (bdist) for Linux available, it will"
-            " fail to build. If this happens, you will either need to update your dependencies to"
-            " only use dependencies with pre-built wheels, or find a Linux environment to run"
-            f" {bin_name()} package. (See https://realpython.com/python-wheels/ for more about"
-            " wheels.)\n\n(If the build does not raise an exception, it's safe to use macOS.)"
-        )
-
-    output_filename = request.output_path.value_or_default(
-        # FaaS typically use the .zip suffix, so we use that instead of .pex.
-        file_ending="zip",
-    )
-
-    platform_str = request.runtime.to_platform_string()
-    pex_platforms = [platform_str] if platform_str else []
-
-    additional_pex_args = (
-        # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
-        "--manylinux=manylinux2014",
-        # When we're executing Pex on Linux, allow a local interpreter to be resolved if
-        # available and matching the AMI platform.
-        "--resolve-local-platforms",
-    )
-
-    complete_platforms = await Get(
-        CompletePlatforms, PythonFaaSCompletePlatforms, request.complete_platforms
-    )
-
-    pex_request = PexFromTargetsRequest(
-        addresses=[request.address],
-        internal_only=False,
-        include_requirements=request.include_requirements,
-        output_filename=output_filename,
-        platforms=PexPlatforms(pex_platforms),
-        complete_platforms=complete_platforms,
-        additional_args=additional_pex_args,
-        additional_lockfile_args=additional_pex_args,
-        warn_for_transitive_files_targets=True,
-    )
-    lambdex_request = lambdex.to_pex_request()
-
-    lambdex_pex, pex_result, handler, transitive_targets = await MultiGet(
-        Get(VenvPex, PexRequest, lambdex_request),
-        Get(Pex, PexFromTargetsRequest, pex_request),
-        Get(ResolvedPythonFaaSHandler, ResolvePythonFaaSHandlerRequest(request.handler)),
-        Get(TransitiveTargets, TransitiveTargetsRequest([request.address])),
-    )
-
-    lambdex_args = ["build", "-e", f"{handler.module}:{handler.func}", output_filename]
-    if request.script_handler:
-        lambdex_args.extend(("-H", request.script_handler))
-    if request.script_module:
-        lambdex_args.extend(("-M", request.script_module))
-
-    # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
-    result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            lambdex_pex,
-            argv=tuple(lambdex_args),
-            input_digest=pex_result.digest,
-            output_files=(output_filename,),
-            description=f"Setting up handler in {output_filename}",
-        ),
-    )
-
-    extra_log_data: list[tuple[str, str]] = []
-    if request.runtime.value:
-        extra_log_data.append(("Runtime", request.runtime.value))
-    extra_log_data.extend(("Complete platform", path) for path in complete_platforms)
-    extra_log_data.append(("Handler", request.handler_log_message))
-
-    first_column_width = 4 + max(len(header) for header, _ in extra_log_data)
-    artifact = BuiltPackageArtifact(
-        output_filename,
-        extra_log_lines=tuple(
-            f"{header.rjust(first_column_width, ' ')}: {data}" for header, data in extra_log_data
-        ),
-    )
-    return BuiltPackage(digest=result.output_digest, artifacts=(artifact,))
-
-
-@dataclass(frozen=True)
 class BuildPythonFaaSRequest:
     address: Address
     target_name: str
@@ -538,6 +421,7 @@ class BuildPythonFaaSRequest:
     handler: None | PythonFaaSHandlerField
     output_path: OutputPathField
     runtime: PythonFaaSRuntimeField
+    pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
 
     include_requirements: bool
     include_sources: bool
@@ -628,6 +512,7 @@ async def build_python_faas(
             layout=PexVenvLayout.FLAT_ZIPPED,
             platforms=platforms.pex_platforms,
             complete_platforms=platforms.complete_platforms,
+            extra_args=request.pex3_venv_create_extra_args.value or (),
             prefix=request.prefix_in_artifact,
             output_path=Path(output_filename),
             description=f"Build {request.target_name} artifact for {request.address}",

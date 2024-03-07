@@ -166,3 +166,44 @@ def test_infer_snapshot_dependencies(rule_runner: RuleRunner) -> None:
     )
 
     assert inferred_deps == InferredDependencies([chart_tgt.address, snapshot_tgt.address])
+
+
+def test_discard_explicit_snapshot_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": textwrap.dedent(
+                """\
+                helm_chart(name="foo")
+                """
+            ),
+            "Chart.yaml": HELM_CHART_FILE,
+            "values.yaml": HELM_VALUES_FILE,
+            "templates/service.yaml": K8S_SERVICE_TEMPLATE,
+            "tests/BUILD": textwrap.dedent(
+                """\
+                helm_unittest_tests(
+                    name="foo_tests",
+                    sources=["*_test.yaml"],
+                    dependencies=["!tests/__snapshot__/service_test.yaml.snap"]
+                )
+                """
+            ),
+            "tests/service_test.yaml": "",
+            "tests/__snapshot__/BUILD": """resources(sources=["*.snap"])""",
+            "tests/__snapshot__/service_test.yaml.snap": "",
+        }
+    )
+
+    chart_tgt = rule_runner.get_target(Address("", target_name="foo"))
+    unittest_tgt = rule_runner.get_target(Address("tests", target_name="foo_tests"))
+
+    inferred_deps = rule_runner.request(
+        InferredDependencies,
+        [
+            InferHelmUnitTestChartDependencyRequest(
+                HelmUnitTestChartDependencyInferenceFieldSet.create(unittest_tgt)
+            )
+        ],
+    )
+
+    assert inferred_deps == InferredDependencies([chart_tgt.address])

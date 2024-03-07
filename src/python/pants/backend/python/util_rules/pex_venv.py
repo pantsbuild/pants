@@ -31,6 +31,7 @@ class PexVenvRequest:
     platforms: PexPlatforms = PexPlatforms()
     complete_platforms: CompletePlatforms = CompletePlatforms()
     prefix: None | str = None
+    extra_args: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,7 @@ async def pex_venv(request: PexVenvRequest) -> PexVenv:
                 # create`. Incorrect usage will be surfaced as a subprocess failure.
                 *request.platforms.generate_pex_arg_list(),
                 *request.complete_platforms.generate_pex_arg_list(),
+                *request.extra_args,
             ),
             additional_input_digest=input_digest,
             output_files=output_files,

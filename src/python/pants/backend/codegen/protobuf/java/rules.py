@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.codegen.protobuf.java import dependency_inference
+from pants.backend.codegen.protobuf.java import dependency_inference, symbol_mapper
 from pants.backend.codegen.protobuf.java.subsystem import JavaProtobufGrpcSubsystem
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import (
@@ -212,13 +212,14 @@ def rules():
     return [
         *collect_rules(),
         *dependency_inference.rules(),
+        *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromProtobufRequest),
         UnionRule(GenerateToolLockfileSentinel, GrpcJavaToolLockfileSentinel),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
-        # Bring in the Java backend (since this backend compiles Jave code) to avoid rule graph errors.
+        # Bring in the Java backend (since this backend compiles Java code) to avoid rule graph errors.
         # TODO: Figure out whether a subset of rules can be brought in to still avoid rule graph errors.
         *java_backend_rules(),
     ]

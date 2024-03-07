@@ -143,6 +143,18 @@ def try_with_backoff(assertion_fn: Callable[[], bool], count: int = 4) -> bool:
 
 
 # -----------------------------------------------------------------------------------------------
+# `FileContent`
+# -----------------------------------------------------------------------------------------------
+
+
+def test_file_content_non_bytes():
+    with pytest.raises(TypeError) as exc:
+        FileContent(path="4.txt", content="four")
+
+    assert str(exc.value) == "Expected 'content' to be bytes, but got str"
+
+
+# -----------------------------------------------------------------------------------------------
 # `PathGlobs`, including `GlobMatchErrorBehavior` and symlink handling
 # -----------------------------------------------------------------------------------------------
 
@@ -1304,7 +1316,7 @@ def test_invalidated_after_rewrite(rule_runner: RuleRunner) -> None:
 
 
 def test_invalidated_after_parent_deletion(rule_runner: RuleRunner) -> None:
-    """Test that FileContent is invalidated after deleting parent directory."""
+    """Test that FileContent is invalidated after deleting the parent directory."""
     setup_fs_test_tar(rule_runner)
 
     def read_file() -> Optional[str]:

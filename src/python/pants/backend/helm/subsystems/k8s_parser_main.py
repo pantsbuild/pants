@@ -13,14 +13,14 @@ def main(args: list[str]):
 
     found_image_refs: dict[tuple[int, str], str] = {}
 
-    with open(input_filename, "r") as file:
+    with open(input_filename) as file:
         try:
             parsed_docs = load_full_yaml(stream=file)
         except RuntimeError:
             # Hikaru fails with a `RuntimeError` when it finds a K8S manifest for an
             # API version and kind that doesn't understand.
             #
-            # We exit the process early without giving any ouput.
+            # We exit the process early without giving any output.
             sys.exit(0)
 
     for idx, doc in enumerate(parsed_docs):

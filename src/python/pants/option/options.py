@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from typing import Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
@@ -240,7 +240,9 @@ class Options:
         section_to_valid_options = {}
         for scope in self.known_scope_to_info:
             section = GLOBAL_SCOPE_CONFIG_SECTION if scope == GLOBAL_SCOPE else scope
-            section_to_valid_options[section] = set(self.for_scope(scope, check_deprecations=False))
+            section_to_valid_options[section] = set(
+                self.for_scope(scope, check_deprecations=False, log_parser_warnings=True)
+            )
         global_config.verify(section_to_valid_options)
 
     def is_known_scope(self, scope: str) -> bool:
@@ -292,7 +294,7 @@ class Options:
           2) The entire ScopeInfo is deprecated (as in the case of deprecated SubsystemDependencies),
              meaning that the options live in one location.
 
-        In the first case, this method has the sideeffect of merging options values from deprecated
+        In the first case, this method has the side effect of merging options values from deprecated
         scopes into the given values.
         """
         si = self.known_scope_to_info[scope]
@@ -344,7 +346,9 @@ class Options:
 
     # TODO: Eagerly precompute backing data for this?
     @memoized_method
-    def for_scope(self, scope: str, check_deprecations: bool = True) -> OptionValueContainer:
+    def for_scope(
+        self, scope: str, check_deprecations: bool = True, log_parser_warnings: bool = False
+    ) -> OptionValueContainer:
         """Return the option values for the given scope.
 
         Values are attributes of the returned object, e.g., options.foo.
@@ -360,7 +364,9 @@ class Options:
         values_builder = OptionValueContainerBuilder()
         flags_in_scope = self._scope_to_flags.get(scope, [])
         parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
-        values = self.get_parser(scope).parse_args(parse_args_request)
+        values = self.get_parser(scope).parse_args(
+            parse_args_request, log_warnings=log_parser_warnings
+        )
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
@@ -374,8 +380,9 @@ class Options:
         self,
         scope: str,
         daemon_only: bool = False,
-    ):
-        """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
+    ) -> list[tuple[str, type, Any]]:
+        """Returns a list of fingerprintable (option name, option type, option value) pairs for the
+        given scope.
 
         Options are fingerprintable by default, but may be registered with "fingerprint=False".
 
@@ -394,13 +401,14 @@ class Options:
                 continue
             if daemon_only and not kwargs.get("daemon", False):
                 continue
-            val = self.for_scope(scope)[kwargs["dest"]]
+            dest = kwargs["dest"]
+            val = self.for_scope(scope)[dest]
             # If we have a list then we delegate to the fingerprinting implementation of the members.
             if is_list_option(kwargs):
                 val_type = kwargs.get("member_type", str)
             else:
                 val_type = kwargs.get("type", str)
-            pairs.append((val_type, val))
+            pairs.append((dest, val_type, val))
         return pairs
 
     def __getitem__(self, scope: str) -> OptionValueContainer:

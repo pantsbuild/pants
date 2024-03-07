@@ -37,7 +37,7 @@ python_distribution(
         # N.B.: Must match [python] interpreter_constraints in pants.toml.
         python_requires="==3.9.*",
     ),
-    entry_points={"console_scripts": {"pants": "src/python/pants/bin:pants"}},
+    entry_points={"console_scripts": {"pants": "pants.bin.pants_loader:main"}},
 )
 
 pex_binary(
@@ -55,3 +55,23 @@ pex_binary(
 # use `entry_points` to link to the actual native code, so clang/gcc do not need to build any
 # native code. This is just a dummy file.
 resources(name="resources", sources=["py.typed", "dummy.c"])
+
+__dependencies_rules__(
+    (
+        # test modules should not depend on other test modules
+        (python_tests, python_test),
+        "!<python_tests>",
+        "!<python_test>",
+        "//BUILD_ROOT:files",
+        "//pants.toml:files",
+        "conftest.py",
+        "pants/**",
+        "pants-plugins/**",
+        "tests/**",
+        "testprojects/**",
+        "<python_requirement>",
+        "<python_requirements>",
+        "?*",
+    ),
+    ("*", "*"),
+)

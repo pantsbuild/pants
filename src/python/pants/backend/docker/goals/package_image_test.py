@@ -14,6 +14,7 @@ import pytest
 
 from pants.backend.docker.goals.package_image import (
     DockerBuildTargetStageError,
+    DockerImageOptionValueError,
     DockerImageTagValueError,
     DockerInfoV1,
     DockerPackageFieldSet,
@@ -168,7 +169,10 @@ def assert_build(
         opts.setdefault("default_context_root", "")
         opts.setdefault("build_args", [])
         opts.setdefault("build_target_stage", None)
+        opts.setdefault("build_hosts", None)
         opts.setdefault("build_verbose", False)
+        opts.setdefault("build_no_cache", False)
+        opts.setdefault("use_buildx", False)
         opts.setdefault("env_vars", [])
 
         docker_options = create_subsystem(
@@ -269,6 +273,11 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
                   image_tags=["latest", "alpha-1.0", "alpha-1"],
                 )
                 docker_image(
+                  name="test6",
+                  image_tags=["1.2.3"],
+                  repository="xyz/{full_directory}/{name}",
+                )
+                docker_image(
                   name="err1",
                   repository="{bad_template}",
                 )
@@ -361,12 +370,17 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
             )
         ],
     )
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="test6"),
+        "Built docker image: xyz/docker/test/test6:1.2.3",
+    )
 
     err1 = (
         r"Invalid value for the `repository` field of the `docker_image` target at "
         r"docker/test:err1: '{bad_template}'\.\n\nThe placeholder 'bad_template' is unknown\. "
-        r"Try with one of: build_args, default_repository, directory, name, pants, "
-        r"parent_directory, tags, target_repository\."
+        r"Try with one of: build_args, default_repository, directory, full_directory, name, "
+        r"pants, parent_directory, tags, target_repository\."
     )
     with pytest.raises(DockerRepositoryNameError, match=err1):
         assert_build(
@@ -1010,6 +1024,228 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_docker_build_no_cache_option(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_NO_CACHE": "true",
+        },
+    )
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--pull=False",
+            "--no-cache",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_build_hosts_option(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_HOSTS": '{"global": "9.9.9.9"}',
+        },
+    )
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  extra_build_hosts={"docker": "10.180.0.1", "docker2": "10.180.0.2"},
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--add-host",
+            "global:9.9.9.9",
+            "--add-host",
+            "docker:10.180.0.1",
+            "--add-host",
+            "docker2:10.180.0.2",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_cache_to_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  cache_to={"type": "local", "dest": "/tmp/docker/pants-test-cache"},
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "buildx",
+            "build",
+            "--cache-to=type=local,dest=/tmp/docker/pants-test-cache",
+            "--output=type=docker",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+        options=dict(use_buildx=True),
+    )
+
+
+def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  cache_from={"type": "local", "dest": "/tmp/docker/pants-test-cache"},
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "buildx",
+            "build",
+            "--cache-from=type=local,dest=/tmp/docker/pants-test-cache",
+            "--output=type=docker",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+        options=dict(use_buildx=True),
+    )
+
+
+def test_docker_output_option(rule_runner: RuleRunner) -> None:
+    """Testing non-default output type 'image'.
+
+    Default output type 'docker' tested implicitly in other scenarios
+    """
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  output={"type": "image"}
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "buildx",
+            "build",
+            "--output=type=image",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+        options=dict(use_buildx=True),
+    )
+
+
+def test_docker_output_option_raises_when_no_buildkit(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  output={"type": "image"}
+                )
+                """
+            ),
+        }
+    )
+
+    with pytest.raises(
+        DockerImageOptionValueError,
+        match=r"Buildx must be enabled via the Docker subsystem options in order to use this field.",
+    ):
+        assert_build(
+            rule_runner,
+            Address("docker/test", target_name="img1"),
+        )
+
+
 def test_docker_build_network_option(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -1029,6 +1265,40 @@ def test_docker_build_network_option(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "build",
             "--network=host",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_build_platform_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  build_platform=["linux/amd64", "linux/arm64", "linux/arm/v7"],
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--platform=linux/amd64,linux/arm64,linux/arm/v7",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1329,14 +1599,17 @@ def test_get_context_root(
 
 
 @pytest.mark.parametrize(
-    "expected, stdout, stderr",
+    "docker, expected, stdout, stderr",
     [
         (
+            DockerBinary("/bin/docker", "1234", is_podman=False),
             "<unknown>",
             "",
             "",
         ),
+        # Docker
         (
+            DockerBinary("/bin/docker", "1234", is_podman=False),
             "0e09b442b572",
             "",
             dedent(
@@ -1350,7 +1623,9 @@ def test_get_context_root(
                 """
             ),
         ),
+        # Buildkit
         (
+            DockerBinary("/bin/docker", "1234", is_podman=False),
             "sha256:7805a7da5f45a70bb9e47e8de09b1f5acd8f479dda06fb144c5590b9d2b86dd7",
             dedent(
                 """\
@@ -1371,10 +1646,70 @@ def test_get_context_root(
             ),
             "",
         ),
+        # Buildkit with containerd-snapshotter
+        (
+            DockerBinary("/bin/docker", "1234", is_podman=False),
+            "sha256:b2b51838586286a9e544ddb31b3dbf7f6a99654d275b6e56b5f69f90138b4c0e",
+            dedent(
+                """\
+                #9 exporting to image
+                #9 exporting layers done
+                #9 exporting manifest sha256:7802087e8e0801f6451d862a00a6ce8af3e4829b09bc890dea0dd2659c11b25a done
+                #9 exporting config sha256:c83bed954709ba0c546d66d8f29afaac87c597f01b03fec158f3b21977c3e143 done
+                #9 exporting attestation manifest sha256:399891f9628cfafaba9e034599bdd55675ac0a3bad38151ed1ebf03993669545 done
+                #9 exporting manifest list sha256:b2b51838586286a9e544ddb31b3dbf7f6a99654d275b6e56b5f69f90138b4c0e done
+                #9 naming to myhost.com/my_app:latest done
+                #9 unpacking to myhost.com/my_app:latest done
+                #9 DONE 0.0s
+                """
+            ),
+            "",
+        ),
+        # Buildkit with containerd-snapshotter and cross platform
+        (
+            DockerBinary("/bin/docker", "1234", is_podman=False),
+            "sha256:3c72de0e05bb75247e68e124e6500700f6e0597425db2ee9f08fd59ef28cea0f",
+            dedent(
+                """\
+                #12 exporting to image
+                #12 exporting layers done
+                #12 exporting manifest sha256:452598369b55c27d752c45736cf26c0339612077f17df31fb0cdd79c5145d081 done
+                #12 exporting config sha256:6fbcebfde0ec24b487045516c3b5ffd3f0633e756a6d5808c2e5ad75809e0ca6 done
+                #12 exporting attestation manifest sha256:32fcf615e85bc9c2f606f863e8db3ca16dd77613a1e175e5972f39267e106dfb done
+                #12 exporting manifest sha256:bcb911a3efbec48e3c58c2acfd38fe92321eed731c53253f0b5c883918420187 done
+                #12 exporting config sha256:86e7fd0c4fa2356430d4ca188ed9e86497b8d03996ccba426d92c7e145e69990 done
+                #12 exporting attestation manifest sha256:66f9e7af29dd04e6264b8e113571f7b653f1681ba124a386530145fb39ff0102 done
+                #12 exporting manifest list sha256:3c72de0e05bb75247e68e124e6500700f6e0597425db2ee9f08fd59ef28cea0f done
+                #12 naming to myhost.com/my_app:latest done
+                #12 unpacking to myhost.com/my_app:latest done
+                #12 DONE 0.0s
+                """
+            ),
+            "",
+        ),
+        # Podman
+        (
+            DockerBinary("/bin/podman", "abcd", is_podman=True),
+            "a85499e9039a4add9712f7ea96a4aa9f0edd57d1008c6565822561ceed927eee",
+            dedent(
+                """\
+                STEP 5/5: COPY ./ .
+                COMMIT example
+                --> a85499e9039a
+                Successfully tagged localhost/example:latest
+                a85499e9039a4add9712f7ea96a4aa9f0edd57d1008c6565822561ceed927eee
+                """
+            ),
+            "",
+        ),
     ],
 )
-def test_parse_image_id_from_docker_build_output(expected: str, stdout: str, stderr: str) -> None:
-    assert expected == parse_image_id_from_docker_build_output(stdout.encode(), stderr.encode())
+def test_parse_image_id_from_docker_build_output(
+    docker: DockerBinary, expected: str, stdout: str, stderr: str
+) -> None:
+    assert expected == parse_image_id_from_docker_build_output(
+        docker, stdout.encode(), stderr.encode()
+    )
 
 
 ImageRefTest = namedtuple(
@@ -1658,18 +1993,40 @@ def test_image_ref_formatting(test: ImageRefTest) -> None:
         assert tuple(image_refs) == test.expect_refs
 
 
-def test_docker_image_tags_from_plugin_hook(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="plugin")'})
+@pytest.mark.parametrize(
+    "BUILD, plugin_tags, tag_flags",
+    [
+        (
+            'docker_image(name="plugin")',
+            ("1.2.3",),
+            (
+                "--tag",
+                "plugin:latest",
+                "--tag",
+                "plugin:1.2.3",
+            ),
+        ),
+        (
+            'docker_image(name="plugin", image_tags=[])',
+            ("1.2.3",),
+            (
+                "--tag",
+                "plugin:1.2.3",
+            ),
+        ),
+    ],
+)
+def test_docker_image_tags_from_plugin_hook(
+    rule_runner: RuleRunner, BUILD: str, plugin_tags: tuple[str, ...], tag_flags: tuple[str, ...]
+) -> None:
+    rule_runner.write_files({"docker/test/BUILD": BUILD})
 
     def check_docker_proc(process: Process):
         assert process.argv == (
             "/dummy/docker",
             "build",
             "--pull=False",
-            "--tag",
-            "plugin:latest",
-            "--tag",
-            "plugin:1.2.3",
+            *tag_flags,
             "--file",
             "docker/test/Dockerfile",
             ".",
@@ -1679,8 +2036,19 @@ def test_docker_image_tags_from_plugin_hook(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("docker/test", target_name="plugin"),
         process_assertions=check_docker_proc,
-        plugin_tags=("1.2.3",),
+        plugin_tags=plugin_tags,
     )
+
+
+def test_docker_image_tags_defined(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="no-tags", image_tags=[])'})
+
+    err = "The `image_tags` field in target docker/test:no-tags must not be empty, unless"
+    with pytest.raises(InvalidFieldException, match=err):
+        assert_build(
+            rule_runner,
+            Address("docker/test", target_name="no-tags"),
+        )
 
 
 def test_docker_info_serialize() -> None:

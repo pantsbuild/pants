@@ -53,6 +53,12 @@ class FileContent:
     content: bytes
     is_executable: bool = False
 
+    def __post_init__(self):
+        if not isinstance(self.content, bytes):
+            raise TypeError(
+                f"Expected 'content' to be bytes, but got {type(self.content).__name__}"
+            )
+
     def __repr__(self) -> str:
         return (
             f"FileContent(path={self.path}, content=(len:{len(self.content)}), "
@@ -78,7 +84,7 @@ class SymlinkEntry:
     """A symlink pointing to a target path.
 
     For the symlink target:
-        - uses a a forward slash `/` path separator.
+        - uses a forward slash `/` path separator.
         - can be relative to the parent directory of the symlink or can be an absolute path starting with `/`.
         - Allows `..` components anywhere in the path (as logical canonicalization may lead to
             different behavior in the presence of directory symlinks).
@@ -278,7 +284,7 @@ class NativeDownloadFile:
 class Workspace(SideEffecting):
     """A handle for operations that mutate the local filesystem."""
 
-    _scheduler: "SchedulerSession"
+    _scheduler: SchedulerSession
     _enforce_effects: bool = True
 
     def write_digest(
@@ -294,7 +300,7 @@ class Workspace(SideEffecting):
         You should not use this in a `for` loop due to slow performance. Instead, call `await
         Get(Digest, MergeDigests)` beforehand.
 
-        As an advanced usecase, if the digest is known to be written to a temporary or idempotent
+        As an advanced use-case, if the digest is known to be written to a temporary or idempotent
         location, side_effecting=False may be passed to avoid tracking this write as a side effect.
         """
         if side_effecting:
@@ -320,7 +326,7 @@ class SnapshotDiff:
     changed_files: tuple[str, ...] = ()
 
     @classmethod
-    def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> "SnapshotDiff":
+    def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> SnapshotDiff:
         return cls(*ours._diff(theirs))
 
 

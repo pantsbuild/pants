@@ -106,15 +106,16 @@ class DockerOptions(Subsystem):
             Configure the default repository name used in the Docker image tag.
 
             The value is formatted and may reference these variables (in addition to the normal
-            placeheolders derived from the Dockerfile and build args etc):
+            placeholders derived from the Dockerfile and build args etc):
 
-            {bullet_list(["name", "directory", "parent_directory", "target_repository"])}
+            {bullet_list(["name", "directory", "parent_directory", "full_directory", "target_repository"])}
 
             Example: `--default-repository="{{directory}}/{{name}}"`.
 
-            The `name` variable is the `docker_image`'s target name, `directory` and
-            `parent_directory` are the name of the directory in which the BUILD file is for the
-            target, and its parent directory respectively.
+            The `name` variable is the `docker_image`'s target name.
+
+            With the directory variables available, given a sample repository path of `baz/foo/bar/BUILD`,
+            then `directory` is `bar`, `parent_directory` is `foo` and `full_directory` will be `baz/foo/bar`.
 
             Use the `repository` field to set this value directly on a `docker_image` target.
 
@@ -143,6 +144,15 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+    use_buildx = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Use [buildx](https://github.com/docker/buildx#buildx) (and BuildKit) for builds.
+            """
+        ),
+    )
+
     _build_args = ShellStrListOption(
         help=softwrap(
             f"""
@@ -174,6 +184,26 @@ class DockerOptions(Subsystem):
             build for at execution time.
             """
         ),
+    )
+    build_hosts = DictOption[str](
+        default={},
+        help=softwrap(
+            f"""
+            Hosts entries to be added to the `/etc/hosts` file in all built images.
+
+            Example:
+
+                [{options_scope}]
+                build_hosts = {{"docker": "10.180.0.1", "docker2": "10.180.0.2"}}
+
+            Use the `extra_build_hosts` field on a `docker_image` target for additional
+            image specific host entries.
+            """
+        ),
+    )
+    build_no_cache = BoolOption(
+        default=False,
+        help="Do not use the Docker cache when building images.",
     )
     build_verbose = BoolOption(
         default=False,

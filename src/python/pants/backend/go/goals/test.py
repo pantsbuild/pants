@@ -210,13 +210,17 @@ def _lift_build_requests_with_coverage(
     result: list[BuildGoPackageRequest] = []
 
     queue: deque[BuildGoPackageRequest] = deque()
+    seen: set[BuildGoPackageRequest] = set()
     queue.extend(roots)
+    seen.update(roots)
 
     while queue:
         build_request = queue.popleft()
         if build_request.with_coverage:
             result.append(build_request)
-        queue.extend(build_request.direct_dependencies)
+        unseen = [dd for dd in build_request.direct_dependencies if dd not in seen]
+        queue.extend(unseen)
+        seen.update(unseen)
 
     return result
 
@@ -705,7 +709,7 @@ async def run_go_tests(
         extra_output = await Get(Snapshot, Digest, output_digest)
 
     return TestResult.from_fallible_process_result(
-        process_result=result,
+        process_results=(result,),
         address=field_set.address,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,

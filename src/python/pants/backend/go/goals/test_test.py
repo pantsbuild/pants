@@ -190,13 +190,12 @@ def test_all_the_tests_are_successful(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
-    print(f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
-    assert "PASS: TestAddInternal" in result.stdout
-    assert "PASS: ExamplePrintInternal" in result.stdout
-    assert "BenchmarkAddInternal" in result.stdout
-    assert "PASS: TestAddExternal" in result.stdout
-    assert "PASS: ExamplePrintExternal" in result.stdout
-    assert "BenchmarkAddExternal" in result.stdout
+    assert b"PASS: TestAddInternal" in result.stdout_bytes
+    assert b"PASS: ExamplePrintInternal" in result.stdout_bytes
+    assert b"BenchmarkAddInternal" in result.stdout_bytes
+    assert b"PASS: TestAddExternal" in result.stdout_bytes
+    assert b"PASS: ExamplePrintExternal" in result.stdout_bytes
+    assert b"BenchmarkAddExternal" in result.stdout_bytes
 
 
 def test_internal_test_fails(rule_runner: RuleRunner) -> None:
@@ -220,7 +219,7 @@ def test_internal_test_fails(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 1
-    assert "FAIL: TestAdd" in result.stdout
+    assert b"FAIL: TestAdd" in result.stdout_bytes
 
 
 def test_internal_test_with_test_main(rule_runner: RuleRunner) -> None:
@@ -251,8 +250,8 @@ def test_internal_test_with_test_main(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 1
-    assert "foo.TestMain called" in result.stdout
-    assert "FAIL: TestAdd" in result.stdout
+    assert b"foo.TestMain called" in result.stdout_bytes
+    assert b"FAIL: TestAdd" in result.stdout_bytes
 
 
 def test_internal_test_fails_to_compile(rule_runner: RuleRunner) -> None:
@@ -290,14 +289,14 @@ def test_internal_test_fails_to_compile(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 1
-    assert "bad_test.go:1:1: expected 'package', found invalid\n" in result.stderr
+    assert b"bad_test.go:1:1: expected 'package', found invalid\n" in result.stderr_bytes
 
     tgt = rule_runner.get_target(Address("foo/uses_dep"))
     result = rule_runner.request(
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 1
-    assert "dep/f.go:1:1: expected 'package', found invalid\n" in result.stderr
+    assert b"dep/f.go:1:1: expected 'package', found invalid\n" in result.stderr_bytes
 
 
 def test_external_test_fails(rule_runner: RuleRunner) -> None:
@@ -332,7 +331,7 @@ def test_external_test_fails(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 1
-    assert "FAIL: TestAdd" in result.stdout
+    assert b"FAIL: TestAdd" in result.stdout_bytes
 
 
 def test_external_test_with_test_main(rule_runner: RuleRunner) -> None:
@@ -374,7 +373,7 @@ def test_external_test_with_test_main(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
-    assert "foo_test.TestMain called" in result.stdout
+    assert b"foo_test.TestMain called" in result.stdout_bytes
 
 
 def test_both_internal_and_external_tests_fail(rule_runner: RuleRunner) -> None:
@@ -420,8 +419,8 @@ def test_both_internal_and_external_tests_fail(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 1
-    assert "FAIL: TestAddInternal" in result.stdout
-    assert "FAIL: TestAddExternal" in result.stdout
+    assert b"FAIL: TestAddInternal" in result.stdout_bytes
+    assert b"FAIL: TestAddExternal" in result.stdout_bytes
 
 
 @pytest.mark.no_error_if_skipped
@@ -459,7 +458,7 @@ def test_fuzz_target_supported(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
-    assert "PASS: FuzzFoo" in result.stdout
+    assert b"PASS: FuzzFoo" in result.stdout_bytes
 
 
 def test_extra_env_vars(rule_runner: RuleRunner) -> None:
@@ -529,7 +528,7 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
-    assert "PASS: TestEnvs" in result.stdout
+    assert b"PASS: TestEnvs" in result.stdout_bytes
 
 
 def test_skip_tests(rule_runner: RuleRunner) -> None:
@@ -607,7 +606,7 @@ def test_compilation_error(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 1
-    assert "failed to parse" in result.stderr
+    assert b"failed to parse" in result.stderr_bytes
 
 
 def test_file_dependencies(rule_runner: RuleRunner) -> None:
@@ -695,7 +694,7 @@ def test_profile_options_write_results(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
-    assert "PASS: TestAdd" in result.stdout
+    assert b"PASS: TestAdd" in result.stdout_bytes
 
     extra_output = result.extra_output
     assert extra_output is not None

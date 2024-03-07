@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.python.dependency_inference import parse_python_dependencies
 from pants.backend.python.framework.django import detect_apps
-from pants.backend.python.framework.django.detect_apps import DjangoApps
+from pants.backend.python.framework.django.detect_apps import DjangoApp, DjangoApps
 from pants.backend.python.target_types import PythonSourceTarget
 from pants.backend.python.util_rules import pex
 from pants.core.util_rules import stripped_source_files
@@ -114,7 +114,13 @@ def assert_apps_detected(
         [],
     )
     assert result == DjangoApps(
-        FrozenDict({"app1": "path.to.app1", "app2_label": "another.path.app2", "app3": "some.app3"})
+        FrozenDict(
+            {
+                "app1": DjangoApp("path.to.app1", "path/to/app1/apps.py"),
+                "app2_label": DjangoApp("another.path.app2", "another/path/app2/apps.py"),
+                "app3": DjangoApp("some.app3", "some/app3/apps.py"),
+            }
+        )
     )
 
 

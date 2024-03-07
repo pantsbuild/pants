@@ -6,9 +6,7 @@ from __future__ import annotations
 import collections
 import json
 from dataclasses import dataclass, fields, is_dataclass
-from typing import Any, Iterable, Mapping
-
-from typing_extensions import Protocol, runtime_checkable
+from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
 
 from pants.engine.addresses import Addresses
 from pants.engine.collection import Collection
@@ -126,7 +124,7 @@ def render_json(
 
 
 class _PeekJsonEncoder(json.JSONEncoder):
-    """Allow us to serialize some commmonly found types in BUILD files."""
+    """Allow us to serialize some commonly found types in BUILD files."""
 
     def default(self, o):
         """Return a serializable object for o."""

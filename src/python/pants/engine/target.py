@@ -29,6 +29,7 @@ from typing import (
     KeysView,
     Mapping,
     Optional,
+    Protocol,
     Sequence,
     Set,
     Tuple,
@@ -39,7 +40,7 @@ from typing import (
     get_type_hints,
 )
 
-from typing_extensions import Protocol, Self, final
+from typing_extensions import Self, final
 
 from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address
@@ -197,7 +198,7 @@ class FieldDefaults:
 
     TODO: This is to work around the fact that Field value defaulting cannot have arbitrary
     subsystem requirements, and so e.g. `JvmResolveField` and `PythonResolveField` have methods
-    which compute the true value of the field given a subsytem argument. Consumers need to
+    which compute the true value of the field given a subsystem argument. Consumers need to
     be type aware, and `@rules` cannot have dynamic requirements.
 
     Additionally, `__defaults__` should mean that computed default Field values should become
@@ -437,7 +438,6 @@ class Target:
             other.field_values,
         )
 
-    @final
     @classmethod
     @memoized_method
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
@@ -515,7 +515,7 @@ class Target:
         grab the `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
         `SourcesField`, you may need to hydrate the value.).
 
-        This works with subclasses of `Field`s. For example, if you subclass `Tags`
+        This works with subclasses of `Field`. For example, if you subclass `Tags`
         to define a custom subclass `CustomTags`, both `tgt.get(Tags)` and
         `tgt.get(CustomTags)` will return the same `CustomTags` instance.
 
@@ -550,7 +550,7 @@ class Target:
     def has_field(self, field: Type[Field]) -> bool:
         """Check that this target has registered the requested field.
 
-        This works with subclasses of `Field`s. For example, if you subclass `Tags` to define a
+        This works with subclasses of `Field`. For example, if you subclass `Tags` to define a
         custom subclass `CustomTags`, both `tgt.has_field(Tags)` and
         `python_tgt.has_field(CustomTags)` will return True.
         """
@@ -560,7 +560,7 @@ class Target:
     def has_fields(self, fields: Iterable[Type[Field]]) -> bool:
         """Check that this target has registered all of the requested fields.
 
-        This works with subclasses of `Field`s. For example, if you subclass `Tags` to define a
+        This works with subclasses of `Field`. For example, if you subclass `Tags` to define a
         custom subclass `CustomTags`, both `tgt.has_fields([Tags])` and
         `python_tgt.has_fields([CustomTags])` will return True.
         """
@@ -693,8 +693,8 @@ class Targets(Collection[Target]):
 # FilteredTargets`. That is necessary so that project-introspection goals like `list` which don't
 # use `FilteredTargets` still have filtering applied.
 class FilteredTargets(Collection[Target]):
-    """A heterogenous collection of Target instances that have been filtered with the global options
-    `--tag` and `--exclude-target-regexp`.
+    """A heterogeneous collection of Target instances that have been filtered with the global
+    options `--tag` and `--exclude-target-regexp`.
 
     Outside of the extra filtering, this type is identical to `Targets`, including its handling of
     target generators.
@@ -788,7 +788,7 @@ class AlwaysTraverseDeps(ShouldTraverseDepsPredicate):
 
 class CoarsenedTarget(EngineAwareParameter):
     def __init__(self, members: Iterable[Target], dependencies: Iterable[CoarsenedTarget]) -> None:
-        """A set of Targets which cyclicly reach one another, and are thus indivisible.
+        """A set of Targets which cyclically reach one another, and are thus indivisible.
 
         Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for the
         recursive portion.
@@ -946,7 +946,7 @@ class TransitiveTargetsRequest:
     """A request to get the transitive dependencies of the input roots.
 
     Resolve the transitive targets with `await Get(TransitiveTargets,
-    TransitiveTargetsRequest([addr1, addr2])`.
+    TransitiveTargetsRequest([addr1, addr2]))`.
     """
 
     roots: Tuple[Address, ...]
@@ -1037,6 +1037,10 @@ class TargetGenerator(Target):
     # acting as a convenient place for them to be specified.
     moved_fields: ClassVar[Tuple[Type[Field], ...]]
 
+    @distinct_union_type_per_subclass
+    class MovedPluginField:
+        """A plugin field that should be moved into the generated targets."""
+
     def validate(self) -> None:
         super().validate()
 
@@ -1051,6 +1055,45 @@ class TargetGenerator(Target):
                 "`TargetGenerator.copied_field`. `Dependencies` fields should be "
                 "`TargetGenerator.moved_field`s, to avoid redundant graph edges."
             )
+
+    @classmethod
+    def register_plugin_field(cls, field: Type[Field], *, as_moved_field=False) -> UnionRule:
+        if as_moved_field:
+            return UnionRule(cls.MovedPluginField, field)
+        else:
+            return super().register_plugin_field(field)
+
+    @classmethod
+    @memoized_method
+    def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
+        return (
+            *cls._find_copied_plugin_fields(union_membership),
+            *cls._find_moved_plugin_fields(union_membership),
+        )
+
+    @final
+    @classmethod
+    @memoized_method
+    def _find_moved_plugin_fields(
+        cls, union_membership: UnionMembership
+    ) -> tuple[type[Field], ...]:
+        result: set[type[Field]] = set()
+        classes = [cls]
+        while classes:
+            cls = classes.pop()
+            classes.extend(cls.__bases__)
+            if issubclass(cls, TargetGenerator):
+                result.update(cast("set[type[Field]]", union_membership.get(cls.MovedPluginField)))
+
+        return tuple(result)
+
+    @final
+    @classmethod
+    @memoized_method
+    def _find_copied_plugin_fields(
+        cls, union_membership: UnionMembership
+    ) -> tuple[type[Field], ...]:
+        return super()._find_plugin_fields(union_membership)
 
 
 class TargetFilesGenerator(TargetGenerator):
@@ -1326,7 +1369,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
 
-    You can optionally set implement the classmethod `opt_out` so that targets have a
+    You can optionally implement the classmethod `opt_out` so that targets have a
     mechanism to not match with the FieldSet even if they have the `required_fields` registered.
 
     For example:
@@ -1342,7 +1385,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
             def opt_out(cls, tgt: Target) -> bool:
                 return tgt.get(MaybeSkipFortranTestsField).value
 
-    This field set may then created from a `Target` through the `is_applicable()` and `create()`
+    This field set may then be created from a `Target` through the `is_applicable()` and `create()`
     class methods:
 
         field_sets = [
@@ -1644,7 +1687,7 @@ class UnrecognizedTargetTypeException(InvalidTargetException):
                 All valid target types: {sorted(registered_target_types.aliases)}
 
                 (If {target_type!r} is a custom target type, refer to
-                {doc_url('target-api-concepts')} for getting it registered with Pants.)
+                {doc_url('docs/writing-plugins/the-target-api/concepts')} for getting it registered with Pants.)
 
                 """
             ),
@@ -1978,7 +2021,7 @@ class SourcesField(AsyncFieldMixin, Field):
     - `default_glob_match_error_behavior` -- Advanced option, should very rarely be used. Override
         glob match error behavior when using the default value. If setting this to
         `GlobMatchErrorBehavior.ignore`, make sure you have other validation in place in case the
-        default glob doesn't match any files if required, to alert the user appropriately.
+        default glob doesn't match any files, if required, to alert the user appropriately.
     """
 
     expected_file_extensions: ClassVar[tuple[str, ...] | None] = None
@@ -2433,44 +2476,6 @@ class SourcesPathsRequest(EngineAwareParameter):
         return self.field.address.spec
 
 
-class SecondaryOwnerMixin(ABC):
-    """Add to a Field for the target to work with file arguments and `--changed-since`, without it
-    needing a `SourcesField`.
-
-    Why use this? In a dependency inference world, multiple targets including the same file in the
-    `sources` field causes issues due to ambiguity over which target to use. So, only one target
-    should have "primary ownership" of the file. However, you may still want other targets to be
-    used when that file is included in file arguments. For example, a `python_source` target
-    being the primary owner of the `.py` file, but a `pex_binary` still working with file
-    arguments for that file. Secondary ownership means that the target won't be used for things like
-    dependency inference and hydrating sources, but file arguments will still work.
-
-    There should be a primary owner of the file(s), e.g. the `python_source` in the above example.
-    Typically, you will want to add a dependency inference rule to infer a dep on that primary
-    owner.
-
-    All associated files must live in the BUILD target's directory or a subdirectory to work
-    properly, like the `sources` field.
-    """
-
-    @property
-    @abstractmethod
-    def filespec(self) -> Filespec:
-        """A dictionary in the form {'globs': ['full/path/to/f.ext']} representing the field's
-        associated files.
-
-        Typically, users should use a file name/glob relative to the BUILD file, like the `sources`
-        field. Then, you can use `os.path.join(self.address.spec_path, self.value)` to relative to
-        the build root.
-        """
-
-    @memoized_property
-    def filespec_matcher(self) -> FilespecMatcher:
-        # Note: memoized because parsing the globs is expensive:
-        # https://github.com/pantsbuild/pants/issues/16122
-        return FilespecMatcher(self.filespec["includes"], self.filespec.get("excludes", []))
-
-
 def targets_with_sources_types(
     sources_types: Iterable[type[SourcesField]],
     targets: Iterable[Target],
@@ -2512,7 +2517,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
         `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
         result.
 
-        See {doc_url('targets')} for more about how addresses are formed, including for generated
+        See {doc_url('docs/using-pants/key-concepts/targets-and-build-files')} for more about how addresses are formed, including for generated
         targets. You can also run `{bin_name()} list ::` to find all addresses in your project, or
         `{bin_name()} list dir` to find all addresses defined in that directory.
 
@@ -2653,7 +2658,7 @@ class ExplicitlyProvidedDependencies:
             f"with `!` or `!!` so that one or no targets are left."
             f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
             f"targets so that only 1 target owns this {import_reference}. Refer to "
-            f"{doc_url('troubleshooting#import-errors-and-missing-dependencies')}."
+            f"{doc_url('docs/using-pants/troubleshooting-common-issues#import-errors-and-missing-dependencies')}."
         )
 
     def disambiguated(
@@ -2732,6 +2737,26 @@ class InferredDependencies:
 
 @union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
+class TransitivelyExcludeDependenciesRequest(Generic[FS], EngineAwareParameter):
+    """A request to transitvely exclude dependencies of a "root" node.
+
+    This is similar to `InferDependenciesRequest`, except the request is only made for "root" nodes
+    in the dependency graph.
+
+    This mirrors the public facing "transitive exclude" dependency feature (i.e. `!!<address>`).
+    """
+
+    infer_from: ClassVar[Type[FS]]  # type: ignore[misc]
+
+    field_set: FS
+
+
+class TransitivelyExcludeDependencies(FrozenOrderedSet[Address]):
+    pass
+
+
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
 class ValidateDependenciesRequest(Generic[FS], ABC):
     """A request to validate dependencies after they have been computed.
 
@@ -2760,7 +2785,7 @@ class DependenciesRuleApplicationRequest:
 
 @dataclass(frozen=True)
 class DependenciesRuleApplication:
-    """Maps all dependencies to their respective dependency rule application of a origin target
+    """Maps all dependencies to their respective dependency rule application of an origin target
     address.
 
     The `applications` will be empty and the `address` `None` if there is no dependency rule

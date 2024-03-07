@@ -66,6 +66,10 @@ async def infer_chart_dependency_into_unittests(
     if unittest_target_dir != _TESTS_FOLDER_NAME:
         raise InvalidUnitTestTestFolder(unittest_target_addr, unittest_target_addr.spec_path)
 
+    explicitly_provided_deps = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
+    )
+
     def is_snapshot_resource(path: PurePath) -> bool:
         if not path.parent:
             return False
@@ -75,12 +79,25 @@ async def infer_chart_dependency_into_unittests(
             return False
         return str(path.parent.parent) == unittest_target_addr.spec_path
 
-    snapshot_resources = {
+    candidate_snapshot_resources = {
         tgt.address
         for path, targets in all_asset_targets.resources.items()
         if is_snapshot_resource(path)
         for tgt in targets
     }
+    found_snapshots = set()
+
+    for candidate_snapshot in candidate_snapshot_resources:
+        explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+            (candidate_snapshot,),
+            unittest_target_addr,
+            import_reference="snapshot",
+            context=f"The target {candidate_snapshot} is nested under {unittest_target_addr}",
+        )
+
+        maybe_disambiguated = explicitly_provided_deps.disambiguated((candidate_snapshot,))
+        if maybe_disambiguated:
+            found_snapshots.add(maybe_disambiguated)
 
     def is_parent_chart(target: Target) -> bool:
         chart_folder = target.address.spec_path
@@ -90,10 +107,6 @@ async def infer_chart_dependency_into_unittests(
         [tgt.address for tgt in all_helm_charts if is_parent_chart(tgt)]
     )
     found_charts = set()
-
-    explicitly_provided_deps = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
-    )
 
     for candidate_chart in candidate_charts:
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
@@ -119,7 +132,7 @@ async def infer_chart_dependency_into_unittests(
         )
 
     dependencies: OrderedSet[Address] = OrderedSet()
-    dependencies.update(snapshot_resources)
+    dependencies.update(found_snapshots)
     dependencies.update(found_charts)
 
     return InferredDependencies(dependencies)

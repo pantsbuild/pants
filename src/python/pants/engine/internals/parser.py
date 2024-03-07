@@ -195,14 +195,21 @@ class ParseState(threading.local):
     @docstring(
         f"""Provide default field values.
 
-        Learn more {doc_url("targets#field-default-values")}
+        Learn more {doc_url("docs/using-pants/key-concepts/targets-and-build-files#field-default-values")}
         """
     )
     def set_defaults(
-        self, *args: SetDefaultsT, ignore_unknown_fields: bool = False, **kwargs
+        self,
+        *args: SetDefaultsT,
+        ignore_unknown_fields: bool = False,
+        ignore_unknown_targets: bool = False,
+        **kwargs,
     ) -> None:
         self.defaults.set_defaults(
-            *args, ignore_unknown_fields=self.is_bootstrap or ignore_unknown_fields, **kwargs
+            *args,
+            ignore_unknown_fields=self.is_bootstrap or ignore_unknown_fields,
+            ignore_unknown_targets=self.is_bootstrap or ignore_unknown_targets,
+            **kwargs,
         )
 
     def set_dependents_rules(self, *args, **kwargs) -> None:
@@ -263,6 +270,12 @@ class Registrar:
         return self._type_alias
 
     def __call__(self, **kwargs: Any) -> TargetAdaptor:
+        if self._parse_state.is_bootstrap and any(
+            isinstance(v, _UnrecognizedSymbol) for v in kwargs.values()
+        ):
+            # Remove any field values that are not recognized during the bootstrap phase.
+            kwargs = {k: v for k, v in kwargs.items() if not isinstance(v, _UnrecognizedSymbol)}
+
         # Target names default to the name of the directory their BUILD file is in
         # (as long as it's not the root directory).
         if "name" not in kwargs:
@@ -429,7 +442,7 @@ class Parser:
             help_str = softwrap(
                 f"""
                 If you expect to see more symbols activated in the below list, refer to
-                {doc_url('enabling-backends')} for all available backends to activate.
+                {doc_url('docs/using-pants/key-concepts/backends')} for all available backends to activate.
                 """
             )
             valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
@@ -466,7 +479,7 @@ def error_on_imports(build_file_content: str, filepath: str) -> None:
             f"Import used in {filepath} at line {lineno}. Import statements are banned in "
             "BUILD files and macros (that act like a normal BUILD file) because they can easily "
             "break Pants caching and lead to stale results. "
-            f"\n\nInstead, consider writing a plugin ({doc_url('plugins-overview')})."
+            f"\n\nInstead, consider writing a plugin ({doc_url('docs/writing-plugins/overview')})."
         )
 
 
@@ -497,6 +510,9 @@ class _UnrecognizedSymbol:
         self.name = name
         self.args: tuple[Any, ...] = ()
         self.kwargs: dict[str, Any] = {}
+
+    def __hash__(self) -> int:
+        return hash(self.name)
 
     def __call__(self, *args, **kwargs) -> _UnrecognizedSymbol:
         self.args = args

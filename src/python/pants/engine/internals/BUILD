@@ -18,7 +18,6 @@ python_tests(
     name="scheduler_integration_test",
     sources=["scheduler_integration_test.py"],
     dependencies=[
-        "pants-plugins/internal_plugins/rules_for_testing",
         "testprojects/src/python:hello_directory",
     ],
     timeout=180,

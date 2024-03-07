@@ -58,7 +58,7 @@ class Pydocstyle(PythonToolBase):
 
             Please note that even though `pydocstyle` keeps looking for a configuration file up the
             directory tree until one is found, Pants will only search for the config files in the
-            repository root (from where you would normally run the `{bin_name}` command).
+            repository root (from where you would normally run the `{bin_name()}` command).
 
             Use `[{cls.options_scope}].config` instead if your config is in a non-standard location.
             """

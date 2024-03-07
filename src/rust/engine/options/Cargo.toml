@@ -6,10 +6,20 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-log = "0.4"
-peg = "0.8"
-shellexpand = "2.1"
-toml = "0.5"
+lazy_static = { workspace = true }
+log = { workspace = true }
+maplit = { workspace = true }
+peg = { workspace = true }
+shellexpand = { workspace = true }
+toml = { workspace = true }
+regex = { workspace = true }
+whoami = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.5.0"
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

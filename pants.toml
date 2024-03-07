@@ -14,6 +14,7 @@ backend_packages.add = [
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
   "pants.backend.python.typecheck.mypy",
+  "pants.backend.python.lint.pyupgrade",
   "pants.backend.python.mixed_interpreter_constraints",
   "pants.backend.shell",
   "pants.backend.shell.lint.shellcheck",
@@ -31,12 +32,13 @@ backend_packages.add = [
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
+  "pants.backend.experimental.scala.lint.scalafix",
   "pants.backend.experimental.scala.debug_goals",
   "pants.backend.experimental.tools.workunit_logger",
   "pants.backend.experimental.visibility",
   "pants.backend.tools.preamble",
   "pants.backend.tools.taplo",
-  "pants.explorer.server",
+  "pants_explorer.server",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
 ]
@@ -68,6 +70,7 @@ pants_ignore.add = [
   "/docs/node_modules",
   # We have Pants stuff in here
   "!.github/",
+  "!/src/rust/engine/.cargo",
 ]
 
 build_ignore.add = [
@@ -91,7 +94,6 @@ enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
 
 [cli.alias]
-run-pyupgrade = "--backend-packages=pants.backend.experimental.python.lint.pyupgrade fmt"
 --all-changed = "--changed-since=HEAD --changed-dependents=transitive"
 
 [source]
@@ -116,7 +118,7 @@ remote = "//:buildgrid_remote"
 
 [tailor]
 build_file_header = """\
-# Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 """
 ignore_paths = ["build-support/migration-support/BUILD"]
@@ -133,6 +135,8 @@ fmt = false
 
 [pex]
 venv_use_symlinks = true
+# This is off by default, but we want to dogfood it before switching on for everyone.
+emit_warnings = true
 
 [python]
 # N.B.: When upgrading to a new Python version, you must update the Pants
@@ -205,6 +209,10 @@ template_by_globs = "@build-support/preambles/config.yaml"
 [generate-lockfiles]
 diff = true
 
+[pyupgrade]
+args = ["--keep-runtime-typing", "--py38-plus"]
+
+
 [jvm]
 default_resolve = "jvm_testprojects"
 
@@ -227,58 +235,8 @@ jar_tool_dev = "src/python/pants/jvm/jar_tool/jar_tool.lock"
 [scala]
 version_for_resolve = { "scala_parser_dev" = "2.13.8" }
 
+[scalac]
+args = ["-Yrangepos", "-Xlint:unused"]
+
 [scala-infer]
 force_add_siblings_as_dependencies = false
-
-[pants-releases.release_notes]
-master = "src/python/pants/notes/master.rst"
-"1.0.x" = "src/python/pants/notes/1.0.x.rst"
-"1.1.x" = "src/python/pants/notes/1.1.x.rst"
-"1.2.x" = "src/python/pants/notes/1.2.x.rst"
-"1.3.x" = "src/python/pants/notes/1.3.x.rst"
-"1.4.x" = "src/python/pants/notes/1.4.x.rst"
-"1.5.x" = "src/python/pants/notes/1.5.x.rst"
-"1.6.x" = "src/python/pants/notes/1.6.x.rst"
-"1.7.x" = "src/python/pants/notes/1.7.x.rst"
-"1.8.x" = "src/python/pants/notes/1.8.x.rst"
-"1.9.x" = "src/python/pants/notes/1.9.x.rst"
-"1.10.x" = "src/python/pants/notes/1.10.x.rst"
-"1.11.x" = "src/python/pants/notes/1.11.x.rst"
-"1.12.x" = "src/python/pants/notes/1.12.x.rst"
-"1.13.x" = "src/python/pants/notes/1.13.x.rst"
-"1.14.x" = "src/python/pants/notes/1.14.x.rst"
-"1.15.x" = "src/python/pants/notes/1.15.x.rst"
-"1.16.x" = "src/python/pants/notes/1.16.x.rst"
-"1.17.x" = "src/python/pants/notes/1.17.x.rst"
-"1.18.x" = "src/python/pants/notes/1.18.x.rst"
-"1.19.x" = "src/python/pants/notes/1.19.x.rst"
-"1.20.x" = "src/python/pants/notes/1.20.x.rst"
-"1.21.x" = "src/python/pants/notes/1.21.x.rst"
-"1.22.x" = "src/python/pants/notes/1.22.x.rst"
-"1.23.x" = "src/python/pants/notes/1.23.x.rst"
-"1.24.x" = "src/python/pants/notes/1.24.x.rst"
-"1.25.x" = "src/python/pants/notes/1.25.x.rst"
-"1.26.x" = "src/python/pants/notes/1.26.x.rst"
-"1.27.x" = "src/python/pants/notes/1.27.x.rst"
-"1.28.x" = "src/python/pants/notes/1.28.x.rst"
-"1.29.x" = "src/python/pants/notes/1.29.x.rst"
-"1.30.x" = "src/python/pants/notes/1.30.x.rst"
-"2.0.x" = "src/python/pants/notes/2.0.x.rst"
-"2.1.x" = "src/python/pants/notes/2.1.x.rst"
-"2.2.x" = "src/python/pants/notes/2.2.x.md"
-"2.3.x" = "src/python/pants/notes/2.3.x.md"
-"2.4.x" = "src/python/pants/notes/2.4.x.md"
-"2.5.x" = "src/python/pants/notes/2.5.x.md"
-"2.6.x" = "src/python/pants/notes/2.6.x.md"
-"2.7.x" = "src/python/pants/notes/2.7.x.md"
-"2.8.x" = "src/python/pants/notes/2.8.x.md"
-"2.9.x" = "src/python/pants/notes/2.9.x.md"
-"2.10.x" = "src/python/pants/notes/2.10.x.md"
-"2.11.x" = "src/python/pants/notes/2.11.x.md"
-"2.12.x" = "src/python/pants/notes/2.12.x.md"
-"2.13.x" = "src/python/pants/notes/2.13.x.md"
-"2.14.x" = "src/python/pants/notes/2.14.x.md"
-"2.15.x" = "src/python/pants/notes/2.15.x.md"
-"2.16.x" = "src/python/pants/notes/2.16.x.md"
-"2.17.x" = "src/python/pants/notes/2.17.x.md"
-"2.18.x" = "src/python/pants/notes/2.18.x.md"

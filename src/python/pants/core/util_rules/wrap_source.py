@@ -126,17 +126,25 @@ def wrap_source_rule_and_target(
             WrapSourceOutputsField,
         )
         help = help_text(
-            "Allow files and sources produced by the targets specified by `inputs` to be consumed "
-            f"by rules that specifically expect a `{source_field_type.__name__}`.\n\n"
-            f"Note that this target does not modify the files in any way. {outputs_help}\n\n"
-            "This target must be explicitly specified as a dependency of any target that requires "
-            "it. Sources from this target will not be automatically inferred as dependencies.\n\n"
-            "This target is experimental: in future versions of Pants, this functionality may be "
-            "made available with a different interface."
+            f"""
+            Allow files and sources produced by the targets specified by `inputs` to be consumed
+            by rules that specifically expect a `{source_field_type.__name__}`.
+
+            Note that this target does not modify the files in any way. {outputs_help}
+
+            This target must be explicitly specified as a dependency of any target that requires
+            it. Sources from this target will not be automatically inferred as dependencies.
+
+            This target is experimental: in future versions of Pants, this functionality may be
+            made available with a different interface.
+            """
         )
 
     # need to use `_param_type_overrides` to stop `@rule` from inspecting the function's source
-    @rule(_param_type_overrides={"request": GenerateWrapSourceSourcesRequest})
+    @rule(
+        canonical_name_suffix=source_field_type.__name__,
+        _param_type_overrides={"request": GenerateWrapSourceSourcesRequest},
+    )
     async def wrap_source(request: GenerateSourcesRequest) -> GeneratedSources:
         return await _wrap_source(request)
 

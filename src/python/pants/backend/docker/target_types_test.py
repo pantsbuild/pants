@@ -13,8 +13,8 @@ from pants.engine.internals.native_engine import Address
     "src, expected",
     [
         (
-            "/aboslute/path",
-            "/aboslute/path",
+            "/absolute/path",
+            "/absolute/path",
         ),
         (
             "./relative/path",
@@ -24,6 +24,11 @@ from pants.engine.internals.native_engine import Address
             "~/home/path",
             os.path.expanduser("~/home/path"),
         ),
+    ],
+    ids=[
+        "absolute_path",
+        "relative_path",
+        "homedir_path",
     ],
 )
 def test_secret_path_resolvement(src: str, expected: str):

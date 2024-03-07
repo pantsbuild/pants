@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.codegen.thrift.scrooge.java import symbol_mapper
 from pants.backend.codegen.thrift.scrooge.rules import (
     GeneratedScroogeThriftSources,
     GenerateScroogeThriftSourcesRequest,
@@ -103,7 +104,7 @@ async def resolve_scrooge_thrift_java_runtime_for_resolve(
     scala_subsystem: ScalaSubsystem,
 ) -> ScroogeThriftJavaRuntimeForResolve:
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
-    scala_binary_version, _, _ = scala_version.rpartition(".")
+    scala_binary_version = scala_version.binary
     addresses = find_jvm_artifacts_or_raise(
         required_coordinates=[
             UnversionedCoordinate(
@@ -138,6 +139,7 @@ async def inject_scrooge_thrift_java_dependencies(
 def rules():
     return (
         *collect_rules(),
+        *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromThriftRequest),
         UnionRule(InferDependenciesRequest, InferScroogeThriftJavaDependencies),
         ThriftSourceTarget.register_plugin_field(PrefixedJvmJdkField),

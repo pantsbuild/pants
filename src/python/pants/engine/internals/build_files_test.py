@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import re
 from textwrap import dedent
-from typing import cast
+from typing import Any, Mapping, cast
 
 import pytest
 
@@ -18,7 +18,9 @@ from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, Envi
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
+    BUILDFileEnvVarExtractor,
     BuildFileOptions,
+    BuildFileSyntaxError,
     OptionalAddressFamily,
     evaluate_preludes,
     parse_address_family,
@@ -543,6 +545,70 @@ def test_parametrize_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
     assert target_adaptor.kwargs["tags"] == ParametrizeDefault(a=("a", "root"), b=("non-root", "b"))
 
 
+def test_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> None:
+    def _determenistic_parametrize_group_keys(value: Mapping[str, Any]) -> dict[str, Any]:
+        # The `parametrize` object uses a unique generated field name when splatted onto a target
+        # (in order to provide a helpful error message in case of non-unique group names), but the
+        # part up until `:` is determenistic on the group name, which we need to exploit in the
+        # tests using parametrize groups.
+        return {key.rsplit(":", 1)[0]: val for key, val in value.items()}
+
+    target_adaptor_rule_runner.write_files(
+        {
+            "hello/BUILD": dedent(
+                """\
+                mock_tgt(
+                  description="desc for a and b",
+                  **parametrize("a", tags=["opt-a"], resolve="lock-a"),
+                  **parametrize("b", tags=["opt-b"], resolve="lock-b"),
+                )
+                """
+            ),
+        }
+    )
+
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("hello"), description_of_origin="tests")],
+    )
+    assert _determenistic_parametrize_group_keys(
+        target_adaptor.kwargs
+    ) == _determenistic_parametrize_group_keys(
+        dict(
+            description="desc for a and b",
+            **Parametrize("a", tags=["opt-a"], resolve="lock-a"),  # type: ignore[arg-type]
+            **Parametrize("b", tags=["opt-b"], resolve="lock-b"),
+        )
+    )
+
+
+def test_default_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "hello/BUILD": dedent(
+                """\
+                __defaults__({mock_tgt: dict(**parametrize("a", tags=["from default"]))})
+                mock_tgt(
+                  tags=["from target"],
+                  **parametrize("a"),
+                  **parametrize("b", tags=["from b"]),
+                )
+                """
+            ),
+        }
+    )
+    address = Address("hello")
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(address, description_of_origin="tests")],
+    )
+    targets = tuple(Parametrize.expand(address, target_adaptor.kwargs))
+    assert targets == (
+        (address.parametrize(dict(parametrize="a")), dict(tags=["from target"])),
+        (address.parametrize(dict(parametrize="b")), dict(tags=("from b",))),
+    )
+
+
 def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
     target_adaptor_rule_runner.write_files(
         {
@@ -606,9 +672,9 @@ def test_build_file_address() -> None:
 def test_build_files_share_globals() -> None:
     """Test that a macro in a prelude can reference another macro in another prelude.
 
-    At some point a change was made to separate the globals/locals dict (uninentional) which has the
-    unintended side-effect of having the `__globals__` of a macro not contain references to every
-    other symbol in every other prelude.
+    At some point a change was made to separate the globals/locals dict (unintentional) which has
+    the unintended side effect of having the `__globals__` of a macro not contain references to
+    every other symbol in every other prelude.
     """
 
     symbols = run_rule_with_mocks(
@@ -709,6 +775,42 @@ def test_default_plugin_field_bootstrap() -> None:
     # Parse the root BUILD file.
     address_family = rule_runner.request(AddressFamily, [AddressFamilyDir("")])
     assert dict(tags=("ok",)) == dict(address_family.defaults["mock_tgt"])
+
+
+def test_environment_target_macro_field_value() -> None:
+    rule_runner = RuleRunner(
+        rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
+        target_types=[MockTgt],
+        is_bootstrap=True,
+    )
+    rule_runner.set_options(
+        args=("--build-file-prelude-globs=prelude.py",),
+    )
+    rule_runner.write_files(
+        {
+            "prelude.py": dedent(
+                """
+                def tags():
+                    return ["foo", "bar"]
+                """
+            ),
+            "BUILD": dedent(
+                """
+                mock_tgt(name="tgt", tags=tags())
+                """
+            ),
+        }
+    )
+
+    # Parse the root BUILD file.
+    address_family = rule_runner.request(AddressFamily, [AddressFamilyDir("")])
+    tgt = address_family.name_to_target_adaptors["tgt"][1]
+    # We're pretending that field values returned from a called macro function doesn't exist during
+    # bootstrap. This is to allow the semi-dubios use of macro calls for environment target field
+    # values that are not required, and depending on how they are used, it may work to only have
+    # those field values set during normal lookup.
+    assert not tgt.kwargs
+    assert tgt == TargetAdaptor("mock_tgt", "tgt", "BUILD:2")
 
 
 def test_build_file_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -844,3 +946,39 @@ def test_build_file_description_of_origin(target_adaptor_rule_runner: RuleRunner
         [TargetAdaptorRequest(Address("src", target_name="foo"), description_of_origin="test")],
     )
     assert "src/BUILD:2" == target_adaptor.description_of_origin
+
+
+@pytest.mark.parametrize(
+    "filename, contents, expect_failure, expected_message",
+    [
+        ("BUILD", "data()", False, None),
+        (
+            "BUILD.qq",
+            "data()qq",
+            True,
+            "Error parsing BUILD file BUILD.qq:1: invalid syntax\n  data()qq\n        ^",
+        ),
+        (
+            "foo/BUILD",
+            "data()\nqwe asd",
+            True,
+            "Error parsing BUILD file foo/BUILD:2: invalid syntax\n  qwe asd\n      ^",
+        ),
+    ],
+)
+def test_build_file_syntax_error(filename, contents, expect_failure, expected_message):
+    class MockFileContent:
+        def __init__(self, path, content):
+            self.path = path
+            self.content = content
+
+    if expect_failure:
+        with pytest.raises(BuildFileSyntaxError) as e:
+            BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))
+
+        formatted = str(e.value)
+
+        assert formatted == expected_message
+
+    else:
+        BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))

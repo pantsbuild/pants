@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 from io import BytesIO
 from textwrap import dedent
+from typing import Any
+from unittest.mock import Mock
 from zipfile import ZipFile
 
 import pytest
@@ -15,20 +16,25 @@ import pytest
 from pants.backend.awslambda.python.rules import (
     PythonAwsLambdaFieldSet,
     PythonAwsLambdaLayerFieldSet,
+    _BaseFieldSet,
+    package_python_aws_lambda_function,
+    package_python_aws_lambda_layer,
 )
 from pants.backend.awslambda.python.rules import rules as awslambda_python_rules
 from pants.backend.awslambda.python.target_types import PythonAWSLambda, PythonAWSLambdaLayer
 from pants.backend.awslambda.python.target_types import rules as target_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
-from pants.backend.python.subsystems.lambdex import Lambdex
-from pants.backend.python.subsystems.lambdex import rules as awslambda_python_subsystem_rules
 from pants.backend.python.target_types import (
     PexBinary,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
+from pants.backend.python.util_rules.faas import (
+    BuildPythonFaaSRequest,
+    PythonFaaSPex3VenvCreateExtraArgsField,
+)
 from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
@@ -42,9 +48,8 @@ from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import FieldSet
-from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.python_rule_runner import PythonRuleRunner
-from pants.testutil.rule_runner import QueryRule
+from pants.testutil.rule_runner import MockGet, QueryRule, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -52,7 +57,6 @@ def rule_runner() -> PythonRuleRunner:
     rule_runner = PythonRuleRunner(
         rules=[
             *awslambda_python_rules(),
-            *awslambda_python_subsystem_rules(),
             *core_target_types_rules(),
             *package_pex_binary.rules(),
             *python_target_types_rules(),
@@ -129,95 +133,7 @@ def complete_platform(rule_runner: PythonRuleRunner) -> bytes:
     ).stdout
 
 
-@pytest.mark.platform_specific_behavior
-@pytest.mark.parametrize(
-    "major_minor_interpreter",
-    all_major_minor_python_versions(Lambdex.default_interpreter_constraints),
-)
-def test_create_hello_world_lambda_with_lambdex(
-    rule_runner: PythonRuleRunner, major_minor_interpreter: str, complete_platform: str, caplog
-) -> None:
-    rule_runner.write_files(
-        {
-            "src/python/foo/bar/hello_world.py": dedent(
-                """
-                import mureq
-
-                def handler(event, context):
-                    print('Hello, World!')
-                """
-            ),
-            "src/python/foo/bar/platform.json": complete_platform,
-            "src/python/foo/bar/BUILD": dedent(
-                """
-                python_requirement(name="mureq", requirements=["mureq==0.2"])
-                python_sources(name='lib')
-
-                file(name="platform", source="platform.json")
-                python_aws_lambda_function(
-                    name='lambda',
-                    dependencies=[':lib'],
-                    handler='foo.bar.hello_world:handler',
-                    runtime='python3.7',
-                    complete_platforms=[':platform'],
-                )
-                python_aws_lambda_function(
-                    name='slimlambda',
-                    include_requirements=False,
-                    dependencies=[':lib'],
-                    handler='foo.bar.hello_world:handler',
-                    runtime='python3.7',
-                )
-                """
-            ),
-        }
-    )
-    zip_file_relpath, content = create_python_awslambda(
-        rule_runner,
-        Address("src/python/foo/bar", target_name="lambda"),
-        expected_extra_log_lines=(
-            "              Runtime: python3.7",
-            "    Complete platform: src/python/foo/bar/platform.json",
-            "              Handler: lambdex_handler.handler",
-        ),
-        extra_args=[
-            f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']",
-            "--lambdex-layout=lambdex",
-        ],
-    )
-    assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
-    zipfile = ZipFile(BytesIO(content))
-    names = set(zipfile.namelist())
-    assert "lambdex_handler.py" in names
-    assert (
-        ".deps/mureq-0.2.0-py3-none-any.whl/mureq/__init__.py" in names
-    ), "third-party dep `mureq` must be included"
-    if sys.platform == "darwin":
-        assert (
-            "`python_aws_lambda_function` targets built on macOS may fail to build." in caplog.text
-        )
-
-    zip_file_relpath, content = create_python_awslambda(
-        rule_runner,
-        Address("src/python/foo/bar", target_name="slimlambda"),
-        expected_extra_log_lines=(
-            "    Runtime: python3.7",
-            "    Handler: lambdex_handler.handler",
-        ),
-        extra_args=[
-            f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']",
-            "--lambdex-layout=lambdex",
-        ],
-    )
-    assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
-    zipfile = ZipFile(BytesIO(content))
-    names = set(zipfile.namelist())
-    assert (
-        ".deps/mureq-0.2.0-py3-none-any.whl/mureq/__init__.py" not in names
-    ), "Using include_requirements=False should exclude third-party deps"
-
-
-def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) -> None:
+def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     rule_runner.write_files(
         {
             "assets/f.txt": "",
@@ -266,9 +182,8 @@ def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) 
         Address("src/py/project", target_name="lambda"),
         expected_extra_log_lines=(
             "    Runtime: python3.7",
-            "    Handler: lambdex_handler.handler",
+            "    Handler: lambda_function.handler",
         ),
-        extra_args=["--lambdex-layout=lambdex"],
     )
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
@@ -436,3 +351,60 @@ def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
             expected_extra_log_lines=("    Runtime: python3.7",),
             layer=True,
         )
+
+
+@pytest.mark.parametrize(
+    ("rule", "field_set_ty", "extra_field_set_args"),
+    [
+        pytest.param(
+            package_python_aws_lambda_function, PythonAwsLambdaFieldSet, ["handler"], id="function"
+        ),
+        pytest.param(
+            package_python_aws_lambda_layer,
+            PythonAwsLambdaLayerFieldSet,
+            ["dependencies", "include_sources"],
+            id="layer",
+        ),
+    ],
+)
+def test_pex3_venv_create_extra_args_are_passed_through(
+    rule: Any, field_set_ty: type[_BaseFieldSet], extra_field_set_args: list[str]
+) -> None:
+    # Setup
+    addr = Address("addr")
+    extra_args = (
+        "--extra-args-for-test",
+        "distinctive-value-E40B861A-266B-4F37-8394-767840BE9E44",
+    )
+    extra_args_field = PythonFaaSPex3VenvCreateExtraArgsField(extra_args, addr)
+    field_set = field_set_ty(
+        address=addr,
+        include_requirements=Mock(),
+        runtime=Mock(),
+        complete_platforms=Mock(),
+        output_path=Mock(),
+        environment=Mock(),
+        **{arg: Mock() for arg in extra_field_set_args},
+        pex3_venv_create_extra_args=extra_args_field,
+    )
+
+    observed_calls = []
+
+    def mocked_build(request: BuildPythonFaaSRequest) -> BuiltPackage:
+        observed_calls.append(request.pex3_venv_create_extra_args)
+        return Mock()
+
+    # Exercise
+    run_rule_with_mocks(
+        rule,
+        rule_args=[field_set],
+        mock_gets=[
+            MockGet(
+                output_type=BuiltPackage, input_types=(BuildPythonFaaSRequest,), mock=mocked_build
+            )
+        ],
+    )
+
+    # Verify
+    assert len(observed_calls) == 1
+    assert observed_calls[0] is extra_args_field

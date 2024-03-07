@@ -22,7 +22,7 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.option.option_types import StrListOption
+from pants.option.option_types import StrListOption, StrOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
@@ -86,7 +86,6 @@ COURSIER_FETCH_WRAPPER_SCRIPT = textwrap.dedent(  # noqa: PNT20
     """
 )
 
-
 # TODO: Coursier renders setrlimit error line on macOS.
 #   see https://github.com/pantsbuild/pants/issues/13942.
 POST_PROCESS_COURSIER_STDERR_SCRIPT = textwrap.dedent(  # noqa: PNT20
@@ -109,8 +108,12 @@ class CoursierSubsystem(TemplatedExternalTool):
     name = "coursier"
     help = "A dependency resolver for the Maven ecosystem. (https://get-coursier.io/)"
 
-    default_version = "v2.1.0-M5-18-gfebf9838c"
+    default_version = "v2.1.6"
     default_known_versions = [
+        "v2.1.6|macos_arm64 |746b3e346fa2c0107fdbc8a627890d495cb09dee4f8dcc87146bdb45941088cf|20829782|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.6/cs-aarch64-apple-darwin.gz",
+        "v2.1.6|linux_arm64 |33330ca433781c9db9458e15d2d32e5d795de3437771647e26835e8b1391af82|20899290|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.6/cs-aarch64-pc-linux.gz",
+        "v2.1.6|linux_x86_64|af7234f8802107f5e1130307ef8a5cc90262d392f16ddff7dce27a4ed0ddd292|20681688",
+        "v2.1.6|macos_x86_64|36a5d42a0724be2ac39d0ebd8869b985e3d58ceb121bc60389ee2d6d7408dd56|20037412",
         "v2.1.0-M5-18-gfebf9838c|linux_arm64 |d4ad15ba711228041ad8a46d848c83c8fbc421d7b01c415d8022074dd609760f|19264005",
         "v2.1.0-M5-18-gfebf9838c|linux_x86_64|3e1a1ad1010d5582e9e43c5a26b273b0147baee5ebd27d3ac1ab61964041c90b|19551533",
         "v2.1.0-M5-18-gfebf9838c|macos_arm64 |d13812c5a5ef4c9b3e25cc046d18addd09bacd149f95b20a14e4d2a73e358ecf|18826510",
@@ -124,6 +127,11 @@ class CoursierSubsystem(TemplatedExternalTool):
         "https://github.com/coursier/coursier/releases/download/{version}/cs-{platform}.gz"
     )
     default_url_platform_mapping = {
+        # By default we pull x86 binaries for Mac, since arm binaries
+        # are unavailable for older supported versions of coursier. They work fine with rosetta.
+        # For recent versions, arm binaries for mac and linux are available
+        # at https://github.com/VirtusLab/coursier-m1/
+        # Set the fifth field in known_versions to pull from this alternative source.
         "macos_arm64": "x86_64-apple-darwin",
         "macos_x86_64": "x86_64-apple-darwin",
         "linux_arm64": "aarch64-pc-linux",
@@ -140,14 +148,30 @@ class CoursierSubsystem(TemplatedExternalTool):
             Maven style repositories to resolve artifacts from.
 
             Coursier will resolve these repositories in the order in which they are
-            specifed, and re-ordering repositories will cause artifacts to be
+            specified, and re-ordering repositories will cause artifacts to be
             re-downloaded. This can result in artifacts in lockfiles becoming invalid.
             """
         ),
     )
 
+    jvm_index = StrOption(
+        default="",
+        help=softwrap(
+            """
+            The JVM index to be used by Coursier.
+
+            Possible values are:
+              - cs: The default JVM index used and maintained by Coursier.
+              - cs-maven: Fetches a JVM index from the io.get-coursier:jvm-index Maven repository.
+              - <URL>: An arbitrary URL for a JVM index. Ex. https://url/of/your/index.json
+            """
+        ),
+    )
+
     def generate_exe(self, plat: Platform) -> str:
-        archive_filename = os.path.basename(self.generate_url(plat))
+        tool_version = self.known_version(plat)
+        url = (tool_version and tool_version.url_override) or self.generate_url(plat)
+        archive_filename = os.path.basename(url)
         filename = os.path.splitext(archive_filename)[0]
         return f"./{filename}"
 
@@ -159,7 +183,8 @@ class Coursier:
     coursier: DownloadedExternalTool
     _digest: Digest
     repos: FrozenOrderedSet[str]
-    _immutable_input_digests: FrozenDict[str, Digest]
+    jvm_index: str
+    _append_only_caches: FrozenDict[str, str]
 
     bin_dir: ClassVar[str] = "__coursier"
     fetch_wrapper_script: ClassVar[str] = f"{bin_dir}/coursier_fetch_wrapper_script.sh"
@@ -203,11 +228,11 @@ class Coursier:
 
     @property
     def append_only_caches(self) -> dict[str, str]:
-        return {self.cache_name: self.cache_dir}
+        return {self.cache_name: self.cache_dir, **self._append_only_caches}
 
     @property
     def immutable_input_digests(self) -> dict[str, Digest]:
-        return {self.bin_dir: self._digest, **self._immutable_input_digests}
+        return {self.bin_dir: self._digest}
 
 
 @dataclass(frozen=True)
@@ -303,7 +328,8 @@ async def setup_coursier(
             ),
         ),
         repos=FrozenOrderedSet(coursier_subsystem.repos),
-        _immutable_input_digests=python.immutable_input_digests,
+        jvm_index=coursier_subsystem.jvm_index,
+        _append_only_caches=python.APPEND_ONLY_CACHES,
     )
 
 

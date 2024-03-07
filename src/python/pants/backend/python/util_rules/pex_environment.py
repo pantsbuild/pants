@@ -14,7 +14,6 @@ from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.core.util_rules.system_binaries import BinaryPath
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.internals.native_engine import Digest
 from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import BoolOption, IntOption, StrListOption
@@ -23,7 +22,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import create_path_env_var, softwrap
+from pants.util.strutil import softwrap
 
 
 class PexSubsystem(Subsystem):
@@ -81,6 +80,19 @@ class PexSubsystem(Subsystem):
             """
         ),
         advanced=True,
+    )
+    emit_warnings = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            If warnings from Pex should be logged by Pants to the console.
+
+            Note: Pants uses Pex internally in some ways that trigger some warnings at the moment,
+            so enabling this may result in warnings not related to your code. See
+            <https://github.com/pantsbuild/pants/issues/20577> and
+            <https://github.com/pantsbuild/pants/issues/20586>.
+            """
+        ),
     )
 
     @property
@@ -144,8 +156,10 @@ class PexEnvironment:
             _pex_environment=self,
             pex_root=pex_root,
             _working_directory=PurePath(working_directory) if working_directory else None,
-            append_only_caches=FrozenDict({self._PEX_ROOT_DIRNAME: str(pex_root)}),
-            immutable_input_digests=self.bootstrap_python.immutable_input_digests,
+            append_only_caches=FrozenDict(
+                **{self._PEX_ROOT_DIRNAME: str(pex_root)},
+                **self.bootstrap_python.APPEND_ONLY_CACHES,
+            ),
         )
 
     def in_workspace(self) -> CompletePexEnvironment:
@@ -159,8 +173,7 @@ class PexEnvironment:
             _pex_environment=self,
             pex_root=pex_root,
             _working_directory=None,
-            append_only_caches=FrozenDict(),
-            immutable_input_digests=self.bootstrap_python.immutable_input_digests,
+            append_only_caches=self.bootstrap_python.APPEND_ONLY_CACHES,
         )
 
     def venv_site_packages_copies_option(self, use_copies: bool) -> str:
@@ -194,7 +207,6 @@ class CompletePexEnvironment:
     pex_root: PurePath
     _working_directory: PurePath | None
     append_only_caches: FrozenDict[str, str]
-    immutable_input_digests: FrozenDict[str, Digest]
 
     @property
     def interpreter_search_paths(self) -> tuple[str, ...]:
@@ -216,20 +228,26 @@ class CompletePexEnvironment:
         If the Process is run with a pre-selected Python interpreter, set `python_configured=True`
         to avoid PEX from trying to find a new interpreter.
         """
+        path = os.pathsep.join(self._pex_environment.path)
+        subprocess_env_dict = dict(self._pex_environment.subprocess_environment_dict)
+
+        if "PATH" in self._pex_environment.subprocess_environment_dict:
+            path = os.pathsep.join([path, subprocess_env_dict.pop("PATH")])
+
         d = dict(
-            PATH=create_path_env_var(self._pex_environment.path),
+            PATH=path,
             PEX_IGNORE_RCFILES="true",
             PEX_ROOT=(
                 os.path.relpath(self.pex_root, self._working_directory)
                 if self._working_directory
                 else str(self.pex_root)
             ),
-            **self._pex_environment.subprocess_environment_dict,
+            **subprocess_env_dict,
         )
         if python:
             d["PEX_PYTHON"] = python.path
         else:
-            d["PEX_PYTHON_PATH"] = create_path_env_var(self.interpreter_search_paths)
+            d["PEX_PYTHON_PATH"] = os.pathsep.join(self.interpreter_search_paths)
         return d
 
 

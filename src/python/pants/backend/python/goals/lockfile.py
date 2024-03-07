@@ -10,11 +10,16 @@ from dataclasses import dataclass
 from operator import itemgetter
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementsField
+from pants.backend.python.target_types import (
+    PythonRequirementFindLinksField,
+    PythonRequirementResolveField,
+    PythonRequirementsField,
+)
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
-from pants.backend.python.util_rules.pex_cli import PexCliProcess
+from pants.backend.python.util_rules.pex_cli import PexCliProcess, maybe_log_pex_stderr
+from pants.backend.python.util_rules.pex_environment import PexSubsystem
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
     ResolvePexConfig,
@@ -47,6 +52,7 @@ from pants.util.pip_requirement import PipRequirement
 @dataclass(frozen=True)
 class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
+    find_links: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
 
     @property
@@ -73,18 +79,6 @@ async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAnd
     args = list(resolve_config.pex_args())
     digests = []
 
-    if resolve_config.no_binary or resolve_config.only_binary:
-        pip_args_file = "__pip_args.txt"
-        args.extend(["-r", pip_args_file])
-        pip_args_file_content = "\n".join(
-            [f"--no-binary {pkg}" for pkg in resolve_config.no_binary]
-            + [f"--only-binary {pkg}" for pkg in resolve_config.only_binary]
-        )
-        pip_args_digest = await Get(
-            Digest, CreateDigest([FileContent(pip_args_file, pip_args_file_content.encode())])
-        )
-        digests.append(pip_args_digest)
-
     if resolve_config.constraints_file:
         args.append(f"--constraints={resolve_config.constraints_file.path}")
         digests.append(resolve_config.constraints_file.digest)
@@ -98,6 +92,7 @@ async def generate_lockfile(
     req: GeneratePythonLockfile,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     python_setup: PythonSetup,
+    pex_subsystem: PexSubsystem,
 ) -> GenerateLockfileResult:
     pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
 
@@ -108,20 +103,19 @@ async def generate_lockfile(
             subcommand=("lock", "create"),
             extra_args=(
                 "--output=lock.json",
-                "--no-emit-warnings",
                 # See https://github.com/pantsbuild/pants/issues/12458. For now, we always
                 # generate universal locks because they have the best compatibility. We may
                 # want to let users change this, as `style=strict` is safer.
                 "--style=universal",
                 "--pip-version",
-                python_setup.pip_version.value,
+                python_setup.pip_version,
                 "--resolver-version",
                 "pip-2020-resolver",
                 # PEX files currently only run on Linux and Mac machines; so we hard code this
-                # limit on lock universaility to avoid issues locking due to irrelevant
+                # limit on lock universality to avoid issues locking due to irrelevant
                 # Windows-only dependency issues. See this Pex issue that originated from a
                 # Pants user issue presented in Slack:
-                #   https://github.com/pantsbuild/pex/issues/1821
+                #   https://github.com/pex-tool/pex/issues/1821
                 #
                 # At some point it will probably make sense to expose `--target-system` for
                 # configuration.
@@ -131,6 +125,7 @@ async def generate_lockfile(
                 "mac",
                 # This makes diffs more readable when lockfiles change.
                 "--indent=2",
+                *(f"--find-links={link}" for link in req.find_links),
                 *pip_args_setup.args,
                 *req.interpreter_constraints.generate_pex_arg_list(),
                 *req.requirements,
@@ -151,6 +146,8 @@ async def generate_lockfile(
             cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
+
+    maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 
     initial_lockfile_digest_contents = await Get(DigestContents, Digest, result.output_digest)
     metadata = PythonLockfileMetadata.new(
@@ -220,17 +217,20 @@ async def setup_user_lockfile_requests(
         return UserGenerateLockfiles()
 
     resolve_to_requirements_fields = defaultdict(set)
+    find_links: set[str] = set()
     for tgt in all_targets:
         if not tgt.has_fields((PythonRequirementResolveField, PythonRequirementsField)):
             continue
         resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
         resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
+        find_links.update(tgt[PythonRequirementFindLinksField].value or ())
 
     return UserGenerateLockfiles(
         GeneratePythonLockfile(
             requirements=PexRequirements.req_strings_from_requirement_fields(
                 resolve_to_requirements_fields[resolve]
             ),
+            find_links=FrozenOrderedSet(find_links),
             interpreter_constraints=InterpreterConstraints(
                 python_setup.resolves_to_interpreter_constraints.get(
                     resolve, python_setup.interpreter_constraints

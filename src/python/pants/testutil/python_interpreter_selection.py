@@ -34,7 +34,7 @@ def has_python_version(version):
     return python_interpreter_path(version) is not None
 
 
-@lru_cache()
+@lru_cache
 def python_interpreter_path(version):
     """Returns the interpreter path if the current system has the specified version of python.
 
@@ -110,9 +110,9 @@ def skip_unless_python27_and_python36_present(func):
     return skip_unless_all_pythons_present(PY_27, PY_36)(func)
 
 
-def skip_unless_python36_and_python37_present(func):
-    """A test skip decorator that only runs a test method if python3.6 and python3.7 are present."""
-    return skip_unless_all_pythons_present(PY_36, PY_37)(func)
+def skip_unless_python38_and_python39_present(func):
+    """A test skip decorator that only runs a test method if python3.8 and python3.9 are present."""
+    return skip_unless_all_pythons_present(PY_38, PY_39)(func)
 
 
 def skip_unless_python37_and_python39_present(func):

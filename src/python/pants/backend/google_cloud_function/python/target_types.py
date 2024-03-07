@@ -10,10 +10,10 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
+    PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
@@ -117,6 +117,7 @@ class PythonGoogleCloudFunction(Target):
         PythonGoogleCloudFunctionRuntime,
         PythonFaaSCompletePlatforms,
         PythonGoogleCloudFunctionType,
+        PythonFaaSPex3VenvCreateExtraArgsField,
         PythonResolveField,
         EnvironmentField,
     )
@@ -124,7 +125,7 @@ class PythonGoogleCloudFunction(Target):
         f"""
         A self-contained Python function suitable for uploading to Google Cloud Function.
 
-        See {doc_url('google-cloud-function-python')}.
+        See {doc_url('docs/python/integrations/google-cloud-functions')}.
         """
     )
 
@@ -136,12 +137,10 @@ class PythonGoogleCloudFunction(Target):
         complete_platforms_alias = self[PexCompletePlatformsField].alias
 
         if has_runtime and has_complete_platforms:
-            warn_or_error(
-                "2.19.0.dev0",
-                f"using both `{runtime_alias}` and `{complete_platforms_alias}` in the `{self.alias}` target {self.address}",
+            raise ValueError(
                 softwrap(
                     f"""
-                    The `{complete_platforms_alias}` now takes precedence over the `{runtime_alias}` field, if
+                    The `{complete_platforms_alias}` takes precedence over the `{runtime_alias}` field, if
                     it is set. Remove the `{runtime_alias}` field to only use the `{complete_platforms_alias}`
                     value, or remove the `{complete_platforms_alias}` field to use the default platform
                     implied by `{runtime_alias}`.

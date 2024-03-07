@@ -79,7 +79,7 @@ async def ktlint_fmt(
         ),
     )
 
-    return await FmtResult.create(request, result, strip_chroot_path=True)
+    return await FmtResult.create(request, result)
 
 
 @rule

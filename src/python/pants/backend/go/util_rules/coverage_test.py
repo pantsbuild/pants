@@ -104,7 +104,7 @@ def test_basic_coverage(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
-    assert "PASS: TestAdd" in result.stdout
+    assert b"PASS: TestAdd" in result.stdout_bytes
     coverage_data = result.coverage_data
     assert coverage_data is not None
     assert isinstance(coverage_data, GoCoverageData)
@@ -172,7 +172,7 @@ def test_coverage_of_multiple_packages(rule_runner: RuleRunner) -> None:
             TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
         )
         assert result.exit_code == 0
-        assert "PASS: TestAdd" in result.stdout
+        assert b"PASS: TestAdd" in result.stdout_bytes
         coverage_data = result.coverage_data
         assert coverage_data is not None
         assert isinstance(coverage_data, GoCoverageData)
@@ -199,7 +199,7 @@ def test_coverage_of_multiple_packages(rule_runner: RuleRunner) -> None:
 
         return raw_go_report
 
-    # Test that the `foo/adder` package is missing when it is **not** configured to be covered via
+    # Test that the `foo/adder` package is missing when it is **not** configured to be covered
     # via the `--go-test-coverage-include-patterns` option.
     tgt = rule_runner.get_target(Address("foo"))
     cover_report = run_test(tgt)

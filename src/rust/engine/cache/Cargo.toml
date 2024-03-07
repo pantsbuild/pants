@@ -6,9 +6,12 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-bytes = "1.2"
+bytes = { workspace = true }
 grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
 protos = { path = "../protos" }
 sharded_lmdb = { path = "../sharded_lmdb" }
 task_executor = { path = "../task_executor" }
+
+[lints]
+workspace = true

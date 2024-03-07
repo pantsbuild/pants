@@ -15,7 +15,10 @@ from typing import Generic, Sequence, Type, TypeVar, cast
 from pants.backend.cc.lint.clangformat.subsystem import ClangFormat
 from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
 from pants.backend.codegen.protobuf.java.subsystem import JavaProtobufGrpcSubsystem
-from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
+    PythonProtobufGrpclibPlugin,
+    PythonProtobufMypyPlugin,
+)
 from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
@@ -40,16 +43,17 @@ from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.ipython import IPython
-from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.subsystems.setuptools_scm import SetuptoolsSCM
 from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
+from pants.backend.python.typecheck.pytype.subsystem import Pytype
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
+from pants.backend.tools.semgrep.subsystem import SemgrepSubsystem
 from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.base.build_environment import get_buildroot
 from pants.jvm.resolve.jvm_tool import JvmToolBase
@@ -86,7 +90,7 @@ class Tool(Generic[ToolBaseT]):
 
 @dataclass
 class PythonTool(Tool[PythonToolRequirementsBase]):
-    interpreter_constraints: str = default_python_interpreter_constraints
+    ...
 
 
 @dataclass
@@ -113,21 +117,25 @@ all_python_tools = tuple(
             PythonTool(HelmPostRendererSubsystem, "pants.backend.experimental.helm"),
             PythonTool(IPython, "pants.backend.python"),
             PythonTool(Isort, "pants.backend.python.lint.isort"),
-            PythonTool(Lambdex, "pants.backend.awslambda.python", "CPython>=3.7,<3.12"),
             PythonTool(MyPy, "pants.backend.python.typecheck.mypy"),
             PythonTool(Pydocstyle, "pants.backend.python.lint.pydocstyle"),
             PythonTool(PyTest, "pants.backend.python"),
             PythonTool(PyUpgrade, "pants.backend.python.lint.pyupgrade"),
             PythonTool(Pylint, "pants.backend.python.lint.pylint"),
             PythonTool(PythonProtobufMypyPlugin, "pants.backend.codegen.protobuf.python"),
+            PythonTool(PythonProtobufGrpclibPlugin, "pants.backend.codegen.protobuf.python"),
+            PythonTool(Pytype, "pants.backend.experimental.python.typecheck.pytype"),
             PythonTool(PyOxidizer, "pants.backend.experimental.python.packaging.pyoxidizer"),
+            # Note - Ruff has two backends (<package>.check and <package>.format).
+            # Both of these rely on the same resolve underneath so we just pick one here.
+            PythonTool(Ruff, "pants.backend.experimental.python.lint.ruff.check"),
+            PythonTool(SemgrepSubsystem, "pants.backend.experimental.tools.semgrep"),
             PythonTool(Setuptools, "pants.backend.python"),
             PythonTool(SetuptoolsSCM, "pants.backend.python"),
             PythonTool(TerraformHcl2Parser, "pants.backend.experimental.terraform"),
             PythonTool(TwineSubsystem, "pants.backend.python"),
             PythonTool(Yamllint, "pants.backend.experimental.tools.yamllint"),
             PythonTool(Yapf, "pants.backend.python.lint.yapf"),
-            PythonTool(Ruff, "pants.backend.experimental.python.lint.ruff"),
         ],
         key=lambda tool: tool.name,
     )
@@ -219,7 +227,7 @@ def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -
                     )
                 )
         resolves = {tool.resolve: tool.lockfile_name for tool in tools}
-        resolves_to_ics = {tool.resolve: [tool.interpreter_constraints] for tool in tools}
+        resolves_to_ics = {tool.resolve: tool.cls.default_interpreter_constraints for tool in tools}
         for file in resolves.values():
             touch(os.path.join(tmp_buildroot, file))  # Prevent "Unmatched glob" warning.
         python_args = [

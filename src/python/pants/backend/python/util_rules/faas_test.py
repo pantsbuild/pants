@@ -2,8 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from pathlib import Path
 from textwrap import dedent
-from typing import List, Optional
+from typing import Optional
+from unittest.mock import Mock
 
 import pytest
 
@@ -15,24 +17,37 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.faas import (
+    BuildPythonFaaSRequest,
     InferPythonFaaSHandlerDependency,
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
     PythonFaaSHandlerInferenceFieldSet,
     PythonFaaSKnownRuntime,
+    PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSRuntimeField,
     ResolvedPythonFaaSHandler,
     ResolvePythonFaaSHandlerRequest,
     RuntimePlatforms,
     RuntimePlatformsRequest,
+    build_python_faas,
 )
-from pants.backend.python.util_rules.pex import CompletePlatforms, PexPlatforms
+from pants.backend.python.util_rules.pex import CompletePlatforms, Pex, PexPlatforms
+from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvRequest
 from pants.build_graph.address import Address
+from pants.core.goals.package import OutputPathField
 from pants.core.target_types import FileTarget
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import InferredDependencies, InvalidFieldException, Target
-from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.testutil.rule_runner import (
+    MockGet,
+    QueryRule,
+    RuleRunner,
+    engine_error,
+    run_rule_with_mocks,
+)
 from pants.util.strutil import softwrap
 
 
@@ -64,15 +79,6 @@ def rule_runner() -> RuleRunner:
 def test_handler_validation(invalid_handler: str) -> None:
     with pytest.raises(InvalidFieldException):
         PythonFaaSHandlerField(invalid_handler, Address("", target_name="t"))
-
-
-@pytest.mark.parametrize(
-    ["handler", "expected"],
-    (("path.to.module:func", []), ("lambda.py:func", ["project/dir/lambda.py"])),
-)
-def test_handler_filespec(handler: str, expected: List[str]) -> None:
-    field = PythonFaaSHandlerField(handler, Address("project/dir"))
-    assert field.filespec == {"includes": expected}
 
 
 def test_resolve_handler(rule_runner: RuleRunner) -> None:
@@ -390,3 +396,61 @@ def test_infer_runtime_platforms_errors_when_wide_ics(
         in str(exc.value)
     )
     assert ics in str(exc.value)
+
+
+def test_venv_create_extra_args_are_passed_through() -> None:
+    # Setup
+    addr = Address("addr")
+    extra_args = (
+        "--extra-args-for-test",
+        "distinctive-value-FA943D37-51DA-445A-8F00-7E9C7DA8FAAA",
+    )
+    extra_args_field = PythonFaaSPex3VenvCreateExtraArgsField(extra_args, addr)
+    request = BuildPythonFaaSRequest(
+        address=addr,
+        target_name="x",
+        complete_platforms=Mock(),
+        handler=None,
+        output_path=OutputPathField(None, addr),
+        runtime=Mock(),
+        pex3_venv_create_extra_args=extra_args_field,
+        include_requirements=False,
+        include_sources=False,
+        reexported_handler_module=None,
+    )
+
+    observed_extra_args = []
+
+    def mock_get_pex_venv(request: PexVenvRequest) -> PexVenv:
+        observed_extra_args.append(request.extra_args)
+
+        return PexVenv(digest=EMPTY_DIGEST, path=Path())
+
+    # Exercise
+    run_rule_with_mocks(
+        build_python_faas,
+        rule_args=[request],
+        mock_gets=[
+            MockGet(
+                output_type=RuntimePlatforms,
+                input_types=(RuntimePlatformsRequest,),
+                mock=lambda _: RuntimePlatforms(interpreter_version=None),
+            ),
+            MockGet(
+                output_type=ResolvedPythonFaaSHandler,
+                input_types=(ResolvePythonFaaSHandlerRequest,),
+                mock=lambda _: Mock(),
+            ),
+            MockGet(output_type=Digest, input_types=(CreateDigest,), mock=lambda _: EMPTY_DIGEST),
+            MockGet(
+                output_type=Pex,
+                input_types=(PexFromTargetsRequest,),
+                mock=lambda _: Pex(digest=EMPTY_DIGEST, name="pex", python=None),
+            ),
+            MockGet(output_type=PexVenv, input_types=(PexVenvRequest,), mock=mock_get_pex_venv),
+        ],
+    )
+
+    # Verify
+    assert len(observed_extra_args) == 1
+    assert observed_extra_args[0] == extra_args

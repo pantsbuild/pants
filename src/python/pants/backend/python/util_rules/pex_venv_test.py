@@ -7,20 +7,28 @@ import fnmatch
 import io
 import zipfile
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
 from pants.backend.python.util_rules import pex_test_utils
 from pants.backend.python.util_rules.pex import CompletePlatforms, Pex, PexPlatforms
 from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.pex_test_utils import create_pex_and_get_all_data
-from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
+from pants.backend.python.util_rules.pex_venv import (
+    PexVenv,
+    PexVenvLayout,
+    PexVenvRequest,
+    pex_venv,
+)
 from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
 from pants.engine.fs import CreateDigest, DigestContents, FileContent
-from pants.engine.internals.native_engine import Digest, Snapshot
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.engine.process import ProcessResult
+from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -216,3 +224,49 @@ def test_prefix_should_add_path(
             "out/dir/some/prefix/first/party.py",
         ),
     )
+
+
+def test_extra_args_should_be_passed_through(
+    rule_runner: RuleRunner,
+) -> None:
+    # Setup
+    pex = Pex(digest=EMPTY_DIGEST, name="pex", python=None)
+    extra_args = (
+        "--extra-args-for-test",
+        "distinctive-value-C3B8DC34-6A27-4A35-AE25-59538ABE8082",
+    )
+
+    request = PexVenvRequest(
+        pex=pex,
+        layout=PexVenvLayout.FLAT,
+        output_path=Path("out"),
+        description="testing",
+        extra_args=extra_args,
+    )
+
+    observed_calls = []
+
+    def mocked_run_pex_cli_process(process: PexCliProcess) -> ProcessResult:
+        assert process.subcommand == ("venv", "create")
+        observed_calls.append(process.extra_args)
+
+        return Mock()
+
+    # Exercise
+    run_rule_with_mocks(
+        pex_venv,
+        rule_args=[request],
+        mock_gets=[
+            MockGet(output_type=Digest, input_types=(MergeDigests,), mock=lambda _: EMPTY_DIGEST),
+            MockGet(
+                output_type=ProcessResult,
+                input_types=(PexCliProcess,),
+                mock=mocked_run_pex_cli_process,
+            ),
+        ],
+    )
+
+    # Verify
+    assert len(observed_calls) == 1
+    # the extra args are always at the end
+    assert observed_calls[0][-2:] == extra_args

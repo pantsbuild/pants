@@ -1,0 +1,606 @@
+---
+    title: test
+    sidebar_position: 7
+---
+
+Run tests with Pytest.
+
+---
+
+Pants uses the [Pytest](https://docs.pytest.org/en/latest/) test runner to run Python tests. You may write your tests in Pytest-style, unittest-style, or mix and match both.
+
+:::tip Benefit of Pants: runs each file in parallel
+Each file gets run as a separate process, which gives you fine-grained caching and better parallelism. Given enough cores, Pants will be able to run all your tests at the same time.
+
+This also gives you fine-grained invalidation. If you run `pants test ::`, and then you only change one file, then only tests that depended on that changed file will need to rerun.
+:::
+
+## Examples
+
+```bash
+ # Run all tests in the repository.
+❯ pants test ::
+
+# Run all the tests in this directory.
+❯ pants test helloworld/util:
+
+# Run just the tests in this file.
+❯ pants test helloworld/util/lang_test.py
+
+ # Run just one test.
+❯ pants test helloworld/util/lang_test.py -- -k test_language_translator
+```
+
+## Pytest version and plugins
+
+To change the Pytest version, set the `install_from_resolve` option in the `[pytest]` scope. You may also add [plugins](https://docs.pytest.org/en/latest/plugins.html) including the plugins in the resolve:
+
+```toml title="pants.toml"
+[python.resolves]
+pytest = "3rdparty/python/pytest-lock.txt"
+
+[pytest]
+install_from_resolve = "pytest"
+```
+
+Then, add a `requirements.txt` file specifying the version of `pytest` and other plugins:
+
+```text title="pytest-requirements.txt"
+pytest>=5.4
+pytest-django>=3.9.0,<4
+pytest-rerunfailures==9.0
+```
+
+Finally, generate the relevant lockfile with `pants generate-lockfiles --resolve=pytest`. For more information, see [Lockfiles for tools](../overview/lockfiles.mdx#lockfiles-for-tools).
+
+Alternatively, if you only want to install the plugin for certain tests, you can add the plugin to the `dependencies` field of your `python_test` / `python_tests` target. See [Third-party dependencies](../overview/third-party-dependencies.mdx) for how to install Python dependencies. For example:
+
+```text tab={"label":"requirements.txt"}
+pytest-django==3.10.0
+```
+
+```python tab={"label":"BUILD"}
+python_requirements(name="reqs")
+```
+
+```python tab={"label":"helloworld/util/BUILD"}
+python_tests(
+   name="tests",
+   # Normally, Pants infers dependencies based on imports.
+   # Here, we don't actually import our plugin, though, so
+   # we need to explicitly list it.
+   dependencies=["//:reqs#pytest-django"],
+)
+```
+
+## Controlling output
+
+By default, Pants only shows output for failed tests. You can change this by setting `--test-output` to one of `all`, `failed`, or `never`, e.g. `pants test --output=all ::`.
+
+You can permanently set the output format in your `pants.toml` like this:
+
+```toml title="pants.toml"
+[test]
+output = "all"
+```
+
+:::note Tip: Use Pytest options to make output more or less verbose
+See ["Passing arguments to Pytest"](./test.mdx#passing-arguments-to-pytest).
+
+For example:
+
+```bash
+❯ pants test project/app_test.py -- -q
+```
+
+You may want to permanently set the Pytest option `--no-header` to avoid printing the Pytest version for each test run:
+
+```toml
+[pytest]
+args = ["--no-header"]
+```
+
+:::
+
+## Passing arguments to Pytest
+
+To pass arguments to Pytest, put them at the end after `--`, like this:
+
+```bash
+❯ pants test project/app_test.py -- -k test_function1 -vv -s
+```
+
+You can also use the `args` option in the `[pytest]` scope, like this:
+
+```toml title="pants.toml"
+[pytest]
+args = ["-vv"]
+```
+
+:::note Tip: some useful Pytest arguments
+See [https://docs.pytest.org/en/latest/usage.html](https://docs.pytest.org/en/latest/usage.html) for more information.
+
+- `-k expression`: only run tests matching the expression.
+- `-v`: verbose mode.
+- `-s`: always print the stdout and stderr of your code, even if a test passes.
+
+:::
+
+:::caution How to use Pytest's `--pdb` option
+You must run `pants test --debug` for this to work properly. See the section "Debugging Tests" for more information.
+:::
+
+## Config files
+
+Pants will automatically include any relevant config files in the process's sandbox: `pytest.ini`, `pyproject.toml`, `tox.ini`, and `setup.cfg`.
+
+## `conftest.py`
+
+Pytest uses [`conftest.py` files](https://docs.pytest.org/en/stable/fixture.html#conftest-py-sharing-fixture-functions) to share fixtures and config across multiple distinct test files.
+
+The default `sources` value for the `python_test_utils` target includes `conftest.py`. You can run [`pants tailor ::`](../../getting-started/initial-configuration.mdx#5-generate-build-files) to automatically add this target:
+
+```
+pants tailor ::
+Created project/BUILD:
+  - Add python_sources target project
+  - Add python_tests target tests
+  - Add python_test_utils target test_utils
+```
+
+Pants will also infer dependencies on any `confest.py` files in the current directory _and_ any ancestor directories, which mirrors how Pytest behaves. This requires that each `conftest.py` has a target referring to it. You can verify this is working correctly by running `pants dependencies path/to/my_test.py` and confirming that each `conftest.py` file shows up. (You can turn off this feature by setting `conftests = false` in the `[python-infer]` scope.)
+
+## Setting environment variables
+
+Test runs are _hermetic_, meaning that they are stripped of the parent `pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
+
+To add any arbitrary environment variable back to the process, you can either add the environment variable to the specific tests with the `extra_env_vars` field on `python_test` / `python_tests` targets or to all your tests with the `[test].extra_env_vars` option. Generally, prefer the field `extra_env_vars` field so that more of your tests are hermetic.
+
+With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `pants` process's environment.
+
+```toml tab={"label":"pants.toml"}
+[test]
+extra_env_vars = ["VAR1", "VAR2=hardcoded_value"]
+```
+
+```python tab={"label":"project/BUILD"}
+python_tests(
+    name="tests",
+    # Adds to all generated `python_test` targets,
+    # i.e. each file in the `sources` field.
+    extra_env_vars=["VAR3", "VAR4=hardcoded"],
+    # Even better, use `overrides` to be more granular.
+    overrides={
+        "strutil_test.py": {"extra_env_vars": ["VAR"]},
+        ("dirutil_test.py", "osutil_test.py"): {"extra_env_vars": ["VAR5"]},
+    },
+)
+```
+
+:::note Tip: avoiding collisions between concurrent `pytest` runs using env vars
+Sometimes your tests/code will need to reach outside of the sandbox, for example to initialize a test DB schema. In these cases you may see conflicts between concurrent `pytest` processes scheduled by Pants, when two or more tests try to set up / tear down the same resource concurrently. To avoid this issue, you can set `[pytest].execution_slot_var` to be a valid environment variable name. Pants will then inject a variable with that name into each `pytest` run, using the process execution slot ID (an integer) as the variable's value. You can then update your test code to check for the presence of the variable and incorporate its value into generated DB names / file paths. For example, in a project using `pytest-django` you could do:
+
+```toml tab={"label":"pants.toml"}
+[pytest]
+execution_slot_var = "PANTS_EXECUTION_SLOT"
+```
+
+```python tab={"label":"src/conftest.py"}
+from pytest_django.fixtures import _set_suffix_to_test_databases
+from pytest_django.lazy_django import skip_if_no_django
+
+@pytest.fixture(scope="session")
+def django_db_modify_db_settings():
+    skip_if_no_django()
+    if "PANTS_EXECUTION_SLOT" in os.environ:
+        _set_suffix_to_test_databases(os.environ["PANTS_EXECUTION_SLOT"])
+```
+
+:::
+
+## Batching and parallelism
+
+By default, Pants will schedule concurrent `pytest` runs for each Python test file passed to the `test` goal. This approach provides parallelism with fine-grained caching, but can have drawbacks in some situations:
+
+- `package`- and `session`-scoped `pytest` fixtures will execute once per `python_test` target, instead of once per directory / once overall. This can cause significant overhead if you have many tests scoped under a time-intensive fixture (i.e. a fixture that sets up a large DB schema).
+- Tests _within_ a `python_test` file will execute sequentially. This can be slow if you have large files containing many tests.
+
+### Batching tests
+
+Running multiple test files within a single `pytest` process can sometimes improve performance by allowing reuse of expensive high-level `pytest` fixtures. Pants allows users to opt into this behavior via the `batch_compatibility_tag` field on `python_test`, with the following rules:
+
+- If the field is not set, the `python_test` is assumed to be incompatible with all others and will run in a dedicated `pytest` process.
+- If the field is set and is different from the value on some other `python_test`, the tests are explicitly incompatible and are guaranteed to not run in the same `pytest` process.
+- If the field is set and is equal to the value on some other `python_test`, the tests are explicitly compatible and _may_ run in the same `pytest` process.
+
+Compatible tests _may not_ end up in the same `pytest` batch if:
+
+- There are "too many" tests with the same `batch_compatibility_tag`, as determined by the `[test].batch_size` setting.
+- Compatible tests have some incompatibility in Pants metadata (i.e. different `resolve` or `extra_env_vars`).
+
+Compatible tests that _do_ end up in the same batch will run in a single `pytest` invocation. By default the tests will run sequentially, but they can be parallelized by enabling `pytest-xdist` (see below). A single success/failure result will be reported for the entire batch, and additional output files (i.e. XML results and coverage) will encapsulate all of the included Python test files.
+
+:::note Tip: finding failed tests in large batches
+It can sometimes be difficult to locate test failures in the logging output of a large `pytest` batch. You can pass the `-r` flag to `pytest` to make this investigation easier:
+
+```bash
+❯ pants test :: -- -r
+```
+
+This will cause `pytest` to print a "summary report" at the end of its output, including the names of all failed tests. See the `pytest` docs [here](https://docs.pytest.org/en/6.2.x/usage.html#detailed-summary-report) for more information.
+:::
+
+The high-level `pytest` fixtures that motivate batched testing are often defined in a `conftest.py` near the root of your repository, applying to every test in a directory tree. In these cases, you can mark all the tests in the directory tree as compatible using the [`__defaults__` builtin](../../using-pants/key-concepts/targets-and-build-files.mdx#field-default-values):
+
+```python title="BUILD"
+python_test_utils()
+
+__defaults__({(python_test, python_tests): dict(batch_compatibility_tag="your-tag-here"),})
+```
+
+:::caution Caching batched tests
+Batched test results are cached together by Pants, meaning that if any file in the batch changes (or if a file is added to / removed from the batch) then the entire batch will be invalidated and need to re-run. Depending on the time it takes to execute your fixtures and the number of tests sharing those fixtures, you may see better performance overall by setting a lower value for `[test].batch_size`, improving your cache-hit rate to skip running tests more often.
+:::
+
+### Parallelism via `pytest-xdist`
+
+Pants includes built-in support for `pytest-xdist`, which can be enabled by setting:
+
+```toml title="pants.toml"
+[pytest]
+xdist_enabled = true
+```
+
+This will cause Pants to pass `-n <concurrency>` when running `pytest`. When this is set, `pytest` will parallelize the tests _within_ your `python_test` file, instead of running them sequentially. If multiple `python_test`s are batched into the same process, `pytest-xdist` will parallelize the tests within _all_ of the files - this can help you regain the benefits of Pants' native concurrency when running batched tests.
+
+By default, Pants will automatically compute the value of `<concurrency>` for each target based on the number of tests defined in the file and the number of available worker threads. You can instead set a hard-coded upper limit on the concurrency per target:
+
+```python title="BUILD"
+python_test(name="tests", source="tests.py", xdist_concurrency=4)
+```
+
+To explicitly disable the use of `pytest-xdist` for a target, set `xdist_concurrency=0`. This can be necessary for tests that are not safe to run in parallel.
+
+:::caution Parallelism in multiple concurrent processes
+Pants will limit the total number of parallel tests running across _all_ scheduled processes so that it does not exceed the configured value of `[GLOBAL].process_execution_local_parallelism` (by default, the number of CPUs available on the machine running Pants). For example, if your machine has 8 CPUs and Pants schedules 8 concurrent `pytest` processes with `pytest-xdist` enabled, it will pass `-n 1` to each process so that the total concurrency is 8.
+
+It is possible to work around this behavior by marking all of your `python_test` targets as batch-compatible and setting a very large value for `[test].batch_size`. This will cause Pants to schedule fewer processes (containing more `python_test`s each) overall, allowing for larger values of `-n <concurrency>`. Note however that this approach will limit the cacheability of your tests.
+:::
+
+When `pytest-xdist` is in use, the `PYTEST_XDIST_WORKER` and `PYTEST_XDIST_WORKER_COUNT` environment variables will be automatically set. You can use those values (in addition to `[pytest].execution_slot_var`) to avoid collisions between parallel tests (i.e. by using the combination of `[pytest].execution_slot_var` and `PYTEST_XDIST_WORKER` as a suffix for generated database names / file paths).
+
+:::caution `pytest-xdist` and high-level fixtures
+Use of `pytest-xdist` may cause high-level `pytest` fixtures to execute more often than expected. See the `pytest-xdist` docs [here](https://pypi.org/project/pytest-xdist/#making-session-scoped-fixtures-execute-only-once) for more details, and tips on how to mitigate this.
+:::
+
+## Force reruns with `--force`
+
+To force your tests to run again, rather than reading from the cache, run `pants test --force path/to/test.py`.
+
+## Debugging Tests
+
+Because Pants runs multiple test targets in parallel, you will not see your test results appear on the screen until the test has completely finished. This means that you cannot use debuggers normally; the breakpoint will never show up on your screen and the test will hang indefinitely (or timeout, if timeouts are enabled).
+
+Instead, if you want to run a test interactively—such as to use a debugger like `pdb`—run your tests with `pants test --debug`. For example:
+
+```python tab={"label":"test_debug_example.py"}
+def test_debug():
+    import pdb; pdb.set_trace()
+    assert 1 + 1 == 2
+```
+
+```text tab={"label":"Shell"}
+❯ pants test --debug test_debug_example.py
+
+===================================================== test session starts =====================================================
+platform darwin -- Python 3.6.10, pytest-5.3.5, py-1.8.1, pluggy-0.13.1
+rootdir: /private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/.tmpn2li0z
+plugins: cov-2.8.1, timeout-1.3.4
+collected 6 items
+
+test_debug_example.py
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> PDB set_trace (IO-capturing turned off) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+> /private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/.tmpn2li0z/test_debug_example.py(11)test_debug()
+-> assert 1 + 1 == 2
+(Pdb) 1 + 1
+2
+```
+
+If you use multiple files with `test --debug`, they will run sequentially rather than in parallel.
+
+:::note Tip: using `ipdb` in tests
+[`ipdb`](https://github.com/gotcha/ipdb) integrates IPython with the normal `pdb` debugger for enhanced features like autocomplete and improved syntax highlighting. `ipdb` is very helpful when debugging tests.
+
+To be able to access `ipdb` when running tests, add this to your `pants.toml`:
+
+```toml
+[pytest]
+extra_requirements.add = ["ipdb"]
+```
+
+Then, you can use `import ipdb; ipdb.set_trace()` in your tests.
+
+To run the tests you will need to add `-- -s` to the test call since ipdb will need stdin and pytest will capture it.
+
+```bash
+❯ pants test --debug  <target>   -- -s
+```
+
+:::
+
+:::note Tip: using the VS Code (or any [DAP](https://microsoft.github.io/debug-adapter-protocol/)-compliant editor) remote debugger in tests
+
+1. In your editor, set your breakpoints and any other debug settings (like break-on-exception).
+2. Run your test with `pants test --debug-adapter`.
+3. Connect your editor to the server. The server host and port are logged by Pants when executing `test --debug-adapter`. (They can also be configured using the `[debug-adapter]` subsystem).
+
+:::
+
+> Run your test with `pants test --debug` as usual.
+
+:::note Tip: using the IntelliJ/PyCharm remote debugger in tests
+First, add this to your `pants.toml`:
+
+```toml
+[pytest]
+extra_requirements.add = ["pydevd-pycharm==203.5419.8"]  # Or whatever version you choose.
+```
+
+Now, use the remote debugger as usual:
+
+1. Start a Python remote debugging session in PyCharm, say on port 5000.
+2. Add the following code at the point where you want execution to pause and connect to the debugger:
+
+```python
+import pydevd_pycharm
+pydevd_pycharm.settrace('localhost', port=5000, stdoutToServer=True, stderrToServer=True)
+```
+
+Run your test with `pants test --debug` as usual.
+:::
+
+## Timeouts
+
+Pants can cancel tests which take too long. This is useful to prevent tests from hanging indefinitely.
+
+To add a timeout, set the `timeout` field to an integer value of seconds, like this:
+
+```python title="BUILD"
+python_test(name="tests", source="tests.py", timeout=120)
+```
+
+When you set timeout on the `python_tests` target generator, the same timeout will apply to every generated `python_test` target.
+
+```python title="BUILD"
+python_tests(
+    name="tests",
+    overrides={
+        "test_f1.py": {"timeout": 20},
+        ("test_f2.py", "test_f3.py"): {"timeout": 35},
+    },
+)
+```
+
+You can also set a default value and a maximum value in `pants.toml`:
+
+```toml title="pants.toml"
+[test]
+timeout_default = 60
+timeout_maximum = 600
+```
+
+If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
+
+:::note Tip: temporarily ignoring timeouts
+When debugging locally, such as with `pdb`, you might want to temporarily disable timeouts. To do this, set `--no-test-timeouts`:
+
+```bash
+$ pants test project/app_test.py --no-test-timeouts
+```
+
+:::
+
+## Test utilities and resources
+
+### Test utilities
+
+Use the target type `python_source` for test utilities, rather than `python_test`.
+
+To reduce boilerplate, you can use either the [`python_sources`](../../../reference/targets/python_sources.mdx) or [`python_test_utils`](../../../reference/targets/python_test_utils.mdx) targets to generate `python_source` targets. These behave the same, except that `python_test_utils` has a different default `sources` to include `conftest.py` and type stubs for tests (like `test_foo.pyi`). Use [`pants tailor ::`](../../getting-started/initial-configuration.mdx#5-generate-build-files) to generate both these targets automatically.
+
+For example:
+
+```python tab={"label":"helloworld/BUILD"}
+# The default `sources` includes all files other than
+# `!*_test.py`, `!test_*.py`, and `tests.py`, and `conftest.py`.
+python_sources(name="lib")
+
+# We leave off the `dependencies` field because Pants will infer
+# it based on import statements.
+python_tests(name="tests")
+```
+
+```python tab={"label":"helloworld/testutils.py"}
+...
+
+@contextmanager
+def setup_tmpdir(files: Mapping[str, str]) -> Iterator[str]:
+    with temporary_dir() as tmpdir:
+        ...
+        yield rel_tmpdir
+```
+
+```python tab={"label":"helloworld/app_test.py"}
+from helloworld.testutils import setup_tmpdir
+
+def test_app() -> None:
+    with setup_tmpdir({"f.py": "print('hello')"}):
+       assert ...
+```
+
+### Assets
+
+Refer to [Assets](../../using-pants/assets-and-archives.mdx) for how to include asset files in your tests by adding to the `dependencies` field.
+
+It's often most convenient to use `file` / `files` and `relocated_files` targets in your test code, although you can also use `resource` / `resources` targets.
+
+## Testing your packaging pipeline
+
+You can include the result of `pants package` in your test through the `runtime_package_dependencies` field. Pants will run the equivalent of `pants package` beforehand and copy the built artifact into the test's chroot, allowing you to test things like that the artifact has the correct files present and that it's executable.
+
+This allows you to test your packaging pipeline by simply running `pants test ::`, without needing custom integration test scripts.
+
+To depend on a built package, use the `runtime_package_dependencies` field on the `python_test` / `python_tests` target, which is a list of addresses to targets that can be built with `pants package`, such as `pex_binary`, `python_aws_lambda_function`, and `archive` targets. Pants will build the package before running your test, and insert the file into the test's chroot. It will use the same name it would normally use with `pants package`, except without the `dist/` prefix (set by the `output_path` field).
+
+For example:
+
+```python tab={"label":"helloworld/BUILD"}
+# This target teaches Pants about our non-test Python files.
+python_sources(name="lib")
+
+pex_binary(
+    name="bin",
+    entry_point="say_hello.py",
+)
+
+python_tests(
+    name="tests",
+    runtime_package_dependencies=[":bin"],
+)
+```
+
+```python tab={"label":"helloworld/say_hello.py"}
+print("Hello, test!")
+```
+
+```python tab={"label":"helloworld/test_binary.py"}
+import subprocess
+
+def test_say_hello():
+    assert  b"Hello, test!" in subprocess.check_output(['helloworld/bin.pex'])
+```
+
+## Coverage
+
+To report coverage using [`Coverage.py`](https://coverage.readthedocs.io/en/coverage-5.1/), set the option `--test-use-coverage`:
+
+```bash
+❯ pants test --use-coverage helloworld/util/lang_test.py
+```
+
+Or to permanently use coverage, set in your config file:
+
+```toml title="pants.ci.toml"
+[test]
+use_coverage = true
+```
+
+:::caution Failure to parse files?
+Coverage defaults to running with Python 3.6+ when generating a report, which means it may fail to parse Python 2 syntax and Python 3.8+ syntax. You can fix this by changing the interpreter constraints for running Coverage:
+
+```toml
+# pants.toml
+[coverage-py]
+interpreter_constraints = [">=3.8"]
+```
+
+However, if your repository has some Python 2-only code and some Python 3-only code, you will not be able to choose an interpreter that works with both versions. So, you will need to set up a `.coveragerc` config file and set `ignore_errors = true` under `[report]`, like this:
+
+```
+# .coveragerc
+[report]
+ignore_errors = true
+```
+
+`ignore_errors = true` means that those files will simply be left off of the final coverage report.
+
+(Pants should autodiscover the config file `.coveragerc`. See [coverage-py](../../../reference/subsystems/coverage-py.mdx#section-config-discovery).)
+
+There's a proposal for Pants to fix this by generating multiple reports when necessary: [https://github.com/pantsbuild/pants/issues/11137](https://github.com/pantsbuild/pants/issues/11137). We'd appreciate your feedback.
+:::
+
+Coverage will report data on any files encountered during the tests. You can filter down the results by using the option `--coverage-py-filter` and passing the name(s) of modules you want coverage data for. Each module name is recursive, meaning submodules will be included. For example:
+
+```bash
+❯ pants test --use-coverage helloworld/util/lang_test.py --coverage-py-filter=helloworld.util
+❯ pants test --use-coverage helloworld/util/lang_test.py --coverage-py-filter='["helloworld.util.lang", "helloworld.util.lang_test"]'
+```
+
+:::note Set `global_report` to include un-encountered files
+By default, coverage.py will only report on files encountered during the tests' run. This means
+that your coverage score may be misleading; even with a score of 100%, you may have files
+without any tests.
+
+Instead, you can set `global_report = true`:
+
+```toml title="pants.toml"
+[coverage-py]
+global_report = true
+```
+
+Coverage.py will report on [all files it considers importable](https://coverage.readthedocs.io/en/6.3.2/source.html),
+i.e. files at the root of the tree, or in directories with a `__init__.py` file. It may still omit
+files in [implicit namespace packages](https://peps.python.org/pep-0420/) that lack `__init__.py` files.
+This is a shortcoming of Coverage.py itself.
+:::
+
+Pants will default to writing the results to the console, but you can also output in HTML, XML, JSON, or the raw SQLite file:
+
+```toml title="pants.toml"
+[coverage-py]
+report = ["raw", "xml", "html", "json", "console"]
+```
+
+You can change the output dir with the `output_dir` option in the `[coverage-py]` scope.
+
+You may want to set `[coverage-py].fail_under` to cause Pants to gracefully fail if coverage is too low, e.g. `fail_under = 70`.
+
+You may use a Coverage config file, e.g. `.coveragerc` or `pyproject.toml`. Pants will autodiscover the config file for you, and you can also set `[coverage-py].config` in your `pants.toml` to point to a non-standard location.
+
+:::note You must include `relative_files = true` in the `[run]` section for Pants to work:
+
+```toml title=".coveragerc"
+[run]
+relative_files = true
+branch = true
+```
+
+:::
+
+When generating HTML, XML, and JSON reports, you can automatically open the reports through the option `--test-open-coverage`.
+
+## JUnit XML results
+
+Pytest can generate [JUnit XML result files](https://docs.pytest.org/en/6.2.x/usage.html#creating-junitxml-format-files). This allows you to hook up your results, for example, to dashboards.
+
+To save JUnit XML result files, set the option `[test].report`, like this:
+
+```toml title="pants.toml"
+[test]
+report = true
+```
+
+This will default to writing test reports to `dist/test/reports`. You may also want to set the option `[pytest].junit_family` to change the format. Run `pants help-advanced pytest` for more information.
+
+## Customizing Pytest command line options per target
+
+You can set `PYTEST_ADDOPTS` environment variable to add your own command line options, like this:
+
+```python title="BUILD"
+python_tests(
+    name="tests",
+    ...
+    extra_env_vars=[
+        "PYTEST_ADDOPTS=-p myplugin --reuse-db",
+    ],
+    ...
+)
+```
+
+Take note that Pants uses some CLI args for its internal mechanism of controlling Pytest (`--color`, `--junit-xml`, `junit_family`, `--cov`, `--cov-report` and `--cov-config`). If these options are overridden, Pants Pytest handling may not work correctly. Set these at your own peril!
+
+## Failures to collect tests
+
+`pytest` follows [certain conventions for test discovery](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html#conventions-for-python-test-discovery), so if no (or only some) tests are run, it may be worth reviewing the documentation. Pants can help you find test modules that would not be collected by `pytest`. For instance, `pants tailor --check ::` command would suggest creating targets for files that are not covered by glob expressions in your `BUILD` files (e.g. if a test module has a typo and is named `tes_connection.py`). You can also run `pants --filter-target-type=python_test filedeps <test-dir>::` command to list all test files known to Pants and compare the output with the list of files that exist on disk.
+
+If your tests fail to import the source modules, it may be due to the import mode used by `pytest`, especially if you are using [namespace packages](https://packaging.python.org/en/latest/guides/packaging-namespace-packages/). Please review [Choosing an import mode](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html#choosing-an-import-mode) and [pytest import mechanisms and sys.path/PYTHONPATH](https://docs.pytest.org/en/7.1.x/explanation/pythonpath.html#import-modes) to learn more.

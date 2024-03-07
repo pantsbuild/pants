@@ -264,7 +264,7 @@ class EntireLockfile:
     """A request to resolve the entire contents of a lockfile.
 
     This resolution mode is used in a few cases:
-    1. for poetry or hand-written lockfiles (which do not support being natively subsetted the
+    1. for poetry or handwritten lockfiles (which do not support being natively subsetted the
        way that a PEX lockfile can be), in order to build a repository-PEX to subset separately.
     2. for tool lockfiles, which (regardless of format), need to resolve the entire lockfile
        content anyway.
@@ -349,8 +349,7 @@ class ResolvePexConfig:
     def pex_args(self) -> Iterator[str]:
         """Arguments for Pex for indexes/--find-links, manylinux, and path mappings.
 
-        Does not include arguments for constraints files, --only-binary, and --no-binary, which must
-        be set up independently.
+        Does not include arguments for constraints files, which must be set up independently.
         """
         # NB: In setting `--no-pypi`, we rely on the default value of `[python-repos].indexes`
         # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
@@ -366,6 +365,30 @@ class ResolvePexConfig:
             yield self.manylinux
         else:
             yield "--no-manylinux"
+
+        # Pex logically plumbs through equivalent settings, but uses a
+        # separate flag instead of the Pip magic :all:/:none: syntax.  To
+        # support the exitings Pants config settings we need to go from
+        # :all:/:none: --> Pex options, which Pex will translate back into Pip
+        # options.  Note that Pex's --wheel (for example) means "allow
+        # wheels", not "require wheels".
+        if self.only_binary and ":all:" in self.only_binary:
+            yield "--wheel"
+            yield "--no-build"
+        elif self.only_binary and ":none:" in self.only_binary:
+            yield "--no-wheel"
+            yield "--build"
+        elif self.only_binary:
+            yield from (f"--only-binary={pkg}" for pkg in self.only_binary)
+
+        if self.no_binary and ":all:" in self.no_binary:
+            yield "--no-wheel"
+            yield "--build"
+        elif self.no_binary and ":none:" in self.no_binary:
+            yield "--wheel"
+            yield "--no-build"
+        elif self.no_binary:
+            yield from (f"--only-build={pkg}" for pkg in self.no_binary)
 
         yield from (f"--path-mapping={v}" for v in self.path_mappings)
 
@@ -554,10 +577,8 @@ def _invalid_lockfile_error(
     consumed_msg_parts = [f"`{str(r)}`" for r in user_requirements[0:2]]
     if len(user_requirements) > 2:
         consumed_msg_parts.append(
-            (
-                f"{len(user_requirements) - 2} other "
-                f"{pluralize(len(user_requirements) - 2, 'requirement', include_count=False)}"
-            )
+            f"{len(user_requirements) - 2} other "
+            f"{pluralize(len(user_requirements) - 2, 'requirement', include_count=False)}"
         )
 
     yield f"\n\nYou are consuming {comma_separated_list(consumed_msg_parts)} from "
@@ -628,13 +649,13 @@ def _invalid_lockfile_error(
             (see below).
             """
         )
-        yield f"\n\nSee {doc_url('python-interpreter-compatibility')} for details."
+        yield f"\n\nSee {doc_url('docs/python/overview/interpreter-compatibility')} for details."
 
     yield "\n\n"
     yield from _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)
     yield "To regenerate your lockfile, "
     yield f"run `{bin_name()} generate-lockfiles --resolve={resolve}`."
-    yield f"\n\nSee {doc_url('python-third-party-dependencies')} for details.\n\n"
+    yield f"\n\nSee {doc_url('docs/python/overview/third-party-dependencies')} for details.\n\n"
 
 
 def rules():

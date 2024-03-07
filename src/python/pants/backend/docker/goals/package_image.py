@@ -9,9 +9,7 @@ import re
 from dataclasses import asdict, dataclass
 from functools import partial
 from itertools import chain
-from typing import Iterator, cast
-
-from typing_extensions import Literal
+from typing import Iterator, Literal, cast
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
 # a dependency cycle from docker_build_context.
@@ -19,7 +17,10 @@ from pants.backend.docker.package_types import BuiltDockerImage as BuiltDockerIm
 from pants.backend.docker.registries import DockerRegistries, DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
+    DockerBuildKitOptionField,
     DockerBuildOptionFieldMixin,
+    DockerBuildOptionFieldMultiValueDictMixin,
+    DockerBuildOptionFieldMultiValueMixin,
     DockerBuildOptionFieldValueMixin,
     DockerBuildOptionFlagFieldMixin,
     DockerImageContextRootField,
@@ -42,10 +43,10 @@ from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
+from pants.engine.target import InvalidFieldException, Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
-from pants.util.strutil import bullet_list
+from pants.util.strutil import bullet_list, softwrap
 from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
 logger = logging.getLogger(__name__)
@@ -93,8 +94,9 @@ class DockerPackageFieldSet(PackageFieldSet):
     ) -> str:
         repository_context = InterpolationContext.from_dict(
             {
-                "directory": os.path.basename(self.address.spec_path),
                 "name": self.address.target_name,
+                "directory": os.path.basename(self.address.spec_path),
+                "full_directory": self.address.spec_path,
                 "parent_directory": os.path.basename(os.path.dirname(self.address.spec_path)),
                 "default_repository": default_repository,
                 "target_repository": self.repository.value or default_repository,
@@ -311,11 +313,34 @@ def get_build_options(
     context: DockerBuildContext,
     field_set: DockerPackageFieldSet,
     global_target_stage_option: str | None,
+    global_build_hosts_options: dict | None,
+    global_build_no_cache_option: bool | None,
+    use_buildx_option: bool,
     target: Target,
 ) -> Iterator[str]:
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
-        if issubclass(field_type, DockerBuildOptionFieldMixin):
+        if issubclass(field_type, DockerBuildKitOptionField):
+            if use_buildx_option is not True:
+                if target[field_type].value != target[field_type].default:
+                    raise DockerImageOptionValueError(
+                        f"The {target[field_type].alias} field on the = `{target.alias}` target in `{target.address}` was set to `{target[field_type].value}`"
+                        f" and buildx is not enabled. Buildx must be enabled via the Docker subsystem options in order to use this field."
+                    )
+                else:
+                    # Case where BuildKit option has a default value - still should not be generated
+                    continue
+
+        if issubclass(
+            field_type,
+            (
+                DockerBuildOptionFieldMixin,
+                DockerBuildOptionFieldMultiValueDictMixin,
+                DockerBuildOptionFieldValueMixin,
+                DockerBuildOptionFieldMultiValueMixin,
+                DockerBuildOptionFlagFieldMixin,
+            ),
+        ):
             source = InterpolationContext.TextSource(
                 address=target.address, target_alias=target.alias, field_alias=field_type.alias
             )
@@ -324,11 +349,7 @@ def get_build_options(
                 source=source,
                 error_cls=DockerImageOptionValueError,
             )
-            yield from target[field_type].options(format)
-        elif issubclass(field_type, DockerBuildOptionFieldValueMixin):
-            yield from target[field_type].options()
-        elif issubclass(field_type, DockerBuildOptionFlagFieldMixin):
-            yield from target[field_type].options()
+            yield from target[field_type].options(format, global_build_hosts_options=global_build_hosts_options)  # type: ignore[attr-defined]
 
     # Target stage
     target_stage = None
@@ -350,6 +371,9 @@ def get_build_options(
 
     if target_stage:
         yield from ("--target", target_stage)
+
+    if global_build_no_cache_option:
+        yield "--no-cache"
 
 
 @rule
@@ -392,6 +416,16 @@ async def build_docker_image(
         )
     )
     tags = tuple(tag.full_name for registry in image_refs for tag in registry.tags)
+    if not tags:
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                The `{DockerImageTagsField.alias}` field in target {field_set.address} must not be
+                empty, unless there is a custom plugin providing additional tags using the
+                `DockerImageTagsRequest` union type.
+                """
+            )
+        )
 
     # Mix the upstream image ids into the env to ensure that Pants invalidates this
     # image-building process correctly when an upstream image changes, even though the
@@ -408,11 +442,15 @@ async def build_docker_image(
         context_root=context_root,
         env=env,
         tags=tags,
+        use_buildx=options.use_buildx,
         extra_args=tuple(
             get_build_options(
                 context=context,
                 field_set=field_set,
                 global_target_stage_option=options.build_target_stage,
+                global_build_hosts_options=options.build_hosts,
+                global_build_no_cache_option=options.build_no_cache,
+                use_buildx_option=options.use_buildx,
                 target=wrapped_target.target,
             )
         ),
@@ -437,7 +475,7 @@ async def build_docker_image(
             keep_sandboxes=keep_sandboxes,
         )
 
-    image_id = parse_image_id_from_docker_build_output(result.stdout, result.stderr)
+    image_id = parse_image_id_from_docker_build_output(docker, result.stdout, result.stderr)
     docker_build_output_msg = "\n".join(
         (
             f"Docker build output for {tags[0]}:",
@@ -463,36 +501,53 @@ async def build_docker_image(
     )
 
 
-def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
+def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: bytes) -> str:
     """Outputs are typically the stdout/stderr pair from the `docker build` process."""
     # NB: We use the extracted image id for invalidation. The short_id may theoretically
     #  not be unique enough, although in a non adversarial situation, this is highly unlikely
     #  to be an issue in practice.
-    image_id_regexp = re.compile(
-        "|".join(
-            (
-                # BuildKit output.
-                r"(writing image (?P<digest>sha256:\S+) done)",
-                # Docker output.
-                r"(Successfully built (?P<short_id>\S+))",
-            ),
+    if docker.is_podman:
+        for output in outputs:
+            try:
+                _, image_id, success, *__ = reversed(output.decode().split("\n"))
+            except ValueError:
+                continue
+
+            if success.startswith("Successfully tagged"):
+                return image_id
+
+    else:
+        image_id_regexp = re.compile(
+            "|".join(
+                (
+                    # BuildKit output.
+                    r"(writing image (?P<digest>sha256:\S+) done)",
+                    # BuildKit with containerd-snapshotter output.
+                    r"(exporting manifest list (?P<manifest_list>sha256:\S+) done)",
+                    # Docker output.
+                    r"(Successfully built (?P<short_id>\S+))",
+                ),
+            )
         )
-    )
-    for output in outputs:
-        image_id_match = next(
-            (
-                match
-                for match in (
-                    re.search(image_id_regexp, line)
-                    for line in reversed(output.decode().split("\n"))
+        for output in outputs:
+            image_id_match = next(
+                (
+                    match
+                    for match in (
+                        re.search(image_id_regexp, line)
+                        for line in reversed(output.decode().split("\n"))
+                    )
+                    if match
+                ),
+                None,
+            )
+            if image_id_match:
+                image_id = (
+                    image_id_match.group("digest")
+                    or image_id_match.group("short_id")
+                    or image_id_match.group("manifest_list")
                 )
-                if match
-            ),
-            None,
-        )
-        if image_id_match:
-            image_id = image_id_match.group("digest") or image_id_match.group("short_id")
-            return image_id
+                return image_id
 
     return "<unknown>"
 

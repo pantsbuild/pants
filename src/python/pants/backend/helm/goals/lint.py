@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
+    HelmChartLintQuietField,
     HelmChartLintStrictField,
     HelmSkipLintField,
 )
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class HelmLintFieldSet(HelmChartFieldSet):
     lint_strict: HelmChartLintStrictField
+    lint_quiet: HelmChartLintQuietField
     skip_lint: HelmSkipLintField
 
 
@@ -64,6 +66,9 @@ async def run_helm_lint(
     strict = field_set.lint_strict.value or helm_subsystem.lint_strict
     if strict:
         argv.append("--strict")
+    quiet = field_set.lint_quiet.value or helm_subsystem.lint_quiet
+    if quiet:
+        argv.append("--quiet")
 
     process_result = await Get(
         FallibleProcessResult,

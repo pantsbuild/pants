@@ -6,19 +6,22 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-async-trait = "0.1"
+async-trait = { workspace = true }
 async_value = { path = "../async_value" }
-fnv = "1.0.5"
-futures = "0.3"
-fixedbitset = "0.4"
-log = "0.4"
-parking_lot = "0.12"
-petgraph = "0.6"
+fnv = { workspace = true }
+futures = { workspace = true }
+fixedbitset = { workspace = true }
+log = { workspace = true }
+parking_lot = { workspace = true }
+petgraph = { workspace = true }
 task_executor = { path = "../task_executor" }
-tokio = { version = "1.28", features = ["time", "parking_lot"] }
+tokio = { workspace = true, features = ["time", "parking_lot"] }
 workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]
-rand = "0.8"
-env_logger = "0.10.0"
-tokio = { version = "1.28", features = ["macros", "rt-multi-thread", "time"] }
+rand = { workspace = true }
+env_logger = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true

@@ -58,7 +58,7 @@ class PythonToolRequirementsBase(Subsystem):
             If specified, install the tool using the lockfile for this named resolve.
 
             This resolve must be defined in `[python].resolves`, as described in
-            {doc_url("python-third-party-dependencies#user-lockfiles")}.
+            {doc_url("docs/python/overview/third-party-dependencies#user-lockfiles")}.
 
             The resolve's entire lockfile will be installed, unless specific requirements are
             listed via the `requirements` option, in which case only those requirements
@@ -214,6 +214,13 @@ class PythonToolBase(PythonToolRequirementsBase):
 
     # Subclasses must set.
     default_main: ClassVar[MainSpecification]
+
+    # Though possible, we do not recommend setting `default_main` to an Executable
+    # instead of a ConsoleScript or an EntryPoint. Executable is a niche pex feature
+    # designed to support poorly named executable python scripts that cannot be imported
+    # (eg when a file has a character like "-" that is not valid in python identifiers).
+    # As this should be rare or even non-existent, we do NOT add an `executable` option
+    # to mirror the other MainSpecification options.
 
     console_script = StrOption(
         advanced=True,

@@ -190,6 +190,14 @@ class DockerImageField(StringField):
         The choice of image ID can affect the reproducibility of builds. Consider using an
         immutable digest if reproducibility is needed, but regularly ensure that the image
         is free of relevant bugs or security vulnerabilities.
+
+        Note that in order to use an image as a `docker_environment` it must have a few tools:
+        - `/bin/sh`
+        - `/usr/bin/env`
+        - `bash`
+        - `tar`
+
+        While most images will have these preinstalled, users of base images such as Distroless or scratch will need to bake these tools into the image themselves. All of these except `bash` are available via busybox.
         """
     )
 
@@ -789,7 +797,7 @@ async def resolve_environment_name(
                 machine's platform: {localhost_platform}. The environment only works with the
                 platforms: {env_tgt.val[CompatiblePlatformsField].value}
 
-                Consider setting the the field `{FallbackEnvironmentField.alias}` for the target
+                Consider setting the field `{FallbackEnvironmentField.alias}` for the target
                 {env_tgt.val.address}, such as to a `docker_environment` or `remote_environment`
                 target. You can also set that field to another `local_environment` target, such as
                 one that is compatible with the current platform {localhost_platform}.

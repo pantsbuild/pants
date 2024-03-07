@@ -4,8 +4,13 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 import time
+from pathlib import Path
 from typing import NoReturn
+
+VERSION_PATH = Path("src/python/pants/VERSION")
+CONTRIBUTORS_PATH = Path("CONTRIBUTORS.md")
 
 _SCRIPT_START_TIME = time.time()
 
@@ -20,12 +25,15 @@ def die(message: str) -> NoReturn:
 
 
 def green(message: str) -> None:
-    print(f"{_COLOR_GREEN}{message}{_COLOR_RESET}")
+    print(f"{_COLOR_GREEN}{message}{_COLOR_RESET}", file=sys.stderr)
 
 
 def banner(message: str) -> None:
     minutes, seconds = elapsed_time()
-    print(f"{_COLOR_BLUE}[=== {minutes:02d}:{seconds:02d} {message} ===]{_COLOR_RESET}")
+    print(
+        f"{_COLOR_BLUE}[=== {minutes:02d}:{seconds:02d} {message} ===]{_COLOR_RESET}",
+        file=sys.stderr,
+    )
 
 
 def elapsed_time() -> tuple[int, int]:
@@ -44,5 +52,5 @@ def sorted_contributors(git_range: str) -> list[str]:
         .stdout.decode()
         .splitlines()
     )
-    contributors -= {"dependabot[bot]"}
+    contributors -= {"dependabot[bot]", "Worker Pants (Pantsbuild GitHub Automation Bot)"}
     return sorted(contributors)
