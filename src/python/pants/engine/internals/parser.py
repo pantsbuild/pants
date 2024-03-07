@@ -106,11 +106,13 @@ class ParseState(threading.local):
         self._target_adaptors: list[TargetAdaptor] = []
         self._is_bootstrap: bool | None = None
         self._env_vars: EnvironmentVars | None = None
+        self._pants_hashes: Mapping[tuple[str, ...], str] | None = None
         self._symbols = tuple(
             BuildFileSymbolInfo(name, value)
             for name, value in (
                 ("build_file_dir", self.build_file_dir),
                 ("env", self.get_env),
+                ("pants_hash", self.get_pants_hash),
                 ("__defaults__", self.set_defaults),
                 ("__dependents_rules__", self.set_dependents_rules),
                 ("__dependencies_rules__", self.set_dependencies_rules),
@@ -125,6 +127,7 @@ class ParseState(threading.local):
         dependents_rules: BuildFileDependencyRulesParserState | None,
         dependencies_rules: BuildFileDependencyRulesParserState | None,
         env_vars: EnvironmentVars,
+        pants_hashes: Mapping[tuple[str, ...], str],
     ) -> None:
         self._is_bootstrap = is_bootstrap
         self._defaults = defaults
@@ -132,6 +135,7 @@ class ParseState(threading.local):
         self._dependencies_rules = dependencies_rules
         self._env_vars = env_vars
         self._filepath = filepath
+        self._pants_hashes = pants_hashes
         self._target_adaptors.clear()
 
     def add(self, target_adaptor: TargetAdaptor) -> None:
@@ -180,6 +184,10 @@ class ParseState(threading.local):
         return self._prelude_check("env", self._env_vars)
 
     @property
+    def pants_hashes(self) -> Mapping[tuple[str, ...], str]:
+        return self._prelude_check("pants_hash", self._pants_hashes)
+
+    @property
     def is_bootstrap(self) -> bool:
         if self._is_bootstrap is None:
             raise AssertionError(
@@ -191,6 +199,12 @@ class ParseState(threading.local):
     def get_env(self, name: str, *args, **kwargs) -> Any:
         """Reference environment variable."""
         return self.env_vars.get(name, *args, **kwargs)
+
+    def get_pants_hash(self, *args, **kwargs) -> Any:
+        """Get source files hash value."""
+        # Turn any target types into their alias string value.
+        args = tuple(map(str, args))
+        return self.pants_hashes.get(args, **kwargs)
 
     @docstring(
         f"""Provide default field values.
@@ -380,6 +394,7 @@ class Parser:
         build_file_content: str,
         extra_symbols: BuildFilePreludeSymbols,
         env_vars: EnvironmentVars,
+        pants_hashes: Mapping[tuple[str, ...], str],
         is_bootstrap: bool,
         defaults: BuildFileDefaultsParserState,
         dependents_rules: BuildFileDependencyRulesParserState | None,
@@ -392,6 +407,7 @@ class Parser:
             dependents_rules=dependents_rules,
             dependencies_rules=dependencies_rules,
             env_vars=env_vars,
+            pants_hashes=pants_hashes,
         )
 
         global_symbols: dict[str, Any] = {
@@ -422,6 +438,7 @@ class Parser:
                         dependents_rules=dependents_rules,
                         dependencies_rules=dependencies_rules,
                         env_vars=env_vars,
+                        pants_hashes=pants_hashes,
                     )
                     continue
                 break

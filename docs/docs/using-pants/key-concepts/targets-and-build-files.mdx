@@ -60,6 +60,26 @@ python_distribution(
 )
 ```
 
+### Source file hashes
+
+For use cases where the current state of a set of source files needs to be captured, to be used as tag or version for some assets etc, Pants provides the `pants_hash()` function which returns the hash digest value (a string) calculated over a set of source files matching the globs provided to the function. The globs must be provided as string literals, or when provided a target type that has a `sources` field, the defaults for that target sources will be used. (as defined in code, any new defaults provided with `__defaults__` does not apply.)
+
+```python title="helloworld/pkg/BUILD"
+python_distribution(
+  name="helloworld-dist",
+  provides=python_artifact(
+    name="helloworld",
+    version=pants_hash(python_sources, "res/**", "!generated_*.py"),
+  ),
+)
+```
+
+Note: when using `python_sources` it only includes Python source files from the current directory, as the default globs for that target does not include files recursively.
+
+:::note Only files present on disk (and not covered by `[GLOBAL].pants_ignore`) when pants starts are available for hashing.
+This means that packaged or generated files etc are not covered. Run with `pants -ldebug ...` for diagnostics of what pants sees when troubleshooting issues with `pants_hash()`.
+:::
+
 ## Target addresses
 
 A target is identified by its unique address, in the form `path/to/dir:name`. The above example has the addresses `helloworld/greet:tests` and `helloworld/greet:bin`.

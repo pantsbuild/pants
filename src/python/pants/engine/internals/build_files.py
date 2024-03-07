@@ -10,9 +10,11 @@ import logging
 import os.path
 import sys
 import typing
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Sequence, cast
+from pprint import pformat
+from typing import Any, Mapping, Sequence, cast
 
 from pants.build_graph.address import (
     Address,
@@ -24,7 +26,14 @@ from pants.build_graph.address import (
 )
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import DigestContents, FileContent, GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.fs import (
+    DigestContents,
+    FileContent,
+    GlobMatchErrorBehavior,
+    PathGlobs,
+    Paths,
+    Snapshot,
+)
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
@@ -49,10 +58,11 @@ from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
     RegisteredTargetTypes,
+    SourcesField,
 )
 from pants.engine.unions import UnionMembership
 from pants.init.bootstrap_scheduler import BootstrapStatus
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, UnmatchedBuildFileGlobs
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
@@ -134,7 +144,7 @@ async def evaluate_preludes(
         except Exception as e:
             raise Exception(f"Error parsing prelude file {file_content.path}: {e}")
         error_on_imports(file_content_str, file_content.path)
-        env_vars.update(BUILDFileEnvVarExtractor.get_env_vars(file_content))
+        env_vars.update(BUILDFilePreProcessor.get_env_vars(file_content))
     # __builtins__ is a dict, so isn't hashable, and can't be put in a FrozenDict.
     # Fortunately, we don't care about it - preludes should not be able to override builtins, so we just pop it out.
     # TODO: Give a nice error message if a prelude tries to set a expose a non-hashable value.
@@ -220,24 +230,48 @@ async def ensure_address_family(request: OptionalAddressFamily) -> AddressFamily
     return request.ensure()
 
 
-class BUILDFileEnvVarExtractor(ast.NodeVisitor):
+class BUILDFilePreProcessor(ast.NodeVisitor):
     def __init__(self, filename: str):
         super().__init__()
         self.env_vars: set[str] = set()
+        self.hash_sources: dict[
+            tuple[int, int], list[tuple[str | tuple[str, str], ...]]
+        ] = defaultdict(list)
         self.filename = filename
 
     @classmethod
-    def get_env_vars(cls, file_content: FileContent) -> Sequence[str]:
+    def create(cls, file_content: FileContent) -> BUILDFilePreProcessor:
         obj = cls(file_content.path)
         try:
             obj.visit(ast.parse(file_content.content, file_content.path))
         except SyntaxError as e:
             raise BuildFileSyntaxError.from_syntax_error(e).with_traceback(e.__traceback__)
+        else:
+            return obj
 
+    @classmethod
+    def get_env_vars(cls, file_content: FileContent) -> Sequence[str]:
+        obj = cls.create(file_content)
         return tuple(obj.env_vars)
 
+    @staticmethod
+    def node_value(node: ast.AST) -> str | None:
+        if sys.version_info[0:2] < (3, 8):
+            return node.s if isinstance(node, ast.Str) else None
+        else:
+            return node.value if isinstance(node, ast.Constant) else None
+
     def visit_Call(self, node: ast.Call):
-        is_env = isinstance(node.func, ast.Name) and node.func.id == "env"
+        func_name = isinstance(node.func, ast.Name) and node.func.id
+        if func_name:
+            visit_func = getattr(self, f"visit_{func_name}_Call", self.generic_visit)
+            visit_func(node)
+        else:
+            self.generic_visit(node)
+
+    def visit_env_Call(self, node: ast.Call):
+        """Extract referenced environment variables from `env(..)` calls."""
+        is_env = True
         for arg in node.args:
             if not is_env:
                 self.visit(arg)
@@ -246,14 +280,9 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
             # Only first arg may be checked as env name
             is_env = False
 
-            if sys.version_info[0:2] < (3, 8):
-                value = arg.s if isinstance(arg, ast.Str) else None
-            else:
-                value = arg.value if isinstance(arg, ast.Constant) else None
+            value = self.node_value(arg)
             if value:
-                # Found env name in this call, we're done here.
                 self.env_vars.add(value)
-                return
             else:
                 logger.warning(
                     f"{self.filename}:{arg.lineno}: Only constant string values as variable name to "
@@ -263,6 +292,118 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
 
         for kwarg in node.keywords:
             self.visit(kwarg)
+
+    def visit_pants_hash_Call(self, node: ast.Call):
+        """Extract referenced source globs or target types from `pants_hash(..)` calls."""
+        values = []
+        linenos = set()
+        value: tuple[str, str] | str | None = None
+
+        for arg in node.args:
+            if isinstance(arg, ast.Name):
+                value = ("target_type", arg.id)
+            else:
+                value = self.node_value(arg)
+            if value:
+                values.append(value)
+                linenos.add(arg.lineno)
+            else:
+                logger.warning(
+                    f"{self.filename}:{arg.lineno}: Only constant string values and target types "
+                    "may be used for `pants_hash()`."
+                )
+        # Track glob values per line range in the BUILD file to give good error messages.
+        self.hash_sources[(min(linenos), max(linenos))].append(tuple(values))
+
+        for kwarg in node.keywords:
+            self.visit(kwarg)
+
+
+async def _get_build_file_referenced_data(
+    file_content: FileContent,
+    extra_env: Sequence[str],
+    env: CompleteEnvironmentVars,
+    glob_match_error_behavior: GlobMatchErrorBehavior,
+    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
+) -> tuple[EnvironmentVars, Mapping[tuple[str, ...], str]]:
+    pp = BUILDFilePreProcessor.create(file_content)
+    dirpath = os.path.dirname(pp.filename)
+
+    def _fix_glob(glob: str) -> str:
+        if glob.startswith("/"):
+            return glob[1:]
+        if glob.startswith("!/"):
+            return f"!{glob[2:]}"
+        return SourcesField.prefix_glob_with_dirpath(dirpath, glob)
+
+    def _globs_with_description_of_origin(
+        globs: tuple[str | tuple[str, str], ...], origin: tuple[int, int]
+    ) -> tuple[tuple[tuple[str, tuple[str, ...]], ...], str]:
+        description_of_origin = (
+            f"{pp.filename}:{origin[0] if origin[0] == origin[1] else '-'.join(map(str, origin))}"
+        )
+        # We track the list of globs to match paired with the original value provided (in case of a target alias).
+        _globs: list[tuple[str, tuple[str, ...]]] = []
+        for glob in globs:
+            if isinstance(glob, str):
+                _globs.append((glob, (glob,)))
+                continue
+            if isinstance(glob, tuple) and len(glob) == 2 and glob[0] == "target_type":
+                target_type = registered_target_types.aliases_to_types.get(glob[1])
+                if target_type:
+                    default_globs = target_type.class_get_field(
+                        SourcesField, union_membership
+                    ).default
+                    if isinstance(default_globs, str):
+                        default_globs = (default_globs,)
+                    _globs.append((target_type.alias, default_globs or ()))
+                    continue
+            logger.warning(f"{description_of_origin}: Invalid argument to `pants_hash`: {glob!r}")
+
+        return tuple(_globs), description_of_origin
+
+    glob_origins = [
+        _globs_with_description_of_origin(globs, origin)
+        for origin, all_globs in pp.hash_sources.items()
+        for globs in all_globs
+    ]
+    env_vars = (*pp.env_vars, *extra_env)
+    env_var_values, *snapshots = await MultiGet(
+        Get(
+            EnvironmentVars,
+            {
+                EnvironmentVarsRequest(sorted(env_vars)): EnvironmentVarsRequest,
+                env: CompleteEnvironmentVars,
+            },
+        ),
+        *(
+            Get(
+                Snapshot,
+                PathGlobs(
+                    globs=(  # Extracting all globs to match.
+                        _fix_glob(g) for _, gs in globs for g in gs
+                    ),
+                    glob_match_error_behavior=glob_match_error_behavior,
+                    description_of_origin=f"{origin} in `pants_hash(...)` call",
+                ),
+            )
+            for globs, origin in glob_origins
+        ),
+    )
+    pants_hashes = {}
+    for (globs, _), snapshot in zip(glob_origins, snapshots):
+        # Extracting the original glob value for the key.
+        key = tuple(g for g, _ in globs)
+        pants_hashes[key] = snapshot.digest.fingerprint
+        logger.debug(
+            f"pants_hash{key}: {snapshot.digest.fingerprint}, files:\n" + pformat(snapshot.files)
+        )
+
+    return (
+        env_var_values,
+        pants_hashes,
+    )
 
 
 @rule(desc="Search for addresses in BUILD files")
@@ -276,6 +417,7 @@ async def parse_address_family(
     union_membership: UnionMembership,
     maybe_build_file_dependency_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
     session_values: SessionValues,
+    unmatched_build_file_globs: UnmatchedBuildFileGlobs,
 ) -> OptionalAddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
@@ -333,25 +475,17 @@ async def parse_address_family(
         dependents_rules_parser_state = None
         dependencies_rules_parser_state = None
 
-    def _extract_env_vars(
-        file_content: FileContent, extra_env: Sequence[str], env: CompleteEnvironmentVars
-    ) -> Get[EnvironmentVars]:
-        """For BUILD file env vars, we only ever consult the local systems env."""
-        env_vars = (*BUILDFileEnvVarExtractor.get_env_vars(file_content), *extra_env)
-        return Get(
-            EnvironmentVars,
-            {
-                EnvironmentVarsRequest(env_vars): EnvironmentVarsRequest,
-                env: CompleteEnvironmentVars,
-            },
-        )
-
-    all_env_vars = await MultiGet(
-        _extract_env_vars(
-            fc, prelude_symbols.referenced_env_vars, session_values[CompleteEnvironmentVars]
+    pre_processed_data = [
+        await _get_build_file_referenced_data(
+            file_content=fc,
+            extra_env=prelude_symbols.referenced_env_vars,
+            env=session_values[CompleteEnvironmentVars],
+            glob_match_error_behavior=unmatched_build_file_globs.error_behavior,
+            registered_target_types=registered_target_types,
+            union_membership=union_membership,
         )
         for fc in digest_contents
-    )
+    ]
 
     address_maps = [
         AddressMap.parse(
@@ -360,12 +494,13 @@ async def parse_address_family(
             parser,
             prelude_symbols,
             env_vars,
+            pants_hashes,
             bootstrap_status.in_progress,
             defaults_parser_state,
             dependents_rules_parser_state,
             dependencies_rules_parser_state,
         )
-        for fc, env_vars in zip(digest_contents, all_env_vars)
+        for fc, (env_vars, pants_hashes) in zip(digest_contents, pre_processed_data)
     ]
 
     # Freeze defaults and dependency rules

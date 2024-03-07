@@ -49,6 +49,7 @@ def test_imports_banned(defaults_parser_state: BuildFileDefaultsParserState) -> 
             "\nx = 'hello'\n\nimport os\n",
             BuildFilePreludeSymbols(FrozenDict(), ()),
             EnvironmentVars({}),
+            {},
             False,
             defaults_parser_state,
             dependents_rules=None,
@@ -81,6 +82,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 "FAKE",
                 prelude_symbols,
                 EnvironmentVars({}),
+                {},
                 False,
                 defaults_parser_state,
                 dependents_rules=None,
@@ -94,7 +96,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
             {doc_url('docs/using-pants/key-concepts/backends')} for all available backends to activate.
 
             All registered symbols: [{fmt_extra_sym}'__defaults__', '__dependencies_rules__',
-            '__dependents_rules__', 'build_file_dir', 'caof', 'env', 'obj', 'prelude', 'tgt']
+            '__dependents_rules__', 'build_file_dir', 'caof', 'env', 'obj', 'pants_hash', 'prelude', 'tgt']
             """
         )
 
@@ -113,6 +115,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 "FAKE",
                 prelude_symbols,
                 EnvironmentVars({}),
+                {},
                 False,
                 defaults_parser_state,
                 dependents_rules=None,
@@ -150,6 +153,7 @@ def test_unrecognized_symbol_during_bootstrap_issue_19156(
         "tgt(field=fake(42,a=(), b='c'))",
         prelude_symbols,
         EnvironmentVars({}),
+        {},
         False,
         defaults_parser_state,
         dependents_rules=None,
@@ -186,6 +190,7 @@ def test_unknown_target_for_defaults_during_bootstrap_issue_19445(
         "__defaults__({'type_1': dict(), type_2: dict()})",
         BuildFilePreludeSymbols.create({}, ()),
         EnvironmentVars({}),
+        {},
         True,
         defaults_parser_state,
         dependents_rules=None,
@@ -237,6 +242,7 @@ def test_unrecognized_symbol_in_prelude(
             build_file_content="macro()",
             extra_symbols=prelude_symbols,
             env_vars=EnvironmentVars({}),
+            pants_hashes={},
             is_bootstrap=False,
             defaults=defaults_parser_state,
             dependents_rules=None,
@@ -252,6 +258,6 @@ def test_unrecognized_symbol_in_prelude(
         {doc_url('docs/using-pants/key-concepts/backends')} for all available backends to activate.
 
         All registered symbols: ['__defaults__', '__dependencies_rules__', '__dependents_rules__',
-        'build_file_dir', 'caof', 'env', 'macro', 'obj']
+        'build_file_dir', 'caof', 'env', 'macro', 'obj', 'pants_hash']
         """
     )

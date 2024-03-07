@@ -15,11 +15,11 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import DigestContents, FileContent, PathGlobs
+from pants.engine.fs import Digest, DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
-    BUILDFileEnvVarExtractor,
     BuildFileOptions,
+    BUILDFilePreProcessor,
     BuildFileSyntaxError,
     OptionalAddressFamily,
     evaluate_preludes,
@@ -47,6 +47,8 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership
 from pants.init.bootstrap_scheduler import BootstrapStatus
+from pants.option.global_options import UnmatchedBuildFileGlobs
+from pants.testutil import rule_runner
 from pants.testutil.pytest_util import assert_logged
 from pants.testutil.rule_runner import (
     MockGet,
@@ -56,6 +58,7 @@ from pants.testutil.rule_runner import (
     run_rule_with_mocks,
 )
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
 
@@ -79,6 +82,7 @@ def test_parse_address_family_empty() -> None:
             UnionMembership({}),
             MaybeBuildFileDependencyRulesImplementation(None),
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
+            UnmatchedBuildFileGlobs.ignore(),
         ],
         mock_gets=[
             MockGet(
@@ -100,6 +104,11 @@ def test_parse_address_family_empty() -> None:
                 output_type=EnvironmentVars,
                 input_types=(EnvironmentVarsRequest, CompleteEnvironmentVars),
                 mock=lambda _1, _2: EnvironmentVars({}),
+            ),
+            MockGet(
+                output_type=Digest,
+                input_types=(PathGlobs,),
+                mock=lambda _: Digest("abcd", 123),
             ),
         ],
     )
@@ -208,6 +217,19 @@ def test_prelude_check_env() -> None:
     with pytest.raises(
         Exception,
         match="The BUILD file symbol `env` may only be used in BUILD files\\. If used",
+    ):
+        run_prelude_parsing_rule(prelude_content)
+
+
+def test_prelude_check_pants_hash() -> None:
+    prelude_content = dedent(
+        """
+        pants_hash("nope")
+        """
+    )
+    with pytest.raises(
+        Exception,
+        match="The BUILD file symbol `pants_hash` may only be used in BUILD files\\. If used",
     ):
         run_prelude_parsing_rule(prelude_content)
 
@@ -906,6 +928,48 @@ def test_invalid_build_file_env_vars(caplog, target_adaptor_rule_runner: RuleRun
     )
 
 
+@pytest.mark.parametrize(
+    "digest, args",
+    [
+        ("b1754ec8fe12024db7f6cb7f3e13e298073b6bd8e01d9111670086668164b37d", ['"f1.mock"']),
+        ("b1754ec8fe12024db7f6cb7f3e13e298073b6bd8e01d9111670086668164b37d", ['"/src/f1.mock"']),
+        ("9e7a36f3d4c564fecf9c5aac10e00b4e8d38f3a5f4bdda111aa5ddf3a05af353", ['"*.mock"']),
+        ("9e7a36f3d4c564fecf9c5aac10e00b4e8d38f3a5f4bdda111aa5ddf3a05af353", ["mock_tgt"]),
+        (
+            "b1754ec8fe12024db7f6cb7f3e13e298073b6bd8e01d9111670086668164b37d",
+            ["mock_tgt", '"!f2.mock"'],
+        ),
+        (
+            "b1754ec8fe12024db7f6cb7f3e13e298073b6bd8e01d9111670086668164b37d",
+            ["mock_tgt", '"!/src/f2.mock"'],
+        ),
+        (
+            "e240dd16ca1ce9697591827f194441d247997f90a88b81085436859f6bb9a748",
+            ['"f3.txt"', "mock_tgt"],
+        ),
+        (
+            "e240dd16ca1ce9697591827f194441d247997f90a88b81085436859f6bb9a748",
+            ['"*.mock"', '"*.txt"'],
+        ),
+    ],
+)
+@rule_runner.logging(level=LogLevel.DEBUG)
+def test_build_file_pants_hash(
+    target_adaptor_rule_runner: RuleRunner, digest: str, args: list[str]
+) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "src/f1.mock": "file 1",
+            "src/f2.mock": "file 2",
+            "src/f3.txt": "file 3",
+            "src/BUILD": f"mock_tgt(tags=[pants_hash({', '.join(args)})])",
+        }
+    )
+    tags = target_adaptor_rule_runner.get_target(Address("src")).get(Tags).value
+    assert tags is not None
+    assert tags == (digest,)
+
+
 def test_build_file_parse_error(target_adaptor_rule_runner: RuleRunner) -> None:
     target_adaptor_rule_runner.write_files(
         {
@@ -974,11 +1038,11 @@ def test_build_file_syntax_error(filename, contents, expect_failure, expected_me
 
     if expect_failure:
         with pytest.raises(BuildFileSyntaxError) as e:
-            BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))
+            BUILDFilePreProcessor.get_env_vars(MockFileContent(filename, contents))
 
         formatted = str(e.value)
 
         assert formatted == expected_message
 
     else:
-        BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))
+        BUILDFilePreProcessor.get_env_vars(MockFileContent(filename, contents))
