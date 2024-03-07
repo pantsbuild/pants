@@ -40,10 +40,13 @@ from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRe
 from pants.engine.target import (
     Dependencies,
     MultipleSourcesField,
+    OverridesField,
     RegisteredTargetTypes,
+    SingleSourceField,
     StringField,
     Tags,
     Target,
+    TargetFilesGenerator,
 )
 from pants.engine.unions import UnionMembership
 from pants.init.bootstrap_scheduler import BootstrapStatus
@@ -357,6 +360,23 @@ class MockTgt(Target):
     core_fields = (MockDepsField, MockMultipleSourcesField, Tags, ResolveField)
 
 
+class MockSingleSourceField(SingleSourceField):
+    pass
+
+
+class MockGeneratedTarget(Target):
+    alias = "generated"
+    core_fields = (MockDepsField, Tags, MockSingleSourceField, ResolveField)
+
+
+class MockTargetGenerator(TargetFilesGenerator):
+    alias = "generator"
+    core_fields = (MockMultipleSourcesField, OverridesField)
+    generated_target_cls = MockGeneratedTarget
+    copied_fields = ()
+    moved_fields = (MockDepsField, Tags, ResolveField)
+
+
 def test_resolve_address() -> None:
     rule_runner = RuleRunner(
         rules=[QueryRule(Address, [AddressInput]), QueryRule(MaybeAddress, [AddressInput])]
@@ -407,7 +427,7 @@ def test_resolve_address() -> None:
 def target_adaptor_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[QueryRule(TargetAdaptor, (TargetAdaptorRequest,))],
-        target_types=[MockTgt],
+        target_types=[MockTgt, MockGeneratedTarget, MockTargetGenerator],
         objects={"parametrize": Parametrize},
     )
 
@@ -498,6 +518,35 @@ def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner)
     # The defaults are not frozen until after the BUILD file have been fully parsed, so this is a
     # list rather than a tuple at this time.
     assert target_adaptor.kwargs["tags"] == ["24"]
+
+
+def test_generated_target_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                __defaults__({generated: dict(resolve="mock")}, all=dict(tags=["24"]))
+                generated(name="explicit", tags=["42"], source="e.txt")
+                generator(name='gen', sources=["g*.txt"])
+                """
+            ),
+            "e.txt": "",
+            "g1.txt": "",
+            "g2.txt": "",
+        }
+    )
+
+    explicit_target = target_adaptor_rule_runner.get_target(Address("", target_name="explicit"))
+    assert explicit_target.address.target_name == "explicit"
+    assert explicit_target.get(ResolveField).value == "mock"
+    assert explicit_target.get(Tags).value == ("42",)
+
+    implicit_target = target_adaptor_rule_runner.get_target(
+        Address("", target_name="gen", relative_file_path="g1.txt")
+    )
+    assert str(implicit_target.address) == "//g1.txt:gen"
+    assert implicit_target.get(ResolveField).value == "mock"
+    assert implicit_target.get(Tags).value == ("24",)
 
 
 def test_inherit_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
