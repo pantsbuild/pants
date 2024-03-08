@@ -507,10 +507,18 @@ def _create_config(
     config: dict[str, dict[str, str]] | None = None,
     config2: dict[str, dict[str, str]] | None = None,
 ) -> Config:
+    config_content = toml.dumps(config or {}).encode()
+    config2_content = toml.dumps(config2 or {}).encode()
+    # Write to files, for the Rust parser.
+    with open("test_config.toml", "wb") as fp:
+        fp.write(config_content)
+    with open("test_config2.toml", "wb") as fp:
+        fp.write(config2_content)
+    # Load in memory, for the Python parser.
     return Config.load(
         [
-            FileContent("test_config.toml", toml.dumps(config or {}).encode()),
-            FileContent("test_config2.toml", toml.dumps(config2 or {}).encode()),
+            FileContent("test_config.toml", config_content),
+            FileContent("test_config2.toml", config2_content),
         ]
     )
 

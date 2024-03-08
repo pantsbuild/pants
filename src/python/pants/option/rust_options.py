@@ -51,6 +51,8 @@ class NativeOptionParser:
         if option_type is list:
             if default is None:
                 default = []
+            if member_type is None:
+                member_type = str
             if member_type == shell_str:
                 rust_member_type = str
             elif callable(member_type):
