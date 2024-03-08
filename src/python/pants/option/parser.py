@@ -19,7 +19,6 @@ import yaml
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
-from pants.engine.internals.native_engine import PyOptionParser
 from pants.option.config import DEFAULT_SECTION, Config
 from pants.option.custom_types import (
     DictValueComponent,
@@ -203,13 +202,18 @@ class Parser:
         for args, kwargs in self._option_registrations:
             self._validate(args, kwargs)
             dest = self.parse_dest(*args, **kwargs)
-            default=kwargs.get("default")
+            default = kwargs.get("default")
             option_type = kwargs.get("type")
             if option_type not in {bool, int, float, str, list, dict}:
                 option_type = str  # For enum and other specialized types.
                 default = str(default)
-            val = native_parser.get(scope=self.scope, flags=args, default=default,
-                                    option_type=option_type, member_type=kwargs.get("member_type"))
+            val = native_parser.get(
+                scope=self.scope,
+                flags=args,
+                default=default,
+                option_type=option_type,
+                member_type=kwargs.get("member_type"),
+            )
             # TODO: If the option is explicitly given, check deprecation and mutual exclusion.
             setattr(namespace, dest, RankedValue(Rank.HARDCODED, val))
         return namespace.build()

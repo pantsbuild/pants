@@ -151,7 +151,9 @@ class Options:
         parser_by_scope = {si.scope: Parser(env, config, si) for si in complete_known_scope_infos}
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
 
-        native_parser = NativeOptionParser(args, env, config.sources(), allow_pantsrc=True, include_derivation=False)
+        native_parser = NativeOptionParser(
+            args, env, config.sources(), allow_pantsrc=True, include_derivation=False
+        )
 
         return cls(
             builtin_goal=split_args.builtin_goal,
