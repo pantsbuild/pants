@@ -206,3 +206,39 @@ def test_generate_lockfile_without_python_backend() -> None:
             "--resolve=dockerfile-parser",
         ]
     ).assert_success()
+
+
+def test_baseimage_dep_inference(rule_runner: RuleRunner) -> None:
+    # We use a single run to grab all information, rather than parametrizing the test to save on
+    # rule invocations.
+    base_image_tags = dict(
+        BASE_IMAGE_1=":sibling",
+        BASE_IMAGE_2=":sibling@a=42,b=c",
+        BASE_IMAGE_3="else/where:weird#name@with=param",
+        BASE_IMAGE_4="//src/common:name@parametrized=foo-bar.1",
+        BASE_IMAGE_5="should/allow/default-target-name",
+    )
+
+    rule_runner.write_files(
+        {
+            "test/BUILD": "docker_image()",
+            "test/Dockerfile": "\n".join(
+                dedent(
+                    f"""\
+                    ARG {arg}="{tag}"
+                    FROM ${arg}
+                    """
+                )
+                for arg, tag in base_image_tags.items()
+            )
+            + dedent(
+                """\
+                ARG DECOY="this is not a target address"
+                FROM $DECOY
+                """
+            ),
+        }
+    )
+    addr = Address("test")
+    info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
+    assert info.from_image_build_args.to_dict() == base_image_tags
