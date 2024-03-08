@@ -28,7 +28,22 @@ class ParsedDockerfileInfo:
 
 _address_regexp = re.compile(
     r"""
-    (?://)?[^:# ]*:[^:#!@?/\= ]+(?:\#[^:#!@?= ]+)?$
+    # Optionally root:ed.
+    (?://)?
+    # Optional path.
+    [^:# ]*
+    # Optional target name.
+    (?::[^:#!@?/\= ]+)?
+    # Optional generated name.
+    (?:\#[^:#!@?= ]+)?
+    # Optional parametrizations.
+    (?:@
+      # key=value
+      [^=: ]+=[^,: ]*
+      # Optional additional `,key=value`s
+      (?:,[^=: ]+=[^,: ]*)*
+    )?
+    $
     """,
     re.VERBOSE,
 )
