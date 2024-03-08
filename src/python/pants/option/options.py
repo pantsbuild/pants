@@ -150,6 +150,9 @@ class Options:
 
         parser_by_scope = {si.scope: Parser(env, config, si) for si in complete_known_scope_infos}
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
+
+        native_parser = NativeOptionParser(args, env, config.sources(), allow_pantsrc=True, include_derivation=False)
+
         return cls(
             builtin_goal=split_args.builtin_goal,
             goals=split_args.goals,
@@ -158,6 +161,7 @@ class Options:
             specs=split_args.specs,
             passthru=split_args.passthru,
             parser_by_scope=parser_by_scope,
+            native_parser=native_parser,
             bootstrap_option_values=bootstrap_option_values,
             known_scope_to_info=known_scope_to_info,
             allow_unknown_options=allow_unknown_options,
@@ -172,6 +176,7 @@ class Options:
         specs: list[str],
         passthru: list[str],
         parser_by_scope: dict[str, Parser],
+        native_parser: NativeOptionParser,
         bootstrap_option_values: OptionValueContainer | None,
         known_scope_to_info: dict[str, ScopeInfo],
         allow_unknown_options: bool = False,
@@ -187,6 +192,7 @@ class Options:
         self._specs = specs
         self._passthru = passthru
         self._parser_by_scope = parser_by_scope
+        self._native_parser = native_parser
         self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
         self._allow_unknown_options = allow_unknown_options
@@ -360,8 +366,7 @@ class Options:
             parse_args_request, log_warnings=log_parser_warnings
         )
 
-        #native_parser = NativeOptionParser()
-        #native_values = self.get_parser(scope).parse_args_native(native_parser)
+        native_values = self.get_parser(scope).parse_args_native(self._native_parser)
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:

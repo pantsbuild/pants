@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import inspect
 from enum import Enum
-from typing import Any
+from typing import Any, Optional, Sequence, Mapping
 
 from pants.engine.internals import native_engine
 from pants.option.custom_types import shell_str, _flatten_shlexed_list
@@ -14,8 +14,14 @@ from pants.option.option_value_container import OptionValueContainer
 
 
 class NativeOptionParser:
-    def __init__(self):
-        self._native_parser = native_engine.PyOptionParser([], {}, None, True, False)
+    def __init__(self,
+                 args: Optional[Sequence[str]],
+                 env: Mapping[str, str],
+                 configs: Optional[Sequence[str]],
+                 allow_pantsrc: bool,
+                 include_derivation: bool
+    ):
+        self._native_parser = native_engine.PyOptionParser(args, dict(env), configs, allow_pantsrc, include_derivation)
         self._getter_by_type = {
             (bool, None): self._native_parser.get_bool,
             (int, None): self._native_parser.get_int,
