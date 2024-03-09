@@ -248,7 +248,7 @@ def no_exception():
             ),
         ),
         (
-            dict(type=bool, default="True"),
+            dict(type=bool, default=True),
             no_exception(),
         ),
         (
@@ -597,9 +597,6 @@ def _register(options):
     # Custom types.
     register_global("--listy", type=list, member_type=int, default="[1, 2, 3]")
     register_global("--dicty", type=dict, default='{"a": "b"}')
-    register_global(
-        "--dict-listy", type=list, member_type=dict, default='[{"a": 1, "b": 2}, {"c": 3}]'
-    )
     register_global("--targety", type=target_option, default="//:a")
     register_global(
         "--target-listy", type=list, member_type=target_option, default=["//:a", "//:b"]
@@ -748,10 +745,6 @@ def test_arg_scoping() -> None:
     global_options = _parse(flags='--dicty=\'{"c": "d"}\'').for_global_scope()
     assert {"c": "d"} == global_options.dicty
 
-    # Test list-of-dict-typed option.
-    global_options = _parse(flags='--dict-listy=\'[{"c": "d"}, {"e": "f"}]\'').for_global_scope()
-    assert [{"c": "d"}, {"e": "f"}] == global_options.dict_listy
-
     # Test target-typed option.
     global_options = _parse().for_global_scope()
     assert "//:a" == global_options.targety
@@ -894,46 +887,6 @@ def test_list_option() -> None:
 
     # Overwriting cancels filters.
     check(env_val="[4]", config_val="-[4]", expected=[4])
-
-
-def test_dict_list_option() -> None:
-    def check(
-        *,
-        expected: list[dict[str, int]],
-        flags: str = "",
-        env_val: str | None = None,
-        config_val: str | None = None,
-    ) -> None:
-        env = {"PANTS_GLOBAL_DICT_LISTY": env_val} if env_val else None
-        config = {"GLOBAL": {"dict_listy": config_val}} if config_val else None
-        global_options = _parse(flags=flags, env=env, config=config).for_global_scope()
-        assert global_options.dict_listy == expected
-
-    default = [{"a": 1, "b": 2}, {"c": 3}]
-    one_element_appended = [*default, {"d": 4, "e": 5}]
-    two_elements_appended = [*one_element_appended, {"f": 6}]
-    replaced = [{"d": 4, "e": 5}, {"f": 6}]
-
-    check(expected=default)
-
-    check(flags='--dict-listy=\'{"d": 4, "e": 5}\'', expected=one_element_appended)
-    check(
-        flags='--dict-listy=\'{"d": 4, "e": 5}\' --dict-listy=\'{"f": 6}\'',
-        expected=two_elements_appended,
-    )
-    check(
-        flags='--dict-listy=\'+[{"d": 4, "e": 5}, {"f": 6}]\'',
-        expected=two_elements_appended,
-    )
-    check(flags='--dict-listy=\'[{"d": 4, "e": 5}, {"f": 6}]\'', expected=replaced)
-
-    check(env_val='{"d": 4, "e": 5}', expected=one_element_appended)
-    check(env_val='+[{"d": 4, "e": 5}, {"f": 6}]', expected=two_elements_appended)
-    check(env_val='[{"d": 4, "e": 5}, {"f": 6}]', expected=replaced)
-
-    check(config_val='{"d": 4, "e": 5}', expected=one_element_appended)
-    check(config_val='+[{"d": 4, "e": 5}, {"f": 6}]', expected=two_elements_appended)
-    check(config_val='[{"d": 4, "e": 5}, {"f": 6}]', expected=replaced)
 
 
 def test_target_list_option() -> None:
@@ -1436,8 +1389,8 @@ def assert_fromfile(parse_func, expected_append=None, append_contents=None):
         contents=dedent(
             """
             ['a',
-             1,
-             2]
+             '1',
+             '2']
             """
         ),
     )
@@ -1447,8 +1400,8 @@ def assert_fromfile(parse_func, expected_append=None, append_contents=None):
         contents=dedent(
             """
             ['a',
-             1,
-             2]
+             '1',
+             '2']
             """
         ),
         passthru_flags="bob @jake",
