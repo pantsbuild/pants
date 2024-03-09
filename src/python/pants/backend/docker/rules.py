@@ -10,6 +10,7 @@ from pants.backend.docker.util_rules import (
     docker_build_context,
     docker_build_env,
     dockerfile,
+    mirror_images,
 )
 
 
@@ -22,6 +23,7 @@ def rules():
         *docker_build_env.rules(),
         *dockerfile.rules(),
         *dockerfile_parser.rules(),
+        *mirror_images.rules(),
         *package_image.rules(),
         *publish.rules(),
         *run_image.rules(),
