@@ -376,8 +376,9 @@ class Options:
             self._check_and_apply_deprecations(scope, values_builder)
             values = values_builder.build()
 
-        if native_values != values:
-            raise Exception(f"{native_values} != {values}")
+        for key, rv in values.as_dict().items():
+            if native_values[key] != rv:
+                raise Exception(f"{key}: {native_values[key]} != {rv.value}")
         return values
 
     def get_fingerprintable_for_scope(
