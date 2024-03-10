@@ -354,6 +354,7 @@ Created as part of the release process.
 + hephex
 + jgartdele/del
 + offsetcyan
++ okcleary
 + olivercoleman-switchdin
 + philipp-sontag-by
 + purajit
