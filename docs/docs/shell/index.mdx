@@ -350,6 +350,15 @@ If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will 
 
 Use the option `pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
 
+### Retries
+
+Pants can automatically retry failed tests. This can help keep your builds passing even with flaky tests, like integration tests.
+
+```toml tab={"label":"pants.toml"}
+[test]
+attempts_default = 3
+```
+
 ### Testing your packaging pipeline
 
 You can include the result of `pants package` in your test through the `runtime_package_dependencies field`. Pants will run the equivalent of `pants package` beforehand and copy the built artifact into the test's chroot, allowing you to test things like that the artifact has the correct files present and that it's executable.

@@ -227,6 +227,15 @@ If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will 
 
 Use the option `pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
 
+### Retries
+
+Pants can automatically retry failed tests. This can help keep your builds passing even with flaky tests, like integration tests.
+
+```toml tab={"label":"pants.toml"}
+[test]
+attempts_default = 3
+```
+
 ## Gofmt
 
 Gofmt is activated by default when you activate the Go backend. Simply run `pants fmt` and `pants lint`:
