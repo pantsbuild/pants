@@ -348,6 +348,10 @@ class DockerImageBuildImageCacheToField(
         f"""
         Export image build cache to an external cache destination.
 
+        Note that Docker [supports](https://docs.docker.com/build/cache/backends/#multiple-caches) 
+        multiple cache sources - Pants will pass these as multiple `--cache_from` arguments to the 
+        Docker CLI. Docker will only use the first cache hit (i.e. the image exists) in the build.
+
         {DockerBuildKitOptionField.required_help}
 
         Example:
@@ -358,10 +362,10 @@ class DockerImageBuildImageCacheToField(
                     "type": "local",
                     "dest": "/tmp/docker-cache/example"
                 }},
-                cache_from={{
+                cache_from=[{{
                     "type": "local",
                     "src": "/tmp/docker-cache/example"
-                }}
+                }}]
             )
 
         {_interpolation_help.format(kind="Values")}
