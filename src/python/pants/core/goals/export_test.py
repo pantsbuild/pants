@@ -22,6 +22,7 @@ from pants.core.goals.export import (
     export,
 )
 from pants.core.goals.resolve_helpers import (
+    ExportLockfile,
     GenerateLockfile,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
@@ -65,12 +66,12 @@ def make_target(path: str, target_name: str, environment_name: str | None = None
     )
 
 
-class MockGenerateLockfile(GenerateLockfile):
+class MockGenerateLockfile(GenerateLockfile, ExportLockfile):
     pass
 
 
 def mock_export(
-    edr: GenerateLockfile,
+    edr: ExportLockfile,
     digest: Digest,
     post_processing_cmds: tuple[PostProcessingCommand, ...],
 ) -> ExportResult:
@@ -124,7 +125,7 @@ def run_export_rule(rule_runner: RuleRunner, resolves: List[str]) -> Tuple[int, 
                     mock=lambda req: RequestedResolves(
                         (
                             UserGenerateLockfiles(
-                                [GenerateLockfile(e, "", False) for e in resolves]
+                                [MockGenerateLockfile(e, "", False) for e in resolves]
                             ),
                         ),
                         tuple(),
@@ -132,7 +133,7 @@ def run_export_rule(rule_runner: RuleRunner, resolves: List[str]) -> Tuple[int, 
                 ),
                 MockGet(
                     output_type=ExportResults,
-                    input_types=(GenerateLockfile,),
+                    input_types=(MockGenerateLockfile,),
                     mock=lambda req: ExportResults(
                         (
                             mock_export(

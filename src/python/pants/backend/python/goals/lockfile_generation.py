@@ -23,6 +23,7 @@ from pants.backend.python.util_rules.pex_requirements import (
 )
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult, GenerateLockfilesSubsystem
 from pants.core.goals.resolve_helpers import (
+    ExportLockfile,
     GenerateLockfile,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
@@ -45,7 +46,7 @@ from pants.util.pip_requirement import PipRequirement
 
 
 @dataclass(frozen=True)
-class GeneratePythonLockfile(GenerateLockfile):
+class GeneratePythonLockfile(GenerateLockfile, ExportLockfile):
     requirements: FrozenOrderedSet[str]
     find_links: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
@@ -255,6 +256,7 @@ def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateLockfile, GeneratePythonLockfile),
+        UnionRule(ExportLockfile, GeneratePythonLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownPythonUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedPythonUserResolveNames),
     )

@@ -15,7 +15,6 @@ from pants.backend.javascript.nodejs_project_environment import (
 from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.resolve import NodeJSProjectResolves
 from pants.backend.javascript.subsystems.nodejs import UserChosenNodeJSResolveAliases
-from pants.core.goals.export import ExportError, ExportResults, ExportSubsystem
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult
 from pants.core.goals.resolve_helpers import (
     GenerateLockfile,
@@ -46,18 +45,6 @@ class KnownPackageJsonUserResolveNamesRequest(KnownUserResolveNamesRequest):
 
 class RequestedPackageJsonUserResolveNames(RequestedUserResolveNames):
     pass
-
-
-@rule
-async def resolve2export(
-    request: GeneratePackageLockJsonFile, export_subsys: ExportSubsystem
-) -> ExportResults:
-    if request:
-        raise ExportError(
-            f"Javascript backend does not support exporting. Received request {request}."
-        )
-    else:
-        return ExportResults(())
 
 
 @rule

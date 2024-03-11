@@ -15,6 +15,7 @@ from pants.backend.terraform.target_types import (
 from pants.backend.terraform.tool import TerraformProcess
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult
 from pants.core.goals.resolve_helpers import (
+    ExportLockfile,
     GenerateLockfile,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
@@ -59,7 +60,7 @@ async def identify_user_resolves_from_terraform_files(
 
 
 @dataclass(frozen=True)
-class GenerateTerraformLockfile(GenerateLockfile):
+class GenerateTerraformLockfile(GenerateLockfile, ExportLockfile):
     target: Union[TerraformModuleTarget, TerraformDeploymentTarget]
 
 
@@ -136,6 +137,7 @@ def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateLockfile, GenerateTerraformLockfile),
+        UnionRule(ExportLockfile, GenerateTerraformLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownTerraformResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedTerraformResolveNames),
     )

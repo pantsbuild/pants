@@ -18,8 +18,6 @@ from pants.engine.rules import collect_rules, rule
 async def export_terraform(
     lockfile_request: GenerateTerraformLockfile,
 ) -> ExportResults:
-    print(f"{lockfile_request.target=}")
-
     initialised_terraform = await Get(
         TerraformInitResponse,
         TerraformInitRequest(

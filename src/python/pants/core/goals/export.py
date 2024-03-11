@@ -11,6 +11,7 @@ from typing import Iterable, Mapping, Sequence
 
 from pants.base.build_root import BuildRoot
 from pants.core.goals.resolve_helpers import (
+    ExportLockfile,
     GenerateLockfile,
     GenerateToolLockfileSentinel,
     KnownUserResolveNames,
@@ -154,16 +155,20 @@ async def export(
         RequestedResolves,
         RequestedResolvesNames(tuple(export_subsys.resolve)),
     )
+
+    def filter_exportable(resolves: list[GenerateLockfile]) -> list[ExportLockfile]:
+        return [e for e in resolves if isinstance(e, ExportLockfile)]
+
     all_specified_user_requests = requested_resolve_names.user_requests
     specified_tool_requests = requested_resolve_names.tool_requests
 
     applicable_tool_requests = [req.request for req in specified_tool_requests]
 
-    all_requests: list[GenerateLockfile] = list(
-        itertools.chain(*all_specified_user_requests, applicable_tool_requests)
+    all_requests: list[ExportLockfile] = filter_exportable(
+        list(itertools.chain(*all_specified_user_requests, applicable_tool_requests))
     )
     logger.debug(f"Found applicable lockfiles {all_requests}")
-    all_results = await MultiGet(Get(ExportResults, GenerateLockfile, e) for e in all_requests)
+    all_results = await MultiGet(Get(ExportResults, ExportLockfile, e) for e in all_requests)
 
     flattened_results = [res for results in all_results for res in results]
     logger.debug(f"Generated digests for resolves {flattened_results}")

@@ -40,6 +40,16 @@ class GenerateLockfile:
 
 
 @union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class ExportLockfile:
+    """A union base for exporting ecosystem-specific resolves."""
+
+    resolve_name: str
+    lockfile_dest: str
+    diff: bool
+
+
+@union(in_scope_types=[EnvironmentName])
 class GenerateToolLockfileSentinel:
     """Tools use this as an entry point to say how to generate their tool lockfile.
 
@@ -356,7 +366,7 @@ async def determine_requested_resolves(
     logger.debug(f"Found known user resolves {known_user_resolve_names}")
     requested_user_resolve_names, requested_tool_sentinels = determine_resolves_to_generate(
         known_user_resolve_names,
-        union_membership.get(GenerateToolLockfileSentinel),
+        [],  # union_membership.get(GenerateToolLockfileSentinel),
         set(requested_resolves.val),
     )
     # This is the "planning" phase of lockfile generation. Currently this is all done in the local
