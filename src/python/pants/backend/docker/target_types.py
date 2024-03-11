@@ -348,8 +348,8 @@ class DockerImageBuildImageCacheToField(
         f"""
         Export image build cache to an external cache destination.
 
-        Note that Docker [supports](https://docs.docker.com/build/cache/backends/#multiple-caches) 
-        multiple cache sources - Pants will pass these as multiple `--cache_from` arguments to the 
+        Note that Docker [supports](https://docs.docker.com/build/cache/backends/#multiple-caches)
+        multiple cache sources - Pants will pass these as multiple `--cache_from` arguments to the
         Docker CLI. Docker will only use the first cache hit (i.e. the image exists) in the build.
 
         {DockerBuildKitOptionField.required_help}
