@@ -18,6 +18,7 @@ from pants.backend.docker.registries import DockerRegistries, DockerRegistryOpti
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerBuildKitOptionField,
+    DockerBuildOptionFieldListOfMultiValueDictMixin,
     DockerBuildOptionFieldMixin,
     DockerBuildOptionFieldMultiValueDictMixin,
     DockerBuildOptionFieldMultiValueMixin,
@@ -336,6 +337,7 @@ def get_build_options(
             (
                 DockerBuildOptionFieldMixin,
                 DockerBuildOptionFieldMultiValueDictMixin,
+                DockerBuildOptionFieldListOfMultiValueDictMixin,
                 DockerBuildOptionFieldValueMixin,
                 DockerBuildOptionFieldMultiValueMixin,
                 DockerBuildOptionFlagFieldMixin,

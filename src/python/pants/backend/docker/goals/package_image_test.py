@@ -1152,7 +1152,7 @@ def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
                 """\
                 docker_image(
                   name="img1",
-                  cache_from={"type": "local", "dest": "/tmp/docker/pants-test-cache"},
+                  cache_from=[{"type": "local", "dest": "/tmp/docker/pants-test-cache1"}, {"type": "local", "dest": "/tmp/docker/pants-test-cache2"}],
                 )
                 """
             ),
@@ -1164,7 +1164,8 @@ def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "buildx",
             "build",
-            "--cache-from=type=local,dest=/tmp/docker/pants-test-cache",
+            "--cache-from=type=local,dest=/tmp/docker/pants-test-cache1",
+            "--cache-from=type=local,dest=/tmp/docker/pants-test-cache2",
             "--output=type=docker",
             "--pull=False",
             "--tag",

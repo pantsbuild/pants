@@ -1918,6 +1918,39 @@ class DictStringToStringField(Field):
         return FrozenDict(value_or_default)
 
 
+class ListOfDictStringToStringField(Field):
+    value: Optional[Tuple[FrozenDict[str, str]]]
+    default: ClassVar[Optional[list[FrozenDict[str, str]]]] = None
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[list[Dict[str, str]]], address: Address
+    ) -> Optional[Tuple[FrozenDict[str, str], ...]]:
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default is None:
+            return None
+        invalid_type_exception = InvalidFieldTypeException(
+            address,
+            cls.alias,
+            raw_value,
+            expected_type="a list of dictionaries (or a single dictionary) of string -> string",
+        )
+
+        # Also support passing in a single dictionary by wrapping it
+        if not isinstance(value_or_default, list):
+            value_or_default = [value_or_default]
+
+        result_lst: list[FrozenDict[str, str]] = []
+        for item in value_or_default:
+            if not isinstance(item, collections.abc.Mapping):
+                raise invalid_type_exception
+            if not all(isinstance(k, str) and isinstance(v, str) for k, v in item.items()):
+                raise invalid_type_exception
+            result_lst.append(FrozenDict(item))
+
+        return tuple(result_lst)
+
+
 class NestedDictStringToStringField(Field):
     value: Optional[FrozenDict[str, FrozenDict[str, str]]]
     default: ClassVar[Optional[FrozenDict[str, FrozenDict[str, str]]]] = None
