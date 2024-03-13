@@ -5,10 +5,12 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.makeself.target_types import (
+    MakeselfArchiveArgsField,
     MakeselfArchiveFilesField,
+    MakeselfArchiveOutputPathField,
     MakeselfArchivePackagesField,
-    MakeselfArchiveStartupScript,
-    MakeselfArthiveLabel,
+    MakeselfArchiveStartupScriptField,
+    MakeselfArthiveLabelField,
 )
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
@@ -136,7 +138,7 @@ async def run_makeself_archive(
 
     if output_directory := request.output_directory:
         output_directories = [output_directory]
-        argv += ("--keep", "--target", request.output_directory)
+        argv += ("--target", request.output_directory)
 
     return Process(
         argv=argv + (request.extra_args or ()),
@@ -151,14 +153,15 @@ async def run_makeself_archive(
 
 @dataclass(frozen=True)
 class MakeselfArchiveFieldSet(PackageFieldSet, RunFieldSet):
-    required_fields = (MakeselfArchiveStartupScript,)
+    required_fields = (MakeselfArchiveStartupScriptField,)
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
-    startup_script: MakeselfArchiveStartupScript
-    label: MakeselfArthiveLabel
+    startup_script: MakeselfArchiveStartupScriptField
+    label: MakeselfArthiveLabelField
     files: MakeselfArchiveFilesField
     packages: MakeselfArchivePackagesField
-    output_path: OutputPathField
+    output_path: MakeselfArchiveOutputPathField
+    args: MakeselfArchiveArgsField
 
 
 @rule

@@ -77,6 +77,7 @@ async def extract_makeself_distribution(
         RunMakeselfArchive(
             exe=dist.exe,
             extra_args=(
+                "--keep",
                 "--accept",
                 "--noprogress",
                 "--nox11",

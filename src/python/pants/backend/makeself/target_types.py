@@ -7,13 +7,14 @@ from pants.engine.target import (
     AsyncFieldMixin,
     SpecialCasedDependencies,
     StringField,
+    StringSequenceField,
     Target,
 )
 from pants.util.docutil import bin_name
 from pants.util.strutil import help_text
 
 
-class MakeselfArthiveLabel(StringField):
+class MakeselfArthiveLabelField(StringField):
     alias = "label"
     help = help_text(
         """
@@ -23,22 +24,14 @@ class MakeselfArthiveLabel(StringField):
     )
 
 
-class MakeselfArchiveStartupScript(StringField, AsyncFieldMixin):
+class MakeselfArchiveStartupScriptField(StringSequenceField):
     alias = "startup_script"
+    required = False
     help = help_text(
         """
-        The startup script, i.e. what gets run when executing `./my_archive.run`, must be set
-        to an address of shell source.
+        The startup script, i.e. what gets run when executing `./my_archive.run`.
         """
     )
-
-    def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
-        assert self.value
-        return UnparsedAddressInputs(
-            [self.value],
-            owning_address=self.address,
-            description_of_origin=f"the `{MakeselfArchiveStartupScript.alias}` from the target {self.address}",
-        )
 
 
 class MakeselfArchiveFilesField(SpecialCasedDependencies):
@@ -78,18 +71,29 @@ class MakeselfArchivePackagesField(SpecialCasedDependencies):
     )
 
 
-class MakeselfArchiveOutputPath(OutputPathField):
+class MakeselfArchiveOutputPathField(OutputPathField):
     pass
+
+
+class MakeselfArchiveArgsField(StringSequenceField):
+    alias = "args"
+    required = False
+    help = help_text(
+        """
+        Makeself script args, see docs [here](https://github.com/megastep/makeself/tree/release-2.5.0#usage).
+        """
+    )
 
 
 class MakeselfArchiveTarget(Target):
     alias = "makeself_archive"
     core_fields = (
-        MakeselfArthiveLabel,
-        MakeselfArchiveStartupScript,
+        MakeselfArthiveLabelField,
+        MakeselfArchiveStartupScriptField,
         MakeselfArchiveFilesField,
         MakeselfArchivePackagesField,
-        MakeselfArchiveOutputPath,
+        MakeselfArchiveOutputPathField,
+        MakeselfArchiveArgsField,
         *COMMON_TARGET_FIELDS,
     )
     help = help_text(
