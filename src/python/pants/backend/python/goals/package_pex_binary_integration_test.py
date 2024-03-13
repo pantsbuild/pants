@@ -135,6 +135,7 @@ def test_include_sources_avoids_files_targets_warning(
                 """\
                 python_sources(
                     name='sources',
+                    interpreter_constraints=["CPython==3.10.*"]
                 )
 
                 python_distribution(
@@ -147,12 +148,14 @@ def test_include_sources_avoids_files_targets_warning(
                         name='my-dist',
                         version='1.2.3',
                     ),
+                    interpreter_constraints=["CPython==3.10.*"]
                 )
 
                 pex_binary(
                     dependencies=[':wheel'],
                     entry_point="none",
                     include_sources=False,
+                    interpreter_constraints=["CPython==3.10.*"]
                 )
                 """
             ),

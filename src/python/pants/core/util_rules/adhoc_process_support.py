@@ -169,7 +169,7 @@ async def merge_extra_sandbox_contents(request: MergeExtraSandboxContents) -> Ex
 
 
 @rule
-async def add_extra_contents_to_prcess(request: AddExtraSandboxContentsToProcess) -> Process:
+async def add_extra_contents_to_process(request: AddExtraSandboxContentsToProcess) -> Process:
     proc = request.process
     extras = request.contents
     new_digest = await Get(
@@ -411,7 +411,7 @@ async def create_tool_runner(
         Get(
             ResolvedExecutionDependencies,
             ResolveExecutionDependenciesRequest(
-                address=runnable_address,
+                address=request.target.address,
                 execution_dependencies=request.execution_dependencies,
                 runnable_dependencies=request.runnable_dependencies,
             ),

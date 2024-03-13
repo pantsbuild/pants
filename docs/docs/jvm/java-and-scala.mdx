@@ -1,5 +1,5 @@
 ---
-    title: Java and Scala overview
+    title: Java and Scala
     sidebar_position: 0
 ---
 
@@ -312,6 +312,43 @@ Once enabled, `lint` and `fmt` will check and automatically reformat your code:
 ❯ pants --changed-since=HEAD fmt
 ```
 
+### Fix Scala code
+
+Additionally to the previously mentioned tools, `scalafix` can also be enabled by adding the `pants.backend.experimental.scala.lint.scalafix` backend to `backend_packages` in the `[GLOBAL]` section of `pants.toml`. However to take full advantage of it additional settings are required.
+
+If we want to use Scalafix's semantic rules, Scalafix needs to be able to find `.semanticdb` compiled files in our classpath. In versions prior to Scala 3 this is achieved by adding the `semanticdb` scalac plugin to our build. Find which is the right version of it for the Scala version you are using and add the following targets:
+
+```python
+scala_artifact(
+    name="semanticdb-jar",
+    group="org.scalameta",
+    artifact="semanticdb-scalac",
+    version="<SEMANTICDB_VERSION>",
+    crossversion="full",
+)
+
+scalac_plugin(name="semanticdb", artifact=":semanticdb-jar")
+```
+
+Now you will need to add the `scalac_plugins` field to your scala targets like in the following:
+
+```python
+scala_sources(scalac_plugins=["semanticdb"])
+```
+
+Alternatively, you could add `semanticdb` to the `[scalac].plugins_for_resolve` setting:
+
+```toml pants.toml
+[scalac.plugins_for_resolve]
+jvm-default = "semanticdb"
+```
+
+:::note Scalafix and Scala 3
+At the moment the support for Scalac 3 in Scalafix is limited, most of the syntactic rules work but not that many in the semantic front.
+
+Despite those raugh edges, Scalafix is a great linting tool for Scala 3, just note that the setup is different than from prior versions: Instead of adding a scalac plugin to our build, we only need to add the `-Xsemanticdb` flag to our `[scalac].args` settings to enable the generation of `.semanticdb` compiled files.
+:::
+
 ## Working in an IDE
 
 Pants supports loading Java and Scala projects in IntelliJ via the [BSP protocol](https://build-server-protocol.github.io/) (which should ease VSCode support [via Metals](https://scalameta.org/metals/docs/editors/vscode), although it is not yet supported).
@@ -321,7 +358,7 @@ Pants supports loading Java and Scala projects in IntelliJ via the [BSP protocol
 After Setup (see below), and after IntelliJ has finished indexing your code, you should be able to:
 
 - Use goto definition and other symbol-index-using operations.
-- Run test classes, which will first compile them will Pants (and render compile failures if not), and then run them in the foreground with IntelliJ's test runner.
+- Run test classes, which will first compile them with Pants (and render compile failures if not), and then run them in the foreground with IntelliJ's test runner.
 
 ### Setup
 

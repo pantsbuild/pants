@@ -1,8 +1,12 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use core::fmt::Debug;
+use maplit::hashmap;
+
 use crate::args::Args;
-use crate::option_id;
+use crate::parse::test_util::write_fromfile;
+use crate::{option_id, DictEdit, DictEditAction, Val};
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource};
 
 fn args<I: IntoIterator<Item = &'static str>>(args: I) -> Args {
@@ -95,7 +99,7 @@ fn test_float() {
 
     assert_eq!(
         "Problem parsing --bad float value:\n1:swallow\n  ^\n\
-        Expected \"+\", \"-\" or ['0' ..= '9'] at line 1 column 1"
+        Expected \"+\", \"-\" or ['0'..='9'] at line 1 column 1"
             .to_owned(),
         args.get_float(&option_id!("bad")).unwrap_err()
     );
@@ -147,4 +151,142 @@ Expected \",\" or the end of a list indicated by ']' at line 1 column 18"
         expected_error_msg,
         args.get_string_list(&option_id!("bad")).unwrap_err()
     );
+}
+
+#[test]
+fn test_scalar_fromfile() {
+    fn do_test<T: PartialEq + Debug>(
+        content: &str,
+        expected: T,
+        getter: fn(&Args, &OptionId) -> Result<Option<T>, String>,
+        negate: bool,
+    ) {
+        let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", content);
+        let args = Args {
+            args: vec![format!(
+                "--{}foo=@{}",
+                if negate { "no-" } else { "" },
+                fromfile_path.display()
+            )],
+        };
+        let actual = getter(&args, &option_id!("foo")).unwrap().unwrap();
+        assert_eq!(expected, actual)
+    }
+
+    do_test("true", true, Args::get_bool, false);
+    do_test("false", false, Args::get_bool, false);
+    do_test("true", false, Args::get_bool, true);
+    do_test("false", true, Args::get_bool, true);
+    do_test("-42", -42, Args::get_int, false);
+    do_test("3.14", 3.14, Args::get_float, false);
+    do_test("EXPANDED", "EXPANDED".to_owned(), Args::get_string, false);
+
+    let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", "BAD INT");
+    let args = Args {
+        args: vec![format!("--foo=@{}", fromfile_path.display())],
+    };
+    assert_eq!(
+        args.get_int(&option_id!("foo")).unwrap_err(),
+        "Problem parsing --foo int value:\n1:BAD INT\n  ^\n\
+               Expected \"+\", \"-\" or ['0'..='9'] at line 1 column 1"
+    );
+}
+
+#[test]
+fn test_list_fromfile() {
+    fn do_test(content: &str, expected: &[ListEdit<i64>], filename: &str) {
+        let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
+        let args = Args {
+            args: vec![format!("--foo=@{}", &fromfile_path.display())],
+        };
+        let actual = args.get_int_list(&option_id!("foo")).unwrap().unwrap();
+        assert_eq!(expected.to_vec(), actual)
+    }
+
+    do_test(
+        "-42",
+        &[ListEdit {
+            action: ListEditAction::Add,
+            items: vec![-42],
+        }],
+        "fromfile.txt",
+    );
+    do_test(
+        "[10, 12]",
+        &[ListEdit {
+            action: ListEditAction::Replace,
+            items: vec![10, 12],
+        }],
+        "fromfile.json",
+    );
+    do_test(
+        "- 22\n- 44\n",
+        &[ListEdit {
+            action: ListEditAction::Replace,
+            items: vec![22, 44],
+        }],
+        "fromfile.yaml",
+    );
+}
+
+#[test]
+fn test_dict_fromfile() {
+    fn do_test(content: &str, filename: &str) {
+        let expected = DictEdit {
+            action: DictEditAction::Replace,
+            items: hashmap! {
+            "FOO".to_string() => Val::Dict(hashmap! {
+                "BAR".to_string() => Val::Float(3.14),
+                "BAZ".to_string() => Val::Dict(hashmap! {
+                    "QUX".to_string() => Val::Bool(true),
+                    "QUUX".to_string() => Val::List(vec![ Val::Int(1), Val::Int(2)])
+                })
+            }),},
+        };
+
+        let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
+        let args = Args {
+            args: vec![format!("--foo=@{}", &fromfile_path.display())],
+        };
+        let actual = args.get_dict(&option_id!("foo")).unwrap().unwrap();
+        assert_eq!(expected, actual)
+    }
+
+    do_test(
+        "{'FOO': {'BAR': 3.14, 'BAZ': {'QUX': True, 'QUUX': [1, 2]}}}",
+        "fromfile.txt",
+    );
+    do_test(
+        "{\"FOO\": {\"BAR\": 3.14, \"BAZ\": {\"QUX\": true, \"QUUX\": [1, 2]}}}",
+        "fromfile.json",
+    );
+    do_test(
+        r#"
+        FOO:
+          BAR: 3.14
+          BAZ:
+            QUX: true
+            QUUX:
+              - 1
+              - 2
+        "#,
+        "fromfile.yaml",
+    );
+}
+
+#[test]
+fn test_nonexistent_required_fromfile() {
+    let args = Args {
+        args: vec!["--foo=@/does/not/exist".to_string()],
+    };
+    let err = args.get_string(&option_id!("foo")).unwrap_err();
+    assert!(err.starts_with("Problem reading /does/not/exist for --foo: No such file or directory"));
+}
+
+#[test]
+fn test_nonexistent_optional_fromfile() {
+    let args = Args {
+        args: vec!["--foo=@?/does/not/exist".to_string()],
+    };
+    assert!(args.get_string(&option_id!("foo")).unwrap().is_none());
 }

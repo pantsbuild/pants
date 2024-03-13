@@ -17,7 +17,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 
 @dataclass(frozen=True)
 class GenerateAssemblySymabisRequest:
-    """Generate a `symabis` file with metadata about the assemnbly files for consumption by Go
+    """Generate a `symabis` file with metadata about the assembly files for consumption by Go
     compiler.
 
     See https://github.com/bazelbuild/rules_go/issues/1893.
@@ -86,10 +86,17 @@ def _asm_args(
     # See:
     # - https://github.com/golang/go/blob/245e95dfabd77f337373bf2d6bb47cd353ad8d74/src/cmd/go/internal/work/gc.go#L370-L372
     # - https://github.com/golang/go/blob/245e95dfabd77f337373bf2d6bb47cd353ad8d74/src/cmd/internal/objabi/path.go#L43-L67
+    # From Go 1.22+ this flag has been removed, since we're already passing the package path, asm can make that determination,
+    # and there's no need to pass the flag anymore.
+    # See:
+    # - https://cs.opensource.google/go/go/+/72946ae8674a295e7485982fe57c65c7142b2c14
     maybe_assembling_stdlib_runtime_args = (
         ["-compiling-runtime"]
-        if import_path in ("runtime", "reflect", "syscall", "internal/bytealg")
-        or import_path.startswith("runtime/internal")
+        if not goroot.is_compatible_version("1.22")
+        and (
+            import_path in ("runtime", "reflect", "syscall", "internal/bytealg")
+            or import_path.startswith("runtime/internal")
+        )
         else []
     )
 

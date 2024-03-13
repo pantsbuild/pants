@@ -87,7 +87,7 @@ def jarjar_lockfile(
 
 
 def _resolve_jar(rule_runner: RuleRunner, coord: Coordinate) -> ClasspathEntry:
-    jvm_arifact_field_sets = [
+    jvm_artifact_field_sets = [
         JvmArtifactFieldSet.create(tgt)
         for tgt in rule_runner.request(AllTargets, [])
         if JvmArtifactFieldSet.is_applicable(tgt)
@@ -98,7 +98,7 @@ def _resolve_jar(rule_runner: RuleRunner, coord: Coordinate) -> ClasspathEntry:
             CoarsenedTargetsRequest(
                 [
                     fs.address
-                    for fs in jvm_arifact_field_sets
+                    for fs in jvm_artifact_field_sets
                     if fs.artifact.value == coord.artifact
                     and fs.group.value == coord.group
                     and fs.version.value == coord.version

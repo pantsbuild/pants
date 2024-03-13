@@ -473,8 +473,8 @@ class TestRuleGraph:
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
     @pytest.mark.no_error_if_skipped
     def test_not_fulfillable_duplicated_dependency(self) -> None:
-        # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable
-        # Only the unfulfillable one should be in the errors.
+        # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable,
+        # only the unfulfillable one should be in the errors.
 
         @rule
         def a_from_c(c: C) -> A:

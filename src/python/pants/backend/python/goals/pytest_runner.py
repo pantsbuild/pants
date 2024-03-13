@@ -243,7 +243,7 @@ async def validate_pytest_cov_included(_pytest: PyTest):
                 `{_pytest.install_from_resolve}` used to install pytest is missing
                 `pytest-cov`, which is needed to collect coverage data.
 
-                See {doc_url("python-test-goal#pytest-version-and-plugins")} for details
+                See {doc_url("docs/python/goals/test#pytest-version-and-plugins")} for details
                 on how to set up a custom resolve for use by pytest.
                 """
             )

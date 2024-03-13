@@ -18,6 +18,7 @@ from pants.backend.docker.registries import DockerRegistries, DockerRegistryOpti
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerBuildKitOptionField,
+    DockerBuildOptionFieldListOfMultiValueDictMixin,
     DockerBuildOptionFieldMixin,
     DockerBuildOptionFieldMultiValueDictMixin,
     DockerBuildOptionFieldMultiValueMixin,
@@ -94,8 +95,9 @@ class DockerPackageFieldSet(PackageFieldSet):
     ) -> str:
         repository_context = InterpolationContext.from_dict(
             {
-                "directory": os.path.basename(self.address.spec_path),
                 "name": self.address.target_name,
+                "directory": os.path.basename(self.address.spec_path),
+                "full_directory": self.address.spec_path,
                 "parent_directory": os.path.basename(os.path.dirname(self.address.spec_path)),
                 "default_repository": default_repository,
                 "target_repository": self.repository.value or default_repository,
@@ -335,6 +337,7 @@ def get_build_options(
             (
                 DockerBuildOptionFieldMixin,
                 DockerBuildOptionFieldMultiValueDictMixin,
+                DockerBuildOptionFieldListOfMultiValueDictMixin,
                 DockerBuildOptionFieldValueMixin,
                 DockerBuildOptionFieldMultiValueMixin,
                 DockerBuildOptionFlagFieldMixin,
@@ -474,7 +477,7 @@ async def build_docker_image(
             keep_sandboxes=keep_sandboxes,
         )
 
-    image_id = parse_image_id_from_docker_build_output(result.stdout, result.stderr)
+    image_id = parse_image_id_from_docker_build_output(docker, result.stdout, result.stderr)
     docker_build_output_msg = "\n".join(
         (
             f"Docker build output for {tags[0]}:",
@@ -500,36 +503,53 @@ async def build_docker_image(
     )
 
 
-def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
+def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: bytes) -> str:
     """Outputs are typically the stdout/stderr pair from the `docker build` process."""
     # NB: We use the extracted image id for invalidation. The short_id may theoretically
     #  not be unique enough, although in a non adversarial situation, this is highly unlikely
     #  to be an issue in practice.
-    image_id_regexp = re.compile(
-        "|".join(
-            (
-                # BuildKit output.
-                r"(writing image (?P<digest>sha256:\S+) done)",
-                # Docker output.
-                r"(Successfully built (?P<short_id>\S+))",
-            ),
+    if docker.is_podman:
+        for output in outputs:
+            try:
+                _, image_id, success, *__ = reversed(output.decode().split("\n"))
+            except ValueError:
+                continue
+
+            if success.startswith("Successfully tagged"):
+                return image_id
+
+    else:
+        image_id_regexp = re.compile(
+            "|".join(
+                (
+                    # BuildKit output.
+                    r"(writing image (?P<digest>sha256:\S+) done)",
+                    # BuildKit with containerd-snapshotter output.
+                    r"(exporting manifest list (?P<manifest_list>sha256:\S+) done)",
+                    # Docker output.
+                    r"(Successfully built (?P<short_id>\S+))",
+                ),
+            )
         )
-    )
-    for output in outputs:
-        image_id_match = next(
-            (
-                match
-                for match in (
-                    re.search(image_id_regexp, line)
-                    for line in reversed(output.decode().split("\n"))
+        for output in outputs:
+            image_id_match = next(
+                (
+                    match
+                    for match in (
+                        re.search(image_id_regexp, line)
+                        for line in reversed(output.decode().split("\n"))
+                    )
+                    if match
+                ),
+                None,
+            )
+            if image_id_match:
+                image_id = (
+                    image_id_match.group("digest")
+                    or image_id_match.group("short_id")
+                    or image_id_match.group("manifest_list")
                 )
-                if match
-            ),
-            None,
-        )
-        if image_id_match:
-            image_id = image_id_match.group("digest") or image_id_match.group("short_id")
-            return image_id
+                return image_id
 
     return "<unknown>"
 

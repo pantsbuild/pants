@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
-from typing import Any, Dict, Iterable, NoReturn, Sequence, cast
+from typing import Any, Callable, Dict, Iterable, NoReturn, Sequence, cast
 
 from typing_extensions import TypedDict
 
@@ -210,7 +210,7 @@ class Scheduler:
             lease_time_millis=LOCAL_STORE_LEASE_TIME_SECS * 1000,
             shard_count=local_store_options.shard_count,
         )
-        exec_stategy_opts = PyExecutionStrategyOptions(
+        exec_strategy_opts = PyExecutionStrategyOptions(
             local_cache=execution_options.local_cache,
             remote_cache_read=execution_options.remote_cache_read,
             remote_cache_write=execution_options.remote_cache_write,
@@ -236,7 +236,7 @@ class Scheduler:
             watch_filesystem,
             remoting_options,
             py_local_store_options,
-            exec_stategy_opts,
+            exec_strategy_opts,
             ca_certs_path,
         )
 
@@ -404,6 +404,9 @@ class SchedulerSession:
 
     def visualize_rule_graph_to_file(self, filename: str) -> None:
         self._scheduler.visualize_rule_graph_to_file(filename)
+
+    def rule_graph_rule_gets(self) -> dict[Callable, list[tuple[type, list[type], Callable]]]:
+        return native_engine.rule_graph_rule_gets(self.py_scheduler)
 
     def execution_request(
         self,

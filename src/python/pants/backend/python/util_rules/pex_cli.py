@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import os.path
 from dataclasses import dataclass
 from typing import Iterable, List, Mapping, Optional, Tuple
@@ -29,15 +30,17 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
+logger = logging.getLogger(__name__)
+
 
 class PexCli(TemplatedExternalTool):
     options_scope = "pex-cli"
     name = "pex"
-    help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
+    help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.1.159"
-    default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.1.135,<3.0"
+    default_version = "v2.2.1"
+    default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
+    version_constraints = ">=2.1.161,<3.0"
 
     @classproperty
     def default_known_versions(cls):
@@ -46,8 +49,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "83c3090938b4d276703864c34ba50bcb3616db0663c54b56dd0521a668d9555f",
-                    "3671772",
+                    "e38e7052282f1855606880333a8f8c8a09458fabc5b5e5fb6c48ce11a4564a34",
+                    "4113219",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
@@ -156,6 +159,8 @@ async def setup_pex_cli_process(
 
     verbosity_args = [f"-{'v' * pex_subsystem.verbosity}"] if pex_subsystem.verbosity > 0 else []
 
+    warnings_args = [] if pex_subsystem.emit_warnings else ["--no-emit-warnings"]
+
     # NB: We should always pass `--python-path`, as that tells Pex where to look for interpreters
     # when `--python` isn't an absolute path.
     resolve_args = [
@@ -171,6 +176,7 @@ async def setup_pex_cli_process(
         *request.subcommand,
         *global_args,
         *verbosity_args,
+        *warnings_args,
         *pip_version_args,
         *resolve_args,
         # NB: This comes at the end because it may use `--` passthrough args, # which must come at
@@ -200,6 +206,15 @@ async def setup_pex_cli_process(
         concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,
     )
+
+
+def maybe_log_pex_stderr(stderr: bytes, pex_verbosity: int) -> None:
+    """Forward Pex's stderr to a Pants logger if conditions are met."""
+    log_output = stderr.decode()
+    if log_output and "PEXWarning:" in log_output:
+        logger.warning("%s", log_output)
+    elif log_output and pex_verbosity > 0:
+        logger.info("%s", log_output)
 
 
 def rules():

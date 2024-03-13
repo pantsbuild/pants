@@ -91,7 +91,7 @@ class GitWorktree(EngineAwareReturnType):
             committed_changes = self._git_binary._invoke_unsandboxed(
                 self._create_git_cmdline(committed_cmd)
             )
-            files.update(committed_changes.split())
+            files.update(committed_changes.splitlines())
         if include_untracked:
             untracked_cmd = [
                 "ls-files",
@@ -102,14 +102,14 @@ class GitWorktree(EngineAwareReturnType):
             untracked = self._git_binary._invoke_unsandboxed(
                 self._create_git_cmdline(untracked_cmd)
             )
-            files.update(untracked.split())
+            files.update(untracked.splitlines())
         # git will report changed files relative to the worktree: re-relativize to relative_to
         return {self._fix_git_relative_path(f, relative_to) for f in files}
 
     def changes_in(self, diffspec: str, relative_to: PurePath | str | None = None) -> set[str]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
         cmd = ["diff-tree", "--no-commit-id", "--name-only", "-r", diffspec]
-        files = self._git_binary._invoke_unsandboxed(self._create_git_cmdline(cmd)).split()
+        files = self._git_binary._invoke_unsandboxed(self._create_git_cmdline(cmd)).splitlines()
         return {self._fix_git_relative_path(f.strip(), relative_to) for f in files}
 
     def _create_git_cmdline(self, args: Iterable[str]) -> list[str]:

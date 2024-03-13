@@ -54,7 +54,7 @@ def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: Py
         raise NoCompatibleResolveException.bad_input_roots(
             root_targets,
             maybe_get_resolve=maybe_get_resolve,
-            doc_url_slug="python-third-party-dependencies#multiple-lockfiles",
+            doc_url_slug="docs/python/overview/lockfiles#multiple-lockfiles",
             workaround=softwrap(
                 f"""
                 To work around this, choose which resolve you want to use from above. Then, run

@@ -57,6 +57,10 @@ async def _run_black(
             ),
             input_digest=input_digest,
             output_files=request.files,
+            # Note - the cache directory is not used by Pants,
+            # and we pass through a temporary directory to neutralize
+            # Black's caching behavior in favor of Pants' caching.
+            extra_env={"BLACK_CACHE_DIR": "__pants_black_cache"},
             concurrency_available=len(request.files),
             description=f"Run Black on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
@@ -74,7 +78,7 @@ async def partition_black(
 
     # Black requires 3.6+ but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6, and 3.7.
     # However, typed-ast does not understand 3.8+, so instead we must run Black with Python 3.8+
-    # when relevant. We only do this if if <3.8 can't be used, as we don't want a loose requirement
+    # when relevant. We only do this if <3.8 can't be used, as we don't want a loose requirement
     # like `>=3.6` to result in requiring Python 3.8, which would error if 3.8 is not installed on
     # the machine.
     tool_interpreter_constraints = black.interpreter_constraints

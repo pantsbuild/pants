@@ -7,7 +7,7 @@ How to execute arbitrary scripts and programs
 
 ---
 
-The [`shell_command`](../../reference/targets/shell_command.mdx) target allows you to run any command during a Pants execution, for the purpose of modifying or creating files to be used by other targets, or its (idempotent: see below) side-effects when accessing services over the network.
+The [`shell_command`](../../reference/targets/shell_command.mdx) target allows you to run any command during a Pants execution, for the purpose of modifying or creating files to be used by other targets, or its (idempotent: see below) side effects when accessing services over the network.
 
 ```python tab={"label":"BUILD"}
 shell_command(

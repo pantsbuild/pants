@@ -128,7 +128,7 @@ class Awaitable(Generic[_Output], _BasePyGeneratorResponseGet[_Output]):
 class Effect(Generic[_Output], Awaitable[_Output]):
     """Asynchronous generator API for types which are SideEffecting.
 
-    Unlike `Get`s, `Effect`s can cause side-effects (writing files to the workspace, publishing
+    Unlike `Get`s, `Effect`s can cause side effects (writing files to the workspace, publishing
     things, printing to the console), and so they may only be used in `@goal_rule`s.
 
     See Get for more information on supported syntaxes.
@@ -550,7 +550,7 @@ async def MultiGet(
             return repr(arg)
         return repr(arg)
 
-    likely_args_exlicitly_passed = tuple(
+    likely_args_explicitly_passed = tuple(
         reversed(
             [
                 render_arg(arg)
@@ -558,12 +558,12 @@ async def MultiGet(
             ]
         )
     )
-    if any(arg is None for arg in likely_args_exlicitly_passed):
+    if any(arg is None for arg in likely_args_explicitly_passed):
         raise ValueError(
             softwrap(
                 f"""
                 Unexpected MultiGet None arguments: {', '.join(
-                    map(str, likely_args_exlicitly_passed)
+                    map(str, likely_args_explicitly_passed)
                 )}
 
                 When constructing a MultiGet from individual Gets, all leading arguments must be
@@ -575,7 +575,7 @@ async def MultiGet(
     raise TypeError(
         softwrap(
             f"""
-            Unexpected MultiGet argument types: {', '.join(map(str, likely_args_exlicitly_passed))}
+            Unexpected MultiGet argument types: {', '.join(map(str, likely_args_explicitly_passed))}
 
             A MultiGet can be constructed in two ways:
               1. MultiGet(Iterable[Get[T]]) -> Tuple[T]

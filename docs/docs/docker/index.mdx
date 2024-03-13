@@ -217,14 +217,14 @@ docker_image(
         "type": "local",
         "dest": "/tmp/docker-cache/pants-example"
     },
-    cache_from={
+    cache_from=[{
         "type": "local",
         "src": "/tmp/docker-cache/pants-example"
-    }
+    }]
 )
 ```
 
-For working examples, including multi-platform builds with Github Actions, refer to the [example-docker](https://github.com/pantsbuild/example-docker) repository.
+For working examples, including multi-platform builds with GitHub Actions, refer to the [example-docker](https://github.com/pantsbuild/example-docker) repository.
 
 ### Build Docker image example
 

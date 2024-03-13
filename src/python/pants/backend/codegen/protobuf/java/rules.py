@@ -219,7 +219,7 @@ def rules():
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
-        # Bring in the Java backend (since this backend compiles Jave code) to avoid rule graph errors.
+        # Bring in the Java backend (since this backend compiles Java code) to avoid rule graph errors.
         # TODO: Figure out whether a subset of rules can be brought in to still avoid rule graph errors.
         *java_backend_rules(),
     ]

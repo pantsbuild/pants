@@ -176,7 +176,7 @@ def test_help_provided_target_plugin_field() -> None:
 
             A publishable Python setuptools distribution (e.g. an sdist or wheel).
 
-            See {doc_url("python-distributions")}.
+            See {doc_url("docs/python/overview/building-distributions")}.
 
 
             Activated by pants.backend.python

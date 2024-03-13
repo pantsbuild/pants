@@ -84,7 +84,7 @@ class ExternalHelmPlugin(HelmPluginSubsystem, TemplatedExternalTool, metaclass=A
     """Represents the subsystem for a Helm plugin that needs to be downloaded from an external
     source.
 
-    For declaring an External Helm plugin, extend this class provinding a value of the
+    For declaring an External Helm plugin, extend this class providing a value of the
     `plugin_name` class attribute and implement the rest of it like you would do for
     any other `TemplatedExternalTool`.
 

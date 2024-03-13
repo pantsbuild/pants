@@ -124,7 +124,7 @@ def render_json(
 
 
 class _PeekJsonEncoder(json.JSONEncoder):
-    """Allow us to serialize some commmonly found types in BUILD files."""
+    """Allow us to serialize some commonly found types in BUILD files."""
 
     def default(self, o):
         """Return a serializable object for o."""

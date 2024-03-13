@@ -69,7 +69,7 @@ GIGABYTES = 1_000 * MEGABYTES
 
 
 class DynamicUIRenderer(Enum):
-    """Which renderer to use for dyanmic UI."""
+    """Which renderer to use for dynamic UI."""
 
     indicatif_spinner = "indicatif-spinner"
     experimental_prodash = "experimental-prodash"
@@ -174,7 +174,7 @@ class RemoteProvider(Enum):
             return softwrap(
                 f"""
                 The type of provider to use, if using a remote cache and/or remote execution, See
-                {doc_url('remote-caching-execution')} for details.
+                {doc_url('docs/using-pants/remote-caching-and-execution')} for details.
 
                 Each provider supports different `remote_store_address` and (optional)
                 `remote_execution_address` URIs.
@@ -924,7 +924,7 @@ class BootstrapOptions:
             using the requested version, as Pants cannot dynamically change the version it
             is using once the program is already running.
 
-            If you use the `{bin_name()}` script from {doc_url('installation')}, however, changing
+            If you use the `{bin_name()}` script from {doc_url('docs/getting-started/installing-pants')}, however, changing
             the value in your `pants.toml` will cause the new version to be installed and run automatically.
 
             Run `{bin_name()} --version` to check what is being used.
@@ -1047,7 +1047,7 @@ class BootstrapOptions:
     )
     pants_ignore = StrListOption(
         advanced=True,
-        default=[".*/", _default_rel_distdir, "__pycache__", "!.semgrep/"],
+        default=[".*/", _default_rel_distdir, "__pycache__", "!.semgrep/", "!.github/"],
         help=softwrap(
             """
             Paths to ignore for all filesystem operations performed by pants
@@ -1389,7 +1389,7 @@ class BootstrapOptions:
 
             This option cannot be overridden via environment targets, so if you need a different
             value than what the rest of your organization is using, override the value via an
-            environment variable, CLI argument, or `.pants.rc` file. See {doc_url('options')}.
+            environment variable, CLI argument, or `.pants.rc` file. See {doc_url('docs/using-pants/key-concepts/options')}.
             """
         ),
     )
@@ -1458,7 +1458,7 @@ class BootstrapOptions:
             """
             The cache namespace for process execution.
             Change this value to invalidate every artifact's execution, or to prevent
-            process cache entries from being (re)used for different usecases or users.
+            process cache entries from being (re)used for different use-cases or users.
             """
         ),
     )
@@ -1596,8 +1596,8 @@ class BootstrapOptions:
             dynamically set the relevant headers. Otherwise, no authorization will be performed.
             """
         ),
-        removal_version="2.21.0.dev0",
-        removal_hint=f'use `[GLOBAL].remote_oauth_bearer_token = "@/path/to/token.txt"` instead, see {doc_url("reference-global#remote_oauth_bearer_token")}',
+        removal_version="2.23.0.dev0",
+        removal_hint=f'use `[GLOBAL].remote_oauth_bearer_token = "@/path/to/token.txt"` instead, see {doc_url("reference/global-options#remote_oauth_bearer_token")}',
     )
 
     remote_oauth_bearer_token = StrOption(
@@ -1617,7 +1617,7 @@ class BootstrapOptions:
             the token via the environment variable (`PANTS_REMOTE_OAUTH_BEARER_TOKEN`), CLI option
             (`--remote-oauth-bearer-token`), or store the token in a file and set the option to
             `"@/path/to/token.txt"` to [read the value from that
-            file]({doc_url('options#reading-individual-option-values-from-files')}).
+            file]({doc_url('docs/using-pants/key-concepts/options#reading-individual-option-values-from-files')}).
             """
         ),
     )
@@ -1791,7 +1791,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         help=softwrap(
             f"""
             Include only targets with these tags (optional '+' prefix) or without these
-            tags ('-' prefix). See {doc_url('advanced-target-selection')}.
+            tags ('-' prefix). See {doc_url('docs/using-pants/advanced-target-selection')}.
             """
         ),
         metavar="[+-]tag1,tag2,...",
@@ -1857,7 +1857,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         help=softwrap(
             f"""
             Python files to evaluate and whose symbols should be exposed to all BUILD files.
-            See {doc_url('macros')}.
+            See {doc_url('docs/writing-plugins/macros')}.
             """
         ),
         advanced=True,

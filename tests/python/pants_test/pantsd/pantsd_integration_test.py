@@ -524,7 +524,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         :param signum: The signal to send.
         :param regexps: Assert that all of these regexps match somewhere in stderr.
         :param not_regexps: Assert that all of these regexps do not match somewhere in stderr.
-        :param cleanup_wait_time: passed throught to waiter, dictated how long simulated cleanup will take
+        :param cleanup_wait_time: passed through to waiter, dictated how long simulated cleanup will take
         """
         with self.pantsd_test_context() as (workdir, config, checker):
             client_handle, waiter_pid, child_pid, _ = launch_waiter(
@@ -561,7 +561,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             checker.assert_running()
 
     def test_pantsd_graceful_shutdown(self):
-        """Test that SIGINT is propgated to child processes and they are given time to shutdown."""
+        """Test that SIGINT is propagated to child processes and they are given time to shutdown."""
         self._assert_pantsd_keyboardinterrupt_signal(
             signal.SIGINT,
             regexps=[

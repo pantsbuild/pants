@@ -21,6 +21,7 @@ Created as part of the release process.
 + Antoine Tollenaere
 + Asher Foa
 + Aurelien Didier
++ Axel Goblet
 + Baptiste Gentholz
 + Bardur Arantsson
 + Bastian Wegge
@@ -48,6 +49,7 @@ Created as part of the release process.
 + Chris Heisterkamp
 + Chris Livingston
 + Chris Pesto
++ Chris Smith
 + Chris Targett
 + Chris Williams
 + Christoph Proeschel
@@ -75,6 +77,7 @@ Created as part of the release process.
 + David Taylor
 + David Turner
 + Derek Young
++ Dimitar Kovachev
 + Dimitrios Bariamis
 + Divij Rajkumar
 + Dominic Hamon
@@ -83,6 +86,7 @@ Created as part of the release process.
 + Drew Rothstein
 + Dumitru Daniliuc
 + Dylan Herman
++ Dương Đỗ Minh Châu
 + Ebube Chuba
 + Eitan Adler
 + Ekaterina Tyurina
@@ -98,6 +102,7 @@ Created as part of the release process.
 + Facetoe
 + Fatin H
 + Fedor Korotkov
++ Filip Nikolovski
 + Fiona Condone
 + Flo
 + Florian Leibert
@@ -137,6 +142,7 @@ Created as part of the release process.
 + James Mouradian
 + Jan Berkel
 + Jan Paul Erkelens
++ Jason Barnett
 + Jason Jackson
 + Jason Song
 + Jay Crumb
@@ -175,6 +181,7 @@ Created as part of the release process.
 + Kaushik Srenevasan
 + Ken Howard
 + Ken Kawamoto
++ Kevin Oliveira
 + Kevin Oliver
 + Kevin Sweeney
 + Koki Nishihara
@@ -262,6 +269,7 @@ Created as part of the release process.
 + Pierre Chevalier
 + Pierre DAL-PRA
 + Qicheng Ma
++ Ramon Buckland
 + Raph Estrada
 + Raúl Cuza
 + Rhuan Barreto
@@ -288,6 +296,7 @@ Created as part of the release process.
 + Shuo Li
 + Simeon Franklin
 + Simon Biggs
++ Sion Kang
 + Srikanth Kotagiri
 + Stefan Sauer
 + Stephan Erb
@@ -345,8 +354,10 @@ Created as part of the release process.
 + hephex
 + jgartdele/del
 + offsetcyan
++ okcleary
 + olivercoleman-switchdin
 + philipp-sontag-by
++ purajit
 + sww
 + twunderlich-grapl
 + wimax-grapl

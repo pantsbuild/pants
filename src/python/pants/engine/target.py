@@ -198,7 +198,7 @@ class FieldDefaults:
 
     TODO: This is to work around the fact that Field value defaulting cannot have arbitrary
     subsystem requirements, and so e.g. `JvmResolveField` and `PythonResolveField` have methods
-    which compute the true value of the field given a subsytem argument. Consumers need to
+    which compute the true value of the field given a subsystem argument. Consumers need to
     be type aware, and `@rules` cannot have dynamic requirements.
 
     Additionally, `__defaults__` should mean that computed default Field values should become
@@ -515,7 +515,7 @@ class Target:
         grab the `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
         `SourcesField`, you may need to hydrate the value.).
 
-        This works with subclasses of `Field`s. For example, if you subclass `Tags`
+        This works with subclasses of `Field`. For example, if you subclass `Tags`
         to define a custom subclass `CustomTags`, both `tgt.get(Tags)` and
         `tgt.get(CustomTags)` will return the same `CustomTags` instance.
 
@@ -550,7 +550,7 @@ class Target:
     def has_field(self, field: Type[Field]) -> bool:
         """Check that this target has registered the requested field.
 
-        This works with subclasses of `Field`s. For example, if you subclass `Tags` to define a
+        This works with subclasses of `Field`. For example, if you subclass `Tags` to define a
         custom subclass `CustomTags`, both `tgt.has_field(Tags)` and
         `python_tgt.has_field(CustomTags)` will return True.
         """
@@ -560,7 +560,7 @@ class Target:
     def has_fields(self, fields: Iterable[Type[Field]]) -> bool:
         """Check that this target has registered all of the requested fields.
 
-        This works with subclasses of `Field`s. For example, if you subclass `Tags` to define a
+        This works with subclasses of `Field`. For example, if you subclass `Tags` to define a
         custom subclass `CustomTags`, both `tgt.has_fields([Tags])` and
         `python_tgt.has_fields([CustomTags])` will return True.
         """
@@ -693,8 +693,8 @@ class Targets(Collection[Target]):
 # FilteredTargets`. That is necessary so that project-introspection goals like `list` which don't
 # use `FilteredTargets` still have filtering applied.
 class FilteredTargets(Collection[Target]):
-    """A heterogenous collection of Target instances that have been filtered with the global options
-    `--tag` and `--exclude-target-regexp`.
+    """A heterogeneous collection of Target instances that have been filtered with the global
+    options `--tag` and `--exclude-target-regexp`.
 
     Outside of the extra filtering, this type is identical to `Targets`, including its handling of
     target generators.
@@ -788,7 +788,7 @@ class AlwaysTraverseDeps(ShouldTraverseDepsPredicate):
 
 class CoarsenedTarget(EngineAwareParameter):
     def __init__(self, members: Iterable[Target], dependencies: Iterable[CoarsenedTarget]) -> None:
-        """A set of Targets which cyclicly reach one another, and are thus indivisible.
+        """A set of Targets which cyclically reach one another, and are thus indivisible.
 
         Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for the
         recursive portion.
@@ -946,7 +946,7 @@ class TransitiveTargetsRequest:
     """A request to get the transitive dependencies of the input roots.
 
     Resolve the transitive targets with `await Get(TransitiveTargets,
-    TransitiveTargetsRequest([addr1, addr2])`.
+    TransitiveTargetsRequest([addr1, addr2]))`.
     """
 
     roots: Tuple[Address, ...]
@@ -1369,7 +1369,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
 
-    You can optionally set implement the classmethod `opt_out` so that targets have a
+    You can optionally implement the classmethod `opt_out` so that targets have a
     mechanism to not match with the FieldSet even if they have the `required_fields` registered.
 
     For example:
@@ -1385,7 +1385,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
             def opt_out(cls, tgt: Target) -> bool:
                 return tgt.get(MaybeSkipFortranTestsField).value
 
-    This field set may then created from a `Target` through the `is_applicable()` and `create()`
+    This field set may then be created from a `Target` through the `is_applicable()` and `create()`
     class methods:
 
         field_sets = [
@@ -1687,7 +1687,7 @@ class UnrecognizedTargetTypeException(InvalidTargetException):
                 All valid target types: {sorted(registered_target_types.aliases)}
 
                 (If {target_type!r} is a custom target type, refer to
-                {doc_url('target-api-concepts')} for getting it registered with Pants.)
+                {doc_url('docs/writing-plugins/the-target-api/concepts')} for getting it registered with Pants.)
 
                 """
             ),
@@ -1918,6 +1918,39 @@ class DictStringToStringField(Field):
         return FrozenDict(value_or_default)
 
 
+class ListOfDictStringToStringField(Field):
+    value: Optional[Tuple[FrozenDict[str, str]]]
+    default: ClassVar[Optional[list[FrozenDict[str, str]]]] = None
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[list[Dict[str, str]]], address: Address
+    ) -> Optional[Tuple[FrozenDict[str, str], ...]]:
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default is None:
+            return None
+        invalid_type_exception = InvalidFieldTypeException(
+            address,
+            cls.alias,
+            raw_value,
+            expected_type="a list of dictionaries (or a single dictionary) of string -> string",
+        )
+
+        # Also support passing in a single dictionary by wrapping it
+        if not isinstance(value_or_default, list):
+            value_or_default = [value_or_default]
+
+        result_lst: list[FrozenDict[str, str]] = []
+        for item in value_or_default:
+            if not isinstance(item, collections.abc.Mapping):
+                raise invalid_type_exception
+            if not all(isinstance(k, str) and isinstance(v, str) for k, v in item.items()):
+                raise invalid_type_exception
+            result_lst.append(FrozenDict(item))
+
+        return tuple(result_lst)
+
+
 class NestedDictStringToStringField(Field):
     value: Optional[FrozenDict[str, FrozenDict[str, str]]]
     default: ClassVar[Optional[FrozenDict[str, FrozenDict[str, str]]]] = None
@@ -2021,7 +2054,7 @@ class SourcesField(AsyncFieldMixin, Field):
     - `default_glob_match_error_behavior` -- Advanced option, should very rarely be used. Override
         glob match error behavior when using the default value. If setting this to
         `GlobMatchErrorBehavior.ignore`, make sure you have other validation in place in case the
-        default glob doesn't match any files if required, to alert the user appropriately.
+        default glob doesn't match any files, if required, to alert the user appropriately.
     """
 
     expected_file_extensions: ClassVar[tuple[str, ...] | None] = None
@@ -2517,7 +2550,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
         `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
         result.
 
-        See {doc_url('targets')} for more about how addresses are formed, including for generated
+        See {doc_url('docs/using-pants/key-concepts/targets-and-build-files')} for more about how addresses are formed, including for generated
         targets. You can also run `{bin_name()} list ::` to find all addresses in your project, or
         `{bin_name()} list dir` to find all addresses defined in that directory.
 
@@ -2658,7 +2691,7 @@ class ExplicitlyProvidedDependencies:
             f"with `!` or `!!` so that one or no targets are left."
             f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
             f"targets so that only 1 target owns this {import_reference}. Refer to "
-            f"{doc_url('troubleshooting#import-errors-and-missing-dependencies')}."
+            f"{doc_url('docs/using-pants/troubleshooting-common-issues#import-errors-and-missing-dependencies')}."
         )
 
     def disambiguated(
@@ -2785,7 +2818,7 @@ class DependenciesRuleApplicationRequest:
 
 @dataclass(frozen=True)
 class DependenciesRuleApplication:
-    """Maps all dependencies to their respective dependency rule application of a origin target
+    """Maps all dependencies to their respective dependency rule application of an origin target
     address.
 
     The `applications` will be empty and the `address` `None` if there is no dependency rule
