@@ -12,7 +12,7 @@ from pants.backend.makeself.target_types import (
     MakeselfArchiveStartupScriptField,
     MakeselfArthiveLabelField,
 )
-from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
+from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.system_binaries import (
     AwkBinary,

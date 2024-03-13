@@ -15,7 +15,7 @@ from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.core.util_rules import system_binaries
 from pants.engine.addresses import Address
-from pants.engine.fs import DigestContents, DigestEntries, FileContent
+from pants.engine.fs import DigestContents, FileContent
 from pants.engine.process import ProcessResult
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 

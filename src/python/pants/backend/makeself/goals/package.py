@@ -1,7 +1,6 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import dataclasses
-import itertools
 import logging
 import os
 from dataclasses import dataclass
@@ -65,8 +64,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class CreateMakeselfArchive:
-    """
-    Create Makeself archive with `await Get(ProcessResult, CreateMakeselfArchive(...))`.
+    """Create Makeself archive with `await Get(ProcessResult, CreateMakeselfArchive(...))`.
+
     See docs for the options [here](https://github.com/megastep/makeself/tree/release-2.5.0#usage).
     """
 
