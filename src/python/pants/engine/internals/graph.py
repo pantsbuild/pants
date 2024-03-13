@@ -12,7 +12,18 @@ import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, DefaultDict, FrozenSet, Iterable, Iterator, NamedTuple, Sequence, Type, cast
+from typing import (
+    Any,
+    DefaultDict,
+    FrozenSet,
+    Iterable,
+    Iterator,
+    NamedTuple,
+    Sequence,
+    Type,
+    TypeVar,
+    cast,
+)
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -304,12 +315,12 @@ async def resolve_generator_target_requests(
         generator_fields,
         union_membership,
     )
-    base_generator = target_type(
-        generator_fields,
+    base_generator = _create_target(
         req.address,
-        name_explicitly_set=target_adaptor.name_explicitly_set,
-        union_membership=union_membership,
-        description_of_origin=target_adaptor.description_of_origin,
+        target_type,
+        target_adaptor,
+        generator_fields,
+        union_membership,
     )
     overrides = await _target_generator_overrides(base_generator, unmatched_build_file_globs)
     return ResolvedTargetGeneratorRequests(
@@ -363,6 +374,36 @@ async def resolve_target_parametrizations(
     return _TargetParametrizations(parametrizations)
 
 
+_TargetType = TypeVar("_TargetType", bound=Target)
+
+
+def _create_target(
+    address: Address,
+    target_type: type[_TargetType],
+    target_adaptor: TargetAdaptor,
+    field_values: dict[str, Any],
+    union_membership: UnionMembership,
+    name_explicitly_set: bool | None = None,
+) -> _TargetType:
+    target = target_type(
+        field_values,
+        address,
+        name_explicitly_set=(
+            target_adaptor.name_explicitly_set
+            if name_explicitly_set is None
+            else name_explicitly_set
+        ),
+        union_membership=union_membership,
+        description_of_origin=target_adaptor.description_of_origin,
+    )
+    # Check for any deprecated field usage.
+    for field_type in target.field_types:
+        if field_type.deprecated_alias is not None and field_type.deprecated_alias in field_values:
+            warn_deprecated_field_type(field_type)
+
+    return target
+
+
 def _target_parametrizations(
     address: Address,
     target_adaptor: TargetAdaptor,
@@ -376,12 +417,12 @@ def _target_parametrizations(
         generated = FrozenDict(
             (
                 parameterized_address,
-                target_type(
-                    parameterized_fields,
+                _create_target(
                     parameterized_address,
-                    name_explicitly_set=target_adaptor.name_explicitly_set,
-                    union_membership=union_membership,
-                    description_of_origin=target_adaptor.description_of_origin,
+                    target_type,
+                    target_adaptor,
+                    parameterized_fields,
+                    union_membership,
                 ),
             )
             for parameterized_address, parameterized_fields in expanded_parametrizations
@@ -389,19 +430,13 @@ def _target_parametrizations(
         return _TargetParametrization(None, generated)
     else:
         # The target was not parametrized.
-        target = target_type(
-            target_adaptor.kwargs,
+        target = _create_target(
             address,
-            name_explicitly_set=target_adaptor.name_explicitly_set,
-            union_membership=union_membership,
-            description_of_origin=target_adaptor.description_of_origin,
+            target_type,
+            target_adaptor,
+            target_adaptor.kwargs,
+            union_membership,
         )
-        for field_type in target.field_types:
-            if (
-                field_type.deprecated_alias is not None
-                and field_type.deprecated_alias in target_adaptor.kwargs
-            ):
-                warn_deprecated_field_type(field_type)
         return _TargetParametrization(target, FrozenDict())
 
 
@@ -423,10 +458,20 @@ def _parametrized_target_generators_with_templates(
         *target_type._find_moved_plugin_fields(union_membership),
     )
     for field_type in copied_fields:
-        field_value = generator_fields.get(field_type.alias, None)
-        if field_value is not None:
-            template_fields[field_type.alias] = field_value
+        for alias in (field_type.deprecated_alias, field_type.alias):
+            if alias is None:
+                continue
+            # Any deprecated field use will be checked on the generator target.
+            field_value = generator_fields.get(alias, None)
+            if field_value is not None:
+                template_fields[alias] = field_value
     for field_type in moved_fields:
+        # We must check for deprecated field usage here before passing the value to the generator.
+        if field_type.deprecated_alias is not None:
+            field_value = generator_fields.pop(field_type.deprecated_alias, None)
+            if field_value is not None:
+                warn_deprecated_field_type(field_type)
+                template_fields[field_type.deprecated_alias] = field_value
         field_value = generator_fields.pop(field_type.alias, None)
         if field_value is not None:
             template_fields[field_type.alias] = field_value
@@ -460,12 +505,13 @@ def _parametrized_target_generators_with_templates(
         )
     return [
         (
-            target_type(
-                generator_fields,
+            _create_target(
                 address,
+                target_type,
+                target_adaptor,
+                generator_fields,
+                union_membership,
                 name_explicitly_set=target_adaptor.name is not None,
-                union_membership=union_membership,
-                description_of_origin=target_adaptor.description_of_origin,
             ),
             template,
         )
@@ -929,7 +975,7 @@ def _log_or_raise_unmatched_owners(
             f"target whose `sources` field includes the file."
         )
     msg = (
-        f"{prefix} See {doc_url('targets')} for more information on target definitions."
+        f"{prefix} See {doc_url('docs/using-pants/key-concepts/targets-and-build-files')} for more information on target definitions."
         f"\n\nYou may want to run `{bin_name()} tailor` to autogenerate your BUILD files. See "
         f"{doc_url('create-initial-build-files')}.{option_msg}"
     )

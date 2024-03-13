@@ -102,8 +102,11 @@ domain = "my.domain"
 
 [python-repos]
 repo_host = "repo.%(domain)s"
-indexes.add = ["http://%(env.PY_REPO)s@%(repo_host)s/index
+indexes.add = ["https://%(env.PY_REPO)s@%(repo_host)s/index"]
 ```
+
+Learn more about exporting environment variables in the [`.pants.bootstrap`](#pantsbootstrap-file))
+Bash script that is sourced before Pants runs.
 
 ## Option types
 
@@ -332,6 +335,11 @@ format, which is useful for list- and dict-valued options.
 
 Otherwise, the file is parsed as a literal as described above for each option type.
 
+Normally, the file must exist, and it is an error if it doesn't.
+To avoid an error when the file doesn't exist, add a `?` after `@`, for example:
+`@?path/that/may/not/exist` -  this will treat the config value in question as not
+being set when the file does not exist.
+
 Note that you can use this feature on the command-line, in an env var, or in a config file:
 
 ```toml title="pants.toml"
@@ -369,3 +377,25 @@ interpreter_constraints = ["==3.9.*"]
 ```
 
 If you want to ban this feature, set `[GLOBAL].pantsrc = false` in `pants.toml`.
+
+## `.pants.bootstrap` file
+
+If you need to set default values for environment variables without requiring all users to define them in the local
+environment, you can export them in the `.pants.bootstrap` Bash script. This file needs to be placed in the root of your
+workspace, and it is going to be sourced before invoking any Pants goal.
+
+You can also add to this file any Bash code you want to execute before Pants runs, and any environment variables
+declared in this file are going to be available to any process that Pants launcher binary may start.
+
+For example:
+
+```bash title=".pants.bootstrap"
+# these variables are defined in our CI agents,
+# but this is set to support local development
+export DOCKER_DEFAULT_REPO="https://hub.docker.com/"
+export GIT_COMMIT="$(git rev-parse HEAD)"
+```
+
+If you want to learn more about how
+[Pants launcher binary](../../getting-started/installing-pants#the-pants-binarys-implementation) works, see
+the [scie-pants](https://github.com/pantsbuild/scie-pants) project.

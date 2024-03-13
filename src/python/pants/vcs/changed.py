@@ -161,7 +161,7 @@ class Changed(Subsystem):
         f"""
         Tell Pants to detect what files and targets have changed from Git.
 
-        See {doc_url('advanced-target-selection')}.
+        See {doc_url('docs/using-pants/advanced-target-selection')}.
         """
     )
 

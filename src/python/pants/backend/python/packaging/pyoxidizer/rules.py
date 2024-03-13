@@ -133,7 +133,7 @@ async def package_pyoxidizer_binary(
                 The `{PyOxidizerTarget.alias}` target {field_set.address} must include
                 in its `dependencies` field at least one `python_distribution` target that produces a
                 `.whl` file. For example, if using `{GenerateSetupField.alias}=True`, then make sure
-                `{WheelField.alias}=True`. See {doc_url('python-distributions')}.
+                `{WheelField.alias}=True`. See {doc_url('docs/python/overview/building-distributions')}.
                 """
             )
         )

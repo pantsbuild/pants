@@ -7,10 +7,7 @@ use std::ffi::OsString;
 
 use super::id::{NameTransform, OptionId, Scope};
 use super::{DictEdit, OptionsSource};
-use crate::parse::{
-    parse_bool, parse_bool_list, parse_dict, parse_float_list, parse_int_list, parse_string_list,
-    ParseError,
-};
+use crate::parse::{expand, expand_to_dict, expand_to_list, Parseable};
 use crate::ListEdit;
 
 #[derive(Debug)]
@@ -70,18 +67,14 @@ impl Env {
         names
     }
 
-    fn get_list<T>(
-        &self,
-        id: &OptionId,
-        parse_list: fn(&str) -> Result<Vec<ListEdit<T>>, ParseError>,
-    ) -> Result<Option<Vec<ListEdit<T>>>, String> {
-        if let Some(value) = self.get_string(id)? {
-            parse_list(&value)
-                .map(Some)
-                .map_err(|e| e.render(self.display(id)))
-        } else {
-            Ok(None)
+    fn get_list<T: Parseable>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
+        for env_var_name in &Self::env_var_names(id) {
+            if let Some(value) = self.env.get(env_var_name) {
+                return expand_to_list::<T>(value.to_owned())
+                    .map_err(|e| e.render(self.display(id)));
+            }
         }
+        Ok(None)
     }
 }
 
@@ -100,10 +93,9 @@ impl OptionsSource for Env {
     }
 
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
-        let env_var_names = Self::env_var_names(id);
-        for env_var_name in &env_var_names {
+        for env_var_name in &Self::env_var_names(id) {
             if let Some(value) = self.env.get(env_var_name) {
-                return Ok(Some(value.to_owned()));
+                return expand(value.to_owned()).map_err(|e| e.render(self.display(id)));
             }
         }
         Ok(None)
@@ -111,7 +103,7 @@ impl OptionsSource for Env {
 
     fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
         if let Some(value) = self.get_string(id)? {
-            parse_bool(&value)
+            bool::parse(&value)
                 .map(Some)
                 .map_err(|e| e.render(self.display(id)))
         } else {
@@ -120,28 +112,27 @@ impl OptionsSource for Env {
     }
 
     fn get_bool_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<bool>>>, String> {
-        self.get_list(id, parse_bool_list)
+        self.get_list::<bool>(id)
     }
 
     fn get_int_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<i64>>>, String> {
-        self.get_list(id, parse_int_list)
+        self.get_list::<i64>(id)
     }
 
     fn get_float_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<f64>>>, String> {
-        self.get_list(id, parse_float_list)
+        self.get_list::<f64>(id)
     }
 
     fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
-        self.get_list(id, parse_string_list)
+        self.get_list::<String>(id)
     }
 
-    fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
-        if let Some(value) = self.get_string(id)? {
-            parse_dict(&value)
-                .map(|e| Some(vec![e]))
-                .map_err(|e| e.render(self.display(id)))
-        } else {
-            Ok(None)
+    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
+        for env_var_name in &Self::env_var_names(id) {
+            if let Some(value) = self.env.get(env_var_name) {
+                return expand_to_dict(value.to_owned()).map_err(|e| e.render(self.display(id)));
+            }
         }
+        Ok(None)
     }
 }

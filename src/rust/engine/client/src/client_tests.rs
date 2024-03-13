@@ -40,6 +40,8 @@ async fn test_client_fingerprint_mismatch() {
         Env::new(HashMap::new()),
         None,
         true,
+        false,
+        None,
     )
     .unwrap();
     let error = pantsd::find_pantsd(&build_root, &options_parser)
