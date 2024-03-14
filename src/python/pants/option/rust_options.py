@@ -20,10 +20,9 @@ class NativeOptionParser:
         env: Mapping[str, str],
         configs: Optional[Sequence[str]],
         allow_pantsrc: bool,
-        include_derivation: bool,
     ):
         self._native_parser = native_engine.PyOptionParser(
-            args, dict(env), configs, allow_pantsrc, include_derivation
+            args, dict(env), configs, allow_pantsrc,
         )
         self._getter_by_type = {
             (bool, None): self._native_parser.get_bool,
@@ -38,16 +37,21 @@ class NativeOptionParser:
         }
 
     def get(self, *, scope, flags, default, option_type, member_type=None) -> Any:
+        def is_enum(typ):
+            # TODO: When we switch to Python 3.11, use: return isinstance(typ, EnumType)
+            return inspect.isclass(typ) and issubclass(typ, Enum)
+
         name_parts = flags[-1][2:].split("-")  # '--foo-bar' -> ['foo', 'bar']
         switch = flags[0][1:] if len(flags) > 1 else None  # '-d' -> 'd'
-        option_id = native_engine.PyOptionId(*name_parts, scope=scope, switch=switch)
+        option_id = native_engine.PyOptionId(*name_parts, scope=scope or "GLOBAL", switch=switch)
 
-        # The Python code allows registering default=None for dicts/lists, and forces it to
-        # an empty dict/list at registration. Since here we only have access to what the user
-        # provided, we do the same.
-        # TODO: Pass in the final, munged, registration data, not what the user provided?
+        rust_option_type = option_type
         rust_member_type = member_type
+
         if option_type is dict:
+            # The Python code allows registering default=None for dicts/lists, and forces it to
+            # an empty dict/list at registration. Since here we only have access to what the user
+            # provided, we do the same.
             if default is None:
                 default = {}
             elif isinstance(default, str):
@@ -62,30 +66,42 @@ class NativeOptionParser:
                 rust_member_type = str
                 if isinstance(default, str):
                     default = shlex.split(default)
-            elif inspect.isclass(member_type) and issubclass(member_type, Enum):
+            elif is_enum(member_type):
                 rust_member_type = str
                 default = [x.value for x in default]
             elif inspect.isfunction(rust_member_type):
                 rust_member_type = str
             elif rust_member_type != str and isinstance(default, str):
                 default = eval(default)
+        elif is_enum(option_type):
+            if default is not None:
+                default = default.value
+                rust_option_type = type(default)
+            else:
+                rust_option_type = str
+        elif option_type not in {bool, int, float, str}:
+            # For enum and other specialized types.
+            rust_option_type = str
+            if default is not None:
+                default = str(default)
 
-        getter = self._getter_by_type.get((option_type, rust_member_type))
+        getter = self._getter_by_type.get((rust_option_type, rust_member_type))
         if getter is None:
-            suffix = f" with member type {rust_member_type}" if option_type is list else ""
-            raise OptionsError(f"Unsupported type: {option_type}{suffix}")
+            suffix = f" with member type {rust_member_type}" if rust_option_type is list else ""
+            raise OptionsError(f"Unsupported type: {rust_option_type}{suffix}")
 
         val = getter(option_id, default)
 
-        if option_type is list:
-            if member_type == shell_str:
-                val = _flatten_shlexed_list(val)
-            elif callable(member_type):
-                try:
+        if val is not None:
+            if option_type is list:
+                if member_type == shell_str:
+                    val = _flatten_shlexed_list(val)
+                elif callable(member_type):
                     val = [member_type(x) for x in val]
-                except Exception:
-                    print(f"EEEEEEEEEE {member_type} | {val}")
-                    raise
+            elif is_enum(option_type):
+                val = option_type(val)
+            elif callable(option_type):
+                val = option_type(val)
         return val
 
 

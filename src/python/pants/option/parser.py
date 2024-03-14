@@ -202,16 +202,11 @@ class Parser:
         for args, kwargs in self._option_registrations:
             self._validate(args, kwargs)
             dest = self.parse_dest(*args, **kwargs)
-            default = kwargs.get("default")
-            option_type = kwargs.get("type")
-            if option_type not in {bool, int, float, str, list, dict}:
-                option_type = str  # For enum and other specialized types.
-                default = str(default)
             val = native_parser.get(
                 scope=self.scope,
                 flags=args,
-                default=default,
-                option_type=option_type,
+                default=kwargs.get("default"),
+                option_type=kwargs.get("type"),
                 member_type=kwargs.get("member_type"),
             )
             # TODO: If the option is explicitly given, check deprecation and mutual exclusion.

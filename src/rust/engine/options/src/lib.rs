@@ -463,7 +463,7 @@ impl OptionParser {
     }
 
     #[allow(clippy::type_complexity)]
-    fn parse_list<T: Clone>(
+    fn parse_list<T: Clone + Debug>(
         &self,
         id: &OptionId,
         default: Vec<T>,
@@ -516,7 +516,7 @@ impl OptionParser {
     // However this is still more than fast enough, and inoculates us against a very unlikely
     // pathological case of a very large removal set.
     #[allow(clippy::type_complexity)]
-    fn parse_list_hashable<T: Clone + Eq + Hash>(
+    fn parse_list_hashable<T: Clone + Debug + Eq + Hash>(
         &self,
         id: &OptionId,
         default: Vec<T>,

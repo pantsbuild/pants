@@ -350,13 +350,13 @@ impl Config {
                             list_edits.push(ListEdit {
                                 action: ListEditAction::Add,
                                 items: T::extract_list(&format!("{option_name}.add"), add)?,
-                            })
+                            });
                         }
                         if let Some(remove) = sub_table.get("remove") {
                             list_edits.push(ListEdit {
                                 action: ListEditAction::Remove,
                                 items: T::extract_list(&format!("{option_name}.remove"), remove)?,
-                            })
+                            });
                         }
                     }
                     Value::String(v) => {
@@ -373,7 +373,11 @@ impl Config {
                 }
             }
         }
-        Ok(Some(list_edits))
+        Ok(if list_edits.is_empty() {
+            None
+        } else {
+            Some(list_edits)
+        })
     }
 }
 

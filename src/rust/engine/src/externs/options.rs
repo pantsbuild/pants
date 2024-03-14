@@ -5,21 +5,12 @@ use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 
-use options::{Args, DictOptionValue, Env, ListOptionValue, OptionId, OptionParser, OptionalOptionValue, Scope, Val};
+use options::{Args, Env, ListOptionValue, OptionId, OptionParser, Scope, Val};
 
 use std::collections::HashMap;
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
     m.add_class::<PyOptionId>()?;
-    m.add_class::<PyBoolOptionValue>()?;
-    m.add_class::<PyIntOptionValue>()?;
-    m.add_class::<PyFloatOptionValue>()?;
-    m.add_class::<PyStrOptionValue>()?;
-    m.add_class::<PyBoolListOptionValue>()?;
-    m.add_class::<PyIntListOptionValue>()?;
-    m.add_class::<PyFloatListOptionValue>()?;
-    m.add_class::<PyStrListOptionValue>()?;
-    m.add_class::<PyDictOptionValue>()?;
     m.add_class::<PyOptionParser>()?;
     Ok(())
 }
@@ -103,33 +94,6 @@ pub(crate) fn py_object_to_val(obj: &PyAny) -> Result<Val, PyErr> {
 #[pyclass]
 struct PyOptionId(OptionId);
 
-#[pyclass]
-struct PyBoolOptionValue(OptionalOptionValue<bool>);
-
-#[pyclass]
-struct PyIntOptionValue(OptionalOptionValue<i64>);
-
-#[pyclass]
-struct PyFloatOptionValue(OptionalOptionValue<f64>);
-
-#[pyclass]
-struct PyStrOptionValue(OptionalOptionValue<String>);
-
-#[pyclass]
-struct PyBoolListOptionValue(ListOptionValue<bool>);
-
-#[pyclass]
-struct PyIntListOptionValue(ListOptionValue<i64>);
-
-#[pyclass]
-struct PyFloatListOptionValue(ListOptionValue<f64>);
-
-#[pyclass]
-struct PyStrListOptionValue(ListOptionValue<String>);
-
-#[pyclass]
-struct PyDictOptionValue(DictOptionValue);
-
 #[pymethods]
 impl PyOptionId {
     #[new]
@@ -170,8 +134,8 @@ impl PyOptionParser {
             &OptionId,
             Vec<T::Owned>,
         ) -> Result<ListOptionValue<T::Owned>, String>,
-    ) -> PyResult<ListOptionValue<T::Owned>> {
-        let opt_val = getter(&self.0, &option_id.0, default).map_err(PyException::new_err)?;
+    ) -> PyResult<Vec<T::Owned>> {
+        let opt_val = getter(&self.0, &option_id.0, default).map_err(PyException::new_err)?.value;
         Ok(opt_val)
     }
 }
@@ -179,13 +143,12 @@ impl PyOptionParser {
 #[pymethods]
 impl PyOptionParser {
     #[new]
-    #[pyo3(signature = (args, env, configs, allow_pantsrc, include_derivation))]
+    #[pyo3(signature = (args, env, configs, allow_pantsrc))]
     fn __new__(
         args: Vec<String>,
         env: &PyDict,
         configs: Option<Vec<&str>>,
         allow_pantsrc: bool,
-        include_derivation: bool,
     ) -> PyResult<Self> {
         let env = env
             .items()
@@ -198,55 +161,55 @@ impl PyOptionParser {
             Env::new(env),
             configs,
             allow_pantsrc,
-            include_derivation,
+            false,
             None,
         )
         .map_err(PyValueError::new_err)?;
         Ok(Self(option_parser))
     }
 
-    fn get_bool(&self, option_id: &PyOptionId, default: Option<bool>) -> PyResult<PyBoolOptionValue> {
-        Ok(self.0.parse_bool_optional(&option_id.0, default).map(PyBoolOptionValue).map_err(PyException::new_err)?)
+    fn get_bool(&self, option_id: &PyOptionId, default: Option<bool>) -> PyResult<Option<bool>> {
+        Ok(self.0.parse_bool_optional(&option_id.0, default).map_err(PyException::new_err)?.value)
     }
 
-    fn get_int(&self, option_id: &PyOptionId, default: Option<i64>) -> PyResult<PyIntOptionValue> {
-        Ok(self.0.parse_int_optional(&option_id.0, default).map(PyIntOptionValue).map_err(PyException::new_err)?)
+    fn get_int(&self, option_id: &PyOptionId, default: Option<i64>) -> PyResult<Option<i64>> {
+        Ok(self.0.parse_int_optional(&option_id.0, default).map_err(PyException::new_err)?.value)
     }
 
-    fn get_float(&self, option_id: &PyOptionId, default: Option<f64>) -> PyResult<PyFloatOptionValue> {
-        Ok(self.0.parse_float_optional(&option_id.0, default).map(PyFloatOptionValue).map_err(PyException::new_err)?)
+    fn get_float(&self, option_id: &PyOptionId, default: Option<f64>) -> PyResult<Option<f64>> {
+        Ok(self.0.parse_float_optional(&option_id.0, default).map_err(PyException::new_err)?.value)
     }
 
-    fn get_string(&self, option_id: &PyOptionId, default: Option<&str>) -> PyResult<PyStrOptionValue> {
-        Ok(self.0.parse_string_optional(&option_id.0, default).map(PyStrOptionValue).map_err(PyException::new_err)?)
+    fn get_string(&self, option_id: &PyOptionId, default: Option<&str>) -> PyResult<Option<String>> {
+        Ok(self.0.parse_string_optional(&option_id.0, default).map_err(PyException::new_err)?.value)
     }
 
-    fn get_bool_list(&self, option_id: &PyOptionId, default: Vec<bool>) -> PyResult<PyBoolListOptionValue> {
+    fn get_bool_list(&self, option_id: &PyOptionId, default: Vec<bool>) -> PyResult<Vec<bool>> {
         self.get_list::<bool>(option_id, default, |op, oid, def| {
             op.parse_bool_list(oid, def)
-        }).map(PyBoolListOptionValue)
+        })
     }
 
-    fn get_int_list(&self, option_id: &PyOptionId, default: Vec<i64>) -> PyResult<PyIntListOptionValue> {
+    fn get_int_list(&self, option_id: &PyOptionId, default: Vec<i64>) -> PyResult<Vec<i64>> {
         self.get_list::<i64>(option_id, default, |op, oid, def| {
             op.parse_int_list(oid, def)
-        }).map(PyIntListOptionValue)
+        })
     }
 
-    fn get_float_list(&self, option_id: &PyOptionId, default: Vec<f64>) -> PyResult<PyFloatListOptionValue> {
+    fn get_float_list(&self, option_id: &PyOptionId, default: Vec<f64>) -> PyResult<Vec<f64>> {
         self.get_list::<f64>(option_id, default, |op, oid, def| {
             op.parse_float_list(oid, def)
-        }).map(PyFloatListOptionValue)
+        })
     }
 
     fn get_string_list(
         &self,
         option_id: &PyOptionId,
         default: Vec<String>,
-    ) -> PyResult<PyStrListOptionValue> {
+    ) -> PyResult<Vec<String>> {
         self.get_list::<String>(option_id, default, |op, oid, def| {
             op.parse_string_list(oid, def)
-        }).map(PyStrListOptionValue)
+        })
     }
 
     fn get_dict(

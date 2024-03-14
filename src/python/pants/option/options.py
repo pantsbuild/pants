@@ -151,9 +151,7 @@ class Options:
         parser_by_scope = {si.scope: Parser(env, config, si) for si in complete_known_scope_infos}
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
 
-        native_parser = NativeOptionParser(
-            args, env, config.sources(), allow_pantsrc=True, include_derivation=False
-        )
+        native_parser = NativeOptionParser(args, env, config.sources(), allow_pantsrc=True)
 
         return cls(
             builtin_goal=split_args.builtin_goal,
@@ -376,9 +374,18 @@ class Options:
             self._check_and_apply_deprecations(scope, values_builder)
             values = values_builder.build()
 
+        def listify_tuples(x):
+            if isinstance(x, (tuple, list)):
+                return [listify_tuples(y) for y in x]
+            elif isinstance(x, dict):
+                return {k: listify_tuples(v) for k, v in x.items() }
+            else:
+                return x
+
         for key, rv in values.as_dict().items():
+            rv = listify_tuples(rv)
             if native_values[key] != rv:
-                raise Exception(f"{key}: {native_values[key]} != {rv.value}")
+                raise Exception(f"{key}: {native_values[key]} of type {type(native_values[key])} !=\n{rv} of type {type(rv)}")
         return values
 
     def get_fingerprintable_for_scope(
