@@ -1,4 +1,4 @@
-# Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ class CompletionBuiltinGoal(BuiltinGoal):
         source this file in your `.zshrc` file to enable completion for Pants.
 
         This command is also used by the completion scripts to generate the completion options using
-        passthrough options. This usage is not intended for use by end users, but could be 
+        passthrough options. This usage is not intended for use by end users, but could be
         useful for building custom completion scripts.
 
         An example of this usage is in the bash completion script, where we use the following command:
@@ -88,7 +88,6 @@ class CompletionBuiltinGoal(BuiltinGoal):
         :param shell: The shell to generate a completion script for.
         :return: The completion script for the specified shell.
         """
-        pass
 
     def _generate_completion_options(self, options: Options) -> list[str]:
         """Generate the completion options for the specified args.
@@ -175,7 +174,7 @@ class CompletionBuiltinGoal(BuiltinGoal):
         try:
             scoped_options = sorted(options.for_scope(goal).as_dict().keys())
             return [f"--{o}" for o in scoped_options]
-        except:
+        except Exception:
             # options.for_scope will throw if the goal is unknown, so we'll just return an empty list
             # Since this is used for user-entered tab completion, it's not a warning or error
             return []
