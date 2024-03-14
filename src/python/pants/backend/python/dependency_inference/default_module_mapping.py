@@ -112,6 +112,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
     "beautifulsoup4": ("bs4",),
     "bitvector": ("BitVector",),
     "cattrs": ("cattr", "cattrs"),
+    "cloud-sql-python-connector": ("google.cloud.sql.connector",),
     "databricks-sdk": ("databricks.sdk",),
     "databricks-sql-connector": (
         "databricks.sql",
