@@ -705,6 +705,12 @@ async def build_pex(
     if request.pex_path:
         argv.extend(["--pex-path", ":".join(pex.name for pex in request.pex_path)])
 
+    if request.internal_only:
+        # An internal-only runs on a single machine, and pre-installing wheels is wasted work in
+        # that case (see https://github.com/pex-tool/pex/issues/2292#issuecomment-1854582647 for
+        # analysis).
+        argv.append("--no-pre-install-wheels")
+
     argv.append(f"--sources-directory={source_dir_name}")
     sources_digest_as_subdir = await Get(
         Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
