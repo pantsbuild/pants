@@ -118,14 +118,19 @@ class GitWorktree(EngineAwareReturnType):
         relative_to: PurePath | str | None = None,
     ) -> dict[str, tuple[Hunk, ...]]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
-        rel_suffix = ["--", str(relative_to)]
 
         hunks = {}
         for path in paths:
             hunks[path] = self._parse_unified_diff(
                 self._git_binary._invoke_unsandboxed(
                     self._create_git_cmdline(
-                        ["diff", "--unified=0", from_commit + "...HEAD"] + rel_suffix,
+                        [
+                            "diff",
+                            "--unified=0",
+                            from_commit + "...HEAD",
+                            "--",
+                            str(relative_to / path),
+                        ],
                     )
                 )
             )
