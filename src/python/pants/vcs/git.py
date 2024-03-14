@@ -7,18 +7,20 @@ import dataclasses
 import logging
 import os
 import re
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
 from io import StringIO
 from os import PathLike
 from pathlib import Path, PurePath
-from typing import Any, Iterable
+from typing import Any, DefaultDict, Iterable
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.internals.target_adaptor import TextBlock
 from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
+from pants.util.frozendict import FrozenDict
 from pants.vcs.hunk import Hunk
 
 logger = logging.getLogger(__name__)
@@ -52,6 +54,7 @@ class GitWorktree(EngineAwareReturnType):
         self.worktree = Path(worktree or os.getcwd()).resolve()
         self._gitdir = Path(gitdir).resolve() if gitdir else (self.worktree / ".git")
         self._git_binary = binary
+        self._diff_parser = DiffParser()
 
     def cacheable(self) -> bool:
         return False
@@ -121,7 +124,7 @@ class GitWorktree(EngineAwareReturnType):
 
         hunks = {}
         for path in paths:
-            hunks[path] = self._parse_unified_diff(
+            file_hunks = self._diff_parser.parse_unified_diff(
                 self._git_binary._invoke_unsandboxed(
                     self._create_git_cmdline(
                         [
@@ -134,39 +137,18 @@ class GitWorktree(EngineAwareReturnType):
                     )
                 )
             )
-
-        return hunks
-
-    def _parse_unified_diff(self, content: str) -> tuple[Hunk, ...]:
-        buf = StringIO(content)
-        hunks = []
-        for line in buf:
-            match = self._lines_changed_regex.match(line)
-            if not match:
+            if len(file_hunks) == 0:
+                # empty diff
                 continue
 
-            g = match.groups()
-            try:
-                hunk = Hunk(
-                    left=TextBlock.from_count(
-                        start=int(g[0]),
-                        count=int(g[2]) if g[2] is not None else 1,
-                    ),
-                    right=TextBlock.from_count(
-                        start=int(g[3]),
-                        count=int(g[5]) if g[5] is not None else 1,
-                    ),
+            if len(file_hunks) > 1 or next(iter(file_hunks.keys())) != path:
+                raise AssertionError(
+                    f"expected a single file `{path}` in the diff, got hunks `{file_hunks}`"
                 )
-            except ValueError as e:
-                raise ValueError(f"Failed to parse hunk: {line}") from e
 
-            hunks.append(hunk)
+            hunks[path] = file_hunks[path]
 
-        return tuple(hunks)
-
-    @cached_property
-    def _lines_changed_regex(self) -> re.Pattern:
-        return re.compile(r"^@@ -([0-9]+)(,([0-9]+))? \+([0-9]+)(,([0-9]+))? @@.*")
+        return hunks
 
     def changes_in(self, diffspec: str, relative_to: PurePath | str | None = None) -> set[str]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
@@ -180,6 +162,65 @@ class GitWorktree(EngineAwareReturnType):
     def __eq__(self, other: Any) -> bool:
         # NB: See the class doc regarding equality.
         return id(self) == id(other)
+
+
+class ParseError(Exception):
+    pass
+
+
+class DiffParser:
+    def parse_unified_diff(self, content: str) -> FrozenDict[str, tuple[Hunk, ...]]:
+        buf = StringIO(content)
+        current_file = None
+        hunks: DefaultDict[str, list[Hunk]] = defaultdict(list)
+        for line in buf:
+            if match := self._filename_regex.match(line):
+                current_file = self._parse_filename(match)
+                continue
+
+            if match := self._lines_changed_regex.match(line):
+                if current_file is None:
+                    raise ParseError("missing filename in the diff")
+
+                try:
+                    hunk = self._parse_hunk(match, line)
+                except ValueError as e:
+                    raise ValueError(f"Failed to parse hunk: {line}") from e
+
+                hunks[current_file].append(hunk)
+                continue
+
+        return FrozenDict((filename, tuple(file_hunks)) for filename, file_hunks in hunks.items())
+
+    @cached_property
+    def _lines_changed_regex(self) -> re.Pattern:
+        return re.compile(r"^@@ -([0-9]+)(,([0-9]+))? \+([0-9]+)(,([0-9]+))? @@.*")
+
+    def _parse_hunk(self, match: re.Match, line: str) -> Hunk:
+        g = match.groups()
+        return Hunk(
+            left=TextBlock.from_count(
+                start=int(g[0]),
+                count=int(g[2]) if g[2] is not None else 1,
+            ),
+            right=TextBlock.from_count(
+                start=int(g[3]),
+                count=int(g[5]) if g[5] is not None else 1,
+            ),
+        )
+
+    @cached_property
+    def _filename_regex(self) -> re.Pattern:
+        # This only handles whitespaces. It doesn't work if a filename has something weird
+        # in it that needs escaping, e.g. a double quote.
+        return re.compile(r'^\+\+\+ ([^ ]+|"[^"]+") .*$')
+
+    def _parse_filename(self, match: re.Match) -> str:
+        filename = match.groups()[0]
+        if filename[0] != '"':
+            return filename
+
+        return filename[1:-1]  # without quotes
 
 
 @dataclass(frozen=True)

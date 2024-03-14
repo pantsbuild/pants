@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import Iterator
+from pants.util.frozendict import FrozenDict
 
 import pytest
 
@@ -17,7 +18,13 @@ from pants.engine.internals.target_adaptor import TextBlock
 from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
-from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, get_git_worktree
+from pants.vcs.git import (
+    DiffParser,
+    GitWorktree,
+    GitWorktreeRequest,
+    MaybeGitWorktree,
+    get_git_worktree,
+)
 from pants.vcs.hunk import Hunk
 
 
@@ -390,7 +397,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +two
                 """
             ),
-            (Hunk(TextBlock.from_count(1, 0), TextBlock.from_count(2, 1)),),
+            FrozenDict({"right": (Hunk(TextBlock.from_count(1, 0), TextBlock.from_count(2, 1)),)}),
         ],
         [
             dedent(
@@ -401,7 +408,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 -two
                 """
             ),
-            (Hunk(TextBlock.from_count(2, 1), TextBlock.from_count(1, 0)),),
+            FrozenDict({"right": (Hunk(TextBlock.from_count(2, 1), TextBlock.from_count(1, 0)),)}),
         ],
         [
             dedent(
@@ -413,7 +420,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +four
                 """
             ),
-            (Hunk(TextBlock.from_count(2, 1), TextBlock.from_count(2, 1)),),
+            FrozenDict({"right": (Hunk(TextBlock.from_count(2, 1), TextBlock.from_count(2, 1)),)}),
         ],
         [
             dedent(
@@ -427,11 +434,11 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +six
                 """
             ),
-            (Hunk(TextBlock.from_count(2, 2), TextBlock.from_count(2, 2)),),
+            FrozenDict({"right": (Hunk(TextBlock.from_count(2, 2), TextBlock.from_count(2, 2)),)}),
         ],
     ],
 )
 def test_parse_unified_diff(diff, expected):
-    wt = GitWorktree(None)
-    actual = wt._parse_unified_diff(diff)
+    wt = DiffParser()
+    actual = wt.parse_unified_diff(diff)
     assert actual == expected
