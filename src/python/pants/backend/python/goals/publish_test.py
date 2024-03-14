@@ -136,7 +136,13 @@ def test_twine_upload(rule_runner, packages) -> None:
                 "my-package-0.1.0.tar.gz",
                 "my_package-0.1.0-py3-none-any.whl",
             ),
-            env=FrozenDict({"TWINE_USERNAME": "whoareyou", "TWINE_PASSWORD": "secret"}),
+            env=FrozenDict(
+                {
+                    "TWINE_USERNAME": "whoareyou",
+                    "TWINE_PASSWORD": "secret",
+                    "PEX_MAX_INSTALL_JOBS": "0",
+                }
+            ),
         ),
     )
     assert_package(
@@ -156,7 +162,7 @@ def test_twine_upload(rule_runner, packages) -> None:
                 "my-package-0.1.0.tar.gz",
                 "my_package-0.1.0-py3-none-any.whl",
             ),
-            env=FrozenDict({"TWINE_USERNAME": "whoami"}),
+            env=FrozenDict({"TWINE_USERNAME": "whoami", "PEX_MAX_INSTALL_JOBS": "0"}),
         ),
     )
 
