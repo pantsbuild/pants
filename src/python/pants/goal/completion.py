@@ -1,6 +1,9 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# TODO: This was written as a port of the original bash script, but since we have 
+# more knowledge of the options and goals, we can make this more robust and accurate (after tests are written).
+
 from __future__ import annotations
 
 import logging
@@ -52,6 +55,7 @@ class CompletionBuiltinGoal(BuiltinGoal):
 
     def run(
         self,
+        *,
         build_config: BuildConfiguration,
         graph_session: GraphSession,
         options: Options,
@@ -152,13 +156,7 @@ class CompletionBuiltinGoal(BuiltinGoal):
         :param args: The list of arguments to search for the previous goal.
         :return: The previous goal, or None if there is no previous goal.
         """
-        # If there is a goal in the list of arguments, reverse the args and return the first
-        # non-hyphenated arg (which should be a goal).
-        for arg in reversed(args):
-            if not arg.startswith("-"):
-                return arg
-
-        return None
+        return next((arg for arg in reversed(args) if arg.isalnum()), None)
 
     def _build_options_for_goal(self, options: Options, goal: str = "") -> list[str]:
         """Build a list of stringified options for the specified goal, prefixed by `--`.
@@ -172,9 +170,11 @@ class CompletionBuiltinGoal(BuiltinGoal):
             return [f"--{o}" for o in global_options]
 
         try:
+            logger.error(f"Getting options for goal {goal}")
             scoped_options = sorted(options.for_scope(goal).as_dict().keys())
             return [f"--{o}" for o in scoped_options]
         except Exception:
             # options.for_scope will throw if the goal is unknown, so we'll just return an empty list
             # Since this is used for user-entered tab completion, it's not a warning or error
+            logger.error(f"Unknown goal {goal}")
             return []
