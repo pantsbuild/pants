@@ -17,7 +17,10 @@ from pants.util.frozendict import FrozenDict
 
 @dataclass(frozen=True)
 class TextBlock:
-    """Block of lines in a file."""
+    """Block of lines in a file.
+
+    Lines are 1 indexed, `start` is inclusive, `end` is exclusive.
+    """
 
     start: int
     end: int
@@ -38,6 +41,11 @@ class TextBlock:
 
     @classmethod
     def from_count(cls, start: int, count: int) -> TextBlock:
+        """Convert (start, count) range to (start, end) range.
+
+        Useful for unified diff conversion, see
+        https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
+        """
         return cls(start=start, end=start + count)
 
 
