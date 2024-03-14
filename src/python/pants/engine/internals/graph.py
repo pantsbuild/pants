@@ -1055,7 +1055,6 @@ async def find_owners(
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> Owners:
     block_owners: tuple[Owners, ...] = (
-        # If we need to process blocks, we delegate the logic to plugins.
         await MultiGet(
             Get(Owners, BlockOwnersRequest(filename, blocks))
             for filename, blocks in owners_request.source_blocks.items()
