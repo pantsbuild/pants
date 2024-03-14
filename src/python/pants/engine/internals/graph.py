@@ -395,6 +395,7 @@ def _create_target(
         ),
         union_membership=union_membership,
         description_of_origin=target_adaptor.description_of_origin,
+        origin_text_blocks=target_adaptor.origin_text_blocks,
     )
     # Check for any deprecated field usage.
     for field_type in target.field_types:
@@ -586,6 +587,7 @@ async def resolve_target_for_bootstrapping(
         union_membership=union_membership,
         ignore_unrecognized_fields=True,
         description_of_origin=target_adaptor.description_of_origin,
+        origin_text_blocks=target_adaptor.origin_text_blocks,
     )
     return WrappedTargetForBootstrap(target)
 
