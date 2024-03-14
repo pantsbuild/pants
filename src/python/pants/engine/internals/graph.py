@@ -1021,15 +1021,20 @@ def calc_files_with_text_blocks(mapping: TextBlockMapping) -> FilesWithTextBlock
 class OwnersRequest:
     """A request for the owners of a set of file paths.
 
+    The resulting owners will be those identified for the sources as well as those
+    for sources_blocks. Do not include a source filename in sources if it is also
+    present in sources_blocks, as that will be redundant, and cancel the finer level
+    of detail gained by inspecting the originating text blocks.
+
     TODO: This is widely used as an effectively-public API. It should probably move to
     `pants.engine.target`.
     """
 
     sources: tuple[str, ...]
+    source_blocks: FrozenDict[str, TextBlocks] = FrozenDict()
     owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
-    text_blocks: FrozenDict[str, TextBlocks] = FrozenDict()
 
 
 @dataclass(frozen=True)
@@ -1053,9 +1058,9 @@ async def find_owners(
         # If we need to process blocks, we delegate the logic to plugins.
         await MultiGet(
             Get(Owners, BlockOwnersRequest(filename, blocks))
-            for filename, blocks in owners_request.text_blocks.items()
+            for filename, blocks in owners_request.source_blocks.items()
         )
-        if owners_request.text_blocks
+        if owners_request.source_blocks
         else ()
     )
 
