@@ -1867,6 +1867,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
 
+    enable_target_origin_text_blocks = BoolOption(
+        default=False,
+        help="Enable fine grained target analysis based on line numbers.",
+        advanced=True,
+    )
+
     loop = BoolOption(default=False, help="Run goals continuously as file changes are detected.")
     loop_max = IntOption(
         default=2**32,

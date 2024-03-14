@@ -997,7 +997,10 @@ class TextBlockMapping(FrozenDict[str, tuple[TargetTextBlocks, ...]]):
 
 
 @rule
-def calc_text_block_mapping(targets: AllTargets) -> TextBlockMapping:
+def calc_text_block_mapping(targets: AllTargets, global_options: GlobalOptions) -> TextBlockMapping:
+    if not global_options.enable_target_origin_text_blocks:
+        return TextBlockMapping()
+
     result: DefaultDict[str, list[TargetTextBlocks]] = defaultdict(list)
     for target in targets:
         for filename, text_blocks in target.origin_text_blocks.items():
