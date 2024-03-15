@@ -119,7 +119,7 @@ class CompletionBuiltinGoal(BuiltinGoal):
         - `pants fmt -<tab>` -> `... --only ...`
 
         :param options: The options object for the current Pants run.
-        :return: A list of completion options.
+        :return: A list of candidate completion options.
         """
         logger.debug(f"Completion passthrough options: {options._passthru}")
         args = [arg for arg in options._passthru if arg != "pants"]
