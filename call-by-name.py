@@ -28,12 +28,13 @@ class CallByNameMigrator(ast.NodeTransformer):
                 print(ast.dump(call))
                 
                 new_call = self._replace_statement(call)
-                print(ast.dump(new_call))
+                print(ast.dump(new_call, include_attributes=True, indent=2))
                 
                 # Replace the existing call with the new call 
+                # TODO: Using the AST to save the file will kill all comments and whitespace
                 child.value.value.value = new_call
+                print(ast.unparse(child))
 
-        
         return node
 
     def _should_visit_node(self, decorator_list: list[ast.expr]) -> bool:
@@ -62,16 +63,14 @@ class CallByNameMigrator(ast.NodeTransformer):
         return statement
 
 # Recursive glob all python files, excluding *_test.py
-# transformer = Visitor()
 files = Path().rglob("*.py")
 for file in files:
     if "_test.py" in file.name:
         continue
-    if "graphql" not in file.parent.name:
+    if "graphql" not in file.parent.name or "rules" not in file.name:
+        # Hardcode a single file for testing
         continue
 
-    if "rules" not in file.name:
-        continue
     with open(file, "rb") as f:
         print(f"Processing {file}")
         try:
@@ -81,13 +80,11 @@ for file in files:
             # Apply the transformer to the AST
             migrated_tree = migrator.visit(tree)
             # Convert the transformed AST back to code
-            transformed_code = ast.unparse(migrated_tree)
-            
-            print(transformed_code)
-            
+            migrated_code = ast.unparse(migrated_tree)
+        
+            # TODO: Do something with this
+            # print(transformed_code)
             # print(ast.dump(tree, include_attributes=False, indent=2))
-
-            # break
         except SyntaxError as e:
             print(f"SyntaxError in {file}: {e}")
         except tokenize.TokenError as e:
