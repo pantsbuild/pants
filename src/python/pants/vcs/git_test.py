@@ -9,7 +9,6 @@ import subprocess
 from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import Iterator
-from pants.util.frozendict import FrozenDict
 
 import pytest
 
@@ -18,6 +17,7 @@ from pants.engine.internals.target_adaptor import TextBlock
 from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
+from pants.util.frozendict import FrozenDict
 from pants.vcs.git import (
     DiffParser,
     GitWorktree,
