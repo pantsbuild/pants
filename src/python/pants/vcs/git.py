@@ -216,7 +216,7 @@ class DiffParser:
         return re.compile(r'^\+\+\+ ([^ ]+|"[^"]+") .*$')
 
     def _parse_filename(self, match: re.Match) -> str:
-        filename = match.groups()[0]
+        filename = str(match.groups()[0])
         if filename[0] != '"':
             return filename
 

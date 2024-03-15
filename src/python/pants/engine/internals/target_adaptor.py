@@ -76,7 +76,7 @@ class TargetAdaptor:
         type_alias: str,
         name: str | None,
         __description_of_origin__: str,
-        __origin_text_blocks__: FrozenDict[str, tuple[TextBlock, ...]] = FrozenDict(),
+        __origin_text_blocks__: FrozenDict[str, TextBlocks] = FrozenDict(),
         **kwargs: Any,
     ) -> None:
         self.type_alias = type_alias

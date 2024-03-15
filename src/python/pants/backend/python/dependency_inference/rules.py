@@ -563,7 +563,7 @@ async def infer_python_conftest_dependencies(
     owners = await MultiGet(
         # NB: Because conftest.py files effectively always have content, we require an
         # owning target.
-        Get(Owners, OwnersRequest((f,), GlobMatchErrorBehavior.error))
+        Get(Owners, OwnersRequest((f,), owners_not_found_behavior=GlobMatchErrorBehavior.error))
         for f in conftest_files.snapshot.files
     )
 
