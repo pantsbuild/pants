@@ -118,14 +118,13 @@ class CompletionBuiltinGoal(BuiltinGoal):
         show the available scoped options for the previous goal.
         - `pants fmt -<tab>` -> `... --only ...`
 
-        # TODO: Handle targets
-
         :param options: The options object for the current Pants run.
         :return: A list of completion options.
         """
         logger.debug(f"Completion passthrough options: {options._passthru}")
-        current_word = options._passthru.pop()
-        previous_goal = self._get_previous_goal(options._passthru)
+        args = [arg for arg in options._passthru if arg != "pants"]
+        current_word = args.pop()
+        previous_goal = self._get_previous_goal(args)
         logger.debug(f"Current word is '{current_word}', and previous goal is '{previous_goal}'")
 
         all_goals = sorted([k for k, v in options.known_scope_to_info.items() if v.is_goal])
@@ -171,16 +170,15 @@ class CompletionBuiltinGoal(BuiltinGoal):
         :param goal: The goal to build options for. Defaults to "" for the global scope.
         :return: A list of options for the specified goal.
         """
+
         if goal == GLOBAL_SCOPE:
             global_options = sorted(options.for_global_scope().as_dict().keys())
             return [f"--{o}" for o in global_options]
 
         try:
-            logger.debug(f"Getting options for goal {goal}")
             scoped_options = sorted(options.for_scope(goal).as_dict().keys())
             return [f"--{o}" for o in scoped_options]
         except Exception:
             # options.for_scope will throw if the goal is unknown, so we'll just return an empty list
             # Since this is used for user-entered tab completion, it's not a warning or error
-            logger.debug(f"Unknown goal {goal}")
             return []

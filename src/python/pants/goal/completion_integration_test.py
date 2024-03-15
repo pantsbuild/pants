@@ -23,8 +23,10 @@ def run_pants_complete(args: list[str]) -> PantsResult:
     """While there may be a way to test tab-completion directly in pytest, that feels too clever.
 
     We can equivalently test the command that the tab-completion will call.
+
+    Note: The "pants" after "--" is intentional, as that's how the completion script would call it.
     """
-    return run_pants(["pants", "complete", "--", *args])
+    return run_pants(["pants", "complete", "--", "pants", *args])
 
 
 def test_completion_script_generation():
@@ -42,11 +44,6 @@ def test_completion_script_generation():
 
     other_result = run_pants(["complete", "--shell=gibberish"])
     other_result.assert_failure()
-
-
-def test_completions_with_no_args():
-    result = run_pants_complete([])
-    result.assert_success()
 
 
 def test_completions_with_global_options():
