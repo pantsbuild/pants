@@ -18,7 +18,10 @@ from pants.init.engine_initializer import GraphSession
 from pants.option.option_types import EnumOption
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE
+from pants.util.resources import read_resource
 from pants.util.strutil import softwrap
+
+_COMPLETIONS_PACKAGE = "pants.goal"
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +96,11 @@ class CompletionBuiltinGoal(BuiltinGoal):
         :param shell: The shell to generate a completion script for.
         :return: The completion script for the specified shell.
         """
+
+        if shell == Shell.BASH:
+            return read_resource(_COMPLETIONS_PACKAGE, "pants-completion.bash").decode("utf-8")
+        if shell == Shell.ZSH:
+            return read_resource(_COMPLETIONS_PACKAGE, "pants-completion.zsh").decode("utf-8")
 
     def _generate_completion_options(self, options: Options) -> list[str]:
         """Generate the completion options for the specified args.

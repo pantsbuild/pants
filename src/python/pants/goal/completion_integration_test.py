@@ -1,6 +1,5 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import pytest
 
 from pants.goal.completion import CompletionBuiltinGoal
 from pants.option.option_value_container import OptionValueContainer
@@ -28,28 +27,31 @@ def run_pants_complete(args: list[str]) -> PantsResult:
     return run_pants(["pants", "complete", "--", *args])
 
 
-@pytest.mark.skip(reason="Not yet implemented")
 def test_completion_script_generation():
-    default_result = run_pants(["pants", "complete"])
-    assert default_result.exit_code == 0
+    default_result = run_pants(["complete"])
+    default_result.assert_success()
 
-    bash_result = run_pants(["pants", "complete", "--shell=bash"])
-    assert bash_result.exit_code == 0
-    assert bash_result.stdout == default_result.stdout
+    bash_result = run_pants(["complete", "--shell=bash"])
+    print(bash_result.stdout)
+    bash_result.assert_success()
+    assert "COMPREPLY" in bash_result.stdout
 
-    zsh_result = run_pants(["pants", "complete", "--shell=zsh"])
-    assert zsh_result.exit_code == 0
-    assert zsh_result.stdout == default_result.stdout
+    zsh_result = run_pants(["complete", "--shell=zsh"])
+    zsh_result.assert_success()
+    assert "compdef" in zsh_result.stdout
+
+    other_result = run_pants(["complete", "--shell=gibberish"])
+    other_result.assert_failure()
 
 
 def test_completions_with_no_args():
     result = run_pants_complete([])
-    assert result.exit_code == 0
+    result.assert_success()
 
 
 def test_completions_with_global_options():
     result = run_pants_complete(["-"])
-    assert result.exit_code == 0
+    result.assert_success()
     lines = result.stdout.splitlines()
     assert all(line.startswith("--") for line in lines)
     assert all(o in lines for o in ("--backend_packages", "--colors", "--loop"))  # Spot check
@@ -57,7 +59,7 @@ def test_completions_with_global_options():
 
 def test_completions_with_all_goals():
     result = run_pants_complete([""])
-    assert result.exit_code == 0
+    result.assert_success()
     lines = result.stdout.splitlines()
     assert all(not line.startswith("-") for line in lines)
     assert all(o in lines for o in ("check", "help", "version"))  # Spot check
@@ -65,18 +67,19 @@ def test_completions_with_all_goals():
 
 def test_completions_with_all_goals_excluding_previous_goals():
     result = run_pants_complete(["check", ""])
-    assert result.exit_code == 0
+    result.assert_success()
     lines = result.stdout.splitlines()
     assert "check" not in lines
 
 
 def test_completions_with_goal_options():
     result = run_pants_complete(["fmt", "-"])
+    result.assert_success()
     lines = result.stdout.splitlines()
     assert lines == ["--batch_size", "--only"]
 
 
 def test_completions_with_options_on_invalid_goal():
     result = run_pants_complete(["invalid-goal", "-"])
-    assert result.exit_code == 0
+    result.assert_success()
     assert result.stdout == ""

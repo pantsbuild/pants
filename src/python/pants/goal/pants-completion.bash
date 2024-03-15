@@ -1,3 +1,5 @@
+# bash completion support for Pants
+
 function _pants_completions()
 {
     local current_word
