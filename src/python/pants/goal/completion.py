@@ -96,11 +96,10 @@ class CompletionBuiltinGoal(BuiltinGoal):
         :param shell: The shell to generate a completion script for.
         :return: The completion script for the specified shell.
         """
-
-        if shell == Shell.BASH:
-            return read_resource(_COMPLETIONS_PACKAGE, "pants-completion.bash").decode("utf-8")
         if shell == Shell.ZSH:
             return read_resource(_COMPLETIONS_PACKAGE, "pants-completion.zsh").decode("utf-8")
+        else:
+            return read_resource(_COMPLETIONS_PACKAGE, "pants-completion.bash").decode("utf-8")
 
     def _generate_completion_options(self, options: Options) -> list[str]:
         """Generate the completion options for the specified args.

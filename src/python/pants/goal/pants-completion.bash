@@ -16,9 +16,4 @@ function _pants_completions()
     return 0
 }
 
-### TODO: Remove these two autoloads
-autoload -U +X bashcompinit && bashcompinit
-autoload -Uz compinit && compinit
-###
-
 complete -F _pants_completions pants
