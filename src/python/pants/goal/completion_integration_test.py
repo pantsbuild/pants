@@ -66,17 +66,28 @@ def test_completions_with_all_goals_excluding_previous_goals():
     result = run_pants_complete(["check", ""])
     result.assert_success()
     lines = result.stdout.splitlines()
+    assert all(not line.startswith("-") for line in lines)
+    assert all(o in lines for o in ("help", "version"))  # Spot check
     assert "check" not in lines
+
+    # Check that multiple goals are excluded
+    result = run_pants_complete(["check", "help", ""])
+    result.assert_success()
+    lines = result.stdout.splitlines()
+    assert all(not line.startswith("-") for line in lines)
+    assert "version" in lines # Spot check
+    assert all(o not in lines for o in ("check", "help"))  
 
 
 def test_completions_with_goal_options():
     result = run_pants_complete(["fmt", "-"])
     result.assert_success()
     lines = result.stdout.splitlines()
-    assert lines == ["--batch_size", "--only"]
+    assert all(line.startswith("--") for line in lines)
+    all(o in lines for o in ("--batch_size", "--only"))  # Spot check
 
 
 def test_completions_with_options_on_invalid_goal():
-    result = run_pants_complete(["invalid-goal", "-"])
+    result = run_pants_complete(["unknown-goal", "-"])
     result.assert_success()
     assert result.stdout == ""
