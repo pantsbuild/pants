@@ -2,7 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-python_sources(dependencies=[":completion-files"])
+python_sources(
+    overrides={"completion.py": {"dependencies": [":completion-files"]}},
+)
 resources(name="completion-files", sources=["pants-completion.bash", "pants-completion.zsh"])
 
 python_tests(name="tests", sources=["*_test.py", "!*_integration_test.py"])

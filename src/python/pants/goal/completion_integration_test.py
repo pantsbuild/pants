@@ -75,8 +75,8 @@ def test_completions_with_all_goals_excluding_previous_goals():
     result.assert_success()
     lines = result.stdout.splitlines()
     assert all(not line.startswith("-") for line in lines)
-    assert "version" in lines # Spot check
-    assert all(o not in lines for o in ("check", "help"))  
+    assert "version" in lines  # Spot check
+    assert all(o not in lines for o in ("check", "help"))
 
 
 def test_completions_with_goal_options():
