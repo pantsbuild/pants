@@ -42,6 +42,13 @@ def repo() -> Iterator[str]:
             "dep.sh": "source transitive.sh",
             "transitive.sh": "",
             "standalone.sh": "",
+            "list.txt": dedent(
+                """\
+                one
+                two
+                three
+                """
+            ),
             "BUILD": dedent(
                 """\
                 # Use a target generator to test some of its semantics.
@@ -59,6 +66,10 @@ def repo() -> Iterator[str]:
                     source="standalone.sh",
                     tags=["a"],
                 )
+
+                text_blocks_generator(name="one", source="list.txt", text_blocks=[text_block(start=1, end=2)])
+                text_blocks_generator(name="two", source="list.txt", text_blocks=[text_block(start=2, end=3)])
+                text_blocks_generator(name="three", source="list.txt", text_blocks=[text_block(start=3, end=4)])
                 """
             ),
         }
@@ -105,7 +116,14 @@ def _run_pants_goal(
             goal,
         ],
         workdir=workdir,
-        config={"GLOBAL": {"backend_packages": ["pants.backend.shell"]}},
+        config={
+            "GLOBAL": {
+                "backend_packages": [
+                    "pants.backend.shell",
+                    "pants.vcs.text_blocks_plugin",
+                ]
+            }
+        },
     )
 
 
@@ -221,12 +239,21 @@ def test_change_build_file(repo: str) -> None:
     append_to_file("BUILD", "# foo")
     # Note that the target generator `//:lib` does not show up.
     assert_list_stdout(
-        repo, ["//app.sh:lib", "//dep.sh:lib", "//transitive.sh:lib", "//:standalone"]
+        repo,
+        [
+            "//:one#target",
+            "//:standalone",
+            "//:three#target",
+            "//:two#target",
+            "//app.sh:lib",
+            "//dep.sh:lib",
+            "//transitive.sh:lib",
+        ],
     )
 
     # This is because the BUILD file gets expanded with all its targets, then their sources are
     # used. This might not be desirable behavior.
-    assert_count_loc(repo, expected_num_files=4)
+    assert_count_loc(repo, expected_num_files=5)
 
 
 def test_different_build_file_changed(repo: str) -> None:
