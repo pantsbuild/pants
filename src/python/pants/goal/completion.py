@@ -1,7 +1,7 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# TODO: This was written as a port of the original bash script, but since we have 
+# TODO: This was written as a port of the original bash script, but since we have
 # more knowledge of the options and goals, we can make this more robust and accurate (after tests are written).
 
 from __future__ import annotations
@@ -76,7 +76,8 @@ class CompletionBuiltinGoal(BuiltinGoal):
         """
         if options._passthru:
             completion_options = self._generate_completion_options(options)
-            print("\n".join(completion_options))
+            if completion_options:
+                print("\n".join(completion_options))
             return PANTS_SUCCEEDED_EXIT_CODE
 
         script = self._generate_completion_script(self.shell)
@@ -148,15 +149,13 @@ class CompletionBuiltinGoal(BuiltinGoal):
     def _get_previous_goal(self, args: list[str]) -> str | None:
         """Get the most recent goal in the command arguments, so options can be correctly applied.
 
-        This function will ignore hyphenated options when looking for the goal. The args list
-        should never be empty, as we should always have at least the `pants` command.
-
-        # TODO: Handle targets
+        A "goal" in the context of completions is simply an arg where the first character is alphanumeric.
+        This under-specifies the goal, because detecting whether an arg is an "actual" goal happens elsewhere.
 
         :param args: The list of arguments to search for the previous goal.
         :return: The previous goal, or None if there is no previous goal.
         """
-        return next((arg for arg in reversed(args) if arg.isalnum()), None)
+        return next((arg for arg in reversed(args) if arg[:1].isalnum()), None)
 
     def _build_options_for_goal(self, options: Options, goal: str = "") -> list[str]:
         """Build a list of stringified options for the specified goal, prefixed by `--`.
@@ -170,11 +169,11 @@ class CompletionBuiltinGoal(BuiltinGoal):
             return [f"--{o}" for o in global_options]
 
         try:
-            logger.error(f"Getting options for goal {goal}")
+            logger.debug(f"Getting options for goal {goal}")
             scoped_options = sorted(options.for_scope(goal).as_dict().keys())
             return [f"--{o}" for o in scoped_options]
         except Exception:
             # options.for_scope will throw if the goal is unknown, so we'll just return an empty list
             # Since this is used for user-entered tab completion, it's not a warning or error
-            logger.error(f"Unknown goal {goal}")
+            logger.debug(f"Unknown goal {goal}")
             return []
