@@ -34,7 +34,6 @@ def test_completion_script_generation():
     default_result.assert_success()
 
     bash_result = run_pants(["complete", "--shell=bash"])
-    print(bash_result.stdout)
     bash_result.assert_success()
     assert "COMPREPLY" in bash_result.stdout
 
@@ -84,7 +83,7 @@ def test_completions_with_goal_options():
     result.assert_success()
     lines = result.stdout.splitlines()
     assert all(line.startswith("--") for line in lines)
-    all(o in lines for o in ("--batch_size", "--only"))  # Spot check
+    assert all(o in lines for o in ("--batch_size", "--only"))  # Spot check
 
 
 def test_completions_with_options_on_invalid_goal():
