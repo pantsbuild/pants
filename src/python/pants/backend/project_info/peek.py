@@ -4,18 +4,25 @@
 from __future__ import annotations
 
 import collections
+import collections.abc
 import json
+import logging
 from dataclasses import dataclass, fields, is_dataclass
 from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
 
-from pants.engine.addresses import Addresses
+from pants.core.goals.deploy import DeployFieldSet
+from pants.core.goals.package import PackageFieldSet
+from pants.core.goals.publish import PublishFieldSet
+from pants.core.goals.run import RunFieldSet
+from pants.core.goals.test import TestFieldSet
+from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.fs import Snapshot
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.internals.build_files import _get_target_family_and_adaptor_for_dep_rules
 from pants.engine.internals.dep_rules import DependencyRuleApplication, DependencyRuleSet
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, MultiGet, Rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     AlwaysTraverseDeps,
     Dependencies,
@@ -23,15 +30,21 @@ from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
     Field,
+    FieldSet,
     HydratedSources,
     HydrateSourcesRequest,
+    NoApplicableTargetsBehavior,
     SourcesField,
     Target,
+    TargetRootsToFieldSets,
+    TargetRootsToFieldSetsRequest,
     Targets,
     UnexpandedTargets,
 )
 from pants.option.option_types import BoolOption
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -63,6 +76,16 @@ class PeekSubsystem(Outputting, GoalSubsystem):
         ),
     )
 
+    include_goals = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Whether to include the goals that apply to the target and its dependencies. These are the
+            embedded in JSON as `goals`.
+            """
+        ),
+    )
+
 
 class Peek(Goal):
     subsystem_cls = PeekSubsystem
@@ -86,6 +109,8 @@ class TargetData:
     dependents_rules: tuple[str, ...] | None = None
     applicable_dep_rules: tuple[DependencyRuleApplication, ...] | None = None
 
+    goals: tuple[str, ...] | None = None
+
     def to_dict(self, exclude_defaults: bool = False, include_dep_rules: bool = False) -> dict:
         nothing = object()
         fields = {
@@ -105,6 +130,9 @@ class TargetData:
             fields["_dependencies_rules"] = self.dependencies_rules
             fields["_dependents_rules"] = self.dependents_rules
             fields["_applicable_dep_rules"] = self.applicable_dep_rules
+
+        if self.goals is not None:
+            fields["goals"] = self.goals
 
         return {
             "address": self.target.address.spec,
@@ -160,21 +188,88 @@ def describe_ruleset(ruleset: DependencyRuleSet | None) -> tuple[str, ...] | Non
     return ruleset.peek()
 
 
+async def _create_target_alias_to_goals_map() -> dict[str, tuple[str, ...]]:
+    """Returns a mapping from a target alias to the goals that can operate on that target.
+
+    For instance, `pex_binary` would map to `("run", "package")`.
+
+    :return: A mapping from a target alias to the goals that can operate on that target.
+    """
+    # TODO: This is manually curated for now - do we want to show all possible goals?
+    peekable_field_sets: list[type[FieldSet]] = [
+        DeployFieldSet,
+        PackageFieldSet,
+        PublishFieldSet,
+        RunFieldSet,
+        TestFieldSet,
+    ]
+    # TODO: How do we get the goal subsystem from field set? This shouldn't need to be manually maintained
+    field_set_to_goal_map: dict[type[FieldSet], str] = {
+        DeployFieldSet: "experimental-deploy",
+        PackageFieldSet: "package",
+        PublishFieldSet: "publish",
+        RunFieldSet: "run",
+        TestFieldSet: "test",
+    }
+    assert len(peekable_field_sets) == len(
+        field_set_to_goal_map
+    ), "Must have a goal string for each field set"
+    peekable_goals = [field_set_to_goal_map[fs] for fs in peekable_field_sets]
+
+    target_roots_to_field_sets_get = [
+        Get(
+            TargetRootsToFieldSets,
+            TargetRootsToFieldSetsRequest(
+                field_set_superclass=fs,
+                goal_description="",
+                no_applicable_targets_behavior=NoApplicableTargetsBehavior.ignore,
+            ),
+        )
+        for fs in peekable_field_sets
+    ]
+
+    target_roots_to_field_sets = await MultiGet(target_roots_to_field_sets_get)
+
+    # Create a collection of target aliases per target roots: e.g. [frozenset(), frozenset({'pyoxidizer_binary', 'pex_binary'}), ...]
+    aliases_per_target_root: Iterable[frozenset[str]] = [
+        frozenset(tgt.alias for tgt in tgt_root.targets) for tgt_root in target_roots_to_field_sets
+    ]
+
+    # Create a mapping from the goal name to a collection of target aliases: e.g. {'run': frozenset({'pyoxidizer_binary', 'pex_binary'}), 'test': frozenset(), ...}
+    goal_to_aliases_map = dict(zip(peekable_goals, aliases_per_target_root))
+
+    # Inverse the goal_to_aliases_map to create a mapping from a target alias to a collection of goal names: e.g. {'pyoxidizer_binary': frozenset({'package', 'run'}), 'pex_binary': frozenset({'package', 'run'}), ...}
+    alias_to_goals_map: dict[str, set[str]] = {}
+    for goal, aliases in goal_to_aliases_map.items():
+        for alias in aliases:
+            alias_to_goals_map.setdefault(alias, set()).add(goal)
+
+    # Convert the goal sets to tuples for JSON serialization
+    return {alias: tuple(sorted(goals)) for alias, goals in alias_to_goals_map.items()}
+
+
 @rule
 async def get_target_data(
-    # NB: We must preserve target generators, not replace with their generated targets.
     targets: UnexpandedTargets,
     subsys: PeekSubsystem,
 ) -> TargetDatas:
+    """Given a set of unexpanded targets, return a mapping of target addresses to their data.
+
+    The data includes the target's fields, expanded sources, expanded dependencies, and any
+    dependency rules that apply to the target.
+
+    NB: We must preserve target generators, not replace with their generated targets.
+
+    :param targets: The unexpanded targets to get data for.
+    :param subsys: The `PeekSubsystem` instance.
+    :return: A mapping of target addresses to their data.
+    """
     sorted_targets = sorted(targets, key=lambda tgt: tgt.address)
 
     # We "hydrate" sources fields with the engine, but not every target has them registered.
-    targets_with_sources = []
-    for tgt in sorted_targets:
-        if tgt.has_field(SourcesField):
-            targets_with_sources.append(tgt)
+    targets_with_sources = [tgt for tgt in sorted_targets if tgt.has_field(SourcesField)]
 
-    # NB: When determining dependencies, we replace target generators with their generated targets.
+    # When determining dependencies, we replace target generators with their generated targets.
     dependencies_per_target = await MultiGet(
         Get(
             Targets,
@@ -189,24 +284,28 @@ async def get_target_data(
         for tgt in targets_with_sources
     )
 
-    expanded_dependencies = [
-        tuple(dep.address.spec for dep in deps)
-        for tgt, deps in zip(sorted_targets, dependencies_per_target)
-    ]
+    # TODO: This feels like something that could be merged with the above code somewhere
     expanded_sources_map = {
         tgt.address: hs.snapshot
         for tgt, hs in zip(targets_with_sources, hydrated_sources_per_target)
     }
 
-    if not subsys.include_dep_rules:
-        dependencies_rules_map = {}
-        dependents_rules_map = {}
-        applicable_dep_rules_map = {}
-    else:
+    expanded_dependencies = [
+        tuple(dep.address.spec for dep in deps)
+        for _, deps in zip(sorted_targets, dependencies_per_target)
+    ]
+
+    dependencies_rules_map: dict[Address, tuple[str, ...] | None] = {}
+    dependents_rules_map: dict[Address, tuple[str, ...] | None] = {}
+    applicable_dep_rules_map = {}
+
+    if subsys.include_dep_rules:
+        # TODO: Why are we pulling a private definition from `build_files`?
         family_adaptors = await _get_target_family_and_adaptor_for_dep_rules(
             *(tgt.address for tgt in sorted_targets),
             description_of_origin="`peek` goal",
         )
+
         dependencies_rules_map = {
             tgt.address: describe_ruleset(
                 family.dependencies_rules.get_ruleset(tgt.address, adaptor)
@@ -214,11 +313,13 @@ async def get_target_data(
             for tgt, (family, adaptor) in zip(sorted_targets, family_adaptors)
             if family.dependencies_rules is not None
         }
+
         dependents_rules_map = {
             tgt.address: describe_ruleset(family.dependents_rules.get_ruleset(tgt.address, adaptor))
             for tgt, (family, adaptor) in zip(sorted_targets, family_adaptors)
             if family.dependents_rules is not None
         }
+
         all_applicable_dep_rules = await MultiGet(
             Get(
                 DependenciesRuleApplication,
@@ -235,6 +336,9 @@ async def get_target_data(
             for application in all_applicable_dep_rules
         }
 
+    # TODO: This currently exists in the `goal_rule` section of code below, but I'd prefer to have it here
+    # target_alias_to_goals_map = await _create_target_alias_to_goals_map() if subsys.include_goals else {}
+
     return TargetDatas(
         TargetData(
             tgt,
@@ -243,6 +347,7 @@ async def get_target_data(
             dependencies_rules=dependencies_rules_map.get(tgt.address),
             dependents_rules=dependents_rules_map.get(tgt.address),
             applicable_dep_rules=applicable_dep_rules_map.get(tgt.address),
+            goals=None,
         )
         for tgt, expanded_deps in zip(sorted_targets, expanded_dependencies)
     )
@@ -254,12 +359,43 @@ async def peek(
     subsys: PeekSubsystem,
     targets: UnexpandedTargets,
 ) -> Peek:
+    """Display detailed target information in JSON form.
+
+    :param console: The console to write the JSON to.
+    :param subsys: The `PeekSubsystem` instance.
+    :param targets: The targets to get data for.
+    :return: The `Peek` goal.
+    """
+
     tds = await Get(TargetDatas, UnexpandedTargets, targets)
+    # This method needs to be called in a @goal_rule, otherwise it fails out with Rule errors (when called in an @rule)
+    target_alias_to_goals_map = (
+        await _create_target_alias_to_goals_map() if subsys.include_goals else {}
+    )
+
+    if target_alias_to_goals_map:
+        # Attach the goals to the target data, in the hopes that we can pull `_create_target_alias_to_goals_map` back into `get_target_data`
+        # TargetData is frozen so we need to create a new collection
+        tds = TargetDatas(
+            [
+                TargetData(
+                    td.target,
+                    td.expanded_sources,
+                    td.expanded_dependencies,
+                    td.dependencies_rules,
+                    td.dependents_rules,
+                    td.applicable_dep_rules,
+                    target_alias_to_goals_map.get(td.target.alias),
+                )
+                for td in tds
+            ]
+        )
     output = render_json(tds, subsys.exclude_defaults, subsys.include_dep_rules)
+
     with subsys.output(console) as write_stdout:
         write_stdout(output)
     return Peek(exit_code=0)
 
 
-def rules():
+def rules() -> Iterable[Rule]:
     return collect_rules()
