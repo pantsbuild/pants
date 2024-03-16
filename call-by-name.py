@@ -1,11 +1,10 @@
+# On a Mac Mini M2 Pro, parsing the AST of all non-test python files (1184ish) and running in-place source-code replacements on 157 files takes < 1 second
+
 import ast
 from dataclasses import dataclass
 import fileinput
 from pathlib import Path
 import tokenize
-
-# Recursively iterate through all python files and run ast.parse on each of them
-# On a Mac Mini M2 Pro, parsing the AST of all python files (1650ish) is < 1 second (transforming/visiting adds time)
 
 @dataclass
 class Replacement:
@@ -46,15 +45,6 @@ class CallByNameVisitor(ast.NodeVisitor):
                         new_source="call_by_some_name(TODO TODO TODO)"
                     )
                 )
-                print(ast.dump(call, include_attributes=True, indent=2))
-                
-                # new_call = self._replace_statement(call)
-                # print(ast.dump(new_call, include_attributes=True, indent=2))
-                
-                # Replace the existing call with the new call 
-                # TODO: Using the AST to save the file will kill all comments and whitespace
-                # child.value.value.value = new_call
-                # print(ast.unparse(child))
 
     def _should_visit_node(self, decorator_list: list[ast.expr]) -> bool:
         """Only interested in async functions with the @rule decorator"""
@@ -117,6 +107,7 @@ def perform_replacements_on_file(file: Path, replacements: list[Replacement]):
             # For any lines that were not involved with replacements, emit them verbatim
             if not modified:
                 print(line, end="")
+
 
 # Recursive glob all python files, excluding *_test.py
 files = Path().rglob("*.py")
