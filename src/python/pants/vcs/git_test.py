@@ -391,42 +391,56 @@ def test_worktree_invalidation(origin: Path) -> None:
         [
             dedent(
                 """
-                --- left        2024-02-04 00:00:00.000000000 +0100
-                +++ right       2024-02-04 00:00:00.000000000 +0100
+                diff --git a/file.txt b/file.txt
+                index e69de29..9daeafb 100644
+                --- a/file.txt
+                +++ b/file.txt
                 @@ -1,0 +2 @@
                 +two
                 """
             ),
-            FrozenDict({"right": (Hunk(TextBlock.from_count(1, 0), TextBlock.from_count(2, 1)),)}),
+            FrozenDict(
+                {"file.txt": (Hunk(TextBlock.from_count(1, 0), TextBlock.from_count(2, 1)),)}
+            ),
         ],
         [
             dedent(
                 """
-                --- left        2024-02-04 00:00:00.000000000 +0100
-                +++ right       2024-02-04 00:00:00.000000000 +0100
+                diff --git a/file.txt b/file.txt
+                index e69de29..9daeafb 100644
+                --- a/file.txt
+                +++ b/file.txt
                 @@ -2 +1,0 @@
                 -two
                 """
             ),
-            FrozenDict({"right": (Hunk(TextBlock.from_count(2, 1), TextBlock.from_count(1, 0)),)}),
+            FrozenDict(
+                {"file.txt": (Hunk(TextBlock.from_count(2, 1), TextBlock.from_count(1, 0)),)}
+            ),
         ],
         [
             dedent(
                 """
-                --- left        2024-02-04 00:00:00.000000000 +0100
-                +++ right       2024-02-04 00:00:00.000000000 +0100
+                diff --git a/file.txt b/file.txt
+                index e69de29..9daeafb 100644
+                --- a/file.txt
+                +++ b/file.txt
                 @@ -2 +2 @@
                 -two
                 +four
                 """
             ),
-            FrozenDict({"right": (Hunk(TextBlock.from_count(2, 1), TextBlock.from_count(2, 1)),)}),
+            FrozenDict(
+                {"file.txt": (Hunk(TextBlock.from_count(2, 1), TextBlock.from_count(2, 1)),)}
+            ),
         ],
         [
             dedent(
                 """
-                --- left        2024-02-04 00:00:00.000000000 +0100
-                +++ right       2024-02-04 00:00:00.000000000 +0100
+                diff --git a/file.txt b/file.txt
+                index e69de29..9daeafb 100644
+                --- a/file.txt
+                +++ b/file.txt
                 @@ -2,2 +2,2 @@
                 -two
                 -three
@@ -434,7 +448,9 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +six
                 """
             ),
-            FrozenDict({"right": (Hunk(TextBlock.from_count(2, 2), TextBlock.from_count(2, 2)),)}),
+            FrozenDict(
+                {"file.txt": (Hunk(TextBlock.from_count(2, 2), TextBlock.from_count(2, 2)),)}
+            ),
         ],
     ],
 )

@@ -318,6 +318,9 @@ class Target:
                 hint=f"Using the `{self.alias}` target type for {address}. {self.removal_hint}",
             )
 
+        if origin_text_blocks:
+            _validate_origin_text_blocks(origin_text_blocks)
+
         object.__setattr__(
             self, "residence_dir", residence_dir if residence_dir is not None else address.spec_path
         )
@@ -644,6 +647,23 @@ class Target:
         context. If the validation only makes sense for certain goals acting on targets; those
         validations should be done in the associated rules.
         """
+
+
+def _validate_origin_text_blocks(origin_text_blocks: FrozenDict[str, TextBlocks]) -> None:
+    if not isinstance(origin_text_blocks, FrozenDict):
+        raise ValueError(
+            f"Expected type `FrozenDict`, got {type(origin_text_blocks)=} {origin_text_blocks=}"
+        )
+    for blocks in origin_text_blocks.values():
+        if not isinstance(blocks, tuple):
+            raise ValueError(
+                f"Expected `FrozenDict` values to be of type `tuple[TextBlock, ...]`, got {type(blocks)=} {blocks=}"
+            )
+        for block in blocks:
+            if not isinstance(block, TextBlock):
+                raise ValueError(
+                    f"Expected `FrozenDict` values to be of type `tuple[TextBlock, ...]`, got {type(blocks)=} {blocks=}"
+                )
 
 
 @dataclass(frozen=True)

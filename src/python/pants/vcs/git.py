@@ -174,13 +174,15 @@ class DiffParser:
         current_file = None
         hunks: DefaultDict[str, list[Hunk]] = defaultdict(list)
         for line in buf:
+            line = line.strip()
+
             if match := self._filename_regex.match(line):
                 current_file = self._parse_filename(match)
                 continue
 
             if match := self._lines_changed_regex.match(line):
                 if current_file is None:
-                    raise ParseError("missing filename in the diff")
+                    raise ParseError(f"missing filename in the diff:\n{content}")
 
                 try:
                     hunk = self._parse_hunk(match, line)
@@ -213,7 +215,7 @@ class DiffParser:
     def _filename_regex(self) -> re.Pattern:
         # This only handles whitespaces. It doesn't work if a filename has something weird
         # in it that needs escaping, e.g. a double quote.
-        return re.compile(r'^\+\+\+ ([^ ]+|"[^"]+") .*$')
+        return re.compile(r'^\+\+\+ b/([^ ]+|"[^"]+")$')
 
     def _parse_filename(self, match: re.Match) -> str:
         filename = str(match.groups()[0])

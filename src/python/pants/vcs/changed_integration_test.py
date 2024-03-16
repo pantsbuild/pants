@@ -105,12 +105,14 @@ def _run_pants_goal(
     goal: str,
     dependents: DependentsOption = DependentsOption.NONE,
     *,
+    changed_since: str | None = None,
     extra_args: list[str] | None = None,
 ) -> PantsResult:
+    changed_since = changed_since or "HEAD"
     return run_pants_with_workdir(
         [
             *(extra_args or ()),
-            "--changed-since=HEAD",
+            f"--changed-since={changed_since}",
             "--print-stacktrace",
             f"--changed-dependents={dependents.value}",
             goal,
@@ -132,9 +134,16 @@ def assert_list_stdout(
     expected: list[str],
     dependents: DependentsOption = DependentsOption.NONE,
     *,
+    changed_since: str | None = None,
     extra_args: list[str] | None = None,
 ) -> None:
-    result = _run_pants_goal(workdir, "list", dependents=dependents, extra_args=extra_args)
+    result = _run_pants_goal(
+        workdir,
+        "list",
+        dependents=dependents,
+        changed_since=changed_since,
+        extra_args=extra_args,
+    )
     result.assert_success()
     assert sorted(result.stdout.strip().splitlines()) == sorted(expected)
 
@@ -179,6 +188,28 @@ def test_change_transitive_dep(repo: str) -> None:
     )
 
     assert_count_loc(repo, DependentsOption.TRANSITIVE, expected_num_files=3)
+
+
+def test_changed_lines(repo: str) -> None:
+    Path("list.txt").write_text(
+        dedent(
+            """\
+            one
+            twenty
+            three
+            """
+        )
+    )
+    _run_git(["add", "list.txt"])
+    _run_git(["commit", "-m", "Change two -> twenty"])
+    assert_list_stdout(
+        repo,
+        [
+            "//:two#target",
+        ],
+        changed_since="HEAD~1",
+        extra_args=["--enable-target-origin-text-blocks"],
+    )
 
 
 def test_unowned_file(repo: str) -> None:

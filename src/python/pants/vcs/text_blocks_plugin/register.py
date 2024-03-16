@@ -18,6 +18,7 @@ from pants.engine.target import (
     TargetGenerator,
 )
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 
 
 class _TextBlocksField(SequenceField[TextBlock]):
@@ -34,20 +35,20 @@ class _TextBlocksField(SequenceField[TextBlock]):
         return computed_value
 
 
-class _TextBlocksSource(SingleSourceField):
+class _TextBlocksSourceField(SingleSourceField):
     pass
 
 
 class _TextBlocksTarget(Target):
     alias = "text_blocks"
-    core_fields = (_TextBlocksField, _TextBlocksSource)
+    core_fields = (_TextBlocksField, _TextBlocksSourceField)
 
 
 class _TextBlocksTargetGenerator(TargetGenerator):
     alias = "text_blocks_generator"
     generated_target_cls = _TextBlocksTarget
-    core_fields = (_TextBlocksSource, _TextBlocksField)
-    copied_fields = (_TextBlocksSource,)
+    core_fields = (_TextBlocksSourceField, _TextBlocksField)
+    copied_fields = (_TextBlocksSourceField,)
     moved_fields = ()
 
 
@@ -57,13 +58,15 @@ class _GenerateTextBlocksTargetRequest(GenerateTargetsRequest):
 
 @rule
 def _generate_text_blocks_target(request: _GenerateTextBlocksTargetRequest) -> GeneratedTargets:
+    text_blocks = request.generator[_TextBlocksField].value
+    source = request.generator[_TextBlocksSourceField].value
     return GeneratedTargets(
         request.generator,
         [
             _TextBlocksTarget(
                 request.template,
                 address=request.template_address.create_generated("target"),
-                origin_text_blocks=request.generator[_TextBlocksField].value,
+                origin_text_blocks=FrozenDict(((source, text_blocks),)),
             )
         ],
     )
