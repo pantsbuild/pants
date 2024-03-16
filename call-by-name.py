@@ -35,8 +35,7 @@ class CallByNameVisitor(ast.NodeVisitor):
             
         # In the body, look for `await Get`, and replace it with a call-by-name equivalent
         for child in node.body:
-            call = self._maybe_replaceable_call(child)
-            if call:
+            if call := self._maybe_replaceable_call(child):
                 self.replacements.append(
                     Replacement(
                         line_range=(call.lineno, call.end_lineno),
@@ -62,14 +61,7 @@ class CallByNameVisitor(ast.NodeVisitor):
             and call_node.func.id == "Get"):
             return call_node
         return None
-    
-    def _replace_statement(self, statement: ast.Call) -> ast.Call:
-        """Append a TODO comment to the end of the statement"""
-        
-        statement.func = ast.Name(
-            id="call_by_some_name"
-        )
-        return statement
+
 
 def create_replacements_for_file(file: Path) -> list[Replacement]:
     visitor = CallByNameVisitor()
