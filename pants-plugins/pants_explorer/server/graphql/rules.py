@@ -25,12 +25,6 @@ async def get_graphql_uvicorn_setup(
     request: GraphQLUvicornServerSetupRequest, graphql: GraphQLSubsystem
 ) -> UvicornServerSetup:
     browser = await Get(Browser, BrowserRequest, request.browser_request())
-
-    browser = await Get(
-        Browser, 
-        BrowserRequest, 
-        request.browser_request()
-    )
     return UvicornServerSetup(graphql_uvicorn_setup(browser, graphql=graphql))
 
 
