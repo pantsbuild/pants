@@ -118,6 +118,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
         "databricks.sql",
         "databricks.sqlalchemy",
     ),
+    "delta-lake": ("delta",),
     "django-cors-headers": ("corsheaders",),
     "django-countries": ("django_countries",),
     "django-filter": ("django_filters",),
