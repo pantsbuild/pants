@@ -178,6 +178,8 @@ class DiffParser:
 
             if match := self._filename_regex.match(line):
                 current_file = self._parse_filename(match)
+                if current_file is None:
+                    raise ValueError(f"failed to parse filename from line: `{line}`")
                 continue
 
             if match := self._lines_changed_regex.match(line):
@@ -215,14 +217,12 @@ class DiffParser:
     def _filename_regex(self) -> re.Pattern:
         # This only handles whitespaces. It doesn't work if a filename has something weird
         # in it that needs escaping, e.g. a double quote.
-        return re.compile(r'^\+\+\+ b/([^ ]+|"[^"]+")$')
+        return re.compile(r'^\+\+\+ (?:b/([^"]+)|"b/((?:[^"]|\\")+)")$')
 
-    def _parse_filename(self, match: re.Match) -> str:
-        filename = str(match.groups()[0])
-        if filename[0] != '"':
-            return filename
-
-        return filename[1:-1]  # without quotes
+    def _parse_filename(self, match: re.Match) -> str | None:
+        unquoted = str(g) if (g := match.groups()[0]) is not None else None
+        quoted = str(g).replace(r"\"", '"') if (g := match.groups()[1]) is not None else None
+        return unquoted or quoted
 
 
 @dataclass(frozen=True)

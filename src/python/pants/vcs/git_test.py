@@ -390,7 +390,7 @@ def test_worktree_invalidation(origin: Path) -> None:
     [
         [
             dedent(
-                """
+                """\
                 diff --git a/file.txt b/file.txt
                 index e69de29..9daeafb 100644
                 --- a/file.txt
@@ -405,7 +405,7 @@ def test_worktree_invalidation(origin: Path) -> None:
         ],
         [
             dedent(
-                """
+                """\
                 diff --git a/file.txt b/file.txt
                 index e69de29..9daeafb 100644
                 --- a/file.txt
@@ -420,7 +420,7 @@ def test_worktree_invalidation(origin: Path) -> None:
         ],
         [
             dedent(
-                """
+                """\
                 diff --git a/file.txt b/file.txt
                 index e69de29..9daeafb 100644
                 --- a/file.txt
@@ -436,7 +436,7 @@ def test_worktree_invalidation(origin: Path) -> None:
         ],
         [
             dedent(
-                """
+                """\
                 diff --git a/file.txt b/file.txt
                 index e69de29..9daeafb 100644
                 --- a/file.txt
@@ -452,9 +452,67 @@ def test_worktree_invalidation(origin: Path) -> None:
                 {"file.txt": (Hunk(SourceBlock.from_count(2, 2), SourceBlock.from_count(2, 2)),)}
             ),
         ],
+        [
+            dedent(
+                """\
+                diff --git a/one.txt b/one.txt
+                index 5626abf..d00491f 100644
+                --- a/one.txt
+                +++ b/one.txt
+                @@ -1 +1 @@
+                -one
+                +1
+                diff --git a/two.txt b/two.txt
+                index f719efd..0cfbf08 100644
+                --- a/two.txt
+                +++ b/two.txt
+                @@ -1 +1 @@
+                -two
+                +2
+                """
+            ),
+            FrozenDict(
+                {
+                    "one.txt": (Hunk(SourceBlock.from_count(1, 1), SourceBlock.from_count(1, 1)),),
+                    "two.txt": (Hunk(SourceBlock.from_count(1, 1), SourceBlock.from_count(1, 1)),),
+                }
+            ),
+        ],
+        [
+            dedent(
+                """\
+                diff --git a/sp ce.txt b/sp ce.txt
+                index 9daeafb..c7e32ef 100644
+                --- a/sp ce.txt
+                +++ b/sp ce.txt
+                @@ -1 +1 @@
+                -test
+                +t st
+                """
+            ),
+            FrozenDict(
+                {"sp ce.txt": (Hunk(SourceBlock.from_count(1, 1), SourceBlock.from_count(1, 1)),)}
+            ),
+        ],
+        [
+            dedent(
+                """\
+                diff --git "a/q\\"ote.txt" "b/q\\"ote.txt"
+                index 79fdb36..9daeafb 100644
+                --- "a/q\\"ote.txt"
+                +++ "b/q\\"ote.txt"
+                @@ -1 +1 @@
+                -te"t
+                +test
+                """
+            ),
+            FrozenDict(
+                {'q"ote.txt': (Hunk(SourceBlock.from_count(1, 1), SourceBlock.from_count(1, 1)),)}
+            ),
+        ],
     ],
 )
 def test_parse_unified_diff(diff, expected):
     wt = DiffParser()
     actual = wt.parse_unified_diff(diff)
-    assert actual == expected
+    assert expected == actual
