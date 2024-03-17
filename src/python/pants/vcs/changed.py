@@ -142,7 +142,7 @@ class ChangedOptions:
 
     def diff_hunks(
         self, git_worktree: GitWorktree, paths: Iterable[str]
-    ) -> dict[str, tuple[Hunk, ...]]:
+    ) -> FrozenDict[str, tuple[Hunk, ...]]:
         """Determines the universal diff hunks changed according to SCM/workspace and options.
 
         More info on universal diff: https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html

@@ -119,36 +119,22 @@ class GitWorktree(EngineAwareReturnType):
         paths: Iterable[str],
         from_commit: str,
         relative_to: PurePath | str | None = None,
-    ) -> dict[str, tuple[Hunk, ...]]:
+    ) -> FrozenDict[str, tuple[Hunk, ...]]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
 
-        hunks = {}
-        for path in paths:
-            file_hunks = self._diff_parser.parse_unified_diff(
-                self._git_binary._invoke_unsandboxed(
-                    self._create_git_cmdline(
-                        [
-                            "diff",
-                            "--unified=0",
-                            from_commit + "...HEAD",
-                            "--",
-                            str(relative_to / path),
-                        ],
-                    )
+        return self._diff_parser.parse_unified_diff(
+            self._git_binary._invoke_unsandboxed(
+                self._create_git_cmdline(
+                    [
+                        "diff",
+                        "--unified=0",
+                        from_commit + "...HEAD",
+                        "--",
+                        *[str(relative_to / path) for path in paths],
+                    ],
                 )
             )
-            if len(file_hunks) == 0:
-                # empty diff
-                continue
-
-            if len(file_hunks) > 1 or next(iter(file_hunks.keys())) != path:
-                raise AssertionError(
-                    f"expected a single file `{path}` in the diff, got hunks `{file_hunks}`"
-                )
-
-            hunks[path] = file_hunks[path]
-
-        return hunks
+        )
 
     def changes_in(self, diffspec: str, relative_to: PurePath | str | None = None) -> set[str]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
