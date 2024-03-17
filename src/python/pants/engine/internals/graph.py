@@ -1191,6 +1191,12 @@ def find_source_blocks_owners(
 
     owners = set()
 
+    # Let's say the rule is called to figure out which targets has changed given the `git diff` output.
+    # Then `request.source_blocks` is populated with source blocks parsed from `git diff` output
+    # and `file_blocks` is holding the list of all source blocks for the given `request.filename`.
+    # In order to get an answer we need to find an intersection for all pairs of blocks and return
+    # the targets they correspond to.
+    #
     # TODO Use interval tree?
     for request_block, target_blocks in itertools.product(request.source_blocks, file_blocks):
         for target_block in target_blocks.source_blocks:
