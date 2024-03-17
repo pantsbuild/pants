@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
 
-from pants.engine.internals.target_adaptor import TextBlock
+from pants.engine.internals.target_adaptor import SourceBlock
 
 
 @dataclass(frozen=True)
@@ -12,5 +12,5 @@ class Hunk:
     https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
     """
 
-    left: TextBlock
-    right: TextBlock
+    left: SourceBlock
+    right: SourceBlock

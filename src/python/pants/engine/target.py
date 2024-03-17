@@ -60,7 +60,7 @@ from pants.engine.internals.dep_rules import (
 )
 from pants.engine.internals.native_engine import NO_VALUE as NO_VALUE  # noqa: F401
 from pants.engine.internals.native_engine import Field as Field
-from pants.engine.internals.target_adaptor import TextBlock, TextBlocks  # noqa: F401
+from pants.engine.internals.target_adaptor import SourceBlock, SourceBlocks  # noqa: F401
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec, FilespecMatcher
@@ -269,7 +269,7 @@ class Target:
     residence_dir: str
     name_explicitly_set: bool
     description_of_origin: str
-    origin_text_blocks: FrozenDict[str, TextBlocks]
+    origin_source_blocks: FrozenDict[str, SourceBlocks]
 
     @final
     def __init__(
@@ -285,7 +285,7 @@ class Target:
         residence_dir: str | None = None,
         ignore_unrecognized_fields: bool = False,
         description_of_origin: str | None = None,
-        origin_text_blocks: FrozenDict[str, TextBlocks] = FrozenDict(),
+        origin_source_blocks: FrozenDict[str, SourceBlocks] = FrozenDict(),
     ) -> None:
         """Create a target.
 
@@ -318,8 +318,8 @@ class Target:
                 hint=f"Using the `{self.alias}` target type for {address}. {self.removal_hint}",
             )
 
-        if origin_text_blocks:
-            _validate_origin_text_blocks(origin_text_blocks)
+        if origin_source_blocks:
+            _validate_origin_source_blocks(origin_source_blocks)
 
         object.__setattr__(
             self, "residence_dir", residence_dir if residence_dir is not None else address.spec_path
@@ -328,7 +328,7 @@ class Target:
         object.__setattr__(
             self, "description_of_origin", description_of_origin or self.residence_dir
         )
-        object.__setattr__(self, "origin_text_blocks", origin_text_blocks)
+        object.__setattr__(self, "origin_source_blocks", origin_source_blocks)
         object.__setattr__(self, "name_explicitly_set", name_explicitly_set)
         try:
             object.__setattr__(
@@ -649,20 +649,20 @@ class Target:
         """
 
 
-def _validate_origin_text_blocks(origin_text_blocks: FrozenDict[str, TextBlocks]) -> None:
-    if not isinstance(origin_text_blocks, FrozenDict):
+def _validate_origin_source_blocks(origin_source_blocks: FrozenDict[str, SourceBlocks]) -> None:
+    if not isinstance(origin_source_blocks, FrozenDict):
         raise ValueError(
-            f"Expected type `FrozenDict`, got {type(origin_text_blocks)=} {origin_text_blocks=}"
+            f"Expected type `FrozenDict`, got {type(origin_source_blocks)=} {origin_source_blocks=}"
         )
-    for blocks in origin_text_blocks.values():
+    for blocks in origin_source_blocks.values():
         if not isinstance(blocks, tuple):
             raise ValueError(
-                f"Expected `FrozenDict` values to be of type `tuple[TextBlock, ...]`, got {type(blocks)=} {blocks=}"
+                f"Expected `FrozenDict` values to be of type `tuple[SourceBlock, ...]`, got {type(blocks)=} {blocks=}"
             )
         for block in blocks:
-            if not isinstance(block, TextBlock):
+            if not isinstance(block, SourceBlock):
                 raise ValueError(
-                    f"Expected `FrozenDict` values to be of type `tuple[TextBlock, ...]`, got {type(blocks)=} {blocks=}"
+                    f"Expected `FrozenDict` values to be of type `tuple[SourceBlock, ...]`, got {type(blocks)=} {blocks=}"
                 )
 
 

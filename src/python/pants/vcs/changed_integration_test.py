@@ -67,9 +67,9 @@ def repo() -> Iterator[str]:
                     tags=["a"],
                 )
 
-                text_blocks_generator(name="one", source="list.txt", text_blocks=[text_block(start=1, end=2)])
-                text_blocks_generator(name="two", source="list.txt", text_blocks=[text_block(start=2, end=3)])
-                text_blocks_generator(name="three", source="list.txt", text_blocks=[text_block(start=3, end=4)])
+                source_blocks_generator(name="one", source="list.txt", source_blocks=[source_block(start=1, end=2)])
+                source_blocks_generator(name="two", source="list.txt", source_blocks=[source_block(start=2, end=3)])
+                source_blocks_generator(name="three", source="list.txt", source_blocks=[source_block(start=3, end=4)])
                 """
             ),
         }
@@ -122,7 +122,7 @@ def _run_pants_goal(
             "GLOBAL": {
                 "backend_packages": [
                     "pants.backend.shell",
-                    "pants.vcs.text_blocks_plugin",
+                    "pants.vcs.source_blocks_plugin",
                 ]
             }
         },

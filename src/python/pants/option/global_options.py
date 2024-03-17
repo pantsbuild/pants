@@ -1867,7 +1867,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
 
-    enable_target_origin_text_blocks = BoolOption(
+    enable_target_origin_source_blocks = BoolOption(
         default=False,
         help="Enable fine grained target analysis based on line numbers.",
         advanced=True,

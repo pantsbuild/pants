@@ -48,7 +48,7 @@ from pants.engine.internals.parametrize import (  # noqa: F401
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizationsRequest as _TargetParametrizationsRequest,
 )
-from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest, TextBlocks
+from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest, SourceBlocks
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
@@ -395,7 +395,7 @@ def _create_target(
         ),
         union_membership=union_membership,
         description_of_origin=target_adaptor.description_of_origin,
-        origin_text_blocks=target_adaptor.origin_text_blocks,
+        origin_source_blocks=target_adaptor.origin_source_blocks,
     )
     # Check for any deprecated field usage.
     for field_type in target.field_types:
@@ -587,7 +587,7 @@ async def resolve_target_for_bootstrapping(
         union_membership=union_membership,
         ignore_unrecognized_fields=True,
         description_of_origin=target_adaptor.description_of_origin,
-        origin_text_blocks=target_adaptor.origin_text_blocks,
+        origin_source_blocks=target_adaptor.origin_source_blocks,
     )
     return WrappedTargetForBootstrap(target)
 
@@ -989,37 +989,37 @@ def _log_or_raise_unmatched_owners(
 
 
 @dataclass(frozen=True)
-class TargetTextBlocks:
+class TargetSourceBlocks:
     address: Address
-    text_blocks: TextBlocks
+    source_blocks: SourceBlocks
 
 
-class TextBlockMapping(FrozenDict[str, tuple[TargetTextBlocks, ...]]):
+class SourceBlockMapping(FrozenDict[str, tuple[TargetSourceBlocks, ...]]):
     pass
 
 
 @rule
-def calc_text_block_mapping(targets: AllTargets, global_options: GlobalOptions) -> TextBlockMapping:
-    if not global_options.enable_target_origin_text_blocks:
-        return TextBlockMapping()
+def calc_source_block_mapping(targets: AllTargets, global_options: GlobalOptions) -> SourceBlockMapping:
+    if not global_options.enable_target_origin_source_blocks:
+        return SourceBlockMapping()
 
-    result: DefaultDict[str, list[TargetTextBlocks]] = defaultdict(list)
+    result: DefaultDict[str, list[TargetSourceBlocks]] = defaultdict(list)
     for target in targets:
-        for filename, text_blocks in target.origin_text_blocks.items():
+        for filename, source_blocks in target.origin_source_blocks.items():
             result[filename].append(
-                TargetTextBlocks(address=target.address, text_blocks=text_blocks)
+                TargetSourceBlocks(address=target.address, source_blocks=source_blocks)
             )
 
-    return TextBlockMapping((filename, tuple(blocks)) for filename, blocks in result.items())
+    return SourceBlockMapping((filename, tuple(blocks)) for filename, blocks in result.items())
 
 
-class FilesWithTextBlocks(FrozenSet[str]):
+class FilesWithSourceBlocks(FrozenSet[str]):
     pass
 
 
 @rule
-def calc_files_with_text_blocks(mapping: TextBlockMapping) -> FilesWithTextBlocks:
-    return FilesWithTextBlocks(mapping.keys())
+def calc_files_with_source_blocks(mapping: SourceBlockMapping) -> FilesWithSourceBlocks:
+    return FilesWithSourceBlocks(mapping.keys())
 
 
 @dataclass(frozen=True)
@@ -1036,7 +1036,7 @@ class OwnersRequest:
     """
 
     sources: tuple[str, ...]
-    source_blocks: FrozenDict[str, TextBlocks] = FrozenDict()
+    source_blocks: FrozenDict[str, SourceBlocks] = FrozenDict()
     owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
@@ -1047,7 +1047,7 @@ class BlockOwnersRequest:
     """Request for file text block owners."""
 
     filename: str
-    blocks: TextBlocks
+    blocks: SourceBlocks
 
 
 class Owners(FrozenOrderedSet[Address]):
@@ -1161,7 +1161,7 @@ async def find_owners(
 
 
 @rule
-def find_block_owners(request: BlockOwnersRequest, mapping: TextBlockMapping) -> Owners:
+def find_block_owners(request: BlockOwnersRequest, mapping: SourceBlockMapping) -> Owners:
     file_blocks = mapping.get(request.filename)
     if not file_blocks:
         return Owners()
@@ -1170,7 +1170,7 @@ def find_block_owners(request: BlockOwnersRequest, mapping: TextBlockMapping) ->
 
     # TODO Use interval tree?
     for request_block, target_blocks in itertools.product(request.blocks, file_blocks):
-        for target_block in target_blocks.text_blocks:
+        for target_block in target_blocks.source_blocks:
             if request_block.intersection(target_block) is None:
                 continue
             owners.add(target_blocks.address)

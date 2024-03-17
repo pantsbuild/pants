@@ -13,7 +13,7 @@ from typing import Iterator
 import pytest
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
-from pants.engine.internals.target_adaptor import TextBlock
+from pants.engine.internals.target_adaptor import SourceBlock
 from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
@@ -400,7 +400,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 """
             ),
             FrozenDict(
-                {"file.txt": (Hunk(TextBlock.from_count(1, 0), TextBlock.from_count(2, 1)),)}
+                {"file.txt": (Hunk(SourceBlock.from_count(1, 0), SourceBlock.from_count(2, 1)),)}
             ),
         ],
         [
@@ -415,7 +415,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 """
             ),
             FrozenDict(
-                {"file.txt": (Hunk(TextBlock.from_count(2, 1), TextBlock.from_count(1, 0)),)}
+                {"file.txt": (Hunk(SourceBlock.from_count(2, 1), SourceBlock.from_count(1, 0)),)}
             ),
         ],
         [
@@ -431,7 +431,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 """
             ),
             FrozenDict(
-                {"file.txt": (Hunk(TextBlock.from_count(2, 1), TextBlock.from_count(2, 1)),)}
+                {"file.txt": (Hunk(SourceBlock.from_count(2, 1), SourceBlock.from_count(2, 1)),)}
             ),
         ],
         [
@@ -449,7 +449,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 """
             ),
             FrozenDict(
-                {"file.txt": (Hunk(TextBlock.from_count(2, 2), TextBlock.from_count(2, 2)),)}
+                {"file.txt": (Hunk(SourceBlock.from_count(2, 2), SourceBlock.from_count(2, 2)),)}
             ),
         ],
     ],

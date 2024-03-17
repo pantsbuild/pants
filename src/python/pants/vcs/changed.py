@@ -15,7 +15,7 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.mapper import SpecsFilter
-from pants.engine.internals.target_adaptor import TextBlocks
+from pants.engine.internals.target_adaptor import SourceBlocks
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import UnexpandedTargets
 from pants.option.option_types import EnumOption, StrOption
@@ -39,7 +39,7 @@ class DependentsOption(Enum):
 class ChangedRequest:
     sources: tuple[str, ...]
     dependents: DependentsOption
-    text_blocks: FrozenDict[str, TextBlocks]
+    source_blocks: FrozenDict[str, SourceBlocks]
 
 
 class ChangedAddresses(Collection[Address]):
@@ -62,7 +62,7 @@ async def find_changed_owners(
             filter_by_global_options=no_dependents,
             # Changing a BUILD file might impact the targets it defines.
             match_if_owning_build_file_included_in_sources=True,
-            source_blocks=request.text_blocks,
+            source_blocks=request.source_blocks,
         ),
     )
 
