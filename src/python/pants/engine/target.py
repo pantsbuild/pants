@@ -652,17 +652,17 @@ class Target:
 def _validate_origin_sources_blocks(origin_sources_blocks: FrozenDict[str, SourceBlocks]) -> None:
     if not isinstance(origin_sources_blocks, FrozenDict):
         raise ValueError(
-            f"Expected type `FrozenDict`, got {type(origin_sources_blocks)=} {origin_sources_blocks=}"
+            f"Expected `origin_sources_blocks` to be of type `FrozenDict`, got {type(origin_sources_blocks)=} {origin_sources_blocks=}"
         )
     for blocks in origin_sources_blocks.values():
-        if not isinstance(blocks, tuple):
+        if not isinstance(blocks, SourceBlocks):
             raise ValueError(
-                f"Expected `FrozenDict` values to be of type `tuple[SourceBlock, ...]`, got {type(blocks)=} {blocks=}"
+                f"Expected `origin_sources_blocks` to be a `FrozenDict` with values of type `SourceBlocks`, got values of {type(blocks)=} {blocks=}"
             )
         for block in blocks:
             if not isinstance(block, SourceBlock):
                 raise ValueError(
-                    f"Expected `FrozenDict` values to be of type `tuple[SourceBlock, ...]`, got {type(blocks)=} {blocks=}"
+                    f"Expected `origin_sources_blocks` to be a `FrozenDict` with values of type `SourceBlocks`, got values of {type(blocks)=} {blocks=}"
                 )
 
 

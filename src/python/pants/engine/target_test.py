@@ -1548,20 +1548,16 @@ def test_generate_file_based_overrides_field_help_message() -> None:
 
 
 def test_validate_origin_sources_blocks():
-    with pytest.raises(ValueError, match=re.compile("^Expected type `FrozenDict`, got .*list")):
+    with pytest.raises(ValueError, match=re.compile("^Expected .*`FrozenDict`, got .*list")):
         _validate_origin_sources_blocks([SourceBlock(start=0, end=1)])
     with pytest.raises(
         ValueError,
-        match=re.compile(
-            r"^Expected `FrozenDict` values to be of type `tuple\[SourceBlock, \.\.\.\]`, got .*SourceBlock"
-        ),
+        match=re.compile(r"^Expected .*`SourceBlocks`, got .*SourceBlock"),
     ):
         _validate_origin_sources_blocks(FrozenDict([("file.txt", SourceBlock(start=0, end=1))]))
     with pytest.raises(
         ValueError,
-        match=re.compile(
-            r"^Expected `FrozenDict` values to be of type `tuple\[SourceBlock, \.\.\.\]`, got .*tuple"
-        ),
+        match=re.compile(r"^Expected .*`SourceBlocks`, got .*tuple"),
     ):
         _validate_origin_sources_blocks(FrozenDict([("file.txt", ((0, 1),))]))
 
