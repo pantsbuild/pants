@@ -1045,11 +1045,11 @@ class OwnersRequest:
 
 
 @dataclass(frozen=True)
-class BlockOwnersRequest:
+class SourceBlocksOwnersRequest:
     """Request for file text block owners."""
 
     filename: str
-    blocks: SourceBlocks
+    source_blocks: SourceBlocks
 
 
 class Owners(FrozenOrderedSet[Address]):
@@ -1063,7 +1063,7 @@ async def find_owners(
 ) -> Owners:
     block_owners: tuple[Owners, ...] = (
         await MultiGet(
-            Get(Owners, BlockOwnersRequest(filename, blocks))
+            Get(Owners, SourceBlocksOwnersRequest(filename, blocks))
             for filename, blocks in owners_request.sources_blocks.items()
         )
         if owners_request.sources_blocks
@@ -1163,7 +1163,9 @@ async def find_owners(
 
 
 @rule
-def find_block_owners(request: BlockOwnersRequest, mapping: SourceBlockMapping) -> Owners:
+def find_source_blocks_owners(
+    request: SourceBlocksOwnersRequest, mapping: SourceBlockMapping
+) -> Owners:
     file_blocks = mapping.get(request.filename)
     if not file_blocks:
         return Owners()
@@ -1171,7 +1173,7 @@ def find_block_owners(request: BlockOwnersRequest, mapping: SourceBlockMapping) 
     owners = set()
 
     # TODO Use interval tree?
-    for request_block, target_blocks in itertools.product(request.blocks, file_blocks):
+    for request_block, target_blocks in itertools.product(request.source_blocks, file_blocks):
         for target_block in target_blocks.sources_blocks:
             if request_block.intersection(target_block) is None:
                 continue
