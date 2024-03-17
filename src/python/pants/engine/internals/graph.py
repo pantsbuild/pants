@@ -991,28 +991,30 @@ def _log_or_raise_unmatched_owners(
 @dataclass(frozen=True)
 class TargetSourceBlocks:
     address: Address
-    sources_blocks: SourceBlocks
+    source_blocks: SourceBlocks
 
 
-class SourceBlockMapping(FrozenDict[str, tuple[TargetSourceBlocks, ...]]):
-    pass
+class FilenameTargetSourceBlocksMapping(FrozenDict[str, tuple[TargetSourceBlocks, ...]]):
+    """Map file paths to all TargetSourceBlocks owned by that file."""
 
 
 @rule
 def calc_source_block_mapping(
     targets: AllTargets, global_options: GlobalOptions
-) -> SourceBlockMapping:
+) -> FilenameTargetSourceBlocksMapping:
     if not global_options.enable_target_origin_sources_blocks:
-        return SourceBlockMapping()
+        return FilenameTargetSourceBlocksMapping()
 
     result: DefaultDict[str, list[TargetSourceBlocks]] = defaultdict(list)
     for target in targets:
         for filename, sources_blocks in target.origin_sources_blocks.items():
             result[filename].append(
-                TargetSourceBlocks(address=target.address, sources_blocks=sources_blocks)
+                TargetSourceBlocks(address=target.address, source_blocks=sources_blocks)
             )
 
-    return SourceBlockMapping((filename, tuple(blocks)) for filename, blocks in result.items())
+    return FilenameTargetSourceBlocksMapping(
+        (filename, tuple(blocks)) for filename, blocks in result.items()
+    )
 
 
 class FilesWithSourceBlocks(FrozenSet[str]):
@@ -1020,7 +1022,9 @@ class FilesWithSourceBlocks(FrozenSet[str]):
 
 
 @rule
-def calc_files_with_sources_blocks(mapping: SourceBlockMapping) -> FilesWithSourceBlocks:
+def calc_files_with_sources_blocks(
+    mapping: FilenameTargetSourceBlocksMapping,
+) -> FilesWithSourceBlocks:
     return FilesWithSourceBlocks(mapping.keys())
 
 
@@ -1164,7 +1168,7 @@ async def find_owners(
 
 @rule
 def find_source_blocks_owners(
-    request: SourceBlocksOwnersRequest, mapping: SourceBlockMapping
+    request: SourceBlocksOwnersRequest, mapping: FilenameTargetSourceBlocksMapping
 ) -> Owners:
     file_blocks = mapping.get(request.filename)
     if not file_blocks:
@@ -1174,7 +1178,7 @@ def find_source_blocks_owners(
 
     # TODO Use interval tree?
     for request_block, target_blocks in itertools.product(request.source_blocks, file_blocks):
-        for target_block in target_blocks.sources_blocks:
+        for target_block in target_blocks.source_blocks:
             if request_block.intersection(target_block) is None:
                 continue
             owners.add(target_blocks.address)
