@@ -19,18 +19,6 @@ mod interactive_process;
 mod process;
 mod values;
 
-use self::dep_inference::{parse_javascript_deps, parse_python_deps};
-use self::digests::{
-    add_prefix_request_to_digest, create_digest_to_digest, digest_subset_to_digest,
-    digest_to_snapshot, directory_digest_to_digest_contents, directory_digest_to_digest_entries,
-    download_file_to_digest, merge_digests_request_to_digest, path_globs_to_digest,
-    path_globs_to_paths, remove_prefix_request_to_digest,
-};
-use self::docker::docker_resolve_image;
-use self::interactive_process::interactive_process;
-use self::process::process_request_to_process_result;
-use self::values::{run_id, session_values};
-
 type IntrinsicFn =
     Box<dyn Fn(Context, Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> + Send + Sync>;
 
@@ -47,7 +35,7 @@ impl Intrinsics {
                 types.directory_digest,
                 types.create_digest,
             ),
-            Box::new(create_digest_to_digest),
+            Box::new(self::digests::create_digest_to_digest),
         );
         intrinsics.insert(
             Intrinsic::new(
@@ -55,11 +43,11 @@ impl Intrinsics {
                 types.directory_digest,
                 types.path_globs,
             ),
-            Box::new(path_globs_to_digest),
+            Box::new(self::digests::path_globs_to_digest),
         );
         intrinsics.insert(
             Intrinsic::new("path_globs_to_paths", types.paths, types.path_globs),
-            Box::new(path_globs_to_paths),
+            Box::new(self::digests::path_globs_to_paths),
         );
         intrinsics.insert(
             Intrinsic::new(
@@ -67,11 +55,11 @@ impl Intrinsics {
                 types.directory_digest,
                 types.native_download_file,
             ),
-            Box::new(download_file_to_digest),
+            Box::new(self::digests::download_file_to_digest),
         );
         intrinsics.insert(
             Intrinsic::new("digest_to_snapshot", types.snapshot, types.directory_digest),
-            Box::new(digest_to_snapshot),
+            Box::new(self::digests::digest_to_snapshot),
         );
         intrinsics.insert(
             Intrinsic::new(
@@ -79,7 +67,7 @@ impl Intrinsics {
                 types.digest_contents,
                 types.directory_digest,
             ),
-            Box::new(directory_digest_to_digest_contents),
+            Box::new(self::digests::directory_digest_to_digest_contents),
         );
         intrinsics.insert(
             Intrinsic::new(
@@ -87,7 +75,7 @@ impl Intrinsics {
                 types.digest_entries,
                 types.directory_digest,
             ),
-            Box::new(directory_digest_to_digest_entries),
+            Box::new(self::digests::directory_digest_to_digest_entries),
         );
         intrinsics.insert(
             Intrinsic::new(
@@ -95,7 +83,7 @@ impl Intrinsics {
                 types.directory_digest,
                 types.merge_digests,
             ),
-            Box::new(merge_digests_request_to_digest),
+            Box::new(self::digests::merge_digests_request_to_digest),
         );
         intrinsics.insert(
             Intrinsic::new(
@@ -103,7 +91,7 @@ impl Intrinsics {
                 types.directory_digest,
                 types.remove_prefix,
             ),
-            Box::new(remove_prefix_request_to_digest),
+            Box::new(self::digests::remove_prefix_request_to_digest),
         );
         intrinsics.insert(
             Intrinsic::new(
@@ -111,7 +99,7 @@ impl Intrinsics {
                 types.directory_digest,
                 types.add_prefix,
             ),
-            Box::new(add_prefix_request_to_digest),
+            Box::new(self::digests::add_prefix_request_to_digest),
         );
         intrinsics.insert(
             Intrinsic {
@@ -122,7 +110,7 @@ impl Intrinsics {
                     DependencyKey::new(types.process_config_from_environment),
                 ],
             },
-            Box::new(process_request_to_process_result),
+            Box::new(self::process::process_request_to_process_result),
         );
         intrinsics.insert(
             Intrinsic::new(
@@ -130,7 +118,7 @@ impl Intrinsics {
                 types.directory_digest,
                 types.digest_subset,
             ),
-            Box::new(digest_subset_to_digest),
+            Box::new(self::digests::digest_subset_to_digest),
         );
         intrinsics.insert(
             Intrinsic {
@@ -138,7 +126,7 @@ impl Intrinsics {
                 product: types.session_values,
                 inputs: vec![],
             },
-            Box::new(session_values),
+            Box::new(self::values::session_values),
         );
         intrinsics.insert(
             Intrinsic {
@@ -146,7 +134,7 @@ impl Intrinsics {
                 product: types.run_id,
                 inputs: vec![],
             },
-            Box::new(run_id),
+            Box::new(self::values::run_id),
         );
         intrinsics.insert(
             Intrinsic {
@@ -157,7 +145,7 @@ impl Intrinsics {
                     DependencyKey::new(types.process_config_from_environment),
                 ],
             },
-            Box::new(interactive_process),
+            Box::new(self::interactive_process::interactive_process),
         );
         intrinsics.insert(
             Intrinsic {
@@ -165,7 +153,7 @@ impl Intrinsics {
                 product: types.docker_resolve_image_result,
                 inputs: vec![DependencyKey::new(types.docker_resolve_image_request)],
             },
-            Box::new(docker_resolve_image),
+            Box::new(self::docker::docker_resolve_image),
         );
         intrinsics.insert(
             Intrinsic {
@@ -173,7 +161,7 @@ impl Intrinsics {
                 product: types.parsed_python_deps_result,
                 inputs: vec![DependencyKey::new(types.deps_request)],
             },
-            Box::new(parse_python_deps),
+            Box::new(self::dep_inference::parse_python_deps),
         );
         intrinsics.insert(
             Intrinsic {
@@ -181,7 +169,7 @@ impl Intrinsics {
                 product: types.parsed_javascript_deps_result,
                 inputs: vec![DependencyKey::new(types.deps_request)],
             },
-            Box::new(parse_javascript_deps),
+            Box::new(self::dep_inference::parse_javascript_deps),
         );
         Intrinsics { intrinsics }
     }
