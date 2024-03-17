@@ -33,6 +33,10 @@ class GoToolchain(Subsystem):
             "1.20.13|linux_x86_64|9a9d3dcae2b6a638b1f2e9bd4db08ffb39c10e55d9696914002742d90f0047b5|100517536",
             "1.20.13|macos_arm64|4b7e8d0260b7376c77a0caea7b19dad6e1426c316671a15bc31036f92af2eb12|96903081",
             "1.20.13|macos_x86_64|713051aa0da66839f5a31a8ec677a7c61717b6fba62bf47eadb25542df3e9ee7|100163195",
+            "1.19.13|linux_arm64|1142ada7bba786d299812b23edd446761a54efbbcde346c2f0bc69ca6a007b58|115331558",
+            "1.19.13|linux_x86_64|4643d4c29c55f53fa0349367d7f1bb5ca554ea6ef528c146825b0f8464e2e668|149141790",
+            "1.19.13|darwin_arm64|022b35fa9c79b9457fa4a14fd9c4cf5f8ea315a8f2e3b3cd949fea55e11a7d7b|145492652",
+            "1.19.13|darwin_x86_64|1b4329dc9e73def7f894ca71fce78bb9f3f5c4c8671b6c7e4f363a3f47e88325|151207317",
             "1.18.10|linux_arm64|160497c583d4c7cbc1661230e68b758d01f741cf4bece67e48edc4fdd40ed92d|109079940",
             "1.18.10|linux_x86_64|5e05400e4c79ef5394424c0eff5b9141cb782da25f64f79d54c98af0a37f8d49|141977100",
             "1.18.10|darwin_arm64|718b32cb2c1d203ba2c5e6d2fc3cf96a6952b38e389d94ff6cdb099eb959dade|139620496",
@@ -46,7 +50,7 @@ class GoToolchain(Subsystem):
         ),
     )
     version = StrOption(
-        default="1.18.10",
+        default="1.19.13",
         help=softwrap(
             """
             The version of Go to use.

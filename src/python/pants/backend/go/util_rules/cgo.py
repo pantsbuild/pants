@@ -374,6 +374,7 @@ async def _gccld(
     flags: Iterable[str],
     objs: Iterable[str],
     description: str,
+    goroot: GoRoot,
 ) -> FallibleProcessResult:
     compiler_path, bash, wrapper_script = await MultiGet(
         Get(
@@ -415,6 +416,7 @@ async def _gccld(
             output_files=(outfile,),
             description=description,
             level=LogLevel.DEBUG,
+            immutable_input_digests={".goroot": goroot.digest},
         ),
     )
 
@@ -509,6 +511,7 @@ async def _dynimport(
             *sorted(transitive_prebuilt_objects),
         ],
         description=f"Link _cgo_.o ({import_path})",
+        goroot=goroot,
     )
     if cgo_binary_link_result.exit_code != 0:
         # From `go` source:
@@ -550,6 +553,7 @@ async def _dynimport(
             flags=[*ldflags, allow_unresolved_symbols_ldflag],
             objs=obj_files,
             description=f"Link _cgo_.o ({import_path})",
+            goroot=goroot,
         )
         if cgo_binary_link_result.exit_code != 0:
             raise ValueError(
