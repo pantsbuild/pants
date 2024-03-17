@@ -8,7 +8,7 @@ python_tests(
     overrides={
         "changed_integration_test.py": {
             "timeout": 350,
-            "dependencies": ["testprojects/pants-plugins/src/python/source_blocks/register.py"],
+            "dependencies": ["testprojects/pants-plugins/src/python/python_constant/register.py"],
         },
         "git_test.py": {"timeout": 120},
     },

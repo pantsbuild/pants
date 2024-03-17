@@ -111,6 +111,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list, pluralize, softwrap
+from pants.vcs.hunk import TextBlocks
 
 logger = logging.getLogger(__name__)
 
@@ -1057,18 +1058,18 @@ class OwnersRequest:
     """
 
     sources: tuple[str, ...]
-    sources_blocks: FrozenDict[str, SourceBlocks] = FrozenDict()
+    sources_blocks: FrozenDict[str, TextBlocks] = FrozenDict()
     owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
 
 
 @dataclass(frozen=True)
-class SourceBlocksOwnersRequest:
+class TextBlocksOwnersRequest:
     """Request for file text block owners."""
 
     filename: str
-    source_blocks: SourceBlocks
+    text_blocks: TextBlocks
 
 
 class Owners(FrozenOrderedSet[Address]):
@@ -1082,7 +1083,7 @@ async def find_owners(
 ) -> Owners:
     block_owners: tuple[Owners, ...] = (
         await MultiGet(
-            Get(Owners, SourceBlocksOwnersRequest(filename, blocks))
+            Get(Owners, TextBlocksOwnersRequest(filename, blocks))
             for filename, blocks in owners_request.sources_blocks.items()
         )
         if owners_request.sources_blocks
@@ -1183,7 +1184,7 @@ async def find_owners(
 
 @rule
 def find_source_blocks_owners(
-    request: SourceBlocksOwnersRequest, mapping: FilenameTargetSourceBlocksMapping
+    request: TextBlocksOwnersRequest, mapping: FilenameTargetSourceBlocksMapping
 ) -> Owners:
     file_blocks = mapping.get(request.filename)
     if not file_blocks:
@@ -1198,13 +1199,14 @@ def find_source_blocks_owners(
     # the targets they correspond to.
     #
     # TODO Use interval tree?
-    for request_block, target_blocks in itertools.product(request.source_blocks, file_blocks):
+    for request_block, target_blocks in itertools.product(request.text_blocks, file_blocks):
         for target_block in target_blocks.source_blocks:
-            if request_block.intersection(target_block) is None:
+            if not target_block.is_touched_by(request_block):
                 continue
             owners.add(target_blocks.address)
             break  # continue outer loop
 
+    # raise RuntimeError(f"{request.text_blocks=} {file_blocks=} {owners=}")
     return Owners(owners)
 
 

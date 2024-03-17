@@ -13,7 +13,6 @@ from typing import Iterator
 import pytest
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
-from pants.engine.internals.target_adaptor import SourceBlock
 from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
@@ -25,7 +24,7 @@ from pants.vcs.git import (
     MaybeGitWorktree,
     get_git_worktree,
 )
-from pants.vcs.hunk import Hunk
+from pants.vcs.hunk import Hunk, TextBlock
 
 
 def init_repo(remote_name: str, remote: PurePath) -> None:
@@ -399,9 +398,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +two
                 """
             ),
-            FrozenDict(
-                {"file.txt": (Hunk(SourceBlock.from_count(1, 0), SourceBlock.from_count(2, 1)),)}
-            ),
+            FrozenDict({"file.txt": (Hunk(TextBlock(1, 0), TextBlock(2, 1)),)}),
         ],
         [
             dedent(
@@ -414,9 +411,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 -two
                 """
             ),
-            FrozenDict(
-                {"file.txt": (Hunk(SourceBlock.from_count(2, 1), SourceBlock.from_count(1, 0)),)}
-            ),
+            FrozenDict({"file.txt": (Hunk(TextBlock(2, 1), TextBlock(1, 0)),)}),
         ],
         [
             dedent(
@@ -430,9 +425,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +four
                 """
             ),
-            FrozenDict(
-                {"file.txt": (Hunk(SourceBlock.from_count(2, 1), SourceBlock.from_count(2, 1)),)}
-            ),
+            FrozenDict({"file.txt": (Hunk(TextBlock(2, 1), TextBlock(2, 1)),)}),
         ],
         [
             dedent(
@@ -448,9 +441,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +six
                 """
             ),
-            FrozenDict(
-                {"file.txt": (Hunk(SourceBlock.from_count(2, 2), SourceBlock.from_count(2, 2)),)}
-            ),
+            FrozenDict({"file.txt": (Hunk(TextBlock(2, 2), TextBlock(2, 2)),)}),
         ],
         [
             dedent(
@@ -473,8 +464,8 @@ def test_worktree_invalidation(origin: Path) -> None:
             ),
             FrozenDict(
                 {
-                    "one.txt": (Hunk(SourceBlock.from_count(1, 1), SourceBlock.from_count(1, 1)),),
-                    "two.txt": (Hunk(SourceBlock.from_count(1, 1), SourceBlock.from_count(1, 1)),),
+                    "one.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),),
+                    "two.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),),
                 }
             ),
         ],
@@ -490,9 +481,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +t st
                 """
             ),
-            FrozenDict(
-                {"sp ce.txt": (Hunk(SourceBlock.from_count(1, 1), SourceBlock.from_count(1, 1)),)}
-            ),
+            FrozenDict({"sp ce.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)}),
         ],
         [
             dedent(
@@ -506,9 +495,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +test
                 """
             ),
-            FrozenDict(
-                {'q"ote.txt': (Hunk(SourceBlock.from_count(1, 1), SourceBlock.from_count(1, 1)),)}
-            ),
+            FrozenDict({'q"ote.txt': (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)}),
         ],
     ],
 )

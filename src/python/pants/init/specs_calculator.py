@@ -14,13 +14,13 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.internals.graph import FilesWithSourceBlocks
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
-from pants.engine.internals.target_adaptor import SourceBlocks
 from pants.engine.rules import QueryRule
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.frozendict import FrozenDict
 from pants.vcs.changed import ChangedAddresses, ChangedOptions, ChangedRequest
 from pants.vcs.git import GitWorktreeRequest, MaybeGitWorktree
+from pants.vcs.hunk import TextBlocks
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ def calculate_specs(
             path,
             # Hunk stores information about the old block and the new block.
             # Here we only care about the final state, so we take `hunk.right`.
-            SourceBlocks(hunk.right for hunk in hunks),
+            TextBlocks(hunk.right for hunk in hunks),
         )
         for path, hunks in changed_options.diff_hunks(
             maybe_git_worktree.git_worktree,

@@ -42,11 +42,31 @@ def repo() -> Iterator[str]:
             "dep.sh": "source transitive.sh",
             "transitive.sh": "",
             "standalone.sh": "",
-            "list.txt": dedent(
+            "tables.py": dedent(
                 """\
-                one
-                two
-                three
+                companies = {
+                    "table": "companies",
+                    "colums": [
+                        "id",
+                        "name",
+                    ],
+                }
+
+                persons = {
+                    "table": "persons",
+                    "colums": [
+                        "id",
+                        "name",
+                    ],
+                }
+
+                employees = {
+                    "table": "employees",
+                    "colums": [
+                        "company_id",
+                        "person_id",
+                    ],
+                }
                 """
             ),
             "BUILD": dedent(
@@ -67,9 +87,7 @@ def repo() -> Iterator[str]:
                     tags=["a"],
                 )
 
-                source_blocks_generator(name="one", source="list.txt", source_blocks=[source_block(start=1, end=2)])
-                source_blocks_generator(name="two", source="list.txt", source_blocks=[source_block(start=2, end=3)])
-                source_blocks_generator(name="three", source="list.txt", source_blocks=[source_block(start=3, end=4)])
+                python_constants(name="tables", source="tables.py")
                 """
             ),
         }
@@ -122,7 +140,8 @@ def _run_pants_goal(
             "GLOBAL": {
                 "backend_packages": [
                     "pants.backend.shell",
-                    "source_blocks",
+                    "pants.backend.python",
+                    "python_constant",
                 ]
             }
         },
@@ -190,22 +209,120 @@ def test_change_transitive_dep(repo: str) -> None:
     assert_count_loc(repo, DependentsOption.TRANSITIVE, expected_num_files=3)
 
 
-def test_changed_lines(repo: str) -> None:
-    Path("list.txt").write_text(
+def test_lines_one_line_added_in_target(repo: str) -> None:
+    Path("tables.py").write_text(
         dedent(
             """\
-            one
-            twenty
-            three
+            companies = {
+                "table": "companies",
+                "colums": [
+                    "id",
+                    "name",
+                ],
+            }
+
+            persons = {
+                "table": "persons",
+                "colums": [
+                    "id",
+                    "name",
+                    "surname",
+                ],
+            }
+
+            employees = {
+                "table": "employees",
+                "colums": [
+                    "company_id",
+                    "person_id",
+                ],
+            }
             """
         )
     )
-    _run_git(["add", "list.txt"])
-    _run_git(["commit", "-m", "Change two -> twenty"])
+    _run_git(["add", "tables.py"])
+    _run_git(["commit", "-m", "Change tables.persons"])
     assert_list_stdout(
         repo,
         [
-            "//:two#target",
+            "//:tables#persons",
+        ],
+        changed_since="HEAD~1",
+        extra_args=["--enable-target-origin-sources-blocks"],
+    )
+
+
+def test_lines_one_target_deleted(repo: str) -> None:
+    Path("tables.py").write_text(
+        dedent(
+            """\
+            companies = {
+                "table": "companies",
+                "colums": [
+                    "id",
+                    "name",
+                ],
+            }
+
+
+            employees = {
+                "table": "employees",
+                "colums": [
+                    "company_id",
+                    "person_id",
+                ],
+            }
+            """
+        )
+    )
+    _run_git(["add", "tables.py"])
+    _run_git(["commit", "-m", "Delete tables.persons"])
+    assert_list_stdout(
+        repo,
+        # No targets need to be triggered.
+        [],
+        changed_since="HEAD~1",
+        extra_args=["--enable-target-origin-sources-blocks"],
+    )
+
+
+def test_lines_one_line_on_the_edge_deleted(repo: str) -> None:
+    Path("tables.py").write_text(
+        dedent(
+            """\
+            companies = {
+                "table": "companies",
+                "colums": [
+                    "id",
+                    "name",
+                ],
+            }
+
+            persons = {
+                "table": "persons",
+                "colums": [
+                    "id",
+                    "name",
+                ],
+            }
+            employees = {
+                "table": "employees",
+                "colums": [
+                    "company_id",
+                    "person_id",
+                ],
+            }
+            """
+        )
+    )
+    _run_git(["add", "tables.py"])
+    _run_git(["commit", "-m", "Delete tables.persons"])
+    assert_list_stdout(
+        repo,
+        # Adjacent targets has to be triggered, because we don't khow if the change has affected them.
+        [
+            "//:tables#persons",
+            "//:tables#employees",
         ],
         changed_since="HEAD~1",
         extra_args=["--enable-target-origin-sources-blocks"],
@@ -272,10 +389,10 @@ def test_change_build_file(repo: str) -> None:
     assert_list_stdout(
         repo,
         [
-            "//:one#target",
             "//:standalone",
-            "//:three#target",
-            "//:two#target",
+            "//:tables#companies",
+            "//:tables#employees",
+            "//:tables#persons",
             "//app.sh:lib",
             "//dep.sh:lib",
             "//transitive.sh:lib",

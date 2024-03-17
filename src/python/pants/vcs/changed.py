@@ -15,7 +15,6 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.mapper import SpecsFilter
-from pants.engine.internals.target_adaptor import SourceBlocks
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import UnexpandedTargets
 from pants.option.option_types import EnumOption, StrOption
@@ -26,7 +25,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text
 from pants.vcs.git import GitWorktree
-from pants.vcs.hunk import Hunk
+from pants.vcs.hunk import Hunk, TextBlocks
 
 
 class DependentsOption(Enum):
@@ -38,7 +37,7 @@ class DependentsOption(Enum):
 @dataclass(frozen=True)
 class ChangedRequest:
     sources: tuple[str, ...]
-    sources_blocks: FrozenDict[str, SourceBlocks]
+    sources_blocks: FrozenDict[str, TextBlocks]
     dependents: DependentsOption
 
 

@@ -17,11 +17,10 @@ from typing import Any, DefaultDict, Iterable
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.internals.target_adaptor import SourceBlock
 from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
 from pants.util.frozendict import FrozenDict
-from pants.vcs.hunk import Hunk
+from pants.vcs.hunk import Hunk, TextBlock
 
 logger = logging.getLogger(__name__)
 
@@ -189,11 +188,11 @@ class DiffParser:
     def _parse_hunk(self, match: re.Match, line: str) -> Hunk:
         g = match.groups()
         return Hunk(
-            left=SourceBlock.from_count(
+            left=TextBlock(
                 start=int(g[0]),
                 count=int(g[2]) if g[2] is not None else 1,
             ),
-            right=SourceBlock.from_count(
+            right=TextBlock(
                 start=int(g[3]),
                 count=int(g[5]) if g[5] is not None else 1,
             ),
