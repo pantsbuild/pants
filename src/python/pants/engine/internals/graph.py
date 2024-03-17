@@ -998,11 +998,26 @@ class FilenameTargetSourceBlocksMapping(FrozenDict[str, tuple[TargetSourceBlocks
     """Map file paths to all TargetSourceBlocks owned by that file."""
 
 
+@dataclass(frozen=True)
+class TargetOriginSourcesBlocksOptions:
+    enable: bool
+
+
+@rule
+def extract_enable_target_origin_sources_blocks(
+    global_options: GlobalOptions,
+) -> TargetOriginSourcesBlocksOptions:
+    return TargetOriginSourcesBlocksOptions(
+        enable=global_options.enable_target_origin_sources_blocks
+    )
+
+
 @rule
 def calc_source_block_mapping(
-    targets: AllTargets, global_options: GlobalOptions
+    targets: AllTargets,
+    options: TargetOriginSourcesBlocksOptions,
 ) -> FilenameTargetSourceBlocksMapping:
-    if not global_options.enable_target_origin_sources_blocks:
+    if not options.enable:
         return FilenameTargetSourceBlocksMapping()
 
     result: DefaultDict[str, list[TargetSourceBlocks]] = defaultdict(list)
