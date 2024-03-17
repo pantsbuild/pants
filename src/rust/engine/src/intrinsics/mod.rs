@@ -1,12 +1,12 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use futures::future::{BoxFuture, FutureExt};
+use futures::future::BoxFuture;
 use indexmap::IndexMap;
 use rule_graph::{DependencyKey, RuleId};
 
 use crate::context::Context;
-use crate::nodes::{NodeResult, RunId, SessionValues};
+use crate::nodes::NodeResult;
 use crate::python::Value;
 use crate::tasks::Intrinsic;
 use crate::types::Types;
@@ -17,6 +17,7 @@ mod digests;
 mod docker;
 mod interactive_process;
 mod process;
+mod values;
 
 use self::dep_inference::{parse_javascript_deps, parse_python_deps};
 use self::digests::{
@@ -28,6 +29,7 @@ use self::digests::{
 use self::docker::docker_resolve_image;
 use self::interactive_process::interactive_process;
 use self::process::process_request_to_process_result;
+use self::values::{run_id, session_values};
 
 type IntrinsicFn =
     Box<dyn Fn(Context, Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> + Send + Sync>;
@@ -200,12 +202,4 @@ impl Intrinsics {
             .unwrap_or_else(|| panic!("Unrecognized intrinsic: {intrinsic:?}"));
         function(context, args).await
     }
-}
-
-fn session_values(context: Context, _args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
-    async move { context.get(SessionValues).await }.boxed()
-}
-
-fn run_id(context: Context, _args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
-    async move { context.get(RunId).await }.boxed()
 }
