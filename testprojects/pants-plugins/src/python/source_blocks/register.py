@@ -7,7 +7,7 @@ from typing import Iterable, Optional, Tuple
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.native_engine import Address
-from pants.engine.internals.target_adaptor import SourceBlock
+from pants.engine.internals.target_adaptor import SourceBlock, SourceBlocks
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     GeneratedTargets,
@@ -60,7 +60,7 @@ class _GenerateSourceBlocksTargetRequest(GenerateTargetsRequest):
 def _generate_sources_blocks_target(
     request: _GenerateSourceBlocksTargetRequest,
 ) -> GeneratedTargets:
-    sources_blocks = request.generator[_SourceBlocksField].value
+    source_blocks = SourceBlocks(request.generator[_SourceBlocksField].value)
     source = request.generator[_SourceBlocksSourceField].value
     return GeneratedTargets(
         request.generator,
@@ -68,7 +68,7 @@ def _generate_sources_blocks_target(
             _SourceBlocksTarget(
                 request.template,
                 address=request.template_address.create_generated("target"),
-                origin_sources_blocks=FrozenDict(((source, sources_blocks),)),
+                origin_sources_blocks=FrozenDict(((source, source_blocks),)),
             )
         ],
     )

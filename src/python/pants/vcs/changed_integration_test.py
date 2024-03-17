@@ -122,7 +122,7 @@ def _run_pants_goal(
             "GLOBAL": {
                 "backend_packages": [
                     "pants.backend.shell",
-                    "pants.vcs.sources_blocks_plugin",
+                    "source_blocks",
                 ]
             }
         },
@@ -208,7 +208,7 @@ def test_changed_lines(repo: str) -> None:
             "//:two#target",
         ],
         changed_since="HEAD~1",
-        extra_args=["--enable-target-origin-text-blocks"],
+        extra_args=["--enable-target-origin-sources-blocks"],
     )
 
 
