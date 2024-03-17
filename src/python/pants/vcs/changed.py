@@ -143,9 +143,9 @@ class ChangedOptions:
     def diff_hunks(
         self, git_worktree: GitWorktree, paths: Iterable[str]
     ) -> FrozenDict[str, tuple[Hunk, ...]]:
-        """Determines the universal diff hunks changed according to SCM/workspace and options.
+        """Determines the unified diff hunks changed according to SCM/workspace and options.
 
-        More info on universal diff: https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
+        More info on unified diff: https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
         """
         changes_since = self.since or git_worktree.current_rev_identifier
         return git_worktree.changed_files_lines(
