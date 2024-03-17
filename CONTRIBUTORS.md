@@ -1,6 +1,7 @@
 Created as part of the release process.
 
 + A. Alonso Dominguez
++ APL
 + Aaron Mitchell
 + Adam Chainz
 + Adam Retter
