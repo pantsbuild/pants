@@ -57,8 +57,10 @@ class _GenerateSourceBlocksTargetRequest(GenerateTargetsRequest):
 
 
 @rule
-def _generate_source_blocks_target(request: _GenerateSourceBlocksTargetRequest) -> GeneratedTargets:
-    source_blocks = request.generator[_SourceBlocksField].value
+def _generate_sources_blocks_target(
+    request: _GenerateSourceBlocksTargetRequest,
+) -> GeneratedTargets:
+    sources_blocks = request.generator[_SourceBlocksField].value
     source = request.generator[_SourceBlocksSourceField].value
     return GeneratedTargets(
         request.generator,
@@ -66,7 +68,7 @@ def _generate_source_blocks_target(request: _GenerateSourceBlocksTargetRequest) 
             _SourceBlocksTarget(
                 request.template,
                 address=request.template_address.create_generated("target"),
-                origin_source_blocks=FrozenDict(((source, source_blocks),)),
+                origin_sources_blocks=FrozenDict(((source, sources_blocks),)),
             )
         ],
     )

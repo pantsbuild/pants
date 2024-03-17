@@ -122,7 +122,7 @@ def _run_pants_goal(
             "GLOBAL": {
                 "backend_packages": [
                     "pants.backend.shell",
-                    "pants.vcs.source_blocks_plugin",
+                    "pants.vcs.sources_blocks_plugin",
                 ]
             }
         },

@@ -71,7 +71,7 @@ def calculate_specs(
             "The `--changed-*` options are only available if Git is used for the repository."
         )
 
-    (files_with_source_blocks,) = session.product_request(
+    (files_with_sources_blocks,) = session.product_request(
         FilesWithSourceBlocks, [Params(bootstrap_environment)]
     )
     changed_files = tuple(
@@ -79,11 +79,11 @@ def calculate_specs(
         for file in changed_options.changed_files(maybe_git_worktree.git_worktree)
         # We want to exclude the file from the normal processing flow if it has associated
         # targets with text blocks. These files are handled with special logic.
-        if file not in files_with_source_blocks
+        if file not in files_with_sources_blocks
     )
     file_literal_specs = tuple(FileLiteralSpec(f) for f in changed_files)
 
-    source_blocks = FrozenDict(
+    sources_blocks = FrozenDict(
         (
             path,
             # Hunk stores information about the old block and the new block.
@@ -92,15 +92,15 @@ def calculate_specs(
         )
         for path, hunks in changed_options.diff_hunks(
             maybe_git_worktree.git_worktree,
-            files_with_source_blocks,
+            files_with_sources_blocks,
         ).items()
     )
-    logger.debug("changed text blocks: %s", source_blocks)
+    logger.debug("changed text blocks: %s", sources_blocks)
 
     changed_request = ChangedRequest(
         sources=changed_files,
         dependents=changed_options.dependents,
-        source_blocks=source_blocks,
+        sources_blocks=sources_blocks,
     )
     (changed_addresses,) = session.product_request(
         ChangedAddresses,

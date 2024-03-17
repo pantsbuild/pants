@@ -48,7 +48,7 @@ from pants.engine.internals.parametrize import (  # noqa: F401
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizationsRequest as _TargetParametrizationsRequest,
 )
-from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest, SourceBlocks
+from pants.engine.internals.target_adaptor import SourceBlocks, TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
@@ -395,7 +395,7 @@ def _create_target(
         ),
         union_membership=union_membership,
         description_of_origin=target_adaptor.description_of_origin,
-        origin_source_blocks=target_adaptor.origin_source_blocks,
+        origin_sources_blocks=target_adaptor.origin_sources_blocks,
     )
     # Check for any deprecated field usage.
     for field_type in target.field_types:
@@ -587,7 +587,7 @@ async def resolve_target_for_bootstrapping(
         union_membership=union_membership,
         ignore_unrecognized_fields=True,
         description_of_origin=target_adaptor.description_of_origin,
-        origin_source_blocks=target_adaptor.origin_source_blocks,
+        origin_sources_blocks=target_adaptor.origin_sources_blocks,
     )
     return WrappedTargetForBootstrap(target)
 
@@ -991,7 +991,7 @@ def _log_or_raise_unmatched_owners(
 @dataclass(frozen=True)
 class TargetSourceBlocks:
     address: Address
-    source_blocks: SourceBlocks
+    sources_blocks: SourceBlocks
 
 
 class SourceBlockMapping(FrozenDict[str, tuple[TargetSourceBlocks, ...]]):
@@ -999,15 +999,17 @@ class SourceBlockMapping(FrozenDict[str, tuple[TargetSourceBlocks, ...]]):
 
 
 @rule
-def calc_source_block_mapping(targets: AllTargets, global_options: GlobalOptions) -> SourceBlockMapping:
-    if not global_options.enable_target_origin_source_blocks:
+def calc_source_block_mapping(
+    targets: AllTargets, global_options: GlobalOptions
+) -> SourceBlockMapping:
+    if not global_options.enable_target_origin_sources_blocks:
         return SourceBlockMapping()
 
     result: DefaultDict[str, list[TargetSourceBlocks]] = defaultdict(list)
     for target in targets:
-        for filename, source_blocks in target.origin_source_blocks.items():
+        for filename, sources_blocks in target.origin_sources_blocks.items():
             result[filename].append(
-                TargetSourceBlocks(address=target.address, source_blocks=source_blocks)
+                TargetSourceBlocks(address=target.address, sources_blocks=sources_blocks)
             )
 
     return SourceBlockMapping((filename, tuple(blocks)) for filename, blocks in result.items())
@@ -1018,7 +1020,7 @@ class FilesWithSourceBlocks(FrozenSet[str]):
 
 
 @rule
-def calc_files_with_source_blocks(mapping: SourceBlockMapping) -> FilesWithSourceBlocks:
+def calc_files_with_sources_blocks(mapping: SourceBlockMapping) -> FilesWithSourceBlocks:
     return FilesWithSourceBlocks(mapping.keys())
 
 
@@ -1036,7 +1038,7 @@ class OwnersRequest:
     """
 
     sources: tuple[str, ...]
-    source_blocks: FrozenDict[str, SourceBlocks] = FrozenDict()
+    sources_blocks: FrozenDict[str, SourceBlocks] = FrozenDict()
     owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
@@ -1062,9 +1064,9 @@ async def find_owners(
     block_owners: tuple[Owners, ...] = (
         await MultiGet(
             Get(Owners, BlockOwnersRequest(filename, blocks))
-            for filename, blocks in owners_request.source_blocks.items()
+            for filename, blocks in owners_request.sources_blocks.items()
         )
-        if owners_request.source_blocks
+        if owners_request.sources_blocks
         else ()
     )
 
@@ -1170,7 +1172,7 @@ def find_block_owners(request: BlockOwnersRequest, mapping: SourceBlockMapping) 
 
     # TODO Use interval tree?
     for request_block, target_blocks in itertools.product(request.blocks, file_blocks):
-        for target_block in target_blocks.source_blocks:
+        for target_block in target_blocks.sources_blocks:
             if request_block.intersection(target_block) is None:
                 continue
             owners.add(target_blocks.address)

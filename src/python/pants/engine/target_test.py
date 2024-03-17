@@ -45,7 +45,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     ValidNumbers,
-    _validate_origin_source_blocks,
+    _validate_origin_sources_blocks,
     generate_file_based_overrides_field_help_message,
     get_shard,
     parse_shard_spec,
@@ -1547,24 +1547,24 @@ def test_generate_file_based_overrides_field_help_message() -> None:
     assert "\n    }\n\nFile" in message
 
 
-def test_validate_origin_source_blocks():
+def test_validate_origin_sources_blocks():
     with pytest.raises(ValueError, match=re.compile("^Expected type `FrozenDict`, got .*list")):
-        _validate_origin_source_blocks([SourceBlock(start=0, end=1)])
+        _validate_origin_sources_blocks([SourceBlock(start=0, end=1)])
     with pytest.raises(
         ValueError,
         match=re.compile(
             r"^Expected `FrozenDict` values to be of type `tuple\[SourceBlock, \.\.\.\]`, got .*SourceBlock"
         ),
     ):
-        _validate_origin_source_blocks(FrozenDict([("file.txt", SourceBlock(start=0, end=1))]))
+        _validate_origin_sources_blocks(FrozenDict([("file.txt", SourceBlock(start=0, end=1))]))
     with pytest.raises(
         ValueError,
         match=re.compile(
             r"^Expected `FrozenDict` values to be of type `tuple\[SourceBlock, \.\.\.\]`, got .*tuple"
         ),
     ):
-        _validate_origin_source_blocks(FrozenDict([("file.txt", ((0, 1),))]))
+        _validate_origin_sources_blocks(FrozenDict([("file.txt", ((0, 1),))]))
 
-    _validate_origin_source_blocks(
+    _validate_origin_sources_blocks(
         FrozenDict([("file.txt", SourceBlocks([SourceBlock(start=0, end=1)]))])
     )
