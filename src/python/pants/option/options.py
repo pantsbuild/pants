@@ -274,7 +274,12 @@ class Options:
         return register
 
     def get_parser(self, scope: str) -> Parser:
-        """Returns the parser for the given scope, so code can register on it directly."""
+        """Returns the parser for the given scope, so code can register on it directly.
+
+        :param scope: The scope to retrieve the parser for.
+        :return: The parser for the given scope.
+        :raises pants.option.errors.ConfigValidationError: if the scope is not known.
+        """
         try:
             return self._parser_by_scope[scope]
         except KeyError:
@@ -350,6 +355,10 @@ class Options:
         Computed lazily per scope.
 
         :API: public
+        :param scope: The scope to get options for.
+        :param check_deprecations: Whether to check for any deprecations conditions.
+        :return: An OptionValueContainer representing the option values for the given scope.
+        :raises pants.option.errors.ConfigValidationError: if the scope is unknown.
         """
 
         values_builder = OptionValueContainerBuilder()

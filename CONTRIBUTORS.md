@@ -1,6 +1,7 @@
 Created as part of the release process.
 
 + A. Alonso Dominguez
++ APL
 + Aaron Mitchell
 + Adam Chainz
 + Adam Retter
@@ -354,6 +355,7 @@ Created as part of the release process.
 + hephex
 + jgartdele/del
 + offsetcyan
++ okcleary
 + olivercoleman-switchdin
 + philipp-sontag-by
 + purajit
