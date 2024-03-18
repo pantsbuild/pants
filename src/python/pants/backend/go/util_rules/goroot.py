@@ -18,7 +18,15 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
     BinaryPathTest,
 )
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, DownloadFile, RemovePrefix
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    DownloadFile,
+    RemovePrefix,
+    SymlinkEntry,
+)
 from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
@@ -34,6 +42,17 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class InstallGoToolchainRequest:
     """Request to install the Go toolchain."""
+
+
+@dataclass(frozen=True)
+class LocateGoToolchainRequest:
+    """Request to locate a Go toolchain."""
+
+
+@dataclass(frozen=True)
+class GoToolchainInfo:
+    binary_path: str
+    digest: Digest
 
 
 @dataclass(frozen=True)
@@ -68,7 +87,7 @@ async def install_go_toolchain(
     req: InstallGoToolchainRequest,
     subsystem: GoToolchain,
     platform: Platform,
-) -> GoRoot:
+) -> GoToolchainInfo:
     version = subsystem.version
 
     external_tool = subsystem.known_version(platform)
@@ -93,42 +112,22 @@ async def install_go_toolchain(
     )
 
     extracted_archive = await Get(ExtractedArchive, Digest, package)
-    with_prefix = await Get(Digest, AddPrefix(extracted_archive.digest, ".goroot"))
 
-    binary_path = ".goroot/go/bin/go"
-    env_result = await Get(  # noqa: PNT30: requires triage
-        ProcessResult,
-        Process(
-            (f"{binary_path}", "env", "-json"),
-            description=f"Determine Go SDK metadata for {binary_path}",
-            level=LogLevel.DEBUG,
-            env={"GOPATH": "/does/not/matter"},
-            input_digest=with_prefix,
-        ),
-    )
+    binary_path = "go/bin/go"
 
-    sdk_metadata = json.loads(strip_v2_chroot_path_bytes(env_result.stdout).decode())
-    major, minor = version.split(".")[:2]
-    version = f"{major}.{minor}"
-
-    return GoRoot(
-        path=sdk_metadata["GOROOT"],
-        version=version,
-        _raw_metadata=FrozenDict(sdk_metadata),
-        digest=extracted_archive.digest,
+    return GoToolchainInfo(
+        binary_path,
+        extracted_archive.digest,
     )
 
 
 @rule(desc="Find Go binary", level=LogLevel.DEBUG)
-async def setup_goroot(
+async def locate_go_toolchain(
+    request: LocateGoToolchainRequest,
     golang_subsystem: GolangSubsystem,
-    toolchain_subsystem: GoToolchain,
     go_bootstrap: GoBootstrap,
     env_target: EnvironmentTarget,
-) -> GoRoot:
-    if toolchain_subsystem.enabled:
-        return await Get(GoRoot, InstallGoToolchainRequest())
-
+) -> GoToolchainInfo:
     search_paths = go_bootstrap.go_search_paths
     all_go_binary_paths = await Get(
         BinaryPaths,
@@ -198,8 +197,12 @@ async def setup_goroot(
                 ),
             )
             sdk_metadata = json.loads(env_result.stdout.decode())
-            return GoRoot(
-                path=sdk_metadata["GOROOT"], version=version, _raw_metadata=FrozenDict(sdk_metadata)
+
+            digest = await Get(Digest, CreateDigest([SymlinkEntry("go", sdk_metadata["GOROOT"])]))
+
+            return GoToolchainInfo(
+                ".goroot/go/bin/go",
+                digest,
             )
 
         logger.debug(
@@ -228,6 +231,40 @@ async def setup_goroot(
             `[golang].expected_minimum_version`.
             """
         )
+    )
+
+
+@rule(desc="Prepare Go environment", level=LogLevel.DEBUG)
+async def prepare_go_environment(
+    toolchain_subsystem: GoToolchain,
+) -> GoRoot:
+    if toolchain_subsystem.enabled:
+        go_sdk = await Get(GoToolchainInfo, InstallGoToolchainRequest())
+
+    else:
+        go_sdk = await Get(GoToolchainInfo, LocateGoToolchainRequest())
+
+    env_result = await Get(  # noqa: PNT30: requires triage
+        ProcessResult,
+        Process(
+            (".goroot/go/bin/go", "env", "-json"),
+            description=f"Determine Go SDK metadata for path {go_sdk.binary_path}",
+            level=LogLevel.DEBUG,
+            env={"GOPATH": "/does/not/matter2"},
+            immutable_input_digests={".goroot": go_sdk.digest},
+        ),
+    )
+
+    sdk_metadata = json.loads(strip_v2_chroot_path_bytes(env_result.stdout).decode())
+    version = sdk_metadata["GOVERSION"][2:]
+    major, minor = version.split(".")[:2]
+    version = f"{major}.{minor}"
+
+    return GoRoot(
+        path=".goroot/go",
+        version=version,
+        _raw_metadata=FrozenDict(sdk_metadata),
+        digest=go_sdk.digest,
     )
 
 
