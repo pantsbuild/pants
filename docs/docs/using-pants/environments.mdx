@@ -44,7 +44,7 @@ local_environment(
 docker_environment(
   name="local_busybox",
   platform="linux_x86_64",
-  image="busybox:latest@sha256-abcd123...",
+  image="busybox:latest@sha256:abcd123...",
   ..
 )
 ```
@@ -177,7 +177,7 @@ You'll need a `docker_environment` which uses an image containing the relevant b
 docker_environment(
   name="python_bullseye",
   platform="linux_x86_64",
-  image="python:3.9.14-slim-bullseye@sha256-abcd123...",
+  image="python:3.9.14-slim-bullseye@sha256:abcd123...",
   ..
 )
 ```
@@ -193,7 +193,7 @@ pex_binary(
 docker_image(
     name="docker_image",
     instructions=[
-        "FROM python:3.9.14-slim-bullseye@sha256-abcd123...",
+        "FROM python:3.9.14-slim-bullseye@sha256:abcd123...",
         "ENTRYPOINT ["/main"]",
         "COPY examples/main.pex /main",
     ],
