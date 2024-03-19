@@ -15,7 +15,7 @@ class GoToolchain(Subsystem):
     help = "Options for the Go toolchain provider."
 
     enabled = BoolOption(
-        default=False,
+        default=True,
         help=softwrap(
             """
             If true, Pants will provide a Go distribution instead of requiring one to be installed on the host system.

@@ -17,7 +17,6 @@ from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule

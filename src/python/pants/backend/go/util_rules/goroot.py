@@ -18,15 +18,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
     BinaryPathTest,
 )
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    DownloadFile,
-    RemovePrefix,
-    SymlinkEntry,
-)
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, DownloadFile, SymlinkEntry
 from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform

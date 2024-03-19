@@ -20,6 +20,10 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
+class UnsupportedFeature(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class GoSdkProcess:
     command: tuple[str, ...]
@@ -136,7 +140,11 @@ async def setup_go_sdk_process(
         env[GoSdkRunSetup.SANDBOX_ROOT_ENV] = "1"
 
     # Disable the "coverage redesign" experiment on Go v1.20+ for now since Pants does not yet support it.
-    if goroot.is_compatible_version("1.20") and not goroot.is_compatible_version("1.21"):
+    if goroot.is_compatible_version("1.20"):
+        if goroot.is_compatible_version("1.21"):
+            raise UnsupportedFeature(
+                "Pants currently does not support the redesigned coverage feature in Go v1.20+. In Go v.1.20, pants falls back to the old coverage feature. In later versions the coverage feature cannot be used. See https://github.com/pantsbuild/pants/issues/20689 for more information."
+            )
         exp_str = env.get("GOEXPERIMENT", "")
         exp_fields = exp_str.split(",") if exp_str != "" else []
         exp_fields = [exp for exp in exp_fields if exp != "coverageredesign"]
