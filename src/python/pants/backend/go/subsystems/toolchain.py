@@ -50,7 +50,7 @@ class GoToolchain(Subsystem):
         ),
     )
     version = StrOption(
-        default="1.21.6",
+        default="1.20.13",
         help=softwrap(
             """
             The version of Go to use.

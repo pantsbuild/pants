@@ -119,7 +119,7 @@ async def install_go_toolchain(
         ProcessResult,
         Process(
             (".goroot/go/bin/go", "env", "-json"),
-            description=f"Determine Go SDK metadata for path {go_sdk.binary_path}",
+            description=f"Determine Go SDK metadata for path .goroot/{binary_path}",
             level=LogLevel.DEBUG,
             env={"GOPATH": "/does/not/matter2"},
             immutable_input_digests={".goroot": extracted_archive.digest},
@@ -134,7 +134,7 @@ async def install_go_toolchain(
         path=".goroot/go",
         version=version,
         _raw_metadata=FrozenDict(sdk_metadata),
-        digest=extracted_archive,
+        digest=extracted_archive.digest,
     )
 
 
