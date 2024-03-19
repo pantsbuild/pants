@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-import textwrap
 from dataclasses import dataclass
+from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
@@ -81,7 +81,7 @@ async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
     # from within the execution sandbox. Thus, this code uses a bash script to be able to resolve
     # absolute paths inside the sandbox.
 
-    script = textwrap.dedent(
+    script = dedent(
         f"""\
             export sandbox_root="$(/bin/pwd)"
             export GOPATH="${{sandbox_root}}/gopath"

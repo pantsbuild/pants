@@ -10,7 +10,6 @@ import pytest
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import (
     Simplifier,
-    anonymize_v2_chroot_path,
     bullet_list,
     comma_separated_list,
     docstring,
@@ -24,6 +23,7 @@ from pants.util.strutil import (
     softwrap,
     stable_hash,
     strip_prefix,
+    strip_v2_chroot_path,
 )
 
 
@@ -71,7 +71,7 @@ def test_strip_prefix() -> None:
 
 def test_strip_chroot_path() -> None:
     assert (
-        anonymize_v2_chroot_path(
+        strip_v2_chroot_path(
             dedent(
                 """\
             Would reformat /private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-sandbox-3zt5Ph/src/python/example.py
@@ -84,9 +84,9 @@ def test_strip_chroot_path() -> None:
         )
         == dedent(
             """\
-        Would reformat /<sandbox-1>/src/python/example.py
-        Would reformat /<sandbox-2>/test.py
-        Would reformat /<sandbox-3>/custom_tmpdir.py
+        Would reformat src/python/example.py
+        Would reformat test.py
+        Would reformat custom_tmpdir.py
 
         Some other output.
         """
@@ -95,24 +95,24 @@ def test_strip_chroot_path() -> None:
 
     # A subdir must be prefixed with `pants-sandbox-`, then some characters after it.
     assert (
-        anonymize_v2_chroot_path("/var/pants_sandbox_OCnquv/test.py")
+        strip_v2_chroot_path("/var/pants_sandbox_OCnquv/test.py")
         == "/var/pants_sandbox_OCnquv/test.py"
     )
     assert (
-        anonymize_v2_chroot_path("/var/pants_sandboxOCnquv/test.py")
+        strip_v2_chroot_path("/var/pants_sandboxOCnquv/test.py")
         == "/var/pants_sandboxOCnquv/test.py"
     )
-    assert anonymize_v2_chroot_path("/var/pants-sandbox/test.py") == "/var/pants-sandbox/test.py"
+    assert strip_v2_chroot_path("/var/pants-sandbox/test.py") == "/var/pants-sandbox/test.py"
 
     # Our heuristic requires absolute paths.
     assert (
-        anonymize_v2_chroot_path("var/pants-sandbox-OCnquv/test.py")
+        strip_v2_chroot_path("var/pants-sandbox-OCnquv/test.py")
         == "var/pants-sandbox-OCnquv/test.py"
     )
 
     # Confirm we can handle values with no chroot path.
-    assert anonymize_v2_chroot_path("") == ""
-    assert anonymize_v2_chroot_path("hello world") == "hello world"
+    assert strip_v2_chroot_path("") == ""
+    assert strip_v2_chroot_path("hello world") == "hello world"
 
 
 @pytest.mark.parametrize(
@@ -120,8 +120,8 @@ def test_strip_chroot_path() -> None:
     [
         (False, False, "\033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m"),
         (False, True, "/var/pants-sandbox-123/red/path.py bold"),
-        (True, False, "\033[0;31m/<sandbox-1>/red/path.py\033[0m \033[1mbold\033[0m"),
-        (True, True, "/<sandbox-1>/red/path.py bold"),
+        (True, False, "\033[0;31mred/path.py\033[0m \033[1mbold\033[0m"),
+        (True, True, "red/path.py bold"),
     ],
 )
 def test_simplifier(strip_chroot_path: bool, strip_formatting: bool, expected: str) -> None:

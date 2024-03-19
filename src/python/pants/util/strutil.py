@@ -129,7 +129,7 @@ def strip_prefix(string: str, prefix: str) -> str:
 
 
 # NB: We allow bytes because `ProcessResult.std{err,out}` uses bytes.
-def strip_v2_chroot_path_bytes(v: bytes) -> str:
+def strip_v2_chroot_path(v: bytes) -> bytes:
     """Remove all instances of the chroot tmpdir path from the str so that it only uses relative
     paths.
 
@@ -138,33 +138,22 @@ def strip_v2_chroot_path_bytes(v: bytes) -> str:
     implementation detail that Pants copies their source code into a chroot.
     """
 
-    return re.sub(rb"/.*/pants-sandbox-[a-zA-Z0-9]+/", b"", v)
-
-
-# NB: We allow bytes because `ProcessResult.std{err,out}` uses bytes.
-def anonymize_v2_chroot_path(v: bytes | str) -> str:
-    """Remove all instances of the chroot tmpdir path from the str so that it only uses relative
-    paths.
-
-    This is useful when a tool that is run with the V2 engine outputs absolute paths. It is
-    confusing for the user to see the absolute path in the final output because it is an
-    implementation detail that Pants copies their source code into a chroot.
-    """
     if isinstance(v, bytes):
         v = v.decode()
 
-    found_sandbox_paths = re.findall(r"(/.*/pants-sandbox-[a-zA-Z0-9]+)/", v)
-    sandbox_path_to_replacement = {}
-    for sandbox_path in found_sandbox_paths:
-        if sandbox_path not in sandbox_path_to_replacement:
-            sandbox_path_to_replacement[
-                sandbox_path
-            ] = f"/<sandbox-{len(sandbox_path_to_replacement)+1}>"
+    return re.sub(r"/.*/pants-sandbox-[a-zA-Z0-9]+/", "", v)
 
-    for sandbox, replacement in sandbox_path_to_replacement.items():
-        v = v.replace(sandbox, replacement)
 
-    return v
+# NB: We allow bytes because `ProcessResult.std{err,out}` uses bytes.
+def strip_v2_chroot_path_bytes(v: bytes) -> bytes:
+    """Remove all instances of the chroot tmpdir path from the str so that it only uses relative
+    paths.
+
+    This is useful when a tool that is run with the V2 engine outputs absolute paths. It is
+    confusing for the user to see the absolute path in the final output because it is an
+    implementation detail that Pants copies their source code into a chroot.
+    """
+    return re.sub(rb"/.*/pants-sandbox-[a-zA-Z0-9]+/", b"", v)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -179,7 +168,7 @@ class Simplifier:
 
     def simplify(self, v: bytes | str) -> str:
         chroot = (
-            anonymize_v2_chroot_path(v)
+            strip_v2_chroot_path(v)
             if self.strip_chroot_path
             else v.decode()
             if isinstance(v, bytes)

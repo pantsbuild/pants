@@ -83,6 +83,10 @@ async def install_go_toolchain(
     version = subsystem.version
 
     external_tool = subsystem.known_version(platform)
+    if external_tool is None:
+        raise ValueError(
+            f"Expected a known version of Go toolchain for platform {platform}, but none was found."
+        )
 
     platform_mapping = {
         "linux_arm64": "linux-arm64",
