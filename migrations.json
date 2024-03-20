@@ -1950,14 +1950,14 @@
       },
       {
         "input_types": [
-          "pants.jvm.compile.ClasspathEntryRequests"
+          "pants.jvm.compile.ClasspathDependenciesRequest"
         ],
         "output_type": "pants.jvm.compile.FallibleClasspathEntries",
         "rule_dep": "pants.jvm.compile.compile_classpath_entries"
       },
       {
         "input_types": [
-          "pants.jvm.compile.ClasspathDependenciesRequest"
+          "pants.jvm.compile.ClasspathEntryRequests"
         ],
         "output_type": "pants.jvm.compile.FallibleClasspathEntries",
         "rule_dep": "pants.jvm.compile.compile_classpath_entries"
@@ -3260,14 +3260,14 @@
       },
       {
         "input_types": [
-          "pants.backend.python.util_rules.pex.VenvPexProcess"
+          "pants.backend.python.util_rules.pex.PexProcess"
         ],
         "output_type": "pants.engine.process.ProcessResult",
         "rule_dep": "pants.engine.process.fallible_to_exec_result_or_raise"
       },
       {
         "input_types": [
-          "pants.backend.python.util_rules.pex.PexProcess"
+          "pants.backend.python.util_rules.pex.VenvPexProcess"
         ],
         "output_type": "pants.engine.process.ProcessResult",
         "rule_dep": "pants.engine.process.fallible_to_exec_result_or_raise"
@@ -5732,14 +5732,14 @@
       },
       {
         "input_types": [
-          "pants.engine.addresses.UnparsedAddressInputs"
+          "pants.engine.addresses.Addresses"
         ],
         "output_type": "pants.jvm.classpath.Classpath",
         "rule_dep": "pants.jvm.classpath.classpath"
       },
       {
         "input_types": [
-          "pants.engine.addresses.Addresses"
+          "pants.engine.addresses.UnparsedAddressInputs"
         ],
         "output_type": "pants.jvm.classpath.Classpath",
         "rule_dep": "pants.jvm.classpath.classpath"
@@ -8979,14 +8979,14 @@
       },
       {
         "input_types": [
-          "pants.jvm.compile.ClasspathEntryRequests"
+          "pants.jvm.compile.ClasspathDependenciesRequest"
         ],
         "output_type": "pants.jvm.compile.FallibleClasspathEntries",
         "rule_dep": "pants.jvm.compile.compile_classpath_entries"
       },
       {
         "input_types": [
-          "pants.jvm.compile.ClasspathDependenciesRequest"
+          "pants.jvm.compile.ClasspathEntryRequests"
         ],
         "output_type": "pants.jvm.compile.FallibleClasspathEntries",
         "rule_dep": "pants.jvm.compile.compile_classpath_entries"
@@ -9005,14 +9005,14 @@
       },
       {
         "input_types": [
-          "pants.jvm.jdk_rules.JvmProcess"
+          "pants.engine.process.Process"
         ],
         "output_type": "pants.engine.process.ProcessResult",
         "rule_dep": "pants.engine.process.fallible_to_exec_result_or_raise"
       },
       {
         "input_types": [
-          "pants.engine.process.Process"
+          "pants.jvm.jdk_rules.JvmProcess"
         ],
         "output_type": "pants.engine.process.ProcessResult",
         "rule_dep": "pants.engine.process.fallible_to_exec_result_or_raise"

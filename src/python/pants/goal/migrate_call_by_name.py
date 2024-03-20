@@ -59,7 +59,9 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
                     }
                 )
 
-            sorted_deps = sorted(unsorted_deps, key=lambda x: x["rule_dep"])
+            # Sort the dependencies by the rule_dep, and then by the input_types.
+            sorted_deps = sorted(unsorted_deps, key=lambda x: (x["rule_dep"], x["input_types"]))
+
             item["gets"] = sorted_deps
             items.append(item)
         
