@@ -6,6 +6,7 @@ from __future__ import annotations
 from functools import partial
 import json
 import logging
+from typing import Any
 
 from pants.base.exiter import ExitCode
 from pants.base.specs import Specs
@@ -41,29 +42,25 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
         for rule, deps in graph_session.scheduler_session.rule_graph_rule_gets().items():
             if isinstance(rule, partial):
                 continue
-            # if "get_graphql_uvicorn_setup" in rule.__name__:
-            #     print(f"R: {rule} -- {deps}")
+
             key = rule.__module__ + "." + rule.__name__
             item = { "function": key, "gets": [] }
 
-            # print(f"F: {rule} -- {rule.__name__} -- {rule.__module__} -- {rule.__qualname__}")
-
+            unsorted_deps: list[dict[str, Any]] = []
             for output_type, input_types, rule_dep in deps:
                 if isinstance(rule_dep, partial):
                     continue
                 
-                item["gets"].append(
+                unsorted_deps.append(
                     {
+                        "input_types": sorted([input_type.__module__ + "." + input_type.__name__ for input_type in input_types]),
                         "output_type": output_type.__module__ + "." + output_type.__name__,
-                        "input_types": [input_type.__module__ + "." + input_type.__name__ for input_type in input_types],
                         "rule_dep": rule_dep.__module__ + "." + rule_dep.__name__,
                     }
                 )
-                # print(f"    O: {output_type} -- {output_type.__name__} -- {output_type.__module__} -- {output_type.__qualname__}")
-                # for input_type in input_types:
-                #     print(f"    I: {input_type} -- {input_type.__name__} -- {input_type.__module__} -- {input_type.__qualname__}")
-                # print(f"    R: {rule_dep} -- {rule_dep.__name__} -- {rule_dep.__module__} -- {rule_dep.__qualname__}")
 
+            sorted_deps = sorted(unsorted_deps, key=lambda x: x["rule_dep"])
+            item["gets"] = sorted_deps
             items.append(item)
         
         sorted_items = sorted(items, key=lambda x: x["function"])
