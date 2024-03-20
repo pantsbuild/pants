@@ -66,7 +66,7 @@ def map_long_form_get_to_new_syntax(get: ast.Call) -> tuple[str,list[str]]:
     assert len(get.args) == 3, f"Expected 3 arg, got {len(get.args)}"
     assert isinstance(get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
     assert isinstance(get.args[1], ast.Name), f"Expected Name, got {get.args[1]}"
-    assert isinstance(get.args[2], ast.Call), f"Expected Call, got {get.args[2]}"
+    # assert isinstance(get.args[2], ast.Call), f"Expected Call, got {get.args[2]}"
     key = (get.args[0].id, get.args[1].id)
     new_function, module = split_module_and_func(lookup[key])
     input_args = ast.unparse(get.args[2])
@@ -74,16 +74,19 @@ def map_long_form_get_to_new_syntax(get: ast.Call) -> tuple[str,list[str]]:
     return f"{new_function}(**implicitly({input_args}))", [f"from {module} import {new_function}"]
 
 
-def map_get_to_new_syntax(get: ast.Call) -> Replacement:
+def map_get_to_new_syntax(get: ast.Call) -> Replacement | None:
     """There are 4 forms the old Get() syntax can take, so we can account for each one of them individually"""
     new_source: str | None = None
     imports: list[str] = []
-    if len(get.args) == 1:
-         new_source = map_no_args_get_to_new_syntax(get)
-    elif len(get.args) == 3:
-        new_source, imports = map_long_form_get_to_new_syntax(get)
-    else:
-        raise NotImplementedError(f"get: {get} not implemented")
+    try:
+        if len(get.args) == 1:
+            new_source = map_no_args_get_to_new_syntax(get)
+        elif len(get.args) == 3:
+            new_source, imports = map_long_form_get_to_new_syntax(get)
+        else:
+            raise NotImplementedError(f"get: {get} not implemented")
+    except:
+        return None
     
     return Replacement(
         line_range=(get.lineno, get.end_lineno),
@@ -148,9 +151,9 @@ class CallByNameVisitor(ast.NodeVisitor):
         # In the body, look for `await Get`, and replace it with a call-by-name equivalent
         for child in node.body:
             if call := self._maybe_replaceable_call(child):
-                replacement = map_get_to_new_syntax(call)
-                self.replacements.append(replacement)
-                print(replacement)
+                if replacement := map_get_to_new_syntax(call):
+                    self.replacements.append(replacement)
+                    print(replacement)
 
 
     def _should_visit_node(self, decorator_list: list[ast.expr]) -> bool:
@@ -188,6 +191,11 @@ def create_replacements_for_file(file: Path) -> list[Replacement]:
 def perform_replacements_on_file(file: Path, replacements: list[Replacement]):
     """In-place replacements for the new source code in a file"""
     
+    imports_added = False
+    imports: set[str] = set()
+    for replacement in replacements:
+        imports.update(replacement.new_imports)
+    
     with fileinput.input(file, inplace=True) as f:
         for line in f:
             line_number = f.lineno()
@@ -196,20 +204,25 @@ def perform_replacements_on_file(file: Path, replacements: list[Replacement]):
             for replacement in replacements:
                 if line_number == replacement.line_range[0]:
                     # On the first line of the range, emit the new source code where the old code started
-                    # print(line[:replacement.col_range[0]], end="")
-                    # print(replacement.new_source)
-                    # modified = True
-                    modified = False
+                    print(line[:replacement.col_range[0]], end="")
+                    print(replacement.new_source)
+                    modified = True
+                    # modified = False
                 elif line_number in range(replacement.line_range[0], replacement.line_range[1] + 1):
                     # If there are other lines in the range, just skip them
-                    # modified = True
+                    modified = True
                     # TODO: Handle comments
-                    modified = False
+                    # modified = False
                     continue
 
             # For any lines that were not involved with replacements, emit them verbatim
             if not modified:
                 print(line, end="")
+
+            # Add the below "pants.engine.rules"
+            if not imports_added and line.startswith("from pants.engine.rules"):
+                print("\n".join(imports))
+                imports_added = True
 
 
 # Recursive glob all python files, excluding *_test.py
