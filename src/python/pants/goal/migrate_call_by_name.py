@@ -66,5 +66,6 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
 
             items.append(item)
         
-        print(json.dumps(items, indent=4))
+        sorted_items = sorted(items, key=lambda x: x["function"])
+        print(json.dumps(sorted_items, indent=2, sort_keys=True))
         return 0

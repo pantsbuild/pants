@@ -71,7 +71,7 @@ def map_long_form_get_to_new_syntax(get: ast.Call) -> tuple[str, list[ast.Import
     new_function, module = split_module_and_func(lookup[key])
     input_args = ast.unparse(get.args[2])
 
-    return f"{new_function}(**implicitly({input_args}))", [ast.ImportFrom(module, names=[ast.alias(new_function)])]
+    return f"{new_function}(**implicitly({{ {input_args}: {get.args[1].id} }}))", [ast.ImportFrom(module, names=[ast.alias(new_function)])]
 
 def map_short_form_get_to_new_syntax(get: ast.Call) -> tuple[str, list[ast.ImportFrom]]:
     """Get(<OutputType>, <InputType>(<constructor args for input>)) -> the_rule_to_call(**implicitly(input))"""
@@ -140,7 +140,7 @@ def map_get_to_new_syntax(get: ast.Call) -> Replacement | None:
         return None
     except KeyError as e:
         not_migrated += 1
-        # print(f"Failed to migrate {ast.unparse(get)} due to lookup error {e}\n")
+        print(f"Failed to migrate {ast.unparse(get)} due to lookup error {e}\n")
         return None
     except Exception as e:
         not_migrated += 1
@@ -223,7 +223,8 @@ def create_replacements_for_file(file: Path) -> list[Replacement]:
 def perform_replacements_on_file(file: Path, replacements: list[Replacement]):
     """In-place replacements for the new source code in a file"""
     
-    naive_module_name = str(file).replace("/", ".").replace(".py", "")
+    # src/python/pants/core/subsystems/python_bootstrap.py --> src.python.pants.core.subsystems.python_bootstrap
+    naive_module_name = str(file.with_suffix("")).replace("/", ".")
 
     imports_added = False
     import_strings: set[str] = set()
@@ -275,15 +276,11 @@ for file in files:
         continue
 
     rel_file = file.absolute().relative_to(file.cwd())
-    # if "backend" not in file.parts:
-    #     continue
-    # if "scala" not in file.parts:
-    #     continue
-
-    # if not "graphql" in file.parent.name:
-    #     continue
-
-    # if not "rules" in file.name:
+    if "internals" in rel_file.parts:
+        # There are some circular imports in graph.py, that can't be resolved here
+        continue
+    
+    # if "backend/python/lint" not in str(rel_file):
     #     continue
 
     if replacements := create_replacements_for_file(rel_file):
