@@ -4,6 +4,7 @@
 # On a Mac Mini M2 Pro, parsing the AST of all non-test python files (1184ish) and running in-place source-code replacements on 157 files takes < 1 second
 
 # TODO: Clean up the prolific use of strings, via a more structured object (or AST) approach
+# TODO: Handle variables with the same name as the new import (e.g. transitive_targets)
 
 from __future__ import annotations
 
@@ -159,7 +160,7 @@ class CallByNameVisitor(ast.NodeVisitor):
    
     def __init__(self) -> None:
         super().__init__()
-        self.imports: set[str] = set()
+        # self.imports: set[str] = set()
         self.replacements: list[Replacement] = []
 
     # def visit_Import(self, node: ast.Import):
@@ -190,9 +191,13 @@ class CallByNameVisitor(ast.NodeVisitor):
 
 
     def _should_visit_node(self, decorator_list: list[ast.expr]) -> bool:
-        """Only interested in async functions with the @rule decorator"""
+        """Only interested in async functions with the @rule(...) decorator"""
         for decorator in decorator_list:
             if isinstance(decorator, ast.Name) and decorator.id == "rule":
+                # Accounts for "@rule"
+                return True
+            if isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Name) and decorator.func.id == "rule":
+                # Accounts for "@rule(desc=..., level=...)"
                 return True
         return False
     
@@ -280,8 +285,8 @@ for file in files:
         # There are some circular imports in graph.py, that can't be resolved here
         continue
     
-    # if "backend/python/lint" not in str(rel_file):
-    #     continue
+    if "backend/python/lint" not in str(rel_file):
+        continue
 
     if replacements := create_replacements_for_file(rel_file):
         perform_replacements_on_file(rel_file, replacements)
