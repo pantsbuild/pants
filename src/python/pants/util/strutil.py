@@ -145,8 +145,7 @@ def strip_v2_chroot_path(v: bytes | str) -> str:
 # NB: As above but doesn't convert to str.
 def strip_v2_chroot_path_bytes(v: bytes) -> bytes:
     """Remove all instances of the chroot tmpdir path from the bytes so that it only uses relative
-    paths.
-    """
+    paths."""
     return re.sub(rb"/.*/pants-sandbox-[a-zA-Z0-9]+/", b"", v)
 
 
