@@ -7,6 +7,10 @@
 # TODO: Pull more functionality into the Visitor, so it's easier to port over
 # TODO: Write some AST tests for the Visitor
 # TODO: Split out "script" functionality, against what will be "Goal" functionality
+# TODO: Handle comments nested in Call (which is horrifically annoying)
+# TODO: setup_pytest_for_target is underspecified, keeps trying to pull in the junit version
+# TODO: Don't try to fix shadowing if the name is in the current file
+
 
 from __future__ import annotations
 
@@ -207,16 +211,7 @@ class CallByNameVisitor(ast.NodeVisitor):
     def __init__(self) -> None:
         super().__init__()
         self.names: set[str] = set()
-        # self.imports: set[str] = set()
         self.replacements: list[Replacement] = []
-
-    # def visit_Assign(self, node: ast.Assign):
-    #     """Collect all names in the file, so we can avoid shadowing them with the new imports"""
-    #     logger.error(ast.dump(node))
-    #     for target in node.targets:
-    #         if isinstance(target, ast.Name):
-    #             self.names.add(target.id)
-    #             logger.error(f"Assign: {target.id}")
 
     def visit_Name(self, node: ast.Name):
         """Collect all names in the file, so we can avoid shadowing them with the new imports"""
@@ -356,7 +351,7 @@ for file in files:
         # There are some circular imports in graph.py, that can't be resolved here
         continue
     
-    if "backend/python/lint" not in str(rel_file):
+    if "backend/python/" not in str(rel_file):
         continue
 
     if replacements := create_replacements_for_file(rel_file):
