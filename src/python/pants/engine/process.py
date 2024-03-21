@@ -408,17 +408,6 @@ class InteractiveProcess(SideEffecting):
 
 
 @dataclass(frozen=True)
-class WorkspaceProcessResult:
-    exit_code: int
-    output_snapshot: Snapshot
-    stdout_bytes: bytes
-    stderr_bytes: bytes
-
-    # TODO: For the actual implementation, return a full FallibleProcessResult.
-    # result: FallibleProcessResult
-
-
-@dataclass(frozen=True)
 class WorkspaceProcess:
     process: Process
     keep_sandboxes: KeepSandboxes

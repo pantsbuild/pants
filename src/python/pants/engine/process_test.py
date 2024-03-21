@@ -28,7 +28,6 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResult,
     WorkspaceProcess,
-    WorkspaceProcessResult,
 )
 from pants.option.global_options import KeepSandboxes
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, mock_console
@@ -43,7 +42,7 @@ def new_rule_runner() -> RuleRunner:
             QueryRule(InteractiveProcessResult, [InteractiveProcess]),
             QueryRule(DigestEntries, [Digest]),
             QueryRule(DigestContents, [Digest]),
-            QueryRule(WorkspaceProcessResult, [WorkspaceProcess]),
+            QueryRule(FallibleProcessResult, [WorkspaceProcess]),
         ],
     )
 
@@ -311,13 +310,13 @@ def test_interactive_process_inputs(rule_runner: RuleRunner, run_in_workspace: b
 
 
 def test_workspace_process_basic(rule_runner: RuleRunner) -> None:
-    def assert_success(result: WorkspaceProcessResult):
+    def assert_success(result: FallibleProcessResult):
         if result.exit_code != 0:
             raise ProcessExecutionFailure(
                 result.exit_code,
                 result.stdout_bytes,
                 result.stderr_bytes,
-                "WorkspaceProcessResult",
+                "ProcessResult",
                 keep_sandboxes=KeepSandboxes.never,
             )
 
@@ -326,7 +325,7 @@ def test_workspace_process_basic(rule_runner: RuleRunner) -> None:
         process = WorkspaceProcess(
             argv=["/bin/bash", "-c", "exit 143"],
         )
-        result = rule_runner.request(WorkspaceProcessResult, [process])
+        result = rule_runner.request(FallibleProcessResult, [process])
         assert result.exit_code == 143
 
     # Test whether there is a distinction between the workspace and chroot
@@ -355,9 +354,9 @@ def test_workspace_process_basic(rule_runner: RuleRunner) -> None:
             argv=["/bin/bash", "-c", script],
             input_digest=input_snapshot.digest,
         )
-        result = rule_runner.request(WorkspaceProcessResult, [process])
+        result = rule_runner.request(FallibleProcessResult, [process])
         assert_success(result)
-        output_lines = result.stdout_bytes.decode().splitlines()
+        output_lines = result.stdout.decode().splitlines()
         assert output_lines[1] == "digest"
         assert output_lines[2] == rule_runner.build_root
         assert output_lines[3] == "workspace"
@@ -377,10 +376,10 @@ def test_workspace_process_basic(rule_runner: RuleRunner) -> None:
             output_files=["output.txt"],
             output_directories=["subdir"],
         )
-        result = rule_runner.request(WorkspaceProcessResult, [process])
+        result = rule_runner.request(FallibleProcessResult, [process])
         assert_success(result)
 
-        digest_contents = rule_runner.request(DigestContents, [result.output_snapshot.digest])
+        digest_contents = rule_runner.request(DigestContents, [result.output_digest])
         assert len(digest_contents) == 2
 
         digest_contents = sorted(digest_contents, key=lambda x: x.path)

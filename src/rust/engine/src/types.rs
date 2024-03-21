@@ -38,5 +38,4 @@ pub struct Types {
     pub parsed_javascript_deps_result: TypeId,
     pub deps_request: TypeId,
     pub workspace_process: TypeId,
-    pub workspace_process_result: TypeId,
 }

@@ -202,7 +202,6 @@ impl PyTypes {
         parsed_python_deps_result: &PyType,
         parsed_javascript_deps_result: &PyType,
         workspace_process: &PyType,
-        workspace_process_result: &PyType,
         py: Python,
     ) -> Self {
         Self(RefCell::new(Some(Types {
@@ -244,7 +243,6 @@ impl PyTypes {
                 py.get_type::<externs::dep_inference::PyNativeDependenciesRequest>(),
             ),
             workspace_process: TypeId::new(workspace_process),
-            workspace_process_result: TypeId::new(workspace_process_result),
         })))
     }
 }

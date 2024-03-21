@@ -151,7 +151,7 @@ impl Intrinsics {
         intrinsics.insert(
             Intrinsic {
                 id: RuleId::new("workspace_process"),
-                product: types.workspace_process_result,
+                product: types.process_result,
                 inputs: vec![
                     DependencyKey::new(types.workspace_process),
                     DependencyKey::new(types.process_config_from_environment),

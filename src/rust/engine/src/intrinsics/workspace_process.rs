@@ -6,7 +6,9 @@ use std::path::Path;
 use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
+use bytes::Bytes;
 use futures::future::{BoxFuture, FutureExt};
 use process_execution::local::{
     apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, CommandRunner,
@@ -27,9 +29,6 @@ pub(crate) fn workspace_process(
     log::trace!("workspace_process generating work unit closure");
     // TODO: in_workunit!("workspace_process", Level::Debug, |_workunit| async move {
     async move {
-        let types = &context.core.types;
-        let workspace_process_result = types.workspace_process_result;
-
         log::trace!("entering workspace_process");
 
         let (py_workspace_process, py_process, process_config): (
@@ -112,7 +111,11 @@ pub(crate) fn workspace_process(
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
+        // Execute the command and capture its output.
+        // TODO: Stream the output to the console.
+        let start_time = Instant::now();
         let output = command.output().await.map_err(|e| e.to_string())?;
+        let elapsed_time = start_time.elapsed();
 
         let store = context.core.store();
         let posix_fs = Arc::new(
@@ -140,6 +143,15 @@ pub(crate) fn workspace_process(
 
         log::trace!("after construct_output_snapshot");
 
+        let store = context.core.store();
+        let output_directory = store.record_digest_trie(snapshot.tree, false).await?;
+
+        let stdout_bytes = Bytes::from(output.stdout);
+        let stdout_digest = store.store_file_bytes(stdout_bytes.clone(), false).await?;
+
+        let stderr_bytes = Bytes::from(output.stderr);
+        let stderr_digest = store.store_file_bytes(stderr_bytes.clone(), false).await?;
+
         let code = output.status.code().unwrap_or(-1);
         log::trace!("code = {code}");
         if keep_sandboxes == KeepSandboxes::Always
@@ -160,19 +172,30 @@ pub(crate) fn workspace_process(
             do_setup_run_sh_script(cwd.as_path())?;
         }
 
-        Ok(Python::with_gil(|py| {
-            externs::unsafe_call(
+        Python::with_gil(|py| -> NodeResult<Value> {
+            Ok(externs::unsafe_call(
                 py,
-                workspace_process_result,
+                context.core.types.process_result,
                 &[
-                    externs::store_i64(py, i64::from(code)),
-                    Snapshot::store_snapshot(py, snapshot)
-                        .expect("TODO: Do proper error handling."),
-                    externs::store_bytes(py, &output.stdout),
-                    externs::store_bytes(py, &output.stderr),
+                    externs::store_bytes(py, &stdout_bytes),
+                    Snapshot::store_file_digest(py, stdout_digest)?,
+                    externs::store_bytes(py, &stderr_bytes),
+                    Snapshot::store_file_digest(py, stderr_digest)?,
+                    externs::store_i64(py, code.into()),
+                    Snapshot::store_directory_digest(py, output_directory)?,
+                    externs::unsafe_call(
+                        py,
+                        context.core.types.process_result_metadata,
+                        &[
+                            externs::store_u64(py, Duration::from(elapsed_time).as_millis() as u64),
+                            Value::from(py.None()),
+                            Value::from(py.None()),
+                            Value::from(py.None()),
+                        ],
+                    ),
                 ],
-            )
-        }))
+            ))
+        })
     }
     .boxed()
 }
