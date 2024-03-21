@@ -107,8 +107,6 @@ def test_basic_coverage(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
-    print(result.stdout_bytes)
-    print(result.stderr_bytes)
     assert result.exit_code == 0
     assert b"PASS: TestAdd" in result.stdout_bytes
     coverage_data = result.coverage_data

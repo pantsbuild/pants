@@ -18,7 +18,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
     BinaryPathTest,
 )
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, DownloadFile, SymlinkEntry
+from pants.engine.fs import CreateDigest, Digest, DownloadFile, SymlinkEntry
 from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
@@ -26,7 +26,7 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.strutil import bullet_list, softwrap, strip_v2_chroot_path_bytes
+from pants.util.strutil import bullet_list, softwrap, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
 
@@ -42,12 +42,6 @@ class LocateGoToolchainRequest:
 
 
 @dataclass(frozen=True)
-class GoToolchainInfo:
-    binary_path: str
-    digest: Digest
-
-
-@dataclass(frozen=True)
 class GoRoot:
     """Path to the Go installation (the `GOROOT`)."""
 
@@ -55,7 +49,7 @@ class GoRoot:
     version: str
 
     _raw_metadata: FrozenDict[str, str]
-    digest: Digest = EMPTY_DIGEST
+    digest: Digest
 
     def is_compatible_version(self, version: str) -> bool:
         """Can this Go compiler handle the target version?"""
@@ -122,7 +116,7 @@ async def install_go_toolchain(
         ),
     )
 
-    sdk_metadata = json.loads(strip_v2_chroot_path_bytes(env_result.stdout).decode())
+    sdk_metadata = json.loads(strip_v2_chroot_path(env_result.stdout.decode()))
     version = sdk_metadata["GOVERSION"][2:]
     major, minor = version.split(".")[:2]
     version = f"{major}.{minor}"
@@ -211,7 +205,9 @@ async def locate_go_toolchain(
             )
             sdk_metadata = json.loads(env_result.stdout.decode())
 
-            digest = await Get(Digest, CreateDigest([SymlinkEntry("go", sdk_metadata["GOROOT"])]))
+            digest = await Get(  # noqa: PNT30: requires triage
+                Digest, CreateDigest([SymlinkEntry("go", sdk_metadata["GOROOT"])])
+            )
 
             return GoRoot(
                 path=".goroot/go",
