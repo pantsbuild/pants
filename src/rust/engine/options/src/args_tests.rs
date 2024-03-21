@@ -10,9 +10,7 @@ use crate::{option_id, DictEdit, DictEditAction, Val};
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource};
 
 fn args<I: IntoIterator<Item = &'static str>>(args: I) -> Args {
-    Args {
-        args: args.into_iter().map(str::to_owned).collect(),
-    }
+    Args::new(args.into_iter().map(str::to_owned).collect())
 }
 
 #[test]
@@ -33,9 +31,13 @@ fn test_display() {
 fn test_string() {
     let args = args([
         "-u=swallow",
+        "-ldebug",
         "--foo=bar",
         "--baz-spam=eggs",
         "--baz-spam=cheese",
+        "--scope-qux=qux",
+        "scope",
+        "--quux=quux",
     ]);
 
     let assert_string = |expected: &str, id: OptionId| {
@@ -45,6 +47,9 @@ fn test_string() {
     assert_string("bar", option_id!("foo"));
     assert_string("cheese", option_id!("baz", "spam"));
     assert_string("swallow", option_id!(-'u', "unladen", "capacity"));
+    assert_string("debug", option_id!(-'l', "level"));
+    assert_string("qux", option_id!(["scope"], "qux"));
+    assert_string("quux", option_id!(["scope"], "quux"));
 
     assert!(args.get_string(&option_id!("dne")).unwrap().is_none());
 }
@@ -59,7 +64,11 @@ fn test_bool() {
         "--baz=true",
         "--baz=FALSE",
         "--no-spam-eggs=False",
-        "--no-b=True",
+        "--scope-quxt",
+        "--no-scope-quxf",
+        "scope",
+        "--no-quuxf",
+        "--quuxt",
     ]);
 
     let assert_bool =
@@ -69,6 +78,10 @@ fn test_bool() {
     assert_bool(false, option_id!("bar"));
     assert_bool(false, option_id!(-'b', "baz"));
     assert_bool(true, option_id!("spam", "eggs"));
+    assert_bool(true, option_id!(["scope"], "quxt"));
+    assert_bool(false, option_id!(["scope"], "quxf"));
+    assert_bool(false, option_id!(["scope"], "quuxf"));
+    assert_bool(true, option_id!(["scope"], "quuxt"));
 
     assert!(args.get_bool(&option_id!("dne")).unwrap().is_none());
     assert_eq!(
@@ -112,6 +125,9 @@ fn test_string_list() {
         "--phases=initial",
         "-p=['one']",
         "--phases=+['two','three'],-['one']",
+        "--lunch-veggies=['tomatoes', 'peppers']",
+        "lunch",
+        "--veggies=+['cucumbers']",
     ]);
 
     assert_eq!(
@@ -134,6 +150,22 @@ fn test_string_list() {
             },
         ],
         args.get_string_list(&option_id!(-'p', "phases"))
+            .unwrap()
+            .unwrap()
+    );
+
+    assert_eq!(
+        vec![
+            ListEdit {
+                action: ListEditAction::Replace,
+                items: vec!["tomatoes".to_owned(), "peppers".to_owned()]
+            },
+            ListEdit {
+                action: ListEditAction::Add,
+                items: vec!["cucumbers".to_owned()]
+            },
+        ],
+        args.get_string_list(&option_id!(["lunch"], "veggies"))
             .unwrap()
             .unwrap()
     );
@@ -162,13 +194,11 @@ fn test_scalar_fromfile() {
         negate: bool,
     ) {
         let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", content);
-        let args = Args {
-            args: vec![format!(
-                "--{}foo=@{}",
-                if negate { "no-" } else { "" },
-                fromfile_path.display()
-            )],
-        };
+        let args = Args::new(vec![format!(
+            "--{}foo=@{}",
+            if negate { "no-" } else { "" },
+            fromfile_path.display()
+        )]);
         let actual = getter(&args, &option_id!("foo")).unwrap().unwrap();
         assert_eq!(expected, actual)
     }
@@ -182,9 +212,7 @@ fn test_scalar_fromfile() {
     do_test("EXPANDED", "EXPANDED".to_owned(), Args::get_string, false);
 
     let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", "BAD INT");
-    let args = Args {
-        args: vec![format!("--foo=@{}", fromfile_path.display())],
-    };
+    let args = Args::new(vec![format!("--foo=@{}", fromfile_path.display())]);
     assert_eq!(
         args.get_int(&option_id!("foo")).unwrap_err(),
         "Problem parsing --foo int value:\n1:BAD INT\n  ^\n\
@@ -196,9 +224,7 @@ fn test_scalar_fromfile() {
 fn test_list_fromfile() {
     fn do_test(content: &str, expected: &[ListEdit<i64>], filename: &str) {
         let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
-        let args = Args {
-            args: vec![format!("--foo=@{}", &fromfile_path.display())],
-        };
+        let args = Args::new(vec![format!("--foo=@{}", &fromfile_path.display())]);
         let actual = args.get_int_list(&option_id!("foo")).unwrap().unwrap();
         assert_eq!(expected.to_vec(), actual)
     }
@@ -245,9 +271,7 @@ fn test_dict_fromfile() {
         };
 
         let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
-        let args = Args {
-            args: vec![format!("--foo=@{}", &fromfile_path.display())],
-        };
+        let args = Args::new(vec![format!("--foo=@{}", &fromfile_path.display())]);
         let actual = args.get_dict(&option_id!("foo")).unwrap().unwrap();
         assert_eq!(expected, actual)
     }
@@ -276,17 +300,13 @@ fn test_dict_fromfile() {
 
 #[test]
 fn test_nonexistent_required_fromfile() {
-    let args = Args {
-        args: vec!["--foo=@/does/not/exist".to_string()],
-    };
+    let args = Args::new(vec!["--foo=@/does/not/exist".to_string()]);
     let err = args.get_string(&option_id!("foo")).unwrap_err();
     assert!(err.starts_with("Problem reading /does/not/exist for --foo: No such file or directory"));
 }
 
 #[test]
 fn test_nonexistent_optional_fromfile() {
-    let args = Args {
-        args: vec!["--foo=@?/does/not/exist".to_string()],
-    };
+    let args = Args::new(vec!["--foo=@?/does/not/exist".to_string()]);
     assert!(args.get_string(&option_id!("foo")).unwrap().is_none());
 }

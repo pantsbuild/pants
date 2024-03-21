@@ -1,13 +1,24 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use lazy_static::lazy_static;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+
+use regex::Regex;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Scope {
     Global,
     Scope(String),
+}
+
+lazy_static! {
+    static ref SCOPE_NAME_RE: Regex = Regex::new(r"^[a-z][a-z0-9-]+$").unwrap();
+}
+
+pub(crate) fn is_valid_scope_name(name: &str) -> bool {
+    SCOPE_NAME_RE.is_match(name)
 }
 
 impl Scope {
@@ -119,6 +130,10 @@ impl OptionId {
             })
             .collect::<Vec<_>>()
             .join(sep)
+    }
+
+    pub(crate) fn name_components_strs(&self) -> impl Iterator<Item = &str> {
+        self.name_components.iter().map(|s| s.as_ref())
     }
 
     pub fn name_underscored(&self) -> String {

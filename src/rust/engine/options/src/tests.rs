@@ -49,12 +49,12 @@ fn with_setup(
     )];
 
     let option_parser = OptionParser::new(
-        Args {
-            args: config_file_arg
+        Args::new(
+            config_file_arg
                 .into_iter()
                 .chain(args.into_iter().map(str::to_string))
                 .collect(),
-        },
+        ),
         Env {
             env: env
                 .into_iter()

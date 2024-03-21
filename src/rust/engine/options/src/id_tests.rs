@@ -1,8 +1,17 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::id::{OptionId, Scope};
+use crate::id::{is_valid_scope_name, OptionId, Scope};
 use crate::option_id;
+
+#[test]
+fn test_is_valid_scope_name() {
+    assert!(is_valid_scope_name("test"));
+    assert!(is_valid_scope_name("generate-lockfiles"));
+    assert!(!is_valid_scope_name("looks/like/a/target"));
+    assert!(!is_valid_scope_name("//:target"));
+    assert!(!is_valid_scope_name("--b"));
+}
 
 #[test]
 fn test_option_id_global_switch() {
