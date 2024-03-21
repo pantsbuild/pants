@@ -116,7 +116,7 @@ class TargetData:
         }
 
         fields["dependencies"] = self.expanded_dependencies
-        fields["additional_info"] = self.additional_info
+        fields["additional_info"] = {atd.field_set.label: atd.data for atd in self.additional_info}
         if self.expanded_sources is not None:
             fields["sources"] = self.expanded_sources.files
             fields["sources_fingerprint"] = self.expanded_sources.digest.fingerprint
@@ -152,8 +152,6 @@ class _PeekJsonEncoder(json.JSONEncoder):
             return o
         if o is None:
             return o
-        if isinstance(o, AdditionalTargetData):
-            return {o.field_set.label: dict(o.data)}
         if is_dataclass(o):
             # NB: `dataclasses.asdict` creates a deep copy by default, which is unnecessary for
             # this case.
