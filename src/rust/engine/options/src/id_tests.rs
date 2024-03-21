@@ -10,7 +10,8 @@ fn test_is_valid_scope_name() {
     assert!(is_valid_scope_name("generate-lockfiles"));
     assert!(!is_valid_scope_name("looks/like/a/target"));
     assert!(!is_valid_scope_name("//:target"));
-    assert!(!is_valid_scope_name("--b"));
+    assert!(!is_valid_scope_name("-b"));
+    assert!(!is_valid_scope_name("--flag=value"));
 }
 
 #[test]
