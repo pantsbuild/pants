@@ -35,7 +35,7 @@ impl Args {
                 Negate::False => "",
                 Negate::True => "no-",
             },
-            match &id.0 {
+            match &id.scope {
                 Scope::Global => "".to_string(),
                 Scope::Scope(scope) => format!("{}-", scope.to_ascii_lowercase()),
             },
@@ -45,10 +45,10 @@ impl Args {
 
     fn arg_names(id: &OptionId, negate: Negate) -> HashMap<String, bool> {
         let mut arg_names = HashMap::new();
-        if let Some(switch) = id.2 {
-            arg_names.insert(format!("-{switch}"), false);
+        if let Some(short_name) = &id.short_name {
+            arg_names.insert(format!("-{short_name}"), false);
             if negate == Negate::True {
-                arg_names.insert(format!("--no-{switch}"), true);
+                arg_names.insert(format!("--no-{short_name}"), true);
             }
         }
         arg_names.insert(Self::arg_name(id, Negate::False), false);

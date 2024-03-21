@@ -27,17 +27,17 @@ impl Scope {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct OptionId(
-    pub(crate) Scope,
-    pub(crate) Vec<String>,
-    pub(crate) Option<char>,
-);
+pub struct OptionId {
+    pub(crate) scope: Scope,
+    pub(crate) name_components: Vec<String>,
+    pub(crate) short_name: Option<String>,
+}
 
 impl OptionId {
     pub fn new<Component, Name>(
         scope: Scope,
         name: Name,
-        switch: Option<char>,
+        short_name: Option<char>,
     ) -> Result<OptionId, String>
     where
         Component: AsRef<str>,
@@ -51,7 +51,11 @@ impl OptionId {
                 "Cannot create an OptionId with an empty name. Given a scope of {scope:?}."
             ));
         }
-        Ok(OptionId(scope, name_components, switch))
+        Ok(OptionId {
+            scope,
+            name_components,
+            short_name: short_name.map(|c| c.to_string()),
+        })
     }
 }
 
@@ -60,7 +64,7 @@ impl Display for OptionId {
         write!(
             f,
             "[{}] {}",
-            self.scope(),
+            self.scope.name(),
             self.name("_", NameTransform::None)
         )
     }
@@ -105,12 +109,8 @@ pub(crate) enum NameTransform {
 }
 
 impl OptionId {
-    pub(crate) fn scope(&self) -> &str {
-        self.0.name()
-    }
-
     pub(crate) fn name(&self, sep: &str, transform: NameTransform) -> String {
-        self.1
+        self.name_components
             .iter()
             .map(|component| match transform {
                 NameTransform::None => component.to_owned(),

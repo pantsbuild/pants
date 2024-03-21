@@ -321,7 +321,7 @@ impl Config {
 
     fn get_value(&self, id: &OptionId) -> Option<&Value> {
         self.value
-            .get(id.scope())
+            .get(id.scope.name())
             .and_then(|table| table.get(Self::option_name(id)))
     }
 
@@ -330,7 +330,7 @@ impl Config {
         id: &OptionId,
     ) -> Result<Option<Vec<ListEdit<T>>>, String> {
         let mut list_edits = vec![];
-        if let Some(table) = self.value.get(id.scope()) {
+        if let Some(table) = self.value.get(id.scope.name()) {
             let option_name = Self::option_name(id);
             if let Some(value) = table.get(&option_name) {
                 match value {
@@ -415,7 +415,7 @@ impl OptionsSource for Config {
     }
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
-        if let Some(table) = self.value.get(id.scope()) {
+        if let Some(table) = self.value.get(id.scope.name()) {
             let option_name = Self::option_name(id);
             if let Some(value) = table.get(&option_name) {
                 match value {
