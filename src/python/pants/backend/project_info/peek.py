@@ -103,7 +103,7 @@ class TargetData:
     dependencies_rules: tuple[str, ...] | None = None
     dependents_rules: tuple[str, ...] | None = None
     applicable_dep_rules: tuple[DependencyRuleApplication, ...] | None = None
-    additional_info: tuple[AdditionalTargetData, ...] | None = None
+    additional_info: tuple[AdditionalTargetData, ...] = ()
 
     def to_dict(self, exclude_defaults: bool = False, include_dep_rules: bool = False) -> dict:
         nothing = object()
@@ -275,7 +275,7 @@ async def get_target_data(
             dependencies_rules=dependencies_rules_map.get(tgt.address),
             dependents_rules=dependents_rules_map.get(tgt.address),
             applicable_dep_rules=applicable_dep_rules_map.get(tgt.address),
-            additional_info=tuple(group_additional_infos_by_address.get(tgt.address))
+            additional_info=tuple(group_additional_infos_by_address.get(tgt.address), ())
         )
         for tgt, expanded_deps in zip(sorted_targets, expanded_dependencies)
     )
