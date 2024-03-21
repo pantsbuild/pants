@@ -21,8 +21,9 @@ from pants.backend.go.target_types import (
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
     GoThirdPartyPackageTarget,
+    GoVendoredPackageTarget,
 )
-from pants.backend.go.util_rules import build_opts, first_party_pkg, import_analysis
+from pants.backend.go.util_rules import build_opts, first_party_pkg, import_analysis, vendor
 from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
@@ -59,6 +60,7 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     InferDependenciesRequest,
     InferredDependencies,
+    Target,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.frozendict import FrozenDict
@@ -102,7 +104,7 @@ async def go_map_import_paths_by_module(
     first_party_gets = []
 
     for tgt, owning_go_mod in zip(candidate_go_source_targets, owning_go_mod_targets):
-        if tgt.has_field(GoImportPathField):
+        if tgt.has_field(GoImportPathField) and tgt[GoImportPathField].value is not None:
             import_path = tgt[GoImportPathField].value
             import_paths_by_module[owning_go_mod.address][import_path].add(tgt.address)
         elif tgt.has_field(GoPackageSourcesField):
@@ -379,6 +381,28 @@ async def generate_targets_from_go_mod(
         ),
     )
 
+    def generate_vendored_target(
+        pkg_import_path: str,
+    ) -> GoVendoredPackageTarget:
+        return GoVendoredPackageTarget(
+            {
+                **request.template,
+                GoImportPathField.alias: pkg_import_path,
+            },
+            # E.g. `src/go:mod#github.com/google/uuid`.
+            generator_addr.create_generated(pkg_import_path),
+            union_membership,
+            residence_dir=generator_addr.spec_path,
+        )
+
+    vendor_module_targets: list[Target] = []
+    for pkg_import_path, pkg_analysis_info in all_packages.vendored_import_paths.items():
+        vendor_module_targets.append(
+            generate_vendored_target(
+                pkg_import_path=pkg_analysis_info.analysis.import_path,
+            )
+        )
+
     def gen_file_tgt(fp: str) -> TargetGeneratorSourcesHelperTarget:
         return TargetGeneratorSourcesHelperTarget(
             {TargetGeneratorSourcesHelperSourcesField.alias: fp},
@@ -390,7 +414,7 @@ async def generate_targets_from_go_mod(
     if go_mod_sources.go_sum_path in go_mod_snapshot.files:
         file_tgts.append(gen_file_tgt("go.sum"))
 
-    def create_tgt(pkg_info: ThirdPartyPkgAnalysis) -> GoThirdPartyPackageTarget:
+    def create_third_party_target(pkg_info: ThirdPartyPkgAnalysis) -> GoThirdPartyPackageTarget:
         return GoThirdPartyPackageTarget(
             {
                 **request.template,
@@ -403,9 +427,12 @@ async def generate_targets_from_go_mod(
             residence_dir=generator_addr.spec_path,
         )
 
-    result = tuple(
-        create_tgt(pkg_info) for pkg_info in all_packages.import_paths_to_pkg_info.values()
-    ) + tuple(file_tgts)
+    third_party_targets = tuple(
+        create_third_party_target(pkg_info)
+        for pkg_info in all_packages.import_paths_to_pkg_info.values()
+    )
+
+    result = third_party_targets + tuple(file_tgts) + tuple(vendor_module_targets)
     return GeneratedTargets(request.generator, result)
 
 
@@ -415,6 +442,7 @@ def rules():
         *build_opts.rules(),
         *first_party_pkg.rules(),
         *import_analysis.rules(),
+        *vendor.rules(),
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
         UnionRule(InferDependenciesRequest, InferGoThirdPartyPackageDependenciesRequest),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromGoModRequest),
