@@ -3,6 +3,11 @@
 
 # On a Mac Mini M2 Pro, parsing the AST of all non-test python files (1184ish) and running in-place source-code replacements on 157 files takes < 1 second
 
+# TODO: Prepare for move to the migrate_call_by_name.py goal
+# TODO: Pull more functionality into the Visitor, so it's easier to port over
+# TODO: Write some AST tests for the Visitor
+# TODO: Split out "script" functionality, against what will be "Goal" functionality
+
 from __future__ import annotations
 
 import ast
