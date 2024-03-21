@@ -10,6 +10,7 @@ from typing import Iterable, List, Tuple
 
 import pytest
 
+from pants.backend.python.goals.lockfile_generation import RequestedPythonUserResolveNames
 from pants.base.build_root import BuildRoot
 from pants.core.goals.export import (
     Export,
@@ -20,7 +21,15 @@ from pants.core.goals.export import (
     PostProcessingCommand,
     export,
 )
-from pants.core.goals.generate_lockfiles import KnownUserResolveNames, KnownUserResolveNamesRequest
+from pants.core.goals.resolve_helpers import (
+    ExportLockfile,
+    GenerateLockfile,
+    KnownUserResolveNames,
+    KnownUserResolveNamesRequest,
+    RequestedResolves,
+    RequestedResolvesNames,
+    UserGenerateLockfiles,
+)
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import (
     EnvironmentField,
@@ -57,20 +66,21 @@ def make_target(path: str, target_name: str, environment_name: str | None = None
     )
 
 
-class MockExportRequest(ExportRequest):
+class MockGenerateLockfile(GenerateLockfile, ExportLockfile):
     pass
 
 
 def mock_export(
-    edr: ExportRequest,
+    edr: ExportLockfile,
     digest: Digest,
     post_processing_cmds: tuple[PostProcessingCommand, ...],
 ) -> ExportResult:
     return ExportResult(
-        description=f"mock export for {','.join(t.address.spec for t in edr.targets)}",
+        description=f"mock export for {edr.resolve_name}",
         reldir="mock",
         digest=digest,
         post_processing_cmds=post_processing_cmds,
+        resolve=edr.resolve_name,
     )
 
 
@@ -86,8 +96,13 @@ def _mock_run(rule_runner: RuleRunner, ip: InteractiveProcess) -> InteractivePro
     return InteractiveProcessResult(0)
 
 
-def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int, str]:
-    union_membership = UnionMembership({ExportRequest: [MockExportRequest]})
+def run_export_rule(rule_runner: RuleRunner, resolves: List[str]) -> Tuple[int, str]:
+    union_membership = UnionMembership(
+        {
+            ExportRequest: [MockGenerateLockfile],
+            KnownUserResolveNamesRequest: [KnownUserResolveNamesRequest],
+        }
+    )
     with open(os.path.join(rule_runner.build_root, "somefile"), "wb") as fp:
         fp.write(b"SOMEFILE")
     with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
@@ -96,17 +111,29 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
             export,
             rule_args=[
                 console,
-                Targets(targets),
+                Targets(tuple()),
                 Workspace(rule_runner.scheduler, _enforce_effects=False),
                 union_membership,
                 BuildRoot(),
                 DistDir(relpath=Path("dist")),
-                create_subsystem(ExportSubsystem, resolve=[]),
+                create_subsystem(ExportSubsystem, resolve=resolves),
             ],
             mock_gets=[
                 MockGet(
+                    output_type=RequestedResolves,
+                    input_types=(RequestedResolvesNames,),
+                    mock=lambda req: RequestedResolves(
+                        (
+                            UserGenerateLockfiles(
+                                [MockGenerateLockfile(e, "", False) for e in resolves]
+                            ),
+                        ),
+                        tuple(),
+                    ),
+                ),
+                MockGet(
                     output_type=ExportResults,
-                    input_types=(ExportRequest,),
+                    input_types=(MockGenerateLockfile,),
                     mock=lambda req: ExportResults(
                         (
                             mock_export(
@@ -132,7 +159,16 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                 rule_runner.do_not_use_mock(Digest, (MergeDigests,)),
                 rule_runner.do_not_use_mock(Digest, (AddPrefix,)),
                 rule_runner.do_not_use_mock(EnvironmentVars, (EnvironmentVarsRequest,)),
-                rule_runner.do_not_use_mock(KnownUserResolveNames, (KnownUserResolveNamesRequest,)),
+                MockGet(
+                    output_type=KnownUserResolveNames,
+                    input_types=(KnownUserResolveNamesRequest,),
+                    mock=lambda req: KnownUserResolveNames(
+                        tuple(resolves),
+                        option_name="",
+                        requested_resolve_names_cls=RequestedPythonUserResolveNames,
+                    ),
+                ),
+                # rule_runner.do_not_use_mock(KnownUserResolveNames, (KnownUserResolveNamesRequest,)),
                 MockEffect(
                     output_type=InteractiveProcessResult,
                     input_types=(InteractiveProcess,),
@@ -144,19 +180,20 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
         return result.exit_code, stdio_reader.get_stdout()
 
 
+# TODO: This test is wrong, it exports files still
 def test_run_export_rule() -> None:
     rule_runner = RuleRunner(
         rules=[
-            UnionRule(ExportRequest, MockExportRequest),
+            UnionRule(ExportRequest, MockGenerateLockfile),
             QueryRule(Digest, [CreateDigest]),
             QueryRule(EnvironmentVars, [EnvironmentVarsRequest]),
             QueryRule(InteractiveProcessResult, [InteractiveProcess]),
         ],
         target_types=[MockTarget],
     )
-    exit_code, stdout = run_export_rule(rule_runner, [make_target("foo/bar", "baz")])
+    exit_code, stdout = run_export_rule(rule_runner, ["python-default"])
     assert exit_code == 0
-    assert "Wrote mock export for foo/bar:baz to dist/export/mock" in stdout
+    assert "Wrote mock export for python-default to dist/export/mock" in stdout
     for filename in ["bar", "bar1", "bar2"]:
         expected_dist_path = os.path.join(
             rule_runner.build_root, "dist", "export", "mock", "foo", filename
@@ -212,7 +249,7 @@ def test_warnings_for_non_local_target_environments(
 ) -> None:
     rule_runner = RuleRunner(
         rules=[
-            UnionRule(ExportRequest, MockExportRequest),
+            UnionRule(ExportRequest, MockGenerateLockfile),
             QueryRule(Digest, [CreateDigest]),
             QueryRule(EnvironmentVars, [EnvironmentVarsRequest]),
             QueryRule(InteractiveProcessResult, [InteractiveProcess]),
@@ -220,7 +257,7 @@ def test_warnings_for_non_local_target_environments(
         target_types=[MockTarget, LocalEnvironmentTarget, RemoteEnvironmentTarget],
     )
 
-    union_membership = UnionMembership({ExportRequest: [MockExportRequest]})
+    union_membership = UnionMembership({ExportRequest: [MockGenerateLockfile]})
     with open(os.path.join(rule_runner.build_root, "somefile"), "wb") as fp:
         fp.write(b"SOMEFILE")
     with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
@@ -238,8 +275,13 @@ def test_warnings_for_non_local_target_environments(
             ],
             mock_gets=[
                 MockGet(
+                    output_type=RequestedResolves,
+                    input_types=(RequestedResolvesNames,),
+                    mock=lambda _: RequestedResolves(tuple(), tuple()),
+                ),
+                MockGet(
                     output_type=ExportResults,
-                    input_types=(ExportRequest,),
+                    input_types=(GenerateLockfile,),
                     mock=lambda req: ExportResults(
                         (
                             mock_export(

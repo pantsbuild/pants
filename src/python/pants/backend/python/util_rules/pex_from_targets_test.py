@@ -58,7 +58,7 @@ from pants.backend.python.util_rules.pex_requirements import (
 )
 from pants.backend.python.util_rules.pex_test_utils import get_all_data
 from pants.build_graph.address import Address
-from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
+from pants.core.goals.resolve_helpers import NoCompatibleResolveException
 from pants.core.target_types import FileTarget, ResourceTarget
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Snapshot

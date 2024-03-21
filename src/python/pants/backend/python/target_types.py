@@ -26,8 +26,8 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
+from pants.core.goals.resolve_helpers import UnrecognizedResolveNamesError
 from pants.core.goals.run import RestartableField
 from pants.core.goals.test import (
     RuntimePackageDependenciesField,

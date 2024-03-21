@@ -8,17 +8,18 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.python.goals.lockfile import (
+from pants.backend.python.goals.lockfile_generation import (
     GeneratePythonLockfile,
     RequestedPythonUserResolveNames,
 )
-from pants.backend.python.goals.lockfile import rules as lockfile_rules
-from pants.backend.python.goals.lockfile import setup_user_lockfile_requests
+from pants.backend.python.goals.lockfile_generation import rules as lockfile_generation_rules
+from pants.backend.python.goals.lockfile_generation import setup_user_lockfile_requests
 from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__DEFAULT, PythonSetup
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
+from pants.core.goals.generate_lockfiles import GenerateLockfileResult
+from pants.core.goals.resolve_helpers import UserGenerateLockfiles
 from pants.engine.fs import DigestContents
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule
@@ -30,7 +31,8 @@ from pants.util.strutil import strip_prefix
 def rule_runner() -> PythonRuleRunner:
     rule_runner = PythonRuleRunner(
         rules=[
-            *lockfile_rules(),
+            # *lockfile_rules(),
+            *lockfile_generation_rules(),
             *pex.rules(),
             QueryRule(GenerateLockfileResult, [GeneratePythonLockfile]),
         ]

@@ -43,8 +43,8 @@ from pants.backend.python.util_rules.python_sources import (
     StrippedPythonSourceFiles,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
-from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.core.goals.package import TraverseIfNotPackageTarget
+from pants.core.goals.resolve_helpers import NoCompatibleResolveException
 from pants.core.target_types import FileSourceField
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection

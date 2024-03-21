@@ -7,7 +7,8 @@ import os
 from dataclasses import dataclass
 from typing import Any, Iterator
 
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
+from pants.core.goals.resolve_helpers import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import CreateDigest, DigestContents, Directory, FileContent
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, RemovePrefix

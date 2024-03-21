@@ -4,6 +4,7 @@
 from pants.backend.python.goals import lockfile as python_lockfile
 from pants.backend.terraform import dependencies, dependency_inference, tool
 from pants.backend.terraform.goals import check, deploy
+from pants.backend.terraform.goals import export as terraform_export
 from pants.backend.terraform.goals import lockfiles as terraform_lockfile
 from pants.backend.terraform.goals import tailor
 from pants.backend.terraform.lint.tffmt.tffmt import rules as tffmt_rules
@@ -38,5 +39,6 @@ def rules():
         *tffmt_rules(),
         *deploy.rules(),
         *terraform_lockfile.rules(),
+        *terraform_export.rules(),
         *python_lockfile.rules(),
     ]

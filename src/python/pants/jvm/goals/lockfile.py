@@ -7,10 +7,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Mapping
 
-from pants.core.goals.generate_lockfiles import (
+from pants.core.goals.generate_lockfiles import GenerateLockfileResult, GenerateLockfilesSubsystem
+from pants.core.goals.resolve_helpers import (
     GenerateLockfile,
-    GenerateLockfileResult,
-    GenerateLockfilesSubsystem,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,

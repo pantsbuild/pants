@@ -11,7 +11,8 @@ from typing import Iterable, Mapping
 import pkg_resources
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
+from pants.core.goals.resolve_helpers import GenerateToolLockfileSentinel
 from pants.engine.fs import (
     CreateDigest,
     Digest,

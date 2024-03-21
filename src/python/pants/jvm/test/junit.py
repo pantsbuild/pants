@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.backend.java.subsystems.junit import JUnit
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolve_helpers import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,

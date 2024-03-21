@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from pants.backend.python.goals.lockfile_generation import GeneratePythonLockfile
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexLayout
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -33,7 +34,7 @@ from pants.core.goals.export import (
 )
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -320,6 +321,7 @@ async def export_virtualenv_for_resolve(
         resolve_name=resolve,
     )
 
+    # TODO: from request?
     interpreter_constraints = InterpreterConstraints(
         python_setup.resolves_to_interpreter_constraints.get(
             request.resolve, python_setup.interpreter_constraints
@@ -338,7 +340,7 @@ async def export_virtualenv_for_resolve(
         description=f"Build pex for resolve `{resolve}`",
         output_filename=f"{path_safe(resolve)}.pex",
         internal_only=True,
-        requirements=EntireLockfile(lockfile),
+        requirements=EntireLockfile(lockfile),  # TODO: from request?
         sources=editable_local_dists_digest,
         interpreter_constraints=interpreter_constraints,
         # Packed layout should lead to the best performance in this use case.
@@ -361,18 +363,15 @@ async def export_virtualenv_for_resolve(
 
 @rule
 async def export_virtualenvs(
-    request: ExportVenvsRequest,
-    export_subsys: ExportSubsystem,
+    request: GeneratePythonLockfile,
 ) -> ExportResults:
-    if not export_subsys.options.resolve:
+    if not request.resolve_name:
         raise ExportError("Must specify at least one --resolve to export")
-    if request.targets:
-        raise ExportError("The `export` goal does not take target specs.")
-    maybe_venvs = await MultiGet(
-        Get(MaybeExportResult, _ExportVenvForResolveRequest(resolve))
-        for resolve in export_subsys.options.resolve
-    )
-    return ExportResults(mv.result for mv in maybe_venvs if mv.result is not None)
+    maybe_venvs = await Get(MaybeExportResult, _ExportVenvForResolveRequest(request.resolve_name))
+    if maybe_venvs.result:
+        return ExportResults((maybe_venvs.result,))
+    else:
+        return ExportResults(())
 
 
 def rules():

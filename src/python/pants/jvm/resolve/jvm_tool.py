@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 from pants.build_graph.address import Address, AddressInput
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
+from pants.core.goals.resolve_helpers import GenerateToolLockfileSentinel
 from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule

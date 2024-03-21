@@ -4,15 +4,20 @@
 from __future__ import annotations
 
 import itertools
+import logging
 import os
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Sequence, cast
+from typing import Iterable, Mapping, Sequence
 
 from pants.base.build_root import BuildRoot
-from pants.core.goals.generate_lockfiles import (
+from pants.core.goals.resolve_helpers import (
+    ExportLockfile,
+    GenerateLockfile,
     GenerateToolLockfileSentinel,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
+    RequestedResolves,
+    RequestedResolvesNames,
     UnrecognizedResolveNamesError,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -33,6 +38,8 @@ from pants.util.dirutil import safe_rmtree
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
+logger = logging.getLogger(__name__)
+
 
 class ExportError(Exception):
     pass
@@ -47,6 +54,7 @@ class ExportRequest:
     """
 
     targets: Sequence[Target]
+    resolve: str | None = None
 
 
 @dataclass(frozen=True)
@@ -143,10 +151,27 @@ async def export(
     dist_dir: DistDir,
     export_subsys: ExportSubsystem,
 ) -> Export:
-    request_types = cast("Iterable[type[ExportRequest]]", union_membership.get(ExportRequest))
-    requests = tuple(request_type(targets) for request_type in request_types)
-    all_results = await MultiGet(Get(ExportResults, ExportRequest, request) for request in requests)
+    requested_resolve_names = await Get(
+        RequestedResolves,
+        RequestedResolvesNames(tuple(export_subsys.resolve)),
+    )
+
+    def filter_exportable(resolves: list[GenerateLockfile]) -> list[ExportLockfile]:
+        return [e for e in resolves if isinstance(e, ExportLockfile)]
+
+    all_specified_user_requests = requested_resolve_names.user_requests
+    specified_tool_requests = requested_resolve_names.tool_requests
+
+    applicable_tool_requests = [req.request for req in specified_tool_requests]
+
+    all_requests: list[ExportLockfile] = filter_exportable(
+        list(itertools.chain(*all_specified_user_requests, applicable_tool_requests))
+    )
+    logger.debug(f"Found applicable lockfiles {all_requests}")
+    all_results = await MultiGet(Get(ExportResults, ExportLockfile, e) for e in all_requests)
+
     flattened_results = [res for results in all_results for res in results]
+    logger.debug(f"Generated digests for resolves {flattened_results}")
 
     await _warn_on_non_local_environments(targets, "the `export` goal")
 
@@ -180,6 +205,7 @@ async def export(
         console.print_stdout(f"Wrote {result.description} to {result_dir}")
 
     unexported_resolves = sorted(set(export_subsys.resolve) - resolves_exported)
+    logger.debug(f"Successfully exported resolves {resolves_exported}")
     if unexported_resolves:
         all_known_user_resolve_names = await MultiGet(
             Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())

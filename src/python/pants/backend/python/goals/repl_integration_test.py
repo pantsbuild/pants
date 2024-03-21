@@ -17,9 +17,9 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import rules as target_types_rules
 from pants.backend.python.util_rules import local_dists, pex_from_targets
 from pants.backend.python.util_rules.pex import PexProcess
-from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.core.goals.repl import Repl
 from pants.core.goals.repl import rules as repl_rules
+from pants.core.goals.resolve_helpers import NoCompatibleResolveException
 from pants.engine.process import Process
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.python_rule_runner import PythonRuleRunner

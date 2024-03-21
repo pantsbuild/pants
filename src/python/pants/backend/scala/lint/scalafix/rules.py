@@ -15,8 +15,8 @@ from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.backend.scala.util_rules.versions import ScalaVersion
 from pants.core.goals.fix import FixResult, FixTargetsRequest, Partitions
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.resolve_helpers import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import (
     GatherConfigFilesByDirectoriesRequest,
     GatheredConfigFilesByDirectories,

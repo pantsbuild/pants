@@ -21,11 +21,8 @@ from pants.backend.javascript.package_json import (
     PackageJsonTarget,
 )
 from pants.backend.javascript.subsystems.nodejs import UserChosenNodeJSResolveAliases
-from pants.core.goals.generate_lockfiles import (
-    GenerateLockfileResult,
-    KnownUserResolveNames,
-    UserGenerateLockfiles,
-)
+from pants.core.goals.generate_lockfiles import GenerateLockfileResult
+from pants.core.goals.resolve_helpers import KnownUserResolveNames, UserGenerateLockfiles
 from pants.core.target_types import FileTarget
 from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.internals.scheduler import ExecutionError

@@ -6,7 +6,8 @@ from typing import Tuple
 
 import pkg_resources
 
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
+from pants.core.goals.resolve_helpers import GenerateToolLockfileSentinel
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, FileContent
 from pants.engine.internals.native_engine import MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, ProcessResult

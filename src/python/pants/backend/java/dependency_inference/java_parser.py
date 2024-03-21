@@ -11,7 +11,8 @@ from dataclasses import dataclass
 import pkg_resources
 
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
+from pants.core.goals.resolve_helpers import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, DigestContents, Directory, FileContent
 from pants.engine.internals.native_engine import MergeDigests, RemovePrefix

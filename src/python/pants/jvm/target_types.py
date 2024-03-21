@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from typing import Callable, ClassVar, Iterable, Iterator, Optional, Tuple, Type, Union
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
+from pants.core.goals.resolve_helpers import UnrecognizedResolveNamesError
 from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest

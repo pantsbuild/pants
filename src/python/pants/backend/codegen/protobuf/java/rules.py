@@ -16,7 +16,7 @@ from pants.backend.codegen.protobuf.target_types import (
 )
 from pants.backend.experimental.java.register import rules as java_backend_rules
 from pants.backend.java.target_types import JavaSourceField
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolve_helpers import GenerateToolLockfileSentinel
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles

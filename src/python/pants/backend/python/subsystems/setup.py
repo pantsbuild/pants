@@ -10,7 +10,7 @@ from typing import Iterable, List, Optional, TypeVar, cast
 
 from packaging.utils import canonicalize_name
 
-from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.core.goals.resolve_helpers import UnrecognizedResolveNamesError
 from pants.option.errors import OptionsError
 from pants.option.option_types import (
     BoolOption,

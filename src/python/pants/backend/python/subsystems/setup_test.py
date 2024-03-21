@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.core.goals.resolve_helpers import UnrecognizedResolveNamesError
 from pants.testutil.option_util import create_subsystem
 
 

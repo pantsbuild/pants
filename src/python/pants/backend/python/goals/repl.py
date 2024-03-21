@@ -22,8 +22,8 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.core.goals.repl import ReplImplementation, ReplRequest
+from pants.core.goals.resolve_helpers import NoCompatibleResolveException
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest

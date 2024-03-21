@@ -22,21 +22,23 @@ from pants.backend.python.target_types import (
 from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import (
     DEFAULT_TOOL_LOCKFILE,
-    AmbiguousResolveNamesError,
-    GenerateLockfile,
     GenerateLockfileWithEnvironments,
-    GenerateToolLockfileSentinel,
-    KnownUserResolveNames,
     LockfileDiff,
     LockfileDiffPrinter,
     LockfilePackages,
+    _preferred_environment,
+    filter_tool_lockfile_requests,
+)
+from pants.core.goals.resolve_helpers import (
+    AmbiguousResolveNamesError,
+    GenerateLockfile,
+    GenerateToolLockfileSentinel,
+    KnownUserResolveNames,
     NoCompatibleResolveException,
     RequestedUserResolveNames,
     UnrecognizedResolveNamesError,
     WrappedGenerateLockfile,
-    _preferred_environment,
     determine_resolves_to_generate,
-    filter_tool_lockfile_requests,
 )
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
