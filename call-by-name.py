@@ -3,29 +3,42 @@
 
 # On a Mac Mini M2 Pro, parsing the AST of all non-test python files (1184ish) and running in-place source-code replacements on 157 files takes < 1 second
 
-# TODO: Clean up the prolific use of strings, via a more structured object (or AST) approach
-# TODO: Handle variables with the same name as the new import (e.g. transitive_targets)
-
 from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
 import fileinput
 import json
+import logging
 from pathlib import Path
 import tokenize
+from typing import TypedDict
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+
+# Copied/Pasted from migrate_call_by_name.py - as the Visitor will eventually be there anyways
+class RuleGraphGet(TypedDict):
+    function: str
+    gets: list[RuleGraphGetDep]
+
+class RuleGraphGetDep(TypedDict):
+    input_types: list[str]
+    output_type: str
+    rule_dep: str
 
 @dataclass
 class Replacement:
     line_range: tuple[int, int]
     col_range: tuple[int, int]
-    current_source: str
-    new_source: str
+    current_source: ast.Call
+    new_source: ast.Call
     additional_imports: list[ast.ImportFrom]
 
 
 with open("migrations.json", "r") as f:
-    data = json.load(f)
+    data: list[RuleGraphGet] = json.load(f)
 
 def removed_module_prefix(s: str) -> str:
     return s.split(".")[-1]
@@ -48,72 +61,100 @@ for item in data:
             assert f"Duplicate key found in lookup table! {key}"
         lookup[key] = value
 
-def map_no_args_get_to_new_syntax(get: ast.Call) -> str:
+def map_no_args_get_to_new_syntax(get: ast.Call) -> tuple[ast.Call, list[ast.ImportFrom]]:
     """Get(<OutputType>) -> the_rule_to_call(**implicitly())"""
-    # e.g. Call(func=Name(id='Get', ctx=Load()), args=[Name(id='Browser', ctx=Load())], keywords=[])
+
+    logging.debug(ast.dump(get))
     assert len(get.args) == 1, f"Expected 1 arg, got {len(get.args)}"
-    assert isinstance(get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
-    key = (get.args[0].id,)
-    new_function = lookup[key]
-    return f"{new_function}(**implicitly())"
+    assert isinstance(output_type := get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
+
+    new_function, module = split_module_and_func(lookup[(output_type.id,)])
+
+    new_call = ast.Call(
+        func=ast.Name(id=new_function), 
+        args=[],
+        keywords=[ast.keyword(value=ast.Call(func=ast.Name(id="implicitly"), args=[], keywords=[]))]
+    )
+    imports = [ast.ImportFrom(module, names=[ast.alias(new_function)])]
+    return new_call, imports
     
-def map_long_form_get_to_new_syntax(get: ast.Call) -> tuple[str, list[ast.ImportFrom]]:
+def map_long_form_get_to_new_syntax(get: ast.Call) -> tuple[ast.Call, list[ast.ImportFrom]]:
     """Get(<OutputType>, <InputType>, input) -> the_rule_to_call(**implicitly(input))"""
-    # Call(func=Name(id='Get', ctx=Load()), 
-    #   args=[
-    #       Name(id='Browser', ctx=Load()), 
-    #       Call(func=Name(id='BrowserRequest', ctx=Load()), args=[
-    #           Call(func=Attribute(value=Name(id='request', ctx=Load()), attr='browser_request', ctx=Load()), args=[], keywords=[])], keywords=[])], keywords=[])
+
+    logging.debug(ast.dump(get))
     assert len(get.args) == 3, f"Expected 3 arg, got {len(get.args)}"
-    assert isinstance(get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
-    assert isinstance(get.args[1], ast.Name), f"Expected Name, got {get.args[1]}"
-    # assert isinstance(get.args[2], ast.Call), f"Expected Call, got {get.args[2]}"
-    key = (get.args[0].id, get.args[1].id)
+    assert isinstance(output_type := get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
+    assert isinstance(input_type := get.args[1], ast.Name), f"Expected Name, got {get.args[1]}"
+    
+    key = (output_type.id, input_type.id)
     new_function, module = split_module_and_func(lookup[key])
-    input_args = ast.unparse(get.args[2])
+    # input_args = ast.unparse(get.args[2])
 
-    return f"{new_function}(**implicitly({{ {input_args}: {get.args[1].id} }}))", [ast.ImportFrom(module, names=[ast.alias(new_function)])]
+    new_call = ast.Call(
+        func=ast.Name(id=new_function),
+        args=[],
+        keywords=[ast.keyword(value=ast.Call(
+            func=ast.Name(id="implicitly"), 
+            args=[ast.Dict(keys=[get.args[2]], values=[ast.Name(id=input_type.id)])], 
+            keywords=[]
+        ))]
+    )
+    imports = [ast.ImportFrom(module, names=[ast.alias(new_function)])]
+    return new_call, imports
 
-def map_short_form_get_to_new_syntax(get: ast.Call) -> tuple[str, list[ast.ImportFrom]]:
+def map_short_form_get_to_new_syntax(get: ast.Call) -> tuple[ast.Call, list[ast.ImportFrom]]:
     """Get(<OutputType>, <InputType>(<constructor args for input>)) -> the_rule_to_call(**implicitly(input))"""
-    # Call(func=Name(id='Get', ctx=Load()), 
-    #   args=[
-    #       Name(id='Browser', ctx=Load()), 
-    #       Call(func=Name(id='BrowserRequest', ctx=Load()), args=[
-    #           Call(func=Attribute(value=Name(id='request', ctx=Load()), attr='browser_request', ctx=Load()), args=[], keywords=[])], keywords=[])], keywords=[])
-    # print(ast.dump(get))
+
+    logging.debug(ast.dump(get))
     assert len(get.args) == 2, f"Expected 2 arg, got {len(get.args)}"
-    assert isinstance(get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
-    assert isinstance(get.args[1], ast.Call), f"Expected Call, got {get.args[1]}"
-    assert isinstance(get.args[1].func, ast.Name), f"Expected Name, got {get.args[1].func}"
-    key = (get.args[0].id, get.args[1].func.id)
+    assert isinstance(output_type := get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
+    assert isinstance(input_call := get.args[1], ast.Call), f"Expected Call, got {get.args[1]}"
+    assert isinstance(input_type := input_call.func, ast.Name), f"Expected Name, got {input_call.func}"
+    key = (output_type.id, input_type.id)
     new_function, module = split_module_and_func(lookup[key])
-    input_args = ast.unparse(get.args[1])
+    # input_args = ast.unparse(get.args[1])
 
-    return f"{new_function}(**implicitly({input_args}))", [ast.ImportFrom(module, names=[ast.alias(new_function)])]
+    new_call = ast.Call(
+        func=ast.Name(id=new_function),
+        args=[],
+        keywords=[ast.keyword(value=ast.Call(
+            func=ast.Name(id="implicitly"), 
+            args=[input_call], 
+            keywords=[]
+        ))]
+    )
+    imports = [ast.ImportFrom(module, names=[ast.alias(new_function)])]
+    return new_call, imports
 
-def map_dict_form_get_to_new_syntax(get: ast.Call) -> tuple[str, list[ast.ImportFrom]]:
+def map_dict_form_get_to_new_syntax(get: ast.Call) -> tuple[ast.Call, list[ast.ImportFrom]]:
     """Get(<OutputType>, {input1: <Input1Type>, ..inputN: <InputNType>}) -> the_rule_to_call(**implicitly(input))"""
-    # Call(func=Name(id='Get', ctx=Load()), 
-    #   args=[
-    #       Name(id='Browser', ctx=Load()), 
-    #       Dict(keys=[Call(func=Attribute(value=Name(id='request', ctx=Load()), attr='browser_request', ctx=Load()), args=[], keywords=[])], values=[Name(id='BrowserRequest', ctx=Load())])], keywords=[])
-    # print(ast.dump(get))
-    assert len(get.args) == 2, f"Expected 2 arg, got {len(get.args)}"
-    assert isinstance(get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
-    assert isinstance(get.args[1], ast.Dict), f"Expected Dict, got {get.args[1]}"
-    key = (get.args[0].id, *get.args[1].keys)
-    new_function, module = split_module_and_func(lookup[key])
-    input_args = ast.unparse(get.args[1])
 
-    return f"{new_function}(**implicitly({input_args}))", [ast.ImportFrom(module, names=[ast.alias(new_function)])]
+    logging.debug(ast.dump(get))
+    assert len(get.args) == 2, f"Expected 2 arg, got {len(get.args)}"
+    assert isinstance(output_type := get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
+    assert isinstance(input_dict := get.args[1], ast.Dict), f"Expected Dict, got {get.args[1]}"
+    key = (output_type.id, *input_dict.keys)
+    new_function, module = split_module_and_func(lookup[key])
+    # input_args = ast.unparse(get.args[1])
+
+    new_call = ast.Call(
+        func=ast.Name(id=new_function),
+        args=[],
+        keywords=[ast.keyword(value=ast.Call(
+            func=ast.Name(id="implicitly"), 
+            args=[input_dict], 
+            keywords=[]
+        ))]
+    )
+    imports = [ast.ImportFrom(module, names=[ast.alias(new_function)])]
+    return new_call, imports
 
 total = 0
 not_migrated = 0
 
 def map_get_to_new_syntax(get: ast.Call) -> Replacement | None:
     """There are 4 forms the old Get() syntax can take, so we can account for each one of them individually"""
-    new_source: str | None = None
+    new_source: ast.Call | None = None
     imports: list[ast.ImportFrom] = []
 
     global total
@@ -122,7 +163,7 @@ def map_get_to_new_syntax(get: ast.Call) -> Replacement | None:
     total += 1
     try:
         if len(get.args) == 1:
-            new_source = map_no_args_get_to_new_syntax(get)
+            new_source, imports = map_no_args_get_to_new_syntax(get)
         elif len(get.args) == 2 and isinstance(get.args[1], ast.Call):
             new_source, imports = map_short_form_get_to_new_syntax(get)
         elif len(get.args) == 2 and isinstance(get.args[1], ast.Dict):
@@ -133,25 +174,25 @@ def map_get_to_new_syntax(get: ast.Call) -> Replacement | None:
             raise NotImplementedError(f"get: {get} not implemented")
     except NotImplementedError as e:
         not_migrated += 1
-        print(f"Failed to migrate {ast.unparse(get)} as it's not implemented\n")
+        logging.warning(f"Failed to migrate {ast.unparse(get)} as it's not implemented\n")
         return None
     except AssertionError as e:
         not_migrated += 1
-        print(f"Failed to migrate {ast.unparse(get)} with assertion error {e}\n")
+        logging.warning(f"Failed to migrate {ast.unparse(get)} with assertion error {e}\n")
         return None
     except KeyError as e:
         not_migrated += 1
-        print(f"Failed to migrate {ast.unparse(get)} due to lookup error {e}\n")
+        logging.warning(f"Failed to migrate {ast.unparse(get)} due to lookup error {e}\n")
         return None
     except Exception as e:
         not_migrated += 1
-        print(f"Failed to migrate {ast.unparse(get)} with {e}\n")
+        logging.warning(f"Failed to migrate {ast.unparse(get)} with {e}\n")
         return None
     
     return Replacement(
         line_range=(get.lineno, get.end_lineno),
         col_range=(get.col_offset, get.end_col_offset),
-        current_source=ast.unparse(get),
+        current_source=get,
         new_source=new_source,
         additional_imports=[ast.ImportFrom(module="pants.engine.rules", names=[ast.alias("implicitly")]), *imports]
     )
@@ -160,14 +201,21 @@ class CallByNameVisitor(ast.NodeVisitor):
    
     def __init__(self) -> None:
         super().__init__()
+        self.names: set[str] = set()
         # self.imports: set[str] = set()
         self.replacements: list[Replacement] = []
 
-    # def visit_Import(self, node: ast.Import):
-    #     return super().visit_Import(node)
-    
-    # def visit_ImportFrom(self, node: ast.ImportFrom):
-    #     return super().visit_ImportFrom(node)
+    # def visit_Assign(self, node: ast.Assign):
+    #     """Collect all names in the file, so we can avoid shadowing them with the new imports"""
+    #     logger.error(ast.dump(node))
+    #     for target in node.targets:
+    #         if isinstance(target, ast.Name):
+    #             self.names.add(target.id)
+    #             logger.error(f"Assign: {target.id}")
+
+    def visit_Name(self, node: ast.Name):
+        """Collect all names in the file, so we can avoid shadowing them with the new imports"""
+        self.names.add(node.id)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
         """Replace the Get() calls with a call-by-name equivalent syntax in @rule decorated async functions.
@@ -180,9 +228,14 @@ class CallByNameVisitor(ast.NodeVisitor):
         In each file we do a replacement, we should add an import to the top of the file to reference the call-by-name'd function.
         We should also add an import to "implicitly", as we'll likely use it in the call-by-name'd function params.
         """
+        
+        # Ensure we collect all names in this function, as well
+        names = [n.id for n in ast.walk(node) if isinstance(n, ast.Name)]
+        self.names.update(names)
+
         if not self._should_visit_node(node.decorator_list):
-            return node
-            
+            return
+    
         # In the body, look for `await Get`, and replace it with a call-by-name equivalent
         for child in node.body:
             if call := self._maybe_replaceable_call(child):
@@ -214,15 +267,28 @@ class CallByNameVisitor(ast.NodeVisitor):
 def create_replacements_for_file(file: Path) -> list[Replacement]:
     visitor = CallByNameVisitor()
     with open(file, "rb") as f:
-        # print(f"Processing {file}")
+        logging.info(f"Processing {file}")
         try:
             tree = ast.parse(f.read(), filename=file, type_comments=True)        
             visitor.visit(tree)            
         except SyntaxError as e:
-            print(f"SyntaxError in {file}: {e}")
+            logging.error(f"SyntaxError in {file}: {e}")
         except tokenize.TokenError as e:
-            print(f"TokenError in {file}: {e}")
-        # print("\n")
+            logging.error(f"TokenError in {file}: {e}")
+        logging.info("\n")
+    
+    names = visitor.names
+    # Sanitize the replacements, so we don't shadow any existing names
+    for replacement in visitor.replacements:
+        assert isinstance(replacement.new_source.func, ast.Name)
+        func_name = replacement.new_source.func.id
+        if func_name in names:
+            bound_name = f"{func_name}_get"
+            replacement.new_source.func.id = bound_name
+            for i in replacement.additional_imports:
+                if i.names[0].name == func_name:
+                    i.names[0].asname = bound_name
+            logging.warning(f"Renamed {func_name} to {bound_name} to avoid shadowing")
     return visitor.replacements
 
 def perform_replacements_on_file(file: Path, replacements: list[Replacement]):
@@ -252,7 +318,7 @@ def perform_replacements_on_file(file: Path, replacements: list[Replacement]):
                 if line_number == replacement.line_range[0]:
                     # On the first line of the range, emit the new source code where the old code started
                     print(line[:replacement.col_range[0]], end="")
-                    print(replacement.new_source)
+                    print(ast.unparse(replacement.new_source))
                     modified = True
                     # modified = False
                 elif line_number in range(replacement.line_range[0], replacement.line_range[1] + 1):
@@ -291,6 +357,4 @@ for file in files:
     if replacements := create_replacements_for_file(rel_file):
         perform_replacements_on_file(rel_file, replacements)
 
-print(f"Total: {total}, Not Migrated: {not_migrated}")
-
-print(__spec__)
+logging.info(f"Total: {total}, Not Migrated: {not_migrated}")

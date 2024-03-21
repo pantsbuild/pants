@@ -6,7 +6,7 @@ from __future__ import annotations
 from functools import partial
 import json
 import logging
-from typing import Any
+from typing import TypedDict
 
 from pants.base.exiter import ExitCode
 from pants.base.specs import Specs
@@ -18,6 +18,14 @@ from pants.option.options import Options
 
 logger = logging.getLogger(__name__)
 
+class RuleGraphGet(TypedDict):
+    function: str
+    gets: list[RuleGraphGetDep]
+
+class RuleGraphGetDep(TypedDict):
+    input_types: list[str]
+    output_type: str
+    rule_dep: str
 
 class MigrateCallByNameBuiltinGoal(BuiltinGoal):
     name = "migrate-call-by-name"
@@ -37,16 +45,16 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
         # The value is a list of objects.
         # Each object has the output_type as a string, the input_types as a list of strings, and the rule_dep as a string.
 
-        items: list[dict[str, list[dict[str, str]]]] = []
+        items: list[RuleGraphGet] = []
 
         for rule, deps in graph_session.scheduler_session.rule_graph_rule_gets().items():
             if isinstance(rule, partial):
                 continue
 
             key = rule.__module__ + "." + rule.__name__
-            item = { "function": key, "gets": [] }
+            item: RuleGraphGet = { "function": key, "gets": [] }
+            unsorted_deps: list[RuleGraphGetDep] = []
 
-            unsorted_deps: list[dict[str, Any]] = []
             for output_type, input_types, rule_dep in deps:
                 if isinstance(rule_dep, partial):
                     continue
@@ -61,7 +69,6 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
 
             # Sort the dependencies by the rule_dep, and then by the input_types.
             sorted_deps = sorted(unsorted_deps, key=lambda x: (x["rule_dep"], x["input_types"]))
-
             item["gets"] = sorted_deps
             items.append(item)
         
