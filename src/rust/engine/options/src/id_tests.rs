@@ -11,7 +11,7 @@ fn test_option_id_global_switch() {
         OptionId::new(Scope::Global, ["bar", "baz"].iter(), Some('x')).unwrap(),
         option_id
     );
-    assert_eq!("GLOBAL", option_id.scope());
+    assert_eq!("GLOBAL", option_id.scope.name());
 }
 
 #[test]
@@ -21,7 +21,7 @@ fn test_option_id_global() {
         OptionId::new(Scope::Global, ["bar", "baz"].iter(), None).unwrap(),
         option_id
     );
-    assert_eq!("GLOBAL", option_id.scope());
+    assert_eq!("GLOBAL", option_id.scope.name());
 }
 
 #[test]
@@ -36,7 +36,7 @@ fn test_option_id_scope_switch() {
         .unwrap(),
         option_id
     );
-    assert_eq!("foo-bar", option_id.scope());
+    assert_eq!("foo-bar", option_id.scope.name());
 }
 
 #[test]
@@ -51,5 +51,5 @@ fn test_option_id_scope() {
         .unwrap(),
         option_id
     );
-    assert_eq!("foo-bar", option_id.scope());
+    assert_eq!("foo-bar", option_id.scope.name());
 }
