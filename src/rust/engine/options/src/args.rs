@@ -43,17 +43,19 @@ impl Arg {
                 once("-")
             }
         }
+        // Check if --scope-flag matches,
         self.flag_match(chain![
             prefix(negate),
             once(id.scope.name()),
             id.name_components_strs()
-        ]) || (self.context == id.scope
-            && self.flag_match(chain![prefix(negate), id.name_components_strs()]))
-            || (if let Some(sn) = &id.short_name {
-                self.flag_match(chain![once(""), once(sn.as_ref())])
-            } else {
-                false
-            })
+        ]) ||
+        // Check if --flag matches in the context of the current goal's scope.
+        (self.context == id.scope &&
+         self.flag_match(chain![prefix(negate), id.name_components_strs()])) ||
+        // Check if -s matches for a short name s, if any.
+        (if let Some(sn) = &id.short_name {
+            self.flag_match(chain![once(""), once(sn.as_ref())])
+        } else { false })
     }
 
     fn matches(&self, id: &OptionId) -> bool {
@@ -161,6 +163,8 @@ impl OptionsSource for Args {
     }
 
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
+        // We iterate in reverse so that the rightmost arg wins in case an option
+        // is specified multiple times.
         for arg in self.args.iter().rev() {
             if arg.matches(id) {
                 return expand(arg.value.clone().ok_or_else(|| {
@@ -173,6 +177,8 @@ impl OptionsSource for Args {
     }
 
     fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
+        // We iterate in reverse so that the rightmost arg wins in case an option
+        // is specified multiple times.
         for arg in self.args.iter().rev() {
             if arg.matches(id) {
                 return arg.to_bool().map_err(|e| e.render(&arg.flag));
@@ -203,6 +209,8 @@ impl OptionsSource for Args {
     }
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
+        // We iterate in reverse so that the rightmost arg wins in case an option
+        // is specified multiple times.
         for arg in self.args.iter().rev() {
             if arg.matches(id) {
                 return expand_to_dict(arg.value.clone().ok_or_else(|| {
