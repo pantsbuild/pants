@@ -24,13 +24,12 @@ fn pantsd_fingerprint_compute(expected_option_names: HashSet<String>) -> PyResul
     let options_parser = OptionParser::new(
         Args::argv(),
         Env::capture_lossy().0,
-        None,
+        Some(vec![]),
         true,
         false,
         None,
     )
     .map_err(PyException::new_err)?;
-
     let options = pantsd::fingerprinted_options(&build_root).map_err(PyException::new_err)?;
     let actual_option_names = options
         .into_iter()
