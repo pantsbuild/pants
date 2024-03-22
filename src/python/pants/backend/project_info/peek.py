@@ -4,11 +4,10 @@
 from __future__ import annotations
 
 import collections
-import collections
 import json
-from dataclasses import dataclass, fields, is_dataclass
-from typing import Any, Iterable, Mapping, Protocol, runtime_checkable, ClassVar
 from abc import ABC, ABCMeta
+from dataclasses import dataclass, fields, is_dataclass
+from typing import Any, ClassVar, Iterable, Mapping, Protocol, runtime_checkable
 
 from pants.engine.addresses import Addresses
 from pants.engine.collection import Collection
@@ -34,7 +33,7 @@ from pants.engine.target import (
     Targets,
     UnexpandedTargets,
 )
-from pants.engine.unions import union, UnionMembership
+from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import BoolOption
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
@@ -273,7 +272,7 @@ async def get_target_data(
             dependencies_rules=dependencies_rules_map.get(tgt.address),
             dependents_rules=dependents_rules_map.get(tgt.address),
             applicable_dep_rules=applicable_dep_rules_map.get(tgt.address),
-            additional_info=tuple(group_additional_infos_by_address.get(tgt.address), ())
+            additional_info=tuple(group_additional_infos_by_address.get(tgt.address, ())),
         )
         for tgt, expanded_deps in zip(sorted_targets, expanded_dependencies)
     )
