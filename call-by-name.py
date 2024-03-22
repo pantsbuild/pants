@@ -3,12 +3,8 @@
 
 # On a Mac Mini M2 Pro, parsing the AST of all non-test python files (1184ish) and running in-place source-code replacements on 157 files takes < 1 second
 
-# TODO: Prepare for move to the migrate_call_by_name.py goal
-# TODO: Pull more functionality into the Visitor, so it's easier to port over
 # TODO: Write some AST tests for the Visitor
-# TODO: Handle comments nested in Call (which is horrifically annoying)
-# TODO: setup_pytest_for_target is underspecified, keeps trying to pull in the junit version
-# TODO: Don't try to fix shadowing if the name is in the current file
+# TODO: Add optimization for single positional argument Get() calls
 
 from __future__ import annotations
 
@@ -60,17 +56,33 @@ class Replacement:
         return [i for i in self.additional_imports if i.module != self.module]
 
     def sanitize(self, names: set[str]):
-        """Remove any shadowing of names"""
+        """Remove any shadowing of names, except if the new_func is in the current file"""
         assert isinstance(self.new_source.func, ast.Name)
         func_name = self.new_source.func.id
-        if func_name in names:
-            bound_name = f"{func_name}_get"
-            self.new_source.func.id = bound_name
-            for i in self.additional_imports:
-                if i.names[0].name == func_name:
-                    i.names[0].asname = bound_name
-            logging.warning(f"Renamed {func_name} to {bound_name} to avoid shadowing")
+        if func_name not in names:
+            return
         
+        # If the new function is not in the sanitized imports, it must be in the current file
+        if not any(i.names[0].name == func_name for i in self.sanitized_imports()):
+            return
+
+        bound_name = f"{func_name}_get"
+        self.new_source.func.id = bound_name
+        for i in self.additional_imports:
+            if i.names[0].name == func_name:
+                i.names[0].asname = bound_name
+        logging.warning(f"Renamed {func_name} to {bound_name} to avoid shadowing")
+        
+    def contains_comments(self) -> bool:
+        """Check if there are any comments within the replacement range. Opens a file for reading"""
+        with open(self.filename, "r") as f:
+            lines = f.readlines()
+        
+        for line_number in range(self.line_range[0], self.line_range[1] + 1):
+            if "#" in lines[line_number - 1]:
+                logger.warning(f"Comments found in {self.filename} within replacement range: {self.line_range}")
+                return True
+        return False
 
     def __str__(self) -> str:
         return f"Replacement: {ast.unparse(self.current_source)} -> {ast.unparse(self.new_source)}"
@@ -297,11 +309,10 @@ def create_replacements_for_file(file: Path) -> list[Replacement]:
         except tokenize.TokenError as e:
             logging.error(f"TokenError in {file}: {e}")
     
-    names = visitor.names
-    # Sanitize the replacements, so we don't shadow any existing names
     for replacement in visitor.replacements:
-        replacement.sanitize(names)
-    return visitor.replacements
+        replacement.sanitize(visitor.names)
+
+    return [r for r in visitor.replacements if not r.contains_comments()]
 
 def perform_replacements_on_file(file: Path, replacements: list[Replacement]):
     """In-place replacements for the new source code in a file"""
@@ -324,9 +335,6 @@ def perform_replacements_on_file(file: Path, replacements: list[Replacement]):
                     modified = True
                     # modified = False
                 elif line_number in range(replacement.line_range[0], replacement.line_range[1] + 1):
-                    # Don't delete lines starting with comments
-                    if line.lstrip().startswith("#"):
-                        print(line, end="")
                     # If there are other lines in the range, just skip them
                     modified = True
 
@@ -345,7 +353,6 @@ def perform_replacements_on_file(file: Path, replacements: list[Replacement]):
                 imports_added = True
 
 
-# Grab list of files of interest from data["function"]
 
 files = sorted(set(Path(f["filepath"]) for f in graphs))
 for file in files:
@@ -353,6 +360,8 @@ for file in files:
         # There are some circular imports in graph.py, that can't be resolved here
         continue
 
+    # if "backend/python" not in str(file.absolute()):
+    #     continue
+
     if replacements := create_replacements_for_file(file):
-        # perform_replacements_on_file(rel_file, replacements)
-        pass
+        perform_replacements_on_file(file, replacements)
