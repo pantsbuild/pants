@@ -24,7 +24,7 @@ fn pantsd_fingerprint_compute(expected_option_names: HashSet<String>) -> PyResul
     let options_parser = OptionParser::new(
         Args::argv(),
         Env::capture_lossy().0,
-        Some(vec![]),
+        None,
         true,
         false,
         None,
