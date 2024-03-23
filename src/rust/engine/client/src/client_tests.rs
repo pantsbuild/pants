@@ -33,7 +33,7 @@ async fn test_client_fingerprint_mismatch() {
     // Then connect with a different set of options (but with a matching `pants_subprocessdir`, so
     // that we find the relevant `.pants.d/pids` directory).
     let options_parser = OptionParser::new(
-        Args::new(vec![format!(
+        Args::new(vec!["pants".to_owned(), format!(
             "--pants-subprocessdir={}",
             tmpdir.path().display()
         )]),
