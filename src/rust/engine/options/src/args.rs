@@ -79,6 +79,7 @@ impl Arg {
     }
 }
 
+#[derive(Debug)]
 pub struct Args {
     args: Vec<Arg>,
 }
