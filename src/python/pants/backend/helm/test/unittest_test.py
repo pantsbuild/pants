@@ -132,11 +132,14 @@ def test_simple_failure(rule_runner: RuleRunner) -> None:
         }
     )
 
+    attempts = 3
+    rule_runner.set_options([f"--test-attempts-default={attempts}"])
     target = rule_runner.get_target(Address("tests", target_name="test"))
     field_set = HelmUnitTestFieldSet.create(target)
 
     result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
     assert result.exit_code == 1
+    assert len(result.process_results) == attempts
 
 
 def test_test_with_local_resource_file(rule_runner: RuleRunner) -> None:
@@ -528,8 +531,11 @@ def test_failure_with_snapshot(rule_runner: RuleRunner) -> None:
         }
     )
 
+    attempts = 3
+    rule_runner.set_options([f"--test-attempts-default={attempts}"])
     target = rule_runner.get_target(Address("src/tests", target_name="test"))
     field_set = HelmUnitTestFieldSet.create(target)
 
     result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
     assert result.exit_code == 1
+    assert len(result.process_results) == attempts
