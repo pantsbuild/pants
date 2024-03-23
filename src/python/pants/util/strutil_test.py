@@ -10,6 +10,7 @@ import pytest
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import (
     Simplifier,
+    anonymize_v2_chroot_path,
     bullet_list,
     comma_separated_list,
     docstring,
@@ -23,7 +24,6 @@ from pants.util.strutil import (
     softwrap,
     stable_hash,
     strip_prefix,
-    strip_v2_chroot_path,
 )
 
 
@@ -71,12 +71,14 @@ def test_strip_prefix() -> None:
 
 def test_strip_chroot_path() -> None:
     assert (
-        strip_v2_chroot_path(
+        anonymize_v2_chroot_path(
             dedent(
                 """\
             Would reformat /private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-sandbox-3zt5Ph/src/python/example.py
             Would reformat /var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-sandbox-OCnquv/test.py
             Would reformat /custom-tmpdir/pants-sandbox-7zt4pH/custom_tmpdir.py
+            Would reformat /custom-tmpdir/pants-sandbox-7zt4pH/another_file.py
+            Would reformat /private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-sandbox-3zt5Ph/foobar.py
 
             Some other output.
             """
@@ -84,9 +86,11 @@ def test_strip_chroot_path() -> None:
         )
         == dedent(
             """\
-        Would reformat src/python/example.py
-        Would reformat test.py
-        Would reformat custom_tmpdir.py
+        Would reformat /<pants-sandbox-1>/src/python/example.py
+        Would reformat /<pants-sandbox-2>/test.py
+        Would reformat /<pants-sandbox-3>/custom_tmpdir.py
+        Would reformat /<pants-sandbox-3>/another_file.py
+        Would reformat /<pants-sandbox-1>/foobar.py
 
         Some other output.
         """
@@ -95,24 +99,45 @@ def test_strip_chroot_path() -> None:
 
     # A subdir must be prefixed with `pants-sandbox-`, then some characters after it.
     assert (
-        strip_v2_chroot_path("/var/pants_sandbox_OCnquv/test.py")
+        anonymize_v2_chroot_path("/var/pants_sandbox_OCnquv/test.py")
         == "/var/pants_sandbox_OCnquv/test.py"
     )
     assert (
-        strip_v2_chroot_path("/var/pants_sandboxOCnquv/test.py")
+        anonymize_v2_chroot_path("/var/pants_sandboxOCnquv/test.py")
         == "/var/pants_sandboxOCnquv/test.py"
     )
-    assert strip_v2_chroot_path("/var/pants-sandbox/test.py") == "/var/pants-sandbox/test.py"
+    assert anonymize_v2_chroot_path("/var/pants-sandbox/test.py") == "/var/pants-sandbox/test.py"
 
     # Our heuristic requires absolute paths.
     assert (
-        strip_v2_chroot_path("var/pants-sandbox-OCnquv/test.py")
+        anonymize_v2_chroot_path("var/pants-sandbox-OCnquv/test.py")
         == "var/pants-sandbox-OCnquv/test.py"
     )
 
     # Confirm we can handle values with no chroot path.
-    assert strip_v2_chroot_path("") == ""
-    assert strip_v2_chroot_path("hello world") == "hello world"
+    assert anonymize_v2_chroot_path("") == ""
+    assert anonymize_v2_chroot_path("hello world") == "hello world"
+
+
+def test_path_issue_strip_chroot_path() -> None:
+    # This was a specific bug observed where the PATH variable got anonymized incorrectly. In particular, the
+    # replacement crossed over into *another* PATH item, i.e, including `:`.
+    assert (
+        anonymize_v2_chroot_path(
+            dedent(
+                """\
+            /var/pants-sandbox-123/red:/var/pants-sandbox-123/blue
+            /var/pants-sandbox-345/red:/var/pants-sandbox-456/blue
+            """
+            )
+        )
+        == dedent(
+            """\
+        /<pants-sandbox-1>/red:/<pants-sandbox-1>/blue
+        /<pants-sandbox-2>/red:/<pants-sandbox-3>/blue
+        """
+        )
+    )
 
 
 @pytest.mark.parametrize(
@@ -120,8 +145,8 @@ def test_strip_chroot_path() -> None:
     [
         (False, False, "\033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m"),
         (False, True, "/var/pants-sandbox-123/red/path.py bold"),
-        (True, False, "\033[0;31mred/path.py\033[0m \033[1mbold\033[0m"),
-        (True, True, "red/path.py bold"),
+        (True, False, "\033[0;31m/<pants-sandbox-1>/red/path.py\033[0m \033[1mbold\033[0m"),
+        (True, True, "/<pants-sandbox-1>/red/path.py bold"),
     ],
 )
 def test_simplifier(strip_chroot_path: bool, strip_formatting: bool, expected: str) -> None:
