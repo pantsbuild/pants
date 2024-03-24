@@ -122,12 +122,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
     "opencv-python-headless": ("cv2",),
     "opensearch-py": ("opensearchpy",),
     # opentelemetry
-    "opentelemetry-api": ("opentelemetry",),
-    "opentelemetry-exporter-otlp": ("opentelemetry.exporter",),
-    "opentelemetry-exporter-otlp-proto-grpc": ("opentelemetry.exporter.otlp.proto.grpc",),
-    "opentelemetry-exporter-otlp-proto-http": ("opentelemetry.exporter.otlp.proto.http",),
-    "opentelemetry-instrumentation-kafka-python": ("opentelemetry.instrumentation.kafka",),
-    "opentelemetry-sdk": (
+    "opentelemetry-api": (
         "opentelemetry._logs",
         "opentelemetry.baggage",
         "opentelemetry.context",
@@ -135,9 +130,10 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
         "opentelemetry.metrics",
         "opentelemetry.propagate",
         "opentelemetry.propagators",
-        "opentelemetry.sdk",
         "opentelemetry.trace",
     ),
+    "opentelemetry-instrumentation-kafka-python": ("opentelemetry.instrumentation.kafka",),
+    "opentelemetry-semantic-conventions": ("opentelemetry.semconv",),
     "opentelemetry-test-utils": ("opentelemetry.test",),
     "paho-mqtt": ("paho",),
     "phonenumberslite": ("phonenumbers",),
