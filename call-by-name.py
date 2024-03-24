@@ -84,9 +84,6 @@ class Replacement:
                 return True
         return False
 
-    def __str__(self) -> str:
-        return f"Replacement: {ast.unparse(self.current_source)} -> {ast.unparse(self.new_source)}"
-
 
 class CallByNameSyntaxMapper:
     def __init__(self, graphs: list[RuleGraphGet]) -> None:
@@ -333,12 +330,9 @@ def perform_replacements_on_file(file: Path, replacements: list[Replacement]):
                     print(line[:replacement.col_range[0]], end="")
                     print(ast.unparse(replacement.new_source))
                     modified = True
-                    # modified = False
                 elif line_number in range(replacement.line_range[0], replacement.line_range[1] + 1):
                     # If there are other lines in the range, just skip them
                     modified = True
-
-                    # modified = False
                     continue
 
             # For any lines that were not involved with replacements, emit them verbatim
