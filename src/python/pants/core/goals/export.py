@@ -110,7 +110,9 @@ class ExportSubsystem(GoalSubsystem):
         Export Pants data for use in other tools, such as IDEs.
 
         :::caution Exporting tools requires creating a custom lockfile for them
+
         Follow [the instructions for creating tool lockfiles](../../docs/python/overview/lockfiles#lockfiles-for-tools)
+
         :::
         """
     )
