@@ -261,7 +261,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         if not cls.is_valid_scope_name(options_scope):
             raise OptionsError(
                 softwrap(
-                    """
+                    f"""
                     Options scope "{options_scope}" is not valid.
 
                     Replace in code with a new scope name consisting of only lower-case letters,
