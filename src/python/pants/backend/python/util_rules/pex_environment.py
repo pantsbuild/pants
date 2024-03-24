@@ -89,8 +89,8 @@ class PexSubsystem(Subsystem):
 
             Note: Pants uses Pex internally in some ways that trigger some warnings at the moment,
             so enabling this may result in warnings not related to your code. See
-            <https://github.com/pantsbuild/pants/issues/20577> and
-            <https://github.com/pantsbuild/pants/issues/20586>.
+            [#20577](https://github.com/pantsbuild/pants/issues/20577) and
+            [#20586](https://github.com/pantsbuild/pants/issues/20586).
             """
         ),
     )
