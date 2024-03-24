@@ -62,7 +62,7 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
         files_to_migrate = requested_files.intersection(plan_files)
         if not files_to_migrate:
             logger.info(
-                f"None of the {len(plan_files)} files in the migration plan are also in the {len(requested_files)} requested files"
+                f"None of the {len(requested_files)} requested files are part of the {len(plan_files)} files in the migration plan"
             )
             return PANTS_SUCCEEDED_EXIT_CODE
 
@@ -320,7 +320,7 @@ class CallByNameSyntaxMapper:
             current_source=get,
             new_source=new_source,
             additional_imports=[
-                ast.ImportFrom(module="pants.engine.rules", names=[ast.alias("implicitly")]),
+                ast.ImportFrom(module="pants.engine.rules", names=[ast.alias("implicitly")], level=0),
                 *imports,
             ],
         )
@@ -349,7 +349,7 @@ class CallByNameSyntaxMapper:
                 ast.keyword(value=ast.Call(func=ast.Name(id="implicitly"), args=[], keywords=[]))
             ],
         )
-        imports = [ast.ImportFrom(module, names=[ast.alias(new_function)])]
+        imports = [ast.ImportFrom(module, names=[ast.alias(new_function)], level=0)]
         return new_call, imports
 
     def map_long_form_get_to_new_syntax(
@@ -385,7 +385,7 @@ class CallByNameSyntaxMapper:
                 )
             ],
         )
-        imports = [ast.ImportFrom(module, names=[ast.alias(new_function)])]
+        imports = [ast.ImportFrom(module, names=[ast.alias(new_function)], level=0)]
         return new_call, imports
 
     def map_short_form_get_to_new_syntax(
@@ -421,7 +421,7 @@ class CallByNameSyntaxMapper:
                 )
             ],
         )
-        imports = [ast.ImportFrom(module, names=[ast.alias(new_function)])]
+        imports = [ast.ImportFrom(module, names=[ast.alias(new_function)], level=0)]
         return new_call, imports
 
     def map_dict_form_get_to_new_syntax(
@@ -453,7 +453,7 @@ class CallByNameSyntaxMapper:
                 )
             ],
         )
-        imports = [ast.ImportFrom(module, names=[ast.alias(new_function)])]
+        imports = [ast.ImportFrom(module, names=[ast.alias(new_function)], level=0)]
         return new_call, imports
 
 
