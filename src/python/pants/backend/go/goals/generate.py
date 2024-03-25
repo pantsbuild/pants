@@ -166,7 +166,6 @@ async def _run_generators(
     goroot: GoRoot,
     base_env: Mapping[str, str],
 ) -> Digest:
-    digest = await Get(Digest, MergeDigests([digest]))
     digest_contents = await Get(DigestContents, Digest, digest)
     content: bytes | None = None
     for entry in digest_contents:

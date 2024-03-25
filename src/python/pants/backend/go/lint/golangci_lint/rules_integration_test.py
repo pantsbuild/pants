@@ -144,7 +144,6 @@ def test_failing(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     lint_results = run_golangci_lint(rule_runner, [tgt])
-    print(lint_results[0].stderr)
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
     assert "f.go:3:6: func `good` is unused (unused)\n" in lint_results[0].stdout

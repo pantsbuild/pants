@@ -58,7 +58,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[GoModTarget, GoPackageTarget, GoBinaryTarget],
     )
-    rule_runner.set_options(["--go-test-args=-v", "--keep-sandboxes=always"], env_inherit={"PATH"})
+    rule_runner.set_options(["--go-test-args=-v"], env_inherit={"PATH"})
     return rule_runner
 
 

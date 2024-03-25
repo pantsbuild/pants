@@ -188,7 +188,10 @@ async def assemble_go_assembly_files(
     asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
 
     def obj_output_path(s_file: str) -> str:
-        return str(PurePath(s_file).with_suffix(".o"))
+        if request.dir_path.startswith(".goroot"):
+            return str(PurePath(s_file).with_suffix(".o"))
+        else:
+            return str(request.dir_path / PurePath(s_file).with_suffix(".o"))
 
     assembly_results = await MultiGet(
         Get(
