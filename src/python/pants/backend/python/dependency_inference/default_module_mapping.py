@@ -109,6 +109,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
     "apache-airflow": ("airflow",),
     "atlassian-python-api": ("atlassian",),
     "attrs": ("attr", "attrs"),
+    "auth0-python": ("auth0",),
     "beautifulsoup4": ("bs4",),
     "bitvector": ("BitVector",),
     "cattrs": ("cattr", "cattrs"),
