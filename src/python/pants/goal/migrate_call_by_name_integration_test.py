@@ -41,10 +41,10 @@ MIGRATED_REGISTER_FILE = dedent(
     """\
     from pants.backend.python.lint.black.subsystem import Black
     from pants.engine.rules import collect_rules, Get, rule, goal_rule
-    from migrateme.rules1 import setup_black
-    from migrateme.rules1 import setup_black_embedded_comments
-    from migrateme.rules1 import setup_black_multiline
-    from migrateme.rules2 import setup_black_shadowed
+    from migrateme.rules1 import embedded_comments
+    from migrateme.rules1 import multiline
+    from migrateme.rules1 import variants
+    from migrateme.rules2 import shadowed
     from pants.engine.rules import implicitly
     from pants.engine.goal import Goal, GoalSubsystem
 
@@ -61,10 +61,10 @@ MIGRATED_REGISTER_FILE = dedent(
 
     @goal_rule
     async def setup_migrateme(black: Black) -> ContrivedGoal:
-        foo = await setup_black(**implicitly({black: Black}))
-        bar = await setup_black_multiline(**implicitly({black: Black}))
-        baz = await setup_black_embedded_comments(**implicitly({black: Black}))
-        qux = await setup_black_shadowed(**implicitly({black: Black}))
+        foo = await variants(**implicitly({black: Black}))
+        bar = await multiline(**implicitly({black: Black}))
+        baz = await embedded_comments(**implicitly({black: Black}))
+        qux = await shadowed(**implicitly({black: Black}))
 
     def rules():
         return [*collect_rules(), *rules1(), *rules2()]
@@ -75,20 +75,29 @@ RULES1_FILE = dedent(
     """\
     from pants.backend.python.lint.black.subsystem import Black
     from pants.backend.python.util_rules.pex import PexRequest, VenvPex
+    from pants.core.goals.check import CheckRequest, CheckResults
+    from pants.core.util_rules.archive import CreateArchive
+    from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
+    from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
+    from pants.engine.fs import Digest, EMPTY_SNAPSHOT
     from pants.engine.rules import collect_rules, Get, rule
+    from pants.engine.target import AllTargets
 
     class Foo:
         pass
 
     @rule
-    async def setup_black(black: Black) -> Foo:
+    async def variants(black: Black, local_env: ChosenLocalEnvironmentName) -> Foo:
+        all_targets = await Get(AllTargets)
         pex = await Get(VenvPex, PexRequest, black.to_pex_request())
+        digest = await Get(Digest, CreateArchive(EMPTY_SNAPSHOT))
+        paths = await Get(BinaryPaths, {{BinaryPathRequest(binary_name="time", search_path=("/usr/bin")): BinaryPathRequest, local_env.val: EnvironmentName}})
 
     class Bar:
         pass
 
     @rule(desc="Ensure multi-line calls are migrated")
-    async def setup_black_multiline(black: Black) -> Bar:
+    async def multiline(black: Black) -> Bar:
         pex = await Get(
             VenvPex,
             PexRequest,
@@ -99,7 +108,7 @@ RULES1_FILE = dedent(
         pass
 
     @rule(desc="Ensure calls with embedded comments are ignored")
-    async def setup_black_embedded_comments(black: Black) -> Baz:
+    async def embedded_comments(black: Black) -> Baz:
         pex = await Get(
             VenvPex,
             PexRequest,
@@ -116,29 +125,41 @@ MIGRATED_RULES1_FILE = dedent(
     """\
     from pants.backend.python.lint.black.subsystem import Black
     from pants.backend.python.util_rules.pex import PexRequest, VenvPex
+    from pants.core.goals.check import CheckRequest, CheckResults
+    from pants.core.util_rules.archive import CreateArchive
+    from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
+    from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
+    from pants.engine.fs import Digest, EMPTY_SNAPSHOT
     from pants.engine.rules import collect_rules, Get, rule
     from pants.backend.python.util_rules.pex import create_venv_pex
+    from pants.core.util_rules.archive import create_archive
+    from pants.core.util_rules.system_binaries import find_binary
+    from pants.engine.internals.graph import find_all_targets
     from pants.engine.rules import implicitly
+    from pants.engine.target import AllTargets
 
     class Foo:
         pass
 
     @rule
-    async def setup_black(black: Black) -> Foo:
+    async def variants(black: Black, local_env: ChosenLocalEnvironmentName) -> Foo:
+        all_targets = await find_all_targets(**implicitly())
         pex = await create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
+        digest = await create_archive(**implicitly(CreateArchive(EMPTY_SNAPSHOT)))
+        paths = await find_binary(**implicitly({BinaryPathRequest(binary_name='time', search_path='/usr/bin'): BinaryPathRequest, local_env.val: EnvironmentName}))
 
     class Bar:
         pass
 
     @rule(desc="Ensure multi-line calls are migrated")
-    async def setup_black_multiline(black: Black) -> Bar:
+    async def multiline(black: Black) -> Bar:
         pex = await create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
 
     class Baz:
         pass
 
     @rule(desc="Ensure calls with embedded comments are ignored")
-    async def setup_black_embedded_comments(black: Black) -> Baz:
+    async def embedded_comments(black: Black) -> Baz:
         pex = await Get(
             VenvPex,
             PexRequest,
@@ -161,7 +182,7 @@ RULES2_FILE = dedent(
         pass
 
     @rule(desc="Ensure assignment name is not shadowed by new syntax")
-    async def setup_black_shadowed(black: Black) -> Qux:
+    async def shadowed(black: Black) -> Qux:
         create_venv_pex = await Get(VenvPex, PexRequest, black.to_pex_request())
 
     def rules():
@@ -181,7 +202,7 @@ MIGRATED_RULES2_FILE = dedent(
         pass
 
     @rule(desc="Ensure assignment name is not shadowed by new syntax")
-    async def setup_black_shadowed(black: Black) -> Qux:
+    async def shadowed(black: Black) -> Qux:
         create_venv_pex = await create_venv_pex_get(**implicitly({black.to_pex_request(): PexRequest}))
 
     def rules():

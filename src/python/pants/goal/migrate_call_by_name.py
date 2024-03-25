@@ -39,6 +39,7 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
 
     def run(
         self,
+        *,
         build_config: BuildConfiguration,
         graph_session: GraphSession,
         options: Options,
@@ -296,15 +297,10 @@ class CallByNameSyntaxMapper:
             elif len(get.args) == 3:
                 new_source, imports = self.map_long_form_get_to_new_syntax(get, get_deps)
             else:
-                raise NotImplementedError(f"get: {get} not implemented")
-        except NotImplementedError as e:
-            logging.warning(f"Failed to migrate {ast.unparse(get)} as it's not implemented\n")
-            return None
+                logging.warning(f"Failed to migrate {ast.unparse(get)} due to unknown form\n")
+                return None
         except AssertionError as e:
             logging.warning(f"Failed to migrate {ast.unparse(get)} with assertion error {e}\n")
-            return None
-        except KeyError as e:
-            logging.warning(f"Failed to migrate {ast.unparse(get)} due to lookup error {e}\n")
             return None
         except Exception as e:
             logging.warning(f"Failed to migrate {ast.unparse(get)} with {e}\n")
@@ -332,7 +328,7 @@ class CallByNameSyntaxMapper:
     ) -> tuple[ast.Call, list[ast.ImportFrom]]:
         """Get(<OutputType>) -> the_rule_to_call(**implicitly())"""
 
-        logging.debug(ast.dump(get))
+        logger.debug(ast.dump(get, indent=2))
         assert len(get.args) == 1, f"Expected 1 arg, got {len(get.args)}"
         assert isinstance(output_type := get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
 
@@ -359,7 +355,7 @@ class CallByNameSyntaxMapper:
     ) -> tuple[ast.Call, list[ast.ImportFrom]]:
         """Get(<OutputType>, <InputType>, input) -> the_rule_to_call(**implicitly(input))"""
 
-        logging.debug(ast.dump(get))
+        logger.debug(ast.dump(get, indent=2))
         assert len(get.args) == 3, f"Expected 3 arg, got {len(get.args)}"
         assert isinstance(output_type := get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
         assert isinstance(input_type := get.args[1], ast.Name), f"Expected Name, got {get.args[1]}"
@@ -396,7 +392,7 @@ class CallByNameSyntaxMapper:
         """Get(<OutputType>, <InputType>(<constructor args for input>)) ->
         the_rule_to_call(**implicitly(input))"""
 
-        logging.debug(ast.dump(get))
+        logger.debug(ast.dump(get, indent=2))
         assert len(get.args) == 2, f"Expected 2 arg, got {len(get.args)}"
         assert isinstance(output_type := get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
         assert isinstance(input_call := get.args[1], ast.Call), f"Expected Call, got {get.args[1]}"
@@ -432,17 +428,20 @@ class CallByNameSyntaxMapper:
         """Get(<OutputType>, {input1: <Input1Type>, ..inputN: <InputNType>}) ->
         the_rule_to_call(**implicitly(input))"""
 
-        logging.debug(ast.dump(get))
+        logger.debug(ast.dump(get, indent=2))
         assert len(get.args) == 2, f"Expected 2 arg, got {len(get.args)}"
         assert isinstance(output_type := get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
         assert isinstance(input_dict := get.args[1], ast.Dict), f"Expected Dict, got {get.args[1]}"
 
-        d = next(
+        input_types = {k.id for k in input_dict.values if isinstance(k, ast.Name)}
+
+        dep = next(
             dep
             for dep in deps
-            if dep["output_type"].endswith(str(output_type.id))
-            and dep["input_types"] == list(input_dict.keys)
+            if dep["output_type"]["name"] == output_type.id
+            and {i["name"] for i in dep["input_types"]} == input_types
         )
+
         module = dep["rule_dep"]["module"]
         new_function = dep["rule_dep"]["function"]
 
