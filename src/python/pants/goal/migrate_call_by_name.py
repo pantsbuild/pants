@@ -184,7 +184,7 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
                 # Note: Intentionally not trying to add to the existing "pants.engine.rules" import, as merging and unparsing would wipe out comments (if any)
                 # Instead, add a new import and let the formatters sort it out
                 if not imports_added and line.startswith("from pants.engine.rules"):
-                    print("\n".join(import_strings))
+                    print("\n".join(sorted(import_strings)))
                     imports_added = True
 
 
@@ -320,7 +320,9 @@ class CallByNameSyntaxMapper:
             current_source=get,
             new_source=new_source,
             additional_imports=[
-                ast.ImportFrom(module="pants.engine.rules", names=[ast.alias("implicitly")], level=0),
+                ast.ImportFrom(
+                    module="pants.engine.rules", names=[ast.alias("implicitly")], level=0
+                ),
                 *imports,
             ],
         )
@@ -499,13 +501,13 @@ class CallByNameVisitor(ast.NodeVisitor):
     def _should_visit_node(self, decorator_list: list[ast.expr]) -> bool:
         """Only interested in async functions with the @rule(...) decorator."""
         for decorator in decorator_list:
-            if isinstance(decorator, ast.Name) and decorator.id == "rule":
+            if isinstance(decorator, ast.Name) and decorator.id in ["rule", "goal_rule"]:
                 # Accounts for "@rule"
                 return True
             if (
                 isinstance(decorator, ast.Call)
                 and isinstance(decorator.func, ast.Name)
-                and decorator.func.id == "rule"
+                and decorator.func.id in ["rule", "goal_rule"]
             ):
                 # Accounts for "@rule(desc=..., level=...)"
                 return True

@@ -39,9 +39,13 @@ REGISTER_FILE = dedent(
 
 MIGRATED_REGISTER_FILE = dedent(
     """\
-    TODO!!!!
     from pants.backend.python.lint.black.subsystem import Black
     from pants.engine.rules import collect_rules, Get, rule, goal_rule
+    from migrateme.rules1 import setup_black
+    from migrateme.rules1 import setup_black_embedded_comments
+    from migrateme.rules1 import setup_black_multiline
+    from migrateme.rules2 import setup_black_shadowed
+    from pants.engine.rules import implicitly
     from pants.engine.goal import Goal, GoalSubsystem
 
     from migrateme.rules1 import Bar, Baz, Foo, rules as rules1
@@ -57,10 +61,10 @@ MIGRATED_REGISTER_FILE = dedent(
 
     @goal_rule
     async def setup_migrateme(black: Black) -> ContrivedGoal:
-        foo = await Get(Foo, Black, black)
-        bar = await Get(Bar, Black, black)
-        baz = await Get(Baz, Black, black)
-        qux = await Get(Qux, Black, black)
+        foo = await setup_black(**implicitly({black: Black}))
+        bar = await setup_black_multiline(**implicitly({black: Black}))
+        baz = await setup_black_embedded_comments(**implicitly({black: Black}))
+        qux = await setup_black_shadowed(**implicitly({black: Black}))
 
     def rules():
         return [*collect_rules(), *rules1(), *rules2()]
@@ -113,8 +117,8 @@ MIGRATED_RULES1_FILE = dedent(
     from pants.backend.python.lint.black.subsystem import Black
     from pants.backend.python.util_rules.pex import PexRequest, VenvPex
     from pants.engine.rules import collect_rules, Get, rule
-    from pants.engine.rules import implicitly
     from pants.backend.python.util_rules.pex import create_venv_pex
+    from pants.engine.rules import implicitly
 
     class Foo:
         pass
@@ -215,9 +219,9 @@ def test_migrate_call_by_name_syntax():
         # Ensure the JSON output contains the paths to the files we expect to migrate.
         assert all(str(p) in result.stdout for p in [register_path, rules1_path, rules2_path])
 
+        with open(register_path) as f:
+            assert f.read() == MIGRATED_REGISTER_FILE
         with open(rules1_path) as f:
             assert f.read() == MIGRATED_RULES1_FILE
         with open(rules2_path) as f:
             assert f.read() == MIGRATED_RULES2_FILE
-        with open(register_path) as f:
-            assert f.read() == MIGRATED_REGISTER_FILE
