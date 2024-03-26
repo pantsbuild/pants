@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import collections
 import json
+from abc import ABC, ABCMeta
 from dataclasses import dataclass, fields, is_dataclass
-from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
+from typing import Any, ClassVar, Iterable, Mapping, Protocol, runtime_checkable
 
 from pants.engine.addresses import Addresses
 from pants.engine.collection import Collection
 from pants.engine.console import Console
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Snapshot
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.internals.build_files import _get_target_family_and_adaptor_for_dep_rules
@@ -23,6 +25,7 @@ from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
     Field,
+    FieldSet,
     HydratedSources,
     HydrateSourcesRequest,
     SourcesField,
@@ -30,7 +33,9 @@ from pants.engine.target import (
     Targets,
     UnexpandedTargets,
 )
+from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import BoolOption
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
 
@@ -75,6 +80,18 @@ def _normalize_value(val: Any) -> Any:
     return val
 
 
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class HasAdditionalTargetDataFieldSet(FieldSet, metaclass=ABCMeta):
+    label: ClassVar[str]
+
+
+@dataclass(frozen=True)
+class AdditionalTargetData:
+    field_set: HasAdditionalTargetDataFieldSet
+    data: FrozenDict[str, Any]
+
+
 @dataclass(frozen=True)
 class TargetData:
     target: Target
@@ -85,6 +102,7 @@ class TargetData:
     dependencies_rules: tuple[str, ...] | None = None
     dependents_rules: tuple[str, ...] | None = None
     applicable_dep_rules: tuple[DependencyRuleApplication, ...] | None = None
+    additional_info: tuple[AdditionalTargetData, ...] = ()
 
     def to_dict(self, exclude_defaults: bool = False, include_dep_rules: bool = False) -> dict:
         nothing = object()
@@ -97,6 +115,7 @@ class TargetData:
         }
 
         fields["dependencies"] = self.expanded_dependencies
+        fields["additional_info"] = {atd.field_set.label: atd.data for atd in self.additional_info}
         if self.expanded_sources is not None:
             fields["sources"] = self.expanded_sources.files
             fields["sources_fingerprint"] = self.expanded_sources.digest.fingerprint
@@ -165,6 +184,7 @@ async def get_target_data(
     # NB: We must preserve target generators, not replace with their generated targets.
     targets: UnexpandedTargets,
     subsys: PeekSubsystem,
+    union_membership: UnionMembership,
 ) -> TargetDatas:
     sorted_targets = sorted(targets, key=lambda tgt: tgt.address)
 
@@ -188,6 +208,15 @@ async def get_target_data(
         Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField]))
         for tgt in targets_with_sources
     )
+    additional_infos = await MultiGet(
+        Get(AdditionalTargetData, HasAdditionalTargetDataFieldSet, field_set_type.create(tgt))
+        for tgt in sorted_targets
+        for field_set_type in union_membership[HasAdditionalTargetDataFieldSet]
+        if field_set_type.is_applicable(tgt)
+    )
+    group_additional_infos_by_address = collections.defaultdict(list)
+    for additional_info in additional_infos:
+        group_additional_infos_by_address[additional_info.field_set.address].append(additional_info)
 
     expanded_dependencies = [
         tuple(dep.address.spec for dep in deps)
@@ -243,6 +272,7 @@ async def get_target_data(
             dependencies_rules=dependencies_rules_map.get(tgt.address),
             dependents_rules=dependents_rules_map.get(tgt.address),
             applicable_dep_rules=applicable_dep_rules_map.get(tgt.address),
+            additional_info=tuple(group_additional_infos_by_address.get(tgt.address, ())),
         )
         for tgt, expanded_deps in zip(sorted_targets, expanded_dependencies)
     )
