@@ -301,9 +301,11 @@ async def _hydrate_asset_source(
         source = source.get_value_for_platform(platform)
 
     file_digest = FileDigest(source.sha256, source.len)
+    environment_name = await Get(EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target))
     # NB: This just has to run, we don't actually need the result because we know the Digest's
     # FileEntry metadata.
-    await Get(Digest, DownloadFile(source.url, file_digest))
+    await Get(Digest, {DownloadFile(source.url, file_digest): DownloadFile, environment_name: EnvironmentName})
+
     snapshot = await Get(
         Snapshot,
         CreateDigest(
