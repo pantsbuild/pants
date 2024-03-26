@@ -705,6 +705,12 @@ async def build_pex(
     if request.pex_path:
         argv.extend(["--pex-path", ":".join(pex.name for pex in request.pex_path)])
 
+    if request.internal_only:
+        # An internal-only runs on a single machine, and pre-installing wheels is wasted work in
+        # that case (see https://github.com/pex-tool/pex/issues/2292#issuecomment-1854582647 for
+        # analysis).
+        argv.append("--no-pre-install-wheels")
+
     argv.append(f"--sources-directory={source_dir_name}")
     sources_digest_as_subdir = await Get(
         Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
@@ -1157,6 +1163,9 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
     complete_pex_env = pex_environment.in_sandbox(working_directory=request.working_directory)
     argv = complete_pex_env.create_argv(pex.name, *request.argv)
     env = {
+        # Set this in case this PEX was built with --no-pre-install-wheels, and thus parallelising
+        # the install on cold boot is handy.
+        "PEX_MAX_INSTALL_JOBS": str(request.concurrency_available),
         **complete_pex_env.environment_dict(python=pex.python),
         **request.extra_env,
     }
@@ -1196,7 +1205,7 @@ class VenvPexProcess:
     level: LogLevel
     input_digest: Digest | None
     working_directory: str | None
-    extra_env: FrozenDict[str, str] | None
+    extra_env: FrozenDict[str, str]
     output_files: tuple[str, ...] | None
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
@@ -1229,7 +1238,7 @@ class VenvPexProcess:
         object.__setattr__(self, "level", level)
         object.__setattr__(self, "input_digest", input_digest)
         object.__setattr__(self, "working_directory", working_directory)
-        object.__setattr__(self, "extra_env", FrozenDict(extra_env) if extra_env else None)
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
         object.__setattr__(self, "output_files", tuple(output_files) if output_files else None)
         object.__setattr__(
             self, "output_directories", tuple(output_directories) if output_directories else None
@@ -1252,6 +1261,12 @@ async def setup_venv_pex_process(
         else venv_pex.pex.argv0
     )
     argv = (pex_bin, *request.argv)
+    env = {
+        # Set this in case this PEX was built with --no-pre-install-wheels, and thus parallelising
+        # the install on cold boot is handy.
+        "PEX_MAX_INSTALL_JOBS": str(request.concurrency_available),
+        **request.extra_env,
+    }
     input_digest = (
         await Get(Digest, MergeDigests((venv_pex.digest, request.input_digest)))
         if request.input_digest
@@ -1270,7 +1285,7 @@ async def setup_venv_pex_process(
         level=request.level,
         input_digest=input_digest,
         working_directory=request.working_directory,
-        env=request.extra_env,
+        env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
         append_only_caches=append_only_caches,
