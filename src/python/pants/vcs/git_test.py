@@ -16,7 +16,15 @@ from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException,
 from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
-from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, get_git_worktree
+from pants.util.frozendict import FrozenDict
+from pants.vcs.git import (
+    DiffParser,
+    GitWorktree,
+    GitWorktreeRequest,
+    MaybeGitWorktree,
+    get_git_worktree,
+)
+from pants.vcs.hunk import Hunk, TextBlock
 
 
 def init_repo(remote_name: str, remote: PurePath) -> None:
@@ -374,3 +382,124 @@ def test_worktree_invalidation(origin: Path) -> None:
         worktree_id_2 = rule_runner.request(str, [])
 
         assert worktree_id_1 != worktree_id_2
+
+
+@pytest.mark.parametrize(
+    "diff,expected",
+    [
+        [
+            dedent(
+                """\
+                diff --git a/file.txt b/file.txt
+                index e69de29..9daeafb 100644
+                --- a/file.txt
+                +++ b/file.txt
+                @@ -1,0 +2 @@
+                +two
+                """
+            ),
+            FrozenDict({"file.txt": (Hunk(TextBlock(1, 0), TextBlock(2, 1)),)}),
+        ],
+        [
+            dedent(
+                """\
+                diff --git a/file.txt b/file.txt
+                index e69de29..9daeafb 100644
+                --- a/file.txt
+                +++ b/file.txt
+                @@ -2 +1,0 @@
+                -two
+                """
+            ),
+            FrozenDict({"file.txt": (Hunk(TextBlock(2, 1), TextBlock(1, 0)),)}),
+        ],
+        [
+            dedent(
+                """\
+                diff --git a/file.txt b/file.txt
+                index e69de29..9daeafb 100644
+                --- a/file.txt
+                +++ b/file.txt
+                @@ -2 +2 @@
+                -two
+                +four
+                """
+            ),
+            FrozenDict({"file.txt": (Hunk(TextBlock(2, 1), TextBlock(2, 1)),)}),
+        ],
+        [
+            dedent(
+                """\
+                diff --git a/file.txt b/file.txt
+                index e69de29..9daeafb 100644
+                --- a/file.txt
+                +++ b/file.txt
+                @@ -2,2 +2,2 @@
+                -two
+                -three
+                +five
+                +six
+                """
+            ),
+            FrozenDict({"file.txt": (Hunk(TextBlock(2, 2), TextBlock(2, 2)),)}),
+        ],
+        [
+            dedent(
+                """\
+                diff --git a/one.txt b/one.txt
+                index 5626abf..d00491f 100644
+                --- a/one.txt
+                +++ b/one.txt
+                @@ -1 +1 @@
+                -one
+                +1
+                diff --git a/two.txt b/two.txt
+                index f719efd..0cfbf08 100644
+                --- a/two.txt
+                +++ b/two.txt
+                @@ -1 +1 @@
+                -two
+                +2
+                """
+            ),
+            FrozenDict(
+                {
+                    "one.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),),
+                    "two.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),),
+                }
+            ),
+        ],
+        [
+            dedent(
+                """\
+                diff --git a/sp ce.txt b/sp ce.txt
+                index 9daeafb..c7e32ef 100644
+                --- a/sp ce.txt
+                +++ b/sp ce.txt
+                @@ -1 +1 @@
+                -test
+                +t st
+                """
+            ),
+            FrozenDict({"sp ce.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)}),
+        ],
+        [
+            dedent(
+                """\
+                diff --git "a/q\\"ote.txt" "b/q\\"ote.txt"
+                index 79fdb36..9daeafb 100644
+                --- "a/q\\"ote.txt"
+                +++ "b/q\\"ote.txt"
+                @@ -1 +1 @@
+                -te"t
+                +test
+                """
+            ),
+            FrozenDict({'q"ote.txt': (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)}),
+        ],
+    ],
+)
+def test_parse_unified_diff(diff, expected):
+    wt = DiffParser()
+    actual = wt.parse_unified_diff(diff)
+    assert expected == actual

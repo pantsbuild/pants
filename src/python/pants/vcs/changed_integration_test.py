@@ -42,6 +42,33 @@ def repo() -> Iterator[str]:
             "dep.sh": "source transitive.sh",
             "transitive.sh": "",
             "standalone.sh": "",
+            "tables.py": dedent(
+                """\
+                companies = {
+                    "table": "companies",
+                    "colums": [
+                        "id",
+                        "name",
+                    ],
+                }
+
+                persons = {
+                    "table": "persons",
+                    "colums": [
+                        "id",
+                        "name",
+                    ],
+                }
+
+                employees = {
+                    "table": "employees",
+                    "colums": [
+                        "company_id",
+                        "person_id",
+                    ],
+                }
+                """
+            ),
             "BUILD": dedent(
                 """\
                 # Use a target generator to test some of its semantics.
@@ -59,6 +86,8 @@ def repo() -> Iterator[str]:
                     source="standalone.sh",
                     tags=["a"],
                 )
+
+                python_constants(name="tables", source="tables.py")
                 """
             ),
         }
@@ -94,18 +123,28 @@ def _run_pants_goal(
     goal: str,
     dependents: DependentsOption = DependentsOption.NONE,
     *,
+    changed_since: str | None = None,
     extra_args: list[str] | None = None,
 ) -> PantsResult:
+    changed_since = changed_since or "HEAD"
     return run_pants_with_workdir(
         [
             *(extra_args or ()),
-            "--changed-since=HEAD",
+            f"--changed-since={changed_since}",
             "--print-stacktrace",
             f"--changed-dependents={dependents.value}",
             goal,
         ],
         workdir=workdir,
-        config={"GLOBAL": {"backend_packages": ["pants.backend.shell"]}},
+        config={
+            "GLOBAL": {
+                "backend_packages": [
+                    "pants.backend.shell",
+                    "pants.backend.python",
+                    "python_constant",
+                ]
+            }
+        },
     )
 
 
@@ -114,9 +153,16 @@ def assert_list_stdout(
     expected: list[str],
     dependents: DependentsOption = DependentsOption.NONE,
     *,
+    changed_since: str | None = None,
     extra_args: list[str] | None = None,
 ) -> None:
-    result = _run_pants_goal(workdir, "list", dependents=dependents, extra_args=extra_args)
+    result = _run_pants_goal(
+        workdir,
+        "list",
+        dependents=dependents,
+        changed_since=changed_since,
+        extra_args=extra_args,
+    )
     result.assert_success()
     assert sorted(result.stdout.strip().splitlines()) == sorted(expected)
 
@@ -161,6 +207,126 @@ def test_change_transitive_dep(repo: str) -> None:
     )
 
     assert_count_loc(repo, DependentsOption.TRANSITIVE, expected_num_files=3)
+
+
+def test_lines_one_line_added_in_target(repo: str) -> None:
+    Path("tables.py").write_text(
+        dedent(
+            """\
+            companies = {
+                "table": "companies",
+                "colums": [
+                    "id",
+                    "name",
+                ],
+            }
+
+            persons = {
+                "table": "persons",
+                "colums": [
+                    "id",
+                    "name",
+                    "surname",
+                ],
+            }
+
+            employees = {
+                "table": "employees",
+                "colums": [
+                    "company_id",
+                    "person_id",
+                ],
+            }
+            """
+        )
+    )
+    _run_git(["add", "tables.py"])
+    _run_git(["commit", "-m", "Change tables.persons"])
+    assert_list_stdout(
+        repo,
+        [
+            "//:tables#persons",
+        ],
+        changed_since="HEAD~1",
+        extra_args=["--enable-target-origin-sources-blocks"],
+    )
+
+
+def test_lines_one_target_deleted(repo: str) -> None:
+    Path("tables.py").write_text(
+        dedent(
+            """\
+            companies = {
+                "table": "companies",
+                "colums": [
+                    "id",
+                    "name",
+                ],
+            }
+
+
+            employees = {
+                "table": "employees",
+                "colums": [
+                    "company_id",
+                    "person_id",
+                ],
+            }
+            """
+        )
+    )
+    _run_git(["add", "tables.py"])
+    _run_git(["commit", "-m", "Delete tables.persons"])
+    assert_list_stdout(
+        repo,
+        # No targets need to be triggered.
+        [],
+        changed_since="HEAD~1",
+        extra_args=["--enable-target-origin-sources-blocks"],
+    )
+
+
+def test_lines_one_line_on_the_edge_deleted(repo: str) -> None:
+    Path("tables.py").write_text(
+        dedent(
+            """\
+            companies = {
+                "table": "companies",
+                "colums": [
+                    "id",
+                    "name",
+                ],
+            }
+
+            persons = {
+                "table": "persons",
+                "colums": [
+                    "id",
+                    "name",
+                ],
+            }
+            employees = {
+                "table": "employees",
+                "colums": [
+                    "company_id",
+                    "person_id",
+                ],
+            }
+            """
+        )
+    )
+    _run_git(["add", "tables.py"])
+    _run_git(["commit", "-m", "Delete tables.persons"])
+    assert_list_stdout(
+        repo,
+        # Adjacent targets has to be triggered, because we don't khow if the change has affected them.
+        [
+            "//:tables#persons",
+            "//:tables#employees",
+        ],
+        changed_since="HEAD~1",
+        extra_args=["--enable-target-origin-sources-blocks"],
+    )
 
 
 def test_unowned_file(repo: str) -> None:
@@ -221,12 +387,21 @@ def test_change_build_file(repo: str) -> None:
     append_to_file("BUILD", "# foo")
     # Note that the target generator `//:lib` does not show up.
     assert_list_stdout(
-        repo, ["//app.sh:lib", "//dep.sh:lib", "//transitive.sh:lib", "//:standalone"]
+        repo,
+        [
+            "//:standalone",
+            "//:tables#companies",
+            "//:tables#employees",
+            "//:tables#persons",
+            "//app.sh:lib",
+            "//dep.sh:lib",
+            "//transitive.sh:lib",
+        ],
     )
 
     # This is because the BUILD file gets expanded with all its targets, then their sources are
     # used. This might not be desirable behavior.
-    assert_count_loc(repo, expected_num_files=4)
+    assert_count_loc(repo, expected_num_files=5)
 
 
 def test_different_build_file_changed(repo: str) -> None:

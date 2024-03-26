@@ -59,7 +59,8 @@ from pants.engine.internals.dep_rules import (
     DependencyRuleApplication,
 )
 from pants.engine.internals.native_engine import NO_VALUE as NO_VALUE  # noqa: F401
-from pants.engine.internals.native_engine import Field as Field  # noqa: F401
+from pants.engine.internals.native_engine import Field as Field
+from pants.engine.internals.target_adaptor import SourceBlock, SourceBlocks  # noqa: F401
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec, FilespecMatcher
@@ -268,6 +269,7 @@ class Target:
     residence_dir: str
     name_explicitly_set: bool
     description_of_origin: str
+    origin_sources_blocks: FrozenDict[str, SourceBlocks]
 
     @final
     def __init__(
@@ -283,6 +285,7 @@ class Target:
         residence_dir: str | None = None,
         ignore_unrecognized_fields: bool = False,
         description_of_origin: str | None = None,
+        origin_sources_blocks: FrozenDict[str, SourceBlocks] = FrozenDict(),
     ) -> None:
         """Create a target.
 
@@ -315,6 +318,9 @@ class Target:
                 hint=f"Using the `{self.alias}` target type for {address}. {self.removal_hint}",
             )
 
+        if origin_sources_blocks:
+            _validate_origin_sources_blocks(origin_sources_blocks)
+
         object.__setattr__(
             self, "residence_dir", residence_dir if residence_dir is not None else address.spec_path
         )
@@ -322,6 +328,7 @@ class Target:
         object.__setattr__(
             self, "description_of_origin", description_of_origin or self.residence_dir
         )
+        object.__setattr__(self, "origin_sources_blocks", origin_sources_blocks)
         object.__setattr__(self, "name_explicitly_set", name_explicitly_set)
         try:
             object.__setattr__(
@@ -640,6 +647,23 @@ class Target:
         context. If the validation only makes sense for certain goals acting on targets; those
         validations should be done in the associated rules.
         """
+
+
+def _validate_origin_sources_blocks(origin_sources_blocks: FrozenDict[str, SourceBlocks]) -> None:
+    if not isinstance(origin_sources_blocks, FrozenDict):
+        raise ValueError(
+            f"Expected `origin_sources_blocks` to be of type `FrozenDict`, got {type(origin_sources_blocks)=} {origin_sources_blocks=}"
+        )
+    for blocks in origin_sources_blocks.values():
+        if not isinstance(blocks, SourceBlocks):
+            raise ValueError(
+                f"Expected `origin_sources_blocks` to be a `FrozenDict` with values of type `SourceBlocks`, got values of {type(blocks)=} {blocks=}"
+            )
+        for block in blocks:
+            if not isinstance(block, SourceBlock):
+                raise ValueError(
+                    f"Expected `origin_sources_blocks` to be a `FrozenDict` with values of type `SourceBlocks`, got values of {type(blocks)=} {blocks=}"
+                )
 
 
 @dataclass(frozen=True)
