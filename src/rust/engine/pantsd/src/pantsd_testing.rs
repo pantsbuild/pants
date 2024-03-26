@@ -16,7 +16,7 @@ pub fn launch_pantsd() -> (BuildRoot, OptionParser, TempDir) {
     let pants_subprocessdir = TempDir::new().unwrap();
 
     let args = vec![
-        "pants",
+        "pants".to_owned(),
         "--pants-config-files=[]".to_owned(),
         "--no-pantsrc".to_owned(),
         "--pantsd".to_owned(),

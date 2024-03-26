@@ -85,8 +85,8 @@ pub struct Args {
 }
 
 impl Args {
-    /// Create an Args instance with the provided args, which must include the process name,
-    /// a la argv[0].
+    /// Create an Args instance with the provided args, which must include the process name
+    /// as the first arg, a la argv[0].
     pub fn new(arg_strs: Vec<String>) -> Self {
         let mut args: Vec<Arg> = vec![];
         let mut arg_iter = arg_strs.into_iter();
