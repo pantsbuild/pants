@@ -9,9 +9,18 @@ from dataclasses import dataclass
 from itertools import chain
 from typing import DefaultDict, cast
 
-from pants.backend.docker.goals.package_image import BuiltDockerImage
+from pants.backend.docker.goals.package_image import (
+    BuiltDockerImage,
+    DockerBuildSetup,
+    DockerBuildSetupRequest,
+    DockerPackageFieldSet,
+)
 from pants.backend.docker.subsystems.docker_options import DockerOptions
-from pants.backend.docker.target_types import DockerImageRegistriesField, DockerImageSkipPushField
+from pants.backend.docker.target_types import (
+    DockerImageBuildPlatformOptionField,
+    DockerImageRegistriesField,
+    DockerImageSkipPushField,
+)
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.publish import (
     PublishFieldSet,
@@ -20,9 +29,11 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishRequest,
 )
+from pants.engine.addresses import Addresses
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import Targets
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +49,7 @@ class PublishDockerImageFieldSet(PublishFieldSet):
 
     registries: DockerImageRegistriesField
     skip_push: DockerImageSkipPushField
+    platforms: DockerImageBuildPlatformOptionField
 
     def get_output_data(self) -> PublishOutputData:
         return PublishOutputData(
@@ -71,6 +83,30 @@ async def push_docker_images(
                     names=tags,
                     description=f"(by `{request.field_set.skip_push.alias}` on {request.field_set.address})",
                 ),
+            ]
+        )
+
+    field_set = cast(PublishDockerImageFieldSet, request.field_set)
+    if options.use_buildx and field_set.platforms.value:
+        targets = await Get(Targets, Addresses([field_set.address]))
+        target = targets.expect_single()
+
+        build_setup = await Get(
+            DockerBuildSetup,
+            DockerBuildSetupRequest(
+                field_set=DockerPackageFieldSet.create(target),
+                ignore_platforms=False,
+                push_image=True,
+            ),
+        )
+
+        return PublishProcesses(
+            [
+                PublishPackages(
+                    # TODO deal with tags that are intended to be skipped
+                    names=tags,
+                    process=InteractiveProcess.from_process(build_setup.process),
+                )
             ]
         )
 
