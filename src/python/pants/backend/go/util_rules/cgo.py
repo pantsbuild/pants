@@ -323,6 +323,7 @@ async def _cc(
     obj_file: str,
     description: str,
     golang_env_aware: GolangSubsystem.EnvironmentAware,
+    goroot: GoRoot,
 ) -> Process:
     compiler_path, bash, wrapper_script = await MultiGet(
         Get(
@@ -361,6 +362,7 @@ async def _cc(
         output_files=(obj_file,),
         description=description,
         level=LogLevel.DEBUG,
+        immutable_input_digests={".goroot": goroot.digest},
     )
 
 
@@ -372,6 +374,7 @@ async def _gccld(
     flags: Iterable[str],
     objs: Iterable[str],
     description: str,
+    goroot: GoRoot,
 ) -> FallibleProcessResult:
     compiler_path, bash, wrapper_script = await MultiGet(
         Get(
@@ -413,6 +416,7 @@ async def _gccld(
             output_files=(outfile,),
             description=description,
             level=LogLevel.DEBUG,
+            immutable_input_digests={".goroot": goroot.digest},
         ),
     )
 
@@ -463,6 +467,7 @@ async def _dynimport(
         obj_file=os.path.join(obj_dir_path, "_cgo_main.o"),
         description=f"Compile _cgo_main.c ({import_path})",
         golang_env_aware=golang_env_aware,
+        goroot=goroot,
     )
     cgo_main_compile_result = await Get(ProcessResult, Process, cgo_main_compile_process)
     obj_digest = await Get(
@@ -506,6 +511,7 @@ async def _dynimport(
             *sorted(transitive_prebuilt_objects),
         ],
         description=f"Link _cgo_.o ({import_path})",
+        goroot=goroot,
     )
     if cgo_binary_link_result.exit_code != 0:
         # From `go` source:
@@ -547,6 +553,7 @@ async def _dynimport(
             flags=[*ldflags, allow_unresolved_symbols_ldflag],
             objs=obj_files,
             description=f"Link _cgo_.o ({import_path})",
+            goroot=goroot,
         )
         if cgo_binary_link_result.exit_code != 0:
             raise ValueError(
@@ -666,10 +673,10 @@ async def cgo_compile_request(
     dir_path = request.dir_path if request.dir_path else "."
 
     obj_dir_path = (
-        f"__go_stdlib_obj__/{request.import_path}" if os.path.isabs(dir_path) else dir_path
+        f"__go_stdlib_obj__/{request.import_path}" if dir_path.startswith(".goroot") else dir_path
     )
     cgo_input_digest = request.digest
-    if os.path.isabs(dir_path):
+    if dir_path.startswith(".goroot"):
         mkdir_digest = await Get(Digest, CreateDigest([Directory(obj_dir_path)]))
         cgo_input_digest = await Get(Digest, MergeDigests([cgo_input_digest, mkdir_digest]))
 
@@ -819,7 +826,7 @@ async def cgo_compile_request(
             env=cgo_env,
             description=f"Generate Go and C files from CGo files ({request.import_path})",
             input_digest=cgo_input_digest,
-            output_directories=(obj_dir_path,),
+            output_directories=(obj_dir_path, "!.goroot"),
             replace_sandbox_root_in_args=True,
         ),
     )
@@ -844,6 +851,7 @@ async def cgo_compile_request(
             obj_file=ofile,
             description=f"Compile cgo source: {gcc_file}",
             golang_env_aware=golang_env_aware,
+            goroot=goroot,
         )
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
 
@@ -863,6 +871,7 @@ async def cgo_compile_request(
             obj_file=ofile,
             description=f"Compile cgo C++ source: {cxx_file}",
             golang_env_aware=golang_env_aware,
+            goroot=goroot,
         )
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
 
@@ -881,6 +890,7 @@ async def cgo_compile_request(
             obj_file=ofile,
             description=f"Compile cgo Objective-C source: {objc_file}",
             golang_env_aware=golang_env_aware,
+            goroot=goroot,
         )
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
 
@@ -901,6 +911,7 @@ async def cgo_compile_request(
             obj_file=ofile,
             description=f"Compile cgo Fortran source: {fortran_file}",
             golang_env_aware=golang_env_aware,
+            goroot=goroot,
         )
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
 

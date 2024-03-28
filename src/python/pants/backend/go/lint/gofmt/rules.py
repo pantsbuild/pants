@@ -59,6 +59,7 @@ async def gofmt_fmt(
     request: GofmtRequest.Batch, gofmt: GofmtSubsystem, goroot: GoRoot
 ) -> FmtResult:
     await _validate_gofmt_args(gofmt.args)
+
     argv = (
         os.path.join(goroot.path, "bin/gofmt"),
         "-w",
@@ -74,6 +75,7 @@ async def gofmt_fmt(
             output_files=request.files,
             description=f"Run gofmt on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
+            immutable_input_digests={".goroot": goroot.digest},
         ),
     )
     return await FmtResult.create(request, result)

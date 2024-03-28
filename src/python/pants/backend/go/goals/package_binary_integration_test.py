@@ -26,7 +26,9 @@ from pants.backend.go.util_rules import (
     third_party_pkg,
 )
 from pants.core.goals.package import BuiltPackage
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address
+from pants.engine.fs import rules as fs_rules
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner, engine_error
@@ -47,6 +49,8 @@ def rule_runner() -> RuleRunner:
             *target_type_rules.rules(),
             *third_party_pkg.rules(),
             *sdk.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],
         target_types=[

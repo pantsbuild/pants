@@ -26,7 +26,9 @@ from pants.backend.go.util_rules import (
 )
 from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files, external_tool, source_files, system_binaries
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address
+from pants.engine.fs import rules as fs_rules
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -51,6 +53,8 @@ def rule_runner() -> RuleRunner:
             *system_binaries.rules(),
             *target_type_rules.rules(),
             *third_party_pkg.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(Partitions, [GolangciLintRequest.PartitionRequest]),
             QueryRule(LintResult, [GolangciLintRequest.Batch]),
             *GolangciLint.rules(),

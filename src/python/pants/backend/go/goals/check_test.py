@@ -23,7 +23,9 @@ from pants.backend.go.util_rules import (
     third_party_pkg,
 )
 from pants.core.goals.check import CheckResult, CheckResults
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address
+from pants.engine.fs import rules as fs_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -42,6 +44,8 @@ def rule_runner() -> RuleRunner:
             *first_party_pkg.rules(),
             *third_party_pkg.rules(),
             *target_type_rules.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(CheckResults, [GoCheckRequest]),
         ],
         target_types=[GoModTarget, GoPackageTarget],

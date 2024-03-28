@@ -7,8 +7,10 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
+from pants.backend.go.subsystems.toolchain import GoToolchain
 from pants.backend.go.util_rules import go_bootstrap
 from pants.backend.go.util_rules.go_bootstrap import GoBootstrap, compatible_go_version
+from pants.core.util_rules.archive import ExtractedArchive
 from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
@@ -16,14 +18,27 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
     BinaryPathTest,
 )
+from pants.engine.fs import CreateDigest, Digest, DownloadFile, SymlinkEntry
+from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.strutil import bullet_list, softwrap
+from pants.util.strutil import bullet_list, softwrap, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class InstallGoToolchainRequest:
+    """Request to install the Go toolchain."""
+
+
+@dataclass(frozen=True)
+class LocateGoToolchainRequest:
+    """Request to locate a Go toolchain."""
 
 
 @dataclass(frozen=True)
@@ -34,6 +49,7 @@ class GoRoot:
     version: str
 
     _raw_metadata: FrozenDict[str, str]
+    digest: Digest
 
     def is_compatible_version(self, version: str) -> bool:
         """Can this Go compiler handle the target version?"""
@@ -52,9 +68,72 @@ class GoRoot:
         return self._raw_metadata["GOARCH"]
 
 
+@rule(desc="Installing Go toolchain", level=LogLevel.DEBUG)
+async def install_go_toolchain(
+    req: InstallGoToolchainRequest,
+    subsystem: GoToolchain,
+    platform: Platform,
+) -> GoRoot:
+    version = subsystem.version
+
+    external_tool = subsystem.known_version(platform)
+    if external_tool is None:
+        raise ValueError(
+            f"Expected a known version of Go toolchain for platform {platform}, but none was found."
+        )
+
+    platform_mapping = {
+        "linux_arm64": "linux-arm64",
+        "linux_x86_64": "linux-amd64",
+        "macos_arm64": "darwin-arm64",
+        "macos_x86_64": "darwin-amd64",
+    }
+    platform_string = platform_mapping[platform.value]
+    url = f"https://go.dev/dl/go{version}.{platform_string}.tar.gz"
+    package = await Get(
+        Digest,
+        DownloadFile(
+            url,
+            FileDigest(
+                fingerprint=external_tool.sha256,
+                serialized_bytes_length=external_tool.filesize,
+            ),
+        ),
+    )
+
+    extracted_archive = await Get(ExtractedArchive, Digest, package)
+
+    binary_path = "go/bin/go"
+
+    env_result = await Get(  # noqa: PNT30: requires triage
+        ProcessResult,
+        Process(
+            (".goroot/go/bin/go", "env", "-json"),
+            description=f"Determine Go SDK metadata for path .goroot/{binary_path}",
+            level=LogLevel.DEBUG,
+            env={"GOPATH": "/does/not/matter2"},
+            immutable_input_digests={".goroot": extracted_archive.digest},
+        ),
+    )
+
+    sdk_metadata = json.loads(strip_v2_chroot_path(env_result.stdout.decode()))
+    version = sdk_metadata["GOVERSION"][2:]
+    major, minor = version.split(".")[:2]
+    version = f"{major}.{minor}"
+    return GoRoot(
+        path=".goroot/go",
+        version=version,
+        _raw_metadata=FrozenDict(sdk_metadata),
+        digest=extracted_archive.digest,
+    )
+
+
 @rule(desc="Find Go binary", level=LogLevel.DEBUG)
-async def setup_goroot(
-    golang_subsystem: GolangSubsystem, go_bootstrap: GoBootstrap, env_target: EnvironmentTarget
+async def locate_go_toolchain(
+    request: LocateGoToolchainRequest,
+    golang_subsystem: GolangSubsystem,
+    go_bootstrap: GoBootstrap,
+    env_target: EnvironmentTarget,
 ) -> GoRoot:
     search_paths = go_bootstrap.go_search_paths
     all_go_binary_paths = await Get(
@@ -125,8 +204,16 @@ async def setup_goroot(
                 ),
             )
             sdk_metadata = json.loads(env_result.stdout.decode())
+
+            digest = await Get(  # noqa: PNT30: requires triage
+                Digest, CreateDigest([SymlinkEntry("go", sdk_metadata["GOROOT"])])
+            )
+
             return GoRoot(
-                path=sdk_metadata["GOROOT"], version=version, _raw_metadata=FrozenDict(sdk_metadata)
+                path=".goroot/go",
+                version=version,
+                _raw_metadata=FrozenDict(sdk_metadata),
+                digest=digest,
             )
 
         logger.debug(
@@ -156,6 +243,19 @@ async def setup_goroot(
             """
         )
     )
+
+
+@rule(desc="Prepare Go environment", level=LogLevel.DEBUG)
+async def prepare_go_environment(
+    toolchain_subsystem: GoToolchain,
+) -> GoRoot:
+    if toolchain_subsystem.enabled:
+        go_sdk = await Get(GoRoot, InstallGoToolchainRequest())
+
+    else:
+        go_sdk = await Get(GoRoot, LocateGoToolchainRequest())
+
+    return go_sdk
 
 
 def rules():

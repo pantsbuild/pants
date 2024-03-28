@@ -16,6 +16,8 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoModRequest,
 )
 from pants.build_graph.address import Address
+from pants.core.util_rules.archive import rules as archive_rules
+from pants.engine.fs import rules as fs_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -26,6 +28,8 @@ def rule_runner() -> RuleRunner:
         rules=[
             *sdk.rules(),
             *go_mod.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(OwningGoMod, [OwningGoModRequest]),
             QueryRule(GoModInfo, [GoModInfoRequest]),
         ],

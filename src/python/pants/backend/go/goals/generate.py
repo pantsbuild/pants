@@ -226,9 +226,10 @@ async def _run_generators(
                 argv=args,
                 input_digest=digest,
                 working_directory=dir_path,
-                output_directories=["."],
+                output_directories=[".", "!.goroot"],
                 env=env,
                 description=f"Process `go generate` directives in file: {os.path.join(dir_path, go_file)}",
+                immutable_input_digests={".goroot": goroot.digest},
             ),
         )
         digest = await Get(  # noqa: PNT30: this is inherently sequential

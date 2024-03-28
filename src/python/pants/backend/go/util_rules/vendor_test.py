@@ -21,6 +21,8 @@ from pants.backend.go.util_rules.vendor import (
     ParseVendorModulesMetadataResult,
     VendoredModuleMetadata,
 )
+from pants.core.util_rules.archive import rules as archive_rules
+from pants.engine.fs import rules as fs_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -37,6 +39,8 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *link.rules(),
             *assembly.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(ParseVendorModulesMetadataResult, (ParseVendorModulesMetadataRequest,)),
         ]
     )

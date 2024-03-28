@@ -23,8 +23,10 @@ from pants.backend.go.util_rules import (
 )
 from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import source_files
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
+from pants.engine.fs import rules as fs_rules
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -45,6 +47,8 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *link.rules(),
             *assembly.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(FmtResult, (GofmtRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
