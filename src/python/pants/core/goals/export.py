@@ -205,5 +205,11 @@ async def export(
     return Export(exit_code=0)
 
 
+@union
+@dataclass(frozen=True)
+class ExportableTool:
+    """Mark a subsystem as exportable."""
+
+
 def rules():
     return collect_rules()
