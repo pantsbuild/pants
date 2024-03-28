@@ -141,6 +141,19 @@ class PythonToolRequirementsBase(Subsystem):
             )
         )
 
+    @classmethod
+    def pex_requirements_for_default_lockfile(cls):
+        """Generate the pex requirements using this subsystem's default lockfile resource."""
+        assert cls.default_lockfile_resource is not None
+        pkg, path = cls.default_lockfile_resource
+        url = f"resource://{pkg}/{path}"
+        origin = f"The built-in default lockfile for {cls.options_scope}"
+        return Lockfile(
+            url=url,
+            url_description_of_origin=origin,
+            resolve_name=cls.options_scope,
+        )
+
     def pex_requirements(
         self,
         *,
@@ -155,17 +168,8 @@ class PythonToolRequirementsBase(Subsystem):
                 from_superset=Resolve(self.install_from_resolve, use_entire_lockfile),
                 description_of_origin=description_of_origin,
             )
-
-        assert self.default_lockfile_resource is not None
-        pkg, path = self.default_lockfile_resource
-        url = f"resource://{pkg}/{path}"
-        origin = f"The built-in default lockfile for {self.options_scope}"
-        lockfile = Lockfile(
-            url=url,
-            url_description_of_origin=origin,
-            resolve_name=self.options_scope,
-        )
-        return EntireLockfile(lockfile)
+        else:
+            return EntireLockfile(self.pex_requirements_for_default_lockfile())
 
     @property
     def interpreter_constraints(self) -> InterpreterConstraints:

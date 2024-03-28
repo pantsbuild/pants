@@ -13,9 +13,11 @@ from pants.backend.python.target_types import (
     InterpreterConstraintsField,
     PythonSourceField,
 )
+from pants.core.goals.export import ExportableTool
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules
 from pants.engine.target import FieldSet, Target
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, FileOption, SkipOption
 
 
@@ -67,7 +69,4 @@ class Bandit(PythonToolBase):
 
 
 def rules():
-    return (
-        *collect_rules(),
-        *lockfile.rules(),
-    )
+    return (*collect_rules(), *lockfile.rules(), UnionRule(ExportableTool, Bandit))
