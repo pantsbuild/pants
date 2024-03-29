@@ -87,8 +87,8 @@ def test_writing_to_output_file_json() -> None:
             "--plugins=hdrhistogram",
             "--stats-log",
             "--stats-memory-summary",
-            "--stats-format=json",
-            "--stats-output-file=stats.json",
+            "--stats-format=jsonlines",
+            "--stats-output-file=stats.jsonl",
             "roots",
         ]
         run_pants(argv1).assert_success()
@@ -97,14 +97,16 @@ def test_writing_to_output_file_json() -> None:
             "--plugins=hdrhistogram",
             "--stats-log",
             "--stats-memory-summary",
-            "--stats-format=json",
-            "--stats-output-file=stats.json",
+            "--stats-format=jsonlines",
+            "--stats-output-file=stats.jsonl",
             "list",
             "::",
         ]
         run_pants(argv2).assert_success()
-        with open("stats.json") as fh:
-            stats = json.load(fh)["stats"]
+        stats = []
+        with open("stats.jsonl") as fh:
+            for line in fh.readlines():
+                stats.append(json.loads(line))
 
         assert len(stats) == 2
 

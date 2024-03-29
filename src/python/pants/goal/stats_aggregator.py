@@ -66,11 +66,11 @@ class StatsOutputFormat(Enum):
     """Output format for reporting Pants stats.
 
     text: Report stats in plain text.
-    json: Report stats in JSON.
+    jsonlines: Report stats in JSON Lines text format.
     """
 
     text = "text"
-    json = "json"
+    jsonlines = "jsonlines"
 
 
 class StatsAggregatorSubsystem(Subsystem):
@@ -127,27 +127,17 @@ def _log_or_write_to_file_plain(output_file: Optional[str], lines: list[str]) ->
 
 
 def _log_or_write_to_file_json(output_file: Optional[str], stats_object: StatsObject) -> None:
-    """Send JSON object to the stdout or write to the file."""
+    """Send JSON Lines single line object to the stdout or write to the file."""
     if not stats_object:
         return
 
     if not output_file:
-        logger.info(stats_object)
+        logger.info(json.dumps(stats_object))
         return
 
-    existing_stats = None
-    if Path(output_file).exists():
-        try:
-            with open(output_file) as fh:
-                existing_stats = json.load(fh)
-            if isinstance(existing_stats.get("stats"), list):
-                existing_stats["stats"].append(stats_object)
-        except Exception:
-            pass
-
-    with safe_open(output_file, "w") as fh:
-        stats = existing_stats if existing_stats else {"stats": [stats_object]}
-        json.dump(stats, fh, indent=4)
+    jsonline = json.dumps(stats_object) + "\n"
+    with safe_open(output_file, "a") as fh:
+        fh.write(jsonline)
     logger.info(f"Wrote Pants stats to {output_file}")
 
 
@@ -355,7 +345,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
 
         if StatsOutputFormat.text == self.format:
             self._output_stats_in_plain_text(context)
-        elif StatsOutputFormat.json == self.format:
+        elif StatsOutputFormat.jsonlines == self.format:
             self._output_stats_in_json(context)
 
 
