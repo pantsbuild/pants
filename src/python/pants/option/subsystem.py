@@ -74,6 +74,7 @@ class Subsystem(metaclass=_SubsystemMeta):
     deprecated_options_scope: str | None = None
     deprecated_options_scope_removal_version: str | None = None
 
+    # // Note: must be aligned with the regex in src/rust/engine/options/src/id.rs.
     _scope_name_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
     _rules: ClassVar[Sequence[Rule] | None] = None

@@ -20,7 +20,7 @@ struct Arg {
 impl Arg {
     /// Checks if this arg's flag is equal to the provided strings concatenated with dashes.
     /// E.g., "--foo-bar" matches ["-", "foo", "bar"].
-    fn flag_match<'a>(&self, dash_separated_strs: impl Iterator<Item = &'a str>) -> bool {
+    fn _flag_match<'a>(&self, dash_separated_strs: impl Iterator<Item = &'a str>) -> bool {
         #[allow(unstable_name_collisions)]
         // intersperse is provided by itertools::Itertools, but is also in the Rust nightly
         // as an experimental feature of standard Iterator. If/when that becomes standard we
@@ -34,28 +34,43 @@ impl Arg {
         )
     }
 
-    /// Checks if this arg provides a value for the specified option, either negated or not.
-    fn _matches(&self, id: &OptionId, negate: bool) -> bool {
-        fn prefix<'a>(negate: bool) -> impl Iterator<Item = &'a str> {
-            if negate {
-                once("--no")
-            } else {
-                once("-")
-            }
+    fn _prefix<'a>(negate: bool) -> impl Iterator<Item = &'a str> {
+        if negate {
+            once("--no")
+        } else {
+            once("-")
         }
-        // Check if --scope-flag matches,
-        self.flag_match(chain![
-            prefix(negate),
+    }
+
+    // Check if --scope-flag matches.
+    fn _matches_explicit_scope(&self, id: &OptionId, negate: bool) -> bool {
+        self._flag_match(chain![
+            Self::_prefix(negate),
             once(id.scope.name()),
             id.name_components_strs()
-        ]) ||
-        // Check if --flag matches in the context of the current goal's scope.
-        (self.context == id.scope &&
-         self.flag_match(chain![prefix(negate), id.name_components_strs()])) ||
-        // Check if -s matches for a short name s, if any.
-        (if let Some(sn) = &id.short_name {
-            self.flag_match(chain![once(""), once(sn.as_ref())])
-        } else { false })
+        ])
+    }
+
+    // Check if --flag matches in the context of the current goal's scope.
+    fn _matches_implicit_scope(&self, id: &OptionId, negate: bool) -> bool {
+        self.context == id.scope
+            && self._flag_match(chain![Self::_prefix(negate), id.name_components_strs()])
+    }
+
+    // Check if -s matches for a short name s, if any.
+    fn _matches_short(&self, id: &OptionId) -> bool {
+        if let Some(sn) = &id.short_name {
+            self._flag_match(chain![once(""), once(sn.as_ref())])
+        } else {
+            false
+        }
+    }
+
+    /// Checks if this arg provides a value for the specified option, either negated or not.
+    fn _matches(&self, id: &OptionId, negate: bool) -> bool {
+        self._matches_explicit_scope(id, negate)
+            || self._matches_implicit_scope(id, negate)
+            || self._matches_short(id)
     }
 
     fn matches(&self, id: &OptionId) -> bool {

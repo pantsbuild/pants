@@ -14,7 +14,8 @@ pub enum Scope {
 }
 
 lazy_static! {
-    static ref SCOPE_NAME_RE: Regex = Regex::new(r"^[a-z][a-z0-9-]+$").unwrap();
+    // Note: must be aligned with the regex in src/python/pants/option/subsystem.py.
+    static ref SCOPE_NAME_RE: Regex = Regex::new(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$").unwrap();
 }
 
 pub(crate) fn is_valid_scope_name(name: &str) -> bool {
