@@ -9,13 +9,13 @@ use crate::parse::test_util::write_fromfile;
 use crate::{option_id, DictEdit, DictEditAction, Val};
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource};
 
-fn args<I: IntoIterator<Item = &'static str>>(args: I) -> Args {
-    Args::new(args.into_iter().map(str::to_owned).collect())
+fn mk_args<I: IntoIterator<Item = &'static str>>(args: I) -> Args {
+    Args::new(args.into_iter().map(str::to_owned))
 }
 
 #[test]
 fn test_display() {
-    let args = args([]);
+    let args = mk_args([]);
     assert_eq!("--global".to_owned(), args.display(&option_id!("global")));
     assert_eq!(
         "--scope-name".to_owned(),
@@ -29,7 +29,7 @@ fn test_display() {
 
 #[test]
 fn test_string() {
-    let args = args([
+    let args = mk_args([
         "-u=swallow",
         "-ldebug",
         "--foo=bar",
@@ -56,7 +56,7 @@ fn test_string() {
 
 #[test]
 fn test_bool() {
-    let args = args([
+    let args = mk_args([
         "-c=swallow",
         "--foo=false",
         "-f",
@@ -93,7 +93,7 @@ fn test_bool() {
 
 #[test]
 fn test_float() {
-    let args = args([
+    let args = mk_args([
         "-j=4",
         "--foo=42",
         "--foo=3.14",
@@ -120,7 +120,7 @@ fn test_float() {
 
 #[test]
 fn test_string_list() {
-    let args = args([
+    let args = mk_args([
         "--bad=['mis', 'matched')",
         "--phases=initial",
         "-p=['one']",

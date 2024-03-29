@@ -52,8 +52,7 @@ fn with_setup(
         Args::new(
             config_file_arg
                 .into_iter()
-                .chain(args.into_iter().map(str::to_string))
-                .collect(),
+                .chain(args.into_iter().map(str::to_string)),
         ),
         Env {
             env: env

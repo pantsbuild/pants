@@ -87,7 +87,7 @@ pub struct Args {
 impl Args {
     /// Create an Args instance with the provided args, which must *not* include the
     /// argv[0] process name.
-    pub fn new(arg_strs: Vec<String>) -> Self {
+    pub fn new<I: IntoIterator<Item = String>>(arg_strs: I) -> Self {
         let mut args: Vec<Arg> = vec![];
         let mut scope = Scope::Global;
         for arg_str in arg_strs.into_iter() {
@@ -128,6 +128,8 @@ impl Args {
     }
 
     pub fn argv() -> Self {
+        let mut args = env::args().collect::<Vec<_>>().into_iter();
+        args.next(); // Consume the process name (argv[0]).
         Self::new(env::args().collect::<Vec<_>>())
     }
 
