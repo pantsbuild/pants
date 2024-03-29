@@ -3,24 +3,19 @@
 
 use core::fmt::Debug;
 use maplit::hashmap;
-use std::iter::once;
 
 use crate::args::Args;
 use crate::parse::test_util::write_fromfile;
 use crate::{option_id, DictEdit, DictEditAction, Val};
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource};
 
-fn mk_args<'a, I: IntoIterator<Item = &'a str>>(args: I) -> Args {
-    Args::new(
-        once("pants".to_owned())
-            .chain(args.into_iter().map(str::to_owned))
-            .collect(),
-    )
+fn args<I: IntoIterator<Item = &'static str>>(args: I) -> Args {
+    Args::new(args.into_iter().map(str::to_owned).collect())
 }
 
 #[test]
 fn test_display() {
-    let args = mk_args([]);
+    let args = args([]);
     assert_eq!("--global".to_owned(), args.display(&option_id!("global")));
     assert_eq!(
         "--scope-name".to_owned(),
@@ -34,7 +29,7 @@ fn test_display() {
 
 #[test]
 fn test_string() {
-    let args = mk_args([
+    let args = args([
         "-u=swallow",
         "-ldebug",
         "--foo=bar",
@@ -61,7 +56,7 @@ fn test_string() {
 
 #[test]
 fn test_bool() {
-    let args = mk_args([
+    let args = args([
         "-c=swallow",
         "--foo=false",
         "-f",
@@ -98,7 +93,7 @@ fn test_bool() {
 
 #[test]
 fn test_float() {
-    let args = mk_args([
+    let args = args([
         "-j=4",
         "--foo=42",
         "--foo=3.14",
@@ -125,7 +120,7 @@ fn test_float() {
 
 #[test]
 fn test_string_list() {
-    let args = mk_args([
+    let args = args([
         "--bad=['mis', 'matched')",
         "--phases=initial",
         "-p=['one']",
@@ -199,12 +194,11 @@ fn test_scalar_fromfile() {
         negate: bool,
     ) {
         let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", content);
-        let args = mk_args(vec![format!(
+        let args = Args::new(vec![format!(
             "--{}foo=@{}",
             if negate { "no-" } else { "" },
             fromfile_path.display()
-        )
-        .as_str()]);
+        )]);
         let actual = getter(&args, &option_id!("foo")).unwrap().unwrap();
         assert_eq!(expected, actual)
     }
@@ -218,7 +212,7 @@ fn test_scalar_fromfile() {
     do_test("EXPANDED", "EXPANDED".to_owned(), Args::get_string, false);
 
     let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", "BAD INT");
-    let args = mk_args(vec![format!("--foo=@{}", fromfile_path.display()).as_str()]);
+    let args = Args::new(vec![format!("--foo=@{}", fromfile_path.display())]);
     assert_eq!(
         args.get_int(&option_id!("foo")).unwrap_err(),
         "Problem parsing --foo int value:\n1:BAD INT\n  ^\n\
@@ -230,7 +224,7 @@ fn test_scalar_fromfile() {
 fn test_list_fromfile() {
     fn do_test(content: &str, expected: &[ListEdit<i64>], filename: &str) {
         let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
-        let args = mk_args(vec![format!("--foo=@{}", &fromfile_path.display()).as_str()]);
+        let args = Args::new(vec![format!("--foo=@{}", &fromfile_path.display())]);
         let actual = args.get_int_list(&option_id!("foo")).unwrap().unwrap();
         assert_eq!(expected.to_vec(), actual)
     }
@@ -277,7 +271,7 @@ fn test_dict_fromfile() {
         };
 
         let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
-        let args = mk_args(vec![format!("--foo=@{}", &fromfile_path.display()).as_str()]);
+        let args = Args::new(vec![format!("--foo=@{}", &fromfile_path.display())]);
         let actual = args.get_dict(&option_id!("foo")).unwrap().unwrap();
         assert_eq!(expected, actual)
     }
@@ -306,13 +300,13 @@ fn test_dict_fromfile() {
 
 #[test]
 fn test_nonexistent_required_fromfile() {
-    let args = mk_args(vec!["--foo=@/does/not/exist"]);
+    let args = Args::new(vec!["--foo=@/does/not/exist".to_string()]);
     let err = args.get_string(&option_id!("foo")).unwrap_err();
     assert!(err.starts_with("Problem reading /does/not/exist for --foo: No such file or directory"));
 }
 
 #[test]
 fn test_nonexistent_optional_fromfile() {
-    let args = mk_args(vec!["--foo=@?/does/not/exist"]);
+    let args = Args::new(vec!["--foo=@?/does/not/exist".to_string()]);
     assert!(args.get_string(&option_id!("foo")).unwrap().is_none());
 }

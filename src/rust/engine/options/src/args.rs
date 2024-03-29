@@ -85,14 +85,12 @@ pub struct Args {
 }
 
 impl Args {
-    /// Create an Args instance with the provided args, which must include the process name
-    /// as the first arg, a la argv[0].
+    /// Create an Args instance with the provided args, which must *not* include the
+    /// argv[0] process name.
     pub fn new(arg_strs: Vec<String>) -> Self {
         let mut args: Vec<Arg> = vec![];
-        let mut arg_iter = arg_strs.into_iter();
-        arg_iter.next(); // Skip argv[0].
         let mut scope = Scope::Global;
-        for arg_str in arg_iter {
+        for arg_str in arg_strs.into_iter() {
             if arg_str.starts_with("--") {
                 let mut components = arg_str.splitn(2, '=');
                 let flag = components.next().unwrap();

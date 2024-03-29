@@ -5,12 +5,10 @@ use crate::{
     option_id, Args, BuildRoot, DictEdit, DictEditAction, Env, ListEdit, ListEditAction,
     OptionParser, Source, Val,
 };
-use itertools::chain;
 use maplit::hashmap;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
-use std::iter::once;
 use tempfile::TempDir;
 
 fn config_source() -> Source {
@@ -52,12 +50,10 @@ fn with_setup(
 
     let option_parser = OptionParser::new(
         Args::new(
-            chain![
-                once("pants".to_owned()),
-                config_file_arg.into_iter(),
-                args.into_iter().map(str::to_string)
-            ]
-            .collect(),
+            config_file_arg
+                .into_iter()
+                .chain(args.into_iter().map(str::to_string))
+                .collect(),
         ),
         Env {
             env: env
