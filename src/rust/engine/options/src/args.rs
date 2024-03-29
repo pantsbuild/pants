@@ -100,8 +100,8 @@ pub struct Args {
 }
 
 impl Args {
-    /// Create an Args instance with the provided args, which must *not* include the
-    /// argv[0] process name.
+    // Create an Args instance with the provided args, which must *not* include the
+    // argv[0] process name.
     pub fn new<I: IntoIterator<Item = String>>(arg_strs: I) -> Self {
         let mut args: Vec<Arg> = vec![];
         let mut scope = Scope::Global;
