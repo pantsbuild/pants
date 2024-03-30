@@ -11,6 +11,7 @@ fn test_is_valid_scope_name() {
     assert!(is_valid_scope_name("generate-lockfiles"));
     assert!(is_valid_scope_name("i_dont_like_underscores"));
 
+    assert!(!is_valid_scope_name("pants"));
     assert!(!is_valid_scope_name("No-Caps"));
     assert!(!is_valid_scope_name("looks/like/a/target"));
     assert!(!is_valid_scope_name("//:target"));

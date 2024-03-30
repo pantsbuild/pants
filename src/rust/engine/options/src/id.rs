@@ -19,7 +19,9 @@ lazy_static! {
 }
 
 pub(crate) fn is_valid_scope_name(name: &str) -> bool {
-    SCOPE_NAME_RE.is_match(name)
+    // The exact string "pants" is not allowed as a scope name: if we encounter it on the
+    // command line, it is part of the invocation: /path/to/python -m pants <actual args>.
+    SCOPE_NAME_RE.is_match(name) && name != "pants"
 }
 
 impl Scope {

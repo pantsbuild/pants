@@ -252,7 +252,7 @@ class Subsystem(metaclass=_SubsystemMeta):
 
     @classmethod
     def is_valid_scope_name(cls, s: str) -> bool:
-        return s == "" or cls._scope_name_re.match(s) is not None
+        return s == "" or (cls._scope_name_re.match(s) is not None and s != "pants")
 
     @classmethod
     def validate_scope(cls) -> None:
