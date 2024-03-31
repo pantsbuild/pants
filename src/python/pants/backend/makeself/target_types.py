@@ -82,7 +82,9 @@ class MakeselfArchiveArgsField(StringSequenceField):
     required = False
     help = help_text(
         """
-        Makeself script args, see docs [here](https://github.com/megastep/makeself/tree/release-2.5.0#usage).
+        [Arguments](https://github.com/megastep/makeself#usage) to pass
+        to the `makeself` script when building this archive. These are passed
+        before any file paths.
         """
     )
 
