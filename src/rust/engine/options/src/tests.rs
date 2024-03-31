@@ -373,6 +373,19 @@ fn test_parse_dict_options() {
         }]
     }
 
+    fn add2(items0: HashMap<&str, Val>, items1: HashMap<&str, Val>) -> Vec<DictEdit> {
+        vec![
+            DictEdit {
+                action: DictEditAction::Add,
+                items: with_owned_keys(items0),
+            },
+            DictEdit {
+                action: DictEditAction::Add,
+                items: with_owned_keys(items1),
+            },
+        ]
+    }
+
     let default_derivation = (
         Source::Default,
         replace(hashmap! {"key1" => Val::Int(1), "key2" => Val::String("val2".to_string())}),
@@ -383,6 +396,7 @@ fn test_parse_dict_options() {
             "key1" => Val::Int(1),
             "key2" => Val::String("val2".to_string()),
             "key3" => Val::Int(3),
+            "key3a" => Val::String("3a".to_string()),
             "key4" => Val::Float(4.0),
             "key5" => Val::Bool(true),
             "key6" => Val::Int(6),
@@ -392,9 +406,15 @@ fn test_parse_dict_options() {
             (config_source(), add(hashmap! {"key5" => Val::Bool(true)})),
             (extra_config_source(), add(hashmap! {"key6" => Val::Int(6)})),
             (Source::Env, add(hashmap! {"key4" => Val::Float(4.0)})),
-            (Source::Flag, add(hashmap! {"key3" => Val::Int(3)})),
+            (
+                Source::Flag,
+                add2(
+                    hashmap! {"key3" => Val::Int(3)},
+                    hashmap! {"key3a" => Val::String("3a".to_string())},
+                ),
+            ),
         ],
-        vec!["--scope-foo=+{'key3': 3}"],
+        vec!["--scope-foo=+{'key3': 3}", "--scope-foo=+{'key3a': '3a'}"],
         vec![("PANTS_SCOPE_FOO", "+{'key4': 4.0}")],
         "[scope]\nfoo = \"+{ 'key5': true }\"",
         "[scope]\nfoo = \"+{ 'key6': 6 }\"",

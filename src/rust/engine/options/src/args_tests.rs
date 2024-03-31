@@ -258,20 +258,31 @@ fn test_list_fromfile() {
 #[test]
 fn test_dict_fromfile() {
     fn do_test(content: &str, filename: &str) {
-        let expected = vec![DictEdit {
-            action: DictEditAction::Replace,
-            items: hashmap! {
-            "FOO".to_string() => Val::Dict(hashmap! {
-                "BAR".to_string() => Val::Float(3.14),
-                "BAZ".to_string() => Val::Dict(hashmap! {
-                    "QUX".to_string() => Val::Bool(true),
-                    "QUUX".to_string() => Val::List(vec![ Val::Int(1), Val::Int(2)])
-                })
-            }),},
-        }];
+        let expected = vec![
+            DictEdit {
+                action: DictEditAction::Replace,
+                items: hashmap! {
+                "FOO".to_string() => Val::Dict(hashmap! {
+                    "BAR".to_string() => Val::Float(3.14),
+                    "BAZ".to_string() => Val::Dict(hashmap! {
+                        "QUX".to_string() => Val::Bool(true),
+                        "QUUX".to_string() => Val::List(vec![ Val::Int(1), Val::Int(2)])
+                    })
+                }),},
+            },
+            DictEdit {
+                action: DictEditAction::Add,
+                items: hashmap! {
+                    "KEY".to_string() => Val::String("VALUE".to_string()),
+                },
+            },
+        ];
 
         let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
-        let args = Args::new(vec![format!("--foo=@{}", &fromfile_path.display())]);
+        let args = Args::new(vec![
+            format!("--foo=@{}", &fromfile_path.display()),
+            "--foo=+{'KEY':'VALUE'}".to_string(),
+        ]);
         let actual = args.get_dict(&option_id!("foo")).unwrap().unwrap();
         assert_eq!(expected, actual)
     }

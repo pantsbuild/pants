@@ -229,16 +229,21 @@ impl OptionsSource for Args {
     }
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
-        // We iterate in reverse so that the rightmost arg wins in case an option
-        // is specified multiple times.
-        for arg in self.args.iter().rev() {
+        let mut edits = vec![];
+        for arg in self.args.iter() {
             if arg.matches(id) {
-                return expand_to_dict(arg.value.clone().ok_or_else(|| {
-                    format!("Expected list option {} to have a value.", self.display(id))
-                })?)
-                .map_err(|e| e.render(&arg.flag));
+                let value = arg.value.clone().ok_or_else(|| {
+                    format!("Expected dict option {} to have a value.", self.display(id))
+                })?;
+                if let Some(es) = expand_to_dict(value).map_err(|e| e.render(&arg.flag))? {
+                    edits.extend(es);
+                }
             }
         }
-        Ok(None)
+        if edits.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(edits))
+        }
     }
 }
