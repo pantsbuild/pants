@@ -228,7 +228,7 @@ impl OptionsSource for Args {
         self.get_list::<String>(id)
     }
 
-    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
+    fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
         // We iterate in reverse so that the rightmost arg wins in case an option
         // is specified multiple times.
         for arg in self.args.iter().rev() {

@@ -182,7 +182,7 @@ pub(crate) trait OptionsSource {
     /// Get the dict option identified by `id` from this source.
     /// Errors when this source has an option value for `id` but that value is not a dict.
     ///
-    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String>;
+    fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String>;
 }
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
@@ -210,7 +210,7 @@ pub struct ListOptionValue<T> {
 
 #[derive(Debug)]
 pub struct DictOptionValue {
-    pub derivation: Option<Vec<(Source, DictEdit)>>,
+    pub derivation: Option<Vec<(Source, Vec<DictEdit>)>>,
     // The highest-priority source that provided edits for this value.
     pub source: Source,
     pub value: HashMap<String, Val>,
@@ -526,25 +526,27 @@ impl OptionParser {
         if self.include_derivation {
             let mut derivations = vec![(
                 Source::Default,
-                DictEdit {
+                vec![DictEdit {
                     action: DictEditAction::Replace,
                     items: dict.clone(),
-                },
+                }],
             )];
             for (source_type, source) in self.sources.iter() {
-                if let Some(dict_edit) = source.get_dict(id)? {
-                    derivations.push((source_type.clone(), dict_edit));
+                if let Some(dict_edits) = source.get_dict(id)? {
+                    derivations.push((source_type.clone(), dict_edits));
                 }
             }
             derivation = Some(derivations);
         }
         let mut highest_priority_source = Source::Default;
         for (source_type, source) in self.sources.iter() {
-            if let Some(dict_edit) = source.get_dict(id)? {
+            if let Some(dict_edits) = source.get_dict(id)? {
                 highest_priority_source = source_type.clone();
-                match dict_edit.action {
-                    DictEditAction::Replace => dict = dict_edit.items,
-                    DictEditAction::Add => dict.extend(dict_edit.items),
+                for dict_edit in dict_edits {
+                    match dict_edit.action {
+                        DictEditAction::Replace => dict = dict_edit.items,
+                        DictEditAction::Add => dict.extend(dict_edit.items),
+                    }
                 }
             }
         }

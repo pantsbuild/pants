@@ -258,7 +258,7 @@ fn test_list_fromfile() {
 #[test]
 fn test_dict_fromfile() {
     fn do_test(content: &str, filename: &str) {
-        let expected = DictEdit {
+        let expected = vec![DictEdit {
             action: DictEditAction::Replace,
             items: hashmap! {
             "FOO".to_string() => Val::Dict(hashmap! {
@@ -268,7 +268,7 @@ fn test_dict_fromfile() {
                     "QUUX".to_string() => Val::List(vec![ Val::Int(1), Val::Int(2)])
                 })
             }),},
-        };
+        }];
 
         let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
         let args = Args::new(vec![format!("--foo=@{}", &fromfile_path.display())]);

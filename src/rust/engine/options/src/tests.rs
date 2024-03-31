@@ -340,7 +340,7 @@ fn test_parse_dict_options() {
 
     fn check(
         expected: HashMap<&str, Val>,
-        expected_derivation: Vec<(Source, DictEdit)>,
+        expected_derivation: Vec<(Source, Vec<DictEdit>)>,
         args: Vec<&'static str>,
         env: Vec<(&'static str, &'static str)>,
         config: &'static str,
@@ -359,18 +359,18 @@ fn test_parse_dict_options() {
         });
     }
 
-    fn replace(items: HashMap<&str, Val>) -> DictEdit {
-        DictEdit {
+    fn replace(items: HashMap<&str, Val>) -> Vec<DictEdit> {
+        vec![DictEdit {
             action: DictEditAction::Replace,
             items: with_owned_keys(items),
-        }
+        }]
     }
 
-    fn add(items: HashMap<&str, Val>) -> DictEdit {
-        DictEdit {
+    fn add(items: HashMap<&str, Val>) -> Vec<DictEdit> {
+        vec![DictEdit {
             action: DictEditAction::Add,
             items: with_owned_keys(items),
-        }
+        }]
     }
 
     let default_derivation = (

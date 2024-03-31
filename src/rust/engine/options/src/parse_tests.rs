@@ -843,6 +843,13 @@ fn test_expand_fromfile_to_dict() {
             "{prefix}{}",
             _tmpdir.path().join(filename).display()
         ))
+        .map(|x| {
+            if let Some(des) = x {
+                des.into_iter().next()
+            } else {
+                None
+            }
+        })
     }
 
     fn do_test(content: &str, expected: &DictEdit, filename: &str) {
