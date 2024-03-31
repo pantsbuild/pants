@@ -28,6 +28,10 @@ class MakeselfArchiveStartupScriptField(StringSequenceField):
     help = help_text(
         """
         The startup script, i.e. what gets run when executing `./my_archive.run`.
+
+        Examples:
+        - `["startup.sh"]`
+        - `["echo", "Running makeself archieve"]`
         """
     )
 
