@@ -26,8 +26,8 @@ from pants.backend.python.util_rules.pex_requirements import (
     ResolvePexConfig,
     ResolvePexConfigRequest,
 )
-from pants.core.goals.export import ExportableTool
 from pants.core.goals.generate_lockfiles import (
+    DEFAULT_TOOL_LOCKFILE,
     GenerateLockfile,
     GenerateLockfileResult,
     GenerateLockfilesSubsystem,
@@ -37,6 +37,7 @@ from pants.core.goals.generate_lockfiles import (
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
@@ -203,8 +204,8 @@ class KnownPythonUserResolveNamesRequest(KnownUserResolveNamesRequest):
 
 def python_exportable_tools(union_membership: UnionMembership) -> dict[str, type[PythonToolBase]]:
     exportable_tools = union_membership.get(ExportableTool)
-    names_of_python_tools = {
-        e.options_scope: e for e in exportable_tools if issubclass(e, PythonToolBase)
+    names_of_python_tools: dict[str, type[PythonToolBase]] = {
+        e.options_scope: e for e in exportable_tools if issubclass(e, PythonToolBase)  # type: ignore  # mypy isn't narrowing with `issubclass`
     }
     return names_of_python_tools
 
@@ -268,17 +269,20 @@ async def setup_user_lockfile_requests(
             tool_cls: type[PythonToolBase] = tools[resolve]
             tool = await _construct_subsystem(tool_cls)
 
-            lockfile_dest = (
-                tool.default_lockfile_resource[1] if tool.default_lockfile_resource else ""
-            )
+            # TODO: we shouldn't be managing default ICs in lockfile identification.
+            #   We should find a better place to do this or a better way to default
+            if tool.register_interpreter_constraints:
+                ic = tool.interpreter_constraints
+            else:
+                ic = InterpreterConstraints(tool.default_interpreter_constraints)
 
             out.append(
                 GeneratePythonLockfile(
                     requirements=FrozenOrderedSet(sorted(tool.requirements)),
                     find_links=FrozenOrderedSet(find_links),
-                    interpreter_constraints=tool.interpreter_constraints,
+                    interpreter_constraints=ic,
                     resolve_name=resolve,
-                    lockfile_dest=lockfile_dest,
+                    lockfile_dest=DEFAULT_TOOL_LOCKFILE,
                     diff=False,
                 )
             )

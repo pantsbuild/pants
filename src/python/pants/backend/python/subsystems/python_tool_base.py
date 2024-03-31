@@ -19,6 +19,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
     Resolve,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
 from pants.option.errors import OptionsError
@@ -31,7 +32,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-class PythonToolRequirementsBase(Subsystem):
+class PythonToolRequirementsBase(Subsystem, ExportableTool):
     """Base class for subsystems that configure a set of requirements for a python tool."""
 
     # Subclasses must set.
@@ -139,6 +140,20 @@ class PythonToolRequirementsBase(Subsystem):
                 cls.default_lockfile_resource[0].replace(".", os.path.sep),
                 cls.default_lockfile_resource[1],
             )
+        )
+
+    @classmethod
+    def help_for_generate_lockfile_with_default_location(cls, resolve_name):
+        return softwrap(
+            f"""
+            You requested to generate a lockfile for {resolve_name} because
+            you included it in `--generate-lockfiles-resolve`, but
+            {resolve_name} is a tool using its default lockfile.
+
+            If you would like to generate a lockfile for {resolve_name},
+            follow the instructions for setting up lockfiles for tools
+            {doc_url('docs/python/overview/lockfiles#lockfiles-for-tools')}
+        """
         )
 
     @classmethod
