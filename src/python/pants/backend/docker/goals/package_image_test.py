@@ -1152,7 +1152,7 @@ def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
                 """\
                 docker_image(
                   name="img1",
-                  cache_from={"type": "local", "dest": "/tmp/docker/pants-test-cache"},
+                  cache_from=[{"type": "local", "dest": "/tmp/docker/pants-test-cache1"}, {"type": "local", "dest": "/tmp/docker/pants-test-cache2"}],
                 )
                 """
             ),
@@ -1164,7 +1164,8 @@ def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "buildx",
             "build",
-            "--cache-from=type=local,dest=/tmp/docker/pants-test-cache",
+            "--cache-from=type=local,dest=/tmp/docker/pants-test-cache1",
+            "--cache-from=type=local,dest=/tmp/docker/pants-test-cache2",
             "--output=type=docker",
             "--pull=False",
             "--tag",
@@ -1646,7 +1647,7 @@ def test_get_context_root(
             ),
             "",
         ),
-        # Buildkit with containerd-snapshotter
+        # Buildkit with containerd-snapshotter 0.12.1
         (
             DockerBinary("/bin/docker", "1234", is_podman=False),
             "sha256:b2b51838586286a9e544ddb31b3dbf7f6a99654d275b6e56b5f69f90138b4c0e",
@@ -1665,7 +1666,7 @@ def test_get_context_root(
             ),
             "",
         ),
-        # Buildkit with containerd-snapshotter and cross platform
+        # Buildkit with containerd-snapshotter and cross platform 0.12.1
         (
             DockerBinary("/bin/docker", "1234", is_podman=False),
             "sha256:3c72de0e05bb75247e68e124e6500700f6e0597425db2ee9f08fd59ef28cea0f",
@@ -1683,6 +1684,29 @@ def test_get_context_root(
                 #12 naming to myhost.com/my_app:latest done
                 #12 unpacking to myhost.com/my_app:latest done
                 #12 DONE 0.0s
+                """
+            ),
+            "",
+        ),
+        # Buildkit with containerd-snapshotter 0.13.1
+        (
+            DockerBinary("/bin/docker", "1234", is_podman=False),
+            "sha256:d15432046b4feaebb70370fad4710151dd8f0b9741cb8bc4d20c08ed8847f17a",
+            dedent(
+                """\
+                #13 exporting to image
+                #13 exporting layers
+                #13 exporting layers done
+                #13 exporting manifest sha256:2f161cf7c511874936d99995adeb53c6ac2262279a606bc1b70756ca1367ceb5 done
+                #13 exporting config sha256:23bf9de65f90e11ab7bb6bad0e1fb5c7eee3df2050aa902e8a53684fbd539eb9 done
+                #13 exporting attestation manifest sha256:5ff8bf97d8ad78a119d95d2b887400b3482a9026192ca7fb70307dfe290c93bf 0.0s done
+                #13 exporting manifest sha256:bf37d968d569812df393c7b6a48eab143066fa56a001905d9a70ec7acf3d34f4 done
+                #13 exporting config sha256:7c99f317cfae97e79dc12096279b71036a60129314e670920475665d466c821f done
+                #13 exporting attestation manifest sha256:4b3176781bb62e51cce743d4428e84e3559c9a23c328d6dfbfacac67f282cf70 0.0s done
+                #13 exporting manifest list sha256:d15432046b4feaebb70370fad4710151dd8f0b9741cb8bc4d20c08ed8847f17a 0.0s done
+                #13 naming to my-host.com/repo:latest done
+                #13 unpacking to my-host.com/repo:latest done
+                #13 DONE 0.1s
                 """
             ),
             "",
