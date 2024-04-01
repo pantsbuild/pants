@@ -219,6 +219,6 @@ class GenerateJvmLockfileFromTool:
 
 
 def rules():
-    from pants.jvm.goals import lockfile
+    from pants.jvm.goals import lockfile  # TODO: Shim to avoid import cycle
 
     return (*collect_rules(), *lockfile.rules())

@@ -15,6 +15,7 @@ from pants.engine.fs import DigestContents, FileDigest
 from pants.engine.internals.parametrize import Parametrize
 from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import GenerateJvmLockfile, RequestedJVMUserResolveNames
+from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coordinate import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
@@ -33,6 +34,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *coursier_fetch_rules(),
             *lockfile.rules(),
+            *jvm_tool.rules(),
             *coursier_setup_rules(),
             *external_tool_rules(),
             *source_files.rules(),
