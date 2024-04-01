@@ -176,12 +176,12 @@ async def setup_user_lockfile_requests(
     # validate the proposed set of artifact requirements for each resolve.
     gets = []
     for resolve in requested:
-        if resolve in resolve_to_artifacts:
+        if resolve in resolve_to_artifacts or resolve not in tools:
             gets.append(
                 Get(
                     GenerateJvmLockfile,
                     _ValidateJvmArtifactsRequest(
-                        artifacts=ArtifactRequirements(resolve_to_artifacts.get(resolve, ())),
+                        artifacts=ArtifactRequirements(resolve_to_artifacts[resolve]),
                         resolve_name=resolve,
                     ),
                 )
@@ -195,6 +195,16 @@ async def setup_user_lockfile_requests(
                     GenerateJvmLockfile,
                     GenerateJvmLockfileFromTool,
                     GenerateJvmLockfileFromTool.create(tool),
+                )
+            )
+        else:
+            gets.append(
+                Get(
+                    GenerateJvmLockfile,
+                    _ValidateJvmArtifactsRequest(
+                        artifacts=ArtifactRequirements(()),
+                        resolve_name=resolve,
+                    ),
                 )
             )
 
