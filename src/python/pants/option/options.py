@@ -394,7 +394,7 @@ class Options:
         for key, rv in values.as_dict().items():
             rv = listify_tuples(rv)
             if native_values[key] != rv:
-                raise Exception(f"{key}: {native_values[key]} of type {type(native_values[key])} !=\n{rv} of type {type(rv)}")
+                raise Exception(f"scope={scope}, key={key}: {native_values[key]} of type {type(native_values[key])} !=\n{rv} of type {type(rv)}")
         return values
 
     def get_fingerprintable_for_scope(

@@ -106,7 +106,7 @@ class NativeOptionParser:
 
 
 def foo() -> None:
-    native_parser = native_engine.PyOptionParser([], {}, None, True, False)
+    native_parser = native_engine.PyOptionParser([], {}, None, True)
     option_id = native_engine.PyOptionId("version_for_resolve", scope="scala")
     val = native_parser.get_dict(
         option_id,
