@@ -2,16 +2,21 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from pants.engine.unions import union
 from pants.util.strutil import softwrap
 
 
 @union
-@dataclass(frozen=True)
 class ExportableTool:
-    """Mark a subsystem as exportable."""
+    """Mark a subsystem as exportable.
+
+    Using this class has 2 parts:
+    - The tool class should subclass this.
+      This can be done at the language-backend level, for example, `PythonToolRequirementsBase`.
+      The help message can be extended with instructions specific to that tool or language backend
+    - Each exportable tool should have a `UnionRule` to `ExportableTool`.
+      This `UnionRule` is what ties the class into the export machinery.
+    """
 
     options_scope: str
 
