@@ -9,22 +9,21 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use deepsize::DeepSizeOf;
-use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
-use internment::Intern;
-use pyo3::prelude::{PyAny, Python};
-
-use crate::context::{Context, SessionCore};
-use crate::externs;
-use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
-use crate::tasks::{self, Rule};
 use fs::{self, Dir, DirectoryDigest, DirectoryListing, File, Link, Vfs};
-use process_execution::{self, ProcessCacheScope};
-
-use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
+use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use graph::{Node, NodeError};
+use internment::Intern;
+use process_execution::{self, ProcessCacheScope};
+use pyo3::prelude::{PyAny, Python};
 use rule_graph::{DependencyKey, Query};
 use store::{self, StoreFileByDigest};
 use workunit_store::{in_workunit, Level};
+
+use crate::context::{Context, SessionCore};
+use crate::externs;
+use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
+use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
+use crate::tasks::{self, Rule};
 
 // Sub-modules for the differnt node kinds.
 mod digest_file;
