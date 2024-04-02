@@ -491,7 +491,11 @@ class CallByNameVisitor(ast.NodeVisitor):
 
         # In the body, look for `await Get`, and replace it with a call-by-name equivalent
         for child in node.body:
-            if call := self._maybe_replaceable_call(child):
+            maybe_call = self._maybe_replaceable_call(child)
+            maybe_multiget = self._maybe_replaceable_multiget(child)
+            maybe_calls = [c for c in [maybe_call] + maybe_multiget if c is not None]
+            for call in maybe_calls:
+                # if call := self._maybe_replaceable_call(child):
                 if replacement := self.syntax_mapper.map_get_to_new_syntax(
                     call, self.filename, calling_func=node.name
                 ):
@@ -513,22 +517,43 @@ class CallByNameVisitor(ast.NodeVisitor):
         return False
 
     def _maybe_replaceable_call(self, statement: ast.stmt) -> ast.Call | None:
-        """
-        TODO: There should be a cleaner way to handle this, maybe split into separate functions?
-        There are three main forms of Get that we want to replace (all in await'able functions):
-        - foo = await Get(...)
+        """There is one forms of Get that we want to replace (all in await'able functions):
+
         - bar_get = Get(...)
-        - baz = await MultiGet(Get(...), ...)
+        - bar = await Get(...)
         """
-        if not isinstance(statement, ast.Assign):
-            return None
-        
-        # Check if the statement.value is an ast.Await or ast.Call
-        if not isinstance((call_node := statement.value), ast.Call) and not (
-            isinstance((await_node := statement.value), ast.Await) and isinstance((call_node := await_node.value), ast.Call)
+        if (
+            isinstance(statement, ast.Assign)
+            and (
+                isinstance((call_node := statement.value), ast.Call)
+                or (
+                    isinstance((await_node := statement.value), ast.Await)
+                    and isinstance((call_node := await_node.value), ast.Call)
+                )
+            )
+            and isinstance(call_node.func, ast.Name)
+            and call_node.func.id == "Get"
         ):
-            return None
-        
-        if isinstance(call_node.func, ast.Name) and call_node.func.id == "Get":
             return call_node
         return None
+
+    def _maybe_replaceable_multiget(self, statement: ast.stmt) -> list[ast.Call]:
+        """There is one forms of Get that we want to replace (all in await'able functions):
+
+        - multigot = await MultiGet(Get(...), Get(...), ...)
+        """
+        if (
+            isinstance(statement, ast.Assign)
+            and isinstance((await_node := statement.value), ast.Await)
+            and isinstance((call_node := await_node.value), ast.Call)
+            and isinstance(call_node.func, ast.Name)
+            and call_node.func.id == "MultiGet"
+        ):
+            return [
+                arg
+                for arg in call_node.args
+                if isinstance(arg, ast.Call)
+                and isinstance(arg.func, ast.Name)
+                and arg.func.id == "Get"
+            ]
+        return []

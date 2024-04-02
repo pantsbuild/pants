@@ -129,6 +129,7 @@ RULES1_FILE = dedent(
         multigot = await MultiGet(
             all_targets_get,
             digest_get,
+            Get(AllTargets),
             Get(VenvPex, PexRequest, black.to_pex_request())
         )
 
@@ -193,6 +194,7 @@ MIGRATED_RULES1_FILE = dedent(
         multigot = await MultiGet(
             all_targets_get,
             digest_get,
+            find_all_targets(**implicitly()),
             create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
         )
 
