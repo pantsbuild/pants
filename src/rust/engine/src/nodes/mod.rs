@@ -16,7 +16,7 @@ use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use internment::Intern;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
-use pyo3::prelude::{Py, PyAny, PyErr, Python, ToPyObject};
+use pyo3::prelude::{PyAny, PyErr, Python, ToPyObject};
 use pyo3::types::{PyDict, PyTuple};
 use pyo3::IntoPy;
 use url::Url;
@@ -26,11 +26,7 @@ use crate::downloads;
 use crate::externs;
 use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
 use crate::tasks::{self, Rule};
-use fs::{
-    self, DigestEntry, Dir, DirectoryDigest, DirectoryListing, File, FileContent, FileEntry,
-    GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PreparedPathGlobs, RelativePath,
-    StrictGlobMatching, SymlinkBehavior, SymlinkEntry, Vfs,
-};
+use fs::{self, Dir, DirectoryDigest, DirectoryListing, File, Link, RelativePath, Vfs};
 use process_execution::{self, ProcessCacheScope};
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
@@ -50,6 +46,7 @@ mod root;
 mod run_id;
 mod scandir;
 mod session_values;
+mod snapshot;
 
 // Re-export symbols for each kind of node.
 pub use self::digest_file::DigestFile;
@@ -59,6 +56,7 @@ pub use self::root::Root;
 pub use self::run_id::RunId;
 pub use self::scandir::Scandir;
 pub use self::session_values::SessionValues;
+pub use self::snapshot::Snapshot;
 
 tokio::task_local! {
     static TASK_SIDE_EFFECTED: Arc<AtomicBool>;
@@ -267,207 +265,6 @@ pub fn unmatched_globs_additional_context() -> Option<String> {
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
     they exist on disk. Refer to {url}."
   ))
-}
-
-///
-/// A Node that captures an store::Snapshot for a PathGlobs subject.
-///
-#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct Snapshot {
-    path_globs: PathGlobs,
-}
-
-impl Snapshot {
-    pub fn from_path_globs(path_globs: PathGlobs) -> Snapshot {
-        Snapshot { path_globs }
-    }
-
-    pub fn lift_path_globs(item: &PyAny) -> Result<PathGlobs, String> {
-        let globs: Vec<String> = externs::getattr(item, "globs")
-            .map_err(|e| format!("Failed to get `globs` for field: {e}"))?;
-
-        let description_of_origin =
-            externs::getattr_as_optional_string(item, "description_of_origin")
-                .map_err(|e| format!("Failed to get `description_of_origin` for field: {e}"))?;
-
-        let glob_match_error_behavior = externs::getattr(item, "glob_match_error_behavior")
-            .map_err(|e| format!("Failed to get `glob_match_error_behavior` for field: {e}"))?;
-
-        let failure_behavior: String = externs::getattr(glob_match_error_behavior, "value")
-            .map_err(|e| format!("Failed to get `value` for field: {e}"))?;
-
-        let strict_glob_matching =
-            StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
-
-        let conjunction_obj = externs::getattr(item, "conjunction")
-            .map_err(|e| format!("Failed to get `conjunction` for field: {e}"))?;
-
-        let conjunction_string: String = externs::getattr(conjunction_obj, "value")
-            .map_err(|e| format!("Failed to get `value` for field: {e}"))?;
-
-        let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
-        Ok(PathGlobs::new(globs, strict_glob_matching, conjunction))
-    }
-
-    pub fn lift_prepared_path_globs(item: &PyAny) -> Result<PreparedPathGlobs, String> {
-        let path_globs = Snapshot::lift_path_globs(item)?;
-        path_globs
-            .parse()
-            .map_err(|e| format!("Failed to parse PathGlobs for globs({item:?}): {e}"))
-    }
-
-    pub fn store_directory_digest(py: Python, item: DirectoryDigest) -> Result<Value, String> {
-        let py_digest = Py::new(py, externs::fs::PyDigest(item)).map_err(|e| format!("{e}"))?;
-        Ok(Value::new(py_digest.into_py(py)))
-    }
-
-    pub fn store_file_digest(py: Python, item: hashing::Digest) -> Result<Value, String> {
-        let py_file_digest =
-            Py::new(py, externs::fs::PyFileDigest(item)).map_err(|e| format!("{e}"))?;
-        Ok(Value::new(py_file_digest.into_py(py)))
-    }
-
-    pub fn store_snapshot(py: Python, item: store::Snapshot) -> Result<Value, String> {
-        let py_snapshot = Py::new(py, externs::fs::PySnapshot(item)).map_err(|e| format!("{e}"))?;
-        Ok(Value::new(py_snapshot.into_py(py)))
-    }
-
-    pub fn store_path(py: Python, item: &Path) -> Result<Value, String> {
-        if let Some(p) = item.as_os_str().to_str() {
-            Ok(externs::store_utf8(py, p))
-        } else {
-            Err(format!("Could not decode path `{item:?}` as UTF8."))
-        }
-    }
-
-    fn store_file_content(
-        py: Python,
-        types: &crate::types::Types,
-        item: &FileContent,
-    ) -> Result<Value, String> {
-        Ok(externs::unsafe_call(
-            py,
-            types.file_content,
-            &[
-                Self::store_path(py, &item.path)?,
-                externs::store_bytes(py, &item.content),
-                externs::store_bool(py, item.is_executable),
-            ],
-        ))
-    }
-
-    fn store_file_entry(
-        py: Python,
-        types: &crate::types::Types,
-        item: &FileEntry,
-    ) -> Result<Value, String> {
-        Ok(externs::unsafe_call(
-            py,
-            types.file_entry,
-            &[
-                Self::store_path(py, &item.path)?,
-                Self::store_file_digest(py, item.digest)?,
-                externs::store_bool(py, item.is_executable),
-            ],
-        ))
-    }
-
-    fn store_symlink_entry(
-        py: Python,
-        types: &crate::types::Types,
-        item: &SymlinkEntry,
-    ) -> Result<Value, String> {
-        Ok(externs::unsafe_call(
-            py,
-            types.symlink_entry,
-            &[
-                Self::store_path(py, &item.path)?,
-                externs::store_utf8(py, item.target.to_str().unwrap()),
-            ],
-        ))
-    }
-
-    fn store_empty_directory(
-        py: Python,
-        types: &crate::types::Types,
-        path: &Path,
-    ) -> Result<Value, String> {
-        Ok(externs::unsafe_call(
-            py,
-            types.directory,
-            &[Self::store_path(py, path)?],
-        ))
-    }
-
-    pub fn store_digest_contents(
-        py: Python,
-        context: &Context,
-        item: &[FileContent],
-    ) -> Result<Value, String> {
-        let entries = item
-            .iter()
-            .map(|e| Self::store_file_content(py, &context.core.types, e))
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(externs::unsafe_call(
-            py,
-            context.core.types.digest_contents,
-            &[externs::store_tuple(py, entries)],
-        ))
-    }
-
-    pub fn store_digest_entries(
-        py: Python,
-        context: &Context,
-        item: &[DigestEntry],
-    ) -> Result<Value, String> {
-        let entries = item
-            .iter()
-            .map(|digest_entry| match digest_entry {
-                DigestEntry::File(file_entry) => {
-                    Self::store_file_entry(py, &context.core.types, file_entry)
-                }
-                DigestEntry::Symlink(symlink_entry) => {
-                    Self::store_symlink_entry(py, &context.core.types, symlink_entry)
-                }
-                DigestEntry::EmptyDirectory(path) => {
-                    Self::store_empty_directory(py, &context.core.types, path)
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(externs::unsafe_call(
-            py,
-            context.core.types.digest_entries,
-            &[externs::store_tuple(py, entries)],
-        ))
-    }
-
-    async fn run_node(self, context: Context) -> NodeResult<store::Snapshot> {
-        let path_globs = self.path_globs.parse().map_err(throw)?;
-
-        // We rely on Context::expand_globs to track dependencies for scandirs,
-        // and `context.get(DigestFile)` to track dependencies for file digests.
-        let path_stats = context
-            .expand_globs(
-                path_globs,
-                SymlinkBehavior::Oblivious,
-                unmatched_globs_additional_context(),
-            )
-            .await?;
-
-        store::Snapshot::from_path_stats(context.clone(), path_stats)
-            .map_err(|e| throw(format!("Snapshot failed: {e}")))
-            .await
-    }
-}
-
-impl CompoundNode<NodeKey> for Snapshot {
-    type Item = store::Snapshot;
-}
-
-impl From<Snapshot> for NodeKey {
-    fn from(n: Snapshot) -> Self {
-        NodeKey::Snapshot(n)
-    }
 }
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
@@ -1253,17 +1050,6 @@ impl TryFrom<NodeOutput> for Value {
     fn try_from(nr: NodeOutput) -> Result<Self, ()> {
         match nr {
             NodeOutput::Value(v) => Ok(v),
-            _ => Err(()),
-        }
-    }
-}
-
-impl TryFrom<NodeOutput> for store::Snapshot {
-    type Error = ();
-
-    fn try_from(nr: NodeOutput) -> Result<Self, ()> {
-        match nr {
-            NodeOutput::Snapshot(v) => Ok(v),
             _ => Err(()),
         }
     }
