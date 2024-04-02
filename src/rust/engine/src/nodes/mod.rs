@@ -49,6 +49,12 @@ use workunit_store::{
     WorkunitMetadata,
 };
 
+// Sub-modules for the differnt node kinds.
+mod root;
+
+// Re-export symbols for each kind of node.
+pub use self::root::Root;
+
 tokio::task_local! {
     static TASK_SIDE_EFFECTED: Arc<AtomicBool>;
 }
@@ -232,47 +238,6 @@ fn select_product<'a>(
         select(context, None, 0, params, entry).await
     }
     .boxed()
-}
-
-///
-/// A root Node in the execution graph.
-///
-#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct Root {
-    pub params: Params,
-    product: TypeId,
-    entry: Intern<rule_graph::Entry<Rule>>,
-}
-
-impl Root {
-    pub fn new(
-        mut params: Params,
-        dependency_key: &DependencyKey<TypeId>,
-        edges: &rule_graph::RuleEdges<Rule>,
-    ) -> Self {
-        let entry = edges.entry_for(dependency_key).unwrap_or_else(|| {
-            panic!("{edges:?} did not declare a dependency on {dependency_key:?}")
-        });
-        params.retain(|k| match entry.as_ref() {
-            rule_graph::Entry::Param(type_id) => type_id == k.type_id(),
-            rule_graph::Entry::WithDeps(with_deps) => with_deps.params().contains(k.type_id()),
-        });
-        Self {
-            params,
-            product: dependency_key.product(),
-            entry,
-        }
-    }
-
-    async fn run_node(self, context: Context) -> NodeResult<Value> {
-        select(context, None, 0, self.params, self.entry).await
-    }
-}
-
-impl From<Root> for NodeKey {
-    fn from(n: Root) -> Self {
-        NodeKey::Root(Box::new(n))
-    }
 }
 
 pub fn lift_directory_digest(digest: &PyAny) -> Result<DirectoryDigest, String> {
