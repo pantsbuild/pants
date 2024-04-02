@@ -26,10 +26,10 @@ pub(crate) fn workspace_process(
     context: Context,
     args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-    log::trace!("workspace_process generating work unit closure");
+    log::debug!("workspace_process generating work unit closure");
     // TODO: in_workunit!("workspace_process", Level::Debug, |_workunit| async move {
     async move {
-        log::trace!("entering workspace_process");
+        log::debug!("entering workspace_process");
 
         let (py_workspace_process, py_process, process_config): (
             Value,
@@ -45,7 +45,7 @@ pub(crate) fn workspace_process(
                 process_config,
             )
         });
-        log::trace!("extracted py_workspace_process and friends");
+        log::debug!("extracted py_workspace_process and friends");
         match process_config.environment.strategy {
             ProcessExecutionStrategy::Docker(_) | ProcessExecutionStrategy::RemoteExecution(_) => {
                 Err(format!(
@@ -56,12 +56,12 @@ pub(crate) fn workspace_process(
             }
             _ => Ok(()),
         }?;
-        log::trace!("checked environment strategy");
+        log::debug!("checked environment strategy");
 
         let mut process = ExecuteProcess::lift(&context.core.store(), py_process, process_config)
             .await?
             .process;
-        log::trace!("process {process:?}");
+        log::debug!("process {process:?}");
         let keep_sandboxes = Python::with_gil(|py| {
             let py_interactive_process_obj = py_workspace_process.to_object(py);
             let py_workspace_process = py_interactive_process_obj.as_ref(py);
@@ -70,7 +70,7 @@ pub(crate) fn workspace_process(
             KeepSandboxes::from_str(externs::getattr(keep_sandboxes_value, "value").unwrap())
                 .unwrap()
         });
-        log::trace!("keep_sandboxes={keep_sandboxes:?}");
+        log::debug!("keep_sandboxes={keep_sandboxes:?}");
 
         let mut tempdir = create_sandbox(
             context.core.executor.clone(),
@@ -78,7 +78,7 @@ pub(crate) fn workspace_process(
             "workspace process",
             keep_sandboxes,
         )?;
-        log::trace!("tempdir = {}", tempdir.path().display());
+        log::debug!("tempdir = {}", tempdir.path().display());
         prepare_workdir(
             tempdir.path().to_owned(),
             &context.core.local_execution_root_dir,
@@ -131,7 +131,7 @@ pub(crate) fn workspace_process(
             })?,
         );
 
-        log::trace!("before construct_output_snapshot");
+        log::debug!("before construct_output_snapshot");
 
         let snapshot = CommandRunner::construct_output_snapshot(
             store,
@@ -141,7 +141,7 @@ pub(crate) fn workspace_process(
         )
         .await?;
 
-        log::trace!("after construct_output_snapshot");
+        log::debug!("after construct_output_snapshot");
 
         let store = context.core.store();
         let output_directory = store.record_digest_trie(snapshot.tree, false).await?;
@@ -153,7 +153,7 @@ pub(crate) fn workspace_process(
         let stderr_digest = store.store_file_bytes(stderr_bytes.clone(), false).await?;
 
         let code = output.status.code().unwrap_or(-1);
-        log::trace!("code = {code}");
+        log::debug!("code = {code}");
         if keep_sandboxes == KeepSandboxes::Always
             || keep_sandboxes == KeepSandboxes::OnFailure && code != 0
         {
