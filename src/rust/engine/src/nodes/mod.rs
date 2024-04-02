@@ -47,6 +47,7 @@ mod digest_file;
 mod execute_process;
 mod read_link;
 mod root;
+mod run_id;
 mod scandir;
 mod session_values;
 
@@ -55,6 +56,7 @@ pub use self::digest_file::DigestFile;
 pub use self::execute_process::{ExecuteProcess, ProcessResult};
 pub use self::read_link::{LinkDest, ReadLink};
 pub use self::root::Root;
+pub use self::run_id::RunId;
 pub use self::scandir::Scandir;
 pub use self::session_values::SessionValues;
 
@@ -265,31 +267,6 @@ pub fn unmatched_globs_additional_context() -> Option<String> {
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
     they exist on disk. Refer to {url}."
   ))
-}
-
-#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct RunId;
-
-impl RunId {
-    async fn run_node(self, context: Context) -> NodeResult<Value> {
-        Ok(Python::with_gil(|py| {
-            externs::unsafe_call(
-                py,
-                context.core.types.run_id,
-                &[externs::store_u64(py, context.session.run_id().0 as u64)],
-            )
-        }))
-    }
-}
-
-impl CompoundNode<NodeKey> for RunId {
-    type Item = Value;
-}
-
-impl From<RunId> for NodeKey {
-    fn from(n: RunId) -> Self {
-        NodeKey::RunId(n)
-    }
 }
 
 ///
