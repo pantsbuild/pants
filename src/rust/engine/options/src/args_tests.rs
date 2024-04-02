@@ -238,6 +238,22 @@ fn test_list_fromfile() {
         "fromfile.txt",
     );
     do_test(
+        "+[-42]",
+        &[ListEdit {
+            action: ListEditAction::Add,
+            items: vec![-42],
+        }],
+        "fromfile.txt",
+    );
+    do_test(
+        "[-42]",
+        &[ListEdit {
+            action: ListEditAction::Replace,
+            items: vec![-42],
+        }],
+        "fromfile.txt",
+    );
+    do_test(
         "[10, 12]",
         &[ListEdit {
             action: ListEditAction::Replace,
@@ -307,6 +323,19 @@ fn test_dict_fromfile() {
         "#,
         "fromfile.yaml",
     );
+
+
+    // Test adding, rather than replacing, from a raw text fromfile.
+    let expected_add = vec![
+        DictEdit {
+            action: DictEditAction::Add,
+            items: hashmap! {"FOO".to_string() => Val::Int(42)},
+        },
+    ];
+
+    let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", "+{'FOO':42}");
+    let args = Args::new(vec![format!("--foo=@{}", &fromfile_path.display())]);
+    assert_eq!(expected_add, args.get_dict(&option_id!("foo")).unwrap().unwrap())
 }
 
 #[test]
