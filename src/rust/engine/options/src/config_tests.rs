@@ -144,13 +144,13 @@ fn test_interpolate_config() {
     );
 
     assert_eq!(
-        DictEdit {
+        vec![DictEdit {
             action: DictEditAction::Replace,
             items: HashMap::from([
                 ("fruit".to_string(), Val::String("strawberry".to_string())),
                 ("spice".to_string(), Val::String("black pepper".to_string()))
             ])
-        },
+        }],
         conf.get_dict(&option_id!(["groceries"], "inline_table"))
             .unwrap()
             .unwrap()
@@ -230,7 +230,7 @@ fn test_list_fromfile() {
 #[test]
 fn test_dict_fromfile() {
     fn do_test(content: &str, filename: &str) {
-        let expected = DictEdit {
+        let expected = vec![DictEdit {
             action: DictEditAction::Replace,
             items: hashmap! {
             "FOO".to_string() => Val::Dict(hashmap! {
@@ -240,7 +240,7 @@ fn test_dict_fromfile() {
                     "QUUX".to_string() => Val::List(vec![ Val::Int(1), Val::Int(2)])
                 })
             }),},
-        };
+        }];
 
         let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
         let conf = config(format!("[GLOBAL]\nfoo = '@{}'\n", fromfile_path.display()).as_str());
