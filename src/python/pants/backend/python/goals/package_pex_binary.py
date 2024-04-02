@@ -16,6 +16,7 @@ from pants.backend.python.target_types import (
     PexExecutableField,
     PexExecutionMode,
     PexExecutionModeField,
+    PexExtraBuildArgsField,
     PexIgnoreErrorsField,
     PexIncludeRequirementsField,
     PexIncludeSourcesField,
@@ -83,6 +84,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     venv_hermetic_scripts: PexVenvHermeticScripts
     environment: EnvironmentField
     check: PexCheckField
+    extra_build_args: PexExtraBuildArgsField
 
     @property
     def _execution_mode(self) -> PexExecutionMode:
@@ -116,6 +118,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append("--venv-site-packages-copies")
         if self.venv_hermetic_scripts.value is False:
             args.append("--non-hermetic-venv-scripts")
+        if self.extra_build_args.value:
+            args.extend(self.extra_build_args.value)
         return tuple(args)
 
 
