@@ -97,6 +97,8 @@ impl Arg {
 #[derive(Debug)]
 pub struct Args {
     args: Vec<Arg>,
+    #[allow(dead_code)]
+    pub passthrough_args: Option<Vec<String>>,
 }
 
 impl Args {
@@ -104,13 +106,16 @@ impl Args {
     // argv[0] process name.
     pub fn new<I: IntoIterator<Item = String>>(arg_strs: I) -> Self {
         let mut args: Vec<Arg> = vec![];
+        let mut passthrough_args: Option<Vec<String>> = None;
         let mut scope = Scope::Global;
-        for arg_str in arg_strs.into_iter() {
+        let mut args_iter = arg_strs.into_iter();
+        while let Some(arg_str) = args_iter.next() {
             if arg_str.starts_with("--") {
                 let mut components = arg_str.splitn(2, '=');
                 let flag = components.next().unwrap();
-                if flag.is_empty() {
+                if flag.len() == 2 {
                     // We've hit the passthrough args delimiter (`--`), so don't look further.
+                    passthrough_args = Some(args_iter.collect::<Vec<String>>());
                     break;
                 } else {
                     args.push(Arg {
@@ -139,7 +144,10 @@ impl Args {
             }
         }
 
-        Self { args }
+        Self {
+            args,
+            passthrough_args,
+        }
     }
 
     pub fn argv() -> Self {
