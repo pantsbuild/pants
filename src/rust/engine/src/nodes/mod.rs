@@ -48,6 +48,7 @@ mod execute_process;
 mod read_link;
 mod root;
 mod scandir;
+mod session_values;
 
 // Re-export symbols for each kind of node.
 pub use self::digest_file::DigestFile;
@@ -55,6 +56,7 @@ pub use self::execute_process::{ExecuteProcess, ProcessResult};
 pub use self::read_link::{LinkDest, ReadLink};
 pub use self::root::Root;
 pub use self::scandir::Scandir;
+pub use self::session_values::SessionValues;
 
 tokio::task_local! {
     static TASK_SIDE_EFFECTED: Arc<AtomicBool>;
@@ -263,25 +265,6 @@ pub fn unmatched_globs_additional_context() -> Option<String> {
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
     they exist on disk. Refer to {url}."
   ))
-}
-
-#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct SessionValues;
-
-impl SessionValues {
-    async fn run_node(self, context: Context) -> NodeResult<Value> {
-        Ok(Value::new(context.session.session_values()))
-    }
-}
-
-impl CompoundNode<NodeKey> for SessionValues {
-    type Item = Value;
-}
-
-impl From<SessionValues> for NodeKey {
-    fn from(n: SessionValues) -> Self {
-        NodeKey::SessionValues(n)
-    }
 }
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
