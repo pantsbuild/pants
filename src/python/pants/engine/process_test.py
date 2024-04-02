@@ -314,8 +314,8 @@ def test_workspace_process_basic(rule_runner: RuleRunner) -> None:
         if result.exit_code != 0:
             raise ProcessExecutionFailure(
                 result.exit_code,
-                result.stdout_bytes,
-                result.stderr_bytes,
+                result.stdout,
+                result.stderr,
                 "ProcessResult",
                 keep_sandboxes=KeepSandboxes.never,
             )
@@ -382,11 +382,11 @@ def test_workspace_process_basic(rule_runner: RuleRunner) -> None:
         digest_contents = rule_runner.request(DigestContents, [result.output_digest])
         assert len(digest_contents) == 2
 
-        digest_contents = sorted(digest_contents, key=lambda x: x.path)
-        assert digest_contents[0].path == "output.txt"
-        assert digest_contents[0].content == b"generated\n"
-        assert digest_contents[1].path == "subdir/file.txt"
-        assert digest_contents[1].content == b"subdir\n"
+        contents = sorted(digest_contents, key=lambda x: x.path)
+        assert contents[0].path == "output.txt"
+        assert contents[0].content == b"generated\n"
+        assert contents[1].path == "subdir/file.txt"
+        assert contents[1].content == b"subdir\n"
 
         new_file = Path(rule_runner.build_root, "new-file.txt")
         assert new_file.exists()
