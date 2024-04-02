@@ -1,7 +1,6 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::Display;
@@ -10,36 +9,30 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use deepsize::DeepSizeOf;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
-use grpc_util::prost::MessageExt;
 use internment::Intern;
-use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
 use pyo3::prelude::{PyAny, PyErr, Python, ToPyObject};
 use pyo3::types::{PyDict, PyTuple};
 use pyo3::IntoPy;
-use url::Url;
 
-use crate::context::{Context, Core, SessionCore};
-use crate::downloads;
+use crate::context::{Context, SessionCore};
 use crate::externs;
 use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
 use crate::tasks::{self, Rule};
-use fs::{self, Dir, DirectoryDigest, DirectoryListing, File, Link, RelativePath, Vfs};
+use fs::{self, Dir, DirectoryDigest, DirectoryListing, File, Link, Vfs};
 use process_execution::{self, ProcessCacheScope};
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
-use crate::externs::fs::PyFileDigest;
 use crate::externs::{GeneratorInput, GeneratorResponse};
 use graph::{CompoundNode, Node, NodeError};
-use hashing::Digest;
 use rule_graph::{DependencyKey, Query};
 use store::{self, StoreFileByDigest};
 use workunit_store::{in_workunit, Level, RunningWorkunit};
 
 // Sub-modules for the differnt node kinds.
 mod digest_file;
+mod downloaded_file;
 mod execute_process;
 mod read_link;
 mod root;
@@ -50,6 +43,7 @@ mod snapshot;
 
 // Re-export symbols for each kind of node.
 pub use self::digest_file::DigestFile;
+pub use self::downloaded_file::DownloadedFile;
 pub use self::execute_process::{ExecuteProcess, ProcessResult};
 pub use self::read_link::{LinkDest, ReadLink};
 pub use self::root::Root;
@@ -265,97 +259,6 @@ pub fn unmatched_globs_additional_context() -> Option<String> {
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
     they exist on disk. Refer to {url}."
   ))
-}
-
-#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct DownloadedFile(pub Key);
-
-impl DownloadedFile {
-    fn url_key(url: &Url, digest: Digest) -> CacheKey {
-        let observed_url = ObservedUrl {
-            url: url.path().to_owned(),
-            observed_digest: Some(digest.into()),
-        };
-        CacheKey {
-            key_type: CacheKeyType::Url.into(),
-            digest: Some(Digest::of_bytes(&observed_url.to_bytes()).into()),
-        }
-    }
-
-    pub async fn load_or_download(
-        &self,
-        core: Arc<Core>,
-        url: Url,
-        auth_headers: BTreeMap<String, String>,
-        digest: hashing::Digest,
-    ) -> Result<store::Snapshot, String> {
-        let file_name = url
-            .path_segments()
-            .and_then(Iterator::last)
-            .map(str::to_owned)
-            .ok_or_else(|| format!("Error getting the file name from the parsed URL: {url}"))?;
-        let path = RelativePath::new(&file_name).map_err(|e| {
-            format!(
-                "The file name derived from {} was {} which is not relative: {:?}",
-                &url, &file_name, e
-            )
-        })?;
-
-        // See if we have observed this URL and Digest before: if so, see whether we already have the
-        // Digest fetched. The extra layer of indirection through the PersistentCache is to sanity
-        // check that a Digest has ever been observed at the given URL.
-        // NB: The auth_headers are not part of the key.
-        let url_key = Self::url_key(&url, digest);
-        let have_observed_url = core.local_cache.load(&url_key).await?.is_some();
-
-        // If we hit the ObservedUrls cache, then we have successfully fetched this Digest from
-        // this URL before. If we still have the bytes, then we skip fetching the content again.
-        let usable_in_store = have_observed_url
-            && (core
-                .store()
-                .load_file_bytes_with(digest, |_| ())
-                .await
-                .is_ok());
-
-        if !usable_in_store {
-            downloads::download(core.clone(), url, auth_headers, file_name, digest).await?;
-            // The value was successfully fetched and matched the digest: record in the ObservedUrls
-            // cache.
-            core.local_cache.store(&url_key, Bytes::from("")).await?;
-        }
-        core.store().snapshot_of_one_file(path, digest, true).await
-    }
-
-    async fn run_node(self, context: Context) -> NodeResult<store::Snapshot> {
-        let (url_str, expected_digest, auth_headers) = Python::with_gil(|py| {
-            let py_download_file_val = self.0.to_value();
-            let py_download_file = (*py_download_file_val).as_ref(py);
-            let url_str: String = externs::getattr(py_download_file, "url")
-                .map_err(|e| format!("Failed to get `url` for field: {e}"))?;
-            let auth_headers =
-                externs::getattr_from_str_frozendict(py_download_file, "auth_headers");
-            let py_file_digest: PyFileDigest =
-                externs::getattr(py_download_file, "expected_digest")?;
-            let res: NodeResult<(String, Digest, BTreeMap<String, String>)> =
-                Ok((url_str, py_file_digest.0, auth_headers));
-            res
-        })?;
-        let url = Url::parse(&url_str)
-            .map_err(|err| throw(format!("Error parsing URL {url_str}: {err}")))?;
-        self.load_or_download(context.core.clone(), url, auth_headers, expected_digest)
-            .await
-            .map_err(throw)
-    }
-}
-
-impl CompoundNode<NodeKey> for DownloadedFile {
-    type Item = store::Snapshot;
-}
-
-impl From<DownloadedFile> for NodeKey {
-    fn from(n: DownloadedFile) -> Self {
-        NodeKey::DownloadedFile(n)
-    }
 }
 
 #[derive(DeepSizeOf, Derivative, Clone)]
