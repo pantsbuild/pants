@@ -30,7 +30,7 @@ from pants.engine.process import (
     WorkspaceProcess,
 )
 from pants.option.global_options import KeepSandboxes
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, mock_console
+from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 from pants.util.contextutil import environment_as
 
 
