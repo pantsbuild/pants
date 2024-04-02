@@ -6,7 +6,7 @@ use std::path::Path;
 use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use bytes::Bytes;
 use futures::future::{BoxFuture, FutureExt};
@@ -15,7 +15,7 @@ use process_execution::local::{
     KeepSandboxes,
 };
 use process_execution::ProcessExecutionStrategy;
-use pyo3::{PyAny, Python, ToPyObject};
+use pyo3::{IntoPy, PyAny, Python, ToPyObject};
 
 use crate::context::Context;
 use crate::externs;
@@ -58,9 +58,10 @@ pub(crate) fn workspace_process(
         }?;
         log::debug!("checked environment strategy");
 
-        let mut process = ExecuteProcess::lift(&context.core.store(), py_process, process_config)
-            .await?
-            .process;
+        let mut process =
+            ExecuteProcess::lift(&context.core.store(), py_process, process_config.clone())
+                .await?
+                .process;
         log::debug!("process {process:?}");
         let keep_sandboxes = Python::with_gil(|py| {
             let py_interactive_process_obj = py_workspace_process.to_object(py);
@@ -187,10 +188,10 @@ pub(crate) fn workspace_process(
                         py,
                         context.core.types.process_result_metadata,
                         &[
-                            externs::store_u64(py, Duration::from(elapsed_time).as_millis() as u64),
-                            Value::from(py.None()),
-                            Value::from(py.None()),
-                            Value::from(py.None()),
+                            externs::store_u64(py, elapsed_time.as_millis() as u64),
+                            Value::from(process_config.into_py(py)),
+                            externs::store_utf8(py, "ran"), // TODO: Find a better way to reference `pants.engine.process.ProcessResultMetadata.Source.RAN`
+                            externs::store_u64(py, context.run_id().0.into()),
                         ],
                     ),
                 ],
