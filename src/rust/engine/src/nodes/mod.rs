@@ -43,11 +43,13 @@ use store::{self, StoreFileByDigest};
 use workunit_store::{in_workunit, Level, RunningWorkunit};
 
 // Sub-modules for the differnt node kinds.
+mod digest_file;
 mod execute_process;
 mod read_link;
 mod root;
 
 // Re-export symbols for each kind of node.
+pub use self::digest_file::DigestFile;
 pub use self::execute_process::{ExecuteProcess, ProcessResult};
 pub use self::read_link::{LinkDest, ReadLink};
 pub use self::root::Root;
@@ -245,34 +247,6 @@ pub fn lift_directory_digest(digest: &PyAny) -> Result<DirectoryDigest, String> 
 pub fn lift_file_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
     let py_file_digest: externs::fs::PyFileDigest = digest.extract().map_err(|e| format!("{e}"))?;
     Ok(py_file_digest.0)
-}
-
-///
-/// A Node that represents reading a file and fingerprinting its contents.
-///
-#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct DigestFile(pub File);
-
-impl DigestFile {
-    async fn run_node(self, context: Context) -> NodeResult<hashing::Digest> {
-        let path = context.core.vfs.file_path(&self.0);
-        context
-            .core
-            .store()
-            .store_file(true, false, path)
-            .map_err(throw)
-            .await
-    }
-}
-
-impl CompoundNode<NodeKey> for DigestFile {
-    type Item = hashing::Digest;
-}
-
-impl From<DigestFile> for NodeKey {
-    fn from(n: DigestFile) -> Self {
-        NodeKey::DigestFile(n)
-    }
 }
 
 ///
@@ -1346,17 +1320,6 @@ impl TryFrom<NodeOutput> for Value {
     fn try_from(nr: NodeOutput) -> Result<Self, ()> {
         match nr {
             NodeOutput::Value(v) => Ok(v),
-            _ => Err(()),
-        }
-    }
-}
-
-impl TryFrom<NodeOutput> for hashing::Digest {
-    type Error = ();
-
-    fn try_from(nr: NodeOutput) -> Result<Self, ()> {
-        match nr {
-            NodeOutput::FileDigest(v) => Ok(v),
             _ => Err(()),
         }
     }
