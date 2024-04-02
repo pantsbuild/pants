@@ -47,12 +47,14 @@ mod digest_file;
 mod execute_process;
 mod read_link;
 mod root;
+mod scandir;
 
 // Re-export symbols for each kind of node.
 pub use self::digest_file::DigestFile;
 pub use self::execute_process::{ExecuteProcess, ProcessResult};
 pub use self::read_link::{LinkDest, ReadLink};
 pub use self::root::Root;
+pub use self::scandir::Scandir;
 
 tokio::task_local! {
     static TASK_SIDE_EFFECTED: Arc<AtomicBool>;
@@ -247,35 +249,6 @@ pub fn lift_directory_digest(digest: &PyAny) -> Result<DirectoryDigest, String> 
 pub fn lift_file_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
     let py_file_digest: externs::fs::PyFileDigest = digest.extract().map_err(|e| format!("{e}"))?;
     Ok(py_file_digest.0)
-}
-
-///
-/// A Node that represents executing a directory listing that returns a Stat per directory
-/// entry (generally in one syscall). No symlinks are expanded.
-///
-#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct Scandir(Dir);
-
-impl Scandir {
-    async fn run_node(self, context: Context) -> NodeResult<Arc<DirectoryListing>> {
-        let directory_listing = context
-            .core
-            .vfs
-            .scandir(self.0)
-            .await
-            .map_err(|e| throw(format!("{e}")))?;
-        Ok(Arc::new(directory_listing))
-    }
-}
-
-impl CompoundNode<NodeKey> for Scandir {
-    type Item = Arc<DirectoryListing>;
-}
-
-impl From<Scandir> for NodeKey {
-    fn from(n: Scandir) -> Self {
-        NodeKey::Scandir(n)
-    }
 }
 
 pub fn unmatched_globs_additional_context() -> Option<String> {
@@ -1331,17 +1304,6 @@ impl TryFrom<NodeOutput> for store::Snapshot {
     fn try_from(nr: NodeOutput) -> Result<Self, ()> {
         match nr {
             NodeOutput::Snapshot(v) => Ok(v),
-            _ => Err(()),
-        }
-    }
-}
-
-impl TryFrom<NodeOutput> for Arc<DirectoryListing> {
-    type Error = ();
-
-    fn try_from(nr: NodeOutput) -> Result<Self, ()> {
-        match nr {
-            NodeOutput::DirectoryListing(v) => Ok(v),
             _ => Err(()),
         }
     }
