@@ -52,7 +52,7 @@ fn test_string() {
     assert_string("quux", option_id!(["scope"], "quux"));
 
     assert!(args.get_string(&option_id!("dne")).unwrap().is_none());
-    assert!(args.passthrough_args.is_none());
+    assert!(args.get_passthrough_args().is_none());
 }
 
 #[test]
@@ -85,7 +85,7 @@ fn test_bool() {
     assert_bool(true, option_id!(["scope"], "quuxt"));
 
     assert!(args.get_bool(&option_id!("dne")).unwrap().is_none());
-    assert!(args.passthrough_args.is_none());
+    assert!(args.get_passthrough_args().is_none());
     assert_eq!(
         "Problem parsing -c bool value:\n1:swallow\n  ^\nExpected 'true' or 'false' at line 1 column 1".to_owned(),
         args.get_bool(&option_id!(-'c', "unladen", "capacity"))
@@ -111,7 +111,7 @@ fn test_float() {
     assert_float(1.137, option_id!("baz", "spam"));
 
     assert!(args.get_float(&option_id!("dne")).unwrap().is_none());
-    assert!(args.passthrough_args.is_none());
+    assert!(args.get_passthrough_args().is_none());
 
     assert_eq!(
         "Problem parsing --bad float value:\n1:swallow\n  ^\n\
@@ -174,7 +174,7 @@ fn test_string_list() {
     );
 
     assert!(args.get_string_list(&option_id!("dne")).unwrap().is_none());
-    assert!(args.passthrough_args.is_none());
+    assert!(args.get_passthrough_args().is_none());
 
     let expected_error_msg = "\
 Problem parsing --bad string list value:
@@ -374,12 +374,8 @@ fn test_passthrough_args() {
     assert_string("debug", option_id!(-'l', "level"));
 
     assert_eq!(
-        Some(vec![
-            "--passthrough0".to_string(),
-            "passthrough1".to_string(),
-            "-p".to_string(),
-        ]),
-        args.passthrough_args
+        Some(vec!["--passthrough0", "passthrough1", "-p",]),
+        args.get_passthrough_args()
     );
 }
 
@@ -387,5 +383,5 @@ fn test_passthrough_args() {
 fn test_empty_passthrough_args() {
     let args = mk_args(["-ldebug", "--foo=bar", "--"]);
 
-    assert_eq!(Some(vec![]), args.passthrough_args);
+    assert_eq!(Some(vec![]), args.get_passthrough_args());
 }
