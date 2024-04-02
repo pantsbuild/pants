@@ -14,7 +14,7 @@ REGISTER_FILE = dedent(
     from pants.engine.rules import collect_rules, Get, rule, goal_rule
     from pants.engine.goal import Goal, GoalSubsystem
 
-    from migrateme.rules1 import Bar, Baz, Foo, rules as rules1
+    from migrateme.rules1 import Bar, Baz, Foo, Thud, rules as rules1
     from migrateme.rules2 import Qux, rules as rules2
 
     class ContrivedGoalSubsystem(GoalSubsystem):
@@ -31,6 +31,7 @@ REGISTER_FILE = dedent(
         bar = await Get(Bar, Black, black)
         baz = await Get(Baz, Black, black)
         qux = await Get(Qux, Black, black)
+        thud = await Get(Thud, Black, black)
 
     def rules():
         return [*collect_rules(), *rules1(), *rules2()]
@@ -42,13 +43,14 @@ MIGRATED_REGISTER_FILE = dedent(
     from pants.backend.python.lint.black.subsystem import Black
     from pants.engine.rules import collect_rules, Get, rule, goal_rule
     from migrateme.rules1 import embedded_comments
+    from migrateme.rules1 import multiget
     from migrateme.rules1 import multiline
     from migrateme.rules1 import variants
     from migrateme.rules2 import shadowed
     from pants.engine.rules import implicitly
     from pants.engine.goal import Goal, GoalSubsystem
 
-    from migrateme.rules1 import Bar, Baz, Foo, rules as rules1
+    from migrateme.rules1 import Bar, Baz, Foo, Thud, rules as rules1
     from migrateme.rules2 import Qux, rules as rules2
 
     class ContrivedGoalSubsystem(GoalSubsystem):
@@ -65,6 +67,7 @@ MIGRATED_REGISTER_FILE = dedent(
         bar = await multiline(**implicitly({black: Black}))
         baz = await embedded_comments(**implicitly({black: Black}))
         qux = await shadowed(**implicitly({black: Black}))
+        thud = await multiget(**implicitly({black: Black}))
 
     def rules():
         return [*collect_rules(), *rules1(), *rules2()]
@@ -80,7 +83,7 @@ RULES1_FILE = dedent(
     from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
     from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
     from pants.engine.fs import Digest, EMPTY_SNAPSHOT
-    from pants.engine.rules import collect_rules, Get, rule
+    from pants.engine.rules import collect_rules, Get, MultiGet, rule
     from pants.engine.target import AllTargets
 
     class Foo:
@@ -116,6 +119,19 @@ RULES1_FILE = dedent(
             black.to_pex_request()
         )
 
+    class Thud:
+        pass
+
+    @rule(desc="Ensure calls used with multiget are migrated")
+    async def multiget(black: Black) -> Thud:
+        all_targets_get = Get(AllTargets)
+        digest_get = Get(Digest, CreateArchive(EMPTY_SNAPSHOT))
+        multigot = await MultiGet(
+            all_targets_get,
+            digest_get,
+            Get(VenvPex, PexRequest, black.to_pex_request())
+        )
+
     def rules():
         return collect_rules()
     """
@@ -130,7 +146,7 @@ MIGRATED_RULES1_FILE = dedent(
     from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
     from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
     from pants.engine.fs import Digest, EMPTY_SNAPSHOT
-    from pants.engine.rules import collect_rules, Get, rule
+    from pants.engine.rules import collect_rules, Get, MultiGet, rule
     from pants.backend.python.util_rules.pex import create_venv_pex
     from pants.core.util_rules.archive import create_archive
     from pants.core.util_rules.system_binaries import find_binary
@@ -165,6 +181,19 @@ MIGRATED_RULES1_FILE = dedent(
             PexRequest,
             # Some comment that the AST parse wipes out, so we can't migrate this call safely
             black.to_pex_request()
+        )
+
+    class Thud:
+        pass
+
+    @rule(desc="Ensure calls used with multiget are migrated")
+    async def multiget(black: Black) -> Thud:
+        all_targets_get = find_all_targets(**implicitly())
+        digest_get = create_archive(**implicitly(CreateArchive(EMPTY_SNAPSHOT)))
+        multigot = await MultiGet(
+            all_targets_get,
+            digest_get,
+            create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
         )
 
     def rules():

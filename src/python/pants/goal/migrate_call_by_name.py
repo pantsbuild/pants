@@ -513,13 +513,22 @@ class CallByNameVisitor(ast.NodeVisitor):
         return False
 
     def _maybe_replaceable_call(self, statement: ast.stmt) -> ast.Call | None:
-        """Only interested in await Get() calls."""
-        if (
-            isinstance(statement, ast.Assign)
-            and isinstance((await_node := statement.value), ast.Await)
-            and isinstance((call_node := await_node.value), ast.Call)
-            and isinstance(call_node.func, ast.Name)
-            and call_node.func.id == "Get"
+        """
+        TODO: There should be a cleaner way to handle this, maybe split into separate functions?
+        There are three main forms of Get that we want to replace (all in await'able functions):
+        - foo = await Get(...)
+        - bar_get = Get(...)
+        - baz = await MultiGet(Get(...), ...)
+        """
+        if not isinstance(statement, ast.Assign):
+            return None
+        
+        # Check if the statement.value is an ast.Await or ast.Call
+        if not isinstance((call_node := statement.value), ast.Call) and not (
+            isinstance((await_node := statement.value), ast.Await) and isinstance((call_node := await_node.value), ast.Call)
         ):
+            return None
+        
+        if isinstance(call_node.func, ast.Name) and call_node.func.id == "Get":
             return call_node
         return None
