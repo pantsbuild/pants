@@ -140,7 +140,6 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
             try:
                 tree = ast.parse(f.read(), filename=file, type_comments=True)
                 visitor.visit(tree)
-                print("\n")
             except SyntaxError as e:
                 logging.error(f"SyntaxError in {file}: {e}")
             except tokenize.TokenError as e:
@@ -167,8 +166,9 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
                 for replacement in replacements:
                     if line_number == replacement.line_range[0]:
                         # On the first line of the range, emit the new source code where the old code started
+                        line_end = ",\n" if replacement.is_argument else "\n"
                         print(line[: replacement.col_range[0]], end="")
-                        print(ast.unparse(replacement.new_source))
+                        print(ast.unparse(replacement.new_source), end=line_end)
                         modified = True
                     elif line_number in range(
                         replacement.line_range[0], replacement.line_range[1] + 1
@@ -221,6 +221,7 @@ class Replacement:
     current_source: ast.Call
     new_source: ast.Call
     additional_imports: list[ast.ImportFrom]
+    is_argument: bool = False
 
     def sanitized_imports(self) -> list[ast.ImportFrom]:
         """Remove any circular or self-imports."""
@@ -491,14 +492,17 @@ class CallByNameVisitor(ast.NodeVisitor):
 
         # In the body, look for `await Get`, and replace it with a call-by-name equivalent
         for child in node.body:
-            maybe_call = self._maybe_replaceable_call(child)
-            maybe_multiget = self._maybe_replaceable_multiget(child)
-            maybe_calls = [c for c in [maybe_call] + maybe_multiget if c is not None]
-            for call in maybe_calls:
-                # if call := self._maybe_replaceable_call(child):
+            if call := self._maybe_replaceable_call(child):
                 if replacement := self.syntax_mapper.map_get_to_new_syntax(
                     call, self.filename, calling_func=node.name
                 ):
+                    self.replacements.append(replacement)
+
+            for call in self._maybe_replaceable_multiget(child):
+                if replacement := self.syntax_mapper.map_get_to_new_syntax(
+                    call, self.filename, calling_func=node.name
+                ):
+                    replacement.is_argument = True
                     self.replacements.append(replacement)
 
     def _should_visit_node(self, decorator_list: list[ast.expr]) -> bool:

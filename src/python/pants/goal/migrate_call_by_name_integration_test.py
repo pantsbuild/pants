@@ -127,10 +127,14 @@ RULES1_FILE = dedent(
         all_targets_get = Get(AllTargets)
         digest_get = Get(Digest, CreateArchive(EMPTY_SNAPSHOT))
         multigot = await MultiGet(
-            all_targets_get,
-            digest_get,
             Get(AllTargets),
-            Get(VenvPex, PexRequest, black.to_pex_request())
+            all_targets_get,
+            Get(
+                VenvPex,
+                PexRequest,
+                black.to_pex_request()
+            ),
+            digest_get
         )
 
     def rules():
@@ -192,10 +196,10 @@ MIGRATED_RULES1_FILE = dedent(
         all_targets_get = find_all_targets(**implicitly())
         digest_get = create_archive(**implicitly(CreateArchive(EMPTY_SNAPSHOT)))
         multigot = await MultiGet(
-            all_targets_get,
-            digest_get,
             find_all_targets(**implicitly()),
-            create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
+            all_targets_get,
+            create_venv_pex(**implicitly({black.to_pex_request(): PexRequest})),
+            digest_get
         )
 
     def rules():
