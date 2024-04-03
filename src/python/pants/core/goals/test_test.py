@@ -33,6 +33,7 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
     TestTimeoutField,
+    _format_test_rerun_command,
     _format_test_summary,
     build_runtime_package_dependencies,
     run_tests,
@@ -269,6 +270,7 @@ def run_test_rule(
     report_dir: str = TestSubsystem.default_report_path,
     output: ShowOutput = ShowOutput.ALL,
     valid_targets: bool = True,
+    show_rerun_command: bool = False,
     run_id: RunId = RunId(999),
 ) -> tuple[int, str]:
     test_subsystem = create_goal_subsystem(
@@ -283,6 +285,7 @@ def run_test_rule(
         extra_env_vars=[],
         shard="",
         batch_size=1,
+        show_rerun_command=show_rerun_command,
     )
     debug_adapter_subsystem = create_subsystem(
         DebugAdapterSubsystem,
@@ -430,7 +433,39 @@ def test_skipped_target_noops(rule_runner: PythonRuleRunner) -> None:
     assert stderr.strip() == ""
 
 
-def test_summary(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize(
+    ("show_rerun_command", "expected_stderr"),
+    [
+        (
+            False,
+            # the summary is for humans, so we test it literally, to make sure the formatting is good
+            dedent(
+                """\
+
+                ✓ //:good succeeded in 1.00s (memoized).
+                ✕ //:bad failed in 1.00s (memoized).
+                """
+            ),
+        ),
+        (
+            True,
+            dedent(
+                """\
+
+                ✓ //:good succeeded in 1.00s (memoized).
+                ✕ //:bad failed in 1.00s (memoized).
+
+                To rerun the failing tests, try:
+
+                    pants test //:bad
+                """
+            ),
+        ),
+    ],
+)
+def test_summary(
+    rule_runner: PythonRuleRunner, show_rerun_command: bool, expected_stderr: str
+) -> None:
     good_address = Address("", target_name="good")
     bad_address = Address("", target_name="bad")
     skipped_address = Address("", target_name="skipped")
@@ -439,15 +474,10 @@ def test_summary(rule_runner: PythonRuleRunner) -> None:
         rule_runner,
         request_type=ConditionallySucceedsRequest,
         targets=[make_target(good_address), make_target(bad_address), make_target(skipped_address)],
+        show_rerun_command=show_rerun_command,
     )
     assert exit_code == ConditionallySucceedsRequest.exit_code((bad_address,))
-    assert stderr == dedent(
-        """\
-
-        ✓ //:good succeeded in 1.00s (memoized).
-        ✕ //:bad failed in 1.00s (memoized).
-        """
-    )
+    assert stderr == expected_stderr
 
 
 def _assert_test_summary(
@@ -509,6 +539,64 @@ def test_format_summary_memoized_remote(rule_runner: PythonRuleRunner) -> None:
             "ran", environment_name="ubuntu", remote_execution=True, total_elapsed_ms=50
         ),
     )
+
+
+@pytest.mark.parametrize(
+    ("results", "expected"),
+    [
+        pytest.param([], None, id="no_results"),
+        pytest.param(
+            [make_test_result([Address("", target_name="t1")], exit_code=0)], None, id="one_success"
+        ),
+        pytest.param(
+            [make_test_result([Address("", target_name="t2")], exit_code=None)],
+            None,
+            id="one_no_run",
+        ),
+        pytest.param(
+            [make_test_result([Address("", target_name="t3")], exit_code=1)],
+            "To rerun the failing tests, try:\n\n    pants test //:t3",
+            id="one_failure",
+        ),
+        pytest.param(
+            [
+                make_test_result([Address("", target_name="t1")], exit_code=0),
+                make_test_result([Address("", target_name="t2")], exit_code=None),
+                make_test_result([Address("", target_name="t3")], exit_code=1),
+            ],
+            "To rerun the failing tests, try:\n\n    pants test //:t3",
+            id="one_of_each",
+        ),
+        pytest.param(
+            [
+                make_test_result([Address("path/to", target_name="t1")], exit_code=1),
+                make_test_result([Address("another/path", target_name="t2")], exit_code=2),
+                make_test_result([Address("", target_name="t3")], exit_code=3),
+            ],
+            "To rerun the failing tests, try:\n\n    pants test //:t3 another/path:t2 path/to:t1",
+            id="multiple_failures",
+        ),
+        pytest.param(
+            [
+                make_test_result(
+                    [
+                        Address(
+                            "path with spaces",
+                            target_name="$*",
+                            parameters=dict(key="value"),
+                            generated_name="gn",
+                        )
+                    ],
+                    exit_code=1,
+                )
+            ],
+            "To rerun the failing tests, try:\n\n    pants test 'path with spaces:$*#gn@key=value'",
+            id="special_characters_require_quoting",
+        ),
+    ],
+)
+def test_format_rerun_command(results: list[TestResult], expected: None | str) -> None:
+    assert expected == _format_test_rerun_command(results)
 
 
 def test_debug_target(rule_runner: PythonRuleRunner) -> None:
