@@ -1100,7 +1100,7 @@ def _format_test_rerun_command(results: Iterable[TestResult]) -> None | str:
     goal = f"{bin_name()} {TestSubsystem.name}"
     invocation = " ".join([goal, *addresses])
 
-    return f"To rerun the failing tests, try:\n\n    {invocation}"
+    return f"To rerun the failing tests, use:\n\n    {invocation}"
 
 
 @dataclass(frozen=True)

@@ -455,7 +455,7 @@ def test_skipped_target_noops(rule_runner: PythonRuleRunner) -> None:
                 ✓ //:good succeeded in 1.00s (memoized).
                 ✕ //:bad failed in 1.00s (memoized).
 
-                To rerun the failing tests, try:
+                To rerun the failing tests, use:
 
                     pants test //:bad
                 """
@@ -555,7 +555,7 @@ def test_format_summary_memoized_remote(rule_runner: PythonRuleRunner) -> None:
         ),
         pytest.param(
             [make_test_result([Address("", target_name="t3")], exit_code=1)],
-            "To rerun the failing tests, try:\n\n    pants test //:t3",
+            "To rerun the failing tests, use:\n\n    pants test //:t3",
             id="one_failure",
         ),
         pytest.param(
@@ -564,7 +564,7 @@ def test_format_summary_memoized_remote(rule_runner: PythonRuleRunner) -> None:
                 make_test_result([Address("", target_name="t2")], exit_code=None),
                 make_test_result([Address("", target_name="t3")], exit_code=1),
             ],
-            "To rerun the failing tests, try:\n\n    pants test //:t3",
+            "To rerun the failing tests, use:\n\n    pants test //:t3",
             id="one_of_each",
         ),
         pytest.param(
@@ -573,7 +573,7 @@ def test_format_summary_memoized_remote(rule_runner: PythonRuleRunner) -> None:
                 make_test_result([Address("another/path", target_name="t2")], exit_code=2),
                 make_test_result([Address("", target_name="t3")], exit_code=3),
             ],
-            "To rerun the failing tests, try:\n\n    pants test //:t3 another/path:t2 path/to:t1",
+            "To rerun the failing tests, use:\n\n    pants test //:t3 another/path:t2 path/to:t1",
             id="multiple_failures",
         ),
         pytest.param(
@@ -590,7 +590,7 @@ def test_format_summary_memoized_remote(rule_runner: PythonRuleRunner) -> None:
                     exit_code=1,
                 )
             ],
-            "To rerun the failing tests, try:\n\n    pants test 'path with spaces:$*#gn@key=value'",
+            "To rerun the failing tests, use:\n\n    pants test 'path with spaces:$*#gn@key=value'",
             id="special_characters_require_quoting",
         ),
     ],
