@@ -52,6 +52,7 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_FILE_DIGEST,
     Digest,
+    FileDigest,
     MergeDigests,
     Snapshot,
     Workspace,
@@ -108,6 +109,31 @@ def make_process_result_metadata(
         ),
         source,
         source_run_id,
+    )
+
+
+def make_test_result(
+    addresses: Iterable[Address],
+    exit_code: None | int,
+    stdout_bytes: bytes = b"",
+    stdout_digest: FileDigest = EMPTY_FILE_DIGEST,
+    stderr_bytes: bytes = b"",
+    stderr_digest: FileDigest = EMPTY_FILE_DIGEST,
+    coverage_data: CoverageData | None = None,
+    output_setting: ShowOutput = ShowOutput.NONE,
+    result_metadata: None | ProcessResultMetadata = None,
+) -> TestResult:
+    """Create a TestResult with default values for most fields."""
+    return TestResult(
+        addresses=tuple(addresses),
+        exit_code=exit_code,
+        stdout_bytes=stdout_bytes,
+        stdout_digest=stdout_digest,
+        stderr_bytes=stderr_bytes,
+        stderr_digest=stderr_digest,
+        coverage_data=coverage_data,
+        output_setting=output_setting,
+        result_metadata=result_metadata,
     )
 
 
@@ -178,13 +204,9 @@ class MockTestRequest(TestRequest):
     @classmethod
     def test_result(cls, field_sets: Iterable[MockTestFieldSet]) -> TestResult:
         addresses = [field_set.address for field_set in field_sets]
-        return TestResult(
+        return make_test_result(
+            addresses,
             exit_code=cls.exit_code(addresses),
-            stdout_bytes=b"",
-            stdout_digest=EMPTY_FILE_DIGEST,
-            stderr_bytes=b"",
-            stderr_digest=EMPTY_FILE_DIGEST,
-            addresses=tuple(addresses),
             coverage_data=MockCoverageData(addresses),
             output_setting=ShowOutput.ALL,
             result_metadata=None if cls.skipped(addresses) else make_process_result_metadata("ran"),
@@ -436,15 +458,11 @@ def _assert_test_summary(
     result_metadata: ProcessResultMetadata | None,
 ) -> None:
     assert expected == _format_test_summary(
-        TestResult(
+        make_test_result(
+            [Address(spec_path="", target_name="dummy_address")],
             exit_code=exit_code,
-            stdout_bytes=b"",
-            stderr_bytes=b"",
-            stdout_digest=EMPTY_FILE_DIGEST,
-            stderr_digest=EMPTY_FILE_DIGEST,
-            addresses=(Address(spec_path="", target_name="dummy_address"),),
-            output_setting=ShowOutput.FAILED,
             result_metadata=result_metadata,
+            output_setting=ShowOutput.FAILED,
         ),
         RunId(run_id),
         Console(use_colors=False),
@@ -597,14 +615,12 @@ def assert_streaming_output(
     expected_message: str,
     result_metadata: ProcessResultMetadata = make_process_result_metadata("dummy"),
 ) -> None:
-    result = TestResult(
+    result = make_test_result(
+        addresses=(Address("demo_test"),),
         exit_code=exit_code,
         stdout_bytes=stdout.encode(),
-        stdout_digest=EMPTY_FILE_DIGEST,
         stderr_bytes=stderr.encode(),
-        stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=output_setting,
-        addresses=(Address("demo_test"),),
         result_metadata=result_metadata,
     )
     assert result.level() == expected_level
@@ -720,14 +736,11 @@ def test_timeout_calculation() -> None:
 
 
 def test_non_utf8_output() -> None:
-    test_result = TestResult(
+    test_result = make_test_result(
+        [],
         exit_code=1,  # "test error" so stdout/stderr are output in message
         stdout_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
-        stdout_digest=EMPTY_FILE_DIGEST,  # incorrect but we do not check in this test
         stderr_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
-        stderr_digest=EMPTY_FILE_DIGEST,  # incorrect but we do not check in this test
-        addresses=(),
         output_setting=ShowOutput.ALL,
-        result_metadata=None,
     )
     assert test_result.message() == "failed (exit code 1).\n��\n��\n\n"
