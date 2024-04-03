@@ -427,11 +427,9 @@ class CallByNameSyntaxMapper:
 
         new_call = ast.Call(
             func=ast.Name(id=new_function),
-            args=[],
+            args=[input_call],
             keywords=[
-                ast.keyword(
-                    value=ast.Call(func=ast.Name(id="implicitly"), args=[input_call], keywords=[])
-                )
+                ast.keyword(value=ast.Call(func=ast.Name(id="implicitly"), args=[], keywords=[]))
             ],
         )
         imports = [ast.ImportFrom(module, names=[ast.alias(new_function)], level=0)]

@@ -166,7 +166,7 @@ MIGRATED_RULES1_FILE = dedent(
     async def variants(black: Black, local_env: ChosenLocalEnvironmentName) -> Foo:
         all_targets = await find_all_targets(**implicitly())
         pex = await create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
-        digest = await create_archive(**implicitly(CreateArchive(EMPTY_SNAPSHOT)))
+        digest = await create_archive(CreateArchive(EMPTY_SNAPSHOT), **implicitly())
         paths = await find_binary(**implicitly({BinaryPathRequest(binary_name='time', search_path='/usr/bin'): BinaryPathRequest, local_env.val: EnvironmentName}))
 
     class Bar:
@@ -194,7 +194,7 @@ MIGRATED_RULES1_FILE = dedent(
     @rule(desc="Ensure calls used with multiget are migrated")
     async def multiget(black: Black) -> Thud:
         all_targets_get = find_all_targets(**implicitly())
-        digest_get = create_archive(**implicitly(CreateArchive(EMPTY_SNAPSHOT)))
+        digest_get = create_archive(CreateArchive(EMPTY_SNAPSHOT), **implicitly())
         multigot = await concurrently(
             find_all_targets(**implicitly()),
             all_targets_get,
