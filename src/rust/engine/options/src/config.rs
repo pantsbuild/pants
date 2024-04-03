@@ -418,7 +418,7 @@ impl OptionsSource for Config {
         self.get_list::<String>(id)
     }
 
-    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
+    fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
         if let Some(table) = self.value.get(id.scope.name()) {
             let option_name = Self::option_name(id);
             if let Some(value) = table.get(&option_name) {
@@ -426,16 +426,16 @@ impl OptionsSource for Config {
                     Value::Table(sub_table) => {
                         if let Some(add) = sub_table.get("add") {
                             if sub_table.len() == 1 && add.is_table() {
-                                return Ok(Some(DictEdit {
+                                return Ok(Some(vec![DictEdit {
                                     action: DictEditAction::Add,
                                     items: toml_table_to_dict(add),
-                                }));
+                                }]));
                             }
                         }
-                        return Ok(Some(DictEdit {
+                        return Ok(Some(vec![DictEdit {
                             action: DictEditAction::Replace,
                             items: toml_table_to_dict(value),
-                        }));
+                        }]));
                     }
                     Value::String(v) => {
                         return expand_to_dict(v.to_owned())
