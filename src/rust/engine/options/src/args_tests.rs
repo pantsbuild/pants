@@ -52,6 +52,7 @@ fn test_string() {
     assert_string("quux", option_id!(["scope"], "quux"));
 
     assert!(args.get_string(&option_id!("dne")).unwrap().is_none());
+    assert!(args.get_passthrough_args().is_none());
 }
 
 #[test]
@@ -84,6 +85,7 @@ fn test_bool() {
     assert_bool(true, option_id!(["scope"], "quuxt"));
 
     assert!(args.get_bool(&option_id!("dne")).unwrap().is_none());
+    assert!(args.get_passthrough_args().is_none());
     assert_eq!(
         "Problem parsing -c bool value:\n1:swallow\n  ^\nExpected 'true' or 'false' at line 1 column 1".to_owned(),
         args.get_bool(&option_id!(-'c', "unladen", "capacity"))
@@ -109,6 +111,7 @@ fn test_float() {
     assert_float(1.137, option_id!("baz", "spam"));
 
     assert!(args.get_float(&option_id!("dne")).unwrap().is_none());
+    assert!(args.get_passthrough_args().is_none());
 
     assert_eq!(
         "Problem parsing --bad float value:\n1:swallow\n  ^\n\
@@ -171,6 +174,7 @@ fn test_string_list() {
     );
 
     assert!(args.get_string_list(&option_id!("dne")).unwrap().is_none());
+    assert!(args.get_passthrough_args().is_none());
 
     let expected_error_msg = "\
 Problem parsing --bad string list value:
@@ -238,6 +242,22 @@ fn test_list_fromfile() {
         "fromfile.txt",
     );
     do_test(
+        "+[-42]",
+        &[ListEdit {
+            action: ListEditAction::Add,
+            items: vec![-42],
+        }],
+        "fromfile.txt",
+    );
+    do_test(
+        "[-42]",
+        &[ListEdit {
+            action: ListEditAction::Replace,
+            items: vec![-42],
+        }],
+        "fromfile.txt",
+    );
+    do_test(
         "[10, 12]",
         &[ListEdit {
             action: ListEditAction::Replace,
@@ -258,20 +278,31 @@ fn test_list_fromfile() {
 #[test]
 fn test_dict_fromfile() {
     fn do_test(content: &str, filename: &str) {
-        let expected = DictEdit {
-            action: DictEditAction::Replace,
-            items: hashmap! {
-            "FOO".to_string() => Val::Dict(hashmap! {
-                "BAR".to_string() => Val::Float(3.14),
-                "BAZ".to_string() => Val::Dict(hashmap! {
-                    "QUX".to_string() => Val::Bool(true),
-                    "QUUX".to_string() => Val::List(vec![ Val::Int(1), Val::Int(2)])
-                })
-            }),},
-        };
+        let expected = vec![
+            DictEdit {
+                action: DictEditAction::Replace,
+                items: hashmap! {
+                "FOO".to_string() => Val::Dict(hashmap! {
+                    "BAR".to_string() => Val::Float(3.14),
+                    "BAZ".to_string() => Val::Dict(hashmap! {
+                        "QUX".to_string() => Val::Bool(true),
+                        "QUUX".to_string() => Val::List(vec![ Val::Int(1), Val::Int(2)])
+                    })
+                }),},
+            },
+            DictEdit {
+                action: DictEditAction::Add,
+                items: hashmap! {
+                    "KEY".to_string() => Val::String("VALUE".to_string()),
+                },
+            },
+        ];
 
         let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
-        let args = Args::new(vec![format!("--foo=@{}", &fromfile_path.display())]);
+        let args = Args::new(vec![
+            format!("--foo=@{}", &fromfile_path.display()),
+            "--foo=+{'KEY':'VALUE'}".to_string(),
+        ]);
         let actual = args.get_dict(&option_id!("foo")).unwrap().unwrap();
         assert_eq!(expected, actual)
     }
@@ -296,6 +327,19 @@ fn test_dict_fromfile() {
         "#,
         "fromfile.yaml",
     );
+
+    // Test adding, rather than replacing, from a raw text fromfile.
+    let expected_add = vec![DictEdit {
+        action: DictEditAction::Add,
+        items: hashmap! {"FOO".to_string() => Val::Int(42)},
+    }];
+
+    let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", "+{'FOO':42}");
+    let args = Args::new(vec![format!("--foo=@{}", &fromfile_path.display())]);
+    assert_eq!(
+        expected_add,
+        args.get_dict(&option_id!("foo")).unwrap().unwrap()
+    )
 }
 
 #[test]
@@ -309,4 +353,35 @@ fn test_nonexistent_required_fromfile() {
 fn test_nonexistent_optional_fromfile() {
     let args = Args::new(vec!["--foo=@?/does/not/exist".to_string()]);
     assert!(args.get_string(&option_id!("foo")).unwrap().is_none());
+}
+
+#[test]
+fn test_passthrough_args() {
+    let args = mk_args([
+        "-ldebug",
+        "--foo=bar",
+        "--",
+        "--passthrough0",
+        "passthrough1",
+        "-p",
+    ]);
+
+    let assert_string = |expected: &str, id: OptionId| {
+        assert_eq!(expected.to_owned(), args.get_string(&id).unwrap().unwrap())
+    };
+
+    assert_string("bar", option_id!("foo"));
+    assert_string("debug", option_id!(-'l', "level"));
+
+    assert_eq!(
+        Some(vec!["--passthrough0", "passthrough1", "-p",]),
+        args.get_passthrough_args()
+    );
+}
+
+#[test]
+fn test_empty_passthrough_args() {
+    let args = mk_args(["-ldebug", "--foo=bar", "--"]);
+
+    assert_eq!(Some(vec![]), args.get_passthrough_args());
 }
