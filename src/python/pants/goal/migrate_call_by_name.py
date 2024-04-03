@@ -72,6 +72,7 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
             file = Path(f)
             if replacements := self._create_replacements_for_file(file, syntax_mapper):
                 self._perform_replacements_on_file(file, replacements)
+                self._perform_renaming_on_file(file, {"MultiGet": "concurrently"})
 
         return PANTS_SUCCEEDED_EXIT_CODE
 
@@ -187,6 +188,19 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
                 if not imports_added and line.startswith("from pants.engine.rules"):
                     print("\n".join(sorted(import_strings)))
                     imports_added = True
+
+    def _perform_renaming_on_file(self, file: Path, rename_map: dict[str, str]):
+        """In-place renaming for the new source code in a file.
+
+        This should be a separate Visitor/Transformer/Tokenizer which allows intelligent renaming based on AST context (e.g. only in Imports)
+        TODO: This system is already done in the deprecation fixer using tokenize.
+        """
+
+        with fileinput.input(file, inplace=True) as f:
+            for line in f:
+                for old, new in rename_map.items():
+                    line = line.replace(old, new)
+                print(line, end="")
 
 
 class RuleGraphGet(TypedDict):

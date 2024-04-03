@@ -36,6 +36,8 @@ from pants.engine.internals.selectors import AwaitableConstraints, Call
 from pants.engine.internals.selectors import Effect as Effect  # noqa: F401
 from pants.engine.internals.selectors import Get as Get  # noqa: F401
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
+# Alias for the MultiGet function to the new `concurrently` name, while being backwards compatible with existing plugins
+from pants.engine.internals.selectors import MultiGet as concurrently  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict

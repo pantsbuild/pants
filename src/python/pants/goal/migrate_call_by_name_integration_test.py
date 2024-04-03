@@ -151,7 +151,7 @@ MIGRATED_RULES1_FILE = dedent(
     from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
     from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
     from pants.engine.fs import Digest, EMPTY_SNAPSHOT
-    from pants.engine.rules import collect_rules, Get, MultiGet, rule
+    from pants.engine.rules import collect_rules, Get, concurrently, rule
     from pants.backend.python.util_rules.pex import create_venv_pex
     from pants.core.util_rules.archive import create_archive
     from pants.core.util_rules.system_binaries import find_binary
@@ -195,7 +195,7 @@ MIGRATED_RULES1_FILE = dedent(
     async def multiget(black: Black) -> Thud:
         all_targets_get = find_all_targets(**implicitly())
         digest_get = create_archive(**implicitly(CreateArchive(EMPTY_SNAPSHOT)))
-        multigot = await MultiGet(
+        multigot = await concurrently(
             find_all_targets(**implicitly()),
             all_targets_get,
             create_venv_pex(**implicitly({black.to_pex_request(): PexRequest})),
