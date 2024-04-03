@@ -97,6 +97,7 @@ impl Arg {
 #[derive(Debug)]
 pub struct Args {
     args: Vec<Arg>,
+    passthrough_args: Option<Vec<String>>,
 }
 
 impl Args {
@@ -104,21 +105,22 @@ impl Args {
     // argv[0] process name.
     pub fn new<I: IntoIterator<Item = String>>(arg_strs: I) -> Self {
         let mut args: Vec<Arg> = vec![];
+        let mut passthrough_args: Option<Vec<String>> = None;
         let mut scope = Scope::Global;
-        for arg_str in arg_strs.into_iter() {
-            if arg_str.starts_with("--") {
+        let mut args_iter = arg_strs.into_iter();
+        while let Some(arg_str) = args_iter.next() {
+            if arg_str == "--" {
+                // We've hit the passthrough args delimiter (`--`).
+                passthrough_args = Some(args_iter.collect::<Vec<String>>());
+                break;
+            } else if arg_str.starts_with("--") {
                 let mut components = arg_str.splitn(2, '=');
                 let flag = components.next().unwrap();
-                if flag.is_empty() {
-                    // We've hit the passthrough args delimiter (`--`), so don't look further.
-                    break;
-                } else {
-                    args.push(Arg {
-                        context: scope.clone(),
-                        flag: flag.to_string(),
-                        value: components.next().map(str::to_string),
-                    });
-                }
+                args.push(Arg {
+                    context: scope.clone(),
+                    flag: flag.to_string(),
+                    value: components.next().map(str::to_string),
+                });
             } else if arg_str.starts_with('-') && arg_str.len() >= 2 {
                 let (flag, mut value) = arg_str.split_at(2);
                 // We support -ldebug and -l=debug, so strip that extraneous equals sign.
@@ -139,13 +141,22 @@ impl Args {
             }
         }
 
-        Self { args }
+        Self {
+            args,
+            passthrough_args,
+        }
     }
 
     pub fn argv() -> Self {
         let mut args = env::args().collect::<Vec<_>>().into_iter();
         args.next(); // Consume the process name (argv[0]).
         Self::new(env::args().collect::<Vec<_>>())
+    }
+
+    pub fn get_passthrough_args(&self) -> Option<Vec<&str>> {
+        self.passthrough_args
+            .as_ref()
+            .map(|v| Vec::from_iter(v.iter().map(String::as_str)))
     }
 
     fn get_list<T: Parseable>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
