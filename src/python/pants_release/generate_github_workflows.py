@@ -1570,6 +1570,38 @@ def public_repos() -> PublicReposOutput:
     return PublicReposOutput(jobs=jobs, inputs=inputs, run_name=run_name)
 
 
+def clear_self_hosted_persistent_caches_jobs() -> list[dict[str, Any]]:
+    def make_job(platform: Platform) -> dict[str, Any]:
+        helper = Helper(platform)
+
+        clear_steps = [
+            {
+                "name": f"Deleting {directory}",
+                "run": f"du -sh {directory} || true; rm -rf {directory}",
+            }
+            for directory in [
+                # not all of these will necessarily exist (e.g. ~/Library/Caches is macOS-specific),
+                # but the script is resilient to this
+                "~/Library/Caches",
+                "~/.cache",
+                "~/.nce",
+                "~/.rustup",
+                "~/.pex",
+            ]
+        ]
+        return {
+            "name": helper.job_name("clear"),
+            "runs-on": helper.runs_on(),
+            "steps": [
+                {"name": "df before", "run": "df -h"},
+                *clear_steps,
+                {"name": "df after", "run": "df -h"},
+            ],
+        }
+
+    return [make_job(platform) for platform in sorted(SELF_HOSTED, key=lambda p: p.value)]
+
+
 # ----------------------------------------------------------------------
 # Main file
 # ----------------------------------------------------------------------
@@ -1740,12 +1772,24 @@ def generate() -> dict[Path, str]:
         Dumper=NoAliasDumper,
     )
 
+    clear_self_hosted_persistent_caches = clear_self_hosted_persistent_caches_jobs()
+    clear_self_hosted_persistent_caches_yaml = yaml.dump(
+        {
+            "name": "Clear persistent caches on long-lived self-hosted runners",
+            "on": {"workflow_dispatch": {}},
+            "jobs": clear_self_hosted_persistent_caches,
+        }
+    )
+
     return {
         Path(".github/workflows/audit.yaml"): f"{HEADER}\n\n{audit_yaml}",
         Path(".github/workflows/cache_comparison.yaml"): f"{HEADER}\n\n{cache_comparison_yaml}",
         Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
         Path(".github/workflows/release.yaml"): f"{HEADER}\n\n{release_yaml}",
         Path(".github/workflows/public_repos.yaml"): f"{HEADER}\n\n{public_repos_yaml}",
+        Path(
+            ".github/workflows/clear_self_hosted_persistent_caches.yaml"
+        ): f"{HEADER}\n\n{clear_self_hosted_persistent_caches_yaml}",
     }
 
 
