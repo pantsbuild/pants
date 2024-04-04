@@ -10,19 +10,66 @@ from typing import Sequence
 import pytest
 
 from pants.backend.project_info import peek
-from pants.backend.project_info.peek import Peek, TargetData, TargetDatas
+from pants.backend.project_info.peek import (
+    AdditionalTargetData,
+    HasAdditionalTargetDataFieldSet,
+    Peek,
+    TargetData,
+    TargetDatas,
+)
 from pants.backend.visibility.rules import rules as visibility_rules
 from pants.base.specs import RawSpecs, RecursiveGlobSpec
-from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileTarget, GenericTarget
+from pants.core.target_types import (
+    ArchiveTarget,
+    FileDependenciesField,
+    FilesGeneratorTarget,
+    FileSourceField,
+    FileTarget,
+    GenericTarget,
+)
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.dep_rules import DependencyRuleAction, DependencyRuleApplication
-from pants.engine.rules import QueryRule
+from pants.engine.rules import QueryRule, rule
+from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
 
 
 def _snapshot(fingerprint: str, files: tuple[str, ...]) -> Snapshot:
     return Snapshot.create_for_testing(files, ())
+
+
+@dataclasses.dataclass(frozen=True)
+class FirstFakeAdditionalTargetDataFieldSet(HasAdditionalTargetDataFieldSet):
+    label = "first"
+    required_fields = (FileSourceField,)
+
+    source: FileSourceField
+
+
+@dataclasses.dataclass(frozen=True)
+class SecondFakeAdditionalTargetDataFieldSet(HasAdditionalTargetDataFieldSet):
+    label = "second"
+    required_fields = (FileDependenciesField,)
+
+    dependencies: FileDependenciesField
+
+
+@rule
+async def first_fake_additional_target_data(
+    field_set: FirstFakeAdditionalTargetDataFieldSet,
+) -> AdditionalTargetData:
+    filename, extension = field_set.source.value.split(".", 1)
+    return AdditionalTargetData("source_parts", {"filename": filename, "extension": extension})
+
+
+@rule
+async def second_fake_additional_target_data(
+    field_set: SecondFakeAdditionalTargetDataFieldSet,
+) -> AdditionalTargetData:
+    return AdditionalTargetData(
+        "reversed_deps", [dep[::-1] for dep in field_set.dependencies.value]
+    )
 
 
 @pytest.mark.parametrize(
@@ -249,6 +296,54 @@ def _snapshot(fingerprint: str, files: tuple[str, ...]) -> Snapshot:
             ),
             id="include-dep-rules",
         ),
+        pytest.param(
+            [
+                TargetData(
+                    FilesGeneratorTarget(
+                        {"sources": ["foo.txt"]}, Address("example", target_name="files_target")
+                    ),
+                    _snapshot(
+                        "1",
+                        ("foo.txt",),
+                    ),
+                    tuple(),
+                    additional_info=(
+                        AdditionalTargetData("test_data1", {"hello": "world"}),
+                        AdditionalTargetData("test_data2", "teststring"),
+                    ),
+                )
+            ],
+            False,
+            False,
+            dedent(
+                """\
+                [
+                  {
+                    "address": "example:files_target",
+                    "target_type": "files",
+                    "additional_info": {
+                      "test_data1": {
+                        "hello": "world"
+                      },
+                      "test_data2": "teststring"
+                    },
+                    "dependencies": [],
+                    "description": null,
+                    "overrides": null,
+                    "sources": [
+                      "foo.txt"
+                    ],
+                    "sources_fingerprint": "b5e73bb1d7a3f8c2e7f8c43f38ab4d198e3512f082c670706df89f5abe319edf",
+                    "sources_raw": [
+                      "foo.txt"
+                    ],
+                    "tags": null
+                  }
+                ]
+                """
+            ),
+            id="include-additional-info",
+        ),
     ],
 )
 def test_render_targets_as_json(
@@ -264,7 +359,12 @@ def rule_runner() -> RuleRunner:
         rules=[
             *peek.rules(),
             *visibility_rules(),
+            first_fake_additional_target_data,
+            second_fake_additional_target_data,
             QueryRule(TargetDatas, [RawSpecs]),
+            QueryRule(AdditionalTargetData, [HasAdditionalTargetDataFieldSet]),
+            UnionRule(HasAdditionalTargetDataFieldSet, FirstFakeAdditionalTargetDataFieldSet),
+            UnionRule(HasAdditionalTargetDataFieldSet, SecondFakeAdditionalTargetDataFieldSet),
         ],
         target_types=[FilesGeneratorTarget, GenericTarget],
     )
@@ -390,5 +490,53 @@ def test_get_target_data_with_dep_rules(rule_runner: RuleRunner) -> None:
             dependencies_rules=("does", "apply", "*"),
             dependents_rules=("fall-through", "*"),
             applicable_dep_rules=(),
+        ),
+    ]
+
+
+def test_get_target_data_with_additional_info(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--peek-include-additional-info"])
+    rule_runner.write_files(
+        {
+            "foo/BUILD": dedent(
+                """\
+            target(name="bar", dependencies=[":baz"])
+
+            files(name="baz", sources=["*.txt"])
+            """
+            ),
+            "foo/a.txt": "",
+            "foo/b.txt": "",
+        }
+    )
+    tds = rule_runner.request(
+        TargetDatas,
+        [RawSpecs(recursive_globs=(RecursiveGlobSpec("foo"),), description_of_origin="tests")],
+    )
+
+    assert _normalize_fingerprints(tds) == [
+        TargetData(
+            GenericTarget({"dependencies": [":baz"]}, Address("foo", target_name="bar")),
+            None,
+            ("foo/a.txt:baz", "foo/b.txt:baz"),
+        ),
+        TargetData(
+            FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
+            _snapshot("", ("foo/a.txt", "foo/b.txt")),
+            ("foo/a.txt:baz", "foo/b.txt:baz"),
+        ),
+        TargetData(
+            FileTarget(
+                {"source": "a.txt"}, Address("foo", relative_file_path="a.txt", target_name="baz")
+            ),
+            _snapshot("", ("foo/a.txt",)),
+            (),
+        ),
+        TargetData(
+            FileTarget(
+                {"source": "b.txt"}, Address("foo", relative_file_path="b.txt", target_name="baz")
+            ),
+            _snapshot("", ("foo/b.txt",)),
+            (),
         ),
     ]
