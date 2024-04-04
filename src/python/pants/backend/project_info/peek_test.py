@@ -359,12 +359,14 @@ def rule_runner() -> RuleRunner:
         rules=[
             *peek.rules(),
             *visibility_rules(),
-            first_fake_additional_target_data,
-            second_fake_additional_target_data,
-            QueryRule(TargetDatas, [RawSpecs]),
             QueryRule(AdditionalTargetData, [HasAdditionalTargetDataFieldSet]),
             UnionRule(HasAdditionalTargetDataFieldSet, FirstFakeAdditionalTargetDataFieldSet),
             UnionRule(HasAdditionalTargetDataFieldSet, SecondFakeAdditionalTargetDataFieldSet),
+            first_fake_additional_target_data,
+            second_fake_additional_target_data,
+            QueryRule(TargetDatas, [RawSpecs]),
+            QueryRule(AdditionalTargetData, [FirstFakeAdditionalTargetDataFieldSet]),
+            QueryRule(AdditionalTargetData, [SecondFakeAdditionalTargetDataFieldSet]),
         ],
         target_types=[FilesGeneratorTarget, GenericTarget],
     )
