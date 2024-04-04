@@ -304,7 +304,9 @@ async def get_target_data(
             dependencies_rules=dependencies_rules_map.get(tgt.address),
             dependents_rules=dependents_rules_map.get(tgt.address),
             applicable_dep_rules=applicable_dep_rules_map.get(tgt.address),
-            additional_info=group_additional_infos_by_address.get(tgt.address),
+            additional_info=group_additional_infos_by_address.get(
+                tgt.address, () if subsys.include_additional_info else None
+            ),
         )
         for tgt, expanded_deps in zip(sorted_targets, expanded_dependencies)
     )

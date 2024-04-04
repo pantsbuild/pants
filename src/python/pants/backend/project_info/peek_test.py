@@ -21,7 +21,6 @@ from pants.backend.visibility.rules import rules as visibility_rules
 from pants.base.specs import RawSpecs, RecursiveGlobSpec
 from pants.core.target_types import (
     ArchiveTarget,
-    FileDependenciesField,
     FilesGeneratorTarget,
     FileSourceField,
     FileTarget,
@@ -31,6 +30,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.dep_rules import DependencyRuleAction, DependencyRuleApplication
 from pants.engine.rules import QueryRule, rule
+from pants.engine.target import DescriptionField
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -50,9 +50,9 @@ class FirstFakeAdditionalTargetDataFieldSet(HasAdditionalTargetDataFieldSet):
 @dataclasses.dataclass(frozen=True)
 class SecondFakeAdditionalTargetDataFieldSet(HasAdditionalTargetDataFieldSet):
     label = "second"
-    required_fields = (FileDependenciesField,)
+    required_fields = (FileSourceField, DescriptionField)
 
-    dependencies: FileDependenciesField
+    description: DescriptionField
 
 
 @rule
@@ -67,9 +67,7 @@ async def first_fake_additional_target_data(
 async def second_fake_additional_target_data(
     field_set: SecondFakeAdditionalTargetDataFieldSet,
 ) -> AdditionalTargetData:
-    return AdditionalTargetData(
-        "reversed_deps", [dep[::-1] for dep in field_set.dependencies.value]
-    )
+    return AdditionalTargetData("reversed_description", field_set.description.value[::-1])
 
 
 @pytest.mark.parametrize(
@@ -309,7 +307,7 @@ async def second_fake_additional_target_data(
                     tuple(),
                     additional_info=(
                         AdditionalTargetData("test_data1", {"hello": "world"}),
-                        AdditionalTargetData("test_data2", "teststring"),
+                        AdditionalTargetData("test_data2", ["one", "two"]),
                     ),
                 )
             ],
@@ -325,7 +323,10 @@ async def second_fake_additional_target_data(
                       "test_data1": {
                         "hello": "world"
                       },
-                      "test_data2": "teststring"
+                      "test_data2": [
+                        "one",
+                        "two"
+                      ]
                     },
                     "dependencies": [],
                     "description": null,
@@ -359,7 +360,6 @@ def rule_runner() -> RuleRunner:
         rules=[
             *peek.rules(),
             *visibility_rules(),
-            QueryRule(AdditionalTargetData, [HasAdditionalTargetDataFieldSet]),
             UnionRule(HasAdditionalTargetDataFieldSet, FirstFakeAdditionalTargetDataFieldSet),
             UnionRule(HasAdditionalTargetDataFieldSet, SecondFakeAdditionalTargetDataFieldSet),
             first_fake_additional_target_data,
@@ -368,7 +368,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(AdditionalTargetData, [FirstFakeAdditionalTargetDataFieldSet]),
             QueryRule(AdditionalTargetData, [SecondFakeAdditionalTargetDataFieldSet]),
         ],
-        target_types=[FilesGeneratorTarget, GenericTarget],
+        target_types=[FilesGeneratorTarget, GenericTarget, FileTarget],
     )
 
 
@@ -502,13 +502,10 @@ def test_get_target_data_with_additional_info(rule_runner: RuleRunner) -> None:
         {
             "foo/BUILD": dedent(
                 """\
-            target(name="bar", dependencies=[":baz"])
-
-            files(name="baz", sources=["*.txt"])
+            file(source="a.txt", description="reverse me!")
             """
             ),
             "foo/a.txt": "",
-            "foo/b.txt": "",
         }
     )
     tds = rule_runner.request(
@@ -518,27 +515,16 @@ def test_get_target_data_with_additional_info(rule_runner: RuleRunner) -> None:
 
     assert _normalize_fingerprints(tds) == [
         TargetData(
-            GenericTarget({"dependencies": [":baz"]}, Address("foo", target_name="bar")),
-            None,
-            ("foo/a.txt:baz", "foo/b.txt:baz"),
-        ),
-        TargetData(
-            FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
-            _snapshot("", ("foo/a.txt", "foo/b.txt")),
-            ("foo/a.txt:baz", "foo/b.txt:baz"),
-        ),
-        TargetData(
             FileTarget(
-                {"source": "a.txt"}, Address("foo", relative_file_path="a.txt", target_name="baz")
+                {"source": "a.txt", "description": "reverse me!"},
+                Address("foo", target_name="foo"),
+                name_explicitly_set=False,
             ),
             _snapshot("", ("foo/a.txt",)),
             (),
-        ),
-        TargetData(
-            FileTarget(
-                {"source": "b.txt"}, Address("foo", relative_file_path="b.txt", target_name="baz")
+            additional_info=(
+                AdditionalTargetData("source_parts", {"filename": "a", "extension": "txt"}),
+                AdditionalTargetData("reversed_description", "reverse me!"[::-1]),
             ),
-            _snapshot("", ("foo/b.txt",)),
-            (),
         ),
     ]
