@@ -239,4 +239,8 @@ impl PyOptionParser {
             })
             .collect()
     }
+
+    fn get_passthrough_args(&self) -> PyResult<Option<Vec<String>>> {
+        Ok(self.0.get_passthrough_args().cloned())
+    }
 }

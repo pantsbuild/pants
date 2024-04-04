@@ -374,7 +374,7 @@ fn test_passthrough_args() {
     assert_string("debug", option_id!(-'l', "level"));
 
     assert_eq!(
-        Some(vec!["--passthrough0", "passthrough1", "-p",]),
+        Some(vec!["--passthrough0".to_string(), "passthrough1".to_string(), "-p".to_string(),]),
         args.get_passthrough_args()
     );
 }

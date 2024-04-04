@@ -236,6 +236,7 @@ pub struct DictOptionValue {
 pub struct OptionParser {
     sources: BTreeMap<Source, Arc<dyn OptionsSource>>,
     include_derivation: bool,
+    passthrough_args: Option<Vec<String>>
 }
 
 impl OptionParser {
@@ -265,12 +266,15 @@ impl OptionParser {
                 .map(|(k, v)| (format!("env.{k}", k = k), v.clone())),
         );
 
+        let passthrough_args = args.get_passthrough_args();
+
         let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
         sources.insert(Source::Env, Arc::new(env));
         sources.insert(Source::Flag, Arc::new(args));
         let mut parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
+            passthrough_args: None,
         };
 
         fn path_join(prefix: &str, suffix: &str) -> String {
@@ -336,6 +340,7 @@ impl OptionParser {
         parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
+            passthrough_args: None,
         };
 
         if allow_pantsrc && parser.parse_bool(&option_id!("pantsrc"), true)?.value {
@@ -367,6 +372,7 @@ impl OptionParser {
         Ok(OptionParser {
             sources,
             include_derivation,
+            passthrough_args,
         })
     }
 
@@ -607,6 +613,10 @@ impl OptionParser {
             source: highest_priority_source,
             value: dict,
         })
+    }
+
+    pub fn get_passthrough_args(&self) -> Option<&Vec<String>> {
+        self.passthrough_args.as_ref()
     }
 }
 

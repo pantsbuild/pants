@@ -153,10 +153,8 @@ impl Args {
         Self::new(env::args().collect::<Vec<_>>())
     }
 
-    pub fn get_passthrough_args(&self) -> Option<Vec<&str>> {
-        self.passthrough_args
-            .as_ref()
-            .map(|v| Vec::from_iter(v.iter().map(String::as_str)))
+    pub fn get_passthrough_args(&self) -> Option<Vec<String>> {
+        self.passthrough_args.clone()
     }
 
     fn get_list<T: Parseable>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {

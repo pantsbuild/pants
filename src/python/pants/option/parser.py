@@ -208,6 +208,7 @@ class Parser:
                 default=kwargs.get("default"),
                 option_type=kwargs.get("type"),
                 member_type=kwargs.get("member_type"),
+                passthrough=kwargs.get("passthrough"),
             )
             # TODO: If the option is explicitly given, check deprecation and mutual exclusion.
             setattr(namespace, dest, RankedValue(Rank.HARDCODED, val))

@@ -36,7 +36,7 @@ class NativeOptionParser:
             (dict, None): self._native_parser.get_dict,
         }
 
-    def get(self, *, scope, flags, default, option_type, member_type=None) -> Any:
+    def get(self, *, scope, flags, default, option_type, member_type=None, passthrough=False) -> Any:
         def is_enum(typ):
             # TODO: When we switch to Python 3.11, use: return isinstance(typ, EnumType)
             return inspect.isclass(typ) and issubclass(typ, Enum)
@@ -98,11 +98,14 @@ class NativeOptionParser:
                     val = _flatten_shlexed_list(val)
                 elif callable(member_type):
                     val = [member_type(x) for x in val]
+                if passthrough:
+                    val += self._native_parser.get_passthrough_args()
             elif is_enum(option_type):
                 val = option_type(val)
             elif callable(option_type):
                 val = option_type(val)
         return val
+
 
 
 def foo() -> None:
