@@ -1599,7 +1599,7 @@ def clear_self_hosted_persistent_caches_jobs() -> list[dict[str, Any]]:
             ],
         }
 
-    return [make_job(platform) for platform in SELF_HOSTED]
+    return [make_job(platform) for platform in sorted(SELF_HOSTED, key=lambda p: p.value)]
 
 
 # ----------------------------------------------------------------------

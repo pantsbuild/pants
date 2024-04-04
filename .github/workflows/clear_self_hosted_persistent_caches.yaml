@@ -4,10 +4,11 @@
 
 
 jobs:
-- name: clear_macos10_15_x86_64
+- name: clear_linux_arm64
   runs-on:
   - self-hosted
-  - macOS-10.15-X64
+  - Linux
+  - ARM64
   steps:
   - name: df before
     run: df -h
@@ -23,11 +24,10 @@ jobs:
     run: du -sh ~/.pex || true; rm -rf ~/.pex
   - name: df after
     run: df -h
-- name: clear_linux_arm64
+- name: clear_macos10_15_x86_64
   runs-on:
   - self-hosted
-  - Linux
-  - ARM64
+  - macOS-10.15-X64
   steps:
   - name: df before
     run: df -h
