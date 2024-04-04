@@ -67,7 +67,10 @@ async def first_fake_additional_target_data(
 async def second_fake_additional_target_data(
     field_set: SecondFakeAdditionalTargetDataFieldSet,
 ) -> AdditionalTargetData:
-    return AdditionalTargetData("reversed_description", field_set.description.value[::-1])
+    return AdditionalTargetData(
+        "reversed_description",
+        field_set.description.value[::-1] if field_set.description.value else None,
+    )
 
 
 @pytest.mark.parametrize(
