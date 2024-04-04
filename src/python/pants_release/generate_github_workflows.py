@@ -1579,7 +1579,10 @@ def clear_self_hosted_persistent_caches_jobs() -> Jobs:
         clear_steps = [
             {
                 "name": f"Deleting {directory}",
-                "run": f"du -sh {directory} || true; rm -rf {directory}",
+                # squash all errors: this is a best effort thing, so, for instance, it's fine if
+                # there's directories hanging around that this workflow doesn't have permission to
+                # delete
+                "run": f"du -sh {directory} || true; rm -rf {directory} || true",
             }
             for directory in [
                 # not all of these will necessarily exist (e.g. ~/Library/Caches is macOS-specific),

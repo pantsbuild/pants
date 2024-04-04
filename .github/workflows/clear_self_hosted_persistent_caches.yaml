@@ -13,15 +13,15 @@ jobs:
     - name: df before
       run: df -h
     - name: Deleting ~/Library/Caches
-      run: du -sh ~/Library/Caches || true; rm -rf ~/Library/Caches
+      run: du -sh ~/Library/Caches || true; rm -rf ~/Library/Caches || true
     - name: Deleting ~/.cache
-      run: du -sh ~/.cache || true; rm -rf ~/.cache
+      run: du -sh ~/.cache || true; rm -rf ~/.cache || true
     - name: Deleting ~/.nce
-      run: du -sh ~/.nce || true; rm -rf ~/.nce
+      run: du -sh ~/.nce || true; rm -rf ~/.nce || true
     - name: Deleting ~/.rustup
-      run: du -sh ~/.rustup || true; rm -rf ~/.rustup
+      run: du -sh ~/.rustup || true; rm -rf ~/.rustup || true
     - name: Deleting ~/.pex
-      run: du -sh ~/.pex || true; rm -rf ~/.pex
+      run: du -sh ~/.pex || true; rm -rf ~/.pex || true
     - name: df after
       run: df -h
   clean_macos10_15_x86_64:
@@ -32,15 +32,15 @@ jobs:
     - name: df before
       run: df -h
     - name: Deleting ~/Library/Caches
-      run: du -sh ~/Library/Caches || true; rm -rf ~/Library/Caches
+      run: du -sh ~/Library/Caches || true; rm -rf ~/Library/Caches || true
     - name: Deleting ~/.cache
-      run: du -sh ~/.cache || true; rm -rf ~/.cache
+      run: du -sh ~/.cache || true; rm -rf ~/.cache || true
     - name: Deleting ~/.nce
-      run: du -sh ~/.nce || true; rm -rf ~/.nce
+      run: du -sh ~/.nce || true; rm -rf ~/.nce || true
     - name: Deleting ~/.rustup
-      run: du -sh ~/.rustup || true; rm -rf ~/.rustup
+      run: du -sh ~/.rustup || true; rm -rf ~/.rustup || true
     - name: Deleting ~/.pex
-      run: du -sh ~/.pex || true; rm -rf ~/.pex
+      run: du -sh ~/.pex || true; rm -rf ~/.pex || true
     - name: df after
       run: df -h
   clean_macos11_arm64:
@@ -51,15 +51,15 @@ jobs:
     - name: df before
       run: df -h
     - name: Deleting ~/Library/Caches
-      run: du -sh ~/Library/Caches || true; rm -rf ~/Library/Caches
+      run: du -sh ~/Library/Caches || true; rm -rf ~/Library/Caches || true
     - name: Deleting ~/.cache
-      run: du -sh ~/.cache || true; rm -rf ~/.cache
+      run: du -sh ~/.cache || true; rm -rf ~/.cache || true
     - name: Deleting ~/.nce
-      run: du -sh ~/.nce || true; rm -rf ~/.nce
+      run: du -sh ~/.nce || true; rm -rf ~/.nce || true
     - name: Deleting ~/.rustup
-      run: du -sh ~/.rustup || true; rm -rf ~/.rustup
+      run: du -sh ~/.rustup || true; rm -rf ~/.rustup || true
     - name: Deleting ~/.pex
-      run: du -sh ~/.pex || true; rm -rf ~/.pex
+      run: du -sh ~/.pex || true; rm -rf ~/.pex || true
     - name: df after
       run: df -h
 name: Clear persistent caches on long-lived self-hosted runners
