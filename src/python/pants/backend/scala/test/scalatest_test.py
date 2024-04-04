@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from typing import Iterable, Mapping
+from typing import List, Mapping
 
 import pytest
 
@@ -40,6 +40,8 @@ from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 # TODO(12812): Switch tests to using parsed scalatest.xml results instead of scanning stdout strings.
+
+ATTEMPTS_DEFAULT_OPTION = 2
 
 
 @pytest.fixture
@@ -95,7 +97,12 @@ def scalatest_lockfile(
 
 
 @maybe_skip_jdk_test
-def test_simple_success(rule_runner: RuleRunner, scalatest_lockfile: JVMLockfileFixture) -> None:
+@pytest.mark.parametrize("passing", [True, False])
+def test_simple(
+    rule_runner: RuleRunner, scalatest_lockfile: JVMLockfileFixture, passing: bool
+) -> None:
+    value_in_test = "simple" if passing else "wrong"
+
     rule_runner.write_files(
         {
             "3rdparty/jvm/default.lock": scalatest_lockfile.serialized_lockfile,
@@ -119,22 +126,27 @@ def test_simple_success(rule_runner: RuleRunner, scalatest_lockfile: JVMLockfile
                 class SimpleSpec extends AnyFunSpec {
                   describe("Simple") {
                     it("should be simple") {
-                      assert("Simple".toLowerCase == "simple")
+                      assert("Simple".toLowerCase == "%s")
                     }
                   }
                 }
                 """
+                % value_in_test
             ),
         }
     )
 
     test_result = run_scalatest_test(rule_runner, "example-test", "SimpleSpec.scala")
 
-    assert test_result.exit_code == 0
-    assert (
-        b"Tests: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
-        in test_result.stdout_bytes
-    )
+    if passing:
+        assert test_result.exit_code == 0
+        assert (
+            b"Tests: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
+            in test_result.stdout_bytes
+        )
+    else:
+        assert test_result.exit_code == 1
+        assert len(test_result.process_results) == ATTEMPTS_DEFAULT_OPTION
     assert test_result.xml_results and test_result.xml_results.files
 
 
@@ -275,10 +287,11 @@ def run_scalatest_test(
     target_name: str,
     relative_file_path: str,
     *,
-    extra_args: Iterable[str] | None = None,
+    extra_args: List[str] | None = None,
     env: Mapping[str, str] | None = None,
 ) -> TestResult:
     args = extra_args or []
+    args.append(f"--test-attempts-default={ATTEMPTS_DEFAULT_OPTION}")
     rule_runner.set_options(args, env=env, env_inherit=PYTHON_BOOTSTRAP_ENV)
     tgt = rule_runner.get_target(
         Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)

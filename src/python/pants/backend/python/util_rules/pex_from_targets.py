@@ -566,7 +566,6 @@ async def create_pex_from_targets(
             LocalDistsPex,
             LocalDistsPexRequest(
                 request.addresses,
-                internal_only=request.internal_only,
                 interpreter_constraints=interpreter_constraints,
                 sources=sources,
             ),

@@ -784,7 +784,7 @@ pub struct WorkunitStoreHandle {
 }
 
 thread_local! {
-  static THREAD_WORKUNIT_STORE_HANDLE: RefCell<Option<WorkunitStoreHandle >> = RefCell::new(None)
+  static THREAD_WORKUNIT_STORE_HANDLE: RefCell<Option<WorkunitStoreHandle >> = const { RefCell::new(None) }
 }
 
 task_local! {
