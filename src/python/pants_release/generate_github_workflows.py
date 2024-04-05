@@ -1570,14 +1570,19 @@ def public_repos() -> PublicReposOutput:
     return PublicReposOutput(jobs=jobs, inputs=inputs, run_name=run_name)
 
 
-def clear_self_hosted_persistent_caches_jobs() -> list[dict[str, Any]]:
-    def make_job(platform: Platform) -> dict[str, Any]:
+def clear_self_hosted_persistent_caches_jobs() -> Jobs:
+    jobs = {}
+
+    for platform in sorted(SELF_HOSTED, key=lambda p: p.value):
         helper = Helper(platform)
 
         clear_steps = [
             {
                 "name": f"Deleting {directory}",
-                "run": f"du -sh {directory} || true; rm -rf {directory}",
+                # squash all errors: this is a best effort thing, so, for instance, it's fine if
+                # there's directories hanging around that this workflow doesn't have permission to
+                # delete
+                "run": f"du -sh {directory} || true; rm -rf {directory} || true",
             }
             for directory in [
                 # not all of these will necessarily exist (e.g. ~/Library/Caches is macOS-specific),
@@ -1589,8 +1594,7 @@ def clear_self_hosted_persistent_caches_jobs() -> list[dict[str, Any]]:
                 "~/.pex",
             ]
         ]
-        return {
-            "name": helper.job_name("clear"),
+        jobs[helper.job_name("clean")] = {
             "runs-on": helper.runs_on(),
             "steps": [
                 {"name": "df before", "run": "df -h"},
@@ -1599,7 +1603,7 @@ def clear_self_hosted_persistent_caches_jobs() -> list[dict[str, Any]]:
             ],
         }
 
-    return [make_job(platform) for platform in sorted(SELF_HOSTED, key=lambda p: p.value)]
+    return jobs
 
 
 # ----------------------------------------------------------------------
