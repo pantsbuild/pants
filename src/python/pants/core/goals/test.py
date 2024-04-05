@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import itertools
 import logging
+import os
+import shlex
 from abc import ABC, ABCMeta
 from dataclasses import dataclass, field
 from enum import Enum
@@ -663,6 +665,24 @@ class TestSubsystem(GoalSubsystem):
         ),
     )
 
+    show_rerun_command = BoolOption(
+        default="CI" in os.environ,
+        advanced=True,
+        help=softwrap(
+            f"""
+            If tests fail, show an appropriate `{bin_name()} {name} ...` invocation to rerun just
+            those tests.
+
+            This is to make it easy to run those tests on a new machine (for instance, run tests
+            locally if they fail in CI): caching of successful tests means that rerunning the exact
+            same command on the same machine will already automatically only rerun the failures.
+
+            This defaults to `True` when running in CI (as determined by the `CI` environment
+            variable being set) but `False` elsewhere.
+            """
+        ),
+    )
+
     def report_dir(self, distdir: DistDir) -> PurePath:
         return PurePath(self._report_dir.format(distdir=distdir.relpath))
 
@@ -943,6 +963,10 @@ async def run_tests(
                     f"Wrote extra output from test `{result.addresses[0]}` to `{path_prefix}`."
                 )
 
+    rerun_command = _format_test_rerun_command(results)
+    if rerun_command and test_subsystem.show_rerun_command:
+        console.print_stderr(f"\n{rerun_command}")
+
     if test_subsystem.report:
         report_dir = test_subsystem.report_dir(distdir)
         merged_reports = await Get(
@@ -1064,6 +1088,19 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
     return f"{sigil} {result.description} {status}{attempt_msg} {elapsed_print}{source_desc}."
+
+
+def _format_test_rerun_command(results: Iterable[TestResult]) -> None | str:
+    failures = [result for result in results if result.exit_code not in (None, 0)]
+    if not failures:
+        return None
+
+    # format an invocation like `pants test path/to/first:address path/to/second:address ...`
+    addresses = sorted(shlex.quote(str(addr)) for result in failures for addr in result.addresses)
+    goal = f"{bin_name()} {TestSubsystem.name}"
+    invocation = " ".join([goal, *addresses])
+
+    return f"To rerun the failing tests, use:\n\n    {invocation}"
 
 
 @dataclass(frozen=True)
