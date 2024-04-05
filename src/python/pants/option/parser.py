@@ -17,7 +17,7 @@ from typing import Any, DefaultDict, Iterable, Mapping
 import yaml
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import validate_deprecation_semver, warn_or_error
+from pants.base.deprecated import deprecated_conditional, validate_deprecation_semver, warn_or_error
 from pants.option.config import DEFAULT_SECTION, Config
 from pants.option.custom_types import (
     DictValueComponent,
@@ -415,6 +415,13 @@ class Parser:
                 error(OptionNameDoubleDash, arg_name=arg)
 
         # Validate kwargs.
+        deprecated_conditional(
+            lambda: "implicit_value" in kwargs,
+            removal_version="2.21.0a0",
+            entity="The 'implicit_value' option registration keyword",
+            hint="Command line flags specifying this option must provide its value explicitly, "
+            "except for boolean flags, where --foo is the same as --foo=true.",
+        )
         if "implicit_value" in kwargs and kwargs["implicit_value"] is None:
             error(ImplicitValIsNone)
         type_arg = kwargs.get("type", str)
