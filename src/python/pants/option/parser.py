@@ -172,14 +172,14 @@ class Parser:
             object.__setattr__(self, "allow_unknown_flags", allow_unknown_flags)
 
         @staticmethod
-        def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, list[str]]:
+        def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, list[str | None]]:
             """Returns a map of flag -> list of values, based on the given flag strings.
 
             None signals no value given (e.g., -x, --foo). The value is a list because the user may
             specify the same flag multiple times, and that's sometimes OK (e.g., when appending to
             list- valued options).
             """
-            flag_value_map: DefaultDict[str, list[str]] = defaultdict(list)
+            flag_value_map: DefaultDict[str, list[str | None]] = defaultdict(list)
             for flag in flags:
                 flag_val: str | None
                 key, has_equals_sign, flag_val = flag.partition("=")
@@ -188,9 +188,8 @@ class Parser:
                         key = flag[0:2]
                         flag_val = flag[2:]
                     if not flag_val:
-                        # Either a short option with no value or a long option with no equals sign,
-                        # meaning a boolean option set to true.
-                        flag_val = "true"
+                        # Either a short option with no value or a long option with no equals sign.
+                        flag_val = None
                 flag_value_map[key].append(flag_val)
             return flag_value_map
 
@@ -232,6 +231,13 @@ class Parser:
 
                 if arg in flag_value_map:
                     for v in flag_value_map[arg]:
+                        if v is None:
+                            if self.is_bool(kwargs):
+                                v = True
+                            else:
+                                raise ParseError(
+                                    f"Missing value for command line flag {arg} in {self._scope_str()}"
+                                )
                         flag_vals.append(v)
                     del flag_value_map[arg]
 
