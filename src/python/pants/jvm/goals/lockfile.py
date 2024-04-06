@@ -103,21 +103,13 @@ class KnownJVMUserResolveNamesRequest(KnownUserResolveNamesRequest):
     pass
 
 
-def jvm_exportable_tools(union_membership: UnionMembership) -> dict[str, type[JvmToolBase]]:
-    exportable_tools = union_membership.get(ExportableTool)
-    names_of_jvm_tools: dict[str, type[JvmToolBase]] = {
-        e.options_scope: e for e in exportable_tools if issubclass(e, JvmToolBase)  # type: ignore  # mypy isn't narrowing with `issubclass`
-    }
-    return names_of_jvm_tools
-
-
 @rule
 def determine_jvm_user_resolves(
     _: KnownJVMUserResolveNamesRequest,
     jvm_subsystem: JvmSubsystem,
     union_membership: UnionMembership,
 ) -> KnownUserResolveNames:
-    jvm_tool_resolves = jvm_exportable_tools(union_membership)
+    jvm_tool_resolves = ExportableTool.filter_for_subclasses(union_membership, JvmToolBase)
     names = (*jvm_subsystem.resolves.keys(), *jvm_tool_resolves.keys())
     return KnownUserResolveNames(
         names=names,
@@ -170,7 +162,7 @@ async def setup_user_lockfile_requests(
         resolve = tgt[JvmResolveField].normalized_value(jvm_subsystem)
         resolve_to_artifacts[resolve].add(artifact)
 
-    tools = jvm_exportable_tools(union_membership)
+    tools = ExportableTool.filter_for_subclasses(union_membership, JvmToolBase)
 
     # Generate a JVM lockfile request for each requested resolve. This step also allows other backends to
     # validate the proposed set of artifact requirements for each resolve.

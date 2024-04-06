@@ -216,7 +216,7 @@ def determine_python_user_resolves(
     python_setup: PythonSetup,
     union_membership: UnionMembership,
 ) -> KnownUserResolveNames:
-    python_tool_resolves = python_exportable_tools(union_membership)
+    python_tool_resolves = ExportableTool.filter_for_subclasses(union_membership, PythonToolBase)
 
     return KnownUserResolveNames(
         names=(*python_setup.resolves.keys(), *python_tool_resolves.keys()),
@@ -244,7 +244,7 @@ async def setup_user_lockfile_requests(
         resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
         find_links.update(tgt[PythonRequirementFindLinksField].value or ())
 
-    tools = python_exportable_tools(union_membership)
+    tools = ExportableTool.filter_for_subclasses(union_membership, PythonToolBase)
 
     out = []
     for resolve in requested:

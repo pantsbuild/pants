@@ -11,8 +11,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, cast
 
-from pants.backend.python.goals.lockfile import python_exportable_tools
-from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexLayout
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -33,6 +32,7 @@ from pants.core.goals.export import (
     ExportSubsystem,
     PostProcessingCommand,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
@@ -320,10 +320,12 @@ async def export_virtualenv_for_resolve(
             resolve_name=resolve,
         )
     else:
-        maybe_exportable = python_exportable_tools(union_membership).get(resolve)
+        maybe_exportable = ExportableTool.filter_for_subclasses(
+            union_membership, PythonToolBase
+        ).get(resolve)
         if maybe_exportable:
             lockfile = cast(
-                PythonToolRequirementsBase, maybe_exportable
+                PythonToolBase, maybe_exportable
             ).pex_requirements_for_default_lockfile()
         else:
             lockfile = None

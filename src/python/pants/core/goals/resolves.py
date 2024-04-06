@@ -2,8 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from pants.engine.unions import union
+from typing import TypeVar
+
+from pants.engine.unions import UnionMembership, union
 from pants.util.strutil import softwrap
+
+T = TypeVar("T", bound="ExportableTool")
 
 
 @union
@@ -33,3 +37,17 @@ class ExportableTool:
             {resolve} is a tool using its default lockfile.
         """
         )
+
+    @staticmethod
+    def filter_for_subclasses(
+        union_membership: UnionMembership, parent_class: type[T]
+    ) -> dict[str, type[T]]:
+        """Find all ExportableTools that are members of `parent_class`.
+
+        Language backends can use this to obtain all tools they can export.
+        """
+        exportable_tools = union_membership.get(ExportableTool)
+        relevant_tools: dict[str, type[T]] = {
+            e.options_scope: e for e in exportable_tools if issubclass(e, parent_class)  # type: ignore # mypy isn't narrowing with `issubclass`
+        }
+        return relevant_tools
