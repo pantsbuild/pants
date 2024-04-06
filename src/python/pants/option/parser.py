@@ -179,7 +179,7 @@ class Parser:
             specify the same flag multiple times, and that's sometimes OK (e.g., when appending to
             list- valued options).
             """
-            flag_value_map: DefaultDict[str, list[str | None]] = defaultdict(list)
+            flag_value_map: DefaultDict[str, list[str]] = defaultdict(list)
             for flag in flags:
                 flag_val: str | None
                 key, has_equals_sign, flag_val = flag.partition("=")
