@@ -147,6 +147,40 @@ async def validate_jvm_artifacts_for_resolve(
     )
 
 
+async def _plan_generate_lockfile(resolve, resolve_to_artifacts, tools) -> Get:
+    """Generate a JVM lockfile request for each requested resolve.
+
+    This step also allows other backends to validate the proposed set of artifact requirements for
+    each resolve.
+    """
+    if resolve in resolve_to_artifacts:
+        return Get(
+            GenerateJvmLockfile,
+            _ValidateJvmArtifactsRequest(
+                artifacts=ArtifactRequirements(resolve_to_artifacts[resolve]),
+                resolve_name=resolve,
+            ),
+        )
+    elif resolve in tools:
+        tool_cls: type[JvmToolBase] = tools[resolve]
+        tool = await _construct_subsystem(tool_cls)
+
+        return Get(
+            GenerateJvmLockfile,
+            GenerateJvmLockfileFromTool,
+            GenerateJvmLockfileFromTool.create(tool),
+        )
+
+    else:
+        return Get(
+            GenerateJvmLockfile,
+            _ValidateJvmArtifactsRequest(
+                artifacts=ArtifactRequirements(()),
+                resolve_name=resolve,
+            ),
+        )
+
+
 @rule
 async def setup_user_lockfile_requests(
     requested: RequestedJVMUserResolveNames,
@@ -164,41 +198,9 @@ async def setup_user_lockfile_requests(
 
     tools = ExportableTool.filter_for_subclasses(union_membership, JvmToolBase)
 
-    # Generate a JVM lockfile request for each requested resolve. This step also allows other backends to
-    # validate the proposed set of artifact requirements for each resolve.
     gets = []
     for resolve in requested:
-        if resolve in resolve_to_artifacts:
-            gets.append(
-                Get(
-                    GenerateJvmLockfile,
-                    _ValidateJvmArtifactsRequest(
-                        artifacts=ArtifactRequirements(resolve_to_artifacts[resolve]),
-                        resolve_name=resolve,
-                    ),
-                )
-            )
-        elif resolve in tools:
-            tool_cls: type[JvmToolBase] = tools[resolve]
-            tool = await _construct_subsystem(tool_cls)
-
-            gets.append(
-                Get(
-                    GenerateJvmLockfile,
-                    GenerateJvmLockfileFromTool,
-                    GenerateJvmLockfileFromTool.create(tool),
-                )
-            )
-        else:
-            gets.append(
-                Get(
-                    GenerateJvmLockfile,
-                    _ValidateJvmArtifactsRequest(
-                        artifacts=ArtifactRequirements(()),
-                        resolve_name=resolve,
-                    ),
-                )
-            )
+        gets.append(await _plan_generate_lockfile(resolve, resolve_to_artifacts, tools))
 
     jvm_lockfile_requests = await MultiGet(*gets)
 
