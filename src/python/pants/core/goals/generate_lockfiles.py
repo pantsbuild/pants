@@ -450,17 +450,17 @@ def filter_tool_lockfile_requests(
 
 
 def filter_lockfiles_for_unconfigured_exportable_tools(
-    ls: Sequence[GenerateLockfile],
+    generate_lockfile_requests: Sequence[GenerateLockfile],
     exportabletools_by_name: dict[str, Type[ExportableTool]],
     *,
     resolve_specified: bool,
-):
+) -> Tuple[Sequence[str], Sequence[GenerateLockfile]]:
     """Filter lockfile requests for tools still using their default lockfiles."""
 
     valid_lockfiles = []
     errs = []
 
-    for req in ls:
+    for req in generate_lockfile_requests:
         if req.lockfile_dest != DEFAULT_TOOL_LOCKFILE:
             valid_lockfiles.append(req)
             continue
@@ -496,10 +496,7 @@ def filter_lockfiles_for_unconfigured_exportable_tools(
             )
             continue
 
-    if errs:
-        raise ValueError("\n\n".join(errs))
-
-    return valid_lockfiles
+    return errs, valid_lockfiles
 
 
 class GenerateLockfilesSubsystem(GoalSubsystem):
@@ -613,11 +610,17 @@ async def generate_lockfiles_goal(
         resolve_specified=resolve_specified,
     )
     # We filter "user" requests because we're moving to combine user and tool lockfiles
-    applicable_user_requests = filter_lockfiles_for_unconfigured_exportable_tools(
+    (
+        tool_request_errors,
+        applicable_user_requests,
+    ) = filter_lockfiles_for_unconfigured_exportable_tools(
         list(itertools.chain(*all_specified_user_requests)),
         {e.options_scope: e for e in union_membership.get(ExportableTool)},
         resolve_specified=resolve_specified,
     )
+
+    if tool_request_errors:
+        raise ValueError("\n\n".join(tool_request_errors))
 
     # Execute the actual lockfile generation in each request's environment.
     # Currently, since resolves specify a single filename for output, we pick a reasonable
