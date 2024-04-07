@@ -942,6 +942,7 @@ async def extract_process_config_from_environment(
             tuple(pair.split("=", maxsplit=1))  # type: ignore[misc]
             for pair in raw_remote_execution_extra_platform_properties
         ],
+        execute_in_workspace=False,
     )
 
 

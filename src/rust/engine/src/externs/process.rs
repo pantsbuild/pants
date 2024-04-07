@@ -29,17 +29,22 @@ impl PyProcessExecutionEnvironment {
         platform: String,
         remote_execution: bool,
         remote_execution_extra_platform_properties: Vec<(String, String)>,
+        execute_in_workspace: bool,
         environment_name: Option<String>,
         docker_image: Option<String>,
     ) -> PyResult<Self> {
         let platform = Platform::try_from(platform).map_err(PyValueError::new_err)?;
-        let strategy = match (docker_image, remote_execution) {
-            (None, true) => Ok(ProcessExecutionStrategy::RemoteExecution(
+        let strategy = match (docker_image, remote_execution, execute_in_workspace) {
+            (Some(_), _, true) | (_, true, true) => Err(PyAssertionError::new_err(
+                "workspace execution is only available locally",
+            )),
+            (None, true, _) => Ok(ProcessExecutionStrategy::RemoteExecution(
                 remote_execution_extra_platform_properties,
             )),
-            (None, false) => Ok(ProcessExecutionStrategy::Local),
-            (Some(image), false) => Ok(ProcessExecutionStrategy::Docker(image)),
-            (Some(_), true) => Err(PyAssertionError::new_err(
+            (None, false, false) => Ok(ProcessExecutionStrategy::Local),
+            (None, false, true) => Ok(ProcessExecutionStrategy::LocalInWorkspace),
+            (Some(image), false, _) => Ok(ProcessExecutionStrategy::Docker(image)),
+            (Some(_), true, _) => Err(PyAssertionError::new_err(
                 "docker_image cannot be set at the same time as remote_execution",
             )),
         }?;

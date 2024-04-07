@@ -429,11 +429,16 @@ impl Default for InputDigests {
 }
 
 #[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize)]
+/// "Where" to run a `Process`. This is the Rust-side of the environments feature.
 pub enum ProcessExecutionStrategy {
+    /// Run the Process locally in an execution sandbox.
     Local,
-    /// Stores the platform_properties.
+    /// Run the Process locally in the workspace without an execution sandbox.
+    LocalInWorkspace,
+    /// Run the Process remotelyt using the Remote Execution API. The vector stores the platform_properties to pass
+    /// for that execution.
     RemoteExecution(Vec<(String, String)>),
-    /// Stores the image name.
+    /// Run the Process in a Docker container. The string stores the image name.
     Docker(String),
 }
 
@@ -443,6 +448,7 @@ impl ProcessExecutionStrategy {
     pub fn cache_value(&self) -> String {
         match self {
             Self::Local => "local_execution".to_string(),
+            Self::LocalInWorkspace => "workspace_execution".to_string(),
             Self::RemoteExecution(_) => "remote_execution".to_string(),
             // NB: this image will include the container ID, thanks to
             // https://github.com/pantsbuild/pants/pull/17101.
@@ -453,6 +459,7 @@ impl ProcessExecutionStrategy {
     pub fn strategy_type(&self) -> &'static str {
         match self {
             Self::Local => "local",
+            Self::LocalInWorkspace => "workspace",
             Self::RemoteExecution(_) => "remote",
             Self::Docker(_) => "docker",
         }
