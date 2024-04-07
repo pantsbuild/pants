@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.backend.java.subsystems.junit import JUnit
-from pants.core.goals.resolves import ExportableTool
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
@@ -37,7 +37,7 @@ from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     JunitTestSourceField,
@@ -70,6 +70,10 @@ class JunitTestRequest(TestRequest):
     supports_debug = True
 
 
+class JunitToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
+    resolve_name = JUnit.options_scope
+
+
 @dataclass(frozen=True)
 class TestSetupRequest:
     field_set: JunitTestFieldSet
@@ -95,7 +99,7 @@ async def setup_junit_for_target(
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
     )
 
-    lockfile_request = GenerateJvmLockfileFromTool.create(junit)
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, JunitToolLockfileSentinel())
     classpath, junit_classpath, files = await MultiGet(
         Get(Classpath, Addresses([request.field_set.address])),
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
@@ -203,10 +207,17 @@ async def setup_junit_debug_request(
     )
 
 
+@rule
+def generate_junit_lockfile_request(
+    _: JunitToolLockfileSentinel, junit: JUnit
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(junit)
+
+
 def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ExportableTool, JUnit),
+        UnionRule(GenerateToolLockfileSentinel, JunitToolLockfileSentinel),
         *JunitTestRequest.rules(),
     ]
