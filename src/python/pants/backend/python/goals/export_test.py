@@ -49,6 +49,7 @@ def rule_runner() -> RuleRunner:
     [
         PythonResolveExportFormat.symlinked_immutable_virtualenv,
         PythonResolveExportFormat.mutable_virtualenv,
+        PythonResolveExportFormat.mutable_virtualenv_with_non_hermetic_scripts,
     ],
 )
 def test_export_venv_new_codepath(
@@ -130,12 +131,14 @@ def test_export_venv_new_codepath(
             assert req_pex_dir == tmpdir
             assert req_pex_name == f"{resolve}.pex"
 
-            assert ppc0.argv[3:] == (
+            assert ppc0.argv[3:6] == (
                 "venv",
                 "--pip",
                 "--collisions-ok",
-                "{digest_root}",
             )
+            if py_resolve_format == PythonResolveExportFormat.mutable_virtualenv_with_non_hermetic_scripts:
+                assert ppc0.argv[6] == "--non-hermetic-scripts"
+            assert ppc0.argv[-1] == "{digest_root}"
             assert ppc0.extra_env["PEX_MODULE"] == "pex.tools"
             assert ppc0.extra_env.get("PEX_ROOT") is not None
 

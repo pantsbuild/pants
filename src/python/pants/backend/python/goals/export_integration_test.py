@@ -73,6 +73,7 @@ def build_config(tmpdir: str, py_resolve_format: PythonResolveExportFormat) -> M
     "py_resolve_format",
     [
         PythonResolveExportFormat.mutable_virtualenv,
+        PythonResolveExportFormat.mutable_virtualenv_with_non_hermetic_scripts,
         PythonResolveExportFormat.symlinked_immutable_virtualenv,
     ],
 )
@@ -116,7 +117,10 @@ def test_export(py_resolve_format: PythonResolveExportFormat) -> None:
             expected_ansicolors_dir
         ), f"expected dist-info for ansicolors '{expected_ansicolors_dir}' does not exist"
 
-        if py_resolve_format == PythonResolveExportFormat.mutable_virtualenv:
+        if py_resolve_format in (
+            PythonResolveExportFormat.mutable_virtualenv,
+            PythonResolveExportFormat.mutable_virtualenv_with_non_hermetic_scripts,
+        ):
             expected_foo_dir = os.path.join(lib_dir, "foo_dist-1.2.3.dist-info")
             if resolve == "b":
                 assert not os.path.isdir(

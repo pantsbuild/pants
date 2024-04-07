@@ -57,6 +57,7 @@ class PythonResolveExportFormat(Enum):
     """How to export Python resolves."""
 
     mutable_virtualenv = "mutable_virtualenv"
+    mutable_virtualenv_with_non_hermetic_scripts = "mutable_virtualenv_with_non_hermetic_scripts"
     symlinked_immutable_virtualenv = "symlinked_immutable_virtualenv"
 
 
@@ -67,7 +68,11 @@ class ExportPluginOptions:
             """\
             Export Python resolves using this format. Options are:
               - `mutable_virtualenv`: Export a standalone mutable virtualenv that you can
-                further modify.
+                further modify. Console scripts use a hermetic shebang (python -sE),
+                so env vars like PYTHONPATH will not pollute the virtualenv.
+              - `mutable_virtualenv_with_non_hermetic_scripts`: Export a standalone mutable
+                virtualenv that you can further modify. This is the same as `mutable_virtualenv`,
+                but without modifying the shebang in console scripts.
               - `symlinked_immutable_virtualenv`: Export a symlink into a cached Python virtualenv.
                 This virtualenv will have no pip binary, and will be immutable. Any attempt to
                 modify it will corrupt the cache! It may, however, take significantly less time
@@ -185,7 +190,10 @@ async def do_export(
             ],
             resolve=req.resolve_name or None,
         )
-    elif export_format == PythonResolveExportFormat.mutable_virtualenv:
+    elif export_format in (
+        PythonResolveExportFormat.mutable_virtualenv,
+        PythonResolveExportFormat.mutable_virtualenv_with_non_hermetic_scripts,
+    ):
         # Note that an internal-only pex will always have the `python` field set.
         # See the build_pex() rule and _determine_pex_python_and_platforms() helper in pex.py.
         requirements_pex = await Get(Pex, PexRequest, req.pex_request)
@@ -205,17 +213,21 @@ async def do_export(
         tmpdir_under_digest_root = os.path.join("{digest_root}", tmpdir_prefix)
         merged_digest_under_tmpdir = await Get(Digest, AddPrefix(merged_digest, tmpdir_prefix))
 
+        pex_args = [
+            os.path.join(tmpdir_under_digest_root, requirements_pex.name),
+            "venv",
+            "--pip",
+            "--collisions-ok",
+            output_path,
+        ]
+        if export_format == PythonResolveExportFormat.mutable_virtualenv_with_non_hermetic_scripts:
+            pex_args.insert(-1, "--non-hermetic-scripts")
+
         post_processing_cmds = [
             PostProcessingCommand(
                 complete_pex_env.create_argv(
                     os.path.join(tmpdir_under_digest_root, pex_pex.exe),
-                    *(
-                        os.path.join(tmpdir_under_digest_root, requirements_pex.name),
-                        "venv",
-                        "--pip",
-                        "--collisions-ok",
-                        output_path,
-                    ),
+                    *pex_args,
                 ),
                 {
                     **complete_pex_env.environment_dict(python=requirements_pex.python),
