@@ -202,6 +202,7 @@ impl Core {
         full_store: &Store,
         local_runner_store: &Store,
         executor: &Executor,
+        build_root: &Path,
         local_execution_root_dir: &Path,
         immutable_inputs: &ImmutableInputs,
         named_caches: &NamedCaches,
@@ -211,11 +212,11 @@ impl Core {
         exec_strategy_opts: &ExecutionStrategyOptions,
         remoting_opts: &RemotingOptions,
     ) -> Result<Arc<dyn CommandRunner>, String> {
-        // Lock shared between local command runner (and in future work) other "local" command runners
-        // for spawning processes.
+        // Lock shared between `local::CommandRunner` and `workspace::CommandRunner` to protect concurrent spawning
+        // of subprocesses.
         let spawn_lock = Arc::new(RwLock::new(()));
 
-        let local_command_runner = local::CommandRunner::new(
+        let local_sandbox_command_runner = local::CommandRunner::new(
             local_runner_store.clone(),
             executor.clone(),
             local_execution_root_dir.to_path_buf(),
@@ -224,6 +225,22 @@ impl Core {
             exec_strategy_opts.local_keep_sandboxes,
             spawn_lock.clone(),
         );
+
+        // TODO: Wrap this in a BoundedCommandRunner so only run process can execute in the workspace at once.
+        let local_workspace_command_runner = process_execution::workspace::CommandRunner::new(
+            local_runner_store.clone(),
+            executor.clone(),
+            build_root.to_path_buf(),
+            local_execution_root_dir.to_path_buf(),
+            named_caches.clone(),
+            immutable_inputs.clone(),
+        );
+
+        let local_command_runner: Box<dyn CommandRunner> = Box::new(SwitchedCommandRunner::new(
+            local_workspace_command_runner,
+            local_sandbox_command_runner,
+            |req| req.execution_environment.strategy == ProcessExecutionStrategy::LocalInWorkspace,
+        ));
 
         let runner: Box<dyn CommandRunner> = if exec_strategy_opts.local_enable_nailgun {
             // We set the nailgun pool size to the number of instances that fit within the memory
@@ -387,6 +404,7 @@ impl Core {
         local_runner_store: &Store,
         executor: &Executor,
         local_cache: &PersistentCache,
+        build_root: &Path,
         local_execution_root_dir: &Path,
         immutable_inputs: &ImmutableInputs,
         named_caches: &NamedCaches,
@@ -400,6 +418,7 @@ impl Core {
             full_store,
             local_runner_store,
             executor,
+            build_root,
             local_execution_root_dir,
             immutable_inputs,
             named_caches,
@@ -607,6 +626,7 @@ impl Core {
             &store,
             &executor,
             &local_cache,
+            &build_root,
             &local_execution_root_dir,
             &immutable_inputs,
             &named_caches,
