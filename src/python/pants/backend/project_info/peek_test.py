@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 from textwrap import dedent
-from typing import Sequence
+from typing import Sequence, cast
 
 import pytest
 
@@ -59,7 +59,7 @@ class SecondFakeAdditionalTargetDataFieldSet(HasAdditionalTargetDataFieldSet):
 async def first_fake_additional_target_data(
     field_set: FirstFakeAdditionalTargetDataFieldSet,
 ) -> AdditionalTargetData:
-    filename, extension = field_set.source.value.split(".", 1)
+    filename, extension = cast(str, field_set.source.value).split(".", 1)
     return AdditionalTargetData("source_parts", {"filename": filename, "extension": extension})
 
 
