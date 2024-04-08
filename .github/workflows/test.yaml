@@ -20,6 +20,7 @@ jobs:
     - self-hosted
     - macOS-11-ARM64
     steps:
+    - run: brew update && brew install tree
     - run: "tree -D ~/.cache/pants"
     - run: "tree -D ~/Library/Caches"
 name: Pull Request CI
