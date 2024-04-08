@@ -449,7 +449,10 @@ impl NailgunProcessFingerprint {
 /// A wrapper around a NailgunProcess checked out from the pool. If `release` is not called, the
 /// guard assumes cancellation, and kills the underlying process.
 ///
-pub struct BorrowedNailgunProcess(Option<NailgunProcessRef>, OwnedSemaphorePermit);
+pub struct BorrowedNailgunProcess(
+    Option<NailgunProcessRef>,
+    #[allow(dead_code)] OwnedSemaphorePermit,
+);
 
 impl BorrowedNailgunProcess {
     fn new(process: NailgunProcessRef, permit: OwnedSemaphorePermit) -> Self {
