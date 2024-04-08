@@ -16,8 +16,6 @@ jobs:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: Build wheels (macOS11-ARM64)
-    needs:
-    - classify_changes
     runs-on:
     - self-hosted
     - macOS-11-ARM64
