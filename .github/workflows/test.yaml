@@ -37,7 +37,7 @@ jobs:
 
     - if: always()
       run: |
-        clang -c test.c -o test.o
+        clang -target arm64-apple-macos11 -c test.c -o test.o
         file test.o
 
     - if: always()
