@@ -93,7 +93,13 @@ def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
             first_party.append(tgt)
         if tgt.has_field(PythonRequirementsField):
             third_party.append(tgt)
-    return AllPythonTargets(tuple(sorted(first_party)), tuple(sorted(third_party)))
+
+    def _sort_key(tgt: Target) -> str:
+        return tgt.address.spec
+
+    return AllPythonTargets(
+        tuple(sorted(first_party, key=_sort_key)), tuple(sorted(third_party, key=_sort_key))
+    )
 
 
 # -----------------------------------------------------------------------------------------------
