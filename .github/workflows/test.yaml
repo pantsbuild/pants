@@ -32,7 +32,7 @@ jobs:
         echo 'int main() { return 0; }' > test.c
     - if: always()
       run: |
-        clang test.c -o test
+        arch -arch arm64 clang test.c -o test
         file test
 
     - if: always()
