@@ -40,12 +40,6 @@ def test_global_scope():
 
     do_test(["-f"], {"type": bool}, ["-f"], ["-f"])
     do_test(["--foo"], {"type": bool}, ["--[no-]foo"], ["--foo", "--no-foo"])
-    do_test(
-        ["--foo"],
-        {"type": bool, "implicit_value": False},
-        ["--[no-]foo"],
-        ["--foo", "--no-foo"],
-    )
     do_test(["-f", "--foo"], {"type": bool}, ["-f", "--[no-]foo"], ["-f", "--foo", "--no-foo"])
 
     do_test(["--foo"], {}, ["--foo=<str>"], ["--foo"])
@@ -98,13 +92,6 @@ def test_non_global_scope():
         ["--bar-baz-foo", "--no-bar-baz-foo"],
         ["--foo", "--no-foo"],
     )
-    do_test(
-        ["--foo"],
-        {"type": bool, "implicit_value": False},
-        ["--[no-]bar-baz-foo"],
-        ["--bar-baz-foo", "--no-bar-baz-foo"],
-        ["--foo", "--no-foo"],
-    )
 
 
 def test_default() -> None:
@@ -128,8 +115,6 @@ def test_default() -> None:
 
     do_test(["--foo"], {"type": bool}, "False")
     do_test(["--foo"], {"type": bool, "default": True}, "True")
-    do_test(["--foo"], {"type": bool, "implicit_value": False}, "True")
-    do_test(["--foo"], {"type": bool, "implicit_value": False, "default": False}, "False")
     do_test(["--foo"], {}, "None")
     do_test(["--foo"], {"type": int}, "None")
     do_test(["--foo"], {"type": int, "default": 42}, "42")
