@@ -201,7 +201,7 @@ During rule execution, the `path` field of the `request` instance will hold the 
 
 Sometimes you may have metadata for a target that cannot be encompassed by a field, e.g. if it depends on the content of a file or if it requires some rule resolution to be calculated.
 
-We can attach this data to the output of `pants peek` by subclassing the `HasAdditionalTargetDataFieldSet` union type and register it as a union member with `UnionRule(HasAdditionalTargetDataFieldSet, SubclassedType)`. Then, implement a rule that takes `SubclassedType` as input and returns an `AdditionalTargetData` object.
+You can attach this data to the output of `pants peek` by subclassing the `HasAdditionalTargetDataFieldSet` union type and register it as a union member with `UnionRule(HasAdditionalTargetDataFieldSet, SubclassedType)`. Then, implement a rule that takes `SubclassedType` as input and returns an `AdditionalTargetData` object.
 
 ```python
 from dataclasses import dataclass
