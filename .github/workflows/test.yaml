@@ -15,8 +15,6 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
     name: Build wheels (macOS11-ARM64)
     needs:
     - classify_changes
@@ -24,59 +22,8 @@ jobs:
     - self-hosted
     - macOS-11-ARM64
     steps:
-    - name: Check out code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 10
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Set rustup profile
-      run: rustup set profile default
-    - name: Cache Rust toolchain
-      uses: actions/cache@v3
-      with:
-        key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.77.0-*
-
-          ~/.rustup/update-hashes
-
-          ~/.rustup/settings.toml
-
-          '
-    - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
-      with:
-        cache-bin: 'false'
-        shared-key: engine
-        workspaces: src/rust/engine
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Install Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.19.5
-    - env:
-        ARCHFLAGS: -arch arm64
-      name: Build wheels
-      run: ./pants run src/python/pants_release/release.py -- build-wheels
-    - env:
-        ARCHFLAGS: -arch arm64
-      name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v3
-      with:
-        name: logs-wheels-and-pex-macOS11-ARM64
-        path: .pants.d/workdir/*.log
-    timeout-minutes: 90
+    - run: "tree -D ~/.cache/pants"
+    - run: "tree -D ~/Library/Caches"
 name: Pull Request CI
 'on':
   pull_request: {}
