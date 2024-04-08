@@ -93,7 +93,7 @@ def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
             first_party.append(tgt)
         if tgt.has_field(PythonRequirementsField):
             third_party.append(tgt)
-    return AllPythonTargets(tuple(first_party), tuple(third_party))
+    return AllPythonTargets(tuple(sorted(first_party)), tuple(sorted(third_party)))
 
 
 # -----------------------------------------------------------------------------------------------

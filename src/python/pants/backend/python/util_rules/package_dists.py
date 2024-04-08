@@ -748,7 +748,7 @@ async def get_sources(
     file_targets = targets_with_sources_types(
         [FileSourceField], transitive_targets.closure, union_membership
     )
-    targets = Targets(itertools.chain((od.target for od in owned_deps), file_targets))
+    targets = Targets(sorted(itertools.chain((od.target for od in owned_deps), file_targets)))
 
     python_sources_request = PythonSourceFilesRequest(
         targets=targets, include_resources=False, include_files=False

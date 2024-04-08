@@ -203,7 +203,7 @@ def determine_python_user_resolves(
     _: KnownPythonUserResolveNamesRequest, python_setup: PythonSetup
 ) -> KnownUserResolveNames:
     return KnownUserResolveNames(
-        names=tuple(python_setup.resolves.keys()),
+        names=tuple(sorted(python_setup.resolves.keys())),
         option_name="[python].resolves",
         requested_resolve_names_cls=RequestedPythonUserResolveNames,
     )
