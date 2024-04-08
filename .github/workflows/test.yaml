@@ -22,8 +22,10 @@ jobs:
     steps:
     - run: date
     - run: |
-        pip install --no-cache psutil==5.9.0 --target psutil-test
+        pip install --verbose --no-cache psutil==5.9.0 --target psutil-test
         file psutil-test/psutil/*.so
+    - run: |
+        file $(which clang)
     - run: |
         curl -LO https://github.com/solidiquis/erdtree/releases/download/v3.1.2/erd-v3.1.2-aarch64-apple-darwin.tar.gz
         tar xvf erd-v3.1.2-aarch64-apple-darwin.tar.gz
