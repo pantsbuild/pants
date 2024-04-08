@@ -24,6 +24,9 @@ jobs:
     - run: |
         pip install --verbose --no-cache psutil==5.9.0 --target psutil-test
         file psutil-test/psutil/*.so
+    - run: |
+        pip install --verbose --no-cache psutil==5.9.8 --target psutil-test-wheels
+        file psutil-test-wheels/psutil/*.so
     - run: arch
     - run: "file $(which clang)"
     - run: "file $SHELL"
