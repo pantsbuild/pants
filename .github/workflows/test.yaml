@@ -27,6 +27,27 @@ jobs:
     - run: |
         file $(which clang)
     - run: |
+        echo 'int main() { return 0; }' > test.c
+    - if: always()
+      run: |
+        clang test.c -o test
+        file test
+
+    - if: always()
+      run: |
+        clang -c test.c -o test.o
+        file test.o
+
+    - if: always()
+      run: |
+        clang -Wno-unused-result -Wsign-compare -Wunreachable-code -DNDEBUG -g -fwrapv -O3 -Wall -I/Library/Developer/CommandLineTools/SDKs/MacOSX12.1.sdk/usr/include -I/Library/Developer/CommandLineTools/SDKs/MacOSX12.1.sdk/usr/include -DPSUTIL_POSIX=1 -DPSUTIL_SIZEOF_PID_T=4 -DPSUTIL_VERSION=590 -DPSUTIL_OSX=1 -I/Users/gha/.pyenv/versions/3.9.13/include/python3.9 -c test.c -o test2.o
+        file test2.o
+
+    - if: always()
+      run: |
+        clang -bundle -undefined dynamic_lookup -L/opt/homebrew/opt/readline/lib -L/opt/homebrew/opt/readline/lib -L/Users/gha/.pyenv/versions/3.9.13/lib -L/opt/homebrew/lib -L/Library/Developer/CommandLineTools/SDKs/MacOSX12.1.sdk/usr/lib -L/opt/homebrew/opt/readline/lib -L/opt/homebrew/opt/readline/lib -L/Users/gha/.pyenv/versions/3.9.13/lib -L/opt/homebrew/lib -L/Library/Developer/CommandLineTools/SDKs/MacOSX12.1.sdk/usr/lib test.o -o test.so
+        file test.so
+    - run: |
         curl -LO https://github.com/solidiquis/erdtree/releases/download/v3.1.2/erd-v3.1.2-aarch64-apple-darwin.tar.gz
         tar xvf erd-v3.1.2-aarch64-apple-darwin.tar.gz
     - run: "./erd --long --time=create --time-format=iso-strict ~/.cache/pants"
