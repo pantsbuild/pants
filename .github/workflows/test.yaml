@@ -20,9 +20,11 @@ jobs:
     - self-hosted
     - macOS-11-ARM64
     steps:
-    - run: brew update && brew install tree
-    - run: "tree -D ~/.cache/pants"
-    - run: "tree -D ~/Library/Caches"
+    - run: |
+        curl -LO https://github.com/solidiquis/erdtree/releases/download/v3.1.2/erd-v3.1.2-aarch64-apple-darwin.tar.gz
+        tar xvf erd-v3.1.2-aarch64-apple-darwin.tar.gz
+    - run: "./erd-v3.1.2-aarch64-apple-darwin/erd --long --time=create ~/.cache/pants"
+    - run: "./erd-v3.1.2-aarch64-apple-darwin/erd --long --time=create ~/Library/Caches"
 name: Pull Request CI
 'on':
   pull_request: {}
