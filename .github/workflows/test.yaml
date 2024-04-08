@@ -24,8 +24,10 @@ jobs:
     - run: |
         pip install --verbose --no-cache psutil==5.9.0 --target psutil-test
         file psutil-test/psutil/*.so
-    - run: |
-        file $(which clang)
+    - run: arch
+    - run: "file $(which clang)"
+    - run: "file $SHELL"
+    - run: env
     - run: |
         echo 'int main() { return 0; }' > test.c
     - if: always()
