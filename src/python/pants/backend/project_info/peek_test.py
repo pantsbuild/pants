@@ -41,7 +41,6 @@ def _snapshot(fingerprint: str, files: tuple[str, ...]) -> Snapshot:
 
 @dataclasses.dataclass(frozen=True)
 class FirstFakeAdditionalTargetDataFieldSet(HasAdditionalTargetDataFieldSet):
-    label = "first"
     required_fields = (FileSourceField,)
 
     source: FileSourceField
@@ -49,7 +48,6 @@ class FirstFakeAdditionalTargetDataFieldSet(HasAdditionalTargetDataFieldSet):
 
 @dataclasses.dataclass(frozen=True)
 class SecondFakeAdditionalTargetDataFieldSet(HasAdditionalTargetDataFieldSet):
-    label = "second"
     required_fields = (FileSourceField, DescriptionField)
 
     description: DescriptionField
