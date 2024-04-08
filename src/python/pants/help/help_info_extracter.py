@@ -819,7 +819,7 @@ class HelpInfoExtracter:
                     dependencies=type_graph[api_type]["dependencies"],
                     dependents=type_graph[api_type].get("dependents", ()),
                     union_members=tuple(
-                        sorted(member.__name__ for member in union_membership.get(api_type))
+                        sorted(member.__qualname__ for member in union_membership.get(api_type))
                     ),
                 )
 
@@ -827,7 +827,7 @@ class HelpInfoExtracter:
 
         return LazyFrozenDict(
             {
-                f"{api_type.__module__}.{api_type.__name__}": get_api_type_info_loader(api_type)
+                f"{api_type.__module__}.{api_type.__qualname__}": get_api_type_info_loader(api_type)
                 for api_type in sorted(all_types, key=attrgetter("__name__"))
             }
         )
