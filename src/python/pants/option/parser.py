@@ -221,23 +221,27 @@ class Parser:
             flag_vals: list[int | float | bool | str] = []
 
             for arg in args:
-                # If the user specified --no-foo on the cmd line, treat it as if the user specified
-                # --foo, but with the inverse value.
                 if self.is_bool(kwargs):
+                    vals = flag_value_map.get(arg)
+                    if vals:
+                        # Ensure that --foo is as-if --foo-true.
+                        vals[:] = [True if v is None else v for v in vals]
+                    # If the user specified --no-foo on the cmd line, treat it as if the user specified
+                    # --foo, but with the inverse value (ensuring that --no-foo is as-if --no-foo=true,
+                    # which is as-if --foo=false).
                     inverse_arg = self._inverse_arg(arg)
                     if inverse_arg in flag_value_map:
-                        flag_value_map[arg] = [self._invert(v) for v in flag_value_map[inverse_arg]]
+                        flag_value_map[arg] = [
+                            self._invert(v) or False for v in flag_value_map[inverse_arg]
+                        ]
                         del flag_value_map[inverse_arg]
 
                 if arg in flag_value_map:
                     for v in flag_value_map[arg]:
                         if v is None:
-                            if self.is_bool(kwargs):
-                                v = True
-                            else:
-                                raise ParseError(
-                                    f"Missing value for command line flag {arg} in {self._scope_str()}"
-                                )
+                            raise ParseError(
+                                f"Missing value for command line flag {arg} in {self._scope_str()}"
+                            )
                         flag_vals.append(v)
                     del flag_value_map[arg]
 
