@@ -3,8 +3,12 @@
 
 from __future__ import annotations
 
+import textwrap
+from pathlib import Path
+
 import pytest
 
+from pants.engine.environment import LOCAL_WORKSPACE_ENV_NAME, EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -16,6 +20,7 @@ from pants.engine.fs import (
     SymlinkEntry,
 )
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.platform import Platform
 from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
@@ -28,14 +33,16 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 from pants.util.contextutil import environment_as
 
 
-def new_rule_runner() -> RuleRunner:
+def new_rule_runner(**extra_kwargs) -> RuleRunner:
     return RuleRunner(
         rules=[
             QueryRule(ProcessResult, [Process]),
             QueryRule(FallibleProcessResult, [Process]),
             QueryRule(InteractiveProcessResult, [InteractiveProcess]),
             QueryRule(DigestEntries, [Digest]),
+            QueryRule(Platform, []),
         ],
+        **extra_kwargs,
     )
 
 
@@ -299,3 +306,54 @@ def test_interactive_process_inputs(rule_runner: RuleRunner, run_in_workspace: b
             "prefix1",
             "prefix2",
         }
+
+
+def test_workspace_process_basic(rule_runner) -> None:
+    rule_runner = new_rule_runner(inherent_environment=EnvironmentName(LOCAL_WORKSPACE_ENV_NAME))
+
+    # Check that a custom exit code is returned as expected.
+    process = Process(
+        argv=["/bin/bash", "-c", "exit 143"],
+        description="a process which reports its error code",
+        cache_scope=ProcessCacheScope.PER_SESSION,  # necessary to ensure result not cached from prior test runs
+    )
+    result = rule_runner.request(FallibleProcessResult, [process])
+    assert result.exit_code == 143
+    assert result.metadata.execution_environment.environment_type == "workspace"
+
+    # Test whether there is a distinction between the workspace and chroot when a workspace
+    # process executes. Do this by puttng a file in the build root which is not covered by a
+    # target, a depenency created via a digest, and have the invoked process create a file
+    # in the build root.
+    rule_runner.write_files(
+        {
+            "unmanaged.txt": "from-workspace\n",
+        }
+    )
+    input_snapshot = rule_runner.make_snapshot(
+        {
+            "dependency.txt": "from-digest\n",
+        }
+    )
+    script = textwrap.dedent(
+        """
+        cat '{chroot}/dependency.txt'
+        pwd
+        cat unmanaged.txt
+        touch created-by-invocation
+        """
+    )
+    process = Process(
+        argv=["/bin/bash", "-c", script],
+        input_digest=input_snapshot.digest,
+        description="a workspace process",
+        cache_scope=ProcessCacheScope.PER_SESSION,  # necessary to ensure result not cached from prior test runs
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    lines = result.stdout.decode().splitlines()
+    assert lines == [
+        "from-digest",
+        rule_runner.build_root,
+        "from-workspace",
+    ]
+    assert (Path(rule_runner.build_root) / "created-by-invocation").exists()
