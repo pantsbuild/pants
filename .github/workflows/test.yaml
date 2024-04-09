@@ -57,6 +57,77 @@ jobs:
         tar xvf erd-v3.1.2-aarch64-apple-darwin.tar.gz
     - run: "./erd --long --time=create --time-format=iso-strict ~/.cache/pants"
     - run: "./erd --long --time=create --time-format=iso-strict ~/Library/Caches"
+
+  build_wheels_macos11_arm64:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: github.repository_owner == 'pantsbuild'
+    name: Build wheels (macOS11-ARM64)
+    runs-on:
+    - self-hosted
+    - macOS-11-ARM64
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        ref: release_2.19.1
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
+    - name: Cache Rust toolchain
+      uses: actions/cache@v3
+      with:
+        key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
+          }}-v2
+        path: '~/.rustup/toolchains/1.77.0-*
+
+          ~/.rustup/update-hashes
+
+          ~/.rustup/settings.toml
+
+          '
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - env:
+        ARCHFLAGS: -arch arm64
+      name: Build wheels
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        ARCHFLAGS: -arch arm64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-wheels-and-pex-macOS11-ARM64
+        path: .pants.d/workdir/*.log
+    - name: Upload Wheel and Pex
+      uses: actions/upload-artifact@v3
+        name: macos-arm64.pex
+        path: dist/src.python.pants/pants-pex.pex
+    timeout-minutes: 90
+
 name: Pull Request CI
 'on':
   pull_request: {}
