@@ -83,8 +83,6 @@ impl super::CommandRunner for CommandRunner {
         apply_chroot(tempdir.path().to_str().unwrap(), &mut req);
 
         let p = Path::new(&req.argv[0]);
-        // TODO: Deprecate this program name calculation, and recommend `{chroot}` replacement in args
-        // instead.
         let program_name = p.to_path_buf();
 
         let mut command = tokio::process::Command::new(program_name);
@@ -92,8 +90,11 @@ impl super::CommandRunner for CommandRunner {
             command.arg(arg);
         }
 
-        // TODO: Apply the working directory to the current directory for the execution.
-        command.current_dir(self.build_root.clone());
+        let current_dir = req
+            .working_directory
+            .map(|relpath| self.build_root.join(&relpath))
+            .unwrap_or_else(|| self.build_root.clone());
+        command.current_dir(current_dir);
 
         command.env_clear();
         command.envs(&req.env);

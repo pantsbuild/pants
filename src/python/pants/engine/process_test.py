@@ -310,6 +310,7 @@ def test_interactive_process_inputs(rule_runner: RuleRunner, run_in_workspace: b
 
 def test_workspace_process_basic(rule_runner) -> None:
     rule_runner = new_rule_runner(inherent_environment=EnvironmentName(LOCAL_WORKSPACE_ENV_NAME))
+    build_root = Path(rule_runner.build_root)
 
     # Check that a custom exit code is returned as expected.
     process = Process(
@@ -356,4 +357,16 @@ def test_workspace_process_basic(rule_runner) -> None:
         rule_runner.build_root,
         "from-workspace",
     ]
-    assert (Path(rule_runner.build_root) / "created-by-invocation").exists()
+    assert (build_root / "created-by-invocation").exists()
+
+    # Test that changing the working directory works.
+    subdir = build_root / "subdir"
+    subdir.mkdir()
+    process = Process(
+        argv=["/bin/bash", "-c", "touch file-in-subdir"],
+        description="check working_directory works",
+        working_directory="subdir",
+        cache_scope=ProcessCacheScope.PER_SESSION,  # necessary to ensure result not cached from prior test runs
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert (subdir / "file-in-subdir").exists()
