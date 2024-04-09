@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import unittest.mock
 from contextlib import contextmanager
@@ -68,6 +69,7 @@ def subsystem(scope: str) -> ScopeInfo:
     return ScopeInfo(scope)
 
 
+@contextmanager
 def create_options(
     scopes: list[str],
     register_fn: Callable[[Options], None],
@@ -77,14 +79,21 @@ def create_options(
     config: dict[str, dict[str, Any]] | None = None,
     extra_scope_infos: list[ScopeInfo] | None = None,
 ) -> Options:
-    options = Options.create(
-        env=env or {},
-        config=Config.load([FileContent("pants.toml", toml.dumps(config or {}).encode())]),
-        known_scope_infos=[*(ScopeInfo(scope) for scope in scopes), *(extra_scope_infos or ())],
-        args=["./pants", *(args or ())],
-    )
-    register_fn(options)
-    return options
+    config_content = toml.dumps(config or {}).encode()
+    with temporary_dir() as tmpdir:
+        # Write to a real path, so the Rust config reader can access it.
+        config_path = os.path.join(tmpdir, "pants.toml")
+        with open(config_path, "wb") as fp:
+            fp.write(config_content)
+        options = Options.create(
+            env=env or {},
+            # The Python config reader accesses the content directly.
+            config=Config.load([FileContent(config_path, config_content)]),
+            known_scope_infos=[*(ScopeInfo(scope) for scope in scopes), *(extra_scope_infos or ())],
+            args=["./pants", *(args or ())],
+        )
+        register_fn(options)
+        yield options
 
 
 # ----------------------------------------------------------------------------------------
@@ -104,10 +113,10 @@ def test_bool_explicit_values() -> None:
         opt.register(GLOBAL_SCOPE, "--opt", type=bool)
 
     def assert_val(arg: str, expected: bool) -> None:
-        global_options = create_options(
+        with create_options(
             [GLOBAL_SCOPE], register, [f"--opt={arg}"]
-        ).for_global_scope()
-        assert global_options.opt is expected
+        ) as opts:
+            assert opts.for_global_scope().opt is expected
 
     assert_val("false", False)
     assert_val("False", False)
@@ -116,16 +125,16 @@ def test_bool_explicit_values() -> None:
 
 
 def test_bool_defaults() -> None:
-    opts = create_options([GLOBAL_SCOPE], register_bool_opts).for_global_scope()
-    assert opts.default_missing is False
-    assert opts.default_true is True
-    assert opts.default_false is False
+    with create_options([GLOBAL_SCOPE], register_bool_opts).for_global_scope() as opts:
+        assert opts.default_missing is False
+        assert opts.default_true is True
+        assert opts.default_false is False
 
-    assert opts.unset is None
+        assert opts.unset is None
 
 
 def test_bool_args() -> None:
-    opts = create_options(
+    with create_options(
         [GLOBAL_SCOPE],
         register_bool_opts,
         [
@@ -134,16 +143,16 @@ def test_bool_args() -> None:
             "--default-false",
             "--unset",
         ],
-    ).for_global_scope()
-    assert opts.default_missing is True
-    assert opts.default_true is True
-    assert opts.default_false is True
+    ).for_global_scope() as opts:
+        assert opts.default_missing is True
+        assert opts.default_true is True
+        assert opts.default_false is True
 
-    assert opts.unset is True
+        assert opts.unset is True
 
 
 def test_bool_negate() -> None:
-    opts = create_options(
+    with create_options(
         [GLOBAL_SCOPE],
         register_bool_opts,
         [
@@ -152,12 +161,12 @@ def test_bool_negate() -> None:
             "--no-default-false",
             "--no-unset",
         ],
-    ).for_global_scope()
-    assert opts.default_missing is False
-    assert opts.default_true is False
-    assert opts.default_false is False
+    ).for_global_scope() as opts:
+        assert opts.default_missing is False
+        assert opts.default_true is False
+        assert opts.default_false is False
 
-    assert opts.unset is False
+        assert opts.unset is False
 
 
 @pytest.mark.parametrize("val", [False, True])
@@ -167,11 +176,12 @@ def test_bool_config(val: bool) -> None:
         "default_true",
         "default_false",
     )
-    opts = create_options(
+    with create_options(
         [GLOBAL_SCOPE], register_bool_opts, config={"GLOBAL": {opt: val for opt in opt_names}}
-    ).for_global_scope()
-    for opt in opt_names:
-        assert opts[opt] is val, f"option {opt} has value {opts[opt]} but expected {val}"
+    ) as opts:
+        global_opts = opts.for_global_scope()
+        for opt in opt_names:
+            assert global_opts[opt] is val, f"option {opt} has value {opts[opt]} but expected {val}"
 
 
 @pytest.mark.parametrize("val", (11, "AlmostTrue"))
@@ -180,7 +190,8 @@ def test_bool_invalid_value(val: Any) -> None:
         opts.register(GLOBAL_SCOPE, "--opt", type=bool)
 
     with pytest.raises(BooleanConversionError):
-        create_options([GLOBAL_SCOPE], register, config={"GLOBAL": {"opt": val}}).for_global_scope()
+        with create_options([GLOBAL_SCOPE], register, config={"GLOBAL": {"opt": val}}).for_global_scope():
+            pass
 
 
 # ----------------------------------------------------------------------------------------
@@ -265,7 +276,8 @@ def test_default_value_type_assert(option_kwargs, assert_expected):
         opts.register(GLOBAL_SCOPE, "--opt", **option_kwargs)
 
     with assert_expected:
-        create_options([GLOBAL_SCOPE], register).for_scope(GLOBAL_SCOPE)
+        with create_options([GLOBAL_SCOPE], register).for_scope(GLOBAL_SCOPE):
+            pass
 
 
 # ----------------------------------------------------------------------------------------
@@ -308,11 +320,11 @@ def test_deprecated_options(caplog) -> None:
     ) -> None:
         caplog.clear()
         warn_or_error.clear()  # type: ignore[attr-defined]
-        opts = create_options([GLOBAL_SCOPE, "scope"], register, args, env=env, config=config)
-        assert opts.for_scope(scope)[opt] == expected
-        assert len(caplog.records) == 1
-        assert "is scheduled to be removed in version" in caplog.text
-        assert opt in caplog.text
+        with create_options([GLOBAL_SCOPE, "scope"], register, args, env=env, config=config) as opts:
+            assert opts.for_scope(scope)[opt] == expected
+            assert len(caplog.records) == 1
+            assert "is scheduled to be removed in version" in caplog.text
+            assert opt in caplog.text
 
     assert_deprecated(GLOBAL_SCOPE, "old1", ["--old1=x"], expected="x")
     assert_deprecated(GLOBAL_SCOPE, "bool1", ["--bool1"], expected=True)
@@ -333,13 +345,14 @@ def test_deprecated_options(caplog) -> None:
     # Make sure the warnings don't come out for regular options.
     caplog.clear()
     warn_or_error.clear()  # type: ignore[attr-defined]
-    assert (
-        create_options([GLOBAL_SCOPE, "scope"], register, ["--scope-valid=x"])
-        .for_scope("scope")
-        .valid
-        == "x"
-    )
-    assert not caplog.records
+    with create_options([GLOBAL_SCOPE, "scope"], register, ["--scope-valid=x"]) as opts:
+        assert (
+            opts
+            .for_scope("scope")
+            .valid
+            == "x"
+        )
+        assert not caplog.records
 
 
 def test_deprecated_options_error() -> None:
@@ -347,7 +360,8 @@ def test_deprecated_options_error() -> None:
         opts.register(GLOBAL_SCOPE, "--expired", removal_version="0.0.1.dev0")
 
     with pytest.raises(CodeRemovedError):
-        create_options([GLOBAL_SCOPE], register, [])
+        with create_options([GLOBAL_SCOPE], register, []):
+            pass
 
 
 @unittest.mock.patch("pants.base.deprecated.PANTS_SEMVER", Version(_FAKE_CUR_VERSION))
@@ -367,18 +381,15 @@ def test_deprecated_options_start_version(caplog) -> None:
         )
 
     caplog.clear()
-    assert (
-        create_options([GLOBAL_SCOPE], register, ["--delayed=x"]).for_global_scope().delayed == "x"
-    )
-    assert not caplog.records
+    with create_options([GLOBAL_SCOPE], register, ["--delayed=x"]) as opts:
+        assert opts.for_global_scope().delayed == "x"
+        assert not caplog.records
 
-    assert (
-        create_options([GLOBAL_SCOPE], register, ["--past-start=x"]).for_global_scope().past_start
-        == "x"
-    )
-    assert len(caplog.records) == 1
-    assert "is scheduled to be removed in version" in caplog.text
-    assert "past_start" in caplog.text
+    with create_options([GLOBAL_SCOPE], register, ["--past-start=x"]) as opts:
+        assert opts.for_global_scope().past_start == "x"
+        assert len(caplog.records) == 1
+        assert "is scheduled to be removed in version" in caplog.text
+        assert "past_start" in caplog.text
 
 
 def test_scope_deprecation(caplog) -> None:
@@ -406,7 +417,7 @@ def test_scope_deprecation(caplog) -> None:
         opts.register(Subsystem1.options_scope, "--baz")
         opts.register(Subsystem2.options_scope, "--qux")
 
-    opts = create_options(
+    with create_options(
         [GLOBAL_SCOPE],
         register,
         ["--new1-baz=vv"],
@@ -420,25 +431,24 @@ def test_scope_deprecation(caplog) -> None:
                 "qux": "uu",
             },
         },
-    )
+    ) as opts:
+        caplog.clear()
+        vals1 = opts.for_scope(Subsystem1.options_scope)
+        assert len(caplog.records) == 1
+        assert Subsystem1.deprecated_options_scope in caplog.text
+        assert "foo" in caplog.text
+        # Deprecated scope takes precedence at equal rank, but new scope takes precedence at higher
+        # rank.
+        assert vals1.foo == "yy"
+        assert vals1.bar == "zz"
+        assert vals1.baz == "vv"
 
-    caplog.clear()
-    vals1 = opts.for_scope(Subsystem1.options_scope)
-    assert len(caplog.records) == 1
-    assert Subsystem1.deprecated_options_scope in caplog.text
-    assert "foo" in caplog.text
-    # Deprecated scope takes precedence at equal rank, but new scope takes precedence at higher
-    # rank.
-    assert vals1.foo == "yy"
-    assert vals1.bar == "zz"
-    assert vals1.baz == "vv"
-
-    caplog.clear()
-    vals2 = opts.for_scope(Subsystem2.options_scope)
-    assert len(caplog.records) == 1
-    assert Subsystem1.deprecated_options_scope in caplog.text
-    assert "qux" in caplog.text
-    assert vals2.qux == "uu"
+        caplog.clear()
+        vals2 = opts.for_scope(Subsystem2.options_scope)
+        assert len(caplog.records) == 1
+        assert Subsystem1.deprecated_options_scope in caplog.text
+        assert "qux" in caplog.text
+        assert vals2.qux == "uu"
 
 
 def test_scope_deprecation_default_config_section(caplog) -> None:
@@ -451,16 +461,16 @@ def test_scope_deprecation_default_config_section(caplog) -> None:
     def register(opts: Options) -> None:
         opts.register(Subsystem1.options_scope, "--foo")
 
-    opts = create_options(
+    with create_options(
         [GLOBAL_SCOPE],
         register,
         [],
         extra_scope_infos=[Subsystem1.get_scope_info()],
         config={"DEFAULT": {"foo": "aa"}, Subsystem1.options_scope: {"foo": "xx"}},
-    )
-    caplog.clear()
-    assert opts.for_scope(Subsystem1.options_scope).foo == "xx"
-    assert not caplog.records
+    ) as opts:
+        caplog.clear()
+        assert opts.for_scope(Subsystem1.options_scope).foo == "xx"
+        assert not caplog.records
 
 
 def _create_config(
@@ -656,7 +666,7 @@ def test_env_var_of_type_int() -> None:
     options.register(GLOBAL_SCOPE, "--foo-bar", type=int)
     assert 123 == options.for_global_scope().foo_bar
 
-    options = create_options_object(env={"PANTS_FOO_BAR": "['123','456']"})
+    options = create_options_object(env={"PANTS_FOO_BAR": "[123,456]"})
     options.register(GLOBAL_SCOPE, "--foo-bar", type=list, member_type=int)
     assert [123, 456] == options.for_global_scope().foo_bar
 

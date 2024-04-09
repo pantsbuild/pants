@@ -99,7 +99,7 @@ class NativeOptionParser:
                 elif callable(member_type):
                     val = [member_type(x) for x in val]
                 if passthrough:
-                    val += self._native_parser.get_passthrough_args()
+                    val += self._native_parser.get_passthrough_args() or []
             elif is_enum(option_type):
                 val = option_type(val)
             elif callable(option_type):
