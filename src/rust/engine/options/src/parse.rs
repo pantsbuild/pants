@@ -435,16 +435,16 @@ pub(crate) fn expand_to_list<T: Parseable>(
     }
 }
 
-pub(crate) fn expand_to_dict(value: String) -> Result<Option<DictEdit>, ParseError> {
+pub(crate) fn expand_to_dict(value: String) -> Result<Option<Vec<DictEdit>>, ParseError> {
     let (path_opt, value_opt) = maybe_expand(value)?;
     if let Some(value) = value_opt {
         if let Some(items) = try_deserialize(&value, path_opt)? {
-            Ok(Some(DictEdit {
+            Ok(Some(vec![DictEdit {
                 action: DictEditAction::Replace,
                 items,
-            }))
+            }]))
         } else {
-            parse_dict(&value).map(Some)
+            parse_dict(&value).map(|x| Some(vec![x]))
         }
     } else {
         Ok(None)

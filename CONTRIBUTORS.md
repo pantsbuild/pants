@@ -1,6 +1,7 @@
 Created as part of the release process.
 
 + A. Alonso Dominguez
++ APL
 + Aaron Mitchell
 + Adam Chainz
 + Adam Retter
@@ -154,6 +155,7 @@ Created as part of the release process.
 + Joe Ennever
 + Joe Smith
 + Johan Oskarsson
++ Johan Sim Jian An
 + John Barry
 + John Basila
 + John Chee
@@ -349,6 +351,7 @@ Created as part of the release process.
 + bianca rosa
 + billybecker
 + csqzhang
++ csteiner
 + eugene yokota
 + gyudoza
 + hephex

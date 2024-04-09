@@ -6,6 +6,7 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
+itertools = { workspace = true }
 lazy_static = { workspace = true }
 log = { workspace = true }
 maplit = { workspace = true }

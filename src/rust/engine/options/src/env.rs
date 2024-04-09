@@ -55,10 +55,10 @@ impl Env {
         let name = id.name("_", NameTransform::ToUpper);
         let mut names = vec![format!(
             "PANTS_{}_{}",
-            id.0.name().replace('-', "_").to_ascii_uppercase(),
+            id.scope.name().replace('-', "_").to_ascii_uppercase(),
             name
         )];
-        if id.0 == Scope::Global {
+        if id.scope == Scope::Global {
             names.push(format!("PANTS_{name}"));
         }
         if name.starts_with("PANTS_") {
@@ -127,7 +127,7 @@ impl OptionsSource for Env {
         self.get_list::<String>(id)
     }
 
-    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
+    fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
         for env_var_name in &Self::env_var_names(id) {
             if let Some(value) = self.env.get(env_var_name) {
                 return expand_to_dict(value.to_owned()).map_err(|e| e.render(self.display(id)));

@@ -415,11 +415,32 @@ class PexExecutableField(Field):
 
 
 class PexArgsField(StringSequenceField):
-    alias = "args"
+    alias: ClassVar[str] = "args"
     help = help_text(
-        """
+        lambda: f"""
         Freeze these command-line args into the PEX. Allows you to run generic entry points
         on specific arguments without creating a shim file.
+
+        This is different to `{PexExtraBuildArgsField.alias}`: `{PexArgsField.alias}`
+        records arguments used by the packaged PEX when executed,
+        `{PexExtraBuildArgsField.alias}` passes arguments to the process that does the
+        packaging.
+        """
+    )
+
+
+class PexExtraBuildArgsField(StringSequenceField):
+    alias: ClassVar[str] = "extra_build_args"
+    default = ()
+    help = help_text(
+        lambda: f"""
+        Extra arguments to pass to the `pex` invocation used to build this PEX. These are
+        passed after all other arguments. This can be used to pass extra options that
+        Pants doesn't have built-in support for.
+
+        This is different to `{PexArgsField.alias}`: `{PexArgsField.alias}` records
+        arguments used by the packaged PEX when executed, `{PexExtraBuildArgsField.alias}`
+        passes arguments to the process that does the packaging.
         """
     )
 
@@ -789,6 +810,7 @@ class PexBinary(Target):
         PexScriptField,
         PexExecutableField,
         PexArgsField,
+        PexExtraBuildArgsField,
         PexEnvField,
         OutputPathField,
     )

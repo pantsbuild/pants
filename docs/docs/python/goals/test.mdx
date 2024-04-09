@@ -400,6 +400,15 @@ $ pants test project/app_test.py --no-test-timeouts
 
 :::
 
+## Retries
+
+Pants can automatically retry failed tests. This can help keep your builds passing even with flaky tests, like integration tests.
+
+```toml tab={"label":"pants.toml"}
+[test]
+attempts_default = 3
+```
+
 ## Test utilities and resources
 
 ### Test utilities
