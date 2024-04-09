@@ -375,7 +375,7 @@ def test_workspace_process_basic(rule_runner) -> None:
     # Test output capture correctly captures from the sandbox and not the workspace.
     script = textwrap.dedent(
         """
-        touch '{chroot}/capture-this-file' do-not-capture-this-file
+        touch '{chroot}/capture-this-file' will-not-capture-this-file
         echo this-goes-to-stdout
         echo this-goes-to-stderr 1>&2
         """
@@ -383,7 +383,7 @@ def test_workspace_process_basic(rule_runner) -> None:
     process = Process(
         argv=["/bin/bash", "-c", script],
         description="check output capture works",
-        output_files=["capture-this-file"],
+        output_files=["capture-this-file", "will-not-capture-this-file"],
         cache_scope=ProcessCacheScope.PER_SESSION,  # necessary to ensure result not cached from prior test runs
     )
     result = rule_runner.request(ProcessResult, [process])
