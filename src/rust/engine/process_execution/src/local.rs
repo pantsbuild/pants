@@ -351,6 +351,10 @@ impl CapturedWorkdir for CommandRunner {
 pub trait CapturedWorkdir {
     type WorkdirToken: Clone + Send;
 
+    fn apply_working_directory_to_outputs() -> bool {
+        true
+    }
+
     async fn run_and_capture_workdir(
         &self,
         req: Process,
@@ -399,19 +403,21 @@ pub trait CapturedWorkdir {
         let output_snapshot = if req.output_files.is_empty() && req.output_directories.is_empty() {
             store::Snapshot::empty()
         } else {
-            let root = if let Some(ref working_directory) = req.working_directory {
-                workdir_path.join(working_directory)
-            } else {
-                workdir_path.clone()
+            let root = match (
+                req.working_directory,
+                Self::apply_working_directory_to_outputs(),
+            ) {
+                (Some(ref working_directory), true) => workdir_path.join(working_directory),
+                _ => workdir_path.clone(),
             };
             // Use no ignore patterns, because we are looking for explicitly listed paths.
             let posix_fs = Arc::new(
-        fs::PosixFS::new(root, fs::GitignoreStyleExcludes::empty(), executor.clone()).map_err(
-          |err| {
-            format!("Error making posix_fs to fetch local process execution output files: {err}")
-          },
-        )?,
-      );
+                fs::PosixFS::new(root, fs::GitignoreStyleExcludes::empty(), executor.clone()).map_err(
+                    |err| {
+                        format!("Error making posix_fs to fetch local process execution output files: {err}")
+                    },
+                )?,
+            );
             CommandRunner::construct_output_snapshot(
                 store.clone(),
                 posix_fs,

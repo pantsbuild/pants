@@ -19,6 +19,7 @@ from pants.engine.fs import (
     FileContent,
     SymlinkEntry,
 )
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.platform import Platform
 from pants.engine.process import (
@@ -370,3 +371,23 @@ def test_workspace_process_basic(rule_runner) -> None:
     )
     result = rule_runner.request(ProcessResult, [process])
     assert (subdir / "file-in-subdir").exists()
+
+    # Test output capture correctly captures from the sandbox and not the workspace.
+    script = textwrap.dedent(
+        """
+        touch '{chroot}/capture-this-file' do-not-capture-this-file
+        echo this-goes-to-stdout
+        echo this-goes-to-stderr 1>&2
+        """
+    )
+    process = Process(
+        argv=["/bin/bash", "-c", script],
+        description="check output capture works",
+        output_files=["capture-this-file"],
+        cache_scope=ProcessCacheScope.PER_SESSION,  # necessary to ensure result not cached from prior test runs
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert result.stdout.decode() == "this-goes-to-stdout\n"
+    assert result.stderr.decode() == "this-goes-to-stderr\n"
+    snapshot = rule_runner.request(Snapshot, [result.output_digest])
+    assert snapshot.files == ("capture-this-file",)
