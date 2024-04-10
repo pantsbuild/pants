@@ -26,8 +26,8 @@ jobs:
         file psutil-test/psutil/*.so
       name: pip install default
     - run: |
-        pip install --verbose --no-cache psutil==5.9.0 --target psutil-test
-        file psutil-test/psutil/*.so
+        pip install --verbose --no-cache psutil==5.9.0 --target psutil-test-archflags
+        file psutil-test-archflags/psutil/*.so
       env:
         ARCHFLAGS: -arch arm64
       name: pip install with ARCHFLAGS
