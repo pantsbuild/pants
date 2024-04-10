@@ -94,7 +94,7 @@ impl super::CommandRunner for CommandRunner {
 
         apply_chroot(tempdir.path().to_str().unwrap(), &mut req);
 
-        let res = self
+        self
             .run_and_capture_workdir(
                 req.clone(),
                 context,
@@ -115,9 +115,7 @@ impl super::CommandRunner for CommandRunner {
                 // error.
                 ProcessError::Unclassified(format!("Failed to execute: {req_debug_repr}\n\n{msg}"))
             })
-            .await;
-
-        res
+            .await
     }
 
     async fn shutdown(&self) -> Result<(), String> {
