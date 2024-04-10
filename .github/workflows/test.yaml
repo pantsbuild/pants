@@ -49,8 +49,6 @@ jobs:
 
     - if: always()
       name: default clang
-      env:
-        ARCHFLAGS: -arch arm64
       run: |
         clang test.c -o test
         file test
