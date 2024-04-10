@@ -39,6 +39,13 @@ jobs:
         file test
 
     - if: always()
+      env:
+        ARCHFLAGS: -arch arm64
+      run: |
+        arch -arch arm64 clang test.c -o test
+        file test
+
+    - if: always()
       run: |
         clang -target arm64-apple-macos11 -c test.c -o test.o
         file test.o
