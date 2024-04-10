@@ -34,17 +34,26 @@ jobs:
     - run: |
         echo 'int main() { return 0; }' > test.c
     - if: always()
+      name: with 'arch'
       run: |
         arch -arch arm64 clang test.c -o test
         file test
 
     - if: always()
+      name: with ARCHFLAGS
       env:
         ARCHFLAGS: -arch arm64
       run: |
-        arch -arch arm64 clang test.c -o test
+        clang test.c -o test
         file test
 
+    - if: always()
+      name: default clang
+      env:
+        ARCHFLAGS: -arch arm64
+      run: |
+        clang test.c -o test
+        file test
     - if: always()
       run: |
         clang -target arm64-apple-macos11 -c test.c -o test.o
