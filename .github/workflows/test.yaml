@@ -24,6 +24,13 @@ jobs:
     - run: |
         pip install --verbose --no-cache psutil==5.9.0 --target psutil-test
         file psutil-test/psutil/*.so
+      name: pip install default
+    - run: |
+        pip install --verbose --no-cache psutil==5.9.0 --target psutil-test
+        file psutil-test/psutil/*.so
+      env:
+        ARCHFLAGS: -arch arm64
+      name: pip install with ARCHFLAGS
     - run: |
         pip install --verbose --no-cache psutil==5.9.8 --target psutil-test-wheels
         file psutil-test-wheels/psutil/*.so
@@ -76,7 +83,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: github.repository_owner == 'pantsbuild'
+    if: github.repository_owner == 'pantsbuild' && false
     name: Build wheels (macOS11-ARM64)
     runs-on:
     - self-hosted
