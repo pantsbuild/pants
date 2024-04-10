@@ -8,12 +8,11 @@ from typing import ClassVar
 
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Targets
-from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
     ArtifactRequirements,
@@ -29,7 +28,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
 
-class JvmToolBase(Subsystem):
+class JvmToolBase(Subsystem, ExportableTool):
     """Base class for subsystems that configure a set of artifact requirements for a JVM tool."""
 
     # Default version of the tool. (Subclasses may set.)
@@ -102,6 +101,20 @@ class JvmToolBase(Subsystem):
                 cls.default_lockfile_resource[0].replace(".", os.path.sep),
                 cls.default_lockfile_resource[1],
             )
+        )
+
+    @classmethod
+    def help_for_generate_lockfile_with_default_location(cls, resolve_name):
+        return softwrap(
+            f"""
+            You requested to generate a lockfile for {resolve_name} because
+            you included it in `--generate-lockfiles-resolve`, but
+            {resolve_name} is a tool using its default lockfile.
+
+            If you would like to generate a lockfile for {resolve_name}, please
+            set `[{resolve_name}].lockfile` to the path where it should be
+                    generated and run again.
+            """
         )
 
     @property
@@ -205,25 +218,7 @@ class GenerateJvmLockfileFromTool:
         )
 
 
-@rule
-async def setup_lockfile_request_from_tool(
-    request: GenerateJvmLockfileFromTool,
-) -> GenerateJvmLockfile:
-    artifacts = await Get(
-        ArtifactRequirements,
-        GatherJvmCoordinatesRequest(request.artifact_inputs, request.artifact_option_name),
-    )
-    return GenerateJvmLockfile(
-        artifacts=artifacts,
-        resolve_name=request.resolve_name,
-        lockfile_dest=(
-            request.write_lockfile_dest
-            if request.read_lockfile_dest != DEFAULT_TOOL_LOCKFILE
-            else DEFAULT_TOOL_LOCKFILE
-        ),
-        diff=False,
-    )
-
-
 def rules():
+    from pants.jvm.goals import lockfile  # TODO: Shim to avoid import cycle
+
     return (*collect_rules(), *lockfile.rules())
