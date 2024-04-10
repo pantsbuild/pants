@@ -2,13 +2,13 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::ops::Neg;
+use std::os::unix::process::ExitStatusExt;
 use std::{
     fmt,
     path::{Path, PathBuf},
     process::Stdio,
     time::Duration,
 };
-use std::os::unix::process::ExitStatusExt;
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
@@ -18,9 +18,9 @@ use nails::execution::ExitCode;
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use tokio::process::Command;
+use tokio::sync::RwLock;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use workunit_store::RunningWorkunit;
-use tokio::sync::RwLock;
 
 use crate::{
     local::{
@@ -94,28 +94,27 @@ impl super::CommandRunner for CommandRunner {
 
         apply_chroot(tempdir.path().to_str().unwrap(), &mut req);
 
-        self
-            .run_and_capture_workdir(
-                req.clone(),
-                context,
-                self.store.clone(),
-                self.executor.clone(),
-                tempdir.path().to_owned(),
-                self.build_root.clone(),
-                exclusive_spawn,
-            )
-            .map_err(|msg| {
-                // Processes that experience no infrastructure issues should result in an "Ok" return,
-                // potentially with an exit code that indicates that they failed (with more information
-                // on stderr). Actually failing at this level indicates a failure to start or otherwise
-                // interact with the process, which would generally be an infrastructure or implementation
-                // error (something missing from the sandbox, incorrect permissions, etc).
-                //
-                // Given that this is expected to be rare, we dump the entire process definition in the
-                // error.
-                ProcessError::Unclassified(format!("Failed to execute: {req_debug_repr}\n\n{msg}"))
-            })
-            .await
+        self.run_and_capture_workdir(
+            req.clone(),
+            context,
+            self.store.clone(),
+            self.executor.clone(),
+            tempdir.path().to_owned(),
+            self.build_root.clone(),
+            exclusive_spawn,
+        )
+        .map_err(|msg| {
+            // Processes that experience no infrastructure issues should result in an "Ok" return,
+            // potentially with an exit code that indicates that they failed (with more information
+            // on stderr). Actually failing at this level indicates a failure to start or otherwise
+            // interact with the process, which would generally be an infrastructure or implementation
+            // error (something missing from the sandbox, incorrect permissions, etc).
+            //
+            // Given that this is expected to be rare, we dump the entire process definition in the
+            // error.
+            ProcessError::Unclassified(format!("Failed to execute: {req_debug_repr}\n\n{msg}"))
+        })
+        .await
     }
 
     async fn shutdown(&self) -> Result<(), String> {
