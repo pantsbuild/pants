@@ -13,6 +13,8 @@ from pants.engine.fs import (
     MergeDigests,
     NativeDownloadFile,
     PathGlobs,
+    PathMetadataRequest,
+    PathMetadataResult,
     Paths,
     RemovePrefix,
     Snapshot,
@@ -141,6 +143,11 @@ async def parse_javascript_deps(
     deps_request: NativeDependenciesRequest,
 ) -> NativeParsedJavascriptDependencies:
     return await native_engine.parse_javascript_deps(deps_request)
+
+
+@rule
+async def path_metadata_request(request: PathMetadataRequest) -> PathMetadataResult:
+    return await native_engine.path_metadata_request(request)
 
 
 def rules():

@@ -38,6 +38,10 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
+    PathMetadata,
+    PathMetadataKind,
+    PathMetadataRequest,
+    PathMetadataResult,
     RemovePrefix,
     Snapshot,
     SnapshotDiff,
@@ -64,6 +68,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(Snapshot, [CreateDigest]),
             QueryRule(Snapshot, [DigestSubset]),
             QueryRule(Snapshot, [PathGlobs]),
+            QueryRule(PathMetadataResult, [PathMetadataRequest]),
         ],
         isolated_local_store=True,
     )
@@ -1502,3 +1507,45 @@ def test_snapshot_diff(
     assert diff.their_unique_files == expected_diff.our_unique_files
     assert diff.their_unique_dirs == expected_diff.our_unique_dirs
     assert diff.changed_files == expected_diff.changed_files
+
+
+def test_path_metadata_request(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo": b"xyzzy",
+            "sub-dir/bar": b"12345",
+        }
+    )
+    os.symlink("foo", os.path.join(rule_runner.build_root, "bar"))
+
+    def get_metadata(path: str) -> PathMetadata | None:
+        result = rule_runner.request(PathMetadataResult, [PathMetadataRequest(path)])
+        print(f"metadata={result.metadata}")
+        return result.metadata
+
+    m1 = get_metadata("foo")
+    assert m1 is not None
+    assert m1.path == "foo"
+    assert m1.kind == PathMetadataKind.FILE.value
+    assert m1.length == len(b"xyzzy")
+    assert m1.symlink_target is None
+
+    m2 = get_metadata("not-found")
+    assert m2 is None
+    (Path(rule_runner.build_root) / "not-found").write_bytes(b"is found")
+    time.sleep(0.250)
+    m3 = get_metadata("not-found")
+    assert m3 is not None
+
+    m4 = get_metadata("bar")
+    assert m4 is not None
+    assert m4.path == "bar"
+    assert m4.kind == PathMetadataKind.SYMLINK.value
+    assert m4.length == 3
+    assert m4.symlink_target == "foo"
+
+    m5 = get_metadata("sub-dir")
+    assert m5 is not None
+    assert m5.path == "sub-dir"
+    assert m5.kind == PathMetadataKind.DIRECTORY.value
+    assert m5.symlink_target is None
