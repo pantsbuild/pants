@@ -3,12 +3,18 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::FromStr;
+use std::time::{SystemTime, UNIX_EPOCH};
 
+use chrono::{Datelike, Timelike};
 use fs::{
-    DigestTrie, DirectoryDigest, GlobMatching, PathStat, RelativePath, SymlinkBehavior, TypedPath,
+    DigestTrie, DirectoryDigest, GlobMatching, PathMetadataKind, PathStat, RelativePath,
+    SymlinkBehavior, TypedPath,
 };
 use hashing::{Digest, EMPTY_DIGEST};
-use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyRef, PyResult, Python};
+use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyRef, PyResult, Python, ToPyObject};
+use pyo3::types::{PyDateTime, PyDict, PyTuple};
+use pyo3::PyErr;
 use store::{SnapshotOps, SubsetParams};
 
 use crate::externs;
@@ -16,7 +22,7 @@ use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyMergeDigests, PyRemovePref
 use crate::externs::PyGeneratorResponseNativeCall;
 use crate::nodes::{
     lift_directory_digest, task_get_context, unmatched_globs_additional_context, DownloadedFile,
-    NodeResult, Snapshot,
+    NodeResult, PathMetadataNode, Snapshot,
 };
 use crate::python::{throw, Key, Value};
 use crate::Failure;
@@ -33,6 +39,7 @@ pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(path_globs_to_digest, m)?)?;
     m.add_function(wrap_pyfunction!(path_globs_to_paths, m)?)?;
     m.add_function(wrap_pyfunction!(remove_prefix_request_to_digest, m)?)?;
+    m.add_function(wrap_pyfunction!(path_metadata_request, m)?)?;
 
     Ok(())
 }
@@ -352,5 +359,155 @@ fn digest_subset_to_digest(digest_subset: Value) -> PyGeneratorResponseNativeCal
         Ok::<_, Failure>(Python::with_gil(|py| {
             Snapshot::store_directory_digest(py, digest)
         })?)
+    })
+}
+
+#[pyfunction]
+fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
+    PyGeneratorResponseNativeCall::new(async move {
+        let path = Python::with_gil(|py| {
+            let arg = (*single_path).as_ref(py);
+            externs::getattr_as_optional_string(arg, "path")
+                .map_err(|e| format!("Failed to get `path` for field: {e}"))
+        })?
+        .expect("path field for intrinsic");
+
+        let context = task_get_context();
+        let metadata_opt = context
+            .get(PathMetadataNode::new(PathBuf::from_str(&path).unwrap()))
+            .await?;
+
+        Ok(Python::with_gil(|py| {
+            let path_metadata_opt = match metadata_opt {
+                Some(m) => {
+                    let py_type = context.core.types.path_metadata.as_py_type(py);
+                    let args_tuple = PyTuple::empty(py);
+                    let kwargs_dict = {
+                        let kwargs = PyDict::new(py);
+
+                        kwargs
+                            .set_item("path", path.to_object(py))
+                            .expect("set length for PathMetadata");
+
+                        let kind_str = match m.kind {
+                            PathMetadataKind::File => "file",
+                            PathMetadataKind::Directory => "directory",
+                            PathMetadataKind::Symlink => "symlink",
+                        };
+                        kwargs
+                            .set_item("kind", kind_str.to_object(py))
+                            .expect("set kind for PathMetadata");
+
+                        kwargs
+                            .set_item("length", m.length.to_object(py))
+                            .expect("set length for PathMetadata");
+
+                        kwargs
+                            .set_item("is_executable", m.is_executable.to_object(py))
+                            .expect("set is_executable for PathMetadata");
+
+                        kwargs
+                            .set_item("read_only", m.read_only.to_object(py))
+                            .expect("set read_only for PathMetadata");
+
+                        match m.unix_mode {
+                            Some(unix_mode) => kwargs
+                                .set_item("unix_mode", unix_mode.to_object(py))
+                                .expect("set unix_mode for PathMetadata"),
+                            None => kwargs
+                                .set_item("unix_mode", py.None())
+                                .expect("set unix_mode for PathMetadata"),
+                        }
+
+                        kwargs
+                            .set_item("accessed_time", py.None())
+                            .expect("set accessed_time for PathMetadata");
+
+                        kwargs
+                            .set_item("created_time", py.None())
+                            .expect("set created_time for PathMetadata");
+
+                        fn set_datetime_opt(
+                            py: Python<'_>,
+                            kwargs: &PyDict,
+                            key: &'static str,
+                            dt_opt: Option<SystemTime>,
+                        ) -> Result<(), PyErr> {
+                            match dt_opt {
+                                Some(st) => {
+                                    let duration_since_unix_epoch = st
+                                        .duration_since(UNIX_EPOCH)
+                                        .expect("duration since unix epoch");
+
+                                    let dt = chrono::DateTime::from_timestamp(
+                                        duration_since_unix_epoch.as_secs() as i64,
+                                        duration_since_unix_epoch.subsec_nanos(),
+                                    )
+                                    .unwrap();
+                                    let d = dt.date_naive();
+                                    let t = dt.time();
+
+                                    let py_datetime = PyDateTime::new_bound(
+                                        py,
+                                        d.year(),
+                                        d.month() as u8,
+                                        d.day() as u8,
+                                        t.hour() as u8,
+                                        t.minute() as u8,
+                                        t.second() as u8,
+                                        t.nanosecond() / 1000,
+                                        None,
+                                    )?;
+
+                                    kwargs
+                                        .set_item(key, py_datetime)
+                                        .expect("set a time on PathMetadata");
+                                }
+                                None => kwargs
+                                    .set_item(key, py.None())
+                                    .expect("set a time on PathMetadata"),
+                            }
+
+                            Ok(())
+                        }
+
+                        set_datetime_opt(py, kwargs, "accessed_time", m.accessed_time)
+                            .expect("set accessed_time on PathMetadata");
+                        set_datetime_opt(py, kwargs, "created_time", m.created_time)
+                            .expect("set created_time on PathMetadata");
+                        set_datetime_opt(py, kwargs, "modification_time", m.modification_time)
+                            .expect("set modification_time on PathMetadata");
+
+                        match m.symlink_target {
+                            Some(path) => kwargs
+                                .set_item("symlink_target", path.as_os_str().to_object(py))
+                                .expect("set symlink_target for PathMetadata"),
+                            None => kwargs
+                                .set_item("symlink_target", py.None())
+                                .expect("set symlink_target for PathMetadata"),
+                        }
+
+                        kwargs
+                    };
+                    let res = py_type
+                        .call(args_tuple, Some(kwargs_dict))
+                        .unwrap_or_else(|e| {
+                            panic!(
+                                "Core type constructor `{}` failed: {:?}",
+                                py_type.name().unwrap(),
+                                e
+                            );
+                        });
+                    Value::new(res.into())
+                }
+                None => Value::from(py.None()),
+            };
+
+            externs::unsafe_call(
+                py,
+                context.core.types.path_metadata_result,
+                &[path_metadata_opt],
+            )
+        }))
     })
 }

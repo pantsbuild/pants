@@ -30,6 +30,8 @@ from pants.engine.fs import (
     DigestSubset,
     NativeDownloadFile,
     PathGlobs,
+    PathMetadataRequest,
+    PathMetadataResult,
     Paths,
 )
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
@@ -530,6 +532,7 @@ async def parse_python_deps(
 async def parse_javascript_deps(
     deps_request: NativeDependenciesRequest,
 ) -> NativeParsedJavascriptDependencies: ...
+async def path_metadata_request(request: PathMetadataRequest) -> PathMetadataResult: ...
 
 # ------------------------------------------------------------------------------
 # `pantsd`

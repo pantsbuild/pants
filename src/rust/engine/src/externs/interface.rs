@@ -180,6 +180,9 @@ impl PyTypes {
     #[new]
     fn __new__(
         paths: &PyType,
+        path_metadata: &PyType,
+        path_metadata_request: &PyType,
+        path_metadata_result: &PyType,
         file_content: &PyType,
         file_entry: &PyType,
         symlink_entry: &PyType,
@@ -211,6 +214,9 @@ impl PyTypes {
             file_digest: TypeId::new(py.get_type::<externs::fs::PyFileDigest>()),
             snapshot: TypeId::new(py.get_type::<externs::fs::PySnapshot>()),
             paths: TypeId::new(paths),
+            path_metadata: TypeId::new(path_metadata),
+            path_metadata_request: TypeId::new(path_metadata_request),
+            path_metadata_result: TypeId::new(path_metadata_result),
             file_content: TypeId::new(file_content),
             file_entry: TypeId::new(file_entry),
             symlink_entry: TypeId::new(symlink_entry),
