@@ -532,7 +532,7 @@ def _common_failure_reasons(
     if InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH in failure_reasons:
         if maybe_constraints_file_path is None:
             yield softwrap(
-                f"""
+                """
                 - Constraint file expected from lockfile metadata but no
                 constraints file configured.  See the option
                 `[python].resolves_to_constraints_file`.
@@ -660,7 +660,10 @@ def _invalid_lockfile_error(
         yield f"\n\nSee {doc_url('docs/python/overview/interpreter-compatibility')} for details."
 
     yield "\n\n"
-    yield from (f"{fail}\n" for fail in _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path))
+    yield from (
+        f"{fail}\n"
+        for fail in _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)
+    )
     yield "To regenerate your lockfile, "
     yield f"run `{bin_name()} generate-lockfiles --resolve={resolve}`."
     yield f"\n\nSee {doc_url('docs/python/overview/third-party-dependencies')} for details.\n\n"
