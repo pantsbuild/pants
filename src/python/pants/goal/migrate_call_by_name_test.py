@@ -96,6 +96,7 @@ def test_replacement_comments_are_flagged():
             args)
         """
     )
+
     assert not DEFAULT_REPLACEMENT.contains_comments(
         """
         await Get(

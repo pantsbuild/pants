@@ -12,7 +12,7 @@ import tokenize
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path, PurePath
-from typing import TypedDict
+from typing import Callable, TypedDict
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -24,6 +24,7 @@ from pants.goal.builtin_goal import BuiltinGoal
 from pants.init.engine_initializer import GraphSession
 from pants.option.option_types import BoolOption
 from pants.option.options import Options
+from pants.util.astutil import maybe_narrow_type, narrow_type
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -374,6 +375,16 @@ class CallByNameSyntaxMapper:
     def __init__(self, graphs: list[RuleGraphGet]) -> None:
         self.graphs = graphs
 
+        self.mapping: dict[
+            tuple[int, type[ast.Call] | type[ast.Dict] | None],
+            Callable[[ast.Call, list[RuleGraphGetDep]], tuple[ast.Call, list[ast.ImportFrom]]],
+        ] = {
+            (1, None): self.map_no_args_get_to_new_syntax,
+            (2, ast.Call): self.map_short_form_get_to_new_syntax,
+            (2, ast.Dict): self.map_dict_form_get_to_new_syntax,
+            (3, None): self.map_long_form_get_to_new_syntax,
+        }
+
     def map_get_to_new_syntax(
         self, get: ast.Call, filename: PurePath, calling_func: str
     ) -> Replacement | None:
@@ -396,21 +407,13 @@ class CallByNameSyntaxMapper:
 
         get_deps = graph_item["gets"]
 
+        num_args = len(get.args)
+        arg_type: type[ast.Call] | type[ast.Dict] | None = None
+        if num_args == 2 and (arg := maybe_narrow_type(get.args[1], (ast.Call, ast.Dict))):
+            arg_type = type(arg) if arg else None  # type: ignore
+
         try:
-            if len(get.args) == 1:
-                new_source, imports = self.map_no_args_get_to_new_syntax(get, get_deps)
-            elif len(get.args) == 2 and isinstance(get.args[1], ast.Call):
-                new_source, imports = self.map_short_form_get_to_new_syntax(get, get_deps)
-            elif len(get.args) == 2 and isinstance(get.args[1], ast.Dict):
-                new_source, imports = self.map_dict_form_get_to_new_syntax(get, get_deps)
-            elif len(get.args) == 3:
-                new_source, imports = self.map_long_form_get_to_new_syntax(get, get_deps)
-            else:
-                logging.warning(f"Failed to migrate {ast.unparse(get)} due to unknown form\n")
-                return None
-        except AssertionError as e:
-            logging.warning(f"Failed to migrate {ast.unparse(get)} with assertion error {e}\n")
-            return None
+            new_source, imports = self.mapping[(num_args, arg_type)](get, get_deps)
         except Exception as e:
             logging.warning(f"Failed to migrate {ast.unparse(get)} with {e}\n")
             return None
@@ -435,11 +438,16 @@ class CallByNameSyntaxMapper:
     def map_no_args_get_to_new_syntax(
         self, get: ast.Call, deps: list[RuleGraphGetDep]
     ) -> tuple[ast.Call, list[ast.ImportFrom]]:
-        """Get(<OutputType>) -> the_rule_to_call(**implicitly())"""
+        """Map the no-args form of Get() to the new syntax.
+
+        The expected mapping is roughly:
+        Get(<OutputType>) -> the_rule_to_call(**implicitly())
+
+        This form expects that the `get` call has exactly 1 arg (otherwise, a different form would be used)
+        """
 
         logger.debug(ast.dump(get, indent=2))
-        assert len(get.args) == 1, f"Expected 1 arg, got {len(get.args)}"
-        assert isinstance(output_type := get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
+        output_type = narrow_type(get.args[0], ast.Name)
 
         dep = next(
             dep
@@ -462,12 +470,17 @@ class CallByNameSyntaxMapper:
     def map_long_form_get_to_new_syntax(
         self, get: ast.Call, deps: list[RuleGraphGetDep]
     ) -> tuple[ast.Call, list[ast.ImportFrom]]:
-        """Get(<OutputType>, <InputType>, input) -> the_rule_to_call(**implicitly(input))"""
+        """Map the long form of Get() to the new syntax.
+
+        The expected mapping is roughly:
+        Get(<OutputType>, <InputType>, input) -> the_rule_to_call(**implicitly(input))
+
+        This form expects that the `get` call has exactly 3 args (otherwise, a different form would be used)
+        """
 
         logger.debug(ast.dump(get, indent=2))
-        assert len(get.args) == 3, f"Expected 3 arg, got {len(get.args)}"
-        assert isinstance(output_type := get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
-        assert isinstance(input_type := get.args[1], ast.Name), f"Expected Name, got {get.args[1]}"
+        output_type = narrow_type(get.args[0], ast.Name)
+        input_type = narrow_type(get.args[1], ast.Name)
 
         dep = next(
             dep
@@ -498,18 +511,18 @@ class CallByNameSyntaxMapper:
     def map_short_form_get_to_new_syntax(
         self, get: ast.Call, deps: list[RuleGraphGetDep]
     ) -> tuple[ast.Call, list[ast.ImportFrom]]:
-        """Get(<OutputType>, <InputType>(<constructor args for input>)) -> the_rule_to_call(input,
+        """Map the short form of Get() to the new syntax.
 
-        **implicitly())
+        The expected mapping is roughly:
+        Get(<OutputType>, <InputType>(<constructor args for input>)) -> the_rule_to_call(input, **implicitly())
+
+        This form expects that the `get` call has exactly 2 args (otherwise, a different form would be used)
         """
 
         logger.debug(ast.dump(get, indent=2))
-        assert len(get.args) == 2, f"Expected 2 arg, got {len(get.args)}"
-        assert isinstance(output_type := get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
-        assert isinstance(input_call := get.args[1], ast.Call), f"Expected Call, got {get.args[1]}"
-        assert isinstance(
-            input_type := input_call.func, ast.Name
-        ), f"Expected Name, got {input_call.func}"
+        output_type = narrow_type(get.args[0], ast.Name)
+        input_call = narrow_type(get.args[1], ast.Call)
+        input_type = narrow_type(input_call.func, ast.Name)
 
         dep = next(
             dep
@@ -534,14 +547,17 @@ class CallByNameSyntaxMapper:
     def map_dict_form_get_to_new_syntax(
         self, get: ast.Call, deps: list[RuleGraphGetDep]
     ) -> tuple[ast.Call, list[ast.ImportFrom]]:
-        """Get(<OutputType>, {input1: <Input1Type>, ..inputN: <InputNType>}) ->
-        the_rule_to_call(**implicitly(input))"""
+        """Map the dict form of Get() to the new syntax.
+
+        The expected mapping is roughly:
+        Get(<OutputType>, {input1: <Input1Type>, ..inputN: <InputNType>}) -> the_rule_to_call(**implicitly(input))
+
+        This form expects that the `get` call has exactly 2 args (otherwise, a different form would be used)
+        """
 
         logger.debug(ast.dump(get, indent=2))
-        assert len(get.args) == 2, f"Expected 2 arg, got {len(get.args)}"
-        assert isinstance(output_type := get.args[0], ast.Name), f"Expected Name, got {get.args[0]}"
-        assert isinstance(input_dict := get.args[1], ast.Dict), f"Expected Dict, got {get.args[1]}"
-
+        output_type = narrow_type(get.args[0], ast.Name)
+        input_dict = narrow_type(get.args[1], ast.Dict)
         input_types = {k.id for k in input_dict.values if isinstance(k, ast.Name)}
 
         dep = next(
