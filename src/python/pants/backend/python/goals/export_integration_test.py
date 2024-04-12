@@ -6,7 +6,6 @@ from __future__ import annotations
 import os
 import platform
 import shutil
-from dataclasses import dataclass
 from textwrap import dedent
 from typing import Mapping, MutableMapping
 
@@ -35,19 +34,6 @@ SOURCES = {
         """
     ),
 }
-
-
-@dataclass
-class _ToolConfig:
-    name: str
-    version: str
-    experimental: bool = False
-    backend_prefix: str | None = "lint"
-    takes_ics: bool = True
-
-    @property
-    def package(self) -> str:
-        return self.name.replace("-", "_")
 
 
 def build_config(tmpdir: str, py_resolve_format: PythonResolveExportFormat) -> Mapping:
