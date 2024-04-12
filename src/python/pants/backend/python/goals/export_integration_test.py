@@ -113,7 +113,7 @@ def test_export(py_resolve_format: PythonResolveExportFormat, py_hermetic_script
             script_path = os.path.join(export_dir, "bin", "wheel")
             assert os.path.isfile(
                 script_path
-            ), f"expected wheel to be installed, but bin/wheel is missing"
+            ), "expected wheel to be installed, but bin/wheel is missing"
             with open(script_path, "r") as script_file:
                 shebang = script_file.readline().strip()
             if py_hermetic_scripts:

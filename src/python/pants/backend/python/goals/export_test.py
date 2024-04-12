@@ -150,7 +150,7 @@ def test_export_venv_new_codepath(
                 "--pip",
                 "--collisions-ok",
             )
-            if export_subsys.options.py_hermetic_scripts:
+            if py_hermetic_scripts:
                 assert "--non-hermetic-scripts" not in ppc0.argv
             else:
                 assert ppc0.argv[6] == "--non-hermetic-scripts"
