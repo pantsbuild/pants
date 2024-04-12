@@ -1657,6 +1657,55 @@ def test_parametrize_group_on_target_generator_20418(
     )
 
 
+def test_parametrize_explicit_dependencies_20739(
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo", target_name="tst"),
+        dedent(
+            """\
+            generator(
+              name='src',
+              sources=['src1.ext'],
+              **parametrize('b1', resolve='a'),
+              **parametrize('b2', resolve='b'),
+            )
+            generator(
+              name='tst',
+              sources=['tst1.ext'],
+              dependencies=['./src1.ext:src'],
+              **parametrize('b1', resolve='a'),
+              **parametrize('b2', resolve='b'),
+            )
+            """
+        ),
+        ["src1.ext", "tst1.ext"],
+        expected_dependencies={
+            "demo/src1.ext:src@parametrize=b1": set(),
+            "demo/src1.ext:src@parametrize=b2": set(),
+            "demo/tst1.ext:tst@parametrize=b1": {
+                "demo/src1.ext:src@parametrize=b1",
+            },
+            "demo/tst1.ext:tst@parametrize=b2": {
+                "demo/src1.ext:src@parametrize=b2",
+            },
+            "demo:src@parametrize=b1": {
+                "demo/src1.ext:src@parametrize=b1",
+            },
+            "demo:src@parametrize=b2": {
+                "demo/src1.ext:src@parametrize=b2",
+            },
+            "demo:tst@parametrize=b1": {
+                "demo/tst1.ext:tst@parametrize=b1",
+            },
+            "demo:tst@parametrize=b2": {
+                "demo/tst1.ext:tst@parametrize=b2",
+            },
+        },
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # Test `SourcesField`. Also see `engine/target_test.py`.
 # -----------------------------------------------------------------------------------------------
