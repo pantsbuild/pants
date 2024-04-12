@@ -79,7 +79,7 @@ def test_export(py_resolve_format: PythonResolveExportFormat, py_hermetic_script
                 *(f"--resolve={name}" for name in resolve_names),
                 "--export-py-editable-in-resolve=['a']",
             ],
-            config=build_config(tmpdir, py_resolve_format),
+            config=build_config(tmpdir, py_resolve_format, py_hermetic_scripts),
         ).assert_success()
 
     export_prefix = os.path.join("dist", "export", "python", "virtualenvs")
@@ -114,7 +114,7 @@ def test_export(py_resolve_format: PythonResolveExportFormat, py_hermetic_script
             assert os.path.isfile(
                 script_path
             ), "expected wheel to be installed, but bin/wheel is missing"
-            with open(script_path, "r") as script_file:
+            with open(script_path) as script_file:
                 shebang = script_file.readline().strip()
             if py_hermetic_scripts:
                 assert shebang.endswith(" -sE")
