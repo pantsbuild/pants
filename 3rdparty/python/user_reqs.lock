@@ -23,7 +23,7 @@
 //     "node-semver==0.9.0",
 //     "packaging==21.3",
 //     "pex==2.2.1",
-//     "psutil==5.9.0",
+//     "psutil==5.9.8",
 //     "pydevd-pycharm==203.5419.8",
 //     "pytest<7.1.0,>=6.2.4",
 //     "python-gnupg==0.4.9",
@@ -952,23 +952,28 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3611e87eea393f779a35b192b46a164b1d01167c9d323dda9b1e527ea69d697d",
-              "url": "https://files.pythonhosted.org/packages/c4/35/7cec9647be077784d20913404f914fffd8fe6dfd0673e29f7bd822ac1331/psutil-5.9.0-cp39-cp39-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "d16bbddf0693323b8c6123dd804100241da461e41d6e332fb0ba6058f630f8c8",
+              "url": "https://files.pythonhosted.org/packages/05/33/2d74d588408caedd065c2497bdb5ef83ce6082db01289a1e1147f6639802/psutil-5.9.8-cp38-abi3-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "869842dbd66bb80c3217158e629d6fceaecc3a3166d3d1faee515b05dd26ca25",
-              "url": "https://files.pythonhosted.org/packages/47/b6/ea8a7728f096a597f0032564e8013b705aa992a0990becd773dcc4d7b4a7/psutil-5.9.0.tar.gz"
+              "hash": "6be126e3225486dff286a8fb9a06246a5253f4c7c53b475ea5f5ac934e64194c",
+              "url": "https://files.pythonhosted.org/packages/90/c7/6dc0a455d111f68ee43f27793971cf03fe29b6ef972042549db29eec39a2/psutil-5.9.8.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "539e429da49c5d27d5a58e3563886057f8fc3868a5547b4f1876d9c0f007bccf",
-              "url": "https://files.pythonhosted.org/packages/48/6a/c6e88a5584544033dbb8318c380e7e1e3796e5ac336577eb91dc75bdecd7/psutil-5.9.0-cp39-cp39-macosx_10_9_x86_64.whl"
+              "hash": "8cb6403ce6d8e047495a701dc7c5bd788add903f8986d523e3e20b98b733e421",
+              "url": "https://files.pythonhosted.org/packages/b3/bd/28c5f553667116b2598b9cc55908ec435cb7f77a34f2bff3e3ca765b0f78/psutil-5.9.8-cp36-abi3-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "58c7d923dc209225600aec73aa2c4ae8ea33b1ab31bc11ef8a5933b027476f07",
-              "url": "https://files.pythonhosted.org/packages/f7/b1/82e95f6368dbde6b7e54ea6b18cf8ac3958223540d0bcbde23ba7be19478/psutil-5.9.0-cp39-cp39-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
+              "hash": "d06016f7f8625a1825ba3732081d77c94589dca78b7a3fc072194851e88461a4",
+              "url": "https://files.pythonhosted.org/packages/c5/4f/0e22aaa246f96d6ac87fe5ebb9c5a693fbe8877f537a1022527c47ca43c5/psutil-5.9.8-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "aee678c8720623dc456fa20659af736241f575d79429a0e5e9cf88ae0605cc81",
+              "url": "https://files.pythonhosted.org/packages/e7/e3/07ae864a636d70a8a6f58da27cb1179192f1140d5d1da10886ade9405797/psutil-5.9.8-cp36-abi3-macosx_10_9_x86_64.whl"
             }
           ],
           "project_name": "psutil",
@@ -977,11 +982,10 @@
             "ipaddress; python_version < \"3.0\" and extra == \"test\"",
             "mock; python_version < \"3.0\" and extra == \"test\"",
             "pywin32; sys_platform == \"win32\" and extra == \"test\"",
-            "unittest2; python_version < \"3.0\" and extra == \"test\"",
             "wmi; sys_platform == \"win32\" and extra == \"test\""
           ],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.6",
-          "version": "5.9.0"
+          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
+          "version": "5.9.8"
         },
         {
           "artifacts": [
@@ -2234,7 +2238,7 @@
     "node-semver==0.9.0",
     "packaging==21.3",
     "pex==2.2.1",
-    "psutil==5.9.0",
+    "psutil==5.9.8",
     "pydevd-pycharm==203.5419.8",
     "pytest<7.1.0,>=6.2.4",
     "python-gnupg==0.4.9",
