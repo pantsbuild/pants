@@ -114,7 +114,7 @@ class ExportPluginOptions:
             - `-E` ignores all `PYTHON*` env vars like `PYTHONPATH`.
 
             Set this to false if you need non-hermetic scripts with
-            simple python shebangs that respect vars likw `PYTHONPATH`.
+            simple python shebangs that respect vars like `PYTHONPATH`.
             """
         ),
         advanced=True,
