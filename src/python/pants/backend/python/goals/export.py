@@ -9,8 +9,9 @@ import os
 import uuid
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexLayout
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -31,12 +32,13 @@ from pants.core.goals.export import (
     ExportSubsystem,
     PostProcessingCommand,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import EnumOption, StrListOption
 from pants.util.strutil import path_safe, softwrap
 
@@ -329,18 +331,31 @@ async def export_virtualenv_for_resolve(
     request: _ExportVenvForResolveRequest,
     python_setup: PythonSetup,
     export_subsys: ExportSubsystem,
+    union_membership: UnionMembership,
 ) -> MaybeExportResult:
     resolve = request.resolve
     lockfile_path = python_setup.resolves.get(resolve)
-    if not lockfile_path:
+    if lockfile_path:
+        lockfile = Lockfile(
+            url=lockfile_path,
+            url_description_of_origin=f"the resolve `{resolve}`",
+            resolve_name=resolve,
+        )
+    else:
+        maybe_exportable = ExportableTool.filter_for_subclasses(
+            union_membership, PythonToolBase
+        ).get(resolve)
+        if maybe_exportable:
+            lockfile = cast(
+                PythonToolBase, maybe_exportable
+            ).pex_requirements_for_default_lockfile()
+        else:
+            lockfile = None
+
+    if not lockfile:
         raise ExportError(
             f"No resolve named {resolve} found in [{python_setup.options_scope}].resolves."
         )
-    lockfile = Lockfile(
-        url=lockfile_path,
-        url_description_of_origin=f"the resolve `{resolve}`",
-        resolve_name=resolve,
-    )
 
     interpreter_constraints = InterpreterConstraints(
         python_setup.resolves_to_interpreter_constraints.get(

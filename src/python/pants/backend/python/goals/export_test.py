@@ -10,6 +10,7 @@ import pytest
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import export
 from pants.backend.python.goals.export import ExportVenvsRequest, PythonResolveExportFormat
+from pants.backend.python.lint.isort import subsystem as isort_subsystem
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
     PythonDistribution,
@@ -19,12 +20,22 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import local_dists_pep660, pex_from_targets
 from pants.base.specs import RawSpecs
 from pants.core.goals.export import ExportResults
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import distdir
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.rules import QueryRule
 from pants.engine.target import Targets
+from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.frozendict import FrozenDict
+
+pants_args_for_python_lockfiles = [
+    "--python-enable-resolves=True",
+    # Turn off lockfile validation to make the test simpler.
+    "--python-invalid-lockfile-behavior=ignore",
+    # Turn off python synthetic lockfile targets to make the test simpler.
+    "--no-python-enable-lockfile-targets",
+]
 
 
 @pytest.fixture
@@ -36,6 +47,10 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             *distdir.rules(),
             *local_dists_pep660.rules(),
+            *isort_subsystem.rules(),  # add a tool that we can try exporting
+            UnionRule(
+                ExportableTool, isort_subsystem.Isort
+            ),  # TODO: remove this manual export when we add ExportableTool to tools
             QueryRule(Targets, [RawSpecs]),
             QueryRule(ExportResults, [ExportVenvsRequest]),
         ],
@@ -83,15 +98,11 @@ def test_export_venv_new_codepath(
     hermetic_flags = [] if py_hermetic_scripts else ["--export-py-hermetic-scripts=false"]
     rule_runner.set_options(
         [
+            *pants_args_for_python_lockfiles,
             f"--python-interpreter-constraints=['=={current_interpreter}']",
-            "--python-enable-resolves=True",
             "--python-resolves={'a': 'lock.txt', 'b': 'lock.txt'}",
             "--export-resolve=a",
             "--export-resolve=b",
-            # Turn off lockfile validation to make the test simpler.
-            "--python-invalid-lockfile-behavior=ignore",
-            # Turn off python synthetic lockfile targets to make the test simpler.
-            "--no-python-enable-lockfile-targets",
             "--export-py-editable-in-resolve=['a', 'b']",
             format_flag,
             *hermetic_flags,
@@ -156,3 +167,13 @@ def test_export_venv_new_codepath(
         f"python/virtualenvs/a/{current_interpreter}",
         f"python/virtualenvs/b/{current_interpreter}",
     ]
+
+
+def test_export_tool(rule_runner: RuleRunner) -> None:
+    """Test exporting an ExportableTool."""
+    rule_runner.set_options([*pants_args_for_python_lockfiles, "--export-resolve=isort"])
+    results = rule_runner.request(ExportResults, [ExportVenvsRequest(tuple())])
+    assert len(results) == 1
+    result = results[0]
+    assert result.resolve == isort_subsystem.Isort.options_scope
+    assert "isort" in result.description
