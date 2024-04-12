@@ -16,7 +16,7 @@ NEW_FUNC_NAME: Final[str] = "goodbye"
 DEFAULT_REPLACEMENT: Final[Replacement] = Replacement(
     filename=PurePath("pants/foo/bar.py"),
     module="pants.foo.bar",
-    line_range=(1, 2),
+    line_range=(1, 3),
     col_range=(3, 4),
     current_source=ast.Call(func=ast.Name(id=OLD_FUNC_NAME), args=[], keywords=[]),
     new_source=ast.Call(func=ast.Name(id=NEW_FUNC_NAME), args=[], keywords=[]),
@@ -69,3 +69,38 @@ def test_replacement_sanitizes_shadowed_code():
     assert replacement.additional_imports[1].module == "pants.greeting"
     assert replacement.additional_imports[1].names[0].name == f"{NEW_FUNC_NAME}"
     assert replacement.additional_imports[1].names[0].asname == f"{NEW_FUNC_NAME}_get"
+
+
+def test_replacement_comments_are_flagged():
+    assert not DEFAULT_REPLACEMENT.contains_comments("await Get(args)")
+    assert DEFAULT_REPLACEMENT.contains_comments("# A comment")
+
+    assert not DEFAULT_REPLACEMENT.contains_comments(
+        """
+        await Get(
+            args
+        )
+        """
+    )
+    assert DEFAULT_REPLACEMENT.contains_comments(
+        """
+        await Get( # A comment in the replacement range
+            args
+        )
+        """
+    )
+    assert DEFAULT_REPLACEMENT.contains_comments(
+        """
+        await Get(
+            # A comment in the replacement range
+            args)
+        """
+    )
+    assert not DEFAULT_REPLACEMENT.contains_comments(
+        """
+        await Get(
+            args
+        )
+        # A comment below the replacement range
+        """
+    )

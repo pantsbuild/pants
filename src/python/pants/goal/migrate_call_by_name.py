@@ -169,26 +169,52 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
     def _create_replacements_for_file(
         self, file: Path, syntax_mapper: CallByNameSyntaxMapper
     ) -> list[Replacement]:
-        """Create a list of replacements using the CallByNameVisitor on a file. After the
-        replacements are created, they are sanitized to avoid shadowing names,
+        """Create a list of replacements using the CallByNameVisitor on a file.
 
-        and any replacements with comments are filtered out - as those are not safe to replace yet
+        After the replacements are created, they are sanitized to avoid shadowing names,
+        and any replacements with comments are filtered out - as those are not safe to replace
         """
         visitor = CallByNameVisitor(file, syntax_mapper)
-        with open(file, "rb") as f:
+        with open(file) as f:
             logging.info(f"Processing {file}")
             try:
-                tree = ast.parse(f.read(), filename=file, type_comments=True)
+                source_code = f.read()
+                tree = ast.parse(source_code, filename=file, type_comments=True)
                 visitor.visit(tree)
+
+                for replacement in visitor.replacements:
+                    replacement.sanitize(visitor.names)
+
+                included: list[Replacement] = []
+                for r in visitor.replacements:
+                    if r.contains_comments(source_code):
+                        logger.warning(
+                            softwrap(
+                                f"""
+                                Comments found in {file} within replacement range: {r.line_range}. This migration
+                                replacement will not be applied, as it is not safe to replace embedded comments.
+
+                                Please review and apply one of the following suggestions:
+                                - Move the comment(s) above or below the replacement range
+                                - Remove the comments from the replacement range, if they are no longer relevant
+                                - If the comments are part of non-`Get` initializer/function args, extract the args to a separate
+                                  variable and pass it in
+                                - Manually apply the replacement. Run the migration with the `--json` flag to get the migration plan,
+                                  and manually import the new function and replace the `Get` call with the new function call
+                                """
+                            )
+                        )
+                        continue
+
+                    included.append(r)
+
+                return included
+
             except SyntaxError as e:
                 logging.error(f"SyntaxError in {file}: {e}")
             except tokenize.TokenError as e:
                 logging.error(f"TokenError in {file}: {e}")
-
-        for replacement in visitor.replacements:
-            replacement.sanitize(visitor.names)
-
-        return [r for r in visitor.replacements if not r.contains_comments()]
+        return []
 
     def _perform_replacements_on_file(self, file: Path, replacements: list[Replacement]):
         """
@@ -318,21 +344,11 @@ class Replacement:
                 i.names[0].asname = bound_name
         logging.warning(f"Renamed {func_name} to {bound_name} to avoid shadowing")
 
-    def contains_comments(self) -> bool:
-        """Check if there are any comments within the replacement range.
-
-        Opens a file for reading
-        """
-        with open(self.filename) as f:
-            lines = f.readlines()
-
-        for line_number in range(self.line_range[0], self.line_range[1] + 1):
-            if "#" in lines[line_number - 1]:
-                logger.warning(
-                    f"Comments found in {self.filename} within replacement range: {self.line_range}"
-                )
-                return True
-        return False
+    def contains_comments(self, source_code: str) -> bool:
+        """Check if there are any comments within the replacement range of the passed-in source
+        code."""
+        lines = source_code.split("\n")
+        return any("#" in line for line in lines[self.line_range[0] - 1 : self.line_range[1]])
 
     def __str__(self) -> str:
         return f"""

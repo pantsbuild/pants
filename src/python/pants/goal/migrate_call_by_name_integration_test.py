@@ -272,8 +272,13 @@ def test_migrate_call_by_name_syntax():
         rules1_path = Path(tmpdir, "src/migrateme/rules1.py")
         rules2_path = Path(tmpdir, "src/migrateme/rules2.py")
 
-        # Ensure the JSON output contains the paths to the files we expect to migrate.
+        # Ensure the JSON output contains the paths to the files we expect to migrate
         assert all(str(p) in result.stdout for p in [register_path, rules1_path, rules2_path])
+        # Ensure the warning for embedded comments is logged
+        assert (
+            f"Comments found in {tmpdir}/src/migrateme/rules1.py within replacement range: (37, 42)"
+            in result.stderr
+        )
 
         with open(register_path) as f:
             assert f.read() == MIGRATED_REGISTER_FILE
