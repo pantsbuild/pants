@@ -38,7 +38,7 @@ SOURCES = {
 
 
 def build_config(
-    tmpdir: str, py_resolve_format: PythonResolveExportFormat, py_hermetic_scripts: bool
+    tmpdir: str, py_resolve_format: PythonResolveExportFormat, py_hermetic_scripts: bool = True
 ) -> Mapping:
     cfg: MutableMapping = {
         "GLOBAL": {
