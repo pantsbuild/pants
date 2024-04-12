@@ -39,7 +39,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.option_types import EnumOption, StrListOption
+from pants.option.option_types import BoolOption, EnumOption, StrListOption
 from pants.util.strutil import path_safe, softwrap
 
 logger = logging.getLogger(__name__)
