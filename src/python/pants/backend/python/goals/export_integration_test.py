@@ -21,6 +21,7 @@ SOURCES = {
         """\
         python_requirement(name='req1', requirements=['ansicolors==1.1.8'], resolve='a', modules=['colors'])
         python_requirement(name='req2', requirements=['ansicolors==1.0.2'], resolve='b', modules=['colors'])
+        python_requirement(name='req3', requirements=['wheel'], resolve=parametrize('a', 'b'))
         """
     ),
     "src/python/foo.py": "from colors import *",
@@ -50,7 +51,9 @@ class _ToolConfig:
         return self.name.replace("-", "_")
 
 
-def build_config(tmpdir: str, py_resolve_format: PythonResolveExportFormat) -> Mapping:
+def build_config(
+    tmpdir: str, py_resolve_format: PythonResolveExportFormat, py_hermetic_scripts: bool
+) -> Mapping:
     cfg: MutableMapping = {
         "GLOBAL": {
             "backend_packages": ["pants.backend.python"],
@@ -63,21 +66,24 @@ def build_config(tmpdir: str, py_resolve_format: PythonResolveExportFormat) -> M
                 "b": f"{tmpdir}/3rdparty/b.lock",
             },
         },
-        "export": {"py_resolve_format": py_resolve_format.value},
+        "export": {
+            "py_resolve_format": py_resolve_format.value,
+            "py_hermetic_scripts": py_hermetic_scripts,
+        },
     }
 
     return cfg
 
 
 @pytest.mark.parametrize(
-    "py_resolve_format",
+    "py_resolve_format,py_hermetic_scripts",
     [
-        PythonResolveExportFormat.mutable_virtualenv,
-        PythonResolveExportFormat.mutable_virtualenv_with_non_hermetic_scripts,
-        PythonResolveExportFormat.symlinked_immutable_virtualenv,
+        (PythonResolveExportFormat.mutable_virtualenv, True),
+        (PythonResolveExportFormat.mutable_virtualenv, False),
+        (PythonResolveExportFormat.symlinked_immutable_virtualenv, True),
     ],
 )
-def test_export(py_resolve_format: PythonResolveExportFormat) -> None:
+def test_export(py_resolve_format: PythonResolveExportFormat, py_hermetic_scripts: bool) -> None:
     with setup_tmpdir(SOURCES) as tmpdir:
         resolve_names = ["a", "b"]
         run_pants(
@@ -117,10 +123,18 @@ def test_export(py_resolve_format: PythonResolveExportFormat) -> None:
             expected_ansicolors_dir
         ), f"expected dist-info for ansicolors '{expected_ansicolors_dir}' does not exist"
 
-        if py_resolve_format in (
-            PythonResolveExportFormat.mutable_virtualenv,
-            PythonResolveExportFormat.mutable_virtualenv_with_non_hermetic_scripts,
-        ):
+        if py_resolve_format == PythonResolveExportFormat.mutable_virtualenv:
+            script_path = os.path.join(export_dir, "bin", "wheel")
+            assert os.path.isfile(
+                script_path
+            ), f"expected wheel to be installed, but bin/wheel is missing"
+            with open(script_path, "r") as script_file:
+                shebang = script_file.readline().strip()
+            if py_hermetic_scripts:
+                assert shebang.endswith(" -sE")
+            else:
+                assert not shebang.endswith(" -sE")
+
             expected_foo_dir = os.path.join(lib_dir, "foo_dist-1.2.3.dist-info")
             if resolve == "b":
                 assert not os.path.isdir(

@@ -57,7 +57,6 @@ class PythonResolveExportFormat(Enum):
     """How to export Python resolves."""
 
     mutable_virtualenv = "mutable_virtualenv"
-    mutable_virtualenv_with_non_hermetic_scripts = "mutable_virtualenv_with_non_hermetic_scripts"
     symlinked_immutable_virtualenv = "symlinked_immutable_virtualenv"
 
 
@@ -68,11 +67,7 @@ class ExportPluginOptions:
             """\
             Export Python resolves using this format. Options are:
               - `mutable_virtualenv`: Export a standalone mutable virtualenv that you can
-                further modify. Console scripts use a hermetic shebang (python -sE),
-                so env vars like PYTHONPATH will not pollute the virtualenv.
-              - `mutable_virtualenv_with_non_hermetic_scripts`: Export a standalone mutable
-                virtualenv that you can further modify. This is the same as `mutable_virtualenv`,
-                but without modifying the shebang in console scripts.
+                further modify.
               - `symlinked_immutable_virtualenv`: Export a symlink into a cached Python virtualenv.
                 This virtualenv will have no pip binary, and will be immutable. Any attempt to
                 modify it will corrupt the cache! It may, however, take significantly less time
@@ -100,6 +95,24 @@ class ExportPluginOptions:
 
             NOTE: If you are using legacy exports (not using the '--resolve' option), then
             this option has no effect. Legacy exports will not include any editable installs.
+            """
+        ),
+        advanced=True,
+    )
+
+    py_hermetic_scripts = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            When exporting a mutable virtualenv for a resolve, by default
+            modify console script shebang lines to make them "hermetic".
+            The shebang of hermetic console scripts uses the python args: `-sE`:
+
+            - `-s` skips inclusion of the user site-packages directoy,
+            - `-E` ignores all `PYTHON*` env vars like `PYTHONPATH`.
+
+            Set this to false if you need non-hermetic scripts with
+            simple python shebangs that respect vars likw `PYTHONPATH`.
             """
         ),
         advanced=True,
@@ -190,10 +203,7 @@ async def do_export(
             ],
             resolve=req.resolve_name or None,
         )
-    elif export_format in (
-        PythonResolveExportFormat.mutable_virtualenv,
-        PythonResolveExportFormat.mutable_virtualenv_with_non_hermetic_scripts,
-    ):
+    elif export_format == PythonResolveExportFormat.mutable_virtualenv:
         # Note that an internal-only pex will always have the `python` field set.
         # See the build_pex() rule and _determine_pex_python_and_platforms() helper in pex.py.
         requirements_pex = await Get(Pex, PexRequest, req.pex_request)
@@ -220,7 +230,7 @@ async def do_export(
             "--collisions-ok",
             output_path,
         ]
-        if export_format == PythonResolveExportFormat.mutable_virtualenv_with_non_hermetic_scripts:
+        if not export_subsys.options.py_hermetic_scripts:
             pex_args.insert(-1, "--non-hermetic-scripts")
 
         post_processing_cmds = [
