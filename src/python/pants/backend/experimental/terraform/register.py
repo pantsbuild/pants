@@ -2,29 +2,41 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.goals import lockfile as python_lockfile
-from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.backend.terraform import dependency_inference, style, tool
-from pants.backend.terraform.goals import check, tailor
+from pants.backend.terraform import dependencies, dependency_inference, tool
+from pants.backend.terraform.goals import check, deploy
+from pants.backend.terraform.goals import lockfiles as terraform_lockfile
+from pants.backend.terraform.goals import tailor
 from pants.backend.terraform.lint.tffmt.tffmt import rules as tffmt_rules
-from pants.backend.terraform.target_types import TerraformModuleTarget
+from pants.backend.terraform.target_types import (
+    TerraformBackendTarget,
+    TerraformDeploymentTarget,
+    TerraformModuleTarget,
+    TerraformVarFileTarget,
+)
 from pants.backend.terraform.target_types import rules as target_types_rules
 from pants.engine.rules import collect_rules
 
 
 def target_types():
-    return [TerraformModuleTarget]
+    return [
+        TerraformModuleTarget,
+        TerraformDeploymentTarget,
+        TerraformBackendTarget,
+        TerraformVarFileTarget,
+    ]
 
 
 def rules():
     return [
         *collect_rules(),
+        *dependencies.rules(),
         *check.rules(),
         *dependency_inference.rules(),
         *tailor.rules(),
         *target_types_rules(),
         *tool.rules(),
-        *style.rules(),
-        *pex_rules(),
         *tffmt_rules(),
+        *deploy.rules(),
+        *terraform_lockfile.rules(),
         *python_lockfile.rules(),
     ]

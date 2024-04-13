@@ -6,15 +6,28 @@ from __future__ import annotations
 import re
 from enum import Enum
 
-from pants.backend.shell.shell_setup import ShellSetup
-from pants.core.goals.test import RuntimePackageDependenciesField
+from pants.backend.adhoc.target_types import (
+    AdhocToolDependenciesField,
+    AdhocToolExecutionDependenciesField,
+    AdhocToolExtraEnvVarsField,
+    AdhocToolLogOutputField,
+    AdhocToolNamedCachesField,
+    AdhocToolOutputDependenciesField,
+    AdhocToolOutputDirectoriesField,
+    AdhocToolOutputFilesField,
+    AdhocToolOutputRootDirField,
+    AdhocToolRunnableDependenciesField,
+    AdhocToolTimeoutField,
+    AdhocToolWorkdirField,
+)
+from pants.backend.shell.subsystems.shell_setup import ShellSetup
+from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.system_binaries import BinaryPathTest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
-    Dependencies,
-    IntField,
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
@@ -24,13 +37,16 @@ from pants.engine.target import (
     TargetFilesGenerator,
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
-    ValidNumbers,
     generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
 from pants.util.enums import match
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
+
+
+class ShellDependenciesField(AdhocToolDependenciesField):
+    pass
 
 
 class ShellSourceField(SingleSourceField):
@@ -104,20 +120,12 @@ class Shunit2Shell(Enum):
         return BinaryPathTest((arg,))
 
 
-class Shunit2TestDependenciesField(Dependencies):
+class Shunit2TestDependenciesField(ShellDependenciesField):
     supports_transitive_excludes = True
 
 
-class Shunit2TestTimeoutField(IntField):
-    alias = "timeout"
-    help = softwrap(
-        """
-        A timeout (in seconds) used by each test file belonging to this target.
-
-        If unset, the test will never time out.
-        """
-    )
-    valid_numbers = ValidNumbers.positive_only
+class Shunit2TestTimeoutField(TestTimeoutField):
+    pass
 
 
 class SkipShunit2TestsField(BoolField):
@@ -147,7 +155,7 @@ class Shunit2TestTarget(Target):
         Shunit2ShellField,
         RuntimePackageDependenciesField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A single test file for Bourne-based shell scripts using the shunit2 test framework.
 
@@ -180,8 +188,8 @@ class Shunit2TestsOverrideField(OverridesField):
         Shunit2TestTarget.alias,
         """
         overrides={
-            "foo_test.sh": {"timeout": 120]},
-            "bar_test.sh": {"timeout": 200]},
+            "foo_test.sh": {"timeout": 120},
+            "bar_test.sh": {"timeout": 200},
             ("foo_test.sh", "bar_test.sh"): {"tags": ["slow_tests"]},
         }
         """,
@@ -214,7 +222,7 @@ class Shunit2TestsGeneratorTarget(TargetFilesGenerator):
 
 class ShellSourceTarget(Target):
     alias = "shell_source"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellSourceField)
+    core_fields = (*COMMON_TARGET_FIELDS, ShellDependenciesField, ShellSourceField)
     help = "A single Bourne-based shell script, e.g. a Bash script."
 
 
@@ -247,7 +255,7 @@ class ShellSourcesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = ShellSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (Dependencies,)
+    moved_fields = (ShellDependenciesField,)
     help = "Generate a `shell_source` target for each file in the `sources` field."
 
 
@@ -259,16 +267,61 @@ class ShellSourcesGeneratorTarget(TargetFilesGenerator):
 class ShellCommandCommandField(StringField):
     alias = "command"
     required = True
-    help = "Shell command to execute.\n\nThe command is executed as 'bash -c <command>' by default."
-
-
-class ShellCommandOutputsField(StringSequenceField):
-    alias = "outputs"
-    help = softwrap(
+    help = help_text(
         """
-        Specify the shell command output files and directories.
+        Shell command to execute.
 
-        Use a trailing slash on directory names, i.e. `my_dir/`.
+        The command is executed as `'bash -c <command>'` by default. If you want to invoke a binary
+        use `exec -a $0 <binary> <args>` as the command so that the binary gets the correct `argv[0]`
+        set.
+        """
+    )
+
+
+class ShellCommandOutputFilesField(AdhocToolOutputFilesField):
+    pass
+
+
+class ShellCommandOutputDirectoriesField(AdhocToolOutputDirectoriesField):
+    pass
+
+
+class ShellCommandOutputDependenciesField(AdhocToolOutputDependenciesField):
+    pass
+
+
+class ShellCommandExecutionDependenciesField(AdhocToolExecutionDependenciesField):
+    pass
+
+
+class RunShellCommandExecutionDependenciesField(ShellCommandExecutionDependenciesField):
+    help = help_text(
+        lambda: f"""
+        The execution dependencies for this command.
+
+        Dependencies specified here are those required to make the command complete successfully
+        (e.g. file inputs, packages compiled from other targets, etc), but NOT required to make
+        the outputs of the command useful.
+
+        See also `{RunShellCommandRunnableDependenciesField.alias}`.
+        """
+    )
+
+
+class ShellCommandRunnableDependenciesField(AdhocToolRunnableDependenciesField):
+    pass
+
+
+class RunShellCommandRunnableDependenciesField(ShellCommandRunnableDependenciesField):
+    help = help_text(
+        lambda: f"""
+        The runnable dependencies for this command.
+
+        Dependencies specified here are those required to exist on the `PATH` to make the command
+        complete successfully (interpreters specified in a `#!` command, etc). Note that these
+        dependencies will be made available on the `PATH` with the name of the target.
+
+        See also `{RunShellCommandExecutionDependenciesField.alias}`.
         """
     )
 
@@ -280,62 +333,90 @@ class ShellCommandSourcesField(MultipleSourcesField):
     expected_num_files = 0
 
 
-class ShellCommandTimeoutField(IntField):
-    alias = "timeout"
-    default = 30
-    help = "Command execution timeout (in seconds)."
-    valid_numbers = ValidNumbers.positive_only
+class ShellCommandTimeoutField(AdhocToolTimeoutField):
+    pass
 
 
 class ShellCommandToolsField(StringSequenceField):
     alias = "tools"
-    required = True
-    help = softwrap(
+    default = ()
+    help = help_text(
         """
         Specify required executable tools that might be used.
 
         Only the tools explicitly provided will be available on the search PATH,
         and these tools must be found on the paths provided by
-        [shell-setup].executable_search_paths (which defaults to the system PATH).
+        `[shell-setup].executable_search_paths` (which defaults to the system PATH).
         """
     )
 
 
-class ShellCommandLogOutputField(BoolField):
-    alias = "log_output"
+class ShellCommandExtraEnvVarsField(AdhocToolExtraEnvVarsField):
+    pass
+
+
+class ShellCommandLogOutputField(AdhocToolLogOutputField):
+    pass
+
+
+class ShellCommandWorkdirField(AdhocToolWorkdirField):
+    pass
+
+
+class RunShellCommandWorkdirField(AdhocToolWorkdirField):
+    pass
+
+
+class ShellCommandOutputRootDirField(AdhocToolOutputRootDirField):
+    pass
+
+
+class ShellCommandTestDependenciesField(ShellCommandExecutionDependenciesField):
+    pass
+
+
+class ShellCommandNamedCachesField(AdhocToolNamedCachesField):
+    pass
+
+
+class SkipShellCommandTestsField(BoolField):
+    alias = "skip_tests"
     default = False
-    help = "Set to true if you want the output from the command logged to the console."
-
-
-class ShellCommandRunWorkdirField(StringField):
-    alias = "workdir"
-    default = "."
-    help = "Sets the current working directory of the command, relative to the project root."
+    help = "If true, don't run this tests for target."
 
 
 class ShellCommandTarget(Target):
-    alias = "experimental_shell_command"
+    alias = "shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        ShellCommandOutputDependenciesField,
+        ShellCommandExecutionDependenciesField,
+        ShellCommandRunnableDependenciesField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
-        ShellCommandOutputsField,
+        ShellCommandOutputFilesField,
+        ShellCommandOutputDirectoriesField,
         ShellCommandSourcesField,
         ShellCommandTimeoutField,
         ShellCommandToolsField,
+        ShellCommandExtraEnvVarsField,
+        ShellCommandWorkdirField,
+        ShellCommandNamedCachesField,
+        ShellCommandOutputRootDirField,
+        EnvironmentField,
     )
-    help = softwrap(
+    help = help_text(
         """
         Execute any external tool for its side effects.
 
         Example BUILD file:
 
-            experimental_shell_command(
+            shell_command(
                 command="./my-script.sh --flag",
                 tools=["tar", "curl", "cat", "bash", "env"],
-                dependencies=[":scripts"],
-                outputs=["results/", "logs/my-script.log"],
+                execution_dependencies=[":scripts"],
+                output_files=["logs/my-script.log"],
+                output_directories=["results"],
             )
 
             shell_sources(name="scripts")
@@ -350,31 +431,69 @@ class ShellCommandTarget(Target):
 
 
 class ShellCommandRunTarget(Target):
-    alias = "experimental_run_shell_command"
+    alias = "run_shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        RunShellCommandExecutionDependenciesField,
+        RunShellCommandRunnableDependenciesField,
         ShellCommandCommandField,
-        ShellCommandRunWorkdirField,
+        RunShellCommandWorkdirField,
     )
-    help = softwrap(
+    help = help_text(
         """
         Run a script in the workspace, with all dependencies packaged/copied into a chroot.
 
         Example BUILD file:
 
-            experimental_run_shell_command(
+            run_shell_command(
                 command="./scripts/my-script.sh --data-files-dir={chroot}",
-                dependencies=["src/project/files:data"],
+                execution_dependencies=["src/project/files:data"],
             )
 
         The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
         environment variable to get the root directory for where any dependencies are located.
 
-        In contrast to the `experimental_shell_command`, in addition to `workdir` you only have
-        the `command` and `dependencies` fields as the `tools` you are going to use are already
-        on the PATH which is inherited from the Pants environment. Also, the `outputs` does not
-        apply, as any output files produced will end up directly in your project tree.
+        In contrast to the `shell_command`, in addition to `workdir` you only have
+        the `command` and `execution_dependencies` fields as the `tools` you are going to use are
+        already on the PATH which is inherited from the Pants environment. Also, the `outputs` does
+        not apply, as any output files produced will end up directly in your project tree.
+        """
+    )
+
+
+class ShellCommandTestTarget(Target):
+    alias = "experimental_test_shell_command"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ShellCommandTestDependenciesField,
+        ShellCommandCommandField,
+        ShellCommandLogOutputField,
+        ShellCommandSourcesField,
+        ShellCommandTimeoutField,
+        ShellCommandToolsField,
+        ShellCommandExtraEnvVarsField,
+        EnvironmentField,
+        SkipShellCommandTestsField,
+        ShellCommandWorkdirField,
+    )
+    help = help_text(
+        """
+        Run a script as a test via the `test` goal, with all dependencies packaged/copied available in the chroot.
+
+        Example BUILD file:
+
+            experimental_test_shell_command(
+                name="test",
+                tools=["test"],
+                command="test -r $CHROOT/some-data-file.txt",
+                execution_dependencies=["src/project/files:data"],
+            )
+
+        The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
+        environment variable to get the root directory for where any dependencies are located.
+
+        In contrast to the `run_shell_command`, this target is intended to run shell commands as tests
+        and will only run them via the `test` goal.
         """
     )
 

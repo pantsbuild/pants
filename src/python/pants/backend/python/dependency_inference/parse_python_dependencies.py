@@ -1,24 +1,30 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
-import json
-import pkgutil
+import logging
+import os
 from dataclasses import dataclass
+from typing import Iterable
 
+from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.collection import DeduplicatedCollection
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
+from pants.engine.internals.native_engine import NativeDependenciesRequest
+from pants.engine.rules import Get, collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.resources import read_resource
+
+logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=True)
 class ParsedPythonImportInfo:
     lineno: int
     # An import is considered "weak" if we're unsure if a dependency will exist between the parsed
@@ -48,62 +54,89 @@ class ParsedPythonDependencies:
 class ParsePythonDependenciesRequest:
     source: PythonSourceField
     interpreter_constraints: InterpreterConstraints
-    string_imports: bool
-    string_imports_min_dots: int
-    assets: bool
-    assets_min_slashes: int
 
 
-@rule
+@dataclass(frozen=True)
+class PythonDependencyVisitor:
+    """Wraps a subclass of DependencyVisitorBase."""
+
+    digest: Digest  # The file contents for the visitor
+    classname: str  # The full classname, e.g., _my_custom_dep_parser.MyCustomVisitor
+    env: FrozenDict[str, str]  # Set these env vars when invoking the visitor
+
+
+@dataclass(frozen=True)
+class ParserScript:
+    digest: Digest
+    env: FrozenDict[str, str]
+
+
+_scripts_package = "pants.backend.python.dependency_inference.scripts"
+
+
+async def get_scripts_digest(scripts_package: str, filenames: Iterable[str]) -> Digest:
+    scripts = [read_resource(scripts_package, filename) for filename in filenames]
+    assert all(script is not None for script in scripts)
+    path_prefix = scripts_package.replace(".", os.path.sep)
+    contents = [
+        FileContent(os.path.join(path_prefix, relpath), script)
+        for relpath, script in zip(filenames, scripts)
+    ]
+
+    # Python 2 requires all the intermediate __init__.py to exist in the sandbox.
+    package = scripts_package
+    while package:
+        contents.append(
+            FileContent(
+                os.path.join(package.replace(".", os.path.sep), "__init__.py"),
+                read_resource(package, "__init__.py"),
+            )
+        )
+        package = package.rpartition(".")[0]
+
+    digest = await Get(Digest, CreateDigest(contents))
+    return digest
+
+
+@rule(level=LogLevel.DEBUG)
 async def parse_python_dependencies(
     request: ParsePythonDependenciesRequest,
+    python_infer_subsystem: PythonInferSubsystem,
 ) -> ParsedPythonDependencies:
-    script = pkgutil.get_data(__name__, "scripts/dependency_parser.py")
-    assert script is not None
-    python_interpreter, script_digest, stripped_sources = await MultiGet(
-        Get(PythonExecutable, InterpreterConstraints, request.interpreter_constraints),
-        Get(Digest, CreateDigest([FileContent("__parse_python_dependencies.py", script)])),
-        Get(StrippedSourceFiles, SourceFilesRequest([request.source])),
-    )
-
+    stripped_sources = await Get(StrippedSourceFiles, SourceFilesRequest([request.source]))
     # We operate on PythonSourceField, which should be one file.
     assert len(stripped_sources.snapshot.files) == 1
-    file = stripped_sources.snapshot.files[0]
 
-    input_digest = await Get(
-        Digest, MergeDigests([script_digest, stripped_sources.snapshot.digest])
+    native_result = await Get(
+        NativeParsedPythonDependencies,
+        NativeDependenciesRequest(stripped_sources.snapshot.digest),
     )
-    process_result = await Get(
-        ProcessResult,
-        Process(
-            argv=[
-                python_interpreter.path,
-                "./__parse_python_dependencies.py",
-                file,
-            ],
-            input_digest=input_digest,
-            description=f"Determine Python dependencies for {request.source.address}",
-            env={
-                "STRING_IMPORTS": "y" if request.string_imports else "n",
-                "STRING_IMPORTS_MIN_DOTS": str(request.string_imports_min_dots),
-                "ASSETS": "y" if request.assets else "n",
-                "ASSETS_MIN_SLASHES": str(request.assets_min_slashes),
-            },
-            level=LogLevel.DEBUG,
-        ),
-    )
-    # See above for where we explicitly encoded as utf8. Even though utf8 is the
-    # default for decode(), we make that explicit here for emphasis.
-    process_output = process_result.stdout.decode("utf8") or "{}"
-    output = json.loads(process_output)
+    imports = dict(native_result.imports)
+    assets = set()
+
+    if python_infer_subsystem.string_imports or python_infer_subsystem.assets:
+        for string, line in native_result.string_candidates.items():
+            if (
+                python_infer_subsystem.string_imports
+                and string.count(".") >= python_infer_subsystem.string_imports_min_dots
+                and all(part.isidentifier() for part in string.split("."))
+            ):
+                imports.setdefault(string, (line, True))
+            if (
+                python_infer_subsystem.assets
+                and string.count("/") >= python_infer_subsystem.assets_min_slashes
+            ):
+                assets.add(string)
 
     return ParsedPythonDependencies(
-        imports=ParsedPythonImports(
-            (key, ParsedPythonImportInfo(**val)) for key, val in output.get("imports", {}).items()
+        ParsedPythonImports(
+            (key, ParsedPythonImportInfo(*value)) for key, value in imports.items()
         ),
-        assets=ParsedPythonAssetPaths(output.get("assets", [])),
+        ParsedPythonAssetPaths(sorted(assets)),
     )
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+    ]

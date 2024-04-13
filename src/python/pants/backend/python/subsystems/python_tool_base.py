@@ -3,29 +3,36 @@
 
 from __future__ import annotations
 
-import importlib.resources
+import logging
+import os
 from typing import ClassVar, Iterable, Sequence
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex import PexRequest
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
+    LoadedLockfile,
+    LoadedLockfileRequest,
+    Lockfile,
     PexRequirements,
-    ToolCustomLockfile,
-    ToolDefaultLockfile,
+    Resolve,
 )
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
-from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
-from pants.engine.fs import Digest, FileContent
+from pants.core.goals.resolves import ExportableTool
+from pants.engine.fs import Digest
+from pants.engine.internals.selectors import Get
 from pants.option.errors import OptionsError
-from pants.option.option_types import BoolOption, StrListOption, StrOption
+from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import bin_name, doc_url
+from pants.util.docutil import doc_url, git_url
+from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
 
+logger = logging.getLogger(__name__)
 
-class PythonToolRequirementsBase(Subsystem):
+
+class PythonToolRequirementsBase(Subsystem, ExportableTool):
     """Base class for subsystems that configure a set of requirements for a python tool."""
 
     # Subclasses must set.
@@ -33,164 +40,151 @@ class PythonToolRequirementsBase(Subsystem):
     # Subclasses do not need to override.
     default_extra_requirements: ClassVar[Sequence[str]] = []
 
-    default_interpreter_constraints: ClassVar[Sequence[str]] = []
+    # Subclasses may set to override the value computed from default_version and
+    # default_extra_requirements.
+    # TODO: Once we get rid of those options, subclasses must set this to loose
+    #  requirements that reflect any minimum capabilities Pants assumes about the tool.
+    default_requirements: Sequence[str] = []
+
+    default_interpreter_constraints: ClassVar[Sequence[str]] = ["CPython>=3.7,<4"]
     register_interpreter_constraints: ClassVar[bool] = False
 
-    # If this tool does not mix with user requirements (e.g. Flake8 and Isort, but not Pylint and
-    # Pytest), you should set this to True.
-    #
-    # You also need to subclass `GenerateToolLockfileSentinel` and create a rule that goes from
-    # it -> GeneratePythonLockfile by calling `GeneratePythonLockfile.from_python_tool()`.
-    # Register the UnionRule.
-    register_lockfile: ClassVar[bool] = False
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
-    default_lockfile_url: ClassVar[str | None] = None
-    uses_requirements_from_source_plugins: ClassVar[bool] = False
 
-    version = StrOption(
-        "--version",
+    install_from_resolve = StrOption(
         advanced=True,
-        default=lambda cls: cls.default_version,
-        help="Requirement string for the tool.",
+        default=None,
+        help=lambda cls: softwrap(
+            f"""\
+            If specified, install the tool using the lockfile for this named resolve.
+
+            This resolve must be defined in `[python].resolves`, as described in
+            {doc_url("docs/python/overview/third-party-dependencies#user-lockfiles")}.
+
+            The resolve's entire lockfile will be installed, unless specific requirements are
+            listed via the `requirements` option, in which case only those requirements
+            will be installed. This is useful if you don't want to invalidate the tool's
+            outputs when the resolve incurs changes to unrelated requirements.
+
+            If unspecified, and the `lockfile` option is unset, the tool will be installed
+            using the default lockfile shipped with Pants.
+
+            If unspecified, and the `lockfile` option is set, the tool will use the custom
+            `{cls.options_scope}` "tool lockfile" generated from the `version` and
+            `extra_requirements` options. But note that this mechanism is deprecated.
+            """
+        ),
     )
-    extra_requirements = StrListOption(
-        "--extra-requirements",
+
+    requirements = StrListOption(
         advanced=True,
-        default=lambda cls: cls.default_extra_requirements,
-        help="Any additional requirement strings to use with the tool. This is useful if the "
-        "tool allows you to install plugins or if you need to constrain a dependency to "
-        "a certain version.",
+        help=lambda cls: softwrap(
+            """\
+            If `install_from_resolve` is specified, install these requirements,
+            at the versions provided by the specified resolve's lockfile.
+
+            Values can be pip-style requirements (e.g., `tool` or `tool==1.2.3` or `tool>=1.2.3`),
+            or addresses of `python_requirement` targets (or targets that generate or depend on
+            `python_requirement` targets).
+
+            The lockfile will be validated against the requirements - if a lockfile doesn't
+            provide the requirement (at a suitable version, if the requirement specifies version
+            constraints) Pants will error.
+
+            If unspecified, install the entire lockfile.
+            """
+        ),
     )
     _interpreter_constraints = StrListOption(
-        "--interpreter-constraints",
         register_if=lambda cls: cls.register_interpreter_constraints,
         advanced=True,
         default=lambda cls: cls.default_interpreter_constraints,
         help="Python interpreter constraints for this tool.",
     )
 
-    _lockfile = StrOption(
-        "--lockfile",
-        register_if=lambda cls: cls.register_lockfile,
-        default=DEFAULT_TOOL_LOCKFILE,
-        advanced=True,
-        help=lambda cls: softwrap(
-            f"""
-            Path to a lockfile used for installing the tool.
-
-            Set to the string `{DEFAULT_TOOL_LOCKFILE}` to use a lockfile provided by
-            Pants, so long as you have not changed the `--version` and
-            `--extra-requirements` options, and the tool's interpreter constraints are
-            compatible with the default. Pants will error or warn if the lockfile is not
-            compatible (controlled by `[python].invalid_lockfile_behavior`). See
-            {cls.default_lockfile_url} for the default lockfile contents.
-
-            Set to the string `{NO_TOOL_LOCKFILE}` to opt out of using a lockfile. We
-            do not recommend this, though, as lockfiles are essential for reproducible builds.
-
-            To use a custom lockfile, set this option to a file path relative to the
-            build root, then run `{bin_name()} generate-lockfiles --resolve={cls.options_scope}`.
-
-            As explained at {doc_url('python-third-party-dependencies')}, lockfile generation
-            via `generate-lockfiles` does not always work and you may want to manually generate
-            the lockfile. You will want to set `[python].invalid_lockfile_behavior = 'ignore'` so
-            that Pants does not complain about missing lockfile headers.
-            """
-        ),
-    )
-
     def __init__(self, *args, **kwargs):
-        if self.default_interpreter_constraints and not self.register_interpreter_constraints:
-            raise ValueError(
-                f"`default_interpreter_constraints` are configured for `{self.options_scope}`, but "
-                "`register_interpreter_constraints` is not set to `True`, so the "
-                "`--interpreter-constraints` option will not be registered. Did you mean to set "
-                "this?"
-            )
-
-        if self.register_lockfile and (
-            not self.default_lockfile_resource or not self.default_lockfile_url
+        if (
+            self.default_interpreter_constraints
+            != PythonToolRequirementsBase.default_interpreter_constraints
+            and not self.register_interpreter_constraints
         ):
             raise ValueError(
-                "The class property `default_lockfile_resource` and `default_lockfile_url` "
-                f"must be set if `register_lockfile` is set. See `{self.options_scope}`."
+                softwrap(
+                    f"""
+                    `default_interpreter_constraints` are configured for `{self.options_scope}`, but
+                    `register_interpreter_constraints` is not set to `True`, so the
+                    `--interpreter-constraints` option will not be registered. Did you mean to set
+                    this?
+                    """
+                )
+            )
+
+        if not self.default_lockfile_resource:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    The class property `default_lockfile_resource` must be set. See `{self.options_scope}`.
+                    """
+                )
             )
 
         super().__init__(*args, **kwargs)
 
-    @property
-    def all_requirements(self) -> tuple[str, ...]:
-        """All the raw requirement strings to install the tool.
+    @classproperty
+    def default_lockfile_url(cls) -> str:
+        assert cls.default_lockfile_resource is not None
+        return git_url(
+            os.path.join(
+                "src",
+                "python",
+                cls.default_lockfile_resource[0].replace(".", os.path.sep),
+                cls.default_lockfile_resource[1],
+            )
+        )
 
-        This may not include transitive dependencies: these are top-level requirements.
+    @classmethod
+    def help_for_generate_lockfile_with_default_location(cls, resolve_name):
+        return softwrap(
+            f"""
+            You requested to generate a lockfile for {resolve_name} because
+            you included it in `--generate-lockfiles-resolve`, but
+            {resolve_name} is a tool using its default lockfile.
+
+            If you would like to generate a lockfile for {resolve_name},
+            follow the instructions for setting up lockfiles for tools
+            {doc_url('docs/python/overview/lockfiles#lockfiles-for-tools')}
         """
-        return (self.version, *self.extra_requirements)
+        )
+
+    @classmethod
+    def pex_requirements_for_default_lockfile(cls):
+        """Generate the pex requirements using this subsystem's default lockfile resource."""
+        assert cls.default_lockfile_resource is not None
+        pkg, path = cls.default_lockfile_resource
+        url = f"resource://{pkg}/{path}"
+        origin = f"The built-in default lockfile for {cls.options_scope}"
+        return Lockfile(
+            url=url,
+            url_description_of_origin=origin,
+            resolve_name=cls.options_scope,
+        )
 
     def pex_requirements(
         self,
         *,
         extra_requirements: Iterable[str] = (),
     ) -> PexRequirements | EntireLockfile:
-        """The requirements to be used when installing the tool.
-
-        If the tool supports lockfiles, the returned type will install from the lockfile rather than
-        `all_requirements`.
-        """
-
-        requirements = (*self.all_requirements, *extra_requirements)
-
-        if not self.uses_lockfile:
-            return PexRequirements(requirements)
-
-        hex_digest = calculate_invalidation_digest(requirements)
-
-        lockfile: ToolDefaultLockfile | ToolCustomLockfile
-        if self.lockfile == DEFAULT_TOOL_LOCKFILE:
-            assert self.default_lockfile_resource is not None
-            lockfile = ToolDefaultLockfile(
-                file_content=FileContent(
-                    f"{self.options_scope}_default.lock",
-                    importlib.resources.read_binary(*self.default_lockfile_resource),
-                ),
-                lockfile_hex_digest=hex_digest,
-                resolve_name=self.options_scope,
-                uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
-                uses_source_plugins=self.uses_requirements_from_source_plugins,
+        """The requirements to be used when installing the tool."""
+        description_of_origin = f"the requirements of the `{self.options_scope}` tool"
+        if self.install_from_resolve:
+            use_entire_lockfile = not self.requirements
+            return PexRequirements(
+                (*self.requirements, *extra_requirements),
+                from_superset=Resolve(self.install_from_resolve, use_entire_lockfile),
+                description_of_origin=description_of_origin,
             )
         else:
-            lockfile = ToolCustomLockfile(
-                file_path=self.lockfile,
-                file_path_description_of_origin=f"the option `[{self.options_scope}].lockfile`",
-                lockfile_hex_digest=hex_digest,
-                resolve_name=self.options_scope,
-                uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
-                uses_source_plugins=self.uses_requirements_from_source_plugins,
-            )
-        return EntireLockfile(lockfile, complete_req_strings=tuple(requirements))
-
-    @property
-    def lockfile(self) -> str:
-        f"""The path to a lockfile or special strings '{NO_TOOL_LOCKFILE}' and '{DEFAULT_TOOL_LOCKFILE}'.
-
-        This assumes you have set the class property `register_lockfile = True`.
-        """
-        return self._lockfile
-
-    @property
-    def uses_lockfile(self) -> bool:
-        """Return true if the tool is installed from a lockfile.
-
-        Note that this lockfile may be the default lockfile Pants distributes.
-        """
-        return self.register_lockfile and self.lockfile != NO_TOOL_LOCKFILE
-
-    @property
-    def uses_custom_lockfile(self) -> bool:
-        """Return true if the tool is installed from a custom lockfile the user sets up."""
-        return self.register_lockfile and self.lockfile not in (
-            NO_TOOL_LOCKFILE,
-            DEFAULT_TOOL_LOCKFILE,
-        )
+            return EntireLockfile(self.pex_requirements_for_default_lockfile())
 
     @property
     def interpreter_constraints(self) -> InterpreterConstraints:
@@ -208,11 +202,27 @@ class PythonToolRequirementsBase(Subsystem):
         main: MainSpecification | None = None,
         sources: Digest | None = None,
     ) -> PexRequest:
+        requirements = self.pex_requirements(extra_requirements=extra_requirements)
+        if not interpreter_constraints:
+            if self.options.is_default("interpreter_constraints") and (
+                isinstance(requirements, EntireLockfile)
+                or (
+                    isinstance(requirements, PexRequirements)
+                    and isinstance(requirements.from_superset, Resolve)
+                )
+            ):
+                # If installing the tool from a resolve, and custom ICs weren't explicitly set,
+                # leave these blank. This will cause the ones for the resolve to be used,
+                # which is clearly what the user intends, rather than forcing the
+                # user to override interpreter_constraints to match those of the resolve.
+                interpreter_constraints = InterpreterConstraints()
+            else:
+                interpreter_constraints = self.interpreter_constraints
         return PexRequest(
             output_filename=f"{self.options_scope.replace('-', '_')}.pex",
             internal_only=True,
-            requirements=self.pex_requirements(extra_requirements=extra_requirements),
-            interpreter_constraints=interpreter_constraints or self.interpreter_constraints,
+            requirements=requirements,
+            interpreter_constraints=interpreter_constraints,
             main=main,
             sources=sources,
         )
@@ -224,8 +234,14 @@ class PythonToolBase(PythonToolRequirementsBase):
     # Subclasses must set.
     default_main: ClassVar[MainSpecification]
 
+    # Though possible, we do not recommend setting `default_main` to an Executable
+    # instead of a ConsoleScript or an EntryPoint. Executable is a niche pex feature
+    # designed to support poorly named executable python scripts that cannot be imported
+    # (eg when a file has a character like "-" that is not valid in python identifiers).
+    # As this should be rare or even non-existent, we do NOT add an `executable` option
+    # to mirror the other MainSpecification options.
+
     console_script = StrOption(
-        "--console-script",
         advanced=True,
         default=lambda cls: (
             cls.default_main.spec if isinstance(cls.default_main, ConsoleScript) else None
@@ -233,14 +249,13 @@ class PythonToolBase(PythonToolRequirementsBase):
         help=softwrap(
             """
             The console script for the tool. Using this option is generally preferable to
-            (and mutually exclusive with) specifying an --entry-point since console script
+            (and mutually exclusive with) specifying an `--entry-point` since console script
             names have a higher expectation of staying stable across releases of the tool.
             Usually, you will not want to change this from the default.
             """
         ),
     )
     entry_point = StrOption(
-        "--entry-point",
         advanced=True,
         default=lambda cls: (
             cls.default_main.spec if isinstance(cls.default_main, EntryPoint) else None
@@ -248,7 +263,7 @@ class PythonToolBase(PythonToolRequirementsBase):
         help=softwrap(
             """
             The entry point for the tool. Generally you only want to use this option if the
-            tool does not offer a --console-script (which this option is mutually exclusive
+            tool does not offer a `--console-script` (which this option is mutually exclusive
             with). Usually, you will not want to change this from the default.
             """
         ),
@@ -260,9 +275,13 @@ class PythonToolBase(PythonToolRequirementsBase):
         is_default_entry_point = self.options.is_default("entry_point")
         if not is_default_console_script and not is_default_entry_point:
             raise OptionsError(
-                f"Both [{self.options_scope}].console-script={self.console_script} and "
-                f"[{self.options_scope}].entry-point={self.entry_point} are configured "
-                f"but these options are mutually exclusive. Please pick one."
+                softwrap(
+                    f"""
+                    Both [{self.options_scope}].console-script={self.console_script} and
+                    [{self.options_scope}].entry-point={self.entry_point} are configured
+                    but these options are mutually exclusive. Please pick one.
+                    """
+                )
             )
         if not is_default_console_script:
             assert self.console_script is not None
@@ -288,23 +307,36 @@ class PythonToolBase(PythonToolRequirementsBase):
         )
 
 
-class ExportToolOption(BoolOption):
-    """An `--export` option to toggle whether the `export` goal should include the tool."""
+async def get_loaded_lockfile(subsystem: PythonToolBase) -> LoadedLockfile:
+    requirements = subsystem.pex_requirements()
+    if isinstance(requirements, EntireLockfile):
+        lockfile = requirements.lockfile
+    else:
+        assert isinstance(requirements, PexRequirements)
+        assert isinstance(requirements.from_superset, Resolve)
+        lockfile = await Get(Lockfile, Resolve, requirements.from_superset)
+    loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(lockfile))
+    return loaded_lockfile
 
-    def __new__(cls):
-        return super().__new__(
-            cls,
-            "--export",
-            default=True,
-            help=(
-                lambda subsystem_cls: softwrap(
-                    f"""
-                    If true, export a virtual environment with {subsystem_cls.name} when running
-                    `{bin_name()} export`.
 
-                    This can be useful, for example, with IDE integrations to point your editor to
-                    the tool's binary.
-                    """
-                )
-            ),
-        )
+async def get_lockfile_metadata(subsystem: PythonToolBase) -> PythonLockfileMetadata:
+    loaded_lockfile = await get_loaded_lockfile(subsystem)
+    assert loaded_lockfile.metadata is not None
+    return loaded_lockfile.metadata
+
+
+async def get_lockfile_interpreter_constraints(
+    subsystem: PythonToolBase,
+) -> InterpreterConstraints:
+    """If a lockfile is used, will try to find the interpreter constraints used to generate the
+    lock.
+
+    This allows us to work around https://github.com/pantsbuild/pants/issues/14912.
+    """
+    # If the tool's interpreter constraints are explicitly set, or it is not using a lockfile at
+    # all, then we should use the tool's interpreter constraints option.
+    if not subsystem.options.is_default("interpreter_constraints"):
+        return subsystem.interpreter_constraints
+
+    lockfile_metadata = await get_lockfile_metadata(subsystem)
+    return lockfile_metadata.valid_for_interpreter_constraints

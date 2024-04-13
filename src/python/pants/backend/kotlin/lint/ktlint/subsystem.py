@@ -3,7 +3,6 @@
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.option.option_types import SkipOption
-from pants.util.docutil import git_url
 
 
 class KtlintSubsystem(JvmToolBase):
@@ -17,7 +16,5 @@ class KtlintSubsystem(JvmToolBase):
         "pants.backend.kotlin.lint.ktlint",
         "ktlint.lock",
     )
-    default_lockfile_path = "src/python/pants/backend/kotlin/lint/ktlint/ktlint.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("fmt", "lint")

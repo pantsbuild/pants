@@ -22,6 +22,7 @@ class DumpKotlinSourceAnalysisSubsystem(GoalSubsystem):
 
 class DumpKotlinSourceAnalysis(Goal):
     subsystem_cls = DumpKotlinSourceAnalysisSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @goal_rule

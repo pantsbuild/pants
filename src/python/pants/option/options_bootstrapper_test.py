@@ -9,8 +9,9 @@ from pathlib import Path
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
+from pants.engine.unions import UnionMembership
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.options_bootstrapper import OptionsBootstrapper, munge_bin_name
 from pants.option.scope import ScopeInfo
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.logging import LogLevel
@@ -58,7 +59,7 @@ class TestOptionsBootstrapper:
                 config=config,
                 env=env,
                 args=args,
-                pants_workdir=workdir or os.path.join(get_buildroot(), ".pants.d"),
+                pants_workdir=workdir or os.path.join(get_buildroot(), ".pants.d", "workdir"),
                 pants_distdir=distdir or os.path.join(get_buildroot(), "dist"),
             )
 
@@ -133,7 +134,8 @@ class TestOptionsBootstrapper:
                     ScopeInfo(""),
                     ScopeInfo("foo"),
                     ScopeInfo("fruit"),
-                ]
+                ],
+                union_membership=UnionMembership({}),
             )
             # So we don't choke on these on the cmd line.
             opts.register("", "--pants-workdir")
@@ -175,6 +177,7 @@ class TestOptionsBootstrapper:
                     ScopeInfo("compile_apt"),
                     ScopeInfo("fruit"),
                 ],
+                union_membership=UnionMembership({}),
             )
             # So we don't choke on these on the cmd line.
             options.register("", "--pants-config-files", type=list)
@@ -244,7 +247,8 @@ class TestOptionsBootstrapper:
                 known_scope_infos=[
                     ScopeInfo(""),
                     ScopeInfo("resolver"),
-                ]
+                ],
+                union_membership=UnionMembership({}),
             )
             opts_single_config.register("", "--pantsrc-files", type=list)
             opts_single_config.register("resolver", "--resolver")
@@ -259,13 +263,15 @@ class TestOptionsBootstrapper:
                 known_scope_infos=[
                     ScopeInfo(""),
                     ScopeInfo("foo"),
-                ]
+                ],
+                union_membership=UnionMembership({}),
             )
             opts2 = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
                     ScopeInfo("foo"),
                     ScopeInfo(""),
-                ]
+                ],
+                union_membership=UnionMembership({}),
             )
             assert opts1 is opts2
 
@@ -274,14 +280,21 @@ class TestOptionsBootstrapper:
                     ScopeInfo(""),
                     ScopeInfo("foo"),
                     ScopeInfo(""),
-                ]
+                ],
+                union_membership=UnionMembership({}),
             )
             assert opts1 is opts3
 
-            opts4 = bootstrapper.full_options_for_scopes(known_scope_infos=[ScopeInfo("")])
+            opts4 = bootstrapper.full_options_for_scopes(
+                known_scope_infos=[ScopeInfo("")],
+                union_membership=UnionMembership({}),
+            )
             assert opts1 is not opts4
 
-            opts5 = bootstrapper.full_options_for_scopes(known_scope_infos=[ScopeInfo("")])
+            opts5 = bootstrapper.full_options_for_scopes(
+                known_scope_infos=[ScopeInfo("")],
+                union_membership=UnionMembership({}),
+            )
             assert opts4 is opts5
             assert opts1 is not opts5
 
@@ -391,28 +404,82 @@ class TestOptionsBootstrapper:
         logdir = ob.get_bootstrap_options().for_global_scope().logdir
         assert "logdir1" == logdir
 
-    def test_alias_pyupgrade(self, tmp_path: Path) -> None:
-        config = tmp_path / "config"
-        config.write_text(
+    def test_alias(self, tmp_path: Path) -> None:
+        config0 = tmp_path / "config0"
+        config0.write_text(
             dedent(
                 """\
                     [cli.alias]
                     pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
+                    green = "lint test"
                     """
             )
         )
 
-        config_arg = f"--pants-config-files=['{config.as_posix()}']"
-        ob = OptionsBootstrapper.create(env={}, args=[config_arg, "pyupgrade"], allow_pantsrc=False)
+        config1 = tmp_path / "config1"
+        config1.write_text(
+            dedent(
+                """\
+                    [cli]
+                    alias.add = {green = "lint test --force check"}
+                    """
+            )
+        )
 
+        config2 = tmp_path / "config2"
+        config2.write_text(
+            dedent(
+                """\
+                    [cli]
+                    alias = "+{'shell': 'repl'}"
+                    """
+            )
+        )
+
+        config_arg = (
+            f"--pants-config-files=["
+            f"'{config0.as_posix()}','{config1.as_posix()}','{config2.as_posix()}']"
+        )
+        ob = OptionsBootstrapper.create(
+            env={}, args=[config_arg, "pyupgrade", "green"], allow_pantsrc=False
+        )
         assert (
             config_arg,
             "--backend-packages=pants.backend.python.lint.pyupgrade",
             "fmt",
+            "lint",
+            "test",
+            "--force",
+            "check",
         ) == ob.args
-
         assert (
             "<ignored>",
             config_arg,
             "--backend-packages=pants.backend.python.lint.pyupgrade",
         ) == ob.bootstrap_args
+
+        ob = OptionsBootstrapper.create(env={}, args=[config_arg, "shell"], allow_pantsrc=False)
+        assert (
+            config_arg,
+            "repl",
+        ) == ob.args
+        assert (
+            "<ignored>",
+            config_arg,
+        ) == ob.bootstrap_args
+
+
+def test_munge_bin_name():
+    build_root = "/my/repo"
+
+    def munge(bin_name: str) -> str:
+        return munge_bin_name(bin_name, build_root)
+
+    assert munge("pants") == "pants"
+    assert munge("pantsv2") == "pantsv2"
+    assert munge("bin/pantsv2") == "bin/pantsv2"
+    assert munge("./pants") == "./pants"
+    assert munge(os.path.join(build_root, "pants")) == "./pants"
+    assert munge(os.path.join(build_root, "bin", "pants")) == "./bin/pants"
+    assert munge("/foo/pants") == "pants"
+    assert munge("/foo/bar/pants") == "pants"

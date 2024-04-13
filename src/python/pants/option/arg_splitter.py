@@ -74,10 +74,10 @@ class ArgSplitter:
 
     Recognizes, e.g.:
 
-    ./pants check --foo lint target1: dir f.ext
-    ./pants --global-opt check target1: dir f.ext --check-flag
-    ./pants --check-flag check target1: dir f.ext
-    ./pants goal -- passthru foo
+    pants check --foo lint target1: dir f.ext
+    pants --global-opt check target1: dir f.ext --check-flag
+    pants --check-flag check target1: dir f.ext
+    pants goal -- passthru foo
     """
 
     def __init__(self, known_scope_infos: Iterable[ScopeInfo], buildroot: str) -> None:
@@ -151,7 +151,10 @@ class ArgSplitter:
                 return scope
 
             nonlocal builtin_goal
-            if scope_info.is_builtin and not builtin_goal:
+            if scope_info.is_builtin and (not builtin_goal or scope.startswith("-")):
+                if builtin_goal:
+                    goals.add(builtin_goal)
+
                 # Get scope from info in case we hit an aliased builtin goal.
                 builtin_goal = scope_info.scope
             else:
@@ -248,7 +251,7 @@ class ArgSplitter:
 
         For example, in:
 
-            ./pants --check-some-opt=100 check <target>
+            pants --check-some-opt=100 check <target>
 
         --check-some-opt should be treated as if it were --check-some-opt=100 in the check scope.
         """

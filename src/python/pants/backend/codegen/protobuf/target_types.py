@@ -22,11 +22,9 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
-# NB: We subclass Dependencies so that specific backends can add dependency injection rules to
-# `protobuf_source` targets.
 class ProtobufDependenciesField(Dependencies):
     pass
 
@@ -63,13 +61,13 @@ class ProtobufSourceTarget(Target):
         ProtobufSourceField,
         ProtobufGrpcToggleField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A single Protobuf file used to generate various languages.
 
         See language-specific docs:
-            Python: {doc_url('protobuf-python')}
-            Go: {doc_url('protobuf-go')}
+            Python: {doc_url('docs/python/integrations/protobuf-and-grpc')}
+            Go: {doc_url('docs/go/integrations/protobuf')}
         """
     )
 

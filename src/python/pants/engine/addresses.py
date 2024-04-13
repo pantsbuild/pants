@@ -1,15 +1,20 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from dataclasses import dataclass
-from typing import Iterable, Optional, Sequence, Tuple
+from __future__ import annotations
 
-from pants.base.exceptions import ResolveError
+from dataclasses import dataclass
+from typing import Iterable, Sequence
+
 from pants.build_graph.address import Address as Address
 from pants.build_graph.address import AddressInput as AddressInput  # noqa: F401: rexport.
 from pants.build_graph.address import BuildFileAddress as BuildFileAddress  # noqa: F401: rexport.
+from pants.build_graph.address import (  # noqa: F401: rexport.
+    BuildFileAddressRequest as BuildFileAddressRequest,
+)
+from pants.build_graph.address import MaybeAddress as MaybeAddress  # noqa: F401: rexport.
+from pants.build_graph.address import ResolveError
 from pants.engine.collection import Collection
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import bullet_list
 
 
@@ -30,8 +35,7 @@ class Addresses(Collection[Address]):
         return self[0]
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class UnparsedAddressInputs:
     """Raw addresses that have not been parsed yet.
 
@@ -49,11 +53,27 @@ class UnparsedAddressInputs:
     references like `:sibling` work properly.
 
     Unlike the `dependencies` field, this type does not work with `!` and `!!` ignores.
+
+    Set `description_of_origin` to a value like "CLI arguments" or "the `dependencies` field
+    from {tgt.address}". It is used for better error messages.
     """
 
-    values: Tuple[str, ...]
-    relative_to: Optional[str]
+    values: tuple[str, ...]
+    relative_to: str | None
+    description_of_origin: str
+    skip_invalid_addresses: bool
 
-    def __init__(self, values: Iterable[str], *, owning_address: Optional[Address]) -> None:
-        self.values = tuple(values)
-        self.relative_to = owning_address.spec_path if owning_address else None
+    def __init__(
+        self,
+        values: Iterable[str],
+        *,
+        owning_address: Address | None,
+        description_of_origin: str,
+        skip_invalid_addresses: bool = False,
+    ) -> None:
+        object.__setattr__(self, "values", tuple(values))
+        object.__setattr__(
+            self, "relative_to", owning_address.spec_path if owning_address else None
+        )
+        object.__setattr__(self, "description_of_origin", description_of_origin)
+        object.__setattr__(self, "skip_invalid_addresses", skip_invalid_addresses)

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.codegen.soap.java import extra_fields
+from pants.backend.codegen.soap.java import dependency_inference, extra_fields, symbol_mapper
 from pants.backend.codegen.soap.java.extra_fields import JavaModuleField, JavaPackageField
 from pants.backend.codegen.soap.java.jaxws import JaxWsTools
 from pants.backend.codegen.soap.target_types import (
@@ -41,7 +41,7 @@ from pants.jvm import jdk_rules
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
@@ -52,7 +52,7 @@ class GenerateJavaFromWsdlRequest(GenerateSourcesRequest):
     output = JavaSourceField
 
 
-class JaxWsToolsLockfileSentinel(GenerateToolLockfileSentinel):
+class JaxWsToolsLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = JaxWsTools.options_scope
 
 
@@ -185,6 +185,8 @@ def rules():
     return [
         *collect_rules(),
         *extra_fields.rules(),
+        *dependency_inference.rules(),
+        *symbol_mapper.rules(),
         *jvm_tool.rules(),
         *jdk_rules.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromWsdlRequest),

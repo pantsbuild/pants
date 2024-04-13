@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 
 from pants.backend.helm.util_rules.chart_metadata import DEFAULT_API_VERSION, ChartType
 
@@ -123,7 +123,7 @@ HELM_CHART_FILE_V2_FULL = dedent(
   """
 )
 
-K8S_SERVICE_FILE = dedent(
+K8S_SERVICE_TEMPLATE = dedent(
     """\
   apiVersion: v1
   kind: Service
@@ -143,7 +143,7 @@ K8S_SERVICE_FILE = dedent(
   """
 )
 
-K8S_INGRESS_FILE_WITH_LINT_WARNINGS = dedent(
+K8S_INGRESS_TEMPLATE_WITH_LINT_WARNINGS = dedent(
     """\
   apiVersion: extensions/v1beta1
   kind: Ingress
@@ -166,22 +166,40 @@ K8S_INGRESS_FILE_WITH_LINT_WARNINGS = dedent(
   """
 )
 
+K8S_POD_TEMPLATE = dedent(
+    """\
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: {{ template "fullname" . }}
+      labels:
+        chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+    spec:
+      containers:
+        - name: myapp-container
+          image: busybox:1.28
+      initContainers:
+        - name: init-service
+          image: busybox:1.29
+    """
+)
+
 K8S_POD_FILE = dedent(
     """\
-  apiVersion: v1
-  kind: Pod
-  metadata:
-    name: {{ template "fullname" . }}
-    labels:
-      chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
-  spec:
-    containers:
-      - name: myapp-container
-        image: busybox:1.28
-    initContainers:
-      - name: init-service
-        image: busybox:1.29
-  """
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: foo
+      labels:
+        chart: foo-bar
+    spec:
+      containers:
+        - name: myapp-container
+          image: busybox:1.28
+      initContainers:
+        - name: init-service
+          image: busybox:1.29
+    """
 )
 
 K8S_CRD_FILE = dedent(
@@ -252,6 +270,19 @@ K8S_CRD_FILE = dedent(
   """
 )
 
+K8S_CUSTOM_RESOURCE_FILE = dedent(
+    """\
+    apiVersion: myplatforms.contoso.com/v1alpha1
+    kind: MyPlatform
+    metadata:
+      name: cr_foo
+    spec:
+      appId: foo
+      language: python
+      environmentType: test
+    """
+)
+
 HELM_TEMPLATE_HELPERS_FILE = dedent(
     """\
   {{- define "fullname" -}}
@@ -276,5 +307,39 @@ HELM_VALUES_FILE = dedent(
     type: ClusterIP
     externalPort: 80
     internalPort: 1223
+  """
+)
+
+HELM_BATCH_HOOK_TEMPLATE = dedent(
+    """\
+  apiVersion: batch/v1
+  kind: Job
+  metadata:
+    name: "{{ .Release.Name }}"
+    labels:
+      app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      app.kubernetes.io/version: {{ .Chart.AppVersion }}
+      helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    annotations:
+      # This is what defines this resource as a hook. Without this line, the
+      # job is considered part of the release.
+      "helm.sh/hook": post-install
+      "helm.sh/hook-weight": "-5"
+      "helm.sh/hook-delete-policy": hook-succeeded
+  spec:
+    template:
+      metadata:
+        name: "{{ .Release.Name }}"
+        labels:
+          app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+          app.kubernetes.io/instance: {{ .Release.Name | quote }}
+          helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+      spec:
+        restartPolicy: Never
+        containers:
+        - name: post-install-job
+          image: "alpine:3.3"
+          command: ["/bin/sleep","{{ default "10" .Values.sleepyTime }}"]
   """
 )

@@ -18,14 +18,18 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
 from typing import (
+    AbstractSet,
     Any,
+    Callable,
     ClassVar,
     Dict,
     Generic,
     Iterable,
     Iterator,
+    KeysView,
     Mapping,
     Optional,
+    Protocol,
     Sequence,
     Set,
     Tuple,
@@ -36,12 +40,13 @@ from typing import (
     get_type_hints,
 )
 
-from typing_extensions import final
+from typing_extensions import Self, final
 
 from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address
-from pants.engine.collection import Collection, DeduplicatedCollection
+from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
@@ -49,17 +54,22 @@ from pants.engine.fs import (
     Paths,
     Snapshot,
 )
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.internals.dep_rules import (
+    DependencyRuleActionDeniedError,
+    DependencyRuleApplication,
+)
+from pants.engine.internals.native_engine import NO_VALUE as NO_VALUE  # noqa: F401
+from pants.engine.internals.native_engine import Field as Field  # noqa: F401
+from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
-from pants.source.filespec import Filespec
+from pants.source.filespec import Filespec, FilespecMatcher
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import bullet_list, pluralize, softwrap
+from pants.util.strutil import bullet_list, help_text, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -70,119 +80,6 @@ logger = logging.getLogger(__name__)
 # Type alias to express the intent that the type should be immutable and hashable. There's nothing
 # to actually enforce this, outside of convention. Maybe we could develop a MyPy plugin?
 ImmutableValue = Any
-
-
-@frozen_after_init
-class Field:
-    """A Field.
-
-    The majority of fields should use field templates like `BoolField`, `StringField`, and
-    `StringSequenceField`. These subclasses will provide sensible type hints and validation
-    automatically.
-
-    If you are directly subclassing `Field`, you should likely override `compute_value()`
-    to perform any custom hydration and/or validation, such as converting unhashable types to
-    hashable types or checking for banned values. The returned value must be hashable
-    (and should be immutable) so that this Field may be used by the engine. This means, for
-    example, using tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
-
-    If you plan to use the engine to fully hydrate the value, you can also inherit
-    `AsyncFieldMixin`, which will store an `address: Address` property on the `Field` instance.
-
-    Subclasses should also override the type hints for `value` and `raw_value` to be more precise
-    than `Any`. The type hint for `raw_value` is used to generate documentation, e.g. for
-    `./pants help $target_type`.
-
-    Set the `help` class property with a description, which will be used in `./pants help`. For the
-    best rendering, use soft wrapping (e.g. implicit string concatenation) within paragraphs, but
-    hard wrapping (`\n`) to separate distinct paragraphs and/or lists.
-
-    Example:
-
-        # NB: Really, this should subclass IntField. We only use Field as an example.
-        class Timeout(Field):
-            alias = "timeout"
-            value: Optional[int]
-            default = None
-            help = "A timeout field.\n\nMore information."
-
-            @classmethod
-            def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
-                value_or_default = super().compute_value(raw_value, address=address)
-                if value_or_default is not None and not isinstance(value_or_default, int):
-                    raise ValueError(
-                        "The `timeout` field expects an integer, but was given"
-                        f"{value_or_default} for target {address}."
-                    )
-                return value_or_default
-    """
-
-    # Subclasses must define these.
-    alias: ClassVar[str]
-    help: ClassVar[str]
-
-    # Subclasses must define at least one of these two.
-    default: ClassVar[ImmutableValue]
-    required: ClassVar[bool] = False
-
-    # Subclasses may define these.
-    removal_version: ClassVar[str | None] = None
-    removal_hint: ClassVar[str | None] = None
-
-    deprecated_alias: ClassVar[str | None] = None
-    deprecated_alias_removal_version: ClassVar[str | None] = None
-
-    @final
-    def __init__(self, raw_value: Optional[Any], address: Address) -> None:
-        self._check_deprecated(raw_value, address)
-        self.value: Optional[ImmutableValue] = self.compute_value(raw_value, address)
-
-    @classmethod
-    def compute_value(cls, raw_value: Optional[Any], address: Address) -> ImmutableValue:
-        """Convert the `raw_value` into `self.value`.
-
-        You should perform any optional validation and/or hydration here. For example, you may want
-        to check that an integer is > 0 or convert an `Iterable[str]` to `List[str]`.
-
-        The resulting value must be hashable (and should be immutable).
-        """
-        if raw_value is None:
-            if cls.required:
-                raise RequiredFieldMissingException(address, cls.alias)
-            return cls.default
-        return raw_value
-
-    @classmethod
-    def _check_deprecated(cls, raw_value: Optional[Any], address: Address) -> None:
-        if not cls.removal_version or address.is_generated_target or raw_value is None:
-            return
-        if not cls.removal_hint:
-            raise ValueError(
-                f"You specified `removal_version` for {cls}, but not the class property "
-                "`removal_hint`."
-            )
-        warn_or_error(
-            cls.removal_version,
-            entity=f"the {repr(cls.alias)} field",
-            hint=(f"Using the `{cls.alias}` field in the target {address}. {cls.removal_hint}"),
-        )
-
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__}(alias={repr(self.alias)}, value={repr(self.value)}, "
-            f"default={repr(self.default)})"
-        )
-
-    def __str__(self) -> str:
-        return f"{self.alias}={self.value}"
-
-    def __hash__(self) -> int:
-        return hash((self.__class__, self.value))
-
-    def __eq__(self, other: Union[Any, Field]) -> bool:
-        if not isinstance(other, Field):
-            return NotImplemented
-        return (self.__class__, self.value) == (other.__class__, other.value)
 
 
 # NB: By subclassing `Field`, MyPy understands our type hints, and it means it doesn't matter which
@@ -233,47 +130,119 @@ class AsyncFieldMixin(Field):
         sources2 = await Get(HydratedSources, HydrateSourcesRequest(custom_tgt.get(CustomSources)))
     """
 
-    @final  # type: ignore[misc]
-    def __init__(self, raw_value: Optional[Any], address: Address) -> None:
-        super().__init__(raw_value, address)
-        # We must temporarily unfreeze the field, but then we refreeze to continue avoiding
-        # subclasses from adding arbitrary fields.
-        self._unfreeze_instance()  # type: ignore[attr-defined]
+    address: Address
+
+    @final
+    def __new__(cls, raw_value: Optional[Any], address: Address) -> Self:
+        obj = super().__new__(cls, raw_value, address)  # type: ignore[call-arg]
         # N.B.: We store the address here and not in the Field base class, because the memory usage
         # of storing this value in every field was shown to be excessive / lead to performance
         # issues.
-        self.address = address
-        self._freeze_instance()  # type: ignore[attr-defined]
+        object.__setattr__(obj, "address", address)
+        return obj
 
     def __repr__(self) -> str:
-        return (
-            f"{self.__class__}(alias={repr(self.alias)}, address={self.address}, "
-            f"value={repr(self.value)}, default={repr(self.default)})"
-        )
+        params = [
+            f"alias={self.alias!r}",
+            f"address={self.address}",
+            f"value={self.value!r}",
+        ]
+        if hasattr(self, "default"):
+            params.append(f"default={self.default!r}")
+        return f"{self.__class__}({', '.join(params)})"
 
     def __hash__(self) -> int:
         return hash((self.__class__, self.value, self.address))
 
-    def __eq__(self, other: Union[Any, AsyncFieldMixin]) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, AsyncFieldMixin):
-            return NotImplemented
-        return (self.__class__, self.value, self.address) == (
-            other.__class__,
-            other.value,
-            other.address,
+            return False
+        return (
+            self.__class__ == other.__class__
+            and self.value == other.value
+            and self.address == other.address
         )
+
+    def __ne__(self, other: Any) -> bool:
+        return not (self == other)
+
+
+@union
+@dataclass(frozen=True)
+class FieldDefaultFactoryRequest:
+    """Registers a dynamic default for a Field.
+
+    See `FieldDefaults`.
+    """
+
+    field_type: ClassVar[type[Field]]
+
+
+# TODO: Workaround for https://github.com/python/mypy/issues/5485, because we cannot directly use
+# a Callable.
+class FieldDefaultFactory(Protocol):
+    def __call__(self, field: Field) -> Any:
+        pass
+
+
+@dataclass(frozen=True)
+class FieldDefaultFactoryResult:
+    """A wrapper for a function which computes the default value of a Field."""
+
+    default_factory: FieldDefaultFactory
+
+
+@dataclass(frozen=True)
+class FieldDefaults:
+    """Generic Field default values. To install a default, see `FieldDefaultFactoryRequest`.
+
+    TODO: This is to work around the fact that Field value defaulting cannot have arbitrary
+    subsystem requirements, and so e.g. `JvmResolveField` and `PythonResolveField` have methods
+    which compute the true value of the field given a subsystem argument. Consumers need to
+    be type aware, and `@rules` cannot have dynamic requirements.
+
+    Additionally, `__defaults__` should mean that computed default Field values should become
+    more rare: i.e. `JvmResolveField` and `PythonResolveField` could potentially move to
+    hardcoded default values which users override with `__defaults__` if they'd like to change
+    the default resolve names.
+
+    See https://github.com/pantsbuild/pants/issues/12934 about potentially allowing unions
+    (including Field registrations) to have `@rule_helper` methods, which would allow the
+    computation of an AsyncField to directly require a subsystem. Since
+    https://github.com/pantsbuild/pants/pull/17947 rules may use any methods as rule helpers without
+    special decoration so this should now be possible to implement.
+    """
+
+    _factories: FrozenDict[type[Field], FieldDefaultFactory]
+
+    @memoized_method
+    def factory(self, field_type: type[Field]) -> FieldDefaultFactory:
+        """Looks up a Field default factory in a subclass-aware way."""
+        factory = self._factories.get(field_type, None)
+        if factory is not None:
+            return factory
+
+        for ft, factory in self._factories.items():
+            if issubclass(field_type, ft):
+                return factory
+
+        return lambda f: f.value
+
+    def value_or_default(self, field: Field) -> Any:
+        return (self.factory(type(field)))(field)
 
 
 # -----------------------------------------------------------------------------------------------
 # Core Target abstractions
 # -----------------------------------------------------------------------------------------------
 
+
 # NB: This TypeVar is what allows `Target.get()` to properly work with MyPy so that MyPy knows
 # the precise Field returned.
 _F = TypeVar("_F", bound=Field)
 
 
-@frozen_after_init
+@dataclass(frozen=True)
 class Target:
     """A Target represents an addressable set of metadata.
 
@@ -285,7 +254,7 @@ class Target:
     # Subclasses must define these
     alias: ClassVar[str]
     core_fields: ClassVar[Tuple[Type[Field], ...]]
-    help: ClassVar[str]
+    help: ClassVar[str | Callable[[], str]]
 
     removal_version: ClassVar[str | None] = None
     removal_hint: ClassVar[str | None] = None
@@ -295,9 +264,10 @@ class Target:
 
     # These get calculated in the constructor
     address: Address
-    plugin_fields: tuple[type[Field], ...]
     field_values: FrozenDict[type[Field], Field]
     residence_dir: str
+    name_explicitly_set: bool
+    description_of_origin: str
 
     @final
     def __init__(
@@ -309,7 +279,10 @@ class Target:
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: UnionMembership | None = None,
         *,
+        name_explicitly_set: bool = True,
         residence_dir: str | None = None,
+        ignore_unrecognized_fields: bool = False,
+        description_of_origin: str | None = None,
     ) -> None:
         """Create a target.
 
@@ -325,6 +298,10 @@ class Target:
             its file. A file-less target like `go_third_party_package` should keep the default of
             `address.spec_path`. This field impacts how command line specs work, so that globs
             like `dir:` know whether to match the target or not.
+        :param ignore_unrecognized_fields: Don't error if fields are not recognized. This is only
+            intended for when Pants is bootstrapping itself.
+        :param description_of_origin: Where this target was declared, such as a path to BUILD file
+            and line number.
         """
         if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:
@@ -338,28 +315,51 @@ class Target:
                 hint=f"Using the `{self.alias}` target type for {address}. {self.removal_hint}",
             )
 
-        self.address = address
-        self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
-        self.residence_dir = residence_dir if residence_dir is not None else address.spec_path
-        self.field_values = self._calculate_field_values(unhydrated_values, address)
-        self.validate()
+        object.__setattr__(
+            self, "residence_dir", residence_dir if residence_dir is not None else address.spec_path
+        )
+        object.__setattr__(self, "address", address)
+        object.__setattr__(
+            self, "description_of_origin", description_of_origin or self.residence_dir
+        )
+        object.__setattr__(self, "name_explicitly_set", name_explicitly_set)
+        try:
+            object.__setattr__(
+                self,
+                "field_values",
+                self._calculate_field_values(
+                    unhydrated_values,
+                    address,
+                    union_membership,
+                    ignore_unrecognized_fields=ignore_unrecognized_fields,
+                ),
+            )
+
+            self.validate()
+        except Exception as e:
+            raise InvalidTargetException(
+                str(e), description_of_origin=self.description_of_origin
+            ) from e
 
     @final
     def _calculate_field_values(
-        self, unhydrated_values: dict[str, Any], address: Address
+        self,
+        unhydrated_values: dict[str, Any],
+        address: Address,
+        # See `__init__`.
+        union_membership: UnionMembership | None,
+        *,
+        ignore_unrecognized_fields: bool,
     ) -> FrozenDict[type[Field], Field]:
+        all_field_types = self.class_field_types(union_membership)
         field_values = {}
-        valid_aliases = set()
-        aliases_to_field_types = {}
-        for field_type in self.field_types:
-            valid_aliases.add(field_type.alias)
-            aliases_to_field_types[field_type.alias] = field_type
-            if field_type.deprecated_alias is not None:
-                valid_aliases.add(field_type.deprecated_alias)
-                aliases_to_field_types[field_type.deprecated_alias] = field_type
+        aliases_to_field_types = self._get_field_aliases_to_field_types(all_field_types)
 
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
+                if ignore_unrecognized_fields:
+                    continue
+                valid_aliases = set(aliases_to_field_types.keys())
                 if isinstance(self, TargetGenerator):
                     # Even though moved_fields don't live on the target generator, they are valid
                     # for users to specify. It's intentional that these are only used for
@@ -376,9 +376,11 @@ class Target:
             field_type = aliases_to_field_types[alias]
             field_values[field_type] = field_type(value, address)
 
-        # For undefined fields, mark the raw value as None.
-        for field_type in set(self.field_types) - set(field_values.keys()):
-            field_values[field_type] = field_type(None, address)
+        # For undefined fields, mark the raw value as missing.
+        for field_type in all_field_types:
+            if field_type in field_values:
+                continue
+            field_values[field_type] = field_type(NO_VALUE, address)
         return FrozenDict(
             sorted(
                 field_values.items(),
@@ -387,29 +389,34 @@ class Target:
         )
 
     @final
-    @property
-    def field_types(self) -> Tuple[Type[Field], ...]:
-        return (*self.core_fields, *self.plugin_fields)
+    @classmethod
+    def _get_field_aliases_to_field_types(
+        cls, field_types: Iterable[type[Field]]
+    ) -> dict[str, type[Field]]:
+        aliases_to_field_types = {}
+        for field_type in field_types:
+            aliases_to_field_types[field_type.alias] = field_type
+            if field_type.deprecated_alias is not None:
+                aliases_to_field_types[field_type.deprecated_alias] = field_type
+        return aliases_to_field_types
 
     @final
-    @memoized_classproperty
-    def _plugin_field_cls(cls) -> type:
-        # NB: We ensure that each Target subtype has its own `PluginField` class so that
-        # registering a plugin field doesn't leak across target types.
+    @property
+    def field_types(self) -> KeysView[Type[Field]]:
+        return self.field_values.keys()
 
-        @union
-        class PluginField:
-            pass
-
-        return PluginField
+    @distinct_union_type_per_subclass
+    class PluginField:
+        pass
 
     def __repr__(self) -> str:
         fields = ", ".join(str(field) for field in self.field_values.values())
         return (
             f"{self.__class__}("
             f"address={self.address}, "
-            f"alias={repr(self.alias)}, "
-            f"residence_dir={repr(self.residence_dir)}, "
+            f"alias={self.alias!r}, "
+            f"residence_dir={self.residence_dir!r}, "
+            f"origin={self.description_of_origin}, "
             f"{fields})"
         )
 
@@ -431,10 +438,18 @@ class Target:
             other.field_values,
         )
 
-    @final
     @classmethod
+    @memoized_method
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
-        return cast(Tuple[Type[Field], ...], tuple(union_membership.get(cls._plugin_field_cls)))
+        result: set[type[Field]] = set()
+        classes = [cls]
+        while classes:
+            cls = classes.pop()
+            classes.extend(cls.__bases__)
+            if issubclass(cls, Target):
+                result.update(cast("set[type[Field]]", union_membership.get(cls.PluginField)))
+
+        return tuple(result)
 
     @final
     @classmethod
@@ -464,7 +479,7 @@ class Target:
         if result is not None:
             return cast(_F, result)
         field_subclass = self._find_registered_field_subclass(
-            field, registered_fields=self.field_types
+            field, registered_fields=self.field_values.keys()
         )
         if field_subclass is not None:
             return cast(_F, self.field_values[field_subclass])
@@ -500,7 +515,7 @@ class Target:
         grab the `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
         `SourcesField`, you may need to hydrate the value.).
 
-        This works with subclasses of `Field`s. For example, if you subclass `Tags`
+        This works with subclasses of `Field`. For example, if you subclass `Tags`
         to define a custom subclass `CustomTags`, both `tgt.get(Tags)` and
         `tgt.get(CustomTags)` will return the same `CustomTags` instance.
 
@@ -518,7 +533,7 @@ class Target:
     @final
     @classmethod
     def _has_fields(
-        cls, fields: Iterable[Type[Field]], *, registered_fields: Iterable[Type[Field]]
+        cls, fields: Iterable[Type[Field]], *, registered_fields: AbstractSet[Type[Field]]
     ) -> bool:
         unrecognized_fields = [field for field in fields if field not in registered_fields]
         if not unrecognized_fields:
@@ -535,7 +550,7 @@ class Target:
     def has_field(self, field: Type[Field]) -> bool:
         """Check that this target has registered the requested field.
 
-        This works with subclasses of `Field`s. For example, if you subclass `Tags` to define a
+        This works with subclasses of `Field`. For example, if you subclass `Tags` to define a
         custom subclass `CustomTags`, both `tgt.has_field(Tags)` and
         `python_tgt.has_field(CustomTags)` will return True.
         """
@@ -545,21 +560,27 @@ class Target:
     def has_fields(self, fields: Iterable[Type[Field]]) -> bool:
         """Check that this target has registered all of the requested fields.
 
-        This works with subclasses of `Field`s. For example, if you subclass `Tags` to define a
+        This works with subclasses of `Field`. For example, if you subclass `Tags` to define a
         custom subclass `CustomTags`, both `tgt.has_fields([Tags])` and
         `python_tgt.has_fields([CustomTags])` will return True.
         """
-        return self._has_fields(fields, registered_fields=self.field_types)
+        return self._has_fields(fields, registered_fields=self.field_values.keys())
 
     @final
     @classmethod
-    def class_field_types(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
+    @memoized_method
+    def class_field_types(
+        cls, union_membership: UnionMembership | None
+    ) -> FrozenOrderedSet[Type[Field]]:
         """Return all registered Fields belonging to this target type.
 
         You can also use the instance property `tgt.field_types` to avoid having to pass the
         parameter UnionMembership.
         """
-        return (*cls.core_fields, *cls._find_plugin_fields(union_membership))
+        if union_membership is None:
+            return FrozenOrderedSet(cls.core_fields)
+        else:
+            return FrozenOrderedSet((*cls.core_fields, *cls._find_plugin_fields(union_membership)))
 
     @final
     @classmethod
@@ -602,7 +623,6 @@ class Target:
             )
         return result
 
-    @final
     @classmethod
     def register_plugin_field(cls, field: Type[Field]) -> UnionRule:
         """Register a new field on the target type.
@@ -611,7 +631,7 @@ class Target:
         `MyTarget.register_plugin_field(NewField)`. This will register `NewField` as a first-class
         citizen. Plugins can use this new field like any other.
         """
-        return UnionRule(cls._plugin_field_cls, field)
+        return UnionRule(cls.PluginField, field)
 
     def validate(self) -> None:
         """Validate the target, such as checking for mutually exclusive fields.
@@ -620,6 +640,18 @@ class Target:
         context. If the validation only makes sense for certain goals acting on targets; those
         validations should be done in the associated rules.
         """
+
+
+@dataclass(frozen=True)
+class WrappedTargetRequest:
+    """Used with `WrappedTarget` to get the Target corresponding to an address.
+
+    `description_of_origin` is used for error messages when the address does not actually exist. If
+    you are confident this cannot happen, set the string to something like `<infallible>`.
+    """
+
+    address: Address
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
 
 
 @dataclass(frozen=True)
@@ -661,8 +693,8 @@ class Targets(Collection[Target]):
 # FilteredTargets`. That is necessary so that project-introspection goals like `list` which don't
 # use `FilteredTargets` still have filtering applied.
 class FilteredTargets(Collection[Target]):
-    """A heterogenous collection of Target instances that have been filtered with the global options
-    `--tag` and `--exclude-target-regexp`.
+    """A heterogeneous collection of Target instances that have been filtered with the global
+    options `--tag` and `--exclude-target-regexp`.
 
     Outside of the extra filtering, this type is identical to `Targets`, including its handling of
     target generators.
@@ -682,9 +714,81 @@ class UnexpandedTargets(Collection[Target]):
         return self[0]
 
 
+class DepsTraversalBehavior(Enum):
+    """The return value for ShouldTraverseDepsPredicate.
+
+    NB: This only indicates whether to traverse the deps of a target;
+    It does not control the inclusion of the target itself (though that
+    might be added in the future). By the time the predicate is called,
+    the target itself was already included.
+    """
+
+    INCLUDE = "include"
+    EXCLUDE = "exclude"
+
+
+@dataclass(frozen=True)
+class ShouldTraverseDepsPredicate(metaclass=ABCMeta):
+    """This callable determines whether to traverse through deps of a given Target + Field.
+
+    This is a callable dataclass instead of a function to avoid issues with hashing closures.
+    Only the id is used when hashing a function; any closure vars are NOT accounted for.
+
+    NB: When subclassing a dataclass (like this one), you do not need to add the @dataclass
+    decorator unless the subclass has additional fields. The @dataclass decorator only inspects
+    the current class (not any parents from __mro__) to determine if any methods were explicitly
+    defined. So, any typically-generated methods explicitly added on this parent class would NOT
+    be inherited by @dataclass decorated subclasses. To avoid these issues, this parent class
+    uses __post_init__ and relies on the generated __init__ and __hash__ methods.
+    """
+
+    # NB: This _callable field ensures that __call__ is included in the __hash__ method generated by @dataclass.
+    # That is extremely important because two predicates with different implementations but the same data
+    # (or no data) need to have different hashes and compare unequal.
+    _callable: Callable[
+        [Any, Target, Dependencies | SpecialCasedDependencies], DepsTraversalBehavior
+    ] = dataclasses.field(init=False, repr=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "_callable", type(self).__call__)
+
+    @abstractmethod
+    def __call__(
+        self, target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> DepsTraversalBehavior:
+        """This predicate decides when to INCLUDE or EXCLUDE the target's field's deps."""
+
+
+class TraverseIfDependenciesField(ShouldTraverseDepsPredicate):
+    """This is the default ShouldTraverseDepsPredicate implementation.
+
+    This skips resolving dependencies for fields (like SpecialCasedDependencies) that are not
+    subclasses of Dependencies.
+    """
+
+    def __call__(
+        self, target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> DepsTraversalBehavior:
+        if isinstance(field, Dependencies):
+            return DepsTraversalBehavior.INCLUDE
+        return DepsTraversalBehavior.EXCLUDE
+
+
+class AlwaysTraverseDeps(ShouldTraverseDepsPredicate):
+    """A predicate to use when a request needs all deps.
+
+    This includes deps from fields like SpecialCasedDependencies which are ignored in most cases.
+    """
+
+    def __call__(
+        self, target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> DepsTraversalBehavior:
+        return DepsTraversalBehavior.INCLUDE
+
+
 class CoarsenedTarget(EngineAwareParameter):
     def __init__(self, members: Iterable[Target], dependencies: Iterable[CoarsenedTarget]) -> None:
-        """A set of Targets which cyclicly reach one another, and are thus indivisible.
+        """A set of Targets which cyclically reach one another, and are thus indivisible.
 
         Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for the
         recursive portion.
@@ -721,7 +825,7 @@ class CoarsenedTarget(EngineAwareParameter):
     ) -> Iterator[CoarsenedTarget]:
         """All CoarsenedTargets reachable from this root."""
 
-        visited = visited or set()
+        visited = set() if visited is None else visited
         queue = deque([self])
         while queue:
             ct = queue.popleft()
@@ -800,25 +904,24 @@ class CoarsenedTargets(Collection[CoarsenedTarget]):
     __hash__ = Tuple.__hash__
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class CoarsenedTargetsRequest:
     """A request to get CoarsenedTargets for input roots."""
 
     roots: Tuple[Address, ...]
     expanded_targets: bool
-    include_special_cased_deps: bool
+    should_traverse_deps_predicate: ShouldTraverseDepsPredicate
 
     def __init__(
         self,
         roots: Iterable[Address],
         *,
         expanded_targets: bool = False,
-        include_special_cased_deps: bool = False,
+        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = TraverseIfDependenciesField(),
     ) -> None:
-        self.roots = tuple(roots)
-        self.expanded_targets = expanded_targets
-        self.include_special_cased_deps = include_special_cased_deps
+        object.__setattr__(self, "roots", tuple(roots))
+        object.__setattr__(self, "expanded_targets", expanded_targets)
+        object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
 
 
 @dataclass(frozen=True)
@@ -838,32 +941,33 @@ class TransitiveTargets:
         return FrozenOrderedSet([*self.roots, *self.dependencies])
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class TransitiveTargetsRequest:
     """A request to get the transitive dependencies of the input roots.
 
     Resolve the transitive targets with `await Get(TransitiveTargets,
-    TransitiveTargetsRequest([addr1, addr2])`.
+    TransitiveTargetsRequest([addr1, addr2]))`.
     """
 
     roots: Tuple[Address, ...]
-    include_special_cased_deps: bool
+    should_traverse_deps_predicate: ShouldTraverseDepsPredicate
 
     def __init__(
-        self, roots: Iterable[Address], *, include_special_cased_deps: bool = False
+        self,
+        roots: Iterable[Address],
+        *,
+        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = TraverseIfDependenciesField(),
     ) -> None:
-        self.roots = tuple(roots)
-        self.include_special_cased_deps = include_special_cased_deps
+        object.__setattr__(self, "roots", tuple(roots))
+        object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class RegisteredTargetTypes:
     aliases_to_types: FrozenDict[str, Type[Target]]
 
     def __init__(self, aliases_to_types: Mapping[str, Type[Target]]) -> None:
-        self.aliases_to_types = FrozenDict(aliases_to_types)
+        object.__setattr__(self, "aliases_to_types", FrozenDict(aliases_to_types))
 
     @classmethod
     def create(cls, target_types: Iterable[Type[Target]]) -> RegisteredTargetTypes:
@@ -897,14 +1001,6 @@ class AllUnexpandedTargets(Collection[Target]):
     """
 
 
-@dataclass(frozen=True)
-class AllTargetsRequest:
-    """Find all targets in the project.
-
-    Use with either `AllUnexpandedTargets` or `AllTargets`.
-    """
-
-
 # -----------------------------------------------------------------------------------------------
 # Target generation
 # -----------------------------------------------------------------------------------------------
@@ -919,6 +1015,13 @@ class TargetGenerator(Target):
     """
 
     # The generated Target class.
+    #
+    # If this is not provided, consider checking for the default values that applies to the target
+    # types being generated manually. The applicable defaults are available on the `AddressFamily`
+    # which you can get using:
+    #
+    #    family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
+    #    target_defaults = family.defaults.get(MyTarget.alias, {})
     generated_target_cls: ClassVar[type[Target]]
 
     # Fields which have their values copied from the generator Target to the generated Target.
@@ -941,6 +1044,10 @@ class TargetGenerator(Target):
     # acting as a convenient place for them to be specified.
     moved_fields: ClassVar[Tuple[Type[Field], ...]]
 
+    @distinct_union_type_per_subclass
+    class MovedPluginField:
+        """A plugin field that should be moved into the generated targets."""
+
     def validate(self) -> None:
         super().validate()
 
@@ -955,6 +1062,45 @@ class TargetGenerator(Target):
                 "`TargetGenerator.copied_field`. `Dependencies` fields should be "
                 "`TargetGenerator.moved_field`s, to avoid redundant graph edges."
             )
+
+    @classmethod
+    def register_plugin_field(cls, field: Type[Field], *, as_moved_field=False) -> UnionRule:
+        if as_moved_field:
+            return UnionRule(cls.MovedPluginField, field)
+        else:
+            return super().register_plugin_field(field)
+
+    @classmethod
+    @memoized_method
+    def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
+        return (
+            *cls._find_copied_plugin_fields(union_membership),
+            *cls._find_moved_plugin_fields(union_membership),
+        )
+
+    @final
+    @classmethod
+    @memoized_method
+    def _find_moved_plugin_fields(
+        cls, union_membership: UnionMembership
+    ) -> tuple[type[Field], ...]:
+        result: set[type[Field]] = set()
+        classes = [cls]
+        while classes:
+            cls = classes.pop()
+            classes.extend(cls.__bases__)
+            if issubclass(cls, TargetGenerator):
+                result.update(cast("set[type[Field]]", union_membership.get(cls.MovedPluginField)))
+
+        return tuple(result)
+
+    @final
+    @classmethod
+    @memoized_method
+    def _find_copied_plugin_fields(
+        cls, union_membership: UnionMembership
+    ) -> tuple[type[Field], ...]:
+        return super()._find_plugin_fields(union_membership)
 
 
 class TargetFilesGenerator(TargetGenerator):
@@ -980,7 +1126,7 @@ class TargetFilesGenerator(TargetGenerator):
             )
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class TargetFilesGeneratorSettingsRequest:
     """An optional union to provide dynamic settings for a `TargetFilesGenerator`.
 
@@ -1006,7 +1152,7 @@ class TargetFilesGeneratorSettings:
 _TargetGenerator = TypeVar("_TargetGenerator", bound=TargetGenerator)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class GenerateTargetsRequest(Generic[_TargetGenerator]):
     generate_from: ClassVar[type[_TargetGenerator]]  # type: ignore[misc]
@@ -1176,7 +1322,7 @@ def _generate_file_level_targets(
         return generated_target_cls(
             generated_target_fields,
             address,
-            union_membership,
+            union_membership=union_membership,
             residence_dir=os.path.dirname(full_fp),
         )
 
@@ -1189,7 +1335,7 @@ def _generate_file_level_targets(
             fast_relpath(fp, template_address.spec_path) for fp in normalized_overrides
         )
         all_valid_relative_paths = sorted(
-            cast(str, tgt.address._relative_file_path or tgt.address.generated_name)
+            cast(str, tgt.address.relative_file_path or tgt.address.generated_name)
             for tgt in result
         )
         raise InvalidFieldException(
@@ -1205,21 +1351,14 @@ def _generate_file_level_targets(
 # -----------------------------------------------------------------------------------------------
 # FieldSet
 # -----------------------------------------------------------------------------------------------
-
-
 def _get_field_set_fields_from_target(
     field_set: Type[FieldSet], target: Target
 ) -> Dict[str, Field]:
-    all_expected_fields: Dict[str, Type[Field]] = {
-        name: field_type
-        for name, field_type in get_type_hints(field_set).items()
-        if isinstance(field_type, type) and issubclass(field_type, Field)
-    }
     return {
         dataclass_field_name: (
             target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)
         )
-        for dataclass_field_name, field_cls in all_expected_fields.items()
+        for dataclass_field_name, field_cls in field_set.fields.items()
     }
 
 
@@ -1237,7 +1376,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
 
-    You can optionally set implement the classmethod `opt_out` so that targets have a
+    You can optionally implement the classmethod `opt_out` so that targets have a
     mechanism to not match with the FieldSet even if they have the `required_fields` registered.
 
     For example:
@@ -1253,7 +1392,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
             def opt_out(cls, tgt: Target) -> bool:
                 return tgt.get(MaybeSkipFortranTestsField).value
 
-    This field set may then created from a `Target` through the `is_applicable()` and `create()`
+    This field set may then be created from a `Target` through the `is_applicable()` and `create()`
     class methods:
 
         field_sets = [
@@ -1305,6 +1444,17 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     def create(cls: Type[_FS], tgt: Target) -> _FS:
         return cls(address=tgt.address, **_get_field_set_fields_from_target(cls, tgt))
 
+    @final
+    @memoized_classproperty
+    def fields(cls) -> FrozenDict[str, Type[Field]]:
+        return FrozenDict(
+            (
+                (name, field_type)
+                for name, field_type in get_type_hints(cls).items()
+                if isinstance(field_type, type) and issubclass(field_type, Field)
+            )
+        )
+
     def debug_hint(self) -> str:
         return self.address.spec
 
@@ -1317,13 +1467,16 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
         return f"{self.__class__.__name__}(address={self.address})"
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class TargetRootsToFieldSets(Generic[_FS]):
     mapping: FrozenDict[Target, Tuple[_FS, ...]]
 
     def __init__(self, mapping: Mapping[Target, Iterable[_FS]]) -> None:
-        self.mapping = FrozenDict({tgt: tuple(field_sets) for tgt, field_sets in mapping.items()})
+        object.__setattr__(
+            self,
+            "mapping",
+            FrozenDict({tgt: tuple(field_sets) for tgt, field_sets in mapping.items()}),
+        )
 
     @memoized_property
     def field_sets(self) -> Tuple[_FS, ...]:
@@ -1371,13 +1524,11 @@ def get_shard(key: str, num_shards: int) -> int:
     return zlib.crc32(key.encode()) % num_shards
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class TargetRootsToFieldSetsRequest(Generic[_FS]):
     field_set_superclass: Type[_FS]
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
-    expect_single_field_set: bool
     shard: int
     num_shards: int
 
@@ -1387,49 +1538,40 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
         *,
         goal_description: str,
         no_applicable_targets_behavior: NoApplicableTargetsBehavior,
-        expect_single_field_set: bool = False,
         shard: int = 0,
         num_shards: int = -1,
     ) -> None:
-        if expect_single_field_set and num_shards != -1:
-            raise ValueError(
-                "At most one of shard_spec and expect_single_field_set may be set"
-                " on a TargetRootsToFieldSetsRequest instance"
-            )
-        self.field_set_superclass = field_set_superclass
-        self.goal_description = goal_description
-        self.no_applicable_targets_behavior = no_applicable_targets_behavior
-        self.expect_single_field_set = expect_single_field_set
-        self.shard = shard
-        self.num_shards = num_shards
+        object.__setattr__(self, "field_set_superclass", field_set_superclass)
+        object.__setattr__(self, "goal_description", goal_description)
+        object.__setattr__(self, "no_applicable_targets_behavior", no_applicable_targets_behavior)
+        object.__setattr__(self, "shard", shard)
+        object.__setattr__(self, "num_shards", num_shards)
 
     def is_in_shard(self, key: str) -> bool:
         return get_shard(key, self.num_shards) == self.shard
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class FieldSetsPerTarget(Generic[_FS]):
     # One tuple of FieldSet instances per input target.
     collection: Tuple[Tuple[_FS, ...], ...]
 
     def __init__(self, collection: Iterable[Iterable[_FS]]):
-        self.collection = tuple(tuple(iterable) for iterable in collection)
+        object.__setattr__(self, "collection", tuple(tuple(iterable) for iterable in collection))
 
     @memoized_property
     def field_sets(self) -> Tuple[_FS, ...]:
         return tuple(itertools.chain.from_iterable(self.collection))
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class FieldSetsPerTargetRequest(Generic[_FS]):
     field_set_superclass: Type[_FS]
     targets: Tuple[Target, ...]
 
     def __init__(self, field_set_superclass: Type[_FS], targets: Iterable[Target]):
-        self.field_set_superclass = field_set_superclass
-        self.targets = tuple(targets)
+        object.__setattr__(self, "field_set_superclass", field_set_superclass)
+        object.__setattr__(self, "targets", tuple(targets))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1442,8 +1584,22 @@ class InvalidTargetException(Exception):
 
     Suggested template:
 
-         f"The `{repr(alias)}` target {address} ..."
+         f"The `{alias!r}` target {address} ..."
     """
+
+    def __init__(self, message: Any, *, description_of_origin: str | None = None) -> None:
+        self.description_of_origin = description_of_origin
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        if not self.description_of_origin:
+            return super().__str__()
+        return f"{self.description_of_origin}: {super().__str__()}"
+
+    def __repr__(self) -> str:
+        if not self.description_of_origin:
+            return super().__repr__()
+        return f"{self.description_of_origin}: {super().__repr__()}"
 
 
 class InvalidGeneratedTargetException(InvalidTargetException):
@@ -1455,8 +1611,22 @@ class InvalidFieldException(Exception):
 
     Suggested template:
 
-         f"The {repr(alias)} field in target {address} must ..., but ..."
+         f"The {alias!r} field in target {address} must ..., but ..."
     """
+
+    def __init__(self, message: Any, *, description_of_origin: str | None = None) -> None:
+        self.description_of_origin = description_of_origin
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        if not self.description_of_origin:
+            return super().__str__()
+        return f"{self.description_of_origin}: {super().__str__()}"
+
+    def __repr__(self) -> str:
+        if not self.description_of_origin:
+            return super().__repr__()
+        return f"{self.description_of_origin}: {super().__repr__()}"
 
 
 class InvalidFieldTypeException(InvalidFieldException):
@@ -1464,17 +1634,30 @@ class InvalidFieldTypeException(InvalidFieldException):
     e.g. `a boolean` or `a string` or `an iterable of strings and integers`."""
 
     def __init__(
-        self, address: Address, field_alias: str, raw_value: Optional[Any], *, expected_type: str
+        self,
+        address: Address,
+        field_alias: str,
+        raw_value: Optional[Any],
+        *,
+        expected_type: str,
+        description_of_origin: str | None = None,
     ) -> None:
+        raw_type = f"with type `{type(raw_value).__name__}`"
         super().__init__(
             f"The {repr(field_alias)} field in target {address} must be {expected_type}, but was "
-            f"`{repr(raw_value)}` with type `{type(raw_value).__name__}`."
+            f"`{repr(raw_value)}` {raw_type}.",
+            description_of_origin=description_of_origin,
         )
 
 
 class RequiredFieldMissingException(InvalidFieldException):
-    def __init__(self, address: Address, field_alias: str) -> None:
-        super().__init__(f"The {repr(field_alias)} field in target {address} must be defined.")
+    def __init__(
+        self, address: Address, field_alias: str, *, description_of_origin: str | None = None
+    ) -> None:
+        super().__init__(
+            f"The {repr(field_alias)} field in target {address} must be defined.",
+            description_of_origin=description_of_origin,
+        )
 
 
 class InvalidFieldChoiceException(InvalidFieldException):
@@ -1485,27 +1668,37 @@ class InvalidFieldChoiceException(InvalidFieldException):
         raw_value: Optional[Any],
         *,
         valid_choices: Iterable[Any],
+        description_of_origin: str | None = None,
     ) -> None:
         super().__init__(
-            f"The {repr(field_alias)} field in target {address} must be one of "
-            f"{sorted(valid_choices)}, but was {repr(raw_value)}."
+            f"Values for the {repr(field_alias)} field in target {address} must be one of "
+            f"{sorted(valid_choices)}, but {repr(raw_value)} was provided.",
+            description_of_origin=description_of_origin,
         )
 
 
-class UnrecognizedTargetTypeException(Exception):
+class UnrecognizedTargetTypeException(InvalidTargetException):
     def __init__(
         self,
         target_type: str,
         registered_target_types: RegisteredTargetTypes,
         address: Address | None = None,
+        description_of_origin: str | None = None,
     ) -> None:
         for_address = f" for address {address}" if address else ""
         super().__init__(
-            f"Target type {repr(target_type)} is not registered{for_address}.\n\nAll valid target "
-            f"types: {sorted(registered_target_types.aliases)}\n\n(If {repr(target_type)} is a "
-            "custom target type, refer to "
-            "https://groups.google.com/forum/#!topic/pants-devel/WsRFODRLVZI for instructions on "
-            "writing a light-weight Target API binding.)"
+            softwrap(
+                f"""
+                Target type {target_type!r} is not registered{for_address}.
+
+                All valid target types: {sorted(registered_target_types.aliases)}
+
+                (If {target_type!r} is a custom target type, refer to
+                {doc_url('docs/writing-plugins/the-target-api/concepts')} for getting it registered with Pants.)
+
+                """
+            ),
+            description_of_origin=description_of_origin,
         )
 
 
@@ -1647,15 +1840,9 @@ class StringField(ScalarField[str]):
     def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is not None and cls.valid_choices is not None:
-            valid_choices = set(
-                cls.valid_choices
-                if isinstance(cls.valid_choices, tuple)
-                else (choice.value for choice in cls.valid_choices)
+            _validate_choices(
+                address, cls.alias, [value_or_default], valid_choices=cls.valid_choices
             )
-            if value_or_default not in valid_choices:
-                raise InvalidFieldChoiceException(
-                    address, cls.alias, value_or_default, valid_choices=valid_choices
-                )
         return value_or_default
 
 
@@ -1673,7 +1860,7 @@ class SequenceField(Generic[T], Field):
 
             @classmethod
             def compute_value(
-                cls, raw_value: Optional[Iterable[MyPluginObject]], *, address: Address
+                cls, raw_value: Optional[Iterable[MyPluginObject]], address: Address
             ) -> Optional[Tuple[MyPluginObject, ...]]:
                 return super().compute_value(raw_value, address=address)
     """
@@ -1705,12 +1892,16 @@ class SequenceField(Generic[T], Field):
 class StringSequenceField(SequenceField[str]):
     expected_element_type = str
     expected_type_description = "an iterable of strings (e.g. a list of strings)"
+    valid_choices: ClassVar[Optional[Union[Type[Enum], Tuple[str, ...]]]] = None
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Optional[Tuple[str, ...]]:
-        return super().compute_value(raw_value, address)
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default and cls.valid_choices is not None:
+            _validate_choices(address, cls.alias, value_or_default, valid_choices=cls.valid_choices)
+        return value_or_default
 
 
 class DictStringToStringField(Field):
@@ -1732,6 +1923,39 @@ class DictStringToStringField(Field):
         if not all(isinstance(k, str) and isinstance(v, str) for k, v in value_or_default.items()):
             raise invalid_type_exception
         return FrozenDict(value_or_default)
+
+
+class ListOfDictStringToStringField(Field):
+    value: Optional[Tuple[FrozenDict[str, str]]]
+    default: ClassVar[Optional[list[FrozenDict[str, str]]]] = None
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[list[Dict[str, str]]], address: Address
+    ) -> Optional[Tuple[FrozenDict[str, str], ...]]:
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default is None:
+            return None
+        invalid_type_exception = InvalidFieldTypeException(
+            address,
+            cls.alias,
+            raw_value,
+            expected_type="a list of dictionaries (or a single dictionary) of string -> string",
+        )
+
+        # Also support passing in a single dictionary by wrapping it
+        if not isinstance(value_or_default, list):
+            value_or_default = [value_or_default]
+
+        result_lst: list[FrozenDict[str, str]] = []
+        for item in value_or_default:
+            if not isinstance(item, collections.abc.Mapping):
+                raise invalid_type_exception
+            if not all(isinstance(k, str) and isinstance(v, str) for k, v in item.items()):
+                raise invalid_type_exception
+            result_lst.append(FrozenDict(item))
+
+        return tuple(result_lst)
 
 
 class NestedDictStringToStringField(Field):
@@ -1793,6 +2017,25 @@ class DictStringToStringSequenceField(Field):
         return FrozenDict(result)
 
 
+def _validate_choices(
+    address: Address,
+    field_alias: str,
+    values: Iterable[Any],
+    *,
+    valid_choices: Union[Type[Enum], Tuple[Any, ...]],
+) -> None:
+    _valid_choices = set(
+        valid_choices
+        if isinstance(valid_choices, tuple)
+        else (choice.value for choice in valid_choices)
+    )
+    for choice in values:
+        if choice not in _valid_choices:
+            raise InvalidFieldChoiceException(
+                address, field_alias, choice, valid_choices=_valid_choices
+            )
+
+
 # -----------------------------------------------------------------------------------------------
 # Sources and codegen
 # -----------------------------------------------------------------------------------------------
@@ -1818,7 +2061,7 @@ class SourcesField(AsyncFieldMixin, Field):
     - `default_glob_match_error_behavior` -- Advanced option, should very rarely be used. Override
         glob match error behavior when using the default value. If setting this to
         `GlobMatchErrorBehavior.ignore`, make sure you have other validation in place in case the
-        default glob doesn't match any files if required, to alert the user appropriately.
+        default glob doesn't match any files, if required, to alert the user appropriately.
     """
 
     expected_file_extensions: ClassVar[tuple[str, ...] | None] = None
@@ -1850,7 +2093,7 @@ class SourcesField(AsyncFieldMixin, Field):
         """
         if self.expected_file_extensions is not None:
             bad_files = [
-                fp for fp in files if not PurePath(fp).suffix in self.expected_file_extensions
+                fp for fp in files if PurePath(fp).suffix not in self.expected_file_extensions
             ]
             if bad_files:
                 expected = (
@@ -1945,7 +2188,7 @@ class SourcesField(AsyncFieldMixin, Field):
         # Use fields default error behavior if defined, if we use default globs else the provided
         # error behavior.
         error_behavior = (
-            unmatched_build_file_globs.to_glob_match_error_behavior()
+            unmatched_build_file_globs.error_behavior
             if conjunction == GlobExpansionConjunction.all_match
             or self.default_glob_match_error_behavior is None
             else self.default_glob_match_error_behavior
@@ -1961,7 +2204,7 @@ class SourcesField(AsyncFieldMixin, Field):
             ),
         )
 
-    @property
+    @memoized_property
     def filespec(self) -> Filespec:
         """The original globs, returned in the Filespec dict format.
 
@@ -1978,6 +2221,12 @@ class SourcesField(AsyncFieldMixin, Field):
         if excludes:
             result["excludes"] = excludes
         return result
+
+    @memoized_property
+    def filespec_matcher(self) -> FilespecMatcher:
+        # Note: memoized because parsing the globs is expensive:
+        # https://github.com/pantsbuild/pants/issues/16122
+        return FilespecMatcher(self.filespec["includes"], self.filespec.get("excludes", []))
 
 
 class MultipleSourcesField(SourcesField, StringSequenceField):
@@ -2003,6 +2252,17 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
         cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Optional[Tuple[str, ...]]:
         value = super().compute_value(raw_value, address)
+        invalid_globs = [glob for glob in (value or ()) if glob.startswith("../") or "/../" in glob]
+        if invalid_globs:
+            raise InvalidFieldException(
+                softwrap(
+                    f"""
+                    The {repr(cls.alias)} field in target {address} must not have globs with the
+                    pattern `../` because targets can only have sources in the current directory
+                    or subdirectories. It was set to: {sorted(value or ())}
+                    """
+                )
+            )
         if cls.ban_subdirectories:
             invalid_globs = [glob for glob in (value or ()) if "**" in glob or os.path.sep in glob]
             if invalid_globs:
@@ -2031,7 +2291,7 @@ class OptionalSingleSourceField(SourcesField, StringField):
     """
 
     alias = "source"
-    help = softwrap(
+    help = help_text(
         """
         A single file that belongs to this target.
 
@@ -2047,17 +2307,36 @@ class OptionalSingleSourceField(SourcesField, StringField):
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
+        if value_or_default.startswith("../") or "/../" in value_or_default:
+            raise InvalidFieldException(
+                softwrap(
+                    f"""\
+                    The {repr(cls.alias)} field in target {address} should not include `../`
+                    patterns because targets can only have sources in the current directory or
+                    subdirectories. It was set to {value_or_default}. Instead, use a normalized
+                    literal file path (relative to the BUILD file).
+                    """
+                )
+            )
         if "*" in value_or_default:
             raise InvalidFieldException(
-                f"The {repr(cls.alias)} field in target {address} should not include `*` globs, "
-                f"but was set to {value_or_default}. Instead, use a literal file path (relative "
-                "to the BUILD file)."
+                softwrap(
+                    f"""\
+                    The {repr(cls.alias)} field in target {address} should not include `*` globs,
+                    but was set to {value_or_default}. Instead, use a literal file path (relative
+                    to the BUILD file).
+                    """
+                )
             )
         if value_or_default.startswith("!"):
             raise InvalidFieldException(
-                f"The {repr(cls.alias)} field in target {address} should not start with `!`, which "
-                f"is usually used in the `sources` field to exclude certain files. Instead, use a "
-                "literal file path (relative to the BUILD file)."
+                softwrap(
+                    f"""\
+                    The {repr(cls.alias)} field in target {address} should not start with `!`,
+                    which is usually used in the `sources` field to exclude certain files. Instead,
+                    use a literal file path (relative to the BUILD file).
+                    """
+                )
             )
         return value_or_default
 
@@ -2105,8 +2384,7 @@ class SingleSourceField(OptionalSingleSourceField):
         return result
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class HydrateSourcesRequest(EngineAwareParameter):
     field: SourcesField
     for_sources_types: tuple[type[SourcesField], ...]
@@ -2128,9 +2406,10 @@ class HydrateSourcesRequest(EngineAwareParameter):
         If `enable_codegen` is set to `True`, any codegen sources will try to be converted to one
         of the `for_sources_types`.
         """
-        self.field = field
-        self.for_sources_types = tuple(for_sources_types)
-        self.enable_codegen = enable_codegen
+        object.__setattr__(self, "field", field)
+        object.__setattr__(self, "for_sources_types", tuple(for_sources_types))
+        object.__setattr__(self, "enable_codegen", enable_codegen)
+
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -2165,7 +2444,7 @@ class HydratedSources:
     sources_type: type[SourcesField] | None
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class GenerateSourcesRequest:
     """A request to go from protocol sources -> a particular language.
@@ -2237,38 +2516,6 @@ class SourcesPathsRequest(EngineAwareParameter):
         return self.field.address.spec
 
 
-class SecondaryOwnerMixin(ABC):
-    """Add to a Field for the target to work with file arguments and `--changed-since`, without it
-    needing a `SourcesField`.
-
-    Why use this? In a dependency inference world, multiple targets including the same file in the
-    `sources` field causes issues due to ambiguity over which target to use. So, only one target
-    should have "primary ownership" of the file. However, you may still want other targets to be
-    used when that file is included in file arguments. For example, a `python_source` target
-    being the primary owner of the `.py` file, but a `pex_binary` still working with file
-    arguments for that file. Secondary ownership means that the target won't be used for things like
-    dependency inference and hydrating sources, but file arguments will still work.
-
-    There should be a primary owner of the file(s), e.g. the `python_source` in the above example.
-    Typically, you will want to add a dependency injection rule to infer a dep on that primary
-    owner.
-
-    All associated files must live in the BUILD target's directory or a subdirectory to work
-    properly, like the `sources` field.
-    """
-
-    @property
-    @abstractmethod
-    def filespec(self) -> Filespec:
-        """A dictionary in the form {'globs': ['full/path/to/f.ext']} representing the field's
-        associated files.
-
-        Typically, users should use a file name/glob relative to the BUILD file, like the `sources`
-        field. Then, you can use `os.path.join(self.address.spec_path, self.value)` to relative to
-        the build root.
-        """
-
-
 def targets_with_sources_types(
     sources_types: Iterable[type[SourcesField]],
     targets: Iterable[Target],
@@ -2295,25 +2542,24 @@ def targets_with_sources_types(
 class Dependencies(StringSequenceField, AsyncFieldMixin):
     """The dependencies field.
 
-    To resolve all dependencies—including the results of dependency injection and inference—use
-    either `await Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
+    To resolve all dependencies—including the results of dependency inference—use either `await
+    Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
     DependenciesRequest(tgt[Dependencies])`.
     """
 
     alias = "dependencies"
-    help = softwrap(
+    help = help_text(
         f"""
         Addresses to other targets that this target depends on, e.g.
-        ['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].
+        `['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django']`.
 
         This augments any dependencies inferred by Pants, such as by analyzing your imports. Use
         `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
         result.
 
-        See {doc_url('targets#target-addresses')} and {doc_url('targets#target-generation')} for
-        more about how addresses are formed, including for generated targets. You can also run
-        `{bin_name()} list ::` to find all addresses in your project, or
-        `{bin_name()} list dir:` to find all addresses defined in that directory.
+        See {doc_url('docs/using-pants/key-concepts/targets-and-build-files')} for more about how addresses are formed, including for generated
+        targets. You can also run `{bin_name()} list ::` to find all addresses in your project, or
+        `{bin_name()} list dir` to find all addresses defined in that directory.
 
         If the target is in the same BUILD file, you can leave off the BUILD file path, e.g.
         `:tgt` instead of `helloworld/subdir:tgt`. For generated first-party addresses, use
@@ -2329,18 +2575,31 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 
     @memoized_property
     def unevaluated_transitive_excludes(self) -> UnparsedAddressInputs:
-        if not self.supports_transitive_excludes or not self.value:
-            return UnparsedAddressInputs((), owning_address=self.address)
+        val = (
+            (v[2:] for v in self.value if v.startswith("!!"))
+            if self.supports_transitive_excludes and self.value
+            else ()
+        )
         return UnparsedAddressInputs(
-            (v[2:] for v in self.value if v.startswith("!!")),
+            val,
             owning_address=self.address,
+            description_of_origin=f"the `{self.alias}` field from the target {self.address}",
         )
 
 
 @dataclass(frozen=True)
 class DependenciesRequest(EngineAwareParameter):
     field: Dependencies
-    include_special_cased_deps: bool = False
+    should_traverse_deps_predicate: ShouldTraverseDepsPredicate = TraverseIfDependenciesField()
+
+    def debug_hint(self) -> str:
+        return self.field.address.spec
+
+
+# NB: ExplicitlyProvidedDependenciesRequest does not have a predicate unlike DependenciesRequest.
+@dataclass(frozen=True)
+class ExplicitlyProvidedDependenciesRequest(EngineAwareParameter):
+    field: Dependencies
 
     def debug_hint(self) -> str:
         return self.field.address.spec
@@ -2351,8 +2610,8 @@ class ExplicitlyProvidedDependencies:
     """The literal addresses from a BUILD file `dependencies` field.
 
     Almost always, you should use `await Get(Addresses, DependenciesRequest)` instead, which will
-    consider dependency injection and inference and apply ignores. However, this type can be
-    useful particularly within inference/injection rules to see if a user already explicitly
+    consider dependency inference and apply ignores. However, this type can be
+    useful particularly within inference rules to see if a user already explicitly
     provided a dependency.
 
     Resolve using `await Get(ExplicitlyProvidedDependencies, DependenciesRequest)`.
@@ -2439,7 +2698,7 @@ class ExplicitlyProvidedDependencies:
             f"with `!` or `!!` so that one or no targets are left."
             f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
             f"targets so that only 1 target owns this {import_reference}. Refer to "
-            f"{doc_url('troubleshooting#import-errors-and-missing-dependencies')}."
+            f"{doc_url('docs/using-pants/troubleshooting-common-issues#import-errors-and-missing-dependencies')}."
         )
 
     def disambiguated(
@@ -2459,78 +2718,32 @@ class ExplicitlyProvidedDependencies:
         return list(remaining_after_ignores)[0] if len(remaining_after_ignores) == 1 else None
 
 
-@union
+FS = TypeVar("FS", bound="FieldSet")
+
+
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
-class InjectDependenciesRequest(EngineAwareParameter, ABC):
-    """A request to inject dependencies, in addition to those explicitly provided.
-
-    To set up a new injection, subclass this class. Set the class property `inject_for` to the
-    type of `Dependencies` field you want to inject for, such as `FortranDependencies`. This will
-    cause the class, and any subclass, to have the injection. Register this subclass with
-    `UnionRule(InjectDependenciesRequest, InjectFortranDependencies)`, for example.
-
-    Then, create a rule that takes the subclass as a parameter and returns `InjectedDependencies`.
-
-    For example:
-
-        class FortranDependencies(Dependencies):
-            pass
-
-        class InjectFortranDependencies(InjectDependenciesRequest):
-            inject_for = FortranDependencies
-
-        @rule
-        async def inject_fortran_dependencies(
-            request: InjectFortranDependencies
-        ) -> InjectedDependencies:
-            addresses = await Get(
-                Addresses, UnparsedAddressInputs(["//:injected"], owning_address=None)
-            )
-            return InjectedDependencies(addresses)
-
-        def rules():
-            return [
-                *collect_rules(),
-                UnionRule(InjectDependenciesRequest, InjectFortranDependencies),
-            ]
-    """
-
-    dependencies_field: Dependencies
-    inject_for: ClassVar[Type[Dependencies]]
-
-    def debug_hint(self) -> str:
-        return self.dependencies_field.address.spec
-
-
-class InjectedDependencies(DeduplicatedCollection[Address]):
-    sort_input = True
-
-
-SF = TypeVar("SF", bound="SourcesField")
-
-
-@union
-@dataclass(frozen=True)
-class InferDependenciesRequest(Generic[SF], EngineAwareParameter):
+class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
     """A request to infer dependencies by analyzing source files.
 
     To set up a new inference implementation, subclass this class. Set the class property
-    `infer_from` to the type of `SourcesField` you are able to infer from, such as
-    `FortranSources`. This will cause the class, and any subclass, to use your inference
-    implementation. Note that there cannot be more than one implementation for a particular
-    `SourcesField` class. Register this subclass with
-    `UnionRule(InferDependenciesRequest, InferFortranDependencies)`, for example.
+    `infer_from` to the FieldSet subclass you are able to infer from. This will cause the FieldSet
+    class, and any subclass, to use your inference implementation.
+
+    Note that there cannot be more than one implementation for a particular `FieldSet` class.
+
+    Register this subclass with `UnionRule(InferDependenciesRequest, InferFortranDependencies)`, for example.
 
     Then, create a rule that takes the subclass as a parameter and returns `InferredDependencies`.
 
     For example:
 
         class InferFortranDependencies(InferDependenciesRequest):
-            from_sources = FortranSources
+            infer_from = FortranDependenciesInferenceFieldSet
 
         @rule
         def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
-            hydrated_sources = await Get(HydratedSources, HydrateSources(request.sources_field))
+            hydrated_sources = await Get(HydratedSources, HydrateSources(request.sources))
             ...
             return InferredDependencies(...)
 
@@ -2541,33 +2754,48 @@ class InferDependenciesRequest(Generic[SF], EngineAwareParameter):
             ]
     """
 
-    sources_field: SF
-    infer_from: ClassVar[Type[SourcesField]]
+    infer_from: ClassVar[Type[FS]]  # type: ignore[misc]
 
-    def debug_hint(self) -> str:
-        return self.sources_field.address.spec
+    field_set: FS
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class InferredDependencies:
-    dependencies: FrozenOrderedSet[Address]
+    include: FrozenOrderedSet[Address]
+    exclude: FrozenOrderedSet[Address]
 
-    def __init__(self, dependencies: Iterable[Address]) -> None:
+    def __init__(
+        self,
+        include: Iterable[Address],
+        *,
+        exclude: Iterable[Address] = (),
+    ) -> None:
         """The result of inferring dependencies."""
-        self.dependencies = FrozenOrderedSet(sorted(dependencies))
-
-    def __bool__(self) -> bool:
-        return bool(self.dependencies)
-
-    def __iter__(self) -> Iterator[Address]:
-        return iter(self.dependencies)
+        object.__setattr__(self, "include", FrozenOrderedSet(sorted(include)))
+        object.__setattr__(self, "exclude", FrozenOrderedSet(sorted(exclude)))
 
 
-FS = TypeVar("FS", bound="FieldSet")
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class TransitivelyExcludeDependenciesRequest(Generic[FS], EngineAwareParameter):
+    """A request to transitvely exclude dependencies of a "root" node.
+
+    This is similar to `InferDependenciesRequest`, except the request is only made for "root" nodes
+    in the dependency graph.
+
+    This mirrors the public facing "transitive exclude" dependency feature (i.e. `!!<address>`).
+    """
+
+    infer_from: ClassVar[Type[FS]]  # type: ignore[misc]
+
+    field_set: FS
 
 
-@union
+class TransitivelyExcludeDependencies(FrozenOrderedSet[Address]):
+    pass
+
+
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class ValidateDependenciesRequest(Generic[FS], ABC):
     """A request to validate dependencies after they have been computed.
@@ -2586,6 +2814,57 @@ class ValidatedDependencies:
     pass
 
 
+@dataclass(frozen=True)
+class DependenciesRuleApplicationRequest:
+    """A request to return the applicable dependency rule action for each dependency of a target."""
+
+    address: Address
+    dependencies: Addresses
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+
+@dataclass(frozen=True)
+class DependenciesRuleApplication:
+    """Maps all dependencies to their respective dependency rule application of an origin target
+    address.
+
+    The `applications` will be empty and the `address` `None` if there is no dependency rule
+    implementation.
+    """
+
+    address: Address | None = None
+    dependencies_rule: FrozenDict[Address, DependencyRuleApplication] = FrozenDict()
+
+    def __post_init__(self):
+        if self.dependencies_rule and self.address is None:
+            raise ValueError(
+                "The `address` field must not be None when there are `dependencies_rule`s."
+            )
+
+    @classmethod
+    @memoized_method
+    def allow_all(cls) -> DependenciesRuleApplication:
+        return cls()
+
+    def execute_actions(self) -> None:
+        errors = [
+            action_error.replace("\n", "\n    ")
+            for action_error in (rule.execute() for rule in self.dependencies_rule.values())
+            if action_error is not None
+        ]
+        if errors:
+            err_count = len(errors)
+            raise DependencyRuleActionDeniedError(
+                softwrap(
+                    f"""
+                    {self.address} has {pluralize(err_count, 'dependency violation')}:
+
+                    {bullet_list(errors)}
+                    """
+                )
+            )
+
+
 class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     """Subclass this for fields that act similarly to the `dependencies` field, but are handled
     differently than normal dependencies.
@@ -2596,7 +2875,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     dedicated field.
 
     This type will ensure that the dependencies show up in project introspection,
-    like `dependencies` and `dependees`, but not show up when you call `Get(TransitiveTargets,
+    like `dependencies` and `dependents`, but not show up when you call `Get(TransitiveTargets,
     TransitiveTargetsRequest)` and `Get(Addresses, DependenciesRequest)`.
 
     To hydrate this field's dependencies, use `await Get(Addresses, UnparsedAddressInputs,
@@ -2604,7 +2883,11 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     """
 
     def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self.value or (), owning_address=self.address)
+        return UnparsedAddressInputs(
+            self.value or (),
+            owning_address=self.address,
+            description_of_origin=f"the `{self.alias}` from the target {self.address}",
+        )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -2614,7 +2897,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
 class Tags(StringSequenceField):
     alias = "tags"
-    help = softwrap(
+    help = help_text(
         f"""
         Arbitrary strings to describe a target.
 
@@ -2626,7 +2909,7 @@ class Tags(StringSequenceField):
 
 class DescriptionField(StringField):
     alias = "description"
-    help = softwrap(
+    help = help_text(
         f"""
         A human-readable description of the target.
 
@@ -2656,38 +2939,37 @@ class OverridesField(AsyncFieldMixin, Field):
         cls,
         raw_value: Optional[Dict[Union[str, Tuple[str, ...]], Dict[str, Any]]],
         address: Address,
-    ) -> Optional[Dict[Tuple[str, ...], Dict[str, Any]]]:
+    ) -> Optional[FrozenDict[Tuple[str, ...], FrozenDict[str, ImmutableValue]]]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
-        invalid_type_exception = InvalidFieldTypeException(
-            address,
-            cls.alias,
-            raw_value,
-            expected_type="dict[str | tuple[str, ...], dict[str, Any]]",
-        )
-        if not isinstance(value_or_default, collections.abc.Mapping):
-            raise invalid_type_exception
 
-        result: dict[tuple[str, ...], dict[str, Any]] = {}
+        def invalid_type_exception() -> InvalidFieldException:
+            return InvalidFieldTypeException(
+                address,
+                cls.alias,
+                raw_value,
+                expected_type="dict[str | tuple[str, ...], dict[str, Any]]",
+            )
+
+        if not isinstance(value_or_default, collections.abc.Mapping):
+            raise invalid_type_exception()
+
+        result: dict[tuple[str, ...], FrozenDict[str, ImmutableValue]] = {}
         for outer_key, nested_value in value_or_default.items():
             if isinstance(outer_key, str):
                 outer_key = (outer_key,)
             if not isinstance(outer_key, collections.abc.Sequence) or not all(
                 isinstance(elem, str) for elem in outer_key
             ):
-                raise invalid_type_exception
+                raise invalid_type_exception()
             if not isinstance(nested_value, collections.abc.Mapping):
-                raise invalid_type_exception
+                raise invalid_type_exception()
             if not all(isinstance(inner_key, str) for inner_key in nested_value):
-                raise invalid_type_exception
-            result[tuple(outer_key)] = dict(nested_value)
+                raise invalid_type_exception()
+            result[tuple(outer_key)] = FrozenDict.deep_freeze(cast(Mapping[str, Any], nested_value))
 
-        return result
-
-    def __hash__(self) -> int:
-        # The value might have unhashable elements like `list`, so we stringify it.
-        return hash((self.__class__, repr(self.value)))
+        return FrozenDict(result)
 
     @classmethod
     def to_path_globs(
@@ -2711,7 +2993,7 @@ class OverridesField(AsyncFieldMixin, Field):
         return tuple(
             PathGlobs(
                 [relativize_glob(glob)],
-                glob_match_error_behavior=unmatched_build_file_globs.to_glob_match_error_behavior(),
+                glob_match_error_behavior=unmatched_build_file_globs.error_behavior,
                 description_of_origin=f"the `overrides` field for {address}",
             )
             for glob in overrides_keys
@@ -2785,12 +3067,12 @@ def generate_multiple_sources_field_help_message(files_example: str) -> str:
 def generate_file_based_overrides_field_help_message(
     generated_target_name: str, example: str
 ) -> str:
-    example = textwrap.dedent(example.lstrip("\n"))
+    example = textwrap.dedent(example.lstrip("\n"))  # noqa: PNT20
     example = textwrap.indent(example, " " * 4)
     return "\n".join(
         [
             softwrap(
-                """
+                f"""
                 Override the field values for generated `{generated_target_name}` targets.
 
                 Expects a dictionary of relative file paths and globs to a dictionary for the
@@ -2799,9 +3081,11 @@ def generate_file_based_overrides_field_help_message(
                 field names to the overridden value.
 
                 For example:
+
+                {example}
                 """
             ),
-            example,
+            "",
             softwrap(
                 f"""
                 File paths and globs are relative to the BUILD file's directory. Every overridden file is

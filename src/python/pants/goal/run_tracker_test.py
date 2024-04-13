@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import datetime
-import getpass
 import re
 import time
 from pathlib import Path
@@ -15,6 +14,7 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.goal.run_tracker import RunTracker
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.contextutil import environment_as
+from pants.util.osutil import getuser
 from pants.version import VERSION
 
 
@@ -61,7 +61,7 @@ def test_run_information(exit_code: ExitCode, expected: str, tmp_path: Path, **k
         assert "Jan" in run_information["datetime"]
         assert "2020" in run_information["datetime"]
         assert run_information["timestamp"] == 1578657601.0
-        assert run_information["user"] == getpass.getuser()
+        assert run_information["user"] == getuser()
         assert run_information["version"] == VERSION
         assert re.match(f"pants.*{spec}", run_information["cmd_line"])
         assert run_information["specs_from_command_line"] == [spec]

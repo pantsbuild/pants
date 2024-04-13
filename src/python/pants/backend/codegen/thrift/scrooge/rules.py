@@ -10,19 +10,23 @@ from pants.backend.codegen.thrift.target_types import (
     ThriftSourcesGeneratorTarget,
     ThriftSourceTarget,
 )
-from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
+from pants.engine.target import (
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
@@ -40,7 +44,7 @@ class GeneratedScroogeThriftSources:
     snapshot: Snapshot
 
 
-class ScroogeToolLockfileSentinel(GenerateToolLockfileSentinel):
+class ScroogeToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = ScroogeSubsystem.options_scope
 
 
@@ -58,7 +62,12 @@ async def generate_scrooge_thrift_sources(
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.thrift_source_field.address])),
         Get(Digest, CreateDigest([Directory(output_dir)])),
-        Get(WrappedTarget, Address, request.thrift_source_field.address),
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(
+                request.thrift_source_field.address, description_of_origin="<infallible>"
+            ),
+        ),
     )
 
     transitive_sources, target_sources = await MultiGet(

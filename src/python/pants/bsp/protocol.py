@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import Future
-from typing import Any, BinaryIO, ClassVar
+from typing import Any, BinaryIO, ClassVar, Protocol
 
 from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
 from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
@@ -16,16 +16,12 @@ from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # ty
 
 from pants.bsp.context import BSPContext
 from pants.bsp.spec.notification import BSPNotification
+from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Workspace
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.unions import UnionMembership, union
-
-try:
-    from typing import Protocol  # Python 3.8+
-except ImportError:
-    # See https://github.com/python/mypy/issues/4427 re the ignore
-    from typing_extensions import Protocol  # type: ignore
 
 _logger = logging.getLogger(__name__)
 
@@ -41,7 +37,7 @@ class BSPResponseTypeProtocol(Protocol):
         ...
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class BSPHandlerMapping:
     """Union type for rules to register handlers for BSP methods."""
 
@@ -70,7 +66,7 @@ def _make_error_future(exc: Exception) -> Future:
 class BSPConnection:
     _INITIALIZE_METHOD_NAME = "build/initialize"
     _SHUTDOWN_METHOD_NAME = "build/shutdown"
-    _EXIT_NOTIFCATION_NAME = "build/exit"
+    _EXIT_NOTIFICATION_NAME = "build/exit"
 
     def __init__(
         self,
@@ -82,6 +78,8 @@ class BSPConnection:
         max_workers: int = 5,
     ) -> None:
         self._scheduler_session = scheduler_session
+        # TODO: We might eventually want to make this configurable.
+        self._env_name = determine_bootstrap_environment(self._scheduler_session)
         self._inbound = JsonRpcStreamReader(inbound)
         self._outbound = JsonRpcStreamWriter(outbound)
         self._context: BSPContext = context
@@ -105,7 +103,7 @@ class BSPConnection:
         _logger.info(f"_send_outbound_message: msg={msg}")
         self._outbound.write(msg)
 
-    # TODO: Figure out how to run this on the `Endpoint`'s thread pool by returing a callable. For now, we
+    # TODO: Figure out how to run this on the `Endpoint`'s thread pool by returning a callable. For now, we
     # need to return errors as futures given that `Endpoint` only handles exceptions returned that way versus using a try ... except block.
     def _handle_inbound_message(self, *, method_name: str, params: Any):
         # If the connection is not yet initialized and this is not the initialization request, BSP requires
@@ -131,7 +129,7 @@ class BSPConnection:
             # Return no-op success for the `build/shutdown` method. This doesn't actually cause the server to
             # exit. That will occur once the client sends the `build/exit` notification.
             return None
-        elif method_name == self._EXIT_NOTIFCATION_NAME:
+        elif method_name == self._EXIT_NOTIFICATION_NAME:
             # The `build/exit` notification directs the BSP server to immediately exit.
             # The read-dispatch loop will exit once it notices that the inbound handle is closed. So close the
             # inbound handle (and outbound handle for completeness) and then return to the dispatch loop
@@ -153,24 +151,16 @@ class BSPConnection:
         self._scheduler_session.new_run_id()
 
         workspace = Workspace(self._scheduler_session)
-        params = Params(request, workspace)
+        params = Params(request, workspace, self._env_name)
         execution_request = self._scheduler_session.execution_request(
-            products=[method_mapping.response_type],
-            subjects=[params],
+            requests=[(method_mapping.response_type, params)],
         )
-        returns, throws = self._scheduler_session.execute(execution_request)
-        if len(returns) == 1 and len(throws) == 0:
-            # Initialize the BSPContext with the client-supplied init parameters. See earlier comment on why this
-            # call to `BSPContext.initialize_connection` is safe.
-            if method_name == self._INITIALIZE_METHOD_NAME:
-                self._context.initialize_connection(request, self.notify_client)
-            return returns[0][1].value.to_json_dict()
-        elif len(returns) == 0 and len(throws) == 1:
-            raise throws[0][1].exc
-        else:
-            raise AssertionError(
-                f"Received unexpected result from engine: returns={returns}; throws={throws}"
-            )
+        (result,) = self._scheduler_session.execute(execution_request)
+        # Initialize the BSPContext with the client-supplied init parameters. See earlier comment on why this
+        # call to `BSPContext.initialize_connection` is safe.
+        if method_name == self._INITIALIZE_METHOD_NAME:
+            self._context.initialize_connection(request, self.notify_client)
+        return result.to_json_dict()
 
     # Called by `Endpoint` to dispatch requests and notifications.
     # TODO: Should probably vendor `Endpoint` so we can detect notifications versus method calls, which

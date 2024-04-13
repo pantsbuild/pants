@@ -9,7 +9,7 @@ from unittest import mock
 import pytest
 
 from pants.engine.fs import EMPTY_DIGEST
-from pants.jvm.resolve.common import Coordinate, Coordinates
+from pants.jvm.resolve.coordinate import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.key import CoursierResolveKey
 
@@ -39,7 +39,6 @@ direct: dict[Coordinate, set[Coordinate]] = {
 
 @pytest.fixture
 def lockfile() -> CoursierResolvedLockfile:
-
     # Calculate transitive deps
     transitive_ = {(i, k) for i, j in direct.items() for k in j}
     while True:
@@ -48,7 +47,7 @@ def lockfile() -> CoursierResolvedLockfile:
         if old_len == len(transitive_):
             break
     transitive = DefaultDict(set)
-    for (i, j) in transitive_:
+    for i, j in transitive_:
         transitive[i].add(j)
 
     entries = (

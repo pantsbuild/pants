@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from pants.backend.codegen.thrift.apache.subsystem import ApacheThriftSubsystem
 from pants.backend.codegen.thrift.target_types import ThriftSourceField
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
@@ -14,10 +15,10 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
     BinaryPathTest,
 )
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
@@ -121,9 +122,13 @@ async def generate_apache_thrift_sources(
 
 
 @rule
-async def setup_thrift_tool(apache_thrift: ApacheThriftSubsystem) -> ApacheThriftSetup:
-    env = await Get(Environment, EnvironmentRequest(["PATH"]))
-    search_paths = apache_thrift.thrift_search_paths(env)
+async def setup_thrift_tool(
+    apache_thrift: ApacheThriftSubsystem,
+    apache_thrift_env_aware: ApacheThriftSubsystem.EnvironmentAware,
+    env_target: EnvironmentTarget,
+) -> ApacheThriftSetup:
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
+    search_paths = apache_thrift_env_aware.thrift_search_paths(env)
     all_thrift_binary_paths = await Get(
         BinaryPaths,
         BinaryPathRequest(
@@ -153,7 +158,7 @@ async def setup_thrift_tool(apache_thrift: ApacheThriftSubsystem) -> ApacheThrif
                 (binary_path.path, "-version"),
                 description=f"Determine Apache Thrift version for {binary_path.path}",
                 level=LogLevel.DEBUG,
-                cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+                cache_scope=env_target.executable_search_path_cache_scope(),
             ),
         )
         for binary_path in all_thrift_binary_paths.paths

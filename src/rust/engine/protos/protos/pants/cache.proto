@@ -7,6 +7,7 @@ import "build/bazel/remote/execution/v2/remote_execution.proto";
 enum CacheKeyType {
   PROCESS = 0;
   URL = 1;
+  DEP_INFERENCE_REQUEST = 2;
 }
 
 // A tagged Digest to be used as a key in the local LMDB cache.
@@ -14,6 +15,27 @@ message CacheKey {
   CacheKeyType key_type = 1;
 
   build.bazel.remote.execution.v2.Digest digest = 2;
+}
+
+message DependencyInferenceRequest {
+  build.bazel.remote.execution.v2.Digest input_file_digest = 1;
+  oneof metadata {
+    JavascriptInferenceMetadata js = 2;
+  }
+  // Ensure using this as a cache key reflects everything that might influence the output: inference
+  // implementation inside Pants, and the input's file location (if there's any relative imports)
+  string impl_hash = 3;
+  string input_file_path = 4;
+}
+
+
+message JavascriptInferenceMetadata {
+  message ImportPattern {
+    string pattern = 1;
+    repeated string replacements = 2;
+  }
+  string package_root = 1;
+  repeated ImportPattern import_patterns = 2;
 }
 
 // A URL and Digest tuple, which is itself digested and used as a CacheKey. ObservedURLs

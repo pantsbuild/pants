@@ -1,10 +1,13 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import textwrap
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Iterable
 
 from pants.build_graph.address import Address
 from pants.core.goals.package import (
@@ -18,14 +21,17 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import (
+    EMPTY_DIGEST,
     AddPrefix,
     CreateDigest,
     Digest,
     DigestEntries,
+    DigestSubset,
     Directory,
     FileContent,
     FileEntry,
     MergeDigests,
+    PathGlobs,
 )
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import Process, ProcessResult
@@ -39,10 +45,13 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
+from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
 from pants.jvm.target_types import (
+    JvmShadingRule,
     JvmWarContentField,
     JvmWarDependenciesField,
     JvmWarDescriptorAddressField,
+    JvmWarShadingRulesField,
 )
 
 logger = logging.getLogger(__name__)
@@ -59,6 +68,7 @@ class PackageWarFileFieldSet(PackageFieldSet):
     dependencies: JvmWarDependenciesField
     descriptor: JvmWarDescriptorAddressField
     content: JvmWarContentField
+    shading_rules: JvmWarShadingRulesField
 
 
 @dataclass(frozen=True)
@@ -82,6 +92,27 @@ class RenderedWarContent:
     digest: Digest
 
 
+async def _apply_shading_rules_to_classpath(
+    classpath: Classpath, shading_rules: Iterable[JvmShadingRule] | None
+) -> Digest:
+    input_digest = await Get(Digest, MergeDigests(classpath.digests()))
+    if not shading_rules:
+        return input_digest
+
+    jars_digest = await Get(Digest, DigestSubset(input_digest, PathGlobs(["**/*.jar"])))
+    digest_entries = await Get(DigestEntries, Digest, jars_digest)
+    jar_entries = [entry for entry in digest_entries if isinstance(entry, FileEntry)]
+    if len(jar_entries) == 0:
+        return EMPTY_DIGEST
+
+    jar_digests = await MultiGet(Get(Digest, CreateDigest([entry])) for entry in jar_entries)
+    shaded_jars = await MultiGet(
+        Get(ShadedJar, ShadeJarRequest(path=entry.path, digest=digest, rules=shading_rules))
+        for entry, digest in zip(jar_entries, jar_digests)
+    )
+    return await Get(Digest, MergeDigests([shaded.digest for shaded in shaded_jars]))
+
+
 @rule
 async def package_war(
     field_set: PackageWarFileFieldSet,
@@ -89,7 +120,9 @@ async def package_war(
     zip: ZipBinary,
 ) -> BuiltPackage:
     classpath = await Get(Classpath, DependenciesRequest(field_set.dependencies))
-    all_jar_files_digest = await Get(Digest, MergeDigests(classpath.digests()))
+    all_jar_files_digest = await _apply_shading_rules_to_classpath(
+        classpath, field_set.shading_rules.value
+    )
 
     prefixed_jars_digest, content, descriptor, input_setup_digest = await MultiGet(
         Get(Digest, AddPrefix(all_jar_files_digest, "__war__/WEB-INF/lib")),
@@ -106,9 +139,9 @@ async def package_war(
                         "make_war.sh",
                         textwrap.dedent(
                             f"""\
-                    cd __war__
-                    {zip.path} ../output.war -r .
-                    """
+                            cd __war__
+                            {zip.path} ../output.war -r .
+                            """
                         ).encode(),
                         is_executable=True,
                     ),

@@ -17,6 +17,6 @@ python_sources(
 python_tests(
     name="tests",
     overrides={
-        "load_backends_integration_test.py": {"timeout": 450},
+        "load_backends_integration_test.py": {"timeout": 900},
     },
 )

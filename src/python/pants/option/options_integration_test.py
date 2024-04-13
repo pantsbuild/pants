@@ -47,22 +47,20 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
         """\
         from pants.option.subsystem import Subsystem
         from pants.option.option_types import StrOption
-        from pants.engine.rules import SubsystemRule
 
         class Options(Subsystem):
             help = "Options just for a test."
             options_scope = "mock-options"
 
             deprecated = StrOption(
-                "--deprecated",
                 default=None,
-                help="doens't matter",
+                help="doesn't matter",
                 removal_version="999.99.9.dev0",
                 removal_hint="blah",
             )
 
         def rules():
-            return [SubsystemRule(Options)]
+            return [*Options.rules()]
         """
     )
     with setup_tmpdir(
@@ -84,8 +82,8 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
         result.assert_success()
         assert unmatched_glob_warning in result.stderr
         assert (
-            "DEPRECATED: option 'deprecated' in scope 'mock-options' is scheduled to be removed in version "
-            "999.99.9.dev0."
+            "DEPRECATED: option 'deprecated' in scope 'mock-options' is scheduled to be removed in version"
+            + " 999.99.9.dev0."
         ) in result.stderr
 
         config["GLOBAL"]["ignore_warnings"] = [  # type: ignore[index]
@@ -99,7 +97,6 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
 
 
 def test_pants_symlink_workdirs(tmp_path: Path) -> None:
-
     symlink_workdir = tmp_path / ".pants.d"
     physical_workdir_base = tmp_path / "workdirs"
     physical_workdir = physical_workdir_base / safe_filename_from_path(symlink_workdir.as_posix())

@@ -28,6 +28,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
 from pants.jvm.dependency_inference.symbol_mapper import JvmFirstPartyPackageMappingException
 from pants.jvm.jdk_rules import rules as java_util_rules
 from pants.jvm.resolve import jvm_tool
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -45,6 +46,7 @@ def rule_runner() -> RuleRunner:
             *dep_inference_rules(),
             *java_target_rules(),
             *java_util_rules(),
+            *strip_jar.rules(),
             *javac_rules(),
             *source_files.rules(),
             *system_binaries.rules(),
@@ -147,7 +149,7 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
             node = new_node
         return node
 
-    # Provided by `JVM_ARTFACT_MAPPINGS.`
+    # Provided by `JVM_ARTIFACT_MAPPINGS.`
     assert set(traverse("org", "junit").addresses[DEFAULT_SYMBOL_NAMESPACE]) == {
         Address("", target_name="junit_junit"),
     }

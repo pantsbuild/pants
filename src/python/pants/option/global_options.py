@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import enum
-import importlib
 import logging
 import os
 import re
@@ -14,7 +13,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path, PurePath
-from typing import Any, Type, cast
+from typing import Any, Callable, Type, TypeVar, cast
+
+from typing_extensions import assert_never
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -23,8 +24,10 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.fs import FileContent
 from pants.engine.internals.native_engine import PyExecutor
 from pants.option.custom_types import memory_size
 from pants.option.errors import OptionsError
@@ -50,7 +53,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classmethod, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.osutil import CPU_COUNT
-from pants.util.strutil import fmt_memory_size, softwrap
+from pants.util.strutil import Simplifier, fmt_memory_size, softwrap
 from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
@@ -66,42 +69,156 @@ GIGABYTES = 1_000 * MEGABYTES
 
 
 class DynamicUIRenderer(Enum):
-    """Which renderer to use for dyanmic UI."""
+    """Which renderer to use for dynamic UI."""
 
     indicatif_spinner = "indicatif-spinner"
     experimental_prodash = "experimental-prodash"
 
 
-class UnmatchedBuildFileGlobs(Enum):
+_G = TypeVar("_G", bound="_GlobMatchErrorBehaviorOptionBase")
+
+
+class RemoteProvider(Enum):
+    """Which remote provider to use."""
+
+    reapi = "reapi"
+    experimental_file = "experimental-file"
+    experimental_github_actions_cache = "experimental-github-actions-cache"
+
+    def _supports_execution(self) -> bool:
+        return self is RemoteProvider.reapi
+
+    def _supported_schemes(self) -> list[str]:
+        if self is RemoteProvider.reapi:
+            return ["grpc", "grpcs"]
+        elif self is RemoteProvider.experimental_file:
+            return ["file"]
+        elif self is RemoteProvider.experimental_github_actions_cache:
+            return ["http", "https"]
+
+        assert_never(self)
+
+    def _matches_scheme(self, addr: str) -> bool:
+        return any(addr.startswith(f"{scheme}://") for scheme in self._supported_schemes())
+
+    def _human_readable_schemes(self) -> str:
+        return ", ".join(f"`{s}://`" for s in sorted(self._supported_schemes()))
+
+    def validate_address(self, addr: str, address_source: str, provider_source: str) -> None:
+        if self._matches_scheme(addr):
+            # All good! The scheme matches this provider.
+            return
+
+        other_providers = [
+            provider for provider in RemoteProvider if provider._matches_scheme(addr)
+        ]
+        if other_providers:
+            rendered = ", ".join(f"`{p.value}`" for p in other_providers)
+            provider_did_you_mean = (
+                f"to use a provider that does support this scheme ({rendered}) or "
+            )
+        else:
+            provider_did_you_mean = ""
+
+        schemes_did_you_mean = (
+            f"to use a scheme that is supported by this provider ({self._human_readable_schemes()})"
+        )
+
+        raise OptionsError(
+            softwrap(
+                f"""
+                Value `{addr}` from {address_source} is invalid: it doesn't have a scheme that is
+                supported by provider `{self.value}` from {provider_source}.
+
+                Did you mean {provider_did_you_mean}{schemes_did_you_mean}?
+                """
+            )
+        )
+
+    def validate_execution_supported(self, provider_source: str, execution_implied_by: str) -> None:
+        if self._supports_execution():
+            # All good! Execution is supported by this provider.
+            return
+
+        supported_execution_providers = ", ".join(
+            f"`{provider.value}`" for provider in RemoteProvider if provider._supports_execution()
+        )
+        raise OptionsError(
+            softwrap(
+                f"""
+                Value `{self.value}` from {provider_source} is invalid: it does not support remote
+                execution, but remote execution is required due to {execution_implied_by}.
+
+                Either disable remote execution, or use a provider that does support remote
+                execution: {supported_execution_providers}
+                """
+            )
+        )
+
+    @staticmethod
+    def provider_help() -> Callable[[object], str]:
+        def provider_list_item(p: RemoteProvider) -> str:
+            if p is RemoteProvider.reapi:
+                description = "a server using the Remote Execution API (https://github.com/bazelbuild/remote-apis)"
+            elif p is RemoteProvider.experimental_github_actions_cache:
+                description = "the GitHub Actions caching service"
+            elif p is RemoteProvider.experimental_file:
+                description = "a directory mapped on the current machine"
+            else:
+                assert_never(p)
+
+            return f"- `{p.value}`: {description} (supported schemes for URIs: {p._human_readable_schemes()})"
+
+        def renderer(_: object) -> str:
+            list_items = "\n\n".join(provider_list_item(p) for p in RemoteProvider)
+            return softwrap(
+                f"""
+                The type of provider to use, if using a remote cache and/or remote execution, See
+                {doc_url('docs/using-pants/remote-caching-and-execution')} for details.
+
+                Each provider supports different `remote_store_address` and (optional)
+                `remote_execution_address` URIs.
+
+                Supported values:
+
+                {list_items}
+                """
+            )
+
+        return renderer
+
+
+@dataclass(frozen=True)
+class _GlobMatchErrorBehaviorOptionBase:
+    """This class exists to have dedicated types per global option of the `GlobMatchErrorBehavior`
+    so we can extract the relevant option in a rule to limit the scope of downstream rules to avoid
+    depending on the entire global options data."""
+
+    error_behavior: GlobMatchErrorBehavior
+
+    @classmethod
+    def ignore(cls: type[_G]) -> _G:
+        return cls(GlobMatchErrorBehavior.ignore)
+
+    @classmethod
+    def warn(cls: type[_G]) -> _G:
+        return cls(GlobMatchErrorBehavior.warn)
+
+    @classmethod
+    def error(cls: type[_G]) -> _G:
+        return cls(GlobMatchErrorBehavior.error)
+
+
+class UnmatchedBuildFileGlobs(_GlobMatchErrorBehaviorOptionBase):
     """What to do when globs do not match in BUILD files."""
 
-    warn = "warn"
-    error = "error"
 
-    def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
-        return GlobMatchErrorBehavior(self.value)
-
-
-class UnmatchedCliGlobs(Enum):
+class UnmatchedCliGlobs(_GlobMatchErrorBehaviorOptionBase):
     """What to do when globs do not match in CLI args."""
 
-    ignore = "ignore"
-    warn = "warn"
-    error = "error"
 
-    def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
-        return GlobMatchErrorBehavior(self.value)
-
-
-class OwnersNotFoundBehavior(Enum):
+class OwnersNotFoundBehavior(_GlobMatchErrorBehaviorOptionBase):
     """What to do when a file argument cannot be mapped to an owning target."""
-
-    ignore = "ignore"
-    warn = "warn"
-    error = "error"
-
-    def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
-        return GlobMatchErrorBehavior(self.value)
 
 
 @enum.unique
@@ -109,6 +226,25 @@ class RemoteCacheWarningsBehavior(Enum):
     ignore = "ignore"
     first_only = "first_only"
     backoff = "backoff"
+    always = "always"
+
+
+@enum.unique
+class CacheContentBehavior(Enum):
+    fetch = "fetch"
+    validate = "validate"
+    defer = "defer"
+
+
+class KeepSandboxes(Enum):
+    """An enum for the global option `keep_sandboxes`.
+
+    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
+    """
+
+    always = "always"
+    on_failure = "on_failure"
+    never = "never"
 
 
 @enum.unique
@@ -119,39 +255,50 @@ class AuthPluginState(Enum):
 
 @dataclass(frozen=True)
 class AuthPluginResult:
-    """The return type for a function specified via `--remote-auth-plugin`.
+    """The return type for a function specified via `[GLOBAL].remote_auth_plugin`.
 
     The returned `store_headers` and `execution_headers` will replace whatever headers Pants would
-    have used normally, e.g. what is set with `--remote-store-headers`. This allows you to control
+    have used normally, e.g. what is set with `[GLOBAL].remote_store_headers`. This allows you to control
     the merge strategy if your plugin sets conflicting headers. Usually, you will want to preserve
     the `initial_store_headers` and `initial_execution_headers` passed to the plugin.
 
-    If set, the returned `instance_name` will override by `--remote-instance-name`, `store_address`
-    will override `--remote-store-address`, and `execution_address` will override
-    `--remote-execution-address`. The store address and execution address must be prefixed with
-    `grpc://` or `grpcs://`.
+    If set, the returned `instance_name` will override `[GLOBAL].remote_instance_name`,
+    `store_address` will override `[GLOBAL].remote_store_address`, and `execution_address` will
+    override ``[GLOBAL].remote_execution_address``. The addresses are interpreted and validated in
+    the same manner as the corresponding option.
     """
 
     state: AuthPluginState
     store_headers: dict[str, str]
     execution_headers: dict[str, str]
+    provider: RemoteProvider = RemoteProvider.reapi
     store_address: str | None = None
     execution_address: str | None = None
     instance_name: str | None = None
     expiration: datetime | None = None
+    plugin_name: str | None = None
 
     def __post_init__(self) -> None:
-        def assert_valid_address(addr: str | None, field_name: str) -> None:
-            valid_schemes = [f"{scheme}://" for scheme in ("grpc", "grpcs")]
-            if addr and not any(addr.startswith(scheme) for scheme in valid_schemes):
-                raise ValueError(
-                    f"Invalid `{field_name}` in `AuthPluginResult` returned from "
-                    f"`--remote-auth-plugin`. Must start with `grpc://` or `grpcs://`, but was "
-                    f"{addr}."
-                )
+        name = self.plugin_name or ""
+        plugin_context = f"in `AuthPluginResult` returned from `[GLOBAL].remote_auth_plugin` {name}"
 
-        assert_valid_address(self.store_address, "store_address")
-        assert_valid_address(self.execution_address, "execution_address")
+        if self.store_address:
+            self.provider.validate_address(
+                self.store_address,
+                address_source=f"`store_address` {plugin_context}",
+                provider_source="`provider` in same result",
+            )
+
+        if self.execution_address:
+            self.provider.validate_execution_supported(
+                provider_source=f"`provider` {plugin_context}",
+                execution_implied_by="`execution_address` in same result",
+            )
+            self.provider.validate_address(
+                self.execution_address,
+                address_source=f"`execution_address` {plugin_context}",
+                provider_source="`provider` in same result",
+            )
 
     @property
     def is_available(self) -> bool:
@@ -162,6 +309,7 @@ class AuthPluginResult:
 class DynamicRemoteOptions:
     """Options related to remote execution of processes which are computed dynamically."""
 
+    provider: RemoteProvider
     execution: bool
     cache_read: bool
     cache_write: bool
@@ -175,9 +323,58 @@ class DynamicRemoteOptions:
     cache_rpc_concurrency: int
     execution_rpc_concurrency: int
 
+    def _validate_store_addr(self) -> None:
+        if self.store_address:
+            return
+        if self.cache_read:
+            raise OptionsError(
+                softwrap(
+                    """
+                    The `[GLOBAL].remote_cache_read` option requires also setting the
+                    `[GLOBAL].remote_store_address` option in order to work properly.
+                    """
+                )
+            )
+        if self.cache_write:
+            raise OptionsError(
+                softwrap(
+                    """
+                    The `[GLOBAL].remote_cache_write` option requires also setting the
+                    `[GLOBAL].remote_store_address` option in order to work properly.
+                    """
+                )
+            )
+
+    def _validate_exec_addr(self) -> None:
+        if not self.execution:
+            return
+        if not self.execution_address:
+            raise OptionsError(
+                softwrap(
+                    """
+                    The `[GLOBAL].remote_execution` option requires also setting the
+                    `[GLOBAL].remote_execution_address` option in order to work properly.
+                    """
+                )
+            )
+        if not self.store_address:
+            raise OptionsError(
+                softwrap(
+                    """
+                    The `[GLOBAL].remote_execution_address` option requires also setting the
+                    `[GLOBAL].remote_store_address` option. Often these have the same value.
+                    """
+                )
+            )
+
+    def __post_init__(self) -> None:
+        self._validate_store_addr()
+        self._validate_exec_addr()
+
     @classmethod
     def disabled(cls) -> DynamicRemoteOptions:
-        return DynamicRemoteOptions(
+        return cls(
+            provider=DEFAULT_EXECUTION_OPTIONS.remote_provider,
             execution=False,
             cache_read=False,
             cache_write=False,
@@ -193,14 +390,23 @@ class DynamicRemoteOptions:
         )
 
     @classmethod
-    def from_options(
-        cls,
-        full_options: Options,
-        env: CompleteEnvironment,
-        prior_result: AuthPluginResult | None = None,
-    ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
-        bootstrap_options = full_options.bootstrap_option_values()
-        assert bootstrap_options is not None
+    def _use_oauth_token(cls, bootstrap_options: OptionValueContainer) -> DynamicRemoteOptions:
+        if bootstrap_options.remote_oauth_bearer_token:
+            oauth_token = bootstrap_options.remote_oauth_bearer_token
+            description = "`remote_oauth_bearer_token` option"
+        else:
+            oauth_token = (
+                Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
+            )
+            description = f"`remote_oauth_bearer_token_path` option ({bootstrap_options.remote_oauth_bearer_token_path})"
+
+        if set(oauth_token).intersection({"\n", "\r"}):
+            raise OptionsError(
+                f"OAuth bearer token from {description} must not contain multiple lines."
+            )
+
+        token_header = {"authorization": f"Bearer {oauth_token}"}
+        provider = cast(RemoteProvider, bootstrap_options.remote_provider)
         execution = cast(bool, bootstrap_options.remote_execution)
         cache_read = cast(bool, bootstrap_options.remote_cache_read)
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
@@ -213,113 +419,181 @@ class DynamicRemoteOptions:
         store_rpc_concurrency = cast(int, bootstrap_options.remote_store_rpc_concurrency)
         cache_rpc_concurrency = cast(int, bootstrap_options.remote_cache_rpc_concurrency)
         execution_rpc_concurrency = cast(int, bootstrap_options.remote_execution_rpc_concurrency)
-
-        if bootstrap_options.remote_oauth_bearer_token_path:
-            oauth_token = (
-                Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
-            )
-            if set(oauth_token).intersection({"\n", "\r"}):
-                raise OptionsError(
-                    f"OAuth bearer token path {bootstrap_options.remote_oauth_bearer_token_path} "
-                    "must not contain multiple lines."
-                )
-            token_header = {"authorization": f"Bearer {oauth_token}"}
-            execution_headers.update(token_header)
-            store_headers.update(token_header)
-
-        auth_plugin_result: AuthPluginResult | None = None
-        if (
-            bootstrap_options.remote_auth_plugin
-            and bootstrap_options.remote_auth_plugin.strip()
-            and (execution or cache_read or cache_write)
-        ):
-            if ":" not in bootstrap_options.remote_auth_plugin:
-                raise OptionsError(
-                    "Invalid value for `--remote-auth-plugin`: "
-                    f"{bootstrap_options.remote_auth_plugin}. Please use the format "
-                    f"`path.to.module:my_func`."
-                )
-            auth_plugin_path, auth_plugin_func = bootstrap_options.remote_auth_plugin.split(":")
-            auth_plugin_module = importlib.import_module(auth_plugin_path)
-            auth_plugin_func = getattr(auth_plugin_module, auth_plugin_func)
-            auth_plugin_result = cast(
-                AuthPluginResult,
-                auth_plugin_func(
-                    initial_execution_headers=execution_headers,
-                    initial_store_headers=store_headers,
-                    options=full_options,
-                    env=dict(env),
-                    prior_result=prior_result,
-                ),
-            )
-            if not auth_plugin_result.is_available:
-                # NB: This is debug because we expect plugins to log more informative messages.
-                logger.debug(
-                    "Disabling remote caching and remote execution because authentication was not "
-                    "available via the plugin from `--remote-auth-plugin`."
-                )
-                execution = False
-                cache_read = False
-                cache_write = False
-            else:
-                logger.debug(
-                    "`--remote-auth-plugin` succeeded. Remote caching/execution will be attempted."
-                )
-                execution_headers = auth_plugin_result.execution_headers
-                store_headers = auth_plugin_result.store_headers
-                overridden_opt_log = (
-                    "Overriding `{}` to instead be {} due to the plugin from "
-                    "`--remote-auth-plugin`."
-                )
-                if (
-                    auth_plugin_result.instance_name is not None
-                    and auth_plugin_result.instance_name != instance_name
-                ):
-                    logger.debug(
-                        overridden_opt_log.format(
-                            f"--remote-instance-name={repr(instance_name)}",
-                            repr(auth_plugin_result.instance_name),
-                        )
-                    )
-                    instance_name = auth_plugin_result.instance_name
-                if (
-                    auth_plugin_result.store_address is not None
-                    and auth_plugin_result.store_address != store_address
-                ):
-                    logger.debug(
-                        overridden_opt_log.format(
-                            f"--remote-store-address={repr(store_address)}",
-                            repr(auth_plugin_result.store_address),
-                        )
-                    )
-                    store_address = auth_plugin_result.store_address
-                if (
-                    auth_plugin_result.execution_address is not None
-                    and auth_plugin_result.execution_address != execution_address
-                ):
-                    logger.debug(
-                        overridden_opt_log.format(
-                            f"--remote-execution-address={repr(execution_address)}",
-                            repr(auth_plugin_result.execution_address),
-                        )
-                    )
-                    execution_address = auth_plugin_result.execution_address
-
-        # NB: Tonic expects the schemes `http` and `https`, even though they are gRPC requests.
-        # We validate that users set `grpc` and `grpcs` in the options system / plugin for clarity,
-        # but then normalize to `http`/`https`.
-        execution_address = (
-            re.sub(r"^grpc", "http", execution_address) if execution_address else None
-        )
-        store_address = re.sub(r"^grpc", "http", store_address) if store_address else None
-
-        opts = DynamicRemoteOptions(
+        execution_headers.update(token_header)
+        store_headers.update(token_header)
+        return cls(
+            provider=provider,
             execution=execution,
             cache_read=cache_read,
             cache_write=cache_write,
             instance_name=instance_name,
-            store_address=store_address,
-            execution_address=execution_address,
+            store_address=cls._normalize_address(store_address),
+            execution_address=cls._normalize_address(execution_address),
+            store_headers=store_headers,
+            execution_headers=execution_headers,
+            parallelism=parallelism,
+            store_rpc_concurrency=store_rpc_concurrency,
+            cache_rpc_concurrency=cache_rpc_concurrency,
+            execution_rpc_concurrency=execution_rpc_concurrency,
+        )
+
+    @classmethod
+    def from_options(
+        cls,
+        full_options: Options,
+        env: CompleteEnvironmentVars,
+        prior_result: AuthPluginResult | None = None,
+        remote_auth_plugin_func: Callable | None = None,
+    ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
+        bootstrap_options = full_options.bootstrap_option_values()
+        assert bootstrap_options is not None
+        execution = cast(bool, bootstrap_options.remote_execution)
+        cache_read = cast(bool, bootstrap_options.remote_cache_read)
+        cache_write = cast(bool, bootstrap_options.remote_cache_write)
+        if not (execution or cache_read or cache_write):
+            return cls.disabled(), None
+
+        sources = {
+            str(remote_auth_plugin_func): bool(remote_auth_plugin_func),
+            "[GLOBAL].remote_oauth_bearer_token_path": bool(
+                bootstrap_options.remote_oauth_bearer_token_path
+            ),
+            "[GLOBAL].remote_oauth_bearer_token": bool(bootstrap_options.remote_oauth_bearer_token),
+        }
+        enabled_sources = [name for name, enabled in sources.items() if enabled]
+        if len(enabled_sources) > 1:
+            rendered = ", ".join(f"`{name}`" for name in enabled_sources)
+            raise OptionsError(
+                softwrap(
+                    f"""
+                    Multiple options are set that provide auth information: {rendered}.
+                    This is not supported. Only one of those should be set.
+                    """
+                )
+            )
+        if (
+            bootstrap_options.remote_oauth_bearer_token_path
+            or bootstrap_options.remote_oauth_bearer_token
+        ):
+            return cls._use_oauth_token(bootstrap_options), None
+        if remote_auth_plugin_func is not None:
+            return cls._use_auth_plugin(
+                bootstrap_options,
+                full_options=full_options,
+                env=env,
+                prior_result=prior_result,
+                remote_auth_plugin_func=remote_auth_plugin_func,
+            )
+        return cls._use_no_auth(bootstrap_options), None
+
+    @classmethod
+    def _use_no_auth(cls, bootstrap_options: OptionValueContainer) -> DynamicRemoteOptions:
+        provider = cast(RemoteProvider, bootstrap_options.remote_provider)
+        execution = cast(bool, bootstrap_options.remote_execution)
+        cache_read = cast(bool, bootstrap_options.remote_cache_read)
+        cache_write = cast(bool, bootstrap_options.remote_cache_write)
+        store_address = cast("str | None", bootstrap_options.remote_store_address)
+        execution_address = cast("str | None", bootstrap_options.remote_execution_address)
+        instance_name = cast("str | None", bootstrap_options.remote_instance_name)
+        execution_headers = cast("dict[str, str]", bootstrap_options.remote_execution_headers)
+        store_headers = cast("dict[str, str]", bootstrap_options.remote_store_headers)
+        parallelism = cast(int, bootstrap_options.process_execution_remote_parallelism)
+        store_rpc_concurrency = cast(int, bootstrap_options.remote_store_rpc_concurrency)
+        cache_rpc_concurrency = cast(int, bootstrap_options.remote_cache_rpc_concurrency)
+        execution_rpc_concurrency = cast(int, bootstrap_options.remote_execution_rpc_concurrency)
+        return cls(
+            provider=provider,
+            execution=execution,
+            cache_read=cache_read,
+            cache_write=cache_write,
+            instance_name=instance_name,
+            store_address=cls._normalize_address(store_address),
+            execution_address=cls._normalize_address(execution_address),
+            store_headers=store_headers,
+            execution_headers=execution_headers,
+            parallelism=parallelism,
+            store_rpc_concurrency=store_rpc_concurrency,
+            cache_rpc_concurrency=cache_rpc_concurrency,
+            execution_rpc_concurrency=execution_rpc_concurrency,
+        )
+
+    @classmethod
+    def _use_auth_plugin(
+        cls,
+        bootstrap_options: OptionValueContainer,
+        full_options: Options,
+        env: CompleteEnvironmentVars,
+        prior_result: AuthPluginResult | None,
+        remote_auth_plugin_func: Callable,
+    ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
+        provider = cast(RemoteProvider, bootstrap_options.remote_provider)
+        execution = cast(bool, bootstrap_options.remote_execution)
+        cache_read = cast(bool, bootstrap_options.remote_cache_read)
+        cache_write = cast(bool, bootstrap_options.remote_cache_write)
+        store_address = cast("str | None", bootstrap_options.remote_store_address)
+        execution_address = cast("str | None", bootstrap_options.remote_execution_address)
+        instance_name = cast("str | None", bootstrap_options.remote_instance_name)
+        execution_headers = cast("dict[str, str]", bootstrap_options.remote_execution_headers)
+        store_headers = cast("dict[str, str]", bootstrap_options.remote_store_headers)
+        parallelism = cast(int, bootstrap_options.process_execution_remote_parallelism)
+        store_rpc_concurrency = cast(int, bootstrap_options.remote_store_rpc_concurrency)
+        cache_rpc_concurrency = cast(int, bootstrap_options.remote_cache_rpc_concurrency)
+        execution_rpc_concurrency = cast(int, bootstrap_options.remote_execution_rpc_concurrency)
+        auth_plugin_result = cast(
+            AuthPluginResult,
+            remote_auth_plugin_func(
+                initial_execution_headers=execution_headers,
+                initial_store_headers=store_headers,
+                options=full_options,
+                env=dict(env),
+                prior_result=prior_result,
+            ),
+        )
+        plugin_name = (
+            auth_plugin_result.plugin_name
+            or f"{remote_auth_plugin_func.__module__}.{remote_auth_plugin_func.__name__}"
+        )
+        if not auth_plugin_result.is_available:
+            # NB: This is debug because we expect plugins to log more informative messages.
+            logger.debug(
+                f"Disabling remote caching and remote execution because authentication was not available via the plugin {plugin_name} (from `[GLOBAL].remote_auth_plugin`)."
+            )
+            return cls.disabled(), None
+
+        logger.debug(
+            f"Remote auth plugin `{plugin_name}` succeeded. Remote caching/execution will be attempted."
+        )
+        provider = auth_plugin_result.provider
+        execution_headers = auth_plugin_result.execution_headers
+        store_headers = auth_plugin_result.store_headers
+        plugin_provided_opt_log = "Setting `[GLOBAL].remote_{opt}` is not needed and will be ignored since it is provided by the auth plugin: {plugin_name}."
+        if auth_plugin_result.instance_name is not None:
+            if instance_name is not None:
+                logger.warning(
+                    plugin_provided_opt_log.format(opt="instance_name", plugin_name=plugin_name)
+                )
+            instance_name = auth_plugin_result.instance_name
+        if auth_plugin_result.store_address is not None:
+            if store_address is not None:
+                logger.warning(
+                    plugin_provided_opt_log.format(opt="store_address", plugin_name=plugin_name)
+                )
+            store_address = auth_plugin_result.store_address
+        if auth_plugin_result.execution_address is not None:
+            if execution_address is not None:
+                logger.warning(
+                    plugin_provided_opt_log.format(opt="execution_address", plugin_name=plugin_name)
+                )
+            execution_address = auth_plugin_result.execution_address
+
+        opts = cls(
+            provider=provider,
+            execution=execution,
+            cache_read=cache_read,
+            cache_write=cache_write,
+            instance_name=instance_name,
+            store_address=cls._normalize_address(store_address),
+            execution_address=cls._normalize_address(execution_address),
             store_headers=store_headers,
             execution_headers=execution_headers,
             parallelism=parallelism,
@@ -328,6 +602,14 @@ class DynamicRemoteOptions:
             execution_rpc_concurrency=execution_rpc_concurrency,
         )
         return opts, auth_plugin_result
+
+    @classmethod
+    def _normalize_address(cls, address: str | None) -> str | None:
+        # NB: Tonic expects the schemes `http` and `https`, even though they are gRPC requests.
+        # We validate that users set `grpc` and `grpcs` in the options system / plugin for clarity,
+        # but then normalize to `http`/`https`.
+        # TODO: move this logic into the actual remote providers
+        return re.sub(r"^grpc", "http", address) if address else None
 
 
 @dataclass(frozen=True)
@@ -338,19 +620,25 @@ class ExecutionOptions:
     allowing Subsystems to be consumed before the Scheduler has been created).
     """
 
+    remote_provider: RemoteProvider
+
     remote_execution: bool
     remote_cache_read: bool
     remote_cache_write: bool
 
     remote_instance_name: str | None
     remote_ca_certs_path: str | None
+    remote_client_certs_path: str | None
+    remote_client_key_path: str | None
 
-    process_cleanup: bool
+    keep_sandboxes: KeepSandboxes
     local_cache: bool
     process_execution_local_parallelism: int
     process_execution_local_enable_nailgun: bool
     process_execution_remote_parallelism: int
     process_execution_cache_namespace: str | None
+    process_execution_graceful_shutdown_timeout: int
+    cache_content_behavior: CacheContentBehavior
 
     process_total_child_memory_usage: int | None
     process_per_child_memory_usage: int
@@ -358,21 +646,21 @@ class ExecutionOptions:
     remote_store_address: str | None
     remote_store_headers: dict[str, str]
     remote_store_chunk_bytes: Any
-    remote_store_chunk_upload_timeout_seconds: int
     remote_store_rpc_retries: int
     remote_store_rpc_concurrency: int
     remote_store_batch_api_size_limit: int
+    remote_store_rpc_timeout_millis: int
 
-    remote_cache_eager_fetch: bool
     remote_cache_warnings: RemoteCacheWarningsBehavior
     remote_cache_rpc_concurrency: int
-    remote_cache_read_timeout_millis: int
+    remote_cache_rpc_timeout_millis: int
 
     remote_execution_address: str | None
-    remote_execution_extra_platform_properties: list[str]
     remote_execution_headers: dict[str, str]
     remote_execution_overall_deadline_secs: int
     remote_execution_rpc_concurrency: int
+
+    remote_execution_append_only_caches_base_path: str | None
 
     @classmethod
     def from_options(
@@ -381,6 +669,7 @@ class ExecutionOptions:
         dynamic_remote_options: DynamicRemoteOptions,
     ) -> ExecutionOptions:
         return cls(
+            remote_provider=dynamic_remote_options.provider,
             # Remote execution strategy.
             remote_execution=dynamic_remote_options.execution,
             remote_cache_read=dynamic_remote_options.cache_read,
@@ -388,34 +677,37 @@ class ExecutionOptions:
             # General remote setup.
             remote_instance_name=dynamic_remote_options.instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
+            remote_client_certs_path=bootstrap_options.remote_client_certs_path,
+            remote_client_key_path=bootstrap_options.remote_client_key_path,
             # Process execution setup.
-            process_cleanup=bootstrap_options.process_cleanup,
+            keep_sandboxes=GlobalOptions.resolve_keep_sandboxes(bootstrap_options),
             local_cache=bootstrap_options.local_cache,
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
+            process_execution_graceful_shutdown_timeout=bootstrap_options.process_execution_graceful_shutdown_timeout,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
+            cache_content_behavior=bootstrap_options.cache_content_behavior,
             process_total_child_memory_usage=bootstrap_options.process_total_child_memory_usage,
             process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
             # Remote store setup.
             remote_store_address=dynamic_remote_options.store_address,
             remote_store_headers=dynamic_remote_options.store_headers,
             remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
-            remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
             remote_store_rpc_concurrency=dynamic_remote_options.store_rpc_concurrency,
             remote_store_batch_api_size_limit=bootstrap_options.remote_store_batch_api_size_limit,
+            remote_store_rpc_timeout_millis=bootstrap_options.remote_store_rpc_timeout_millis,
             # Remote cache setup.
-            remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
             remote_cache_warnings=bootstrap_options.remote_cache_warnings,
             remote_cache_rpc_concurrency=dynamic_remote_options.cache_rpc_concurrency,
-            remote_cache_read_timeout_millis=bootstrap_options.remote_cache_read_timeout_millis,
+            remote_cache_rpc_timeout_millis=bootstrap_options.remote_cache_rpc_timeout_millis,
             # Remote execution setup.
             remote_execution_address=dynamic_remote_options.execution_address,
-            remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
             remote_execution_headers=dynamic_remote_options.execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             remote_execution_rpc_concurrency=dynamic_remote_options.execution_rpc_concurrency,
+            remote_execution_append_only_caches_base_path=bootstrap_options.remote_execution_append_only_caches_base_path,
         )
 
 
@@ -460,7 +752,11 @@ class LocalStoreOptions:
         )
 
 
+_PER_CHILD_MEMORY_USAGE = "512MiB"
+
+
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
+    remote_provider=RemoteProvider.reapi,
     # Remote execution strategy.
     remote_execution=False,
     remote_cache_read=False,
@@ -468,38 +764,41 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     # General remote setup.
     remote_instance_name=None,
     remote_ca_certs_path=None,
+    remote_client_certs_path=None,
+    remote_client_key_path=None,
     # Process execution setup.
     process_total_child_memory_usage=None,
-    process_per_child_memory_usage=memory_size("512MiB"),
+    process_per_child_memory_usage=memory_size(_PER_CHILD_MEMORY_USAGE),
     process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
-    process_cleanup=True,
+    keep_sandboxes=KeepSandboxes.never,
     local_cache=True,
+    cache_content_behavior=CacheContentBehavior.fetch,
     process_execution_local_enable_nailgun=True,
+    process_execution_graceful_shutdown_timeout=3,
     # Remote store setup.
     remote_store_address=None,
     remote_store_headers={
         "user-agent": f"pants/{VERSION}",
     },
     remote_store_chunk_bytes=1024 * 1024,
-    remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
     remote_store_rpc_concurrency=128,
     remote_store_batch_api_size_limit=4194304,
+    remote_store_rpc_timeout_millis=30000,
     # Remote cache setup.
-    remote_cache_eager_fetch=True,
-    remote_cache_warnings=RemoteCacheWarningsBehavior.first_only,
+    remote_cache_warnings=RemoteCacheWarningsBehavior.backoff,
     remote_cache_rpc_concurrency=128,
-    remote_cache_read_timeout_millis=1500,
+    remote_cache_rpc_timeout_millis=1500,
     # Remote execution setup.
     remote_execution_address=None,
-    remote_execution_extra_platform_properties=[],
     remote_execution_headers={
         "user-agent": f"pants/{VERSION}",
     },
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
     remote_execution_rpc_concurrency=128,
+    remote_execution_append_only_caches_base_path=None,
 )
 
 DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions()
@@ -515,7 +814,6 @@ class LogLevelOption(EnumOption[LogLevel, LogLevel]):
     def __new__(cls) -> LogLevelOption:
         self = super().__new__(
             cls,  # type: ignore[arg-type]
-            "--level",
             default=LogLevel.INFO,
             daemon=True,
             help="Set the logging level.",
@@ -538,7 +836,6 @@ class BootstrapOptions:
     _default_rel_distdir = f"/{_default_distdir_name}/"
 
     backend_packages = StrListOption(
-        "--backend-packages",
         advanced=True,
         help=softwrap(
             """
@@ -550,7 +847,6 @@ class BootstrapOptions:
         ),
     )
     plugins = StrListOption(
-        "--plugins",
         advanced=True,
         help=softwrap(
             """
@@ -562,47 +858,44 @@ class BootstrapOptions:
         ),
     )
     plugins_force_resolve = BoolOption(
-        "--plugins-force-resolve",
         advanced=True,
         default=False,
         help="Re-resolve plugins, even if previously resolved.",
     )
     level = LogLevelOption()
     show_log_target = BoolOption(
-        "--show-log-target",
         default=False,
         daemon=True,
         advanced=True,
         help=softwrap(
             """
             Display the target where a log message originates in that log message's output.
-            This can be helpful when paired with --log-levels-by-target.
+            This can be helpful when paired with `--log-levels-by-target`.
             """
         ),
     )
     log_levels_by_target = DictOption[str](
-        "--log-levels-by-target",
-        daemon=True,
+        # TODO: While we would like this option to be fingerprinted for the daemon, the Rust side
+        # option parser does not support dict options. See #19832.
+        # daemon=True,
         advanced=True,
         help=softwrap(
             """
             Set a more specific logging level for one or more logging targets. The names of
             logging targets are specified in log strings when the --show-log-target option is set.
             The logging levels are one of: "error", "warn", "info", "debug", "trace".
-            All logging targets not specified here use the global log level set with --level. For example,
+            All logging targets not specified here use the global log level set with `--level`. For example,
             you can set `--log-levels-by-target='{"workunit_store": "info", "pants.engine.rules": "warn"}'`.
             """
         ),
     )
     log_show_rust_3rdparty = BoolOption(
-        "--log-show-rust-3rdparty",
         default=False,
         daemon=True,
         advanced=True,
         help="Whether to show/hide logging done by 3rdparty Rust crates used by the Pants engine.",
     )
     ignore_warnings = StrListOption(
-        "--ignore-warnings",
         daemon=True,
         advanced=True,
         help=softwrap(
@@ -621,7 +914,6 @@ class BootstrapOptions:
         ),
     )
     pants_version = StrOption(
-        "--pants-version",
         advanced=True,
         default=pants_version(),
         default_help_repr="<pants_version>",
@@ -632,7 +924,7 @@ class BootstrapOptions:
             using the requested version, as Pants cannot dynamically change the version it
             is using once the program is already running.
 
-            If you use the `{bin_name()}` script from {doc_url('installation')}, however, changing
+            If you use the `{bin_name()}` script from {doc_url('docs/getting-started/installing-pants')}, however, changing
             the value in your `pants.toml` will cause the new version to be installed and run automatically.
 
             Run `{bin_name()} --version` to check what is being used.
@@ -640,22 +932,23 @@ class BootstrapOptions:
         ),
     )
     pants_bin_name = StrOption(
-        "--pants-bin-name",
         advanced=True,
-        default="./pants",  # noqa: PANTSBIN
-        help="The name of the script or binary used to invoke Pants. "
-        "Useful when printing help messages.",
+        default="pants",  # noqa: PANTSBIN
+        help=softwrap(
+            """
+            The name of the script or binary used to invoke Pants.
+            Useful when printing help messages.
+            """
+        ),
     )
     pants_workdir = StrOption(
-        "--pants-workdir",
         advanced=True,
         metavar="<dir>",
-        default=lambda _: os.path.join(get_buildroot(), ".pants.d"),
+        default=lambda _: os.path.join(get_buildroot(), ".pants.d", "workdir"),
         daemon=True,
         help="Write intermediate logs and output files to this dir.",
     )
     pants_physical_workdir_base = StrOption(
-        "--pants-physical-workdir-base",
         advanced=True,
         metavar="<dir>",
         default=None,
@@ -669,16 +962,14 @@ class BootstrapOptions:
         ),
     )
     pants_distdir = StrOption(
-        "--pants-distdir",
         advanced=True,
         metavar="<dir>",
         default=lambda _: os.path.join(get_buildroot(), "dist"),
-        help="Write end products, such as the results of `./pants package`, to this dir.",  # noqa: PANTSBIN
+        help="Write end products, such as the results of `pants package`, to this dir.",  # noqa: PANTSBIN
     )
     pants_subprocessdir = StrOption(
-        "--pants-subprocessdir",
         advanced=True,
-        default=lambda _: os.path.join(get_buildroot(), ".pids"),
+        default=lambda _: os.path.join(get_buildroot(), ".pants.d", "pids"),
         daemon=True,
         help=softwrap(
             """
@@ -689,7 +980,6 @@ class BootstrapOptions:
         ),
     )
     pants_config_files = StrListOption(
-        "--pants-config-files",
         advanced=True,
         # NB: We don't fingerprint the list of config files, because the content of the config
         # files independently affects fingerprints.
@@ -704,7 +994,6 @@ class BootstrapOptions:
         ),
     )
     pantsrc = BoolOption(
-        "--pantsrc",
         advanced=True,
         default=True,
         # NB: See `--pants-config-files`.
@@ -712,7 +1001,6 @@ class BootstrapOptions:
         help="Use pantsrc files located at the paths specified in the global option `pantsrc_files`.",
     )
     pantsrc_files = StrListOption(
-        "--pantsrc-files",
         advanced=True,
         metavar="<path>",
         # NB: See `--pants-config-files`.
@@ -721,7 +1009,6 @@ class BootstrapOptions:
         help="Override config with values from these files, using syntax matching that of `--pants-config-files`.",
     )
     pythonpath = StrListOption(
-        "--pythonpath",
         advanced=True,
         help=softwrap(
             """
@@ -731,7 +1018,6 @@ class BootstrapOptions:
         ),
     )
     spec_files = StrListOption(
-        "--spec-files",
         # NB: We don't fingerprint spec files because the content of the files independently
         # affects fingerprints.
         fingerprint=False,
@@ -743,13 +1029,11 @@ class BootstrapOptions:
         ),
     )
     verify_config = BoolOption(
-        "--verify-config",
         default=True,
         advanced=True,
         help="Verify that all config file values correspond to known options.",
     )
     stats_record_option_scopes = StrListOption(
-        "--stats-record-option-scopes",
         advanced=True,
         default=["*"],
         help=softwrap(
@@ -762,36 +1046,41 @@ class BootstrapOptions:
         ),
     )
     pants_ignore = StrListOption(
-        "--pants-ignore",
         advanced=True,
-        default=[".*/", _default_rel_distdir, "__pycache__"],
+        default=[".*/", _default_rel_distdir, "__pycache__", "!.semgrep/", "!.github/"],
         help=softwrap(
             """
             Paths to ignore for all filesystem operations performed by pants
             (e.g. BUILD file scanning, glob matching, etc).
+
             Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).
             The `pants_distdir` and `pants_workdir` locations are automatically ignored.
+
             `pants_ignore` can be used in tandem with `pants_ignore_use_gitignore`; any rules
             specified here are applied after rules specified in a .gitignore file.
             """
         ),
     )
     pants_ignore_use_gitignore = BoolOption(
-        "--pants-ignore-use-gitignore",
         advanced=True,
         default=True,
         help=softwrap(
             """
-            Make use of a root .gitignore file when determining whether to ignore filesystem
-            operations performed by Pants. If used together with `--pants-ignore`, any exclude/include
-            patterns specified there apply after .gitignore rules.
+            Include patterns from `.gitignore`, `.git/info/exclude`, and the global gitignore
+            files in the option `[GLOBAL].pants_ignore`, which is used for Pants to ignore
+            filesystem operations on those patterns.
+
+            Patterns from `[GLOBAL].pants_ignore` take precedence over these files' rules. For
+            example, you can use `!my_pattern` in `pants_ignore` to have Pants operate on files
+            that are gitignored.
+
+            Warning: this does not yet support reading nested gitignore files.
             """
         ),
     )
     # These logging options are registered in the bootstrap phase so that plugins can log during
     # registration and not so that their values can be interpolated in configs.
     logdir = StrOption(
-        "--logdir",
         advanced=True,
         default=None,
         metavar="<dir>",
@@ -799,7 +1088,6 @@ class BootstrapOptions:
         help="Write logs to files under this directory.",
     )
     pantsd = BoolOption(
-        "--pantsd",
         default=True,
         daemon=True,
         help=softwrap(
@@ -814,13 +1102,13 @@ class BootstrapOptions:
     # In practice, this means that if this is set, a run will not even try to use pantsd.
     # NB: Eventually, we would like to deprecate this flag in favor of making pantsd runs parallelizable.
     concurrent = BoolOption(
-        "--concurrent",
         default=False,
         help=softwrap(
             """
-            Enable concurrent runs of Pants. Without this enabled, Pants will
+            Enable concurrent runs of Pants. With this enabled, Pants will
             start up all concurrent invocations (e.g. in other terminals) without pantsd.
-            Enabling this option requires parallel Pants invocations to block on the first.
+            As a result, enabling this option will increase the per-run startup cost, but
+            will not block subsequent invocations.
             """
         ),
     )
@@ -829,7 +1117,6 @@ class BootstrapOptions:
     # different needs. For instance, an IDE might have a very long timeout because it only wants to refresh
     # a project in the background, while a user might want a shorter timeout for interactivity.
     pantsd_timeout_when_multiple_invocations = FloatOption(
-        "--pantsd-timeout-when-multiple-invocations",
         advanced=True,
         default=60.0,
         help=softwrap(
@@ -843,10 +1130,9 @@ class BootstrapOptions:
         ),
     )
     pantsd_max_memory_usage = MemorySizeOption(
-        "--pantsd-max-memory-usage",
         advanced=True,
-        default=memory_size("1GiB"),
-        default_help_repr="1GiB",
+        default=memory_size("4GiB"),
+        default_help_repr="4GiB",
         help=softwrap(
             """
             The maximum memory usage of the pantsd process.
@@ -867,13 +1153,11 @@ class BootstrapOptions:
 
     # These facilitate configuring the native engine.
     print_stacktrace = BoolOption(
-        "--print-stacktrace",
         advanced=True,
         default=False,
         help="Print the full exception stack trace for any errors.",
     )
     engine_visualize_to = DirOption(
-        "--engine-visualize-to",
         advanced=True,
         default=None,
         help=softwrap(
@@ -885,14 +1169,14 @@ class BootstrapOptions:
     )
     # Pants Daemon options.
     pantsd_nailgun_port = IntOption(
+        # TODO: The name "pailgun" is likely historical, and this should be renamed to "nailgun".
         "--pantsd-pailgun-port",
         advanced=True,
         default=0,
         daemon=True,
         help="The port to bind the Pants nailgun server to. Defaults to a random port.",
     )
-    pantsd_invalidation_glob = StrListOption(
-        "--pantsd-invalidation-globs",
+    pantsd_invalidation_globs = StrListOption(
         advanced=True,
         daemon=True,
         help=softwrap(
@@ -902,52 +1186,39 @@ class BootstrapOptions:
             """
         ),
     )
-
-    _rule_threads_core_flag = "--rule-threads-core"
-    _process_execution_local_parallelism_flag = "--process-execution-local-parallelism"
-    _rule_threads_max_flag = "--rule-threads-max"
-
     rule_threads_core = IntOption(
-        _rule_threads_core_flag,
         default=max(2, CPU_COUNT // 2),
         default_help_repr="max(2, #cores/2)",
         advanced=True,
         help=softwrap(
-            f"""
+            """
             The number of threads to keep active and ready to execute `@rule` logic (see
-            also: `{_rule_threads_max_flag}`).
+            also: `--rule-threads-max`).
 
             Values less than 2 are not currently supported.
 
             This value is independent of the number of processes that may be spawned in
-            parallel locally (controlled by `{_process_execution_local_parallelism_flag}`).
+            parallel locally (controlled by `--process-execution-local-parallelism`).
             """
         ),
     )
     rule_threads_max = IntOption(
-        _rule_threads_max_flag,
         default=None,
         advanced=True,
         help=softwrap(
-            f"""
+            """
             The maximum number of threads to use to execute `@rule` logic. Defaults to
-            a small multiple of `{_rule_threads_core_flag}`.
+            a small multiple of `--rule-threads-core`.
             """
         ),
     )
-
-    local_store_dir_flag = "--local-store-dir"
-    local_store_shard_count_flag = "--local-store-shard-count"
-    local_store_files_max_size_bytes_flag = "--local-store-files-max-size-bytes"
     cache_instructions = softwrap(
         """
         The path may be absolute or relative. If the directory is within the build root, be
         sure to include it in `--pants-ignore`.
         """
     )
-
     local_store_dir = StrOption(
-        local_store_dir_flag,
         advanced=True,
         help=softwrap(
             f"""
@@ -963,12 +1234,11 @@ class BootstrapOptions:
         default=DEFAULT_LOCAL_STORE_OPTIONS.store_dir,
     )
     local_store_shard_count = IntOption(
-        local_store_shard_count_flag,
         advanced=True,
         help=softwrap(
-            f"""
+            """
             The number of LMDB shards created for the local store. This setting also impacts
-            the maximum size of stored files: see `{local_store_files_max_size_bytes_flag}`
+            the maximum size of stored files: see `--local-store-files-max-size-bytes`
             for more information.
 
             Because LMDB allows only one simultaneous writer per database, the store is split
@@ -976,33 +1246,31 @@ class BootstrapOptions:
             are, the fewer shards you are likely to need for performance.
 
             NB: After changing this value, you will likely want to manually clear the
-            `{local_store_dir_flag}` directory to clear the space used by old shard layouts.
+            `--local-store-dir` directory to clear the space used by old shard layouts.
             """
         ),
         default=DEFAULT_LOCAL_STORE_OPTIONS.shard_count,
     )
     local_store_processes_max_size_bytes = IntOption(
-        "--local-store-processes-max-size-bytes",
         advanced=True,
         help=softwrap(
-            f"""
+            """
             The maximum size in bytes of the local store containing process cache entries.
-            Stored below `{local_store_dir_flag}`.
+            Stored below `--local-store-dir`.
             """
         ),
         default=DEFAULT_LOCAL_STORE_OPTIONS.processes_max_size_bytes,
     )
     local_store_files_max_size_bytes = IntOption(
-        local_store_files_max_size_bytes_flag,
         advanced=True,
         help=softwrap(
-            f"""
+            """
             The maximum size in bytes of the local store containing files.
-            Stored below `{local_store_dir_flag}`.
+            Stored below `--local-store-dir`.
 
             NB: This size value bounds the total size of all files, but (due to sharding of the
             store on disk) it also bounds the per-file size to (VALUE /
-            `{local_store_shard_count_flag}`).
+            `--local-store-shard-count`).
 
             This value doesn't reflect space allocated on disk, or RAM allocated (it
             may be reflected in VIRT but not RSS). However, the default is lower than you
@@ -1014,18 +1282,16 @@ class BootstrapOptions:
         default=DEFAULT_LOCAL_STORE_OPTIONS.files_max_size_bytes,
     )
     local_store_directories_max_size_bytes = IntOption(
-        "--local-store-directories-max-size-bytes",
         advanced=True,
         help=softwrap(
-            f"""
+            """
             The maximum size in bytes of the local store containing directories.
-            Stored below `{local_store_dir_flag}`.
+            Stored below `--local-store-dir`.
             """
         ),
         default=DEFAULT_LOCAL_STORE_OPTIONS.directories_max_size_bytes,
     )
     _named_caches_dir = StrOption(
-        "--named-caches-dir",
         advanced=True,
         help=softwrap(
             f"""
@@ -1038,7 +1304,6 @@ class BootstrapOptions:
         default=os.path.join(get_pants_cachedir(), "named_caches"),
     )
     local_execution_root_dir = StrOption(
-        "--local-execution-root-dir",
         advanced=True,
         help=softwrap(
             f"""
@@ -1051,7 +1316,6 @@ class BootstrapOptions:
         default_help_repr="<tmp_dir>",
     )
     local_cache = BoolOption(
-        "--local-cache",
         default=DEFAULT_EXECUTION_OPTIONS.local_cache,
         help=softwrap(
             """
@@ -1061,8 +1325,9 @@ class BootstrapOptions:
         ),
     )
     process_cleanup = BoolOption(
-        "--process-cleanup",
-        default=DEFAULT_EXECUTION_OPTIONS.process_cleanup,
+        default=(DEFAULT_EXECUTION_OPTIONS.keep_sandboxes == KeepSandboxes.never),
+        removal_version="3.0.0.dev0",
+        removal_hint="Use the `keep_sandboxes` option instead.",
         help=softwrap(
             """
             If false, Pants will not clean up local directories used as chroots for running
@@ -1072,34 +1337,80 @@ class BootstrapOptions:
             """
         ),
     )
+    keep_sandboxes = EnumOption(
+        default=DEFAULT_EXECUTION_OPTIONS.keep_sandboxes,
+        help=softwrap(
+            """
+            Controls whether Pants will clean up local directories used as chroots for running
+            processes.
+
+            Pants will log their location so that you can inspect the chroot, and run the
+            `__run.sh` script to recreate the process using the same argv and environment variables
+            used by Pants. This option is useful for debugging.
+            """
+        ),
+    )
+    cache_content_behavior = EnumOption(
+        advanced=True,
+        default=DEFAULT_EXECUTION_OPTIONS.cache_content_behavior,
+        help=softwrap(
+            """
+            Controls how the content of cache entries is handled during process execution.
+
+            When using a remote cache, the `fetch` behavior will fetch remote cache content from the
+            remote store before considering the cache lookup a hit, while the `validate` behavior
+            will only validate (for either a local or remote cache) that the content exists, without
+            fetching it.
+
+            The `defer` behavior, on the other hand, will neither fetch nor validate the cache
+            content before calling a cache hit a hit. This "defers" actually fetching the cache
+            entry until Pants needs it (which may be never).
+
+            The `defer` mode is the most network efficient (because it will completely skip network
+            requests in many cases), followed by the `validate` mode (since it can still skip
+            fetching the content if no consumer ends up needing it). But both the `validate` and
+            `defer` modes rely on an experimental feature called "backtracking" to attempt to
+            recover if content later turns out to be missing (`validate` has a much narrower window
+            for backtracking though, since content would need to disappear between validation and
+            consumption: generally, within one `pantsd` session).
+            """
+        ),
+    )
     ca_certs_path = StrOption(
-        "--ca-certs-path",
         advanced=True,
         default=None,
         help=softwrap(
-            """
+            f"""
             Path to a file containing PEM-format CA certificates used for verifying secure
             connections when downloading files required by a build.
+
+            Even when using the `docker_environment` and `remote_environment` targets, this path
+            will be read from the local host, and those certs will be used in the environment.
+
+            This option cannot be overridden via environment targets, so if you need a different
+            value than what the rest of your organization is using, override the value via an
+            environment variable, CLI argument, or `.pants.rc` file. See {doc_url('docs/using-pants/key-concepts/options')}.
             """
         ),
     )
     process_total_child_memory_usage = MemorySizeOption(
-        "--process-total-child-memory-usage",
         advanced=True,
         default=None,
-        default_help_repr="1GiB",
         help=softwrap(
             """
-            The maximum memory usage for all child processes.
+            The maximum memory usage for all "pooled" child processes.
 
-            This value participates in precomputing the pool size of child processes used by
-            `pantsd`. A high value would result in a high number of child processes spawned,
-            potentially overconsuming your resources and triggering the OS' OOM killer. A low
-            value would mean a low number of child processes launched and therefore less
-            paralellism for the tasks that need those processes.
+            When set, this value participates in precomputing the pool size of child processes
+            used by Pants (pooling is currently used only for the JVM). When not set, Pants will
+            default to spawning `2 * --process-execution-local-parallelism` pooled processes.
 
-            If setting this value, consider also setting a value for the `process-per-child-memory-usage`
-            option too.
+            A high value would result in a high number of child processes spawned, potentially
+            overconsuming your resources and triggering the OS' OOM killer. A low value would
+            mean a low number of child processes launched and therefore less parallelism for the
+            tasks that need those processes.
+
+            If setting this value, consider also adjusting the value of the
+            `--process-per-child-memory-usage` option.
 
             You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
             `2GiB` or `2.12GiB`. A bare number will be in bytes.
@@ -1107,15 +1418,14 @@ class BootstrapOptions:
         ),
     )
     process_per_child_memory_usage = MemorySizeOption(
-        "--process-per-child-memory-usage",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.process_per_child_memory_usage,
-        default_help_repr="512MiB",
+        default_help_repr=_PER_CHILD_MEMORY_USAGE,
         help=softwrap(
             """
-            The default memory usage for a child process.
+            The default memory usage for a single "pooled" child process.
 
-            Check the documentation for the `process-total-child-memory-usage` for advice on
+            Check the documentation for the `--process-total-child-memory-usage` for advice on
             how to choose an appropriate value for this option.
 
             You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
@@ -1124,79 +1434,98 @@ class BootstrapOptions:
         ),
     )
     process_execution_local_parallelism = IntOption(
-        _process_execution_local_parallelism_flag,
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
         default_help_repr="#cores",
         advanced=True,
         help=softwrap(
-            f"""
+            """
             Number of concurrent processes that may be executed locally.
 
             This value is independent of the number of threads that may be used to
-            execute the logic in `@rules` (controlled by `{_rule_threads_core_flag}`).
+            execute the logic in `@rules` (controlled by `--rule-threads-core`).
             """
         ),
     )
     process_execution_remote_parallelism = IntOption(
-        "--process-execution-remote-parallelism",
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_remote_parallelism,
         advanced=True,
         help="Number of concurrent processes that may be executed remotely.",
     )
     process_execution_cache_namespace = StrOption(
-        "--process-execution-cache-namespace",
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.process_execution_cache_namespace),
         help=softwrap(
             """
             The cache namespace for process execution.
             Change this value to invalidate every artifact's execution, or to prevent
-            process cache entries from being (re)used for different usecases or users.
+            process cache entries from being (re)used for different use-cases or users.
             """
         ),
     )
     process_execution_local_enable_nailgun = BoolOption(
-        "--process-execution-local-enable-nailgun",
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
         help="Whether or not to use nailgun to run JVM requests that are marked as supporting nailgun.",
         advanced=True,
     )
+    process_execution_graceful_shutdown_timeout = IntOption(
+        default=DEFAULT_EXECUTION_OPTIONS.process_execution_graceful_shutdown_timeout,
+        help=softwrap(
+            f"""
+            The time in seconds to wait when gracefully shutting down an interactive process (such
+            as one opened using `{bin_name()} run`) before killing it.
+            """
+        ),
+        advanced=True,
+    )
+    session_end_tasks_timeout = FloatOption(
+        default=3.0,
+        help=softwrap(
+            """
+            The time in seconds to wait for still-running "session end" tasks to complete before finishing
+            completion of a Pants invocation. "Session end" tasks include, for example, writing data that was
+            generated during the applicable Pants invocation to a configured remote cache.
+            """
+        ),
+    )
+
+    remote_provider = EnumOption(
+        default=RemoteProvider.reapi,
+        help=RemoteProvider.provider_help(),
+    )
+
     remote_execution = BoolOption(
-        "--remote-execution",
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
         help=softwrap(
             """
             Enables remote workers for increased parallelism. (Alpha)
 
-            Alternatively, you can use `--remote-cache-read` and `--remote-cache-write` to still run
+            Alternatively, you can use `[GLOBAL].remote_cache_read` and `[GLOBAL].remote_cache_write` to still run
             everything locally, but to use a remote cache.
             """
         ),
     )
     remote_cache_read = BoolOption(
-        "--remote-cache-read",
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_read,
         help=softwrap(
             """
             Whether to enable reading from a remote cache.
 
-            This cannot be used at the same time as `--remote-execution`.
+            This cannot be used at the same time as `[GLOBAL].remote_execution`.
             """
         ),
     )
     remote_cache_write = BoolOption(
-        "--remote-cache-write",
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_write,
         help=softwrap(
             """
             Whether to enable writing results to a remote cache.
 
-            This cannot be used at the same time as `--remote-execution`.
+            This cannot be used at the same time as `[GLOBAL].remote_execution`.
             """
         ),
     )
+    # TODO: update all these remote_... option helps for the new support for non-REAPI schemes
     remote_instance_name = StrOption(
-        "--remote-instance-name",
         default=None,
         advanced=True,
         help=softwrap(
@@ -1206,90 +1535,103 @@ class BootstrapOptions:
             This is used by some remote servers for routing. Consult your remote server for
             whether this should be set.
 
-            You can also use `--remote-auth-plugin` to provide a plugin to dynamically set this value.
+            You can also use a Pants plugin which provides remote authentication to dynamically
+            set this value.
             """
         ),
     )
     remote_ca_certs_path = StrOption(
-        "--remote-ca-certs-path",
         default=None,
         advanced=True,
         help=softwrap(
             """
             Path to a PEM file containing CA certificates used for verifying secure
-            connections to `--remote-execution-address` and `--remote-store-address`.
+            connections to `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address`.
 
             If unspecified, Pants will attempt to auto-discover root CA certificates when TLS
             is enabled with remote execution and caching.
             """
         ),
     )
-    remote_oath_bearer_token_path = StrOption(
-        "--remote-oauth-bearer-token-path",
+    remote_client_certs_path = StrOption(
+        default=None,
+        advanced=True,
+        help=softwrap(
+            """
+            Path to a PEM file containing client certificates used for verifying secure connections to
+            `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address` when using
+            client authentication (mTLS).
+
+            If unspecified, will use regular TLS. Requires `remote_client_key_path` to also be
+            specified.
+            """
+        ),
+    )
+
+    remote_client_key_path = StrOption(
+        default=None,
+        advanced=True,
+        help=softwrap(
+            """
+            Path to a PEM file containing a private key used for verifying secure connections to
+            `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address` when using
+            client authentication (mTLS).
+
+            If unspecified, will use regular TLS. Requires `remote_client_certs_path` to also be
+            specified.
+            """
+        ),
+    )
+    remote_oauth_bearer_token_path = StrOption(
         default=None,
         advanced=True,
         help=softwrap(
             """
             Path to a file containing an oauth token to use for gGRPC connections to
-            `--remote-execution-address` and `--remote-store-address`.
+            `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address`.
 
             If specified, Pants will add a header in the format `authorization: Bearer <token>`.
-            You can also manually add this header via `--remote-execution-headers` and
-            `--remote-store-headers`, or use `--remote-auth-plugin` to provide a plugin to
+            You can also manually add this header via `[GLOBAL].remote_execution_headers` and
+            `[GLOBAL].remote_store_headers`, or use `[GLOBAL].remote_auth_plugin` to provide a plugin to
             dynamically set the relevant headers. Otherwise, no authorization will be performed.
             """
         ),
+        removal_version="2.23.0.dev0",
+        removal_hint=f'use `[GLOBAL].remote_oauth_bearer_token = "@/path/to/token.txt"` instead, see {doc_url("reference/global-options#remote_oauth_bearer_token")}',
     )
-    remote_auth_plugin = StrOption(
-        "--remote-auth-plugin",
+
+    remote_oauth_bearer_token = StrOption(
         default=None,
         advanced=True,
         help=softwrap(
-            """
-            Path to a plugin to dynamically configure remote caching and execution options.
+            f"""
+            An oauth token to use for gGRPC connections to
+            `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address`.
 
-            Format: `path.to.module:my_func`. Pants will import your module and run your
-            function. Update the `--pythonpath` option to ensure your file is loadable.
+            If specified, Pants will add a header in the format `authorization: Bearer <token>`.
+            You can also manually add this header via `[GLOBAL].remote_execution_headers` and
+            `[GLOBAL].remote_store_headers`, or use `[GLOBAL].remote_auth_plugin` to provide a plugin to
+            dynamically set the relevant headers. Otherwise, no authorization will be performed.
 
-            The function should take the kwargs `initial_store_headers: dict[str, str]`,
-            `initial_execution_headers: dict[str, str]`, `options: Options` (from
-            pants.option.options), `env: dict[str, str]`, and
-            `prior_result: AuthPluginResult | None`. It should return an instance of
-            `AuthPluginResult` from `pants.option.global_options`.
-
-            Pants will replace the headers it would normally use with whatever your plugin
-            returns; usually, you should include the `initial_store_headers` and
-            `initial_execution_headers` in your result so that options like
-            `--remote-store-headers` still work.
-
-            If you return `instance_name`, Pants will replace `--remote-instance-name`
-            with this value.
-
-            If the returned auth state is `AuthPluginState.UNAVAILABLE`, Pants will disable
-            remote caching and execution.
-
-            If Pantsd is in use, `prior_result` will be the previous
-            `AuthPluginResult` returned by your plugin, which allows you to reuse the result.
-            Otherwise, if Pantsd has been restarted or is not used, the `prior_result` will
-            be `None`.
+            Recommendation: do not place a token directly in `pants.toml`, instead do one of: set
+            the token via the environment variable (`PANTS_REMOTE_OAUTH_BEARER_TOKEN`), CLI option
+            (`--remote-oauth-bearer-token`), or store the token in a file and set the option to
+            `"@/path/to/token.txt"` to [read the value from that
+            file]({doc_url('docs/using-pants/key-concepts/options#reading-individual-option-values-from-files')}).
             """
         ),
     )
     remote_store_address = StrOption(
-        "--remote-store-address",
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.remote_store_address),
         help=softwrap(
             """
-            The URI of a server used for the remote file store.
-
-            Format: `scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC
-            with TLS enabled. If `grpc` is used, TLS will be disabled.
+            The URI of a server/entity used as a remote file store. The supported URIs depends on
+            the value of the `remote_provider` option.
             """
         ),
     )
     remote_store_headers = DictOption(
-        "--remote-store-headers",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_headers,
         help=softwrap(
@@ -1298,7 +1640,7 @@ class BootstrapOptions:
 
             Format: header=value. Pants may add additional headers.
 
-            See `--remote-execution-headers` as well.
+            See `[GLOBAL].remote_execution_headers` as well.
             """
         ),
         default_help_repr=repr(DEFAULT_EXECUTION_OPTIONS.remote_store_headers).replace(
@@ -1306,102 +1648,65 @@ class BootstrapOptions:
         ),
     )
     remote_store_chunk_bytes = IntOption(
-        "--remote-store-chunk-bytes",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_bytes,
         help="Size in bytes of chunks transferred to/from the remote file store.",
     )
-    remote_store_chunk_upload_timeout_seconds = IntOption(
-        "--remote-store-chunk-upload-timeout-seconds",
-        advanced=True,
-        default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_upload_timeout_seconds,
-        help="Timeout (in seconds) for uploads of individual chunks to the remote file store.",
-    )
     remote_store_rpc_retries = IntOption(
-        "--remote-store-rpc-retries",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_retries,
         help="Number of times to retry any RPC to the remote store before giving up.",
     )
     remote_store_rpc_concurrency = IntOption(
-        "--remote-store-rpc-concurrency",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_concurrency,
         help="The number of concurrent requests allowed to the remote store service.",
     )
+    remote_store_rpc_timeout_millis = IntOption(
+        advanced=True,
+        default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_timeout_millis,
+        help="Timeout value for remote store RPCs (not including streaming requests) in milliseconds.",
+    )
     remote_store_batch_api_size_limit = IntOption(
-        "--remote-store-batch-api-size-limit",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_batch_api_size_limit,
         help="The maximum total size of blobs allowed to be sent in a single batch API call to the remote store.",
     )
     remote_cache_warnings = EnumOption(
-        "--remote-cache-warnings",
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_warnings,
         advanced=True,
         help=softwrap(
             """
-            Whether to log remote cache failures at the `warn` log level.
+            How frequently to log remote cache failures at the `warn` log level.
 
             All errors not logged at the `warn` level will instead be logged at the
             `debug` level.
             """
         ),
     )
-    remote_cache_eager_fetch = BoolOption(
-        "--remote-cache-eager-fetch",
-        advanced=True,
-        default=DEFAULT_EXECUTION_OPTIONS.remote_cache_eager_fetch,
-        help=softwrap(
-            """
-            Eagerly fetch relevant content from the remote store instead of lazily fetching.
-
-            This may result in worse performance, but reduce the frequency of errors
-            encountered by reducing the surface area of when remote caching is used.
-            """
-        ),
-    )
     remote_cache_rpc_concurrency = IntOption(
-        "--remote-cache-rpc-concurrency",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_concurrency,
         help="The number of concurrent requests allowed to the remote cache service.",
     )
-    remote_cache_rwad_timeout_millis = IntOption(
-        "--remote-cache-read-timeout-millis",
+    remote_cache_rpc_timeout_millis = IntOption(
         advanced=True,
-        default=DEFAULT_EXECUTION_OPTIONS.remote_cache_read_timeout_millis,
-        help="Timeout value for remote cache lookups in milliseconds.",
+        default=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_timeout_millis,
+        help="Timeout value for remote cache RPCs in milliseconds.",
     )
     remote_execution_address = StrOption(
-        "--remote-execution-address",
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.remote_execution_address),
         help=softwrap(
             """
-            The URI of a server used as a remote execution scheduler.
+            The URI of a server/entity used as a remote execution scheduler. The supported URIs depends on
+            the value of the `remote_provider` option.
 
-            Format: `scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC
-            with TLS enabled. If `grpc` is used, TLS will be disabled.
-
-            You must also set `--remote-store-address`, which will often be the same value.
+            You must also set `[GLOBAL].remote_store_address`, which will often be the same value.
             """
         ),
-    )
-    remote_execution_extra_platform_properties = StrListOption(
-        "--remote-execution-extra-platform-properties",
-        advanced=True,
-        help=softwrap(
-            """
-            Platform properties to set on remote execution requests.
-            Format: property=value. Multiple values should be specified as multiple
-            occurrences of this flag. Pants itself may add additional platform properties.
-            """
-        ),
-        default=DEFAULT_EXECUTION_OPTIONS.remote_execution_extra_platform_properties,
     )
     remote_execution_headers = DictOption(
-        "--remote-execution-headers",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution_headers,
         help=softwrap(
@@ -1409,7 +1714,7 @@ class BootstrapOptions:
             Headers to set on remote execution requests. Format: header=value. Pants
             may add additional headers.
 
-            See `--remote-store-headers` as well.
+            See `[GLOBAL].remote_store_headers` as well.
             """
         ),
         default_help_repr=repr(DEFAULT_EXECUTION_OPTIONS.remote_execution_headers).replace(
@@ -1417,19 +1722,28 @@ class BootstrapOptions:
         ),
     )
     remote_execution_overall_deadline_secs = IntOption(
-        "--remote-execution-overall-deadline-secs",
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution_overall_deadline_secs,
         advanced=True,
         help="Overall timeout in seconds for each remote execution request from time of submission",
     )
     remote_execution_rpc_concurrency = IntOption(
-        "--remote-execution-rpc-concurrency",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution_rpc_concurrency,
         help="The number of concurrent requests allowed to the remote execution service.",
     )
+    remote_execution_append_only_caches_base_path = StrOption(
+        default=None,
+        advanced=True,
+        help=softwrap(
+            """
+            Sets the base path to use when setting up an append-only cache for a process running remotely.
+            If this option is not set, then append-only caches will not be used with remote execution.
+            The option should be set to the absolute path of a writable directory in the remote execution
+            environment where Pants can create append-only caches for use with remotely executing processes.
+            """
+        ),
+    )
     watch_filesystem = BoolOption(
-        "--watch-filesystem",
         default=True,
         advanced=True,
         help=softwrap(
@@ -1448,7 +1762,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     help = "Options to control the overall behavior of Pants."
 
     colors = BoolOption(
-        "--colors",
         default=sys.stdout.isatty(),
         help=softwrap(
             """
@@ -1460,7 +1773,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         ),
     )
     dynamic_ui = BoolOption(
-        "--dynamic-ui",
         default=(("CI" not in os.environ) and sys.stderr.isatty()),
         help=softwrap(
             """
@@ -1471,49 +1783,22 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         ),
     )
     dynamic_ui_renderer = EnumOption(
-        "--dynamic-ui-renderer",
         default=DynamicUIRenderer.indicatif_spinner,
         help="If `--dynamic-ui` is enabled, selects the renderer.",
     )
 
     tag = StrListOption(
-        "--tag",
         help=softwrap(
             f"""
             Include only targets with these tags (optional '+' prefix) or without these
-            tags ('-' prefix). See {doc_url('advanced-target-selection')}.
+            tags ('-' prefix). See {doc_url('docs/using-pants/advanced-target-selection')}.
             """
         ),
         metavar="[+-]tag1,tag2,...",
     )
-    exclude_target_regexp = StrListOption(
-        "--exclude-target-regexp",
-        help="Exclude targets that match these regexes. This does not impact file arguments.",
-        metavar="<regexp>",
-    )
 
-    files_not_found_behavior = EnumOption(
-        "--files-not-found-behavior",
-        default=UnmatchedBuildFileGlobs.warn,
-        help=softwrap(
-            """
-            What to do when files and globs specified in BUILD files, such as in the
-            `sources` field, cannot be found. This happens when the files do not exist on
-            your machine or when they are ignored by the `--pants-ignore` option.
-            """
-        ),
-        advanced=True,
-        removal_version="2.14.0.dev0",
-        removal_hint=softwrap(
-            """
-            Use `[GLOBAL].unmatched_build_file_globs` instead, which behaves the same. This
-            option was renamed for clarity with the new `[GLOBAL].unmatched_cli_globs` option.
-            """
-        ),
-    )
     unmatched_build_file_globs = EnumOption(
-        "--unmatched-build-file-globs",
-        default=UnmatchedBuildFileGlobs.warn,
+        default=GlobMatchErrorBehavior.warn,
         help=softwrap(
             """
             What to do when files and globs specified in BUILD files, such as in the
@@ -1527,8 +1812,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
     unmatched_cli_globs = EnumOption(
-        "--unmatched-cli-globs",
-        default=UnmatchedCliGlobs.error,
+        default=GlobMatchErrorBehavior.error,
         help=softwrap(
             """
             What to do when command line arguments, e.g. files and globs like `dir::`, cannot be
@@ -1542,31 +1826,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
 
-    owners_not_found_behavior = EnumOption(
-        "--owners-not-found-behavior",
-        default=OwnersNotFoundBehavior.ignore,
-        help=softwrap(
-            """
-            What to do when file arguments do not have any owning target. This happens when
-            there are no targets whose `sources` fields include the file argument.
-            """
-        ),
-        advanced=True,
-        removal_version="2.14.0.dev0",
-        removal_hint=softwrap(
-            """
-            This option is no longer useful with Pants because we have goals that work without any
-            targets, e.g. the `count-loc` goal or the `regex-lint` linter from the `lint` goal. This
-            option caused us to error on valid use cases.
-
-            For goals that require targets, like `list`, the unowned file will simply be ignored. If
-            no owners are found at all, most goals will warn and some like `run` will error.
-            """
-        ),
-    )
-
     build_patterns = StrListOption(
-        "--build-patterns",
         default=["BUILD", "BUILD.*"],
         help=softwrap(
             """
@@ -1583,7 +1843,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     )
 
     build_ignore = StrListOption(
-        "--build-ignore",
         help=softwrap(
             """
             Path globs or literals to ignore when identifying BUILD files.
@@ -1595,40 +1854,32 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
     build_file_prelude_globs = StrListOption(
-        "--build-file-prelude-globs",
         help=softwrap(
             f"""
             Python files to evaluate and whose symbols should be exposed to all BUILD files.
-            See {doc_url('macros')}.
+            See {doc_url('docs/writing-plugins/macros')}.
             """
         ),
         advanced=True,
     )
     subproject_roots = StrListOption(
-        "--subproject-roots",
         help="Paths that correspond with build roots for any subproject that this project depends on.",
         advanced=True,
     )
 
-    _loop_flag = "--loop"
-    loop = BoolOption(
-        _loop_flag, default=False, help="Run goals continuously as file changes are detected."
-    )
+    loop = BoolOption(default=False, help="Run goals continuously as file changes are detected.")
     loop_max = IntOption(
-        "--loop-max",
         default=2**32,
-        help=f"The maximum number of times to loop when `{_loop_flag}` is specified.",
+        help="The maximum number of times to loop when `--loop` is specified.",
         advanced=True,
     )
 
     streaming_workunits_report_interval = FloatOption(
-        "--streaming-workunits-report-interval",
         default=1.0,
         help="Interval in seconds between when streaming workunit event receivers will be polled.",
         advanced=True,
     )
     streaming_workunits_level = EnumOption(
-        "--streaming-workunits-level",
         default=LogLevel.DEBUG,
         help=softwrap(
             """
@@ -1642,7 +1893,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
     streaming_workunits_complete_async = BoolOption(
-        "--streaming-workunits-complete-async",
         default=not is_in_container(),
         help=softwrap(
             """
@@ -1655,28 +1905,38 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
 
-    use_deprecated_directory_cli_args_semantics = BoolOption(
-        "--use-deprecated-directory-cli-args-semantics",
+    docker_execution = BoolOption(
         default=True,
+        advanced=True,
         help=softwrap(
-            f"""
-            If true, Pants will use the old, deprecated semantics for directory arguments like
-            `{bin_name()} test dir`: directories are shorthand for the target `dir:dir`, i.e. the
-            target that leaves off `name=`.
+            """
+            If true, `docker_environment` targets can be used to run builds inside a Docker
+            container.
 
-            If false, Pants will use the new semantics: directory arguments will match all files
-            and targets in the directory, e.g. `{bin_name()} test dir` will run all tests in `dir`.
+            If false, anytime a `docker_environment` target is used, Pants will instead fallback to
+            whatever the target's `fallback_environment` field is set to.
 
-            The new semantics will become the default in Pants 2.14, and the old semantics will be
-            removed in 2.15.
-
-            This also impacts the behavior of the `tailor` goal. If this option is true,
-            `{bin_name()} tailor` without additional arguments will run over the whole project, and
-            `{bin_name()} tailor dir` will run over `dir` and all recursive sub-directories. If
-            false, you must specify arguments, like `{bin_name()} tailor ::` to run over the
-            whole project; specifying a directory will only add targets for that directory.
+            This can be useful, for example, if you want to always use Docker locally, but disable
+            it in CI, or vice versa.
             """
         ),
+    )
+    remote_execution_extra_platform_properties = StrListOption(
+        advanced=True,
+        help=softwrap(
+            """
+            Platform properties to set on remote execution requests.
+
+            Format: `property=value`. Multiple values should be specified as multiple
+            occurrences of this flag.
+
+            Pants itself may add additional platform properties.
+
+            If you are using the `remote_environment` target mechanism, set this value as a field
+            on the target instead. This option will be ignored.
+            """
+        ),
+        default=[],
     )
 
     @classmethod
@@ -1694,8 +1954,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             # TODO: This is a defense against deadlocks due to #11329: we only run one `@goal_rule`
             # at a time, and a `@goal_rule` will only block one thread.
             raise OptionsError(
-                "--rule-threads-core values less than 2 are not supported, but it was set to "
-                f"{opts.rule_threads_core}."
+                softwrap(
+                    f"""
+                    --rule-threads-core values less than 2 are not supported, but it was set to
+                    {opts.rule_threads_core}.
+                    """
+                )
             )
 
         if (
@@ -1715,57 +1979,33 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                 )
             )
 
-        if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
+        if not opts.watch_filesystem and (opts.pantsd or opts.loop):
             raise OptionsError(
                 softwrap(
                     """
-                    `--remote-execution` cannot be set at the same time as either
-                    `--remote-cache-read` or `--remote-cache-write`.
-
-                    If remote execution is enabled, it will already use remote caching.
+                    The `--no-watch-filesystem` option may not be set if
+                    `--pantsd` or `--loop` is set.
                     """
                 )
             )
 
-        if opts.remote_execution and not opts.remote_execution_address:
-            raise OptionsError(
-                "The `--remote-execution` option requires also setting "
-                "`--remote-execution-address` to work properly."
+        provider_source = "the `[GLOBAL].remote_provider` option"
+        if opts.remote_execution_address:
+            address_source = "the `[GLOBAL].remote_execution_address` option"
+            opts.remote_provider.validate_execution_supported(
+                provider_source=provider_source, execution_implied_by=address_source
             )
-        if opts.remote_execution_address and not opts.remote_store_address:
-            raise OptionsError(
-                "The `--remote-execution-address` option requires also setting "
-                "`--remote-store-address`. Often these have the same value."
+            opts.remote_provider.validate_address(
+                opts.remote_execution_address,
+                address_source=address_source,
+                provider_source=provider_source,
             )
-
-        if opts.remote_cache_read and not opts.remote_store_address:
-            raise OptionsError(
-                "The `--remote-cache-read` option requires also setting "
-                "`--remote-store-address` to work properly."
+        if opts.remote_store_address:
+            opts.remote_provider.validate_address(
+                opts.remote_store_address,
+                address_source="the `[GLOBAL].remote_store_address` option",
+                provider_source=provider_source,
             )
-        if opts.remote_cache_write and not opts.remote_store_address:
-            raise OptionsError(
-                "The `--remote-cache-write` option requires also setting "
-                "`--remote-store-address` or to work properly."
-            )
-
-        if not opts.watch_filesystem and (opts.pantsd or opts.loop):
-            raise OptionsError(
-                "The `--no-watch-filesystem` option may not be set if "
-                "`--pantsd` or `--loop` is set."
-            )
-
-        def validate_remote_address(opt_name: str) -> None:
-            valid_schemes = [f"{scheme}://" for scheme in ("grpc", "grpcs")]
-            address = getattr(opts, opt_name)
-            if address and not any(address.startswith(scheme) for scheme in valid_schemes):
-                raise OptionsError(
-                    f"The `{opt_name}` option must begin with one of {valid_schemes}, but "
-                    f"was {address}."
-                )
-
-        validate_remote_address("remote_execution_address")
-        validate_remote_address("remote_store_address")
 
         # Ensure that remote headers are ASCII.
         def validate_remote_headers(opt_name: str) -> None:
@@ -1773,23 +2013,47 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             for k, v in getattr(opts, opt_name).items():
                 if not k.isascii():
                     raise OptionsError(
-                        f"All values in `{command_line_opt_name}` must be ASCII, but the key "
-                        f"in `{k}: {v}` has non-ASCII characters."
+                        softwrap(
+                            f"""
+                            All values in `{command_line_opt_name}` must be ASCII, but the key
+                            in `{k}: {v}` has non-ASCII characters.
+                            """
+                        )
                     )
                 if not v.isascii():
                     raise OptionsError(
-                        f"All values in `{command_line_opt_name}` must be ASCII, but the value in "
-                        f"`{k}: {v}` has non-ASCII characters."
+                        softwrap(
+                            f"""
+                            All values in `{command_line_opt_name}` must be ASCII, but the value in
+                            `{k}: {v}` has non-ASCII characters.
+                            """
+                        )
                     )
 
         validate_remote_headers("remote_execution_headers")
         validate_remote_headers("remote_store_headers")
 
+        is_remote_client_key_set = opts.remote_client_key_path is not None
+        is_remote_client_certs_set = opts.remote_client_certs_path is not None
+        if is_remote_client_key_set != is_remote_client_certs_set:
+            raise OptionsError(
+                softwrap(
+                    """
+                    `--remote-client-key-path` and `--remote-client-certs-path` must be specified
+                    together.
+                    """
+                )
+            )
+
         illegal_build_ignores = [i for i in opts.build_ignore if i.startswith("!")]
         if illegal_build_ignores:
             raise OptionsError(
-                "The `--build-ignore` option does not support negated globs, but was "
-                f"given: {illegal_build_ignores}."
+                softwrap(
+                    f"""
+                    The `--build-ignore` option does not support negated globs, but was
+                    given: {illegal_build_ignores}.
+                    """
+                )
             )
 
     @staticmethod
@@ -1802,6 +2066,27 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         return PyExecutor(
             core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
         )
+
+    @staticmethod
+    def resolve_keep_sandboxes(
+        bootstrap_options: OptionValueContainer,
+    ) -> KeepSandboxes:
+        resolved_value = resolve_conflicting_options(
+            old_option="process_cleanup",
+            new_option="keep_sandboxes",
+            old_scope="",
+            new_scope="",
+            old_container=bootstrap_options,
+            new_container=bootstrap_options,
+        )
+
+        if isinstance(resolved_value, bool):
+            # Is `process_cleanup`.
+            return KeepSandboxes.never if resolved_value else KeepSandboxes.always
+        elif isinstance(resolved_value, KeepSandboxes):
+            return resolved_value
+        else:
+            raise TypeError(f"Unexpected option value for `keep_sandboxes`: {resolved_value}")
 
     @staticmethod
     def compute_pants_ignore(buildroot, global_options):
@@ -1873,6 +2158,15 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     def named_caches_dir(self) -> PurePath:
         return Path(self._named_caches_dir).resolve()
 
+    def output_simplifier(self) -> Simplifier:
+        """Create a `Simplifier` instance for use on stdout and stderr that will be shown to a
+        user."""
+        return Simplifier(
+            # it's ~never useful to show the chroot path to a user
+            strip_chroot_path=True,
+            strip_formatting=not self.colors,
+        )
+
 
 @dataclass(frozen=True)
 class GlobalOptionsFlags:
@@ -1913,3 +2207,21 @@ class NamedCachesDirOption:
     """
 
     val: PurePath
+
+
+def ca_certs_path_to_file_content(path: str) -> FileContent:
+    """Set up FileContent for using the ca_certs_path locally in a process sandbox.
+
+    This helper can be used when setting up a Process so that the certs are included in the process.
+    Use `Get(Digest, CreateDigest)`, and then include this in the `input_digest` for the Process.
+    Typically, you will also need to configure the invoking tool to load those certs, via its argv
+    or environment variables.
+
+    Note that the certs are always read on the localhost, even when using Docker and remote
+    execution. Then, those certs can be copied into the process.
+
+    Warning: this will not detect when the contents of cert files changes, because we use
+    `pathlib.Path.read_bytes()`. Better would be
+    # https://github.com/pantsbuild/pants/issues/10842
+    """
+    return FileContent(os.path.basename(path), Path(path).read_bytes())

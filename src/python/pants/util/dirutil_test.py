@@ -19,6 +19,8 @@ from pants.util.dirutil import (
     _mkdtemp_unregister_cleaner,
     absolute_symlink,
     fast_relpath,
+    find_nearest_ancestor_file,
+    group_by_dir,
     longest_dir_prefix,
     read_file,
     relative_symlink,
@@ -171,9 +173,9 @@ class TestDirutilTest:
         path: str
 
     def assert_tree(self, root: str, *expected: Dir | File | Symlink):
-        def collect_tree() -> Iterator[
-            TestDirutilTest.Dir | TestDirutilTest.File | TestDirutilTest.Symlink
-        ]:
+        def collect_tree() -> (
+            Iterator[TestDirutilTest.Dir | TestDirutilTest.File | TestDirutilTest.Symlink]
+        ):
             for path, dirnames, filenames in os.walk(root, followlinks=False):
                 relpath = os.path.relpath(path, root)
                 if relpath == os.curdir:
@@ -360,6 +362,25 @@ class TestDirutilTest:
             assert os.path.exists(real)
             assert not os.path.exists(link)
 
+    def test_group_by_dir(self) -> None:
+        paths = {
+            "foo/bar/baz1.ext",
+            "foo/bar/baz1_test.ext",
+            "foo/bar/qux/quux1.ext",
+            "foo/__init__.ext",
+            "foo/bar/__init__.ext",
+            "foo/bar/baz2.ext",
+            "foo/bar1.ext",
+            "foo1.ext",
+            "__init__.ext",
+        }
+        assert {
+            "": {"__init__.ext", "foo1.ext"},
+            "foo": {"__init__.ext", "bar1.ext"},
+            "foo/bar": {"__init__.ext", "baz1.ext", "baz1_test.ext", "baz2.ext"},
+            "foo/bar/qux": {"quux1.ext"},
+        } == group_by_dir(paths)
+
 
 class AbsoluteSymlinkTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -414,3 +435,28 @@ class AbsoluteSymlinkTest(unittest.TestCase):
     def test_overwrite_dir(self) -> None:
         os.makedirs(os.path.join(self.link, "a", "b", "c"))
         self._create_and_check_link(self.source, self.link)
+
+
+def test_find_nearest_ancestor_file() -> None:
+    files = {"grok.conf", "foo/bar/grok.conf", "hello/world/grok.conf"}
+    assert find_nearest_ancestor_file(files, "foo/bar", "grok.conf") == "foo/bar/grok.conf"
+    assert find_nearest_ancestor_file(files, "foo/bar/", "grok.conf") == "foo/bar/grok.conf"
+    assert find_nearest_ancestor_file(files, "foo", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "foo/", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "foo/xyzzy", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "foo/xyzzy", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "hello", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "hello/", "grok.conf") == "grok.conf"
+    assert (
+        find_nearest_ancestor_file(files, "hello/world/foo", "grok.conf") == "hello/world/grok.conf"
+    )
+    assert (
+        find_nearest_ancestor_file(files, "hello/world/foo/", "grok.conf")
+        == "hello/world/grok.conf"
+    )
+
+    files2 = {"foo/bar/grok.conf", "hello/world/grok.conf"}
+    assert find_nearest_ancestor_file(files2, "foo", "grok.conf") is None
+    assert find_nearest_ancestor_file(files2, "foo/", "grok.conf") is None
+    assert find_nearest_ancestor_file(files2, "", "grok.conf") is None

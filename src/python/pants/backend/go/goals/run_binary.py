@@ -5,10 +5,9 @@ import os.path
 
 from pants.backend.go.goals.package_binary import GoBinaryFieldSet
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.goals.run import RunFieldSet, RunRequest
+from pants.core.goals.run import RunRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.unions import UnionRule
 
 
 @rule
@@ -20,4 +19,7 @@ async def create_go_binary_run_request(field_set: GoBinaryFieldSet) -> RunReques
 
 
 def rules():
-    return [*collect_rules(), UnionRule(RunFieldSet, GoBinaryFieldSet)]
+    return [
+        *collect_rules(),
+        *GoBinaryFieldSet.rules(),
+    ]

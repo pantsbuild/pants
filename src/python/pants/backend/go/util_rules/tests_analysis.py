@@ -23,6 +23,7 @@ class GenerateTestMainRequest(EngineAwareParameter):
     test_paths: FrozenOrderedSet[str]
     xtest_paths: FrozenOrderedSet[str]
     import_path: str
+    register_cover: bool
     address: Address
 
     def debug_hint(self) -> str:
@@ -36,31 +37,45 @@ class GeneratedTestMain:
     has_xtests: bool
     failed_exit_code_and_stderr: tuple[int, str] | None
 
-    TEST_MAIN_FILE = "_testmain.go"
+    TEST_MAIN_FILE = "testmain.go"
     TEST_PKG = "_test"
     XTEST_PKG = "_xtest"
 
 
 @rule
 async def generate_testmain(request: GenerateTestMainRequest) -> GeneratedTestMain:
+    generator_binary_name = "./generator"
     analyzer = await Get(
-        LoadedGoBinary, LoadedGoBinaryRequest("generate_testmain", ("main.go",), "./analyzer")
+        LoadedGoBinary,
+        LoadedGoBinaryRequest("generate_testmain", ("main.go",), generator_binary_name),
     )
     input_digest = await Get(Digest, MergeDigests([request.digest, analyzer.digest]))
 
     test_paths = tuple(f"{GeneratedTestMain.TEST_PKG}:{path}" for path in request.test_paths)
     xtest_paths = tuple(f"{GeneratedTestMain.XTEST_PKG}:{path}" for path in request.xtest_paths)
 
+    env = {}
+    if request.register_cover:
+        env["GENERATE_COVER"] = "1"
+
     result = await Get(
         FallibleProcessResult,
         Process(
-            argv=("./analyzer", request.import_path, *test_paths, *xtest_paths),
+            argv=(
+                generator_binary_name,
+                GeneratedTestMain.TEST_MAIN_FILE,
+                request.import_path,
+                *test_paths,
+                *xtest_paths,
+            ),
             input_digest=input_digest,
+            env=env,
             description=f"Analyze Go test sources for {request.address}",
             level=LogLevel.DEBUG,
-            output_files=("_testmain.go",),
+            output_files=(GeneratedTestMain.TEST_MAIN_FILE,),
         ),
     )
+
     if result.exit_code != 0:
         return GeneratedTestMain(
             digest=EMPTY_DIGEST,

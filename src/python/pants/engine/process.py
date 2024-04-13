@@ -7,18 +7,20 @@ import dataclasses
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, Mapping
+from typing import Iterable, List, Mapping, Tuple
 
 from pants.engine.engine_aware import SideEffecting
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, FileDigest, MergeDigests
-from pants.engine.internals.selectors import MultiGet
+from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
+from pants.engine.internals.native_engine import (  # noqa: F401
+    ProcessExecutionEnvironment as ProcessExecutionEnvironment,
+)
+from pants.engine.internals.selectors import Get
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, rule
-from pants.option.global_options import ProcessCleanupOption
+from pants.engine.rules import collect_rules, rule
+from pants.option.global_options import KeepSandboxes
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +46,7 @@ class ProcessCacheScope(Enum):
     PER_SESSION = "per_session"
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Process:
     argv: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
@@ -63,7 +64,8 @@ class Process:
     execution_slot_variable: str | None
     concurrency_available: int
     cache_scope: ProcessCacheScope
-    platform: str | None
+    remote_cache_speculation_delay_millis: int
+    attempt: int
 
     def __init__(
         self,
@@ -84,7 +86,8 @@ class Process:
         execution_slot_variable: str | None = None,
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
-        platform: Platform | None = None,
+        remote_cache_speculation_delay_millis: int = 0,
+        attempt: int = 0,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -114,24 +117,40 @@ class Process:
         """
         if isinstance(argv, str):
             raise ValueError("argv must be a sequence of strings, but was a single string.")
-        self.argv = tuple(argv)
-        self.description = description
-        self.level = level
-        self.input_digest = input_digest
-        self.immutable_input_digests = FrozenDict(immutable_input_digests or {})
-        self.use_nailgun = tuple(use_nailgun)
-        self.working_directory = working_directory
-        self.env = FrozenDict(env or {})
-        self.append_only_caches = FrozenDict(append_only_caches or {})
-        self.output_files = tuple(output_files or ())
-        self.output_directories = tuple(output_directories or ())
+
+        object.__setattr__(self, "argv", tuple(argv))
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "level", level)
+        object.__setattr__(self, "input_digest", input_digest)
+        object.__setattr__(
+            self, "immutable_input_digests", FrozenDict(immutable_input_digests or {})
+        )
+        object.__setattr__(self, "use_nailgun", tuple(use_nailgun))
+        object.__setattr__(self, "working_directory", working_directory)
+        object.__setattr__(self, "env", FrozenDict(env or {}))
+        object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches or {}))
+        object.__setattr__(self, "output_files", tuple(output_files or ()))
+        object.__setattr__(self, "output_directories", tuple(output_directories or ()))
         # NB: A negative or None time value is normalized to -1 to ease the transfer to Rust.
-        self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1
-        self.jdk_home = jdk_home
-        self.execution_slot_variable = execution_slot_variable
-        self.concurrency_available = concurrency_available
-        self.cache_scope = cache_scope
-        self.platform = platform.value if platform is not None else None
+        object.__setattr__(
+            self,
+            "timeout_seconds",
+            timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1,
+        )
+        object.__setattr__(self, "jdk_home", jdk_home)
+        object.__setattr__(self, "execution_slot_variable", execution_slot_variable)
+        object.__setattr__(self, "concurrency_available", concurrency_available)
+        object.__setattr__(self, "cache_scope", cache_scope)
+        object.__setattr__(
+            self, "remote_cache_speculation_delay_millis", remote_cache_speculation_delay_millis
+        )
+        object.__setattr__(self, "attempt", attempt)
+
+
+@dataclass(frozen=True)
+class ProcessWithRetries:
+    proc: Process
+    attempts: int
 
 
 @dataclass(frozen=True)
@@ -147,12 +166,14 @@ class ProcessResult:
     stderr: bytes
     stderr_digest: FileDigest
     output_digest: Digest
-    platform: Platform
     metadata: ProcessResultMetadata = field(compare=False, hash=False)
 
+    @property
+    def platform(self) -> Platform:
+        return self.metadata.platform
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+
+@dataclass(frozen=True)
 class FallibleProcessResult:
     """Result of executing a process which might fail.
 
@@ -165,8 +186,20 @@ class FallibleProcessResult:
     stderr_digest: FileDigest
     exit_code: int
     output_digest: Digest
-    platform: Platform
     metadata: ProcessResultMetadata = field(compare=False, hash=False)
+
+    @property
+    def platform(self) -> Platform:
+        return self.metadata.platform
+
+
+@dataclass(frozen=True)
+class ProcessResultWithRetries:
+    results: Tuple[FallibleProcessResult, ...]
+
+    @property
+    def last(self):
+        return self.results[-1]
 
 
 @dataclass(frozen=True)
@@ -174,8 +207,7 @@ class ProcessResultMetadata:
     """Metadata for a ProcessResult, which is not included in its definition of equality."""
 
     class Source(Enum):
-        RAN_LOCALLY = "ran_locally"
-        RAN_REMOTELY = "ran_remotely"
+        RAN = "ran"
         HIT_LOCALLY = "hit_locally"
         HIT_REMOTELY = "hit_remotely"
         MEMOIZED = "memoized"
@@ -183,16 +215,22 @@ class ProcessResultMetadata:
     # The execution time of the process, in milliseconds, or None if it could not be captured
     # (since remote execution does not guarantee its availability).
     total_elapsed_ms: int | None
+    # The environment that the process ran in (or would have run in, if it was not a cache hit).
+    execution_environment: ProcessExecutionEnvironment
     # Whether the ProcessResult (when it was created in the attached run_id) came from the local
     # or remote cache, or ran locally or remotely. See the `self.source` method.
     _source: str
     # The run_id in which a ProcessResult was created. See the `self.source` method.
     source_run_id: int
 
+    @property
+    def platform(self) -> Platform:
+        return Platform[self.execution_environment.platform]
+
     def source(self, current_run_id: RunId) -> Source:
         """Given the current run_id, return the calculated "source" of the ProcessResult.
 
-        If a ProcessResult is consumed in any run_id other than the one it was created in, the its
+        If a ProcessResult is consumed in any run_id other than the one it was created in, the
         source implicitly becomes memoization, since the result was re-used in a new run without
         being recreated.
         """
@@ -216,7 +254,7 @@ class ProcessExecutionFailure(Exception):
         stderr: bytes,
         process_description: str,
         *,
-        process_cleanup: bool,
+        keep_sandboxes: KeepSandboxes,
     ) -> None:
         # These are intentionally "public" members.
         self.exit_code = exit_code
@@ -239,9 +277,9 @@ class ProcessExecutionFailure(Exception):
             "stderr:",
             try_decode(stderr),
         ]
-        if process_cleanup:
+        if keep_sandboxes == KeepSandboxes.never:
             err_strings.append(
-                "\n\nUse `--no-process-cleanup` to preserve process chroots for inspection."
+                "\n\nUse `--keep-sandboxes=on_failure` to preserve the process chroot for inspection."
             )
         super().__init__("\n".join(err_strings))
 
@@ -255,7 +293,7 @@ def get_multi_platform_request_description(req: Process) -> ProductDescription:
 def fallible_to_exec_result_or_raise(
     fallible_result: FallibleProcessResult,
     description: ProductDescription,
-    process_cleanup: ProcessCleanupOption,
+    keep_sandboxes: KeepSandboxes,
 ) -> ProcessResult:
     """Converts a FallibleProcessResult to a ProcessResult or raises an error."""
 
@@ -266,7 +304,6 @@ def fallible_to_exec_result_or_raise(
             stderr=fallible_result.stderr,
             stderr_digest=fallible_result.stderr_digest,
             output_digest=fallible_result.output_digest,
-            platform=fallible_result.platform,
             metadata=fallible_result.metadata,
         )
     raise ProcessExecutionFailure(
@@ -274,8 +311,24 @@ def fallible_to_exec_result_or_raise(
         fallible_result.stdout,
         fallible_result.stderr,
         description.value,
-        process_cleanup=process_cleanup.val,
+        keep_sandboxes=keep_sandboxes,
     )
+
+
+@rule
+async def run_proc_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
+    results: List[FallibleProcessResult] = []
+    for attempt in range(0, req.attempts):
+        proc = dataclasses.replace(req.proc, attempt=attempt)
+        result = (
+            await Get(  # noqa: PNT30: We only know that we need to rerun the test after we run it
+                FallibleProcessResult, Process, proc
+            )
+        )
+        results.append(result)
+        if result.exit_code == 0:
+            break
+    return ProcessResultWithRetries(tuple(results))
 
 
 @dataclass(frozen=True)
@@ -283,16 +336,15 @@ class InteractiveProcessResult:
     exit_code: int
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class InteractiveProcess(SideEffecting):
-    argv: tuple[str, ...]
-    env: FrozenDict[str, str]
-    input_digest: Digest
+    # NB: Although InteractiveProcess supports only some of the features of Process, we construct an
+    # underlying Process instance to improve code reuse.
+    process: Process
     run_in_workspace: bool
     forward_signals_to_process: bool
     restartable: bool
-    append_only_caches: FrozenDict[str, str]
+    keep_sandboxes: KeepSandboxes
 
     def __init__(
         self,
@@ -304,6 +356,8 @@ class InteractiveProcess(SideEffecting):
         forward_signals_to_process: bool = True,
         restartable: bool = False,
         append_only_caches: Mapping[str, str] | None = None,
+        immutable_input_digests: Mapping[str, Digest] | None = None,
+        keep_sandboxes: KeepSandboxes = KeepSandboxes.never,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
@@ -316,28 +370,22 @@ class InteractiveProcess(SideEffecting):
         sent to a process by hitting Ctrl-C in the terminal to actually reach the process,
         or capture that signal itself, blocking it from the process.
         """
-        self.argv = tuple(argv)
-        self.env = FrozenDict(env or {})
-        self.input_digest = input_digest
-        self.run_in_workspace = run_in_workspace
-        self.forward_signals_to_process = forward_signals_to_process
-        self.restartable = restartable
-        self.append_only_caches = FrozenDict(append_only_caches or {})
-
-        self.__post_init__()
-
-    def __post_init__(self):
-        if self.input_digest != EMPTY_DIGEST and self.run_in_workspace:
-            raise ValueError(
-                "InteractiveProcess should use the Workspace API to materialize any needed "
-                "files when it runs in the workspace"
-            )
-        if self.append_only_caches and self.run_in_workspace:
-            raise ValueError(
-                "InteractiveProcess requested setup of append-only caches and also requested to run"
-                " in the workspace. These options are incompatible since setting up append-only"
-                " caches would modify the workspace."
-            )
+        object.__setattr__(
+            self,
+            "process",
+            Process(
+                argv,
+                description="Interactive process",
+                env=env,
+                input_digest=input_digest,
+                append_only_caches=append_only_caches,
+                immutable_input_digests=immutable_input_digests,
+            ),
+        )
+        object.__setattr__(self, "run_in_workspace", run_in_workspace)
+        object.__setattr__(self, "forward_signals_to_process", forward_signals_to_process)
+        object.__setattr__(self, "restartable", restartable)
+        object.__setattr__(self, "keep_sandboxes", keep_sandboxes)
 
     @classmethod
     def from_process(
@@ -347,14 +395,6 @@ class InteractiveProcess(SideEffecting):
         forward_signals_to_process: bool = True,
         restartable: bool = False,
     ) -> InteractiveProcess:
-        # TODO: Remove this check once https://github.com/pantsbuild/pants/issues/13852 is
-        #  implemented and the immutable_input_digests are propagated into the InteractiveProcess.
-        if process.immutable_input_digests:
-            raise ValueError(
-                "Process has immutable_input_digests, so it cannot be converted to an "
-                "InteractiveProcess by calling from_process().  Use an async "
-                "InteractiveProcessRequest instead."
-            )
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
@@ -362,40 +402,8 @@ class InteractiveProcess(SideEffecting):
             forward_signals_to_process=forward_signals_to_process,
             restartable=restartable,
             append_only_caches=process.append_only_caches,
+            immutable_input_digests=process.immutable_input_digests,
         )
-
-
-@dataclass(frozen=True)
-class InteractiveProcessRequest:
-    process: Process
-    forward_signals_to_process: bool = True
-    restartable: bool = False
-
-
-@rule
-async def interactive_process_from_process(req: InteractiveProcessRequest) -> InteractiveProcess:
-    # TODO: Temporary workaround until https://github.com/pantsbuild/pants/issues/13852
-    #  is implemented. Once that is implemented we can get rid of this rule, and the
-    #  InteractiveProcessRequest type, and use InteractiveProcess.from_process directly.
-
-    if req.process.immutable_input_digests:
-        prefixed_immutable_input_digests = await MultiGet(
-            Get(Digest, AddPrefix(digest, prefix))
-            for prefix, digest in req.process.immutable_input_digests.items()
-        )
-        full_input_digest = await Get(
-            Digest, MergeDigests([req.process.input_digest, *prefixed_immutable_input_digests])
-        )
-    else:
-        full_input_digest = req.process.input_digest
-    return InteractiveProcess(
-        argv=req.process.argv,
-        env=req.process.env,
-        input_digest=full_input_digest,
-        forward_signals_to_process=req.forward_signals_to_process,
-        restartable=req.restartable,
-        append_only_caches=req.process.append_only_caches,
-    )
 
 
 def rules():

@@ -1,9 +1,13 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import hashlib
 import os
 import pkgutil
 import shutil
+import socket
 import ssl
 import tarfile
 import time
@@ -11,7 +15,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Set, Union
+from typing import Callable, Dict, Iterable, Optional, Set, Union
 
 import pytest
 
@@ -37,6 +41,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
     SnapshotDiff,
+    SymlinkEntry,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -135,6 +140,18 @@ def try_with_backoff(assertion_fn: Callable[[], bool], count: int = 4) -> bool:
         if assertion_fn():
             return True
     return False
+
+
+# -----------------------------------------------------------------------------------------------
+# `FileContent`
+# -----------------------------------------------------------------------------------------------
+
+
+def test_file_content_non_bytes():
+    with pytest.raises(TypeError) as exc:
+        FileContent(path="4.txt", content="four")
+
+    assert str(exc.value) == "Expected 'content' to be bytes, but got str"
 
 
 # -----------------------------------------------------------------------------------------------
@@ -286,6 +303,22 @@ def test_path_globs_ignore_pattern(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_path_globs_ignore_sock(rule_runner: RuleRunner) -> None:
+    sock_path = os.path.join(rule_runner.build_root, "sock.sock")
+    with socket.socket(socket.AF_UNIX) as sock:
+        sock.bind(sock_path)
+    assert os.path.exists(sock_path)
+    assert not os.path.isfile(sock_path)
+
+    rule_runner.write_files({"non-sock.txt": ""})
+    assert_path_globs(
+        rule_runner,
+        ["**"],
+        expected_files=["non-sock.txt"],
+        expected_dirs=[],
+    )
+
+
 def test_path_globs_remove_duplicates(rule_runner: RuleRunner) -> None:
     setup_fs_test_tar(rule_runner)
     assert_path_globs(
@@ -349,6 +382,19 @@ def test_path_globs_symlink_dead_nested(rule_runner: RuleRunner) -> None:
     assert_path_globs(rule_runner, ["subdir/dead"], expected_files=[], expected_dirs=[])
 
 
+def test_path_globs_symlink_loop(rule_runner: RuleRunner) -> None:
+    # Matching a recursive glob against a link which points to its parent directory would cause
+    # infinite recursion, so we eagerly error instead.
+    setup_fs_test_tar(rule_runner)
+    link = os.path.join(rule_runner.build_root, "subdir/link.ln")
+    dest = os.path.join(rule_runner.build_root, "subdir")
+    relative_symlink(dest, link)
+
+    exc_reg = r".*Maximum link depth exceeded"
+    with pytest.raises(Exception, match=exc_reg):
+        assert_path_globs(rule_runner, ["**"], expected_files=[], expected_dirs=[])
+
+
 def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
     setup_fs_test_tar(rule_runner)
 
@@ -369,7 +415,7 @@ def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
 def test_path_globs_to_digest_entries(rule_runner: RuleRunner) -> None:
     setup_fs_test_tar(rule_runner)
 
-    def get_entries(globs: Iterable[str]) -> Set[Union[FileEntry, Directory]]:
+    def get_entries(globs: Iterable[str]) -> Set[Union[FileEntry, Directory, SymlinkEntry]]:
         return set(rule_runner.request(DigestEntries, [PathGlobs(globs)]))
 
     assert get_entries(["4.txt", "a/4.txt.ln"]) == {
@@ -408,6 +454,125 @@ def test_digest_entries_handles_empty_directory(rule_runner: RuleRunner) -> None
             ),
         ]
     )
+
+
+def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
+    digest = rule_runner.request(
+        Digest,
+        [
+            CreateDigest(
+                [
+                    SymlinkEntry("a.ln", "a.txt"),
+                    SymlinkEntry("b.ln", "b.txt"),
+                    FileContent("a.txt", b"four\n"),
+                ]
+            )
+        ],
+    )
+    entries = rule_runner.request(DigestEntries, [digest])
+    assert entries == DigestEntries(
+        [
+            SymlinkEntry("a.ln", "a.txt"),
+            FileEntry(
+                "a.txt",
+                FileDigest("ab929fcd5594037960792ea0b98caf5fdaf6b60645e4ef248c28db74260f393e", 5),
+            ),
+            SymlinkEntry("b.ln", "b.txt"),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    "create_digest, files, dirs",
+    [
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("file.txt", b"four\n"),
+                    SymlinkEntry("symlink", "file.txt"),
+                    SymlinkEntry("relsymlink", "./file.txt"),
+                    SymlinkEntry("a/symlink", "../file.txt"),
+                    SymlinkEntry("a/b/symlink", "../../file.txt"),
+                ]
+            ),
+            ("a/b/symlink", "a/symlink", "file.txt", "relsymlink", "symlink"),
+            ("a", "a/b"),
+            id="simple",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("file.txt", b"four\n"),
+                    SymlinkEntry(
+                        "circular1", "./circular1"
+                    ),  # After so many traversals, we give up
+                    SymlinkEntry("circular2", "circular2"),  # After so many traversals, we give up
+                    SymlinkEntry("chain1", "chain2"),
+                    SymlinkEntry("chain2", "chain3"),
+                    SymlinkEntry("chain3", "chain1"),
+                    SymlinkEntry(
+                        "a/symlink", "file.txt"
+                    ),  # looks for a/file.txt, which doesn't exist
+                    SymlinkEntry("a/too-far.ln", "../../file.txt"),  # went too far up
+                    SymlinkEntry("a/parent", ".."),
+                    SymlinkEntry("too-far.ln", "../file.txt"),  # went too far up
+                    SymlinkEntry("absolute1.ln", str(Path(__file__).resolve())),  # absolute path
+                    SymlinkEntry("absolute2.ln", "/file.txt"),
+                ]
+            ),
+            ("file.txt",),
+            ("a",),
+            id="ignored",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("file.txt", b"four\n"),
+                    SymlinkEntry("a/b/parent-file.ln", "../../file.txt"),
+                    SymlinkEntry("dirlink", "a"),
+                ]
+            ),
+            ("a/b/parent-file.ln", "dirlink/b/parent-file.ln", "file.txt"),
+            ("a", "a/b", "dirlink", "dirlink/b"),
+            id="parentdir-in-symlink-target",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("a/file.txt", b"four\n"),
+                    SymlinkEntry("dirlink", "a"),
+                    SymlinkEntry("double-dirlink", "dirlink"),
+                ]
+            ),
+            ("a/file.txt", "dirlink/file.txt", "double-dirlink/file.txt"),
+            ("a", "dirlink", "double-dirlink"),
+            id="double-dirlink",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("a/file.txt", b"four\n"),
+                    SymlinkEntry("a/self", "."),
+                ]
+            ),
+            tuple(f"a/{'self/' * count}file.txt" for count in range(64)),
+            ("a",),
+            id="self-dir",
+        ),
+    ],
+)
+def test_snapshot_and_contents_are_symlink_oblivious(
+    rule_runner: RuleRunner,
+    create_digest: CreateDigest,
+    files: tuple[str, ...],
+    dirs: tuple[str, ...],
+) -> None:
+    digest = rule_runner.request(Digest, [create_digest])
+    snapshot = rule_runner.request(Snapshot, [digest])
+    assert snapshot.files == files
+    assert snapshot.dirs == dirs
+    contents = rule_runner.request(DigestContents, [digest])
+    assert tuple(content.path for content in contents) == files
 
 
 def test_glob_match_error_behavior(rule_runner: RuleRunner, caplog) -> None:
@@ -827,6 +992,40 @@ class StubHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
+def stub_erroring_handler(error_count_value: int) -> type[BaseHTTPRequestHandler]:
+    """Return a handler that errors once mid-download before succeeding for the next GET.
+
+    This function returns an anonymous class so that each call can create a new instance with its
+    own error counter.
+    """
+    error_num = 1
+
+    class StubErroringHandler(BaseHTTPRequestHandler):
+        error_count = error_count_value
+        response_text = b"Hello, client!"
+
+        def do_HEAD(self):
+            self.send_headers()
+
+        def do_GET(self):
+            self.send_headers()
+            nonlocal error_num
+            if error_num <= self.error_count:
+                msg = f"Returning error {error_num}"
+                error_num += 1
+                raise Exception(msg)
+            self.wfile.write(self.response_text)
+
+        def send_headers(self):
+            code = 200 if self.path == "/file.txt" else 404
+            self.send_response(code)
+            self.send_header("Content-Type", "text/utf-8")
+            self.send_header("Content-Length", f"{len(self.response_text)}")
+            self.end_headers()
+
+    return StubErroringHandler
+
+
 DOWNLOADS_FILE_DIGEST = FileDigest(
     "8fcbc50cda241aee7238c71e87c27804e7abc60675974eaf6567aa16366bc105", 14
 )
@@ -854,6 +1053,24 @@ def test_download_missing_file(downloads_rule_runner: RuleRunner) -> None:
                 Snapshot, [DownloadFile(f"http://localhost:{port}/notfound", DOWNLOADS_FILE_DIGEST)]
             )
     assert "404" in str(exc.value)
+
+
+def test_download_body_error_retry(downloads_rule_runner: RuleRunner) -> None:
+    with http_server(stub_erroring_handler(1)) as port:
+        snapshot = downloads_rule_runner.request(
+            Snapshot, [DownloadFile(f"http://localhost:{port}/file.txt", DOWNLOADS_FILE_DIGEST)]
+        )
+    assert snapshot.files == ("file.txt",)
+    assert snapshot.digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
+
+
+def test_download_body_error_retry_eventually_fails(downloads_rule_runner: RuleRunner) -> None:
+    # Returns one more error than the retry will allow.
+    with http_server(stub_erroring_handler(5)) as port:
+        with pytest.raises(Exception):
+            _ = downloads_rule_runner.request(
+                Snapshot, [DownloadFile(f"http://localhost:{port}/file.txt", DOWNLOADS_FILE_DIGEST)]
+            )
 
 
 def test_download_wrong_digest(downloads_rule_runner: RuleRunner) -> None:
@@ -980,17 +1197,81 @@ def test_write_digest_workspace(rule_runner: RuleRunner) -> None:
     assert path2.read_text() == "goodbye"
 
 
+def test_write_digest_workspace_clear_paths(rule_runner: RuleRunner) -> None:
+    workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
+    digest_a = rule_runner.request(
+        Digest,
+        [CreateDigest([FileContent("newdir/a.txt", b"hello")])],
+    )
+    digest_b = rule_runner.request(
+        Digest,
+        [CreateDigest([FileContent("newdir/b.txt", b"goodbye")])],
+    )
+    digest_c = rule_runner.request(
+        Digest,
+        [CreateDigest([FileContent("newdir/c.txt", b"hello again")])],
+    )
+    digest_c_root = rule_runner.request(
+        Digest, [CreateDigest([FileContent("c.txt", b"hello again")])]
+    )
+    digest_d = rule_runner.request(
+        Digest, [CreateDigest([SymlinkEntry("newdir/d.txt", "newdir/a.txt")])]
+    )
+    all_paths = {name: Path(rule_runner.build_root, f"newdir/{name}.txt") for name in "abcd"}
+
+    def check(expected_names: set[str]) -> None:
+        for name, path in all_paths.items():
+            expected = name in expected_names
+            assert path.exists() == expected
+
+    workspace.write_digest(digest_a, clear_paths=())
+    workspace.write_digest(digest_b, clear_paths=())
+    check({"a", "b"})
+
+    # clear a file
+    workspace.write_digest(digest_d, clear_paths=("newdir/b.txt",))
+    check({"a", "d"})
+
+    # clear a symlink (doesn't remove target file)
+    workspace.write_digest(digest_b, clear_paths=("newdir/d.txt",))
+    check({"a", "b"})
+
+    # clear a directory
+    workspace.write_digest(digest_c, clear_paths=("newdir",))
+    check({"c"})
+
+    # path prefix, and clearing the 'current' directory
+    workspace.write_digest(digest_c_root, path_prefix="newdir", clear_paths=("",))
+    check({"c"})
+
+    # clear multiple paths
+    workspace.write_digest(digest_b, clear_paths=())
+    check({"b", "c"})
+    workspace.write_digest(digest_a, clear_paths=("newdir/b.txt", "newdir/c.txt"))
+    check({"a"})
+
+    # clearing non-existent paths is fine
+    workspace.write_digest(
+        digest_b, clear_paths=("not-here", "newdir/not-here", "not-here/also-not-here")
+    )
+    check({"a", "b"})
+
+
+@dataclass(frozen=True)
+class DigestRequest:
+    create_digest: CreateDigest
+
+
+class WorkspaceGoalSubsystem(GoalSubsystem):
+    name = "workspace-goal"
+
+
+class WorkspaceGoal(Goal):
+    subsystem_cls = WorkspaceGoalSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
+
+
 def test_workspace_in_goal_rule() -> None:
-    class WorkspaceGoalSubsystem(GoalSubsystem):
-        name = "workspace-goal"
-
-    class WorkspaceGoal(Goal):
-        subsystem_cls = WorkspaceGoalSubsystem
-
-    @dataclass(frozen=True)
-    class DigestRequest:
-        create_digest: CreateDigest
-
     @rule
     def digest_request_singleton() -> DigestRequest:
         fc = FileContent(path="a.txt", content=b"hello")
@@ -1035,7 +1316,7 @@ def test_invalidated_after_rewrite(rule_runner: RuleRunner) -> None:
 
 
 def test_invalidated_after_parent_deletion(rule_runner: RuleRunner) -> None:
-    """Test that FileContent is invalidated after deleting parent directory."""
+    """Test that FileContent is invalidated after deleting the parent directory."""
     setup_fs_test_tar(rule_runner)
 
     def read_file() -> Optional[str]:
@@ -1130,49 +1411,20 @@ def test_digest_is_not_file_digest() -> None:
 
 
 def test_snapshot_properties() -> None:
-    digest = Digest("691638f4d58abaa8cfdc9af2e00682f13f07f96ad1d177f146216a7341ca4982", 154)
-    snapshot = Snapshot._unsafe_create(digest, ["f.ext", "dir/f.ext"], ["dir"])
-    assert snapshot.digest == digest
+    snapshot = Snapshot.create_for_testing(["f.ext", "dir/f.ext"], ["dir"])
+    assert snapshot.digest is not None
     assert snapshot.files == ("dir/f.ext", "f.ext")
     assert snapshot.dirs == ("dir",)
 
 
-def test_snapshot_hash() -> None:
-    def assert_hash(
-        expected: int,
-        *,
-        digest_char: str = "a",
-        files: Optional[List[str]] = None,
-        dirs: Optional[List[str]] = None,
-    ) -> None:
-        digest = Digest(digest_char * 64, 1000)
-        snapshot = Snapshot._unsafe_create(digest, files or ["f.ext", "dir/f.ext"], dirs or ["dir"])
-        assert hash(snapshot) == expected
-
-    # The digest's fingerprint is used for the hash, so all other properties are irrelevant.
-    assert_hash(-6148914691236517206)
-    assert_hash(-6148914691236517206, files=["f.ext"])
-    assert_hash(-6148914691236517206, dirs=["foo"])
-    assert_hash(-6148914691236517206, dirs=["foo"])
-    assert_hash(-4919131752989213765, digest_char="b")
-
-
-def test_snapshot_equality() -> None:
-    # Only the digest is used for equality.
-    snapshot = Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"])
-    assert snapshot == Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
-    )
-    assert snapshot == Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["foo"]
-    )
-    assert snapshot == Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext"], ["dir"])
-    assert snapshot != Snapshot._unsafe_create(Digest("a" * 64, 0), ["f.ext", "dir/f.ext"], ["dir"])
-    assert snapshot != Snapshot._unsafe_create(
-        Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
-    )
-    with pytest.raises(TypeError):
-        snapshot < snapshot  # type: ignore[operator]
+def test_snapshot_hash_and_eq() -> None:
+    one = Snapshot.create_for_testing(["f.ext"], ["dir"])
+    two = Snapshot.create_for_testing(["f.ext"], ["dir"])
+    assert hash(one) == hash(two)
+    assert one == two
+    three = Snapshot.create_for_testing(["f.ext"], [])
+    assert hash(two) != hash(three)
+    assert two != three
 
 
 @pytest.mark.parametrize(

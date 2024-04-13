@@ -22,6 +22,7 @@ class DumpJavaSourceAnalysisSubsystem(GoalSubsystem):
 
 class DumpJavaSourceAnalysis(Goal):
     subsystem_cls = DumpJavaSourceAnalysisSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @goal_rule

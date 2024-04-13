@@ -10,14 +10,14 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
-from pants.engine.process import ProcessResult
+from pants.engine.process import ProcessExecutionFailure, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
+from pants.option.global_options import KeepSandboxes
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -33,9 +33,10 @@ class IsortFieldSet(FieldSet):
         return tgt.get(SkipIsortField).value
 
 
-class IsortRequest(FmtRequest):
+class IsortRequest(FmtTargetsRequest):
     field_set_type = IsortFieldSet
-    name = Isort.options_scope
+    tool_subsystem = Isort
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 def generate_argv(
@@ -62,9 +63,9 @@ def generate_argv(
 
 
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
-async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
-    if isort.skip:
-        return FmtResult.skip(formatter_name=request.name)
+async def isort_fmt(
+    request: IsortRequest.Batch, isort: Isort, keep_sandboxes: KeepSandboxes
+) -> FmtResult:
     isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, isort.config_request(request.snapshot.dirs)
@@ -74,34 +75,42 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     # Isort 5+ changes how config files are handled. Determine which semantics we should use.
     is_isort5 = False
     if isort.config:
-        isort_info = await Get(PexResolveInfo, VenvPex, isort_pex)
-        is_isort5 = any(
-            dist_info.project_name == "isort" and dist_info.version.major >= 5
-            for dist_info in isort_info
-        )
+        isort_pex_info = await Get(PexResolveInfo, VenvPex, isort_pex)
+        isort_info = isort_pex_info.find("isort")
+        is_isort5 = isort_info is not None and isort_info.version.major >= 5
 
     input_digest = await Get(
         Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
+    description = f"Run isort on {pluralize(len(request.files), 'file')}."
     result = await Get(
         ProcessResult,
         VenvPexProcess(
             isort_pex,
-            argv=generate_argv(request.snapshot.files, isort, is_isort5=is_isort5),
+            argv=generate_argv(request.files, isort, is_isort5=is_isort5),
             input_digest=input_digest,
-            output_files=request.snapshot.files,
-            description=f"Run isort on {pluralize(len(request.field_sets), 'file')}.",
+            output_files=request.files,
+            description=description,
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
+
+    if b"Failed to pull configuration information" in result.stderr:
+        raise ProcessExecutionFailure(
+            -1,
+            result.stdout,
+            result.stderr,
+            description,
+            keep_sandboxes=keep_sandboxes,
+        )
+
+    return await FmtResult.create(request, result)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtRequest, IsortRequest),
+        *IsortRequest.rules(),
         *pex.rules(),
     ]

@@ -34,15 +34,23 @@ class MockTarget(Target):
     deprecated_alias_removal_version = "99.9.0.dev0"
 
 
+class MockSingleSourceField(SingleSourceField):
+    pass
+
+
 class MockGeneratedFileTarget(Target):
     alias = "file_generated"
-    core_fields = (SingleSourceField, Tags)
+    core_fields = (MockSingleSourceField, Tags)
+
+
+class MockMultipleSourcesField(MultipleSourcesField):
+    pass
 
 
 class MockFileTargetGenerator(TargetFilesGenerator):
     alias = "file_generator"
     generated_target_cls = MockGeneratedFileTarget
-    core_fields = (MultipleSourcesField, Tags)
+    core_fields = (MockMultipleSourcesField, Tags)
     copied_fields = (Tags,)
     moved_fields = ()
 
@@ -109,7 +117,6 @@ def assert_targets(
     )
     assert set(filter_result.stdout.splitlines()) == expected
 
-    # Also run with `list` to prove that the filters work from any goal.
     list_result = rule_runner.run_goal_rule(
         List,
         global_args=[

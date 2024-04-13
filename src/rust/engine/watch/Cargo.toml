@@ -2,21 +2,24 @@
 version = "0.0.1"
 edition = "2021"
 name = "watch"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-crossbeam-channel = "0.5"
+crossbeam-channel = { workspace = true }
 fs = { path = "../fs" }
-futures = "0.3"
+futures = { workspace = true }
 hashing = { path = "../hashing" }
-log = "0.4"
+log = { workspace = true }
 # TODO: See https://github.com/notify-rs/notify/issues/255.
-notify = { git = "https://github.com/pantsbuild/notify", rev = "64880f0662db2b5ecbf25f1cccdca64bb8fac1bc" }
-parking_lot = "0.12"
+notify = { workspace = true }
+parking_lot = { workspace = true }
 task_executor = { path = "../task_executor" }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }
 testutil = { path = "../testutil" }
-tokio = { version = "1.16", features = ["rt", "macros"] }
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,42 @@
+[package]
+version = "0.0.1"
+edition = "2021"
+name = "docker"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+async-stream = { workspace = true }
+async-trait = { workspace = true }
+async-lock = { workspace = true }
+bollard = { workspace = true }
+docker_credential = { workspace = true }
+fs = { path = "../../fs" }
+futures = { workspace = true }
+log = { workspace = true }
+nails = { workspace = true }
+store = { path = "../../fs/store" }
+task_executor = { path = "../../task_executor" }
+tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio-rustls = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
+workunit_store = { path = "../../workunit_store" }
+parking_lot = { workspace = true }
+async-oncecell = { workspace = true }
+once_cell = { workspace = true }
+process_execution = { path = ".." }
+hashing = { path = "../../hashing" }
+bytes = { workspace = true }
+
+[dev-dependencies]
+env_logger = { workspace = true }
+maplit = { workspace = true }
+mock = { path = "../../testutil/mock" }
+parking_lot = { workspace = true }
+sharded_lmdb = { path = "../../sharded_lmdb" }
+tempfile = { workspace = true }
+testutil = { path = "../../testutil" }
+tokio = { workspace = true, features = ["macros"] }
+
+[lints]
+workspace = true

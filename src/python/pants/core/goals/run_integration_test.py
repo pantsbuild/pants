@@ -42,7 +42,7 @@ def test_run_then_edit(use_pantsd: bool) -> None:
             [
                 "--backend-packages=['pants.backend.python']",
                 "run",
-                f"{dirname}/slow.py",
+                f"{dirname}:bin",
             ],
             workdir=workdir,
             use_pantsd=use_pantsd,

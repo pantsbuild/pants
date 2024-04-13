@@ -2,36 +2,47 @@
 version = "0.0.1"
 edition = "2021"
 name = "grpc_util"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-bytes = "1.0"
-either = "1"
-futures = "0.3"
-hyper = "0.14"
-http = "0.2"
-itertools = "0.10"
-rustls-native-certs = "0.5"
-prost = "0.9"
-rand = "0.8"
-rustls = { version = "0.19", features = ["dangerous_configuration"] }
-rustls-pemfile = "0.2"
-tokio = { version = "1.4", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
-tokio-rustls = "0.22"
-tokio-util = { version = "0.6", features = ["codec"] }
-tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
-tower = { version = "0.4", features = ["limit"] }
-tower-layer = "0.3"
-tower-service = "0.3"
-webpki = "0.21"
+bytes = { workspace = true }
+either = { workspace = true }
+futures = { workspace = true }
+http = { workspace = true }
+http-body = { workspace = true }
+hyper = { workspace = true }
+hyper-rustls = { workspace = true, features = ["http2"] }
+itertools = { workspace = true }
+lazy_static = { workspace = true }
+log = { workspace = true }
+pin-project = { workspace = true }
+pin-project-lite = { workspace = true }
+prost = { workspace = true }
+rand = { workspace = true }
+rustls = { workspace = true, features = ["dangerous_configuration", 'logging'] }
+rustls-native-certs = { workspace = true }
+rustls-pemfile = { workspace = true }
+tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio-rustls = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
+tonic = { workspace = true, features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tower = { workspace = true, features = ["limit"] }
+tower-layer = { workspace = true }
+tower-service = { workspace = true }
+webpki = { workspace = true }
+workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]
-# Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
-async-trait = "=0.1.42"
-parking_lot = "0.11"
-prost-types = "0.9"
+axum = { workspace = true }
+axum-server = { workspace = true, features = ["tls-rustls"] }
+async-trait = { workspace = true }
+parking_lot = { workspace = true }
+prost-types = { workspace = true }
 
 [build-dependencies]
-prost-build = "0.9"
-tonic-build = "0.6"
+prost-build = { workspace = true }
+tonic-build = { workspace = true }
+
+[lints]
+workspace = true

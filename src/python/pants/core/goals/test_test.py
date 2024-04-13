@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
+from typing import Any, Iterable
 
 import pytest
 
@@ -25,126 +26,243 @@ from pants.core.goals.test import (
     RuntimePackageDependenciesField,
     ShowOutput,
     Test,
+    TestDebugAdapterRequest,
     TestDebugRequest,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
+    TestTimeoutField,
+    _format_test_rerun_command,
     _format_test_summary,
     build_runtime_package_dependencies,
     run_tests,
 )
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import (
+    ChosenLocalEnvironmentName,
+    SingleEnvironmentNameRequest,
+)
+from pants.core.util_rules.partitions import Partition, Partitions
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_FILE_DIGEST,
     Digest,
+    FileDigest,
     MergeDigests,
     Snapshot,
     Workspace,
 )
 from pants.engine.internals.session import RunId
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult, ProcessResultMetadata
+from pants.engine.platform import Platform
+from pants.engine.process import (
+    InteractiveProcess,
+    InteractiveProcessResult,
+    ProcessExecutionEnvironment,
+    ProcessResultMetadata,
+)
 from pants.engine.target import (
+    BoolField,
+    Field,
     MultipleSourcesField,
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership
-from pants.testutil.option_util import create_goal_subsystem
+from pants.option.option_types import SkipOption
+from pants.option.subsystem import Subsystem
+from pants.testutil.option_util import create_goal_subsystem, create_subsystem
+from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import (
     MockEffect,
     MockGet,
     QueryRule,
-    RuleRunner,
     mock_console,
     run_rule_with_mocks,
 )
 from pants.util.logging import LogLevel
 
 
+def make_process_result_metadata(
+    source: str,
+    *,
+    environment_name: str | None = None,
+    docker_image: str | None = None,
+    remote_execution: bool = False,
+    total_elapsed_ms: int = 999,
+    source_run_id: int = 0,
+) -> ProcessResultMetadata:
+    return ProcessResultMetadata(
+        total_elapsed_ms,
+        ProcessExecutionEnvironment(
+            environment_name=environment_name,
+            # TODO: None of the following are currently consumed in these tests.
+            platform=Platform.create_for_localhost().value,
+            docker_image=docker_image,
+            remote_execution=remote_execution,
+            remote_execution_extra_platform_properties=[],
+        ),
+        source,
+        source_run_id,
+    )
+
+
+def make_test_result(
+    addresses: Iterable[Address],
+    exit_code: None | int,
+    stdout_bytes: bytes = b"",
+    stdout_digest: FileDigest = EMPTY_FILE_DIGEST,
+    stderr_bytes: bytes = b"",
+    stderr_digest: FileDigest = EMPTY_FILE_DIGEST,
+    coverage_data: CoverageData | None = None,
+    output_setting: ShowOutput = ShowOutput.NONE,
+    result_metadata: None | ProcessResultMetadata = None,
+) -> TestResult:
+    """Create a TestResult with default values for most fields."""
+    return TestResult(
+        addresses=tuple(addresses),
+        exit_code=exit_code,
+        stdout_bytes=stdout_bytes,
+        stdout_digest=stdout_digest,
+        stderr_bytes=stderr_bytes,
+        stderr_digest=stderr_digest,
+        coverage_data=coverage_data,
+        output_setting=output_setting,
+        result_metadata=result_metadata,
+    )
+
+
+class MockMultipleSourcesField(MultipleSourcesField):
+    pass
+
+
+class MockTestTimeoutField(TestTimeoutField):
+    pass
+
+
+class MockSkipTestsField(BoolField):
+    alias = "skip_test"
+    default = False
+
+
+class MockRequiredField(Field):
+    alias = "required"
+    required = True
+
+
 class MockTarget(Target):
     alias = "mock_target"
-    core_fields = (MultipleSourcesField,)
+    core_fields = (MockMultipleSourcesField, MockSkipTestsField, MockRequiredField)
 
 
 @dataclass(frozen=True)
 class MockCoverageData(CoverageData):
-    address: Address
+    addresses: Iterable[Address]
 
 
 class MockCoverageDataCollection(CoverageDataCollection):
     element_type = MockCoverageData
 
 
-class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
-    required_fields = (MultipleSourcesField,)
+@dataclass(frozen=True)
+class MockTestFieldSet(TestFieldSet):
+    required_fields = (MultipleSourcesField, MockRequiredField)
+    sources: MultipleSourcesField
+    required: MockRequiredField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(MockSkipTestsField).value
+
+
+class MockTestSubsystem(Subsystem):
+    options_scope = "mock-test"
+    help = "Not real"
+    name = "Mock"
+    skip = SkipOption("test")
+
+
+class MockTestRequest(TestRequest):
+    field_set_type = MockTestFieldSet
+    tool_subsystem = MockTestSubsystem
 
     @staticmethod
     @abstractmethod
-    def exit_code(_: Address) -> int:
+    def exit_code(_: Iterable[Address]) -> int:
         pass
 
     @staticmethod
     @abstractmethod
-    def skipped(_: Address) -> bool:
+    def skipped(_: Iterable[Address]) -> bool:
         pass
 
-    @property
-    def test_result(self) -> TestResult:
-        return TestResult(
-            exit_code=self.exit_code(self.address),
-            stdout="",
-            stdout_digest=EMPTY_FILE_DIGEST,
-            stderr="",
-            stderr_digest=EMPTY_FILE_DIGEST,
-            address=self.address,
-            coverage_data=MockCoverageData(self.address),
+    @classmethod
+    def test_result(cls, field_sets: Iterable[MockTestFieldSet]) -> TestResult:
+        addresses = [field_set.address for field_set in field_sets]
+        return make_test_result(
+            addresses,
+            exit_code=cls.exit_code(addresses),
+            coverage_data=MockCoverageData(addresses),
             output_setting=ShowOutput.ALL,
-            result_metadata=None
-            if self.skipped(self.address)
-            else ProcessResultMetadata(999, "ran_locally", 0),
+            result_metadata=None if cls.skipped(addresses) else make_process_result_metadata("ran"),
         )
 
 
-class SuccessfulFieldSet(MockTestFieldSet):
+class SuccessfulRequest(MockTestRequest):
     @staticmethod
-    def exit_code(_: Address) -> int:
+    def exit_code(_: Iterable[Address]) -> int:
         return 0
 
     @staticmethod
-    def skipped(_: Address) -> bool:
+    def skipped(_: Iterable[Address]) -> bool:
         return False
 
 
-class ConditionallySucceedsFieldSet(MockTestFieldSet):
+class ConditionallySucceedsRequest(MockTestRequest):
     @staticmethod
-    def exit_code(address: Address) -> int:
-        return 27 if address.target_name == "bad" else 0
+    def exit_code(addresses: Iterable[Address]) -> int:
+        if any(address.target_name == "bad" for address in addresses):
+            return 27
+        return 0
 
     @staticmethod
-    def skipped(address: Address) -> bool:
-        return address.target_name == "skipped"
+    def skipped(addresses: Iterable[Address]) -> bool:
+        return any(address.target_name == "skipped" for address in addresses)
+
+
+def mock_partitioner(
+    request: MockTestRequest.PartitionRequest,
+    _: EnvironmentName,
+) -> Partitions[MockTestFieldSet, Any]:
+    return Partitions(Partition((field_set,), None) for field_set in request.field_sets)
+
+
+def mock_test_partition(request: MockTestRequest.Batch, _: EnvironmentName) -> TestResult:
+    request_type = {cls.Batch: cls for cls in MockTestRequest.__subclasses__()}[type(request)]
+    return request_type.test_result(request.elements)
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner()
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner()
 
 
-def make_target(address: Address | None = None) -> Target:
+def make_target(address: Address | None = None, *, skip: bool = False) -> Target:
     if address is None:
         address = Address("", target_name="tests")
-    return MockTarget({}, address)
+    return MockTarget({MockSkipTestsField.alias: skip, MockRequiredField.alias: "present"}, address)
 
 
 def run_test_rule(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     *,
-    field_set: type[TestFieldSet],
+    request_type: type[TestRequest],
     targets: list[Target],
     debug: bool = False,
     use_coverage: bool = False,
@@ -152,11 +270,13 @@ def run_test_rule(
     report_dir: str = TestSubsystem.default_report_path,
     output: ShowOutput = ShowOutput.ALL,
     valid_targets: bool = True,
+    show_rerun_command: bool = False,
     run_id: RunId = RunId(999),
 ) -> tuple[int, str]:
     test_subsystem = create_goal_subsystem(
         TestSubsystem,
         debug=debug,
+        debug_adapter=False,
         use_coverage=use_coverage,
         report=report,
         report_dir=report_dir,
@@ -164,11 +284,21 @@ def run_test_rule(
         output=output,
         extra_env_vars=[],
         shard="",
+        batch_size=1,
+        show_rerun_command=show_rerun_command,
+    )
+    debug_adapter_subsystem = create_subsystem(
+        DebugAdapterSubsystem,
+        host="127.0.0.1",
+        port="5678",
     )
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
     union_membership = UnionMembership(
         {
-            TestFieldSet: [field_set],
+            TestFieldSet: [MockTestFieldSet],
+            TestRequest: [request_type],
+            TestRequest.PartitionRequest: [request_type.PartitionRequest],
+            TestRequest.Batch: [request_type.Batch],
             CoverageDataCollection: [MockCoverageDataCollection],
         }
     )
@@ -178,16 +308,32 @@ def run_test_rule(
     ) -> TargetRootsToFieldSets:
         if not valid_targets:
             return TargetRootsToFieldSets({})
-        return TargetRootsToFieldSets({tgt: [field_set.create(tgt)] for tgt in targets})
+        return TargetRootsToFieldSets(
+            {
+                tgt: [request_type.field_set_type.create(tgt)]
+                for tgt in targets
+                if request_type.field_set_type.is_applicable(tgt)
+            }
+        )
 
-    def mock_debug_request(_: TestFieldSet) -> TestDebugRequest:
+    def mock_debug_request(
+        _field_set: TestFieldSet, _environment_name: EnvironmentName
+    ) -> TestDebugRequest:
         return TestDebugRequest(InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST))
+
+    def mock_debug_adapter_request(_: TestFieldSet) -> TestDebugAdapterRequest:
+        return TestDebugAdapterRequest(
+            InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST)
+        )
 
     def mock_coverage_report_generation(
         coverage_data_collection: MockCoverageDataCollection,
+        _: EnvironmentName,
     ) -> CoverageReports:
         addresses = ", ".join(
-            coverage_data.address.spec for coverage_data in coverage_data_collection
+            address.spec
+            for coverage_data in coverage_data_collection
+            for address in coverage_data.addresses
         )
         console_report = ConsoleCoverageReport(
             coverage_insufficient=False, report=f"Ran coverage on {addresses}"
@@ -200,47 +346,64 @@ def run_test_rule(
             rule_args=[
                 console,
                 test_subsystem,
+                debug_adapter_subsystem,
                 workspace,
                 union_membership,
                 DistDir(relpath=Path("dist")),
                 run_id,
+                ChosenLocalEnvironmentName(EnvironmentName(None)),
             ],
             mock_gets=[
                 MockGet(
                     output_type=TargetRootsToFieldSets,
-                    input_type=TargetRootsToFieldSetsRequest,
+                    input_types=(TargetRootsToFieldSetsRequest,),
                     mock=mock_find_valid_field_sets,
                 ),
                 MockGet(
+                    output_type=Partitions,
+                    input_types=(TestRequest.PartitionRequest, EnvironmentName),
+                    mock=mock_partitioner,
+                ),
+                MockGet(
+                    output_type=EnvironmentName,
+                    input_types=(SingleEnvironmentNameRequest,),
+                    mock=lambda _a: EnvironmentName(None),
+                ),
+                MockGet(
                     output_type=TestResult,
-                    input_type=TestFieldSet,
-                    mock=lambda fs: fs.test_result,
+                    input_types=(TestRequest.Batch, EnvironmentName),
+                    mock=mock_test_partition,
                 ),
                 MockGet(
                     output_type=TestDebugRequest,
-                    input_type=TestFieldSet,
+                    input_types=(TestRequest.Batch, EnvironmentName),
                     mock=mock_debug_request,
+                ),
+                MockGet(
+                    output_type=TestDebugAdapterRequest,
+                    input_types=(TestFieldSet,),
+                    mock=mock_debug_adapter_request,
                 ),
                 # Merge XML results.
                 MockGet(
                     output_type=Digest,
-                    input_type=MergeDigests,
+                    input_types=(MergeDigests,),
                     mock=lambda _: EMPTY_DIGEST,
                 ),
                 MockGet(
                     output_type=CoverageReports,
-                    input_type=CoverageDataCollection,
+                    input_types=(CoverageDataCollection, EnvironmentName),
                     mock=mock_coverage_report_generation,
                 ),
                 MockGet(
                     output_type=OpenFiles,
-                    input_type=OpenFilesRequest,
+                    input_types=(OpenFilesRequest,),
                     mock=lambda _: OpenFiles(()),
                 ),
                 MockEffect(
                     output_type=InteractiveProcessResult,
-                    input_type=InteractiveProcess,
-                    mock=lambda _: InteractiveProcessResult(0),
+                    input_types=(InteractiveProcess, EnvironmentName),
+                    mock=lambda _p, _e: InteractiveProcessResult(0),
                 ),
             ],
             union_membership=union_membership,
@@ -249,10 +412,10 @@ def run_test_rule(
         return result.exit_code, stdio_reader.get_stderr()
 
 
-def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
+def test_invalid_target_noops(rule_runner: PythonRuleRunner) -> None:
     exit_code, stderr = run_test_rule(
         rule_runner,
-        field_set=SuccessfulFieldSet,
+        request_type=SuccessfulRequest,
         targets=[make_target()],
         valid_targets=False,
     )
@@ -260,24 +423,61 @@ def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
     assert stderr.strip() == ""
 
 
-def test_summary(rule_runner: RuleRunner) -> None:
+def test_skipped_target_noops(rule_runner: PythonRuleRunner) -> None:
+    exit_code, stderr = run_test_rule(
+        rule_runner,
+        request_type=ConditionallySucceedsRequest,
+        targets=[make_target(Address("", target_name="bad"), skip=True)],
+    )
+    assert exit_code == 0
+    assert stderr.strip() == ""
+
+
+@pytest.mark.parametrize(
+    ("show_rerun_command", "expected_stderr"),
+    [
+        (
+            False,
+            # the summary is for humans, so we test it literally, to make sure the formatting is good
+            dedent(
+                """\
+
+                ✓ //:good succeeded in 1.00s (memoized).
+                ✕ //:bad failed in 1.00s (memoized).
+                """
+            ),
+        ),
+        (
+            True,
+            dedent(
+                """\
+
+                ✓ //:good succeeded in 1.00s (memoized).
+                ✕ //:bad failed in 1.00s (memoized).
+
+                To rerun the failing tests, use:
+
+                    pants test //:bad
+                """
+            ),
+        ),
+    ],
+)
+def test_summary(
+    rule_runner: PythonRuleRunner, show_rerun_command: bool, expected_stderr: str
+) -> None:
     good_address = Address("", target_name="good")
     bad_address = Address("", target_name="bad")
     skipped_address = Address("", target_name="skipped")
 
     exit_code, stderr = run_test_rule(
         rule_runner,
-        field_set=ConditionallySucceedsFieldSet,
+        request_type=ConditionallySucceedsRequest,
         targets=[make_target(good_address), make_target(bad_address), make_target(skipped_address)],
+        show_rerun_command=show_rerun_command,
     )
-    assert exit_code == ConditionallySucceedsFieldSet.exit_code(bad_address)
-    assert stderr == dedent(
-        """\
-
-        ✓ //:good succeeded in 1.00s (memoized).
-        ✕ //:bad failed in 1.00s (memoized).
-        """
-    )
+    assert exit_code == ConditionallySucceedsRequest.exit_code((bad_address,))
+    assert stderr == expected_stderr
 
 
 def _assert_test_summary(
@@ -288,64 +488,133 @@ def _assert_test_summary(
     result_metadata: ProcessResultMetadata | None,
 ) -> None:
     assert expected == _format_test_summary(
-        TestResult(
+        make_test_result(
+            [Address(spec_path="", target_name="dummy_address")],
             exit_code=exit_code,
-            stdout="",
-            stderr="",
-            stdout_digest=EMPTY_FILE_DIGEST,
-            stderr_digest=EMPTY_FILE_DIGEST,
-            address=Address(spec_path="", target_name="dummy_address"),
-            output_setting=ShowOutput.FAILED,
             result_metadata=result_metadata,
+            output_setting=ShowOutput.FAILED,
         ),
         RunId(run_id),
         Console(use_colors=False),
     )
 
 
-def test_format_summary_remote(rule_runner: RuleRunner) -> None:
+def test_format_summary_remote(rule_runner: PythonRuleRunner) -> None:
     _assert_test_summary(
-        "✓ //:dummy_address succeeded in 0.05s (ran remotely).",
+        "✓ //:dummy_address succeeded in 0.05s (ran in remote environment `ubuntu`).",
         exit_code=0,
         run_id=0,
-        result_metadata=ProcessResultMetadata(50, "ran_remotely", 0),
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name="ubuntu", remote_execution=True, total_elapsed_ms=50
+        ),
     )
 
 
-def test_format_summary_local(rule_runner: RuleRunner) -> None:
+def test_format_summary_local(rule_runner: PythonRuleRunner) -> None:
     _assert_test_summary(
         "✓ //:dummy_address succeeded in 0.05s.",
         exit_code=0,
         run_id=0,
-        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name=None, total_elapsed_ms=50
+        ),
     )
 
 
-def test_format_summary_memoized(rule_runner: RuleRunner) -> None:
+def test_format_summary_memoized(rule_runner: PythonRuleRunner) -> None:
     _assert_test_summary(
         "✓ //:dummy_address succeeded in 0.05s (memoized).",
         exit_code=0,
         run_id=1234,
-        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+        result_metadata=make_process_result_metadata("ran", total_elapsed_ms=50),
     )
 
 
-def test_debug_target(rule_runner: RuleRunner) -> None:
+def test_format_summary_memoized_remote(rule_runner: PythonRuleRunner) -> None:
+    _assert_test_summary(
+        "✓ //:dummy_address succeeded in 0.05s (memoized for remote environment `ubuntu`).",
+        exit_code=0,
+        run_id=1234,
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name="ubuntu", remote_execution=True, total_elapsed_ms=50
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("results", "expected"),
+    [
+        pytest.param([], None, id="no_results"),
+        pytest.param(
+            [make_test_result([Address("", target_name="t1")], exit_code=0)], None, id="one_success"
+        ),
+        pytest.param(
+            [make_test_result([Address("", target_name="t2")], exit_code=None)],
+            None,
+            id="one_no_run",
+        ),
+        pytest.param(
+            [make_test_result([Address("", target_name="t3")], exit_code=1)],
+            "To rerun the failing tests, use:\n\n    pants test //:t3",
+            id="one_failure",
+        ),
+        pytest.param(
+            [
+                make_test_result([Address("", target_name="t1")], exit_code=0),
+                make_test_result([Address("", target_name="t2")], exit_code=None),
+                make_test_result([Address("", target_name="t3")], exit_code=1),
+            ],
+            "To rerun the failing tests, use:\n\n    pants test //:t3",
+            id="one_of_each",
+        ),
+        pytest.param(
+            [
+                make_test_result([Address("path/to", target_name="t1")], exit_code=1),
+                make_test_result([Address("another/path", target_name="t2")], exit_code=2),
+                make_test_result([Address("", target_name="t3")], exit_code=3),
+            ],
+            "To rerun the failing tests, use:\n\n    pants test //:t3 another/path:t2 path/to:t1",
+            id="multiple_failures",
+        ),
+        pytest.param(
+            [
+                make_test_result(
+                    [
+                        Address(
+                            "path with spaces",
+                            target_name="$*",
+                            parameters=dict(key="value"),
+                            generated_name="gn",
+                        )
+                    ],
+                    exit_code=1,
+                )
+            ],
+            "To rerun the failing tests, use:\n\n    pants test 'path with spaces:$*#gn@key=value'",
+            id="special_characters_require_quoting",
+        ),
+    ],
+)
+def test_format_rerun_command(results: list[TestResult], expected: None | str) -> None:
+    assert expected == _format_test_rerun_command(results)
+
+
+def test_debug_target(rule_runner: PythonRuleRunner) -> None:
     exit_code, _ = run_test_rule(
         rule_runner,
-        field_set=SuccessfulFieldSet,
+        request_type=SuccessfulRequest,
         targets=[make_target()],
         debug=True,
     )
     assert exit_code == 0
 
 
-def test_report(rule_runner: RuleRunner) -> None:
+def test_report(rule_runner: PythonRuleRunner) -> None:
     addr1 = Address("", target_name="t1")
     addr2 = Address("", target_name="t2")
     exit_code, stderr = run_test_rule(
         rule_runner,
-        field_set=SuccessfulFieldSet,
+        request_type=SuccessfulRequest,
         targets=[make_target(addr1), make_target(addr2)],
         report=True,
     )
@@ -353,13 +622,13 @@ def test_report(rule_runner: RuleRunner) -> None:
     assert "Wrote test reports to dist/test/reports" in stderr
 
 
-def test_report_dir(rule_runner: RuleRunner) -> None:
+def test_report_dir(rule_runner: PythonRuleRunner) -> None:
     report_dir = "dist/test-results"
     addr1 = Address("", target_name="t1")
     addr2 = Address("", target_name="t2")
     exit_code, stderr = run_test_rule(
         rule_runner,
-        field_set=SuccessfulFieldSet,
+        request_type=SuccessfulRequest,
         targets=[make_target(addr1), make_target(addr2)],
         report=True,
         report_dir=report_dir,
@@ -368,12 +637,12 @@ def test_report_dir(rule_runner: RuleRunner) -> None:
     assert f"Wrote test reports to {report_dir}" in stderr
 
 
-def test_coverage(rule_runner: RuleRunner) -> None:
+def test_coverage(rule_runner: PythonRuleRunner) -> None:
     addr1 = Address("", target_name="t1")
     addr2 = Address("", target_name="t2")
     exit_code, stderr = run_test_rule(
         rule_runner,
-        field_set=SuccessfulFieldSet,
+        request_type=SuccessfulRequest,
         targets=[make_target(addr1), make_target(addr2)],
         use_coverage=True,
     )
@@ -390,12 +659,30 @@ def sort_results() -> None:
         stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=ShowOutput.ALL,
     )
-    skip1 = create_test_result(exit_code=None, address=Address("t1"))
-    skip2 = create_test_result(exit_code=None, address=Address("t2"))
-    success1 = create_test_result(exit_code=0, address=Address("t1"))
-    success2 = create_test_result(exit_code=0, address=Address("t2"))
-    fail1 = create_test_result(exit_code=1, address=Address("t1"))
-    fail2 = create_test_result(exit_code=1, address=Address("t2"))
+    skip1 = create_test_result(
+        exit_code=None,
+        addresses=(Address("t1"),),
+    )
+    skip2 = create_test_result(
+        exit_code=None,
+        addresses=(Address("t2"),),
+    )
+    success1 = create_test_result(
+        exit_code=0,
+        addresses=(Address("t1"),),
+    )
+    success2 = create_test_result(
+        exit_code=0,
+        addresses=(Address("t2"),),
+    )
+    fail1 = create_test_result(
+        exit_code=1,
+        addresses=(Address("t1"),),
+    )
+    fail2 = create_test_result(
+        exit_code=1,
+        addresses=(Address("t2"),),
+    )
     assert sorted([fail2, success2, skip2, fail1, success1, skip1]) == [
         skip1,
         skip2,
@@ -414,29 +701,27 @@ def assert_streaming_output(
     output_setting: ShowOutput = ShowOutput.ALL,
     expected_level: LogLevel,
     expected_message: str,
-    result_metadata: ProcessResultMetadata = ProcessResultMetadata(999, "dummy", 0),
+    result_metadata: ProcessResultMetadata = make_process_result_metadata("dummy"),
 ) -> None:
-    result = TestResult(
+    result = make_test_result(
+        addresses=(Address("demo_test"),),
         exit_code=exit_code,
-        stdout=stdout,
-        stdout_digest=EMPTY_FILE_DIGEST,
-        stderr=stderr,
-        stderr_digest=EMPTY_FILE_DIGEST,
+        stdout_bytes=stdout.encode(),
+        stderr_bytes=stderr.encode(),
         output_setting=output_setting,
-        address=Address("demo_test"),
         result_metadata=result_metadata,
     )
     assert result.level() == expected_level
     assert result.message() == expected_message
 
 
-def test_streaming_output_skip() -> None:
+def test_streaming_output_no_tests() -> None:
     assert_streaming_output(
         exit_code=None,
         stdout="",
         stderr="",
         expected_level=LogLevel.DEBUG,
-        expected_message="demo_test:demo_test skipped.",
+        expected_message="no tests found.",
     )
 
 
@@ -447,19 +732,15 @@ def test_streaming_output_success() -> None:
     assert_success_streamed(
         expected_message=dedent(
             """\
-            demo_test:demo_test succeeded.
+            succeeded.
             stdout
             stderr
 
             """
         ),
     )
-    assert_success_streamed(
-        output_setting=ShowOutput.FAILED, expected_message="demo_test:demo_test succeeded."
-    )
-    assert_success_streamed(
-        output_setting=ShowOutput.NONE, expected_message="demo_test:demo_test succeeded."
-    )
+    assert_success_streamed(output_setting=ShowOutput.FAILED, expected_message="succeeded.")
+    assert_success_streamed(output_setting=ShowOutput.NONE, expected_message="succeeded.")
 
 
 def test_streaming_output_failure() -> None:
@@ -468,7 +749,7 @@ def test_streaming_output_failure() -> None:
     )
     message = dedent(
         """\
-        demo_test:demo_test failed (exit code 1).
+        failed (exit code 1).
         stdout
         stderr
 
@@ -477,12 +758,12 @@ def test_streaming_output_failure() -> None:
     assert_failure_streamed(expected_message=message)
     assert_failure_streamed(output_setting=ShowOutput.FAILED, expected_message=message)
     assert_failure_streamed(
-        output_setting=ShowOutput.NONE, expected_message="demo_test:demo_test failed (exit code 1)."
+        output_setting=ShowOutput.NONE, expected_message="failed (exit code 1)."
     )
 
 
 def test_runtime_package_dependencies() -> None:
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             build_runtime_package_dependencies,
             *pex_from_targets.rules(),
@@ -514,3 +795,40 @@ def test_runtime_package_dependencies() -> None:
     built_package = result[0]
     snapshot = rule_runner.request(Snapshot, [built_package.digest])
     assert snapshot.files == ("src.py/main.pex",)
+
+
+def test_timeout_calculation() -> None:
+    def assert_timeout_calculated(
+        *,
+        field_value: int | None,
+        expected: int | None,
+        global_default: int | None = None,
+        global_max: int | None = None,
+        timeouts_enabled: bool = True,
+    ) -> None:
+        field = MockTestTimeoutField(field_value, Address("", target_name="tests"))
+        test_subsystem = create_subsystem(
+            TestSubsystem,
+            timeouts=timeouts_enabled,
+            timeout_default=global_default,
+            timeout_maximum=global_max,
+        )
+        assert field.calculate_from_global_options(test_subsystem) == expected
+
+    assert_timeout_calculated(field_value=10, expected=10)
+    assert_timeout_calculated(field_value=20, global_max=10, expected=10)
+    assert_timeout_calculated(field_value=None, global_default=20, expected=20)
+    assert_timeout_calculated(field_value=None, expected=None)
+    assert_timeout_calculated(field_value=None, global_default=20, global_max=10, expected=10)
+    assert_timeout_calculated(field_value=10, timeouts_enabled=False, expected=None)
+
+
+def test_non_utf8_output() -> None:
+    test_result = make_test_result(
+        [],
+        exit_code=1,  # "test error" so stdout/stderr are output in message
+        stdout_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
+        stderr_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
+        output_setting=ShowOutput.ALL,
+    )
+    assert test_result.message() == "failed (exit code 1).\n��\n��\n\n"

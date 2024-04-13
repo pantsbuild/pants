@@ -17,7 +17,10 @@ TargetFilter = Callable[["Target"], bool]
 def _extract_modifier(modified_param: str) -> Tuple[Callable[[bool], bool], str]:
     if modified_param.startswith("-"):
         return operator.not_, modified_param[1:]
-    identity_func = lambda x: x
+
+    def identity_func(x):
+        return x
+
     return identity_func, modified_param[1:] if modified_param.startswith("+") else modified_param
 
 

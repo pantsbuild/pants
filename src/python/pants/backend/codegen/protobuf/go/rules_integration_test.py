@@ -21,7 +21,7 @@ from pants.backend.codegen.protobuf.target_types import (
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals import test
-from pants.backend.go.goals.test import GoTestFieldSet
+from pants.backend.go.goals.test import GoTestFieldSet, GoTestRequest
 from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
@@ -29,19 +29,21 @@ from pants.backend.go.util_rules import (
     build_pkg_target,
     first_party_pkg,
     go_mod,
+    implicit_linker_deps,
     link,
     sdk,
     tests_analysis,
     third_party_pkg,
 )
 from pants.build_graph.address import Address
-from pants.core.goals.test import TestResult
+from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner, logging
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+from pants.testutil.skip_utils import requires_go
 
 
 @pytest.fixture
@@ -65,14 +67,16 @@ def rule_runner() -> RuleRunner:
             *first_party_pkg.rules(),
             *go_mod.rules(),
             *link.rules(),
+            *implicit_linker_deps.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),
             *tests_analysis.rules(),
             *third_party_pkg.rules(),
+            get_filtered_environment,
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateGoFromProtobufRequest]),
             QueryRule(DigestContents, (Digest,)),
-            QueryRule(TestResult, (GoTestFieldSet,)),
+            QueryRule(TestResult, (GoTestRequest.Batch,)),
         ],
         target_types=[
             GoModTarget,
@@ -109,11 +113,11 @@ def assert_files_generated(
 
 
 def test_extracts_go_package() -> None:
-    import_path = parse_go_package_option("""option go_package = "example.com/dir1";""".encode())
+    import_path = parse_go_package_option(b"""option go_package = "example.com/dir1";""")
     assert import_path == "example.com/dir1"
 
 
-@logging
+@requires_go
 def test_generates_go(rule_runner: RuleRunner) -> None:
     # This tests a few things:
     #  * We generate the correct file names.
@@ -286,11 +290,14 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     tgt = rule_runner.get_target(Address("src/go/people", target_name="pkg"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 0
-    assert "PASS: TestProtoGen" in result.stdout
+    assert b"PASS: TestProtoGen" in result.stdout_bytes
 
 
+@requires_go
 def test_generates_go_grpc(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

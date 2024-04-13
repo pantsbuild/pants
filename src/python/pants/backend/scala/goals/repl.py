@@ -1,8 +1,13 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import annotations
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
+from pants.backend.scala.util_rules.versions import (
+    ScalaArtifactsForVersionRequest,
+    ScalaArtifactsForVersionResult,
+)
 from pants.core.goals.repl import ReplImplementation, ReplRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses
@@ -13,13 +18,14 @@ from pants.engine.target import CoarsenedTargets
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest
-from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
 
 
 class ScalaRepl(ReplImplementation):
     name = "scala"
+    supports_args = False
 
 
 @rule(level=LogLevel.DEBUG)
@@ -35,28 +41,15 @@ async def create_scala_repl_request(
     jdk = max(environs, key=lambda j: j.jre_major_version)
 
     scala_version = scala_subsystem.version_for_resolve(user_classpath.resolve.name)
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    )
     tool_classpath = await Get(
         ToolClasspath,
         ToolClasspathRequest(
             prefix="__toolcp",
             artifact_requirements=ArtifactRequirements.from_coordinates(
-                [
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-compiler",
-                        version=scala_version,
-                    ),
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-library",
-                        version=scala_version,
-                    ),
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-reflect",
-                        version=scala_version,
-                    ),
-                ]
+                scala_artifacts.all_coordinates
             ),
         ),
     )
@@ -66,32 +59,26 @@ async def create_scala_repl_request(
         Get(Digest, AddPrefix(d, user_classpath_prefix)) for d in user_classpath.digests()
     )
 
-    # TODO: Manually merging the `immutable_input_digests` since InteractiveProcess doesn't
-    # support them yet. See https://github.com/pantsbuild/pants/issues/13852.
-    jdk_digests = await MultiGet(
-        Get(Digest, AddPrefix(digest, relpath))
-        for relpath, digest in jdk.immutable_input_digests.items()
-    )
-
     repl_digest = await Get(
         Digest,
-        MergeDigests([*prefixed_user_classpath, tool_classpath.content.digest, *jdk_digests]),
+        MergeDigests([*prefixed_user_classpath, tool_classpath.content.digest]),
     )
 
     return ReplRequest(
         digest=repl_digest,
         args=[
-            *jdk.args(bash, tool_classpath.classpath_entries()),
+            *jdk.args(bash, tool_classpath.classpath_entries(), chroot="{chroot}"),
             "-Dscala.usejavacp=true",
-            "scala.tools.nsc.MainGenericRunner",
+            scala_artifacts.repl_main,
             "-classpath",
             ":".join(user_classpath.args(prefix=user_classpath_prefix)),
         ],
+        run_in_workspace=False,
         extra_env={
             **jdk.env,
             "PANTS_INTERNAL_ABSOLUTE_PREFIX": "",
         },
-        run_in_workspace=False,
+        immutable_input_digests=jdk.immutable_input_digests,
         append_only_caches=jdk.append_only_caches,
     )
 

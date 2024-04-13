@@ -9,6 +9,7 @@ from typing import AbstractSet, Iterator, Sequence, Tuple, Type, Union
 import pytest
 
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import softwrap
 
 OrderedSetInstance = Union[OrderedSet, FrozenOrderedSet]
 OrderedSetCls = Union[Type[OrderedSet], Type[FrozenOrderedSet]]
@@ -57,6 +58,7 @@ def test_equality(cls: OrderedSetCls) -> None:
     assert set1 == cls([1, 2])
     assert set1 == cls([1, 1, 2, 2])
 
+    assert set1 != cls([1, 2, None])
     assert set1 != cls([2, 1])
     assert set1 != [2, 1]
     assert set1 != [2, 1, 1]
@@ -188,9 +190,11 @@ def assert_results_are_the_same(
     for a, b in itertools.combinations(results, r=2):
         if isinstance(a, bool):
             continue
-        assert a is not b, (
-            "The results should all be distinct OrderedSet or FrozenOrderedSet instances. "
-            f"{a} is the same object as {b}."
+        assert a is not b, softwrap(
+            f"""
+                The results should all be distinct OrderedSet or FrozenOrderedSet instances.
+                {a} is the same object as {b}.
+            """
         )
 
 

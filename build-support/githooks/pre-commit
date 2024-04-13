@@ -2,6 +2,10 @@
 
 set -e
 
+# If you use the `pants` scie, you may "export _PANTS_PRE_COMMIT_BINARY=pants" in order to use the same bootstrapped
+# pants setup for this pre-commit hook as you get from the command line for any other pants command.
+: "${_PANTS_PRE_COMMIT_BINARY:=./pants}"
+
 # NB: pre-commit runs in the context of GIT_WORK_TREE, ie: pwd == REPO_ROOT
 source build-support/common.sh
 
@@ -21,19 +25,13 @@ if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
 fi
 
 echo "* Typechecking"
-./pants --changed-since="${MERGE_BASE}" --changed-dependees=transitive check
+$_PANTS_PRE_COMMIT_BINARY --changed-since="${MERGE_BASE}" --changed-dependents=transitive check
 
 echo "* Checking linters, formatters, and headers"
-./pants --changed-since="${MERGE_BASE}" lint ||
-  die "If there were formatting errors, run \`./pants --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
+$_PANTS_PRE_COMMIT_BINARY --changed-since="${MERGE_BASE}" lint ||
+  die "If there were formatting errors, run \`$_PANTS_PRE_COMMIT_BINARY --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
 
-if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_github_workflows.py > /dev/null; then
+if git diff "${MERGE_BASE}" --name-only | grep src/python/pants_release/generate_github_workflows.py > /dev/null; then
   echo "* Checking GitHub workflows generation"
-  ./pants run build-support/bin/generate_github_workflows.py -- --check
+  $_PANTS_PRE_COMMIT_BINARY run src/python/pants_release/generate_github_workflows.py -- --check
 fi
-
-echo "* Checking __init__.py files"
-./pants run build-support/bin/check_inits.py
-
-echo "* Checking for banned imports"
-./pants run build-support/bin/check_banned_imports.py

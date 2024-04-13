@@ -9,8 +9,6 @@ import pytest
 
 from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.python.goals import repl as python_repl
-from pants.backend.python.subsystems.ipython import rules as ipython_subsystem_rules
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
@@ -24,21 +22,15 @@ from pants.core.goals.repl import Repl
 from pants.core.goals.repl import rules as repl_rules
 from pants.engine.process import Process
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
-from pants.testutil.rule_runner import (
-    GoalRuleResult,
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    mock_console,
-)
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import GoalRuleResult, QueryRule, engine_error, mock_console
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
         rules=[
             *repl_rules(),
-            *ipython_subsystem_rules(),
             *python_repl.rules(),
             *pex_from_targets.rules(),
             *local_dists.rules(),
@@ -56,9 +48,11 @@ def rule_runner() -> RuleRunner:
         {
             "src/python/foo.proto": 'syntax = "proto3";message Foo {}',
             "src/python/lib.py": "from foo import Foo\nclass SomeClass:\n  pass\n",
-            "src/python/BUILD": (
-                "protobuf_source(name='proto', source='foo.proto')\n"
-                "python_sources(dependencies=[':proto'])"
+            "src/python/BUILD": dedent(
+                """\
+                protobuf_source(name='proto', source='foo.proto')
+                python_sources(dependencies=[':proto'])
+                """
             ),
         }
     )
@@ -66,7 +60,7 @@ def rule_runner() -> RuleRunner:
 
 
 def run_repl(
-    rule_runner: RuleRunner, args: list[str], *, global_args: list[str] | None = None
+    rule_runner: PythonRuleRunner, args: list[str], *, global_args: list[str] | None = None
 ) -> GoalRuleResult:
     # TODO(#9108): Expand `mock_console` to allow for providing input for the repl to verify
     # that, e.g., the generated protobuf code is available. Right now this test prepares for
@@ -80,16 +74,16 @@ def run_repl(
         )
 
 
-def test_default_repl(rule_runner: RuleRunner) -> None:
+def test_default_repl(rule_runner: PythonRuleRunner) -> None:
     assert run_repl(rule_runner, ["src/python/lib.py"]).exit_code == 0
 
 
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+    all_major_minor_python_versions(["CPython>=3.7,<4"]),
 )
-def test_ipython(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+def test_ipython(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     assert (
         run_repl(
             rule_runner,
@@ -103,7 +97,7 @@ def test_ipython(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     )
 
 
-def test_eagerly_validate_roots_have_common_resolve(rule_runner: RuleRunner) -> None:
+def test_eagerly_validate_roots_have_common_resolve(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -114,7 +108,7 @@ def test_eagerly_validate_roots_have_common_resolve(rule_runner: RuleRunner) -> 
             )
         }
     )
-    with engine_error(NoCompatibleResolveException, contains="./pants peek"):
+    with engine_error(NoCompatibleResolveException, contains="pants peek"):
         run_repl(
             rule_runner,
             ["//:t1", "//:t2"],

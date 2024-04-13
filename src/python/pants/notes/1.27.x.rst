@@ -92,7 +92,7 @@ Bugfixes
   `PR #9531 <https://github.com/pantsbuild/pants/pull/9531>`_
 
 * Fix V2 binary still using the `current` platform when `platforms` is specified (#9563)
-  `Issue #957 <https://github.com/pantsbuild/pex/issues/957>`_
+  `Issue #957 <https://github.com/pex-tool/pex/issues/957>`_
   `PR #9563 <https://github.com/pantsbuild/pants/pull/9563>`_
 
 * Propagate the owners_not_found_behavior to FilesystemSpec expansion. (#9551)

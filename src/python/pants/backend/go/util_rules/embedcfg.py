@@ -8,11 +8,10 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
+from pants.util.strutil import strip_prefix
 
 
-@dataclass(unsafe_hash=True)
-@frozen_after_init
+@dataclass(frozen=True)
 class EmbedConfig:
     patterns: FrozenDict[str, tuple[str, ...]]
     files: FrozenDict[str, str]
@@ -34,16 +33,20 @@ class EmbedConfig:
         :param files: Maps each virtual, relative file path used as a value in the `patterns`
           dictionary to the actual filesystem path with that file's content.
         """
-        self.patterns = FrozenDict({k: tuple(v) for k, v in patterns.items()})
-        self.files = FrozenDict(files)
+        object.__setattr__(self, "patterns", FrozenDict({k: tuple(v) for k, v in patterns.items()}))
+        object.__setattr__(self, "files", FrozenDict(files))
 
     @classmethod
-    def from_json_dict(cls, d: dict[str, Any]) -> EmbedConfig | None:
+    def from_json_dict(
+        cls, d: dict[str, Any], prefix_to_strip: str | None = None
+    ) -> EmbedConfig | None:
+        patterns = d.get("Patterns", {})
+        files = d.get("Files", {})
+        if prefix_to_strip:
+            files = {key: strip_prefix(value, prefix_to_strip) for key, value in files.items()}
         result = cls(
-            patterns=FrozenDict(
-                {key: tuple(value) for key, value in d.get("Patterns", {}).items()}
-            ),
-            files=FrozenDict(d.get("Files", {})),
+            patterns=FrozenDict({key: tuple(value) for key, value in patterns.items()}),
+            files=FrozenDict(files),
         )
         return result if result else None
 

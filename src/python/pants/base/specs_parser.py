@@ -44,8 +44,17 @@ class SpecsParser:
     class BadSpecError(Exception):
         """Indicates an unparseable command line selector."""
 
-    def __init__(self, root_dir: str | None = None) -> None:
+    def __init__(self, *, root_dir: str | None = None, working_dir: str | None = None) -> None:
         self._root_dir = os.path.realpath(root_dir or get_buildroot())
+        self._working_dir = (
+            os.path.relpath(os.path.join(self._root_dir, working_dir), self._root_dir)
+            if working_dir
+            else ""
+        )
+        if self._working_dir.startswith(".."):
+            raise self.BadSpecError(
+                f"Work directory {self._working_dir} escapes build root {self._root_dir}"
+            )
 
     def _normalize_spec_path(self, path: str) -> str:
         is_abs = not path.startswith("//") and os.path.isabs(path)
@@ -58,9 +67,15 @@ class SpecsParser:
         else:
             if path.startswith("//"):
                 path = path[2:]
+            elif self._working_dir:
+                path = os.path.join(self._working_dir, path)
             path = os.path.join(self._root_dir, path)
 
         normalized = os.path.relpath(path, self._root_dir)
+        if normalized.startswith(".."):
+            raise self.BadSpecError(
+                f"Relative spec path {path} escapes build root {self._root_dir}"
+            )
         if normalized == ".":
             normalized = ""
         return normalized
@@ -115,7 +130,7 @@ class SpecsParser:
         self,
         specs: Iterable[str],
         *,
-        convert_dir_literal_to_address_literal: bool,
+        description_of_origin: str,
         unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error,
     ) -> Specs:
         include_specs = []
@@ -129,13 +144,13 @@ class SpecsParser:
 
         includes = RawSpecs.create(
             include_specs,
-            convert_dir_literal_to_address_literal=convert_dir_literal_to_address_literal,
+            description_of_origin=description_of_origin,
             unmatched_glob_behavior=unmatched_glob_behavior,
             filter_by_global_options=True,
         )
         ignores = RawSpecs.create(
             ignore_specs,
-            convert_dir_literal_to_address_literal=convert_dir_literal_to_address_literal,
+            description_of_origin=description_of_origin,
             unmatched_glob_behavior=unmatched_glob_behavior,
             # By setting the below to False, we will end up matching some targets
             # that cannot have been resolved by the include specs. For example, if the user runs

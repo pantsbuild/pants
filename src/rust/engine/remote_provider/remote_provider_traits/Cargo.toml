@@ -1,0 +1,20 @@
+[package]
+version = "0.0.1"
+edition = "2021"
+name = "remote_provider_traits"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+async-oncecell = { workspace = true }
+async-trait = { workspace = true }
+bytes = { workspace = true }
+grpc_util = { path = "../../grpc_util" }
+hashing = { path = "../../hashing" }
+protos = { path = "../../protos" }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+tokio = { workspace = true, features = ["fs"] }
+
+[lints]
+workspace = true

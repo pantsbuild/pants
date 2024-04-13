@@ -8,7 +8,6 @@ import pytest
 
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
-from pants.backend.docker.subsystems.dockerfile_parser import split_iterable
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
@@ -73,7 +72,7 @@ def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunne
 
     addr = Address("test")
     info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
-    assert info.from_image_addresses == (":base",)
+    assert info.from_image_build_args.to_dict() == {"BASE_IMAGE": ":base"}
     assert info.copy_source_paths == (
         "some.target/binary.pex",
         "some.target/tool.pex",
@@ -81,10 +80,6 @@ def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunne
         "another/cli.pex",
         "tool",
     )
-
-
-def test_split_iterable() -> None:
-    assert [("a", "b"), ("c",)] == list(split_iterable("-", ("a", "b", "-", "c")))
 
 
 def test_build_args(rule_runner: RuleRunner) -> None:
@@ -128,7 +123,7 @@ def test_from_image_build_arg_names(rule_runner: RuleRunner) -> None:
     )
     addr = Address("test/downstream", target_name="image")
     info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
-    assert info.from_image_build_arg_names == ("BASE_IMAGE",)
+    assert info.from_image_build_args.to_dict() == {"BASE_IMAGE": "test/upstream:image"}
 
 
 def test_inconsistent_build_args(rule_runner: RuleRunner) -> None:
@@ -173,7 +168,7 @@ def test_copy_source_references(rule_runner: RuleRunner) -> None:
     )
 
     info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(Address("test"))])
-    assert info.copy_sources == ("a", "b", "c/d", "e/f/g", "j", "k")
+    assert info.copy_source_paths == ("a", "b", "c/d", "e/f/g", "j", "k")
 
 
 def test_baseimage_tags(rule_runner: RuleRunner) -> None:
@@ -186,6 +181,7 @@ def test_baseimage_tags(rule_runner: RuleRunner) -> None:
                 "FROM digest@sha256:d1f0463b35135852308ea815c2ae54c1734b876d90288ce35828aeeff9899f9d\n"
                 "FROM gcr.io/tekton-releases/github.com/tektoncd/operator/cmd/kubernetes/operator:"
                 "v0.54.0@sha256:d1f0463b35135852308ea815c2ae54c1734b876d90288ce35828aeeff9899f9d\n"
+                "FROM $PYTHON_VERSION AS python\n"
             ),
         }
     )
@@ -196,6 +192,7 @@ def test_baseimage_tags(rule_runner: RuleRunner) -> None:
         "stage1 v1.2",
         # Stage 2 is not pinned with a tag.
         "stage3 v0.54.0",
+        "python build-arg:PYTHON_VERSION",  # Parse tag from build arg.
     )
 
 
@@ -204,8 +201,44 @@ def test_generate_lockfile_without_python_backend() -> None:
     run_pants(
         [
             "--backend-packages=pants.backend.docker",
-            "--dockerfile-parser-lockfile=dp.lock",
+            "--python-resolves={'dockerfile-parser':'dp.lock'}",
             "generate-lockfiles",
             "--resolve=dockerfile-parser",
         ]
     ).assert_success()
+
+
+def test_baseimage_dep_inference(rule_runner: RuleRunner) -> None:
+    # We use a single run to grab all information, rather than parametrizing the test to save on
+    # rule invocations.
+    base_image_tags = dict(
+        BASE_IMAGE_1=":sibling",
+        BASE_IMAGE_2=":sibling@a=42,b=c",
+        BASE_IMAGE_3="else/where:weird#name@with=param",
+        BASE_IMAGE_4="//src/common:name@parametrized=foo-bar.1",
+        BASE_IMAGE_5="should/allow/default-target-name",
+    )
+
+    rule_runner.write_files(
+        {
+            "test/BUILD": "docker_image()",
+            "test/Dockerfile": "\n".join(
+                dedent(
+                    f"""\
+                    ARG {arg}="{tag}"
+                    FROM ${arg}
+                    """
+                )
+                for arg, tag in base_image_tags.items()
+            )
+            + dedent(
+                """\
+                ARG DECOY="this is not a target address"
+                FROM $DECOY
+                """
+            ),
+        }
+    )
+    addr = Address("test")
+    info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
+    assert info.from_image_build_args.to_dict() == base_image_tags

@@ -19,7 +19,6 @@ class ListSubsystem(LineOriented, GoalSubsystem):
     help = "Lists all targets matching the file or target arguments."
 
     documented = BoolOption(
-        "--documented",
         default=False,
         help="Print only targets that are documented with a description.",
     )
@@ -27,6 +26,7 @@ class ListSubsystem(LineOriented, GoalSubsystem):
 
 class List(Goal):
     subsystem_cls = ListSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule

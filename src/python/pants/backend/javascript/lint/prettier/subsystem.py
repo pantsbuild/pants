@@ -6,16 +6,16 @@ from __future__ import annotations
 import os
 from typing import Iterable
 
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.option.option_types import ArgsListOption, SkipOption
-from pants.option.subsystem import Subsystem
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
-class Prettier(Subsystem):
+class Prettier(NodeJSToolBase):
     options_scope = "prettier"
     name = "Prettier"
-    help = softwrap(
+    help = help_text(
         """
         The Prettier utility for formatting JS/TS (and others) code
         (https://prettier.io/).

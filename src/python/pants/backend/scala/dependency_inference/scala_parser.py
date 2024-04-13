@@ -5,13 +5,16 @@ from __future__ import annotations
 import json
 import logging
 import os
-import pkgutil
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
-from pants.build_graph.address import Address
+from pants.backend.scala.util_rules.versions import (
+    ScalaArtifactsForVersionRequest,
+    ScalaArtifactsForVersionResult,
+    ScalaVersion,
+)
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
@@ -25,30 +28,31 @@ from pants.engine.fs import (
     RemovePrefix,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessResult, ProductDescription
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import WrappedTarget
+from pants.engine.target import WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
-from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
+from pants.jvm.jdk_rules import rules as jdk_rules
+from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
-from pants.option.global_options import ProcessCleanupOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.resources import read_resource
 
 logger = logging.getLogger(__name__)
 
 
-_PARSER_SCALA_VERSION = "2.13.8"
-_PARSER_SCALA_BINARY_VERSION = _PARSER_SCALA_VERSION.rpartition(".")[0]
+_PARSER_SCALA_VERSION = ScalaVersion.parse("2.13.8")
+_PARSER_SCALA_BINARY_VERSION = _PARSER_SCALA_VERSION.binary
 
 
-class ScalaParserToolLockfileSentinel(GenerateToolLockfileSentinel):
+class ScalaParserToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = "scala-parser"
 
 
@@ -71,9 +75,25 @@ class ScalaImport:
 
 
 @dataclass(frozen=True)
+class ScalaProvidedSymbol:
+    name: str
+    recursive: bool
+
+    @classmethod
+    def from_json_dict(cls, data: Mapping[str, Any]):
+        return cls(name=data["name"], recursive=data["recursive"])
+
+    def to_debug_json_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "recursive": self.recursive,
+        }
+
+
+@dataclass(frozen=True)
 class ScalaSourceDependencyAnalysis:
-    provided_symbols: FrozenOrderedSet[str]
-    provided_symbols_encoded: FrozenOrderedSet[str]
+    provided_symbols: FrozenOrderedSet[ScalaProvidedSymbol]
+    provided_symbols_encoded: FrozenOrderedSet[ScalaProvidedSymbol]
     imports_by_scope: FrozenDict[str, tuple[ScalaImport, ...]]
     consumed_symbols_by_scope: FrozenDict[str, FrozenOrderedSet[str]]
     scopes: FrozenOrderedSet[str]
@@ -129,8 +149,12 @@ class ScalaSourceDependencyAnalysis:
     @classmethod
     def from_json_dict(cls, d: dict) -> ScalaSourceDependencyAnalysis:
         return cls(
-            provided_symbols=FrozenOrderedSet(d["providedSymbols"]),
-            provided_symbols_encoded=FrozenOrderedSet(d["providedSymbolsEncoded"]),
+            provided_symbols=FrozenOrderedSet(
+                ScalaProvidedSymbol.from_json_dict(v) for v in d["providedSymbols"]
+            ),
+            provided_symbols_encoded=FrozenOrderedSet(
+                ScalaProvidedSymbol.from_json_dict(v) for v in d["providedSymbolsEncoded"]
+            ),
             imports_by_scope=FrozenDict(
                 {
                     key: tuple(ScalaImport.from_json_dict(v) for v in values)
@@ -148,8 +172,10 @@ class ScalaSourceDependencyAnalysis:
 
     def to_debug_json_dict(self) -> dict[str, Any]:
         return {
-            "provided_symbols": list(self.provided_symbols),
-            "provided_symbols_encoded": list(self.provided_symbols_encoded),
+            "provided_symbols": [v.to_debug_json_dict() for v in self.provided_symbols],
+            "provided_symbols_encoded": [
+                v.to_debug_json_dict() for v in self.provided_symbols_encoded
+            ],
             "imports_by_scope": {
                 key: [v.to_debug_json_dict() for v in values]
                 for key, values in self.imports_by_scope.items()
@@ -173,7 +199,7 @@ class ScalaParserCompiledClassfiles(ClasspathEntry):
 @dataclass(frozen=True)
 class AnalyzeScalaSourceRequest:
     source_files: SourceFiles
-    scala_version: str
+    scala_version: ScalaVersion
     source3: bool
 
 
@@ -183,8 +209,13 @@ async def create_analyze_scala_source_request(
 ) -> AnalyzeScalaSourceRequest:
     address = request.sources_fields[0].address
 
-    (wrapped_tgt, source_files) = await MultiGet(
-        Get(WrappedTarget, Address, address),
+    wrapped_tgt, source_files = await MultiGet(
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(
+                address, description_of_origin="<the Scala analyze request setup rule>"
+            ),
+        ),
         Get(SourceFiles, SourceFilesRequest, request),
     )
 
@@ -248,7 +279,7 @@ async def analyze_scala_source_dependencies(
                 "org.pantsbuild.backend.scala.dependency_inference.ScalaParser",
                 analysis_output_path,
                 source_path,
-                request.scala_version,
+                str(request.scala_version),
                 str(request.source3),
             ],
             input_digest=prefixed_source_files_digest,
@@ -266,23 +297,18 @@ async def analyze_scala_source_dependencies(
 @rule(level=LogLevel.DEBUG)
 async def resolve_fallible_result_to_analysis(
     fallible_result: FallibleScalaSourceDependencyAnalysisResult,
-    process_cleanup: ProcessCleanupOption,
 ) -> ScalaSourceDependencyAnalysis:
-    # TODO(#12725): Just convert directly to a ProcessResult like this:
-    # result = await Get(ProcessResult, FallibleProcessResult, fallible_result.process_result)
-    if fallible_result.process_result.exit_code == 0:
-        analysis_contents = await Get(
-            DigestContents, Digest, fallible_result.process_result.output_digest
-        )
-        analysis = json.loads(analysis_contents[0].content)
-        return ScalaSourceDependencyAnalysis.from_json_dict(analysis)
-    raise ProcessExecutionFailure(
-        fallible_result.process_result.exit_code,
-        fallible_result.process_result.stdout,
-        fallible_result.process_result.stderr,
-        "Scala source dependency analysis failed.",
-        process_cleanup=process_cleanup.val,
+    description = ProductDescription("Scala source dependency analysis failed.")
+    result = await Get(
+        ProcessResult,
+        {
+            fallible_result.process_result: FallibleProcessResult,
+            description: ProductDescription,
+        },
     )
+    analysis_contents = await Get(DigestContents, Digest, result.output_digest)
+    analysis = json.loads(analysis_contents[0].content)
+    return ScalaSourceDependencyAnalysis.from_json_dict(analysis)
 
 
 # TODO(13879): Consolidate compilation of wrapper binaries to common rules.
@@ -290,7 +316,7 @@ async def resolve_fallible_result_to_analysis(
 async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiledClassfiles:
     dest_dir = "classfiles"
 
-    parser_source_content = pkgutil.get_data(
+    parser_source_content = read_resource(
         "pants.backend.scala.dependency_inference", "ScalaParser.scala"
     )
     if not parser_source_content:
@@ -298,8 +324,9 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
 
     parser_source = FileContent("ScalaParser.scala", parser_source_content)
 
-    parser_lockfile_request = await Get(
-        GenerateJvmLockfileFromTool, ScalaParserToolLockfileSentinel()
+    parser_lockfile_request, scala_artifacts = await MultiGet(
+        Get(GenerateJvmLockfileFromTool, ScalaParserToolLockfileSentinel()),
+        Get(ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(_PARSER_SCALA_VERSION)),
     )
 
     tool_classpath, parser_classpath, source_digest = await MultiGet(
@@ -308,23 +335,7 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
             ToolClasspathRequest(
                 prefix="__toolcp",
                 artifact_requirements=ArtifactRequirements.from_coordinates(
-                    [
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-compiler",
-                            version=_PARSER_SCALA_VERSION,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-library",
-                            version=_PARSER_SCALA_VERSION,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-reflect",
-                            version=_PARSER_SCALA_VERSION,
-                        ),
-                    ]
+                    scala_artifacts.all_coordinates
                 ),
             ),
         ),
@@ -376,15 +387,18 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
 
 
 @rule
-def generate_scala_parser_lockfile_request(
+async def generate_scala_parser_lockfile_request(
     _: ScalaParserToolLockfileSentinel,
 ) -> GenerateJvmLockfileFromTool:
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(_PARSER_SCALA_VERSION)
+    )
     return GenerateJvmLockfileFromTool(
         artifact_inputs=FrozenOrderedSet(
             {
-                f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.4.30",
+                f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.8.7",
                 f"io.circe:circe-generic_{_PARSER_SCALA_BINARY_VERSION}:0.14.1",
-                f"org.scala-lang:scala-library:{_PARSER_SCALA_VERSION}",
+                scala_artifacts.library_coordinate.to_coord_str(),
             }
         ),
         artifact_option_name="n/a",
@@ -402,5 +416,6 @@ def generate_scala_parser_lockfile_request(
 def rules():
     return (
         *collect_rules(),
+        *jdk_rules(),
         UnionRule(GenerateToolLockfileSentinel, ScalaParserToolLockfileSentinel),
     )

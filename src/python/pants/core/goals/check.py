@@ -4,32 +4,36 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, cast
+from typing import Any, ClassVar, Generic, Iterable, TypeVar, cast
 
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
-from pants.core.goals.style_request import (
-    StyleRequest,
-    determine_specified_tool_names,
-    only_option_help,
+from pants.core.goals.multi_tool_goal_helper import (
+    OnlyOption,
+    determine_specified_tool_ids,
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, goal_rule
-from pants.engine.target import FilteredTargets
+from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, union
-from pants.option.option_types import StrListOption
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
-from pants.util.meta import frozen_after_init
-from pants.util.strutil import strip_v2_chroot_path
+from pants.util.meta import classproperty
+from pants.util.strutil import Simplifier
 
 logger = logging.getLogger(__name__)
+
+_FS = TypeVar("_FS", bound=FieldSet)
 
 
 @dataclass(frozen=True)
@@ -45,16 +49,13 @@ class CheckResult:
         process_result: FallibleProcessResult,
         *,
         partition_description: str | None = None,
-        strip_chroot_path: bool = False,
+        output_simplifier: Simplifier = Simplifier(),
         report: Digest = EMPTY_DIGEST,
     ) -> CheckResult:
-        def prep_output(s: bytes) -> str:
-            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
-
         return CheckResult(
             exit_code=process_result.exit_code,
-            stdout=prep_output(process_result.stdout),
-            stderr=prep_output(process_result.stderr),
+            stdout=output_simplifier.simplify(process_result.stdout),
+            stderr=output_simplifier.simplify(process_result.stderr),
             partition_description=partition_description,
             report=report,
         )
@@ -63,8 +64,7 @@ class CheckResult:
         return {"partition": self.partition_description}
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class CheckResults(EngineAwareReturnType):
     """Zero or more CheckResult objects for a single type checker.
 
@@ -77,8 +77,8 @@ class CheckResults(EngineAwareReturnType):
     checker_name: str
 
     def __init__(self, results: Iterable[CheckResult], *, checker_name: str) -> None:
-        self.results = tuple(results)
-        self.checker_name = checker_name
+        object.__setattr__(self, "results", tuple(results))
+        object.__setattr__(self, "checker_name", checker_name)
 
     @property
     def skipped(self) -> bool:
@@ -130,12 +130,32 @@ class CheckResults(EngineAwareReturnType):
         return False
 
 
-@union
-class CheckRequest(StyleRequest):
-    """A union for StyleRequests that should be type-checkable.
+@dataclass(frozen=True)
+@union(in_scope_types=[EnvironmentName])
+class CheckRequest(Generic[_FS], EngineAwareParameter):
+    """A union for targets that should be checked.
 
-    Subclass and install a member of this type to provide a linter.
+    Subclass and install a member of this type to provide a checker.
     """
+
+    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
+    tool_name: ClassVar[str]
+
+    @classproperty
+    def tool_id(cls) -> str:
+        """The "id" of the tool, used in tool selection (Eg --only=<id>)."""
+        return cls.tool_name
+
+    field_sets: Collection[_FS]
+
+    def __init__(self, field_sets: Iterable[_FS]) -> None:
+        object.__setattr__(self, "field_sets", Collection[_FS](field_sets))
+
+    def debug_hint(self) -> str:
+        return self.tool_name
+
+    def metadata(self) -> dict[str, Any]:
+        return {"addresses": [fs.address.spec for fs in self.field_sets]}
 
 
 class CheckSubsystem(GoalSubsystem):
@@ -146,14 +166,12 @@ class CheckSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return CheckRequest in union_membership
 
-    only = StrListOption(
-        "--only",
-        help=only_option_help("check", "checkers", "mypy", "javac"),
-    )
+    only = OnlyOption("checker", "mypy", "javac")
 
 
 class Check(Goal):
     subsystem_cls = CheckSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
 
 @goal_rule
@@ -165,33 +183,54 @@ async def check(
     union_membership: UnionMembership,
     check_subsystem: CheckSubsystem,
 ) -> Check:
-    request_types = cast("Iterable[type[StyleRequest]]", union_membership[CheckRequest])
-    specified_names = determine_specified_tool_names("check", check_subsystem.only, request_types)
+    request_types = cast("Iterable[type[CheckRequest]]", union_membership[CheckRequest])
+    specified_ids = determine_specified_tool_ids("check", check_subsystem.only, request_types)
 
     requests = tuple(
         request_type(
             request_type.field_set_type.create(target)
             for target in targets
             if (
-                request_type.name in specified_names
+                request_type.tool_id in specified_ids
                 and request_type.field_set_type.is_applicable(target)
             )
         )
         for request_type in request_types
     )
-    all_results = await MultiGet(
-        Get(CheckResults, CheckRequest, request) for request in requests if request.field_sets
+
+    request_to_field_set = [
+        (request, field_set) for request in requests for field_set in request.field_sets
+    ]
+
+    environment_names = await MultiGet(
+        Get(
+            EnvironmentName,
+            EnvironmentNameRequest,
+            EnvironmentNameRequest.from_field_set(field_set),
+        )
+        for (_, field_set) in request_to_field_set
     )
 
-    def get_name(res: CheckResults) -> str:
-        return res.checker_name
+    request_to_env_name = {
+        (request, env_name)
+        for (request, _), env_name in zip(request_to_field_set, environment_names)
+    }
+
+    # Run each check request in each valid environment (potentially multiple runs per tool)
+    all_results = await MultiGet(
+        Get(CheckResults, {request: CheckRequest, env_name: EnvironmentName})
+        for (request, env_name) in request_to_env_name
+    )
+
+    results_by_tool: dict[str, list[CheckResult]] = defaultdict(list)
+    for results in all_results:
+        results_by_tool[results.checker_name].extend(results.results)
 
     write_reports(
-        all_results,
+        results_by_tool,
         workspace,
         dist_dir,
         goal_name=CheckSubsystem.name,
-        get_name=get_name,
     )
 
     exit_code = 0

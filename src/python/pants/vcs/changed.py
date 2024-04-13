@@ -7,9 +7,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, cast
 
-from pants.backend.project_info import dependees
-from pants.backend.project_info.dependees import Dependees, DependeesRequest
+from pants.backend.project_info import dependents
+from pants.backend.project_info.dependents import Dependents, DependentsRequest
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
@@ -21,11 +22,11 @@ from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 from pants.vcs.git import GitWorktree
 
 
-class DependeesOption(Enum):
+class DependentsOption(Enum):
     NONE = "none"
     DIRECT = "direct"
     TRANSITIVE = "transitive"
@@ -34,7 +35,7 @@ class DependeesOption(Enum):
 @dataclass(frozen=True)
 class ChangedRequest:
     sources: tuple[str, ...]
-    dependees: DependeesOption
+    dependents: DependentsOption
 
 
 class ChangedAddresses(Collection[Address]):
@@ -45,18 +46,20 @@ class ChangedAddresses(Collection[Address]):
 async def find_changed_owners(
     request: ChangedRequest, specs_filter: SpecsFilter
 ) -> ChangedAddresses:
-    no_dependees = request.dependees == DependeesOption.NONE
+    no_dependents = request.dependents == DependentsOption.NONE
     owners = await Get(
         Owners,
         OwnersRequest(
             request.sources,
-            # If `--changed-dependees` is used, we cannot eagerly filter out root targets. We
-            # need to first find their dependees, and only then should we filter. See
+            # If `--changed-dependents` is used, we cannot eagerly filter out root targets. We
+            # need to first find their dependents, and only then should we filter. See
             # https://github.com/pantsbuild/pants/issues/15544
-            filter_by_global_options=no_dependees,
+            filter_by_global_options=no_dependents,
+            # Changing a BUILD file might impact the targets it defines.
+            match_if_owning_build_file_included_in_sources=True,
         ),
     )
-    if no_dependees:
+    if no_dependents:
         return ChangedAddresses(owners)
 
     # See https://github.com/pantsbuild/pants/issues/15313. We filter out target generators because
@@ -69,15 +72,15 @@ async def find_changed_owners(
     owner_target_generators = FrozenOrderedSet(
         addr.maybe_convert_to_target_generator() for addr in owners if addr.is_generated_target
     )
-    dependees = await Get(
-        Dependees,
-        DependeesRequest(
+    dependents = await Get(
+        Dependents,
+        DependentsRequest(
             owners,
-            transitive=request.dependees == DependeesOption.TRANSITIVE,
+            transitive=request.dependents == DependentsOption.TRANSITIVE,
             include_roots=False,
         ),
     )
-    result = FrozenOrderedSet(owners) | (dependees - owner_target_generators)
+    result = FrozenOrderedSet(owners) | (dependents - owner_target_generators)
     if specs_filter.is_specified:
         # Finally, we must now filter out the result to only include what matches our tags, as the
         # last step of https://github.com/pantsbuild/pants/issues/15544.
@@ -97,16 +100,24 @@ class ChangedOptions:
     """A wrapper for the options from the `Changed` Subsystem.
 
     This is necessary because parsing of these options happens before conventional subsystems are
-    configured, so the normal mechanisms like `SubsystemRule` would not work properly.
+    configured, so the normal mechanisms like `Subsystem.rules()` would not work properly.
     """
 
     since: str | None
     diffspec: str | None
-    dependees: DependeesOption
+    dependents: DependentsOption
 
     @classmethod
     def from_options(cls, options: OptionValueContainer) -> ChangedOptions:
-        return cls(options.since, options.diffspec, options.dependees)
+        dependents = resolve_conflicting_options(
+            old_option="dependees",
+            new_option="dependents",
+            old_scope=Changed.options_scope,
+            new_scope=Changed.options_scope,
+            old_container=options,
+            new_container=options,
+        )
+        return cls(options.since, options.diffspec, dependents)
 
     @property
     def provided(self) -> bool:
@@ -130,30 +141,33 @@ class ChangedOptions:
 
 class Changed(Subsystem):
     options_scope = "changed"
-    help = softwrap(
+    help = help_text(
         f"""
         Tell Pants to detect what files and targets have changed from Git.
 
-        See {doc_url('advanced-target-selection')}.
+        See {doc_url('docs/using-pants/advanced-target-selection')}.
         """
     )
 
     since = StrOption(
-        "--since",
         default=None,
         help="Calculate changes since this Git spec (commit range/SHA/ref).",
     )
     diffspec = StrOption(
-        "--diffspec",
         default=None,
         help="Calculate changes contained within a given Git spec (commit range/SHA/ref).",
     )
+    dependents = EnumOption(
+        default=DependentsOption.NONE,
+        help="Include direct or transitive dependents of changed targets.",
+    )
     dependees = EnumOption(
-        "--dependees",
-        default=DependeesOption.NONE,
-        help="Include direct or transitive dependees of changed targets.",
+        default=DependentsOption.NONE,
+        help="Include direct or transitive dependents of changed targets.",
+        removal_version="2.23.0.dev0",
+        removal_hint="Use --dependents instead",
     )
 
 
 def rules():
-    return [*collect_rules(), *dependees.rules()]
+    return [*collect_rules(), *dependents.rules()]

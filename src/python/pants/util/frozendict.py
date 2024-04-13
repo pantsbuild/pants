@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any, Callable, Iterable, Iterator, Mapping, TypeVar, cast, overload
 
 from pants.util.memo import memoized_method
+from pants.util.strutil import softwrap
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -47,6 +48,31 @@ class FrozenDict(Mapping[K, V]):
         # performance bottleneck.
         self._hash = self._calculate_hash()
 
+    @classmethod
+    def deep_freeze(cls, data: Mapping[K, V]) -> FrozenDict[K, V]:
+        """Convert mutable values to their frozen counter parts.
+
+        Sets and lists are turned into tuples and dicts into FrozenDicts.
+        """
+
+        def _freeze(obj):
+            if isinstance(obj, dict):
+                return cls.deep_freeze(obj)
+            if isinstance(obj, (list, set)):
+                return tuple(map(_freeze, obj))
+            return obj
+
+        return cls({k: _freeze(v) for k, v in data.items()})
+
+    @staticmethod
+    def frozen(to_freeze: Mapping[K, V]) -> FrozenDict[K, V]:
+        """Returns a `FrozenDict` containing the keys and values of `to_freeze`.
+
+        If `to_freeze` is already a `FrozenDict`, returns the same object.
+        """
+
+        return to_freeze if isinstance(to_freeze, FrozenDict) else FrozenDict(to_freeze)
+
     def __getitem__(self, k: K) -> V:
         return self._data[k]
 
@@ -59,26 +85,41 @@ class FrozenDict(Mapping[K, V]):
     def __reversed__(self) -> Iterator[K]:
         return reversed(tuple(self._data))
 
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, FrozenDict):
-            return NotImplemented
-        return tuple(self.items()) == tuple(other.items())
+    def __eq__(self, other: Any) -> Any:
+        # defer to dict's __eq__
+        return self._data == other
 
     def __lt__(self, other: Any) -> bool:
         if not isinstance(other, FrozenDict):
             return NotImplemented
-        return tuple(self._data.items()) < tuple(other._data.items())
+        # If sorting each of these on every __lt__ call ends up being a problem we could consider
+        # optimising this, by, for instance, sorting on construction.
+        return sorted(self._data.items()) < sorted(other._data.items())
 
     def _calculate_hash(self) -> int:
         try:
-            return hash(tuple(self._data.items()))
+            h = 0
+            for pair in self._data.items():
+                # xor is commutative, i.e. we get the same hash no matter the order of items. This
+                # "relies" on "hash" of the individual elements being unpredictable enough that such
+                # a naive aggregation is okay. In addition, the Python hash isn't / shouldn't be
+                # used for cryptographically sensitive purposes.
+                h ^= hash(pair)
+            return h
         except TypeError as e:
             raise TypeError(
-                f"Even though you are using a `{type(self).__name__}`, the underlying values are "
-                "not hashable. Please use hashable (and preferably immutable) types for the "
-                "underlying values, e.g. use tuples instead of lists and use FrozenOrderedSet "
-                "instead of set().\n\n"
-                f"Original error message: {e}\n\nValue: {self}"
+                softwrap(
+                    f"""
+                    Even though you are using a `{type(self).__name__}`, the underlying values are
+                    not hashable. Please use hashable (and preferably immutable) types for the
+                    underlying values, e.g. use tuples instead of lists and use FrozenOrderedSet
+                    instead of set().
+
+                    Original error message: {e}
+
+                    Value: {self}
+                    """
+                )
             )
 
     def __hash__(self) -> int:

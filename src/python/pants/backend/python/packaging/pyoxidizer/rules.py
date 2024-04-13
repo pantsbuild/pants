@@ -8,11 +8,12 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 
 from pants.backend.python.packaging.pyoxidizer.config import PyOxidizerConfig
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
 from pants.backend.python.packaging.pyoxidizer.target_types import (
+    PyOxidizerBinaryNameField,
     PyOxidizerConfigSourceField,
     PyOxidizerDependenciesField,
     PyOxidizerEntryPointField,
@@ -22,8 +23,14 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
 )
 from pants.backend.python.target_types import GenerateSetupField, WheelField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
-from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.core.goals.run import RunFieldSet, RunRequest
+from pants.core.goals.package import (
+    BuiltPackage,
+    BuiltPackageArtifact,
+    EnvironmentAwarePackageRequest,
+    PackageFieldSet,
+)
+from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
+from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import (
     AddPrefix,
@@ -35,6 +42,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.platform import Platform, PlatformError
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -49,19 +57,23 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PyOxidizerFieldSet(PackageFieldSet):
+class PyOxidizerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (PyOxidizerDependenciesField,)
+    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
+    binary_name: PyOxidizerBinaryNameField
     entry_point: PyOxidizerEntryPointField
     dependencies: PyOxidizerDependenciesField
     unclassified_resources: PyOxidizerUnclassifiedResources
     template: PyOxidizerConfigSourceField
     output_path: PyOxidizerOutputPathField
+    environment: EnvironmentField
 
 
 @dataclass(frozen=True)
@@ -96,13 +108,17 @@ async def package_pyoxidizer_binary(
     field_set: PyOxidizerFieldSet,
     runner_script: PyoxidizerRunnerScript,
     bash: BashBinary,
+    platform: Platform,
 ) -> BuiltPackage:
+    if platform == Platform.linux_arm64:
+        raise PlatformError(f"PyOxidizer is not supported on {platform.value}")
     direct_deps = await Get(Targets, DependenciesRequest(field_set.dependencies))
     deps_field_sets = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, direct_deps)
     )
     built_packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in deps_field_sets.field_sets
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+        for field_set in deps_field_sets.field_sets
     )
     wheel_paths = [
         artifact.relpath
@@ -112,10 +128,14 @@ async def package_pyoxidizer_binary(
     ]
     if not wheel_paths:
         raise InvalidTargetException(
-            f"The `{PyOxidizerTarget.alias}` target {field_set.address} must include "
-            "in its `dependencies` field at least one `python_distribution` target that produces a "
-            f"`.whl` file. For example, if using `{GenerateSetupField.alias}=True`, then make sure "
-            f"`{WheelField.alias}=True`. See {doc_url('python-distributions')}."
+            softwrap(
+                f"""
+                The `{PyOxidizerTarget.alias}` target {field_set.address} must include
+                in its `dependencies` field at least one `python_distribution` target that produces a
+                `.whl` file. For example, if using `{GenerateSetupField.alias}=True`, then make sure
+                `{WheelField.alias}=True`. See {doc_url('docs/python/overview/building-distributions')}.
+                """
+            )
         )
 
     config_template = None
@@ -127,7 +147,7 @@ async def package_pyoxidizer_binary(
         config_template = digest_contents[0].content.decode("utf-8")
 
     config = PyOxidizerConfig(
-        executable_name=field_set.address.target_name,
+        executable_name=field_set.binary_name.value or field_set.address.target_name,
         entry_point=field_set.entry_point.value,
         wheels=wheel_paths,
         template=config_template,
@@ -206,18 +226,21 @@ async def run_pyoxidizer_binary(field_set: PyOxidizerFieldSet) -> RunRequest:
             return False
 
         artifact_path = PurePath(artifact_relpath)
-        return artifact_path.parent.name == "install"
+        # COPYING.txt is the default name later versions of pyoxidizer use to write an SBOM.
+        return artifact_path.parent.name == "install" and artifact_path.name != "COPYING.txt"
 
     binary = await Get(BuiltPackage, PackageFieldSet, field_set)
     executable_binaries = [
         artifact for artifact in binary.artifacts if is_executable_binary(artifact.relpath)
     ]
 
-    assert len(executable_binaries) == 1, (
-        "More than one executable binary discovered in the `install` directory, "
-        "which is a bug in the PyOxidizer plugin. "
-        "Please file a bug report at https://github.com/pantsbuild/pants/issues/new. "
-        f"Enumerated executable binaries: {executable_binaries}"
+    assert len(executable_binaries) == 1, softwrap(
+        f"""
+        More than one executable binary discovered in the `install` directory,
+        which is a bug in the PyOxidizer plugin.
+        Please file a bug report at https://github.com/pantsbuild/pants/issues/new.
+        Enumerated executable binaries: {executable_binaries}
+        """
     )
 
     artifact = executable_binaries[0]
@@ -229,5 +252,5 @@ def rules():
     return (
         *collect_rules(),
         UnionRule(PackageFieldSet, PyOxidizerFieldSet),
-        UnionRule(RunFieldSet, PyOxidizerFieldSet),
+        *PyOxidizerFieldSet.rules(),
     )

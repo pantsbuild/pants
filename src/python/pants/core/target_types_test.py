@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 import tarfile
 import textwrap
 import zipfile
@@ -24,31 +23,33 @@ from pants.core.target_types import (
     FilesGeneratorTarget,
     FileSourceField,
     FileTarget,
-    HTTPSource,
+    LockfilesGeneratorSourcesField,
+    LockfileSourceField,
     RelocatedFiles,
     RelocateFilesViaCodegenRequest,
-    ResourcesGeneratorTarget,
     ResourceTarget,
+    http_source,
+    per_platform,
 )
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import archive, source_files, system_binaries
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent
-from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent, GlobMatchErrorBehavior
+from pants.engine.platform import Platform
 from pants.engine.target import (
     GeneratedSources,
-    SingleSourceField,
     SourcesField,
-    Tags,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
+from pants.option.global_options import UnmatchedBuildFileGlobs
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule, mock_console
 
 
 def test_relocated_files() -> None:
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             *target_type_rules(),
             *archive.rules(),
@@ -165,7 +166,7 @@ def test_relocated_files() -> None:
 
 
 def test_relocated_relocated_files() -> None:
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             *target_type_rules(),
             *archive.rules(),
@@ -218,7 +219,7 @@ def test_archive() -> None:
     * An `archive` containing another `archive`.
     """
 
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             *target_type_rules(),
             *pex_from_targets.rules(),
@@ -311,75 +312,9 @@ def test_archive() -> None:
         assert_archive1_is_valid(get_file("archive1.zip"))
 
 
-def test_generate_file_and_resource_targets() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            QueryRule(_TargetParametrizations, [Address]),
-        ],
-        target_types=[FilesGeneratorTarget, ResourcesGeneratorTarget],
-    )
-    rule_runner.write_files(
-        {
-            "assets/BUILD": dedent(
-                """\
-                files(
-                    name='files',
-                    sources=['**/*.ext'],
-                    overrides={'f1.ext': {'tags': ['overridden']}},
-                )
-
-                resources(
-                    name='resources',
-                    sources=['**/*.ext'],
-                    overrides={'f1.ext': {'tags': ['overridden']}},
-                )
-                """
-            ),
-            "assets/f1.ext": "",
-            "assets/f2.ext": "",
-            "assets/f[3].ext": "",
-            "assets/subdir/f.ext": "",
-        }
-    )
-
-    def gen_file_tgt(rel_fp: str, tags: list[str] | None = None) -> FileTarget:
-        return FileTarget(
-            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
-            Address("assets", target_name="files", relative_file_path=rel_fp),
-            residence_dir=os.path.dirname(os.path.join("assets", rel_fp)),
-        )
-
-    def gen_resource_tgt(rel_fp: str, tags: list[str] | None = None) -> ResourceTarget:
-        return ResourceTarget(
-            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
-            Address("assets", target_name="resources", relative_file_path=rel_fp),
-            residence_dir=os.path.dirname(os.path.join("assets", rel_fp)),
-        )
-
-    generated_files = rule_runner.request(
-        _TargetParametrizations, [Address("assets", target_name="files")]
-    ).parametrizations
-    generated_resources = rule_runner.request(
-        _TargetParametrizations, [Address("assets", target_name="resources")]
-    ).parametrizations
-
-    assert set(generated_files.values()) == {
-        gen_file_tgt("f1.ext", tags=["overridden"]),
-        gen_file_tgt("f2.ext"),
-        gen_file_tgt("f[[]3].ext"),
-        gen_file_tgt("subdir/f.ext"),
-    }
-    assert set(generated_resources.values()) == {
-        gen_resource_tgt("f1.ext", tags=["overridden"]),
-        gen_resource_tgt("f2.ext"),
-        gen_resource_tgt("f[[]3].ext"),
-        gen_resource_tgt("subdir/f.ext"),
-    }
-
-
-@pytest.mark.parametrize("asset_type", ("file", "resource"))
-def test_url_assets(asset_type) -> None:
-    rule_runner = RuleRunner(
+@pytest.mark.parametrize("use_per_platform", [True, False])
+def test_url_assets(use_per_platform: bool) -> None:
+    rule_runner = PythonRuleRunner(
         rules=[
             *target_type_rules(),
             *pex_from_targets.rules(),
@@ -389,29 +324,30 @@ def test_url_assets(asset_type) -> None:
             *run.rules(),
         ],
         target_types=[FileTarget, ResourceTarget, PythonSourceTarget, PexBinary],
-        objects={"http_source": HTTPSource},
+        objects={"http_source": http_source, "per_platform": per_platform},
     )
     http_source_info = (
         'url="https://raw.githubusercontent.com/python/cpython/7e46ae33bd522cf8331052c3c8835f9366599d8d/Lib/antigravity.py",'
-        "len=500,"
-        'sha256="8a5ee63e1b79ba2733e7ff4290b6eefea60e7f3a1ccb6bb519535aaf92b44967"'
+        + "len=500,"
+        + 'sha256="8a5ee63e1b79ba2733e7ff4290b6eefea60e7f3a1ccb6bb519535aaf92b44967"'
     )
+
+    def source_field_value(http_source_value: str) -> str:
+        if use_per_platform:
+            return f"per_platform({Platform.create_for_localhost().value}={http_source_value})"
+        return http_source_value
+
     rule_runner.write_files(
         {
             "assets/BUILD": dedent(
                 f"""\
-                {asset_type}(
+                resource(
                     name='antigravity',
-                    source=http_source(
-                        {http_source_info},
-                    ),
+                    source={source_field_value(f'http_source({http_source_info})')}
                 )
-                {asset_type}(
+                resource(
                     name='antigravity_renamed',
-                    source=http_source(
-                        {http_source_info},
-                        filename="antigravity_renamed.py",
-                    ),
+                    source={source_field_value(f'http_source({http_source_info}, filename="antigravity_renamed.py")')}
                 )
                 """
             ),
@@ -442,7 +378,9 @@ def test_url_assets(asset_type) -> None:
     with mock_console(rule_runner.options_bootstrapper) as (console, stdout_reader):
         rule_runner.run_goal_rule(
             run.Run,
-            args=["app/app.py"],
+            args=[
+                "app:app.py",
+            ],
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
         stdout = stdout_reader.get_stdout()
@@ -462,7 +400,7 @@ def test_url_assets(asset_type) -> None:
     ],
 )
 def test_http_source_filename(url, expected):
-    assert HTTPSource(url, len=0, sha256="").filename == expected
+    assert http_source(url, len=0, sha256="").filename == expected
 
 
 @pytest.mark.parametrize(
@@ -496,4 +434,36 @@ def test_http_source_filename(url, expected):
 )
 def test_invalid_http_source(kwargs, exc_match):
     with exc_match:
-        HTTPSource(**kwargs)
+        http_source(**kwargs)
+
+
+@pytest.mark.parametrize(
+    "error_behavior", [GlobMatchErrorBehavior.warn, GlobMatchErrorBehavior.error]
+)
+def test_lockfile_glob_match_error_behavior(
+    error_behavior: GlobMatchErrorBehavior,
+) -> None:
+    lockfile_source = LockfileSourceField("test.lock", Address("", target_name="lockfile-test"))
+    assert (
+        GlobMatchErrorBehavior.ignore
+        == lockfile_source.path_globs(
+            UnmatchedBuildFileGlobs(error_behavior)
+        ).glob_match_error_behavior
+    )
+
+
+@pytest.mark.parametrize(
+    "error_behavior", [GlobMatchErrorBehavior.warn, GlobMatchErrorBehavior.error]
+)
+def test_lockfiles_glob_match_error_behavior(
+    error_behavior: GlobMatchErrorBehavior,
+) -> None:
+    lockfile_sources = LockfilesGeneratorSourcesField(
+        ["test.lock"], Address("", target_name="lockfiles-test")
+    )
+    assert (
+        GlobMatchErrorBehavior.ignore
+        == lockfile_sources.path_globs(
+            UnmatchedBuildFileGlobs(error_behavior)
+        ).glob_match_error_behavior
+    )

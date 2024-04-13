@@ -5,9 +5,12 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.kotlin.dependency_inference import kotlin_parser, symbol_mapper
-from pants.backend.kotlin.dependency_inference.rules import InferKotlinSourceDependencies
+from pants.backend.kotlin.dependency_inference.rules import (
+    InferKotlinSourceDependencies,
+    KotlinSourceDependenciesInferenceFieldSet,
+)
 from pants.backend.kotlin.dependency_inference.rules import rules as dep_inference_rules
-from pants.backend.kotlin.target_types import KotlinSourceField, KotlinSourcesGeneratorTarget
+from pants.backend.kotlin.target_types import KotlinSourcesGeneratorTarget
 from pants.backend.kotlin.target_types import rules as kotlin_target_type_rules
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files
@@ -87,13 +90,13 @@ def test_infer_kotlin_imports_same_target(rule_runner: RuleRunner) -> None:
 
     assert rule_runner.request(
         InferredDependencies,
-        [InferKotlinSourceDependencies(target_a[KotlinSourceField])],
-    ) == InferredDependencies(dependencies=[])
+        [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_a))],
+    ) == InferredDependencies([])
 
     assert rule_runner.request(
         InferredDependencies,
-        [InferKotlinSourceDependencies(target_b[KotlinSourceField])],
-    ) == InferredDependencies(dependencies=[])
+        [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_b))],
+    ) == InferredDependencies([])
 
 
 @maybe_skip_jdk_test
@@ -135,12 +138,14 @@ def test_infer_kotlin_imports_with_cycle(rule_runner: RuleRunner) -> None:
     target_b = rule_runner.get_target(Address("sub", target_name="b", relative_file_path="B.kt"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferKotlinSourceDependencies(target_a[KotlinSourceField])]
-    ) == InferredDependencies(dependencies=[target_b.address])
+        InferredDependencies,
+        [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_a))],
+    ) == InferredDependencies([target_b.address])
 
     assert rule_runner.request(
-        InferredDependencies, [InferKotlinSourceDependencies(target_b[KotlinSourceField])]
-    ) == InferredDependencies(dependencies=[target_a.address])
+        InferredDependencies,
+        [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_b))],
+    ) == InferredDependencies([target_a.address])
 
 
 @maybe_skip_jdk_test
@@ -188,14 +193,16 @@ def test_infer_kotlin_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None
     # disambiguates with a `!`, and so gets the appropriate version.
     caplog.clear()
     assert rule_runner.request(
-        InferredDependencies, [InferKotlinSourceDependencies(target_b[KotlinSourceField])]
-    ) == InferredDependencies(dependencies=[])
+        InferredDependencies,
+        [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_b))],
+    ) == InferredDependencies([])
     assert len(caplog.records) == 1
     assert "The target b/B.kt imports `org.pantsbuild.a.A`, but Pants cannot safely" in caplog.text
 
     assert rule_runner.request(
-        InferredDependencies, [InferKotlinSourceDependencies(target_c[KotlinSourceField])]
-    ) == InferredDependencies(dependencies=[Address("a_one", relative_file_path="A.kt")])
+        InferredDependencies,
+        [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_c))],
+    ) == InferredDependencies([Address("a_one", relative_file_path="A.kt")])
 
 
 @maybe_skip_jdk_test
@@ -233,9 +240,15 @@ def test_infer_same_package_via_consumed_symbol(rule_runner: RuleRunner) -> None
     target_main = rule_runner.get_target(Address("", target_name="a", relative_file_path="Main.kt"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferKotlinSourceDependencies(target_a[KotlinSourceField])]
-    ) == InferredDependencies(dependencies=[])
+        InferredDependencies,
+        [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_a))],
+    ) == InferredDependencies([])
 
     assert rule_runner.request(
-        InferredDependencies, [InferKotlinSourceDependencies(target_main[KotlinSourceField])]
-    ) == InferredDependencies(dependencies=[target_a.address])
+        InferredDependencies,
+        [
+            InferKotlinSourceDependencies(
+                KotlinSourceDependenciesInferenceFieldSet.create(target_main)
+            )
+        ],
+    ) == InferredDependencies([target_a.address])

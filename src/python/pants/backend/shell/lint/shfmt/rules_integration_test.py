@@ -15,8 +15,6 @@ from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -30,7 +28,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *target_types_rules(),
-            QueryRule(FmtResult, [ShfmtRequest]),
+            QueryRule(FmtResult, [ShfmtRequest.Batch]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
         target_types=[ShellSourcesGeneratorTarget],
@@ -87,16 +85,15 @@ def run_shfmt(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            ShfmtRequest(field_sets, snapshot=input_sources.snapshot),
+            ShfmtRequest.Batch(
+                "",
+                input_sources.snapshot.files,
+                partition_metadata=None,
+                snapshot=input_sources.snapshot,
+            ),
         ],
     )
     return fmt_result
-
-
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
@@ -104,7 +101,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
     fmt_result = run_shfmt(rule_runner, [tgt])
     assert fmt_result.stdout == ""
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.sh": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"f.sh": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -113,7 +110,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
     fmt_result = run_shfmt(rule_runner, [tgt])
     assert fmt_result.stdout == "f.sh\n"
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.sh": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"f.sh": GOOD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -127,8 +124,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     ]
     fmt_result = run_shfmt(rule_runner, tgts)
     assert "bad.sh\n" == fmt_result.stdout
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"good.sh": GOOD_FILE, "bad.sh": GOOD_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good.sh": GOOD_FILE, "bad.sh": GOOD_FILE}
     )
     assert fmt_result.did_change is True
 
@@ -149,8 +146,8 @@ def test_config_files(rule_runner: RuleRunner) -> None:
     ]
     fmt_result = run_shfmt(rule_runner, tgts)
     assert fmt_result.stdout == "a/f.sh\n"
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"a/f.sh": FIXED_NEEDS_CONFIG_FILE, "b/f.sh": NEEDS_CONFIG_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"a/f.sh": FIXED_NEEDS_CONFIG_FILE, "b/f.sh": NEEDS_CONFIG_FILE}
     )
     assert fmt_result.did_change is True
 
@@ -160,13 +157,5 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
     fmt_result = run_shfmt(rule_runner, [tgt], extra_args=["--shfmt-args=-ci"])
     assert fmt_result.stdout == "f.sh\n"
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.sh": FIXED_NEEDS_CONFIG_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"f.sh": FIXED_NEEDS_CONFIG_FILE})
     assert fmt_result.did_change is True
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
-    fmt_result = run_shfmt(rule_runner, [tgt], extra_args=["--shfmt-skip"])
-    assert fmt_result.skipped is True
-    assert fmt_result.did_change is False

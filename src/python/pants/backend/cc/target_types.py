@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
+from typing import Iterable
 
-from pants.engine.rules import collect_rules
+from pants.engine.rules import Rule, collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -16,8 +18,30 @@ from pants.engine.target import (
     TargetFilesGenerator,
     generate_multiple_sources_field_help_message,
 )
+from pants.engine.unions import UnionRule
 
-CC_FILE_EXTENSIONS = (".c", ".h", ".cc", ".cpp", ".hpp")
+# Using the extensions referenced in C++ Core Guidelines FAQ
+# https://isocpp.org/wiki/faq/coding-standards#hdr-file-ext
+# https://isocpp.org/wiki/faq/coding-standards#src-file-ext
+# NB: CMake uses these as the default C++ extensions: "C;M;c++;cc;cpp;cxx;mm;mpp;CPP;ixx;cppm"
+CC_HEADER_FILE_EXTENSIONS = (
+    ".h",
+    ".hh",
+    ".hpp",
+)
+C_SOURCE_FILE_EXTENSIONS = (".c",)
+CXX_SOURCE_FILE_EXTENSIONS = (".cc", ".cpp", ".cxx")
+CC_SOURCE_FILE_EXTENSIONS = C_SOURCE_FILE_EXTENSIONS + CXX_SOURCE_FILE_EXTENSIONS
+CC_FILE_EXTENSIONS = CC_HEADER_FILE_EXTENSIONS + CC_SOURCE_FILE_EXTENSIONS
+
+
+class CCLanguage(Enum):
+    C = "c"
+    CXX = "cxx"
+
+
+class CCDependenciesField(Dependencies):
+    pass
 
 
 class CCSourceField(SingleSourceField):
@@ -51,7 +75,7 @@ class CCSourceTarget(Target):
     alias = "cc_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        CCDependenciesField,
         CCSourceField,
     )
     help = "A single C/C++ source file or header file."
@@ -76,5 +100,5 @@ class CCSourcesGeneratorTarget(TargetFilesGenerator):
     help = "Generate a `cc_source` target for each file in the `sources` field."
 
 
-def rules():
+def rules() -> Iterable[Rule | UnionRule]:
     return collect_rules()

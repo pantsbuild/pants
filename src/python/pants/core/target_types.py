@@ -9,28 +9,33 @@ import urllib.parse
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional, Sequence, Union, cast
+from typing import Generic, Optional, Sequence, TypeVar, Union, cast
 
+from pants.core.goals import package
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
+    EnvironmentAwarePackageRequest,
     OutputPathField,
     PackageFieldSet,
 )
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
     DownloadFile,
+    FileDigest,
     FileEntry,
     MergeDigests,
+    PathGlobs,
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.internals.native_engine import FileDigest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.platform import Platform
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
@@ -44,6 +49,7 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InvalidFieldTypeException,
     MultipleSourcesField,
+    OptionalSingleSourceField,
     OverridesField,
     SingleSourceField,
     SourcesField,
@@ -56,20 +62,105 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
+from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
+
+# -----------------------------------------------------------------------------------------------
+# `per_platform` object
+# -----------------------------------------------------------------------------------------------
+_T = TypeVar("_T")
+
+
+@dataclass(frozen=True)
+class per_platform(Generic[_T]):
+    """An object containing differing homogeneous platform-dependent values.
+
+    The values should be evaluated for the execution environment, and not the host environment
+    (I.e. it should be evaluated in a `rule` which requests `Platform`).
+
+    Expected usage is roughly:
+
+    ```python
+    class MyFieldType(...):
+        value = str | per_platform[str]
+
+        @classmethod
+        def compute_value(  # type: ignore[override]
+            cls,
+            raw_value: Optional[Union[str, per_platform[str]]],
+            address: Address,
+        ) -> Optional[Union[str, per_platform[str]]]:
+            if isinstance(raw_value, per_platform):
+                # NOTE: Ensure the values are homogeneous
+                raw_value.check_types(str)
+
+            return raw_value
+
+    ...
+
+    @rule
+    async def my_rule(..., platform: Platform) -> ...:
+        field_value = target[MyFieldType].value
+
+        if isinstance(field_value, per_platform):
+            field_value = field_value.get_value_for_platform(platform)
+
+        ...
+    ```
+
+    NOTE: Support for this object should be heavily weighed, as it would be inappropriate to use in
+    certain contexts (such as the `source` field in a `foo_source` target, where the intent is to
+    support differing source files based on platform. The result would be that dependency inference
+    (and therefore the dependencies field) wouldn't be knowable on the host, which is not something
+    the engine can support yet).
+    """
+
+    linux_arm64: _T | None = None
+    linux_x86_64: _T | None = None
+    macos_arm64: _T | None = None
+    macos_x86_64: _T | None = None
+
+    def check_types(self, type_: type) -> None:
+        fields_and_values = [
+            (field.name, getattr(self, field.name)) for field in dataclasses.fields(self)
+        ]
+        fields_with_values = {name: value for name, value in fields_and_values if value is not None}
+        if not fields_with_values:
+            raise ValueError("`per_platform` must be given at least one platform value.")
+
+        bad_typed_fields = [
+            (name, type(value).__name__)
+            for name, value in fields_with_values.items()
+            if not isinstance(value, type_)
+        ]
+        if bad_typed_fields:
+            raise TypeError(
+                f"The following fields of a `per_platform` object were expected to be of type `{type_.__name__}`:"
+                + ' "'
+                + ", ".join(f"{name} of type '{typename}'" for name, typename in bad_typed_fields)
+                + '".'
+            )
+
+    def get_value_for_platform(self, platform: Platform) -> _T:
+        value = getattr(self, platform.value)
+        if value is None:
+            raise ValueError(
+                f"A request was made to resolve a `per_platform` on `{platform.value}`"
+                + " but the value was `None`. Please specify a value."
+            )
+        return cast("_T", value)
+
 
 # -----------------------------------------------------------------------------------------------
 # Asset target helpers
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(unsafe_hash=True)
-@frozen_after_init
-class HTTPSource:
+@dataclass(frozen=True)
+class http_source:
     url: str
     len: int
     sha256: str
@@ -82,11 +173,16 @@ class HTTPSource:
             if not isinstance(value, getattr(builtins, cast(str, field.type))):
                 raise TypeError(f"`{field.name}` must be a `{field.type}`, got `{type(value)!r}`.")
 
-        self.url = url
-        self.len = len
-        self.sha256 = sha256
-        self.filename = filename or urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]
+        object.__setattr__(self, "url", url)
+        object.__setattr__(self, "len", len)
+        object.__setattr__(self, "sha256", sha256)
+        object.__setattr__(
+            self, "filename", filename or urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]
+        )
 
+        self.__post_init__()
+
+    def __post_init__(self):
         if not self.filename:
             raise ValueError(
                 softwrap(
@@ -104,41 +200,64 @@ class HTTPSource:
 
 
 class AssetSourceField(SingleSourceField):
-    value: str | HTTPSource  # type: ignore[assignment]
+    value: str | http_source | per_platform[http_source]  # type: ignore[assignment]
     # @TODO: Don't document http_source, link to it once https://github.com/pantsbuild/pants/issues/14832
     # is implemented.
-    help = softwrap(
+    help = help_text(
         """
         The source of this target.
 
         If a string is provided, represents a path that is relative to the BUILD file's directory,
         e.g. `source='example.ext'`.
 
-        If an http_source is provided, represents the network location to download the source from.
+        If an `http_source` is provided, represents the network location to download the source from.
         The downloaded file will exist in the sandbox in the same directory as the target.
+
         `http_source` has the following signature:
+
             http_source(url: str, *, len: int, sha256: str, filename: str = "")
-        The filename defaults to the last part of the URL path (E.g. `example.ext`), but can also be
+
+        The filename defaults to the last part of the URL path (e.g. `example.ext`), but can also be
         specified if you wish to have control over the file name. You cannot, however, specify a
         path separator to download the file into a subdirectory (you must declare a target in desired
         subdirectory).
+
         You can easily get the len and checksum with the following command:
-            `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
+
+            curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null
+
+        If a `per_platform` is provided, represents a mapping from platform to `http_source`, where
+        the platform is one of (`linux_arm64`, `linux_x86_64`, `macos_arm64`, `macos_x86_64`) and is
+        resolved in the execution target. Each `http_source` value MUST have the same filename provided.
         """
     )
 
     @classmethod
     def compute_value(  # type: ignore[override]
-        cls, raw_value: Optional[Union[str, HTTPSource]], address: Address
-    ) -> Optional[Union[str, HTTPSource]]:
+        cls,
+        raw_value: Optional[Union[str, http_source, per_platform[http_source]]],
+        address: Address,
+    ) -> Optional[Union[str, http_source, per_platform[http_source]]]:
         if raw_value is None or isinstance(raw_value, str):
             return super().compute_value(raw_value, address)
-        elif not isinstance(raw_value, HTTPSource):
+        elif isinstance(raw_value, per_platform):
+            raw_value.check_types(http_source)
+            value_as_dict = dataclasses.asdict(raw_value)
+            filenames = {
+                source["filename"] for source in value_as_dict.values() if source is not None
+            }
+            if len(filenames) > 1:
+                raise ValueError(
+                    "Every `http_source` in the `per_platform` must have the same `filename`,"
+                    + f" but found: {', '.join(sorted(filenames))}"
+                )
+
+        elif not isinstance(raw_value, http_source):
             raise InvalidFieldTypeException(
                 address,
                 cls.alias,
                 raw_value,
-                expected_type="a string or an `http_source` object",
+                expected_type="a string, an `http_source` object, or a `per_platform[http_source]` object.",
             )
         return raw_value
 
@@ -155,22 +274,36 @@ class AssetSourceField(SingleSourceField):
     @property
     def file_path(self) -> str:
         assert self.value
-        filename = self.value if isinstance(self.value, str) else self.value.filename
+        filename = (
+            self.value
+            if isinstance(self.value, str)
+            else self.value.filename
+            if isinstance(self.value, http_source)
+            else next(
+                source["filename"]
+                for source in dataclasses.asdict(self.value).values()
+                if source is not None
+            )
+        )
         return os.path.join(self.address.spec_path, filename)
 
 
-@rule_helper
-async def _hydrate_asset_source(request: GenerateSourcesRequest) -> GeneratedSources:
+async def _hydrate_asset_source(
+    request: GenerateSourcesRequest, platform: Platform
+) -> GeneratedSources:
     target = request.protocol_target
     source_field = target[AssetSourceField]
     if isinstance(source_field.value, str):
         return GeneratedSources(request.protocol_sources)
 
-    http_source = source_field.value
-    file_digest = FileDigest(http_source.sha256, http_source.len)
+    source = source_field.value
+    if isinstance(source, per_platform):
+        source = source.get_value_for_platform(platform)
+
+    file_digest = FileDigest(source.sha256, source.len)
     # NB: This just has to run, we don't actually need the result because we know the Digest's
     # FileEntry metadata.
-    await Get(Digest, DownloadFile(http_source.url, file_digest))
+    await Get(Digest, DownloadFile(source.url, file_digest))
     snapshot = await Get(
         Snapshot,
         CreateDigest(
@@ -187,16 +320,20 @@ async def _hydrate_asset_source(request: GenerateSourcesRequest) -> GeneratedSou
 
 
 # -----------------------------------------------------------------------------------------------
-# `file` and`files` targets
+# `file` and `files` targets
 # -----------------------------------------------------------------------------------------------
 class FileSourceField(AssetSourceField):
     uses_source_roots = False
 
 
+class FileDependenciesField(Dependencies):
+    pass
+
+
 class FileTarget(Target):
     alias = "file"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FileSourceField)
-    help = softwrap(
+    core_fields = (*COMMON_TARGET_FIELDS, FileDependenciesField, FileSourceField)
+    help = help_text(
         """
         A single loose file that lives outside of code packages.
 
@@ -210,12 +347,13 @@ class FileTarget(Target):
 class GenerateFileSourceRequest(GenerateSourcesRequest):
     input = FileSourceField
     output = FileSourceField
-    exportable = False
 
 
 @rule
-async def hydrate_file_source(request: GenerateFileSourceRequest) -> GeneratedSources:
-    return await _hydrate_asset_source(request)
+async def hydrate_file_source(
+    request: GenerateFileSourceRequest, platform: Platform
+) -> GeneratedSources:
+    return await _hydrate_asset_source(request, platform)
 
 
 class FilesGeneratingSourcesField(MultipleSourcesField):
@@ -248,7 +386,7 @@ class FilesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = FileTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (Dependencies,)
+    moved_fields = (FileDependenciesField,)
     help = "Generate a `file` target for each file in the `sources` field."
 
 
@@ -266,7 +404,7 @@ class RelocatedFilesSourcesField(MultipleSourcesField):
 class RelocatedFilesOriginalTargetsField(SpecialCasedDependencies):
     alias = "files_targets"
     required = True
-    help = softwrap(
+    help = help_text(
         """
         Addresses to the original `file` and `files` targets that you want to relocate, such as
         `['//:json_files']`.
@@ -280,7 +418,7 @@ class RelocatedFilesOriginalTargetsField(SpecialCasedDependencies):
 class RelocatedFilesSrcField(StringField):
     alias = "src"
     required = True
-    help = softwrap(
+    help = help_text(
         """
         The original prefix that you want to replace, such as `src/resources`.
 
@@ -293,7 +431,7 @@ class RelocatedFilesSrcField(StringField):
 class RelocatedFilesDestField(StringField):
     alias = "dest"
     required = True
-    help = softwrap(
+    help = help_text(
         """
         The new prefix that you want to add to the beginning of the path, such as `data`.
 
@@ -312,7 +450,7 @@ class RelocatedFiles(Target):
         RelocatedFilesSrcField,
         RelocatedFilesDestField,
     )
-    help = softwrap(
+    help = help_text(
         """
         Loose files with path manipulation applied.
 
@@ -403,14 +541,18 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
 # -----------------------------------------------------------------------------------------------
 
 
+class ResourceDependenciesField(Dependencies):
+    pass
+
+
 class ResourceSourceField(AssetSourceField):
     uses_source_roots = True
 
 
 class ResourceTarget(Target):
     alias = "resource"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourceSourceField)
-    help = softwrap(
+    core_fields = (*COMMON_TARGET_FIELDS, ResourceDependenciesField, ResourceSourceField)
+    help = help_text(
         """
         A single resource file embedded in a code package and accessed in a
         location-independent manner.
@@ -425,12 +567,13 @@ class ResourceTarget(Target):
 class GenerateResourceSourceRequest(GenerateSourcesRequest):
     input = ResourceSourceField
     output = ResourceSourceField
-    exportable = False
 
 
 @rule
-async def hydrate_resource_source(request: GenerateResourceSourceRequest) -> GeneratedSources:
-    return await _hydrate_asset_source(request)
+async def hydrate_resource_source(
+    request: GenerateResourceSourceRequest, platform: Platform
+) -> GeneratedSources:
+    return await _hydrate_asset_source(request, platform)
 
 
 class ResourcesGeneratingSourcesField(MultipleSourcesField):
@@ -462,7 +605,7 @@ class ResourcesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = ResourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (Dependencies,)
+    moved_fields = (ResourceDependenciesField,)
     help = "Generate a `resource` target for each file in the `sources` field."
 
 
@@ -485,10 +628,14 @@ class ResourcesGeneratorFieldSet(FieldSet):
 # -----------------------------------------------------------------------------------------------
 
 
+class GenericTargetDependenciesField(Dependencies):
+    pass
+
+
 class GenericTarget(Target):
     alias = "target"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies)
-    help = softwrap(
+    core_fields = (*COMMON_TARGET_FIELDS, GenericTargetDependenciesField)
+    help = help_text(
         """
         A generic target with no specific type.
 
@@ -503,10 +650,6 @@ class GenericTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class AllAssetTargetsRequest:
-    pass
-
-
 @dataclass(frozen=True)
 class AllAssetTargets:
     resources: tuple[Target, ...]
@@ -514,10 +657,7 @@ class AllAssetTargets:
 
 
 @rule(desc="Find all assets in project")
-def find_all_assets(
-    all_targets: AllTargets,
-    _: AllAssetTargetsRequest,
-) -> AllAssetTargets:
+def find_all_assets(all_targets: AllTargets) -> AllAssetTargets:
     resources = []
     files = []
     for tgt in all_targets:
@@ -538,7 +678,6 @@ class AllAssetTargetsByPath:
 def map_assets_by_path(
     all_asset_targets: AllAssetTargets,
 ) -> AllAssetTargetsByPath:
-
     resources_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
     for resource_tgt in all_asset_targets.resources:
         resources_by_path[PurePath(resource_tgt[ResourceSourceField].file_path)].add(resource_tgt)
@@ -574,11 +713,11 @@ class TargetGeneratorSourcesHelperTarget(Target):
 
     alias = "_generator_sources_helper"
     core_fields = (*COMMON_TARGET_FIELDS, TargetGeneratorSourcesHelperSourcesField)
-    help = softwrap(
+    help = help_text(
         """
         A private helper target type used by some target generators.
 
-        This tracks their `source` / `sources` field so that `--changed-since --changed-dependees`
+        This tracks their `source` / `sources` field so that `--changed-since --changed-dependents`
         works properly for generated targets.
         """
     )
@@ -591,21 +730,24 @@ class TargetGeneratorSourcesHelperTarget(Target):
 
 class ArchivePackagesField(SpecialCasedDependencies):
     alias = "packages"
-    help = softwrap(
+    help = help_text(
         f"""
-        Addresses to any targets that can be built with `{bin_name()} package`, e.g.
-        `["project:app"]`.\n\nPants will build the assets as if you had run `{bin_name()} package`.
-        It will include the results in your archive using the same name they would normally have,
-        but without the `--distdir` prefix (e.g. `dist/`).\n\nYou can include anything that can
-        be built by `{bin_name()} package`, e.g. a `pex_binary`, `python_awslambda`, or even another
-        `archive`.
+        Addresses to any targets that can be built with `{bin_name()} package`,
+        e.g. `["project:app"]`.
+
+        Pants will build the assets as if you had run `{bin_name()} package`.
+        It will include the results in your archive using the same name they
+        would normally have, but without the `--distdir` prefix (e.g. `dist/`).
+
+        You can include anything that can be built by `{bin_name()} package`,
+        e.g. a `pex_binary`, `python_awslambda`, or even another `archive`.
         """
     )
 
 
 class ArchiveFilesField(SpecialCasedDependencies):
     alias = "files"
-    help = softwrap(
+    help = help_text(
         """
         Addresses to any `file`, `files`, or `relocated_files` targets to include in the
         archive, e.g. `["resources:logo"]`.
@@ -668,7 +810,7 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, package_targets)
     )
     packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set)
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
         for field_set in package_field_sets_per_target.field_sets
     )
 
@@ -708,9 +850,73 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
     return BuiltPackage(archive, (BuiltPackageArtifact(output_filename),))
 
 
+# -----------------------------------------------------------------------------------------------
+# `_lockfile` and `_lockfiles` targets
+# -----------------------------------------------------------------------------------------------
+
+
+class LockfileSourceField(OptionalSingleSourceField):
+    """Source field for synthesized `_lockfile` targets.
+
+    It is special in that it always ignores any missing files, regardless of the global
+    `--unmatched-build-file-globs` option.
+    """
+
+    uses_source_roots = False
+    required = True
+    value: str
+
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+        return super().path_globs(UnmatchedBuildFileGlobs.ignore())
+
+
+class LockfileDependenciesField(Dependencies):
+    pass
+
+
+class LockfileTarget(Target):
+    alias = "_lockfile"
+    core_fields = (*COMMON_TARGET_FIELDS, LockfileSourceField, LockfileDependenciesField)
+    help = help_text(
+        """
+        A target for lockfiles in order to include them in the dependency graph of other targets.
+
+        This tracks them so that `--changed-since --changed-dependents` works properly for targets
+        relying on a particular lockfile.
+        """
+    )
+
+
+class LockfilesGeneratorSourcesField(MultipleSourcesField):
+    """Sources field for synthesized `_lockfiles` targets.
+
+    It is special in that it always ignores any missing files, regardless of the global
+    `--unmatched-build-file-globs` option.
+    """
+
+    help = generate_multiple_sources_field_help_message("Example: `sources=['example.lock']`")
+
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+        return super().path_globs(UnmatchedBuildFileGlobs.ignore())
+
+
+class LockfilesGeneratorTarget(TargetFilesGenerator):
+    alias = "_lockfiles"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        LockfilesGeneratorSourcesField,
+    )
+    generated_target_cls = LockfileTarget
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (LockfileDependenciesField,)
+    help = "Generate a `_lockfile` target for each file in the `sources` field."
+
+
 def rules():
     return (
         *collect_rules(),
+        *archive_rules(),
+        *package.rules(),
         UnionRule(GenerateSourcesRequest, GenerateResourceSourceRequest),
         UnionRule(GenerateSourcesRequest, GenerateFileSourceRequest),
         UnionRule(GenerateSourcesRequest, RelocateFilesViaCodegenRequest),

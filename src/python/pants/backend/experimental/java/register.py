@@ -7,6 +7,7 @@ from pants.backend.java.dependency_inference import java_parser
 from pants.backend.java.dependency_inference import rules as dependency_inference_rules
 from pants.backend.java.goals import check, tailor
 from pants.backend.java.target_types import (
+    JavaSourceField,
     JavaSourcesGeneratorTarget,
     JavaSourceTarget,
     JunitTestsGeneratorTarget,
@@ -14,26 +15,20 @@ from pants.backend.java.target_types import (
 )
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.core.util_rules import archive
-from pants.jvm import classpath, jdk_rules, resources, run_deploy_jar
-from pants.jvm import util_rules as jvm_util_rules
-from pants.jvm.dependency_inference import symbol_mapper
-from pants.jvm.goals import lockfile
-from pants.jvm.package import deploy_jar
-from pants.jvm.package.war import rules as war_rules
-from pants.jvm.resolve import coursier_fetch, jvm_tool
-from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget, JvmWarTarget
-from pants.jvm.test import junit
+from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
+from pants.jvm import jvm_common
+
+wrap_java = wrap_source_rule_and_target(JavaSourceField, "java_sources")
 
 
 def target_types():
     return [
-        DeployJarTarget,
         JavaSourceTarget,
         JavaSourcesGeneratorTarget,
         JunitTestTarget,
         JunitTestsGeneratorTarget,
-        JvmArtifactTarget,
-        JvmWarTarget,
+        *jvm_common.target_types(),
+        *wrap_java.target_types,
     ]
 
 
@@ -41,22 +36,16 @@ def rules():
     return [
         *javac.rules(),
         *check.rules(),
-        *classpath.rules(),
-        *junit.rules(),
-        *deploy_jar.rules(),
-        *lockfile.rules(),
-        *coursier_fetch.rules(),
         *java_parser.rules(),
-        *resources.rules(),
-        *symbol_mapper.rules(),
         *dependency_inference_rules.rules(),
         *tailor.rules(),
-        *jvm_util_rules.rules(),
-        *jdk_rules.rules(),
-        *target_types_rules(),
-        *jvm_tool.rules(),
-        *run_deploy_jar.rules(),
-        *war_rules(),
         *java_bsp_rules.rules(),
         *archive.rules(),
+        *target_types_rules(),
+        *jvm_common.rules(),
+        *wrap_java.rules,
     ]
+
+
+def build_file_aliases():
+    return jvm_common.build_file_aliases()

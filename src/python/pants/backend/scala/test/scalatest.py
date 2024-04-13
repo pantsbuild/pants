@@ -4,37 +4,45 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.scala.subsystems.scalatest import Scalatest
-from pants.backend.scala.target_types import ScalatestTestSourceField
+from pants.backend.scala.target_types import (
+    ScalatestTestExtraEnvVarsField,
+    ScalatestTestSourceField,
+    ScalatestTestTimeoutField,
+)
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
+from pants.core.goals.test import (
+    TestDebugRequest,
+    TestExtraEnv,
+    TestFieldSet,
+    TestRequest,
+    TestResult,
+    TestSubsystem,
+)
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import (
-    FallibleProcessResult,
     InteractiveProcess,
-    InteractiveProcessRequest,
     Process,
     ProcessCacheScope,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    Dependencies,
-    SourcesField,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.target import SourcesField, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmJdkField
+from pants.jvm.target_types import JvmDependenciesField, JvmJdkField
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -48,11 +56,19 @@ class ScalatestTestFieldSet(TestFieldSet):
     )
 
     sources: ScalatestTestSourceField
+    timeout: ScalatestTestTimeoutField
     jdk_version: JvmJdkField
-    dependencies: Dependencies
+    dependencies: JvmDependenciesField
+    extra_env_vars: ScalatestTestExtraEnvVarsField
 
 
-class ScalatestToolLockfileSentinel(GenerateToolLockfileSentinel):
+class ScalatestTestRequest(TestRequest):
+    tool_subsystem = Scalatest
+    field_set_type = ScalatestTestFieldSet
+    supports_debug = True
+
+
+class ScalatestToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = Scalatest.options_scope
 
 
@@ -74,8 +90,8 @@ async def setup_scalatest_for_target(
     jvm: JvmSubsystem,
     scalatest: Scalatest,
     test_subsystem: TestSubsystem,
+    test_extra_env: TestExtraEnv,
 ) -> TestSetup:
-
     jdk, transitive_tgts = await MultiGet(
         Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(request.field_set.jdk_version)),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
@@ -117,6 +133,10 @@ async def setup_scalatest_for_target(
     if request.is_debug:
         extra_jvm_args.extend(jvm.debug_args)
 
+    field_set_extra_env = await Get(
+        EnvironmentVars, EnvironmentVarsRequest(request.field_set.extra_env_vars.value or ())
+    )
+
     process = JvmProcess(
         jdk=jdk,
         classpath_entries=[
@@ -136,10 +156,12 @@ async def setup_scalatest_for_target(
             *scalatest.args,
         ],
         input_digest=input_digest,
+        extra_env={**test_extra_env.env, **field_set_extra_env},
         extra_jvm_options=scalatest.jvm_options,
         extra_immutable_input_digests=extra_immutable_input_digests,
         output_directories=(reports_dir,),
         description=f"Run Scalatest runner for {request.field_set.address}",
+        timeout_seconds=request.field_set.timeout.calculate_from_global_options(test_subsystem),
         level=LogLevel.DEBUG,
         cache_scope=cache_scope,
         use_nailgun=False,
@@ -150,19 +172,25 @@ async def setup_scalatest_for_target(
 @rule(desc="Run Scalatest", level=LogLevel.DEBUG)
 async def run_scalatest_test(
     test_subsystem: TestSubsystem,
-    field_set: ScalatestTestFieldSet,
+    batch: ScalatestTestRequest.Batch[ScalatestTestFieldSet, Any],
 ) -> TestResult:
+    field_set = batch.single_element
+
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
-    process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
+    process = await Get(Process, JvmProcess, test_setup.process)
+    process_results = await Get(
+        ProcessResultWithRetries, ProcessWithRetries(process, test_subsystem.attempts_default)
+    )
     reports_dir_prefix = test_setup.reports_dir_prefix
 
     xml_result_subset = await Get(
-        Digest, DigestSubset(process_result.output_digest, PathGlobs([f"{reports_dir_prefix}/**"]))
+        Digest,
+        DigestSubset(process_results.last.output_digest, PathGlobs([f"{reports_dir_prefix}/**"])),
     )
     xml_results = await Get(Snapshot, RemovePrefix(xml_result_subset, reports_dir_prefix))
 
     return TestResult.from_fallible_process_result(
-        process_result,
+        process_results=process_results.results,
         address=field_set.address,
         output_setting=test_subsystem.output,
         xml_results=xml_results,
@@ -170,15 +198,14 @@ async def run_scalatest_test(
 
 
 @rule(level=LogLevel.DEBUG)
-async def setup_scalatest_debug_request(field_set: ScalatestTestFieldSet) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
-
+async def setup_scalatest_debug_request(
+    batch: ScalatestTestRequest.Batch[ScalatestTestFieldSet, Any]
+) -> TestDebugRequest:
+    setup = await Get(TestSetup, TestSetupRequest(batch.single_element, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)
-    interactive_process = await Get(
-        InteractiveProcess,
-        InteractiveProcessRequest(process, forward_signals_to_process=False, restartable=True),
+    return TestDebugRequest(
+        InteractiveProcess.from_process(process, forward_signals_to_process=False, restartable=True)
     )
-    return TestDebugRequest(interactive_process)
 
 
 @rule
@@ -192,6 +219,6 @@ def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(TestFieldSet, ScalatestTestFieldSet),
         UnionRule(GenerateToolLockfileSentinel, ScalatestToolLockfileSentinel),
+        *ScalatestTestRequest.rules(),
     ]

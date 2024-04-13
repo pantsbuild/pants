@@ -21,11 +21,9 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
-# NB: We subclass Dependencies so that specific backends can add dependency injection rules to
-# `thrift_source` targets.
 class ThriftDependenciesField(Dependencies):
     pass
 
@@ -69,12 +67,12 @@ class ThriftSourceTarget(Target):
         ThriftDependenciesField,
         ThriftSourceField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A single Thrift file used to generate various languages.
 
         See language-specific docs:
-            Python: {doc_url('thrift-python')}
+            Python: {doc_url('docs/python/integrations/thrift')}
         """
     )
 

@@ -5,18 +5,13 @@
 # Consider pinging us on Slack if you're thinking a new dependency might be needed.
 
 ansicolors==1.1.8
-chevron==0.14.0  # Should only be used by build-support.
+chevron==0.14.0
 fasteners==0.16.3
-freezegun==1.1.0
-
-# Note: we use humbug to report telemetry. When upgrading, ensure the new version maintains the
-# anonymity promise we make here: https://www.pantsbuild.org/docs/anonymous-telemetry
-humbug==0.2.7
-
-ijson==3.1.4
+freezegun==1.2.1
+ijson==3.2.3
 packaging==21.3
-pex==2.1.90
-psutil==5.9.0
+pex==2.3.0
+psutil==5.9.8
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
 # Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most
@@ -26,14 +21,34 @@ psutil==5.9.0
 pytest>=6.2.4,<7.1.0
 python-lsp-jsonrpc==1.0.0
 PyYAML>=6.0,<7.0
-requests[security]>=2.25.1
-setproctitle==1.2.2
-setuptools>=56.0.0,<58.0
+requests[security]>=2.28.1
+setproctitle==1.3.2
+setuptools>=63.1.0,<64.0
 toml==0.10.2
 types-freezegun==1.1.6
 types-PyYAML==6.0.3
-types-requests==2.27.5
-types-setuptools==57.4.7
-types-toml==0.10.3
-typing-extensions==4.0.1
+types-requests==2.28.1
+types-setuptools==62.6.1
+types-toml==0.10.8
+typing-extensions==4.3.0
 mypy-typing-asserts==0.1.1
+node-semver==0.9.0
+
+
+# These dependencies are only for debugging Pants itself (in VSCode/PyCharm respectively),
+# and should never be imported.
+debugpy==1.6.0
+pydevd-pycharm==203.5419.8
+
+# These dependencies must only be used from the explorer backend, and no code outside that backend
+# may import anything from it, so these libraries are not ending up as requirements of Pants itself.
+fastapi==0.78.0
+starlette==0.19.1
+strawberry-graphql[fastapi]==0.114.0
+uvicorn[standard]==0.17.6
+
+beautifulsoup4==4.11.1 # Util for webcrawling for pulling in tool versions
+python-gnupg==0.4.9 # For validating signatures
+
+# Only used for release management
+PyGithub==2.0.0rc1

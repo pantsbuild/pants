@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import logging
 import os
 import shutil
 import ssl
@@ -16,8 +15,6 @@ from pathlib import Path
 from queue import Queue
 from socketserver import TCPServer
 from typing import IO, Any, Callable, Iterator, Mapping
-
-from colors import green
 
 from pants.util.dirutil import safe_delete
 
@@ -71,12 +68,22 @@ def _restore_env(env: Mapping[str, str]) -> None:
 
 
 @contextmanager
-def hermetic_environment_as(**kwargs: str | None) -> Iterator[None]:
-    """Set the environment to the supplied values from an empty state."""
+def hermetic_environment_as(*preserve: str, **override: str | None) -> Iterator[None]:
+    """Mutate the environment of this process, restoring it on exit.
+
+    The given `preserve` environment variable names will have their current values preserved, while
+    the given `override` environment variables will override any values which are already set.
+    """
     old_environment = os.environ.copy()
+    preserve_set = set(preserve)
+    new_environment: dict[str, str | None] = {
+        k: v for k, v in old_environment.items() if k in preserve_set
+    }
+    new_environment.update(override)
+
     _purge_env()
     try:
-        with environment_as(**kwargs):
+        with environment_as(**new_environment):
             yield
     finally:
         _purge_env()
@@ -107,7 +114,7 @@ def temporary_dir(
     :API: public
 
     You may specify the following keyword args:
-    :param root_dir: The parent directory to create the temporary directory.
+    :param root_dir: The parent directory in which to create the temporary directory.
     :param cleanup: Whether or not to clean up the temporary directory.
     :param suffix: If not None the directory name will end with this suffix.
     :param permissions: If provided, sets the directory permissions to this mode.
@@ -245,35 +252,6 @@ def open_zip(path_or_file: str | Any, *args, **kwargs) -> Iterator[zipfile.ZipFi
         yield zf
     finally:
         zf.close()
-
-
-@contextmanager
-def maybe_profiled(profile_path: str | None) -> Iterator[None]:
-    """A profiling context manager.
-
-    :param profile_path: The path to write profile information to. If `None`, this will no-op.
-    """
-    if not profile_path:
-        yield
-        return
-
-    import cProfile
-
-    profiler = cProfile.Profile()
-    try:
-        profiler.enable()
-        yield
-    finally:
-        profiler.disable()
-        profiler.dump_stats(profile_path)
-        view_cmd = green(
-            "gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && open {path}.png".format(
-                path=profile_path
-            )
-        )
-        logging.getLogger().info(
-            f"Dumped profile data to: {profile_path}\nUse e.g. {view_cmd} to render and view."
-        )
 
 
 @contextmanager

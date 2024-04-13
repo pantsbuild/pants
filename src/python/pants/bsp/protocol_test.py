@@ -1,5 +1,6 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 from pathlib import Path
 from textwrap import dedent
@@ -8,7 +9,10 @@ from urllib.parse import urlparse
 import pytest
 from pylsp_jsonrpc.exceptions import JsonRpcException  # type: ignore[import]
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import JVMLockfileFixture
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.java.bsp.rules import rules as java_bsp_rules
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget
@@ -42,6 +46,7 @@ from pants.jvm import classpath, jdk_rules, testutil
 from pants.jvm.goals import lockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
@@ -92,6 +97,7 @@ def jvm_rule_runner() -> RuleRunner:
             *coursier_setup_rules(),
             *external_tool_rules(),
             *scala_dep_inf_rules(),
+            *strip_jar.rules(),
             *javac_rules(),
             *jdk_rules.rules(),
             *scalac_rules(),
@@ -117,13 +123,22 @@ def jvm_rule_runner() -> RuleRunner:
     return rule_runner
 
 
-@pytest.mark.jvm_lockfile(
-    path="protocol-intellij.test.lock",
-    requirements=[
-        "org.scala-lang:scala-library:2.13.6",
-        "org.scalatest:scalatest_2.13:3.2.10",
-    ],
-)
+@pytest.fixture
+def jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "protocol-intellij.test.lock",
+        [
+            "org.scala-lang:scala-library:2.13.6",
+            "org.scalatest:scalatest_2.13:3.2.10",
+        ],
+    )
+
+
+@pytest.fixture
+def jvm_lockfile(jvm_lockfile_def: JVMLockfileFixtureDefinition, request) -> JVMLockfileFixture:
+    return jvm_lockfile_def.load(request)
+
+
 def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
     jvm_rule_runner.write_files(
         {

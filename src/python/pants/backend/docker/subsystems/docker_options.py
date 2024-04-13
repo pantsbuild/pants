@@ -3,12 +3,11 @@
 
 from __future__ import annotations
 
-import os
 import sys
 from typing import Any
 
 from pants.backend.docker.registries import DockerRegistries
-from pants.engine.environment import Environment
+from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
 from pants.option.option_types import (
     BoolOption,
     DictOption,
@@ -20,7 +19,6 @@ from pants.option.option_types import (
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.memo import memoized_method
-from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list, softwrap
 
 doc_links = {
@@ -34,8 +32,29 @@ class DockerOptions(Subsystem):
     options_scope = "docker"
     help = "Options for interacting with Docker."
 
+    class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
+        _env_vars = ShellStrListOption(
+            help=softwrap(
+                """
+                Environment variables to set for `docker` invocations.
+
+                Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
+                or just `ENV_VAR` to copy the value from Pants's own environment.
+                """
+            ),
+            advanced=True,
+        )
+        executable_search_paths_help = softwrap(
+            """
+            The PATH value that will be used to find the Docker client and any tools required.
+            """
+        )
+
+        @property
+        def env_vars(self) -> tuple[str, ...]:
+            return tuple(sorted(set(self._env_vars)))
+
     _registries = DictOption[Any](
-        "--registries",
         help=softwrap(
             """
             Configure Docker registries. The schema for a registry entry is as follows:
@@ -46,6 +65,8 @@ class DockerOptions(Subsystem):
                         "default": bool,
                         "extra_image_tags": [],
                         "skip_push": bool,
+                        "repository": str,
+                        "use_local_alias": bool,
                     },
                     ...
                 }
@@ -67,28 +88,38 @@ class DockerOptions(Subsystem):
             `extra_image_tags` option. The tags may use value formatting the same as for the
             `image_tags` field of the `docker_image` target.
 
+            When a registry provides a `repository` value, it will be used instead of the
+            `docker_image.repository` or the default repository. Using the placeholders
+            `{target_repository}` or `{default_repository}` those overridden values may be
+            incorporated into the registry specific repository value.
+
+            If `use_local_alias` is true, a built image is additionally tagged locally using the
+            registry alias as the value for repository (i.e. the additional image tag is not pushed)
+            and will be used for any `pants run` requests.
             """
         ),
         fromfile=True,
     )
     default_repository = StrOption(
-        "--default-repository",
         help=softwrap(
             f"""
             Configure the default repository name used in the Docker image tag.
 
             The value is formatted and may reference these variables (in addition to the normal
-            placeheolders derived from the Dockerfile and build args etc):
+            placeholders derived from the Dockerfile and build args etc):
 
-            {bullet_list(["name", "directory", "parent_directory"])}
+            {bullet_list(["name", "directory", "parent_directory", "full_directory", "target_repository"])}
 
             Example: `--default-repository="{{directory}}/{{name}}"`.
 
-            The `name` variable is the `docker_image`'s target name, `directory` and
-            `parent_directory` are the name of the directory in which the BUILD file is for the
-            target, and its parent directory respectively.
+            The `name` variable is the `docker_image`'s target name.
+
+            With the directory variables available, given a sample repository path of `baz/foo/bar/BUILD`,
+            then `directory` is `bar`, `parent_directory` is `foo` and `full_directory` will be `baz/foo/bar`.
 
             Use the `repository` field to set this value directly on a `docker_image` target.
+
+            Registries may override the repository value for a specific registry.
 
             Any registries or tags are added to the image name as required, and should
             not be part of the repository name.
@@ -97,7 +128,6 @@ class DockerOptions(Subsystem):
         default="{name}",
     )
     default_context_root = WorkspacePathOption(
-        "--default-context-root",
         default="",
         help=softwrap(
             """
@@ -114,8 +144,16 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+    use_buildx = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Use [buildx](https://github.com/docker/buildx#buildx) (and BuildKit) for builds.
+            """
+        ),
+    )
+
     _build_args = ShellStrListOption(
-        "--build-args",
         help=softwrap(
             f"""
             Global build arguments (for Docker `--build-arg` options) to use for all
@@ -136,7 +174,6 @@ class DockerOptions(Subsystem):
         ),
     )
     build_target_stage = StrOption(
-        "--build-target-stage",
         default=None,
         help=softwrap(
             """
@@ -148,25 +185,31 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+    build_hosts = DictOption[str](
+        default={},
+        help=softwrap(
+            f"""
+            Hosts entries to be added to the `/etc/hosts` file in all built images.
+
+            Example:
+
+                [{options_scope}]
+                build_hosts = {{"docker": "10.180.0.1", "docker2": "10.180.0.2"}}
+
+            Use the `extra_build_hosts` field on a `docker_image` target for additional
+            image specific host entries.
+            """
+        ),
+    )
+    build_no_cache = BoolOption(
+        default=False,
+        help="Do not use the Docker cache when building images.",
+    )
     build_verbose = BoolOption(
-        "--build-verbose",
         default=False,
         help="Whether to log the Docker output to the console. If false, only the image ID is logged.",
     )
-    _env_vars = ShellStrListOption(
-        "--env-vars",
-        help=softwrap(
-            """
-            Environment variables to set for `docker` invocations.
-
-            Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
-            or just `ENV_VAR` to copy the value from Pants's own environment.
-            """
-        ),
-        advanced=True,
-    )
     run_args = ShellStrListOption(
-        "--run-args",
         default=["--interactive", "--tty"] if sys.stdout.isatty() else [],
         help=softwrap(
             f"""
@@ -188,21 +231,7 @@ class DockerOptions(Subsystem):
             """
         ),
     )
-    _executable_search_paths = StrListOption(
-        "--executable-search-paths",
-        default=["<PATH>"],
-        help=softwrap(
-            """
-            The PATH value that will be used to find the Docker client and any tools required.
-
-            The special string `"<PATH>"` will expand to the contents of the PATH env var.
-            """
-        ),
-        advanced=True,
-        metavar="<binary-paths>",
-    )
     _tools = StrListOption(
-        "--tools",
         default=[],
         help=softwrap(
             """
@@ -215,7 +244,6 @@ class DockerOptions(Subsystem):
     )
 
     tailor = BoolOption(
-        "--tailor",
         default=True,
         help="If true, add `docker_image` targets with the `tailor` goal.",
         advanced=True,
@@ -226,26 +254,9 @@ class DockerOptions(Subsystem):
         return tuple(sorted(set(self._build_args)))
 
     @property
-    def env_vars(self) -> tuple[str, ...]:
-        return tuple(sorted(set(self._env_vars)))
-
-    @property
     def tools(self) -> tuple[str, ...]:
         return tuple(sorted(set(self._tools)))
 
     @memoized_method
     def registries(self) -> DockerRegistries:
         return DockerRegistries.from_dict(self._registries)
-
-    @memoized_method
-    def executable_search_path(self, env: Environment) -> tuple[str, ...]:
-        def iter_path_entries():
-            for entry in self._executable_search_paths:
-                if entry == "<PATH>":
-                    path = env.get("PATH")
-                    if path:
-                        yield from path.split(os.pathsep)
-                else:
-                    yield entry
-
-        return tuple(OrderedSet(iter_path_entries()))

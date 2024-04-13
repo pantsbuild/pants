@@ -1,0 +1,20 @@
+# See `build-support/reapi-sample-server/README.md` for information on how to use this config
+# for internal testing.
+
+[GLOBAL]
+
+# NB: We disable the `toolchain` plugin to avoid it overriding remote execution settings,
+# and disable config verification to ignore `toolchain` related settings.
+plugins = []
+verify_config = false
+
+remote_execution = true
+remote_cache_read = true
+remote_cache_write = true
+
+remote_store_address = "grpc://127.0.0.1:50051"
+remote_execution_address = "grpc://127.0.0.1:50051"
+remote_instance_name = ""
+
+# TODO: See https://gitlab.com/BuildGrid/buildgrid/-/blob/master/buildgrid/server/server.py#L212-222
+process_execution_remote_parallelism = 4

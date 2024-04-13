@@ -3,23 +3,29 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.kotlin.subsystems.kotlin import KotlinSubsystem
-from pants.backend.kotlin.target_types import KotlinSourcesGeneratorTarget
+from pants.backend.kotlin.target_types import (
+    KotlinJunitTestsGeneratorSourcesField,
+    KotlinJunitTestsGeneratorTarget,
+    KotlinSourcesGeneratorTarget,
+)
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsRequest,
-    group_by_dir,
 )
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.source.filespec import FilespecMatcher
+from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 
 
@@ -30,8 +36,18 @@ class PutativeKotlinTargetsRequest(PutativeTargetsRequest):
 
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
-    sources_files = set(paths)
-    return {KotlinSourcesGeneratorTarget: sources_files}
+    junit_filespec_matcher = FilespecMatcher(KotlinJunitTestsGeneratorSourcesField.default, ())
+    junit_files = {
+        path
+        for path in paths
+        if os.path.basename(path)
+        in set(junit_filespec_matcher.matches([os.path.basename(path) for path in paths]))
+    }
+    sources_files = set(paths) - junit_files
+    return {
+        KotlinJunitTestsGeneratorTarget: junit_files,
+        KotlinSourcesGeneratorTarget: sources_files,
+    }
 
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Kotlin targets to create")

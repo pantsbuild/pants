@@ -1,46 +1,95 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import logging
 from abc import ABCMeta
 from dataclasses import dataclass
-from pathlib import PurePath
-from typing import Iterable, Mapping, Optional, Tuple
+from enum import Enum
+from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple, TypeVar, Union
 
-from pants.base.build_root import BuildRoot
-from pants.build_graph.address import Address
-from pants.engine.environment import CompleteEnvironment
+from typing_extensions import final
+
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
+from pants.core.util_rules.environments import _warn_on_non_local_environments
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.specs_rules import (
+    AmbiguousImplementationsException,
+    TooManyTargetsException,
+)
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, collect_rules, goal_rule
+from pants.engine.rules import Effect, Get, Rule, _uncacheable_rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     BoolField,
     FieldSet,
     NoApplicableTargetsBehavior,
+    Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
-    WrappedTarget,
 )
-from pants.engine.unions import UnionMembership, union
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
 from pants.option.option_types import ArgsListOption, BoolOption
-from pants.util.contextutil import temporary_dir
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
-from pants.util.strutil import softwrap
+from pants.util.memo import memoized
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
+_T = TypeVar("_T")
 
-@union
+
+class RunInSandboxBehavior(Enum):
+    """Defines the behavior of rules that act on a `RunFieldSet` subclass with regards to use in the
+    sandbox.
+
+    This is used to automatically generate rules used to fulfill `experimental_run_in_sandbox`
+    targets.
+
+    The behaviors are as follows:
+
+    * `RUN_REQUEST_HERMETIC`: Use the existing `RunRequest`-generating rule, and enable cacheing.
+       Use this if you are confident the behavior of the rule relies only on state that is
+       captured by pants (e.g. binary paths are found using `EnvironmentVarsRequest`), and that
+       the rule only refers to files in the sandbox.
+    * `RUN_REQUEST_NOT_HERMETIC`: Use the existing `RunRequest`-generating rule, and do not
+       enable cacheing. Use this if your existing rule is mostly suitable for use in the sandbox,
+       but you cannot guarantee reproducible behavior.
+    * `CUSTOM`: Opt to write your own rule that returns `RunInSandboxRequest`.
+    * `NOT_SUPPORTED`: Opt out of being usable in `experimental_run_in_sandbox`. Attempting to use
+       such a target will result in a runtime exception.
+    """
+
+    RUN_REQUEST_HERMETIC = 1
+    RUN_REQUEST_NOT_HERMETIC = 2
+    CUSTOM = 3
+    NOT_SUPPORTED = 4
+
+
+@union(in_scope_types=[EnvironmentName])
 class RunFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary from a target to run a program/script."""
+
+    supports_debug_adapter: ClassVar[bool] = False
+    run_in_sandbox_behavior: ClassVar[RunInSandboxBehavior]
+
+    @final
+    @classmethod
+    def rules(cls) -> Iterable[Union[Rule, UnionRule]]:
+        yield UnionRule(RunFieldSet, cls)
+        if not cls.supports_debug_adapter:
+            yield from _unsupported_debug_adapter_rules(cls)
+        yield from _run_in_sandbox_behavior_rule(cls)
 
 
 class RestartableField(BoolField):
     alias = "restartable"
     default = False
-    help = softwrap(
+    help = help_text(
         """
         If true, runs of this target with the `run` goal may be interrupted and
         restarted when its input files change.
@@ -48,14 +97,15 @@ class RestartableField(BoolField):
     )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class RunRequest:
     digest: Digest
     # Values in args and in env can contain the format specifier "{chroot}", which will
     # be substituted with the (absolute) chroot path.
     args: Tuple[str, ...]
     extra_env: FrozenDict[str, str]
+    immutable_input_digests: Mapping[str, Digest] | None = None
+    append_only_caches: Mapping[str, str] | None = None
 
     def __init__(
         self,
@@ -63,15 +113,51 @@ class RunRequest:
         digest: Digest,
         args: Iterable[str],
         extra_env: Optional[Mapping[str, str]] = None,
+        immutable_input_digests: Mapping[str, Digest] | None = None,
+        append_only_caches: Mapping[str, str] | None = None,
     ) -> None:
-        self.digest = digest
-        self.args = tuple(args)
-        self.extra_env = FrozenDict(extra_env or {})
+        object.__setattr__(self, "digest", digest)
+        object.__setattr__(self, "args", tuple(args))
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
+        object.__setattr__(
+            self, "immutable_input_digests", FrozenDict(immutable_input_digests or {})
+        )
+        object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches or {}))
+
+    def to_run_in_sandbox_request(self) -> RunInSandboxRequest:
+        return RunInSandboxRequest(
+            args=self.args,
+            digest=self.digest,
+            extra_env=self.extra_env,
+            immutable_input_digests=self.immutable_input_digests,
+            append_only_caches=self.append_only_caches,
+        )
+
+
+class RunDebugAdapterRequest(RunRequest):
+    """Like RunRequest, but launches the process using the relevant Debug Adapter server.
+
+    The process should be launched waiting for the client to connect.
+    """
+
+
+class RunInSandboxRequest(RunRequest):
+    """A run request that launches the process in the sandbox for use as part of a build rule.
+
+    The arguments and environment should only use values relative to the build root (or prefixed
+    with `{chroot}`), or refer to binaries that were fetched with `BinaryPathRequest`.
+
+    Presently, implementors can opt to use the existing as not guaranteeing hermeticity, which will
+    internally mark the rule as uncacheable. In such a case, non-safe APIs can be used, however,
+    this behavior can result in poorer performance, and only exists as a stop-gap while
+    implementors work to make sure their `RunRequest`-generating rules can be used in a hermetic
+    context, or writing new custom rules. (See the Plugin Upgrade Guide for details).
+    """
 
 
 class RunSubsystem(GoalSubsystem):
     name = "run"
-    help = softwrap(
+    help = help_text(
         """
         Runs a binary target.
 
@@ -93,17 +179,16 @@ class RunSubsystem(GoalSubsystem):
         tool_name="the executed target",
         passthrough=True,
     )
-    cleanup = BoolOption(
-        "--cleanup",
-        default=True,
+    # See also `test.py`'s same option
+    debug_adapter = BoolOption(
+        default=False,
         help=softwrap(
             """
-            Whether to clean up the temporary directory in which the binary is chrooted.
-            Set this to false to retain the directory, e.g., for debugging.
+            Run the interactive process using a Debug Adapter
+            (https://microsoft.github.io/debug-adapter-protocol/) for the language if supported.
 
-            Note that setting the global --process-cleanup option to false will also conserve
-            this directory, along with those of all other processes that Pants executes.
-            This option is more selective and controls just the target binary's directory.
+            The interactive process used will be immediately blocked waiting for a client before
+            continuing.
             """
         ),
     )
@@ -111,57 +196,131 @@ class RunSubsystem(GoalSubsystem):
 
 class Run(Goal):
     subsystem_cls = RunSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
+
+
+async def _find_what_to_run(
+    goal_description: str,
+) -> tuple[RunFieldSet, Target]:
+    targets_to_valid_field_sets = await Get(
+        TargetRootsToFieldSets,
+        TargetRootsToFieldSetsRequest(
+            RunFieldSet,
+            goal_description=goal_description,
+            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
+        ),
+    )
+    mapping = targets_to_valid_field_sets.mapping
+
+    if len(mapping) > 1:
+        raise TooManyTargetsException(mapping, goal_description=goal_description)
+
+    target, field_sets = next(iter(mapping.items()))
+    if len(field_sets) > 1:
+        raise AmbiguousImplementationsException(
+            target,
+            field_sets,
+            goal_description=goal_description,
+        )
+
+    return field_sets[0], target
 
 
 @goal_rule
 async def run(
     run_subsystem: RunSubsystem,
+    debug_adapter: DebugAdapterSubsystem,
     global_options: GlobalOptions,
-    workspace: Workspace,
-    build_root: BuildRoot,
-    complete_env: CompleteEnvironment,
+    workspace: Workspace,  # Needed to enable side-effecting.
+    complete_env: CompleteEnvironmentVars,
 ) -> Run:
-    targets_to_valid_field_sets = await Get(
-        TargetRootsToFieldSets,
-        TargetRootsToFieldSetsRequest(
-            RunFieldSet,
-            goal_description="the `run` goal",
-            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
-            expect_single_field_set=True,
+    field_set, target = await _find_what_to_run("the `run` goal")
+
+    await _warn_on_non_local_environments((target,), "the `run` goal")
+
+    request = await (
+        Get(RunRequest, RunFieldSet, field_set)
+        if not run_subsystem.debug_adapter
+        else Get(RunDebugAdapterRequest, RunFieldSet, field_set)
+    )
+    restartable = target.get(RestartableField).value
+    if run_subsystem.debug_adapter:
+        logger.info(
+            softwrap(
+                f"""
+                Launching debug adapter at '{debug_adapter.host}:{debug_adapter.port}',
+                which will wait for a client connection...
+                """
+            )
+        )
+
+    result = await Effect(
+        InteractiveProcessResult,
+        InteractiveProcess(
+            argv=(*request.args, *run_subsystem.args),
+            env={**complete_env, **request.extra_env},
+            input_digest=request.digest,
+            run_in_workspace=True,
+            restartable=restartable,
+            keep_sandboxes=global_options.keep_sandboxes,
+            immutable_input_digests=request.immutable_input_digests,
+            append_only_caches=request.append_only_caches,
         ),
     )
-    field_set = targets_to_valid_field_sets.field_sets[0]
-    request = await Get(RunRequest, RunFieldSet, field_set)
-    wrapped_target = await Get(WrappedTarget, Address, field_set.address)
-    restartable = wrapped_target.target.get(RestartableField).value
-    # Cleanup is the default, so we want to preserve the chroot if either option is off.
-    cleanup = run_subsystem.cleanup and global_options.process_cleanup
 
-    with temporary_dir(root_dir=global_options.pants_workdir, cleanup=cleanup) as tmpdir:
-        if not cleanup:
-            logger.info(f"Preserving running binary chroot {tmpdir}")
-        workspace.write_digest(
-            request.digest,
-            path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
-            # We don't want to influence whether the InteractiveProcess is able to restart. Because
-            # we're writing into a temp directory, we can safely mark this side_effecting=False.
-            side_effecting=False,
+    return Run(result.exit_code)
+
+
+@memoized
+def _unsupported_debug_adapter_rules(cls: type[RunFieldSet]) -> Iterable:
+    """Returns a rule that implements DebugAdapterRequest by raising an error."""
+
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
+    async def get_run_debug_adapter_request(request: RunFieldSet) -> RunDebugAdapterRequest:
+        raise NotImplementedError(
+            "Running this target type with a debug adapter is not yet supported."
         )
 
-        args = (arg.format(chroot=tmpdir) for arg in request.args)
-        env = {**complete_env, **{k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}}
-        result = await Effect(
-            InteractiveProcessResult,
-            InteractiveProcess(
-                argv=(*args, *run_subsystem.args),
-                env=env,
-                run_in_workspace=True,
-                restartable=restartable,
-            ),
-        )
-        exit_code = result.exit_code
+    return collect_rules(locals())
 
-    return Run(exit_code)
+
+async def _run_request(request: RunFieldSet) -> RunInSandboxRequest:
+    run_request = await Get(RunRequest, RunFieldSet, request)
+    return run_request.to_run_in_sandbox_request()
+
+
+@memoized
+def _run_in_sandbox_behavior_rule(cls: type[RunFieldSet]) -> Iterable:
+    """Returns a default rule that helps fulfil `experimental_run_in_sandbox` targets.
+
+    If `RunInSandboxBehavior.CUSTOM` is specified, rule implementors must write a rule that returns
+    a `RunInSandboxRequest`.
+    """
+
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
+    async def not_supported(request: RunFieldSet) -> RunInSandboxRequest:
+        raise NotImplementedError(
+            "Running this target type within the sandbox is not yet supported."
+        )
+
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
+    async def run_request_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
+        return await _run_request(request)
+
+    @_uncacheable_rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
+    async def run_request_not_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
+        return await _run_request(request)
+
+    default_rules: dict[RunInSandboxBehavior, list[Any]] = {
+        RunInSandboxBehavior.NOT_SUPPORTED: [not_supported],
+        RunInSandboxBehavior.RUN_REQUEST_HERMETIC: [run_request_hermetic],
+        RunInSandboxBehavior.RUN_REQUEST_NOT_HERMETIC: [run_request_not_hermetic],
+        RunInSandboxBehavior.CUSTOM: [],
+    }
+
+    return collect_rules(
+        {_rule.__name__: _rule for _rule in default_rules[cls.run_in_sandbox_behavior]}
+    )
 
 
 def rules():

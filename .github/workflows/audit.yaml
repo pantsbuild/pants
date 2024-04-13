@@ -1,42 +1,25 @@
 # GENERATED, DO NOT EDIT!
-# To change, edit `build-support/bin/generate_github_workflows.py` and run:
-#   ./pants run build-support/bin/generate_github_workflows.py
+# To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
+#   ./pants run src/python/pants_release/generate_github_workflows.py
 
 
 jobs:
   audit:
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+    if: github.repository_owner == 'pantsbuild'
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - name: Cargo audit (for security vulnerabilities)
-      run: './cargo install --version 0.16.0 cargo-audit
+      run: './cargo install --version 0.17.5 cargo-audit
 
-        ./cargo audit
+        ./cargo audit --ignore RUSTSEC-2020-0128
 
         '
 name: Cargo Audit
 'on':
   schedule:
   - cron: 11 8 * * *
+  workflow_dispatch: null

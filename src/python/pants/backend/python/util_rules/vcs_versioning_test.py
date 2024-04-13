@@ -19,15 +19,15 @@ from pants.engine.fs import DigestContents
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_open
 from pants.vcs import git
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
         rules=[
             *vcs_versioning.rules(),
             *setuptools_scm.rules(),
@@ -64,7 +64,7 @@ def rule_runner() -> RuleRunner:
     ),
 )
 def test_vcs_versioning(
-    tag_regex, tag, expected_version, tmp_path: Path, rule_runner: RuleRunner
+    tag_regex, tag, expected_version, tmp_path: Path, rule_runner: PythonRuleRunner
 ) -> None:
     worktree = tmp_path / "worktree"
     gitdir = worktree / ".git"
@@ -93,7 +93,7 @@ def test_vcs_versioning(
         GIT_WORK_TREE=str(worktree),
         GIT_CONFIG_GLOBAL="/dev/null",
     ):
-        subprocess.check_call(["git", "init", "--initial-branch=main"])
+        subprocess.check_call(["git", "init"])
         subprocess.check_call(["git", "config", "user.email", "you@example.com"])
         subprocess.check_call(["git", "config", "user.name", "Your Name"])
         subprocess.check_call(["git", "add", "."])

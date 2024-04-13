@@ -6,25 +6,24 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, Tuple
 
+from pants.core.util_rules.environments import ChosenLocalEnvironmentName, EnvironmentName
 from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess
-from pants.engine.rules import Get, collect_rules, rule
-from pants.util.meta import frozen_after_init
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 
 logger = logging.getLogger(__name__)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class OpenFilesRequest:
     files: Tuple[PurePath, ...]
     error_if_open_not_found: bool
 
     def __init__(self, files: Iterable[PurePath], *, error_if_open_not_found: bool = True) -> None:
-        self.files = tuple(files)
-        self.error_if_open_not_found = error_if_open_not_found
+        object.__setattr__(self, "files", tuple(files))
+        object.__setattr__(self, "error_if_open_not_found", error_if_open_not_found)
 
 
 @dataclass(frozen=True)
@@ -35,13 +34,21 @@ class OpenFiles:
 @rule
 async def find_open_program(
     request: OpenFilesRequest,
-    plat: Platform,
-    complete_env: CompleteEnvironment,
+    local_environment_name: ChosenLocalEnvironmentName,
 ) -> OpenFiles:
+    plat, complete_env = await MultiGet(
+        Get(Platform, EnvironmentName, local_environment_name.val),
+        Get(CompleteEnvironmentVars, EnvironmentName, local_environment_name.val),
+    )
     open_program_name = "open" if plat.is_macos else "xdg-open"
     open_program_paths = await Get(
         BinaryPaths,
-        BinaryPathRequest(binary_name=open_program_name, search_path=("/bin", "/usr/bin")),
+        {
+            BinaryPathRequest(
+                binary_name=open_program_name, search_path=("/bin", "/usr/bin")
+            ): BinaryPathRequest,
+            local_environment_name.val: EnvironmentName,
+        },
     )
     if not open_program_paths.first_path:
         error = (

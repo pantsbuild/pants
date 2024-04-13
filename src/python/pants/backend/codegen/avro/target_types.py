@@ -17,11 +17,9 @@ from pants.engine.target import (
 )
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
-# NB: We subclass Dependencies so that specific backends can add dependency injection rules to
-# `avro_source` targets.
 class AvroDependenciesField(Dependencies):
     pass
 
@@ -51,7 +49,7 @@ class AvroSourceTarget(Target):
         AvroDependenciesField,
         AvroSourceField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A single Avro file used to generate various languages.
 

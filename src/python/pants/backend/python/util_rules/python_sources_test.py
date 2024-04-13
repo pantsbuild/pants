@@ -34,9 +34,13 @@ class PythonTarget(Target):
     core_fields = (PythonSourceField,)
 
 
+class NonPythonSourceField(SingleSourceField):
+    pass
+
+
 class NonPythonTarget(Target):
     alias = "non_python_target"
-    core_fields = (SingleSourceField,)
+    core_fields = (NonPythonSourceField,)
 
 
 @pytest.fixture

@@ -6,11 +6,13 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.base.build_root import BuildRoot
-from pants.engine.addresses import Address, Addresses, BuildFileAddress
+from pants.build_graph.address import BuildFileAddressRequest
+from pants.engine.addresses import Addresses, BuildFileAddress
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
+    AlwaysTraverseDeps,
     HydratedSources,
     HydrateSourcesRequest,
     SourcesField,
@@ -28,7 +30,6 @@ class FiledepsSubsystem(LineOriented, GoalSubsystem):
     help = "List all source and BUILD files a target depends on."
 
     absolute = BoolOption(
-        "--absolute",
         default=False,
         help=softwrap(
             """
@@ -38,7 +39,6 @@ class FiledepsSubsystem(LineOriented, GoalSubsystem):
         ),
     )
     globs = BoolOption(
-        "--globs",
         default=False,
         help=softwrap(
             """
@@ -48,7 +48,6 @@ class FiledepsSubsystem(LineOriented, GoalSubsystem):
         ),
     )
     transitive = BoolOption(
-        "--transitive",
         default=False,
         help=softwrap(
             """
@@ -61,6 +60,7 @@ class FiledepsSubsystem(LineOriented, GoalSubsystem):
 
 class Filedeps(Goal):
     subsystem_cls = FiledepsSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
@@ -73,7 +73,10 @@ async def file_deps(
     targets: Iterable[Target]
     if filedeps_subsystem.transitive:
         transitive_targets = await Get(
-            TransitiveTargets, TransitiveTargetsRequest(addresses, include_special_cased_deps=True)
+            TransitiveTargets,
+            TransitiveTargetsRequest(
+                addresses, should_traverse_deps_predicate=AlwaysTraverseDeps()
+            ),
         )
         targets = transitive_targets.closure
     else:
@@ -81,7 +84,11 @@ async def file_deps(
         targets = await Get(UnexpandedTargets, Addresses, addresses)
 
     build_file_addresses = await MultiGet(
-        Get(BuildFileAddress, Address, tgt.address) for tgt in targets
+        Get(
+            BuildFileAddress,
+            BuildFileAddressRequest(tgt.address, description_of_origin="CLI arguments"),
+        )
+        for tgt in targets
     )
     unique_rel_paths = {bfa.rel_path for bfa in build_file_addresses}
 

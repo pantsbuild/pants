@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Iterable, cast
+from typing import Any, Iterable, cast
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import (
@@ -17,6 +17,7 @@ from pants.backend.helm.target_types import (
 )
 from pants.backend.helm.util_rules.chart_metadata import rules as metadata_rules
 from pants.engine.addresses import Address
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target
 from pants.util.frozendict import FrozenDict
@@ -41,8 +42,9 @@ class DuplicateHelmChartNamesFound(Exception):
 
 class HelmArtifactLocationSpec(ABC):
     @property
+    @abstractmethod
     def spec(self) -> str:
-        pass
+        ...
 
     @property
     def is_url(self) -> bool:
@@ -120,7 +122,7 @@ class HelmArtifact:
 
 
 @dataclass(frozen=True)
-class ResolvedHelmArtifact(HelmArtifact):
+class ResolvedHelmArtifact(HelmArtifact, EngineAwareReturnType):
     location_url: str
 
     @classmethod
@@ -135,10 +137,21 @@ class ResolvedHelmArtifact(HelmArtifact):
     def chart_url(self) -> str:
         return f"{self.location_url}/{self.name}"
 
+    def metadata(self) -> dict[str, Any] | None:
+        return {
+            "name": self.requirement.name,
+            "version": self.requirement.version,
+            "location": self.requirement.location.spec,
+            "address": self.address.spec,
+            "url": self.chart_url,
+        }
+
 
 @rule
-def resolved_helm_artifact(artifact: HelmArtifact, subsytem: HelmSubsystem) -> ResolvedHelmArtifact:
-    remotes = subsytem.remotes()
+def resolved_helm_artifact(
+    artifact: HelmArtifact, subsystem: HelmSubsystem
+) -> ResolvedHelmArtifact:
+    remotes = subsystem.remotes()
 
     candidate_remotes = list(remotes.get(artifact.requirement.location.spec))
     if candidate_remotes:

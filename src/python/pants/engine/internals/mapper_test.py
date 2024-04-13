@@ -3,13 +3,18 @@
 
 from __future__ import annotations
 
+import functools
 from textwrap import dedent
 
 import pytest
 
 from pants.backend.project_info.filter_targets import FilterSubsystem, TargetGranularity
+from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.target_types import GenericTarget
+from pants.engine.env_vars import EnvironmentVars
+from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.mapper import (
     AddressFamily,
     AddressMap,
@@ -17,17 +22,38 @@ from pants.engine.internals.mapper import (
     DuplicateNameError,
     SpecsFilter,
 )
-from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
-from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, _UnrecognizedSymbol
+from pants.engine.internals.target_adaptor import TargetAdaptor as _TargetAdaptor
 from pants.engine.target import RegisteredTargetTypes, Tags, Target
+from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
 from pants.util.frozendict import FrozenDict
 
+TargetAdaptor = functools.partial(_TargetAdaptor, __description_of_origin__="BUILD")
 
-def parse_address_map(build_file: str) -> AddressMap:
+
+def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = False) -> AddressMap:
     path = "/dev/null"
-    parser = Parser(build_root="", target_type_aliases=["thing"], object_aliases=BuildFileAliases())
-    address_map = AddressMap.parse(path, build_file, parser, BuildFilePreludeSymbols(FrozenDict()))
+    parser = Parser(
+        build_root="",
+        registered_target_types=RegisteredTargetTypes({"thing": GenericTarget}),
+        union_membership=UnionMembership({}),
+        object_aliases=BuildFileAliases(),
+        ignore_unrecognized_symbols=ignore_unrecognized_symbols,
+    )
+    address_map = AddressMap.parse(
+        path,
+        build_file,
+        parser,
+        BuildFilePreludeSymbols(FrozenDict(), ()),
+        EnvironmentVars({}),
+        False,
+        BuildFileDefaultsParserState.create(
+            "", BuildFileDefaults({}), RegisteredTargetTypes({}), UnionMembership({})
+        ),
+        dependents_rules=None,
+        dependencies_rules=None,
+    )
     assert path == address_map.path
     return address_map
 
@@ -52,6 +78,32 @@ def test_address_map_parse() -> None:
         "one": TargetAdaptor(type_alias="thing", name="one", age=42),
         "two": TargetAdaptor(type_alias="thing", name="two", age=37),
     } == address_map.name_to_target_adaptor
+
+
+def test_address_map_unrecognized_symbol() -> None:
+    build_file = dedent(
+        """
+        thing(name="one")
+        thing(name="bad", age=fake)
+        thing(name="two")
+        another_fake()
+        yet_another()
+        thing(name="three")
+        and_finally(age=fakey)
+        """
+    )
+    address_map = parse_address_map(build_file, ignore_unrecognized_symbols=True)
+    assert {
+        "one": TargetAdaptor(type_alias="thing", name="one"),
+        "bad": TargetAdaptor(type_alias="thing", name="bad", age=_UnrecognizedSymbol("fake")),
+        "two": TargetAdaptor(type_alias="thing", name="two"),
+        "three": TargetAdaptor(
+            type_alias="thing",
+            name="three",
+        ),
+    } == address_map.name_to_target_adaptor
+    with pytest.raises(MappingError):
+        parse_address_map(build_file, ignore_unrecognized_symbols=False)
 
 
 def test_address_map_duplicate_names() -> None:
@@ -151,7 +203,6 @@ def test_specs_filter() -> None:
         ),
         RegisteredTargetTypes({"tgt1": MockTgt1, "tgt2": MockTgt2}),
         tags=["-a", "+b"],
-        exclude_target_regexps=["skip-me"],
     )
 
     def make_tgt1(name: str, tags: list[str] | None = None) -> MockTgt1:
@@ -161,9 +212,7 @@ def test_specs_filter() -> None:
         return MockTgt2({Tags.alias: tags}, Address("", target_name=name))
 
     untagged_tgt = make_tgt1(name="untagged")
-    b_tagged_tgt = make_tgt1(name="b-tagged", tags=["b"])
-    b_tagged_exclude_regex_tgt = make_tgt1(name="skip-me", tags=["b"])
-    a_and_b_tagged_tgt = make_tgt1(name="a-and-b-tagged", tags=["a", "b"])
+    tagged_tgt = make_tgt1(name="tagged", tags=["b"])
 
     # Even though this has the tag `b`, it should be excluded because the target type.
     tgt2 = make_tgt2("tgt2", tags=["b"])
@@ -171,6 +220,6 @@ def test_specs_filter() -> None:
     def matches(tgt: Target) -> bool:
         return specs_filter.matches(tgt)
 
-    assert matches(b_tagged_tgt) is True
-    for t in (untagged_tgt, b_tagged_exclude_regex_tgt, a_and_b_tagged_tgt, tgt2):
-        assert matches(t) is False
+    assert matches(tagged_tgt) is True
+    assert matches(untagged_tgt) is False
+    assert matches(tgt2) is False

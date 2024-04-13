@@ -7,19 +7,29 @@ import logging
 import os
 from abc import ABCMeta
 from dataclasses import dataclass
+from typing import Iterable
 
+from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.engine.addresses import Address
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     AllTargets,
     AsyncFieldMixin,
+    Dependencies,
+    DepsTraversalBehavior,
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
+    ShouldTraverseDepsPredicate,
+    SpecialCasedDependencies,
     StringField,
+    Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
@@ -27,12 +37,13 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, union
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
+from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import help_text
 
 logger = logging.getLogger(__name__)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class PackageFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to build an asset from a target."""
 
@@ -56,7 +67,7 @@ class BuiltPackage:
 
 class OutputPathField(StringField, AsyncFieldMixin):
     alias = "output_path"
-    help = softwrap(
+    help = help_text(
         f"""
         Where the built asset should be located.
 
@@ -72,17 +83,40 @@ class OutputPathField(StringField, AsyncFieldMixin):
     def value_or_default(self, *, file_ending: str | None) -> str:
         if self.value:
             return self.value
-        file_prefix = (
+        target_name_part = (
             self.address.generated_name.replace(".", "_")
             if self.address.generated_name
             else self.address.target_name
         )
+        params_sanitized = self.address.parameters_repr.replace(".", "_")
+        file_prefix = f"{target_name_part}{params_sanitized}"
+
         if file_ending is None:
             file_name = file_prefix
         else:
             assert not file_ending.startswith("."), "`file_ending` should not start with `.`"
             file_name = f"{file_prefix}.{file_ending}"
         return os.path.join(self.address.spec_path.replace(os.sep, "."), file_name)
+
+
+@dataclass(frozen=True)
+class EnvironmentAwarePackageRequest:
+    """Request class to request a `BuiltPackage` in an environment-aware fashion."""
+
+    field_set: PackageFieldSet
+
+
+@rule
+async def environment_aware_package(request: EnvironmentAwarePackageRequest) -> BuiltPackage:
+    environment_name = await Get(
+        EnvironmentName,
+        EnvironmentNameRequest,
+        EnvironmentNameRequest.from_field_set(request.field_set),
+    )
+    package = await Get(
+        BuiltPackage, {request.field_set: PackageFieldSet, environment_name: EnvironmentName}
+    )
+    return package
 
 
 class PackageSubsystem(GoalSubsystem):
@@ -96,6 +130,7 @@ class PackageSubsystem(GoalSubsystem):
 
 class Package(Goal):
     subsystem_cls = PackageSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
 
 class AllPackageableTargets(Targets):
@@ -128,11 +163,18 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
         return Package(exit_code=0)
 
     packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set)
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
         for field_set in target_roots_to_field_sets.field_sets
     )
+
     merged_digest = await Get(Digest, MergeDigests(pkg.digest for pkg in packages))
-    workspace.write_digest(merged_digest, path_prefix=str(dist_dir.relpath))
+    all_relpaths = [
+        artifact.relpath for pkg in packages for artifact in pkg.artifacts if artifact.relpath
+    ]
+
+    workspace.write_digest(
+        merged_digest, path_prefix=str(dist_dir.relpath), clear_paths=all_relpaths
+    )
     for pkg in packages:
         for artifact in pkg.artifacts:
             msg = []
@@ -144,5 +186,47 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
     return Package(exit_code=0)
 
 
+@dataclass(frozen=True)
+class TraverseIfNotPackageTarget(ShouldTraverseDepsPredicate):
+    """This predicate stops dep traversal after package targets.
+
+    When traversing deps, such as when collecting a list of transitive deps,
+    this predicate effectively turns any package targets into graph leaf nodes.
+    The package targets are included, but the deps of package targets are not.
+
+    Also, this excludes dependencies from any SpecialCasedDependencies fields,
+    which mirrors the behavior of the default predicate: TraverseIfDependenciesField.
+    """
+
+    package_field_set_types: FrozenOrderedSet[PackageFieldSet]
+    roots: FrozenOrderedSet[Address]
+    always_traverse_roots: bool  # traverse roots even if they are package targets
+
+    def __init__(
+        self,
+        *,
+        union_membership: UnionMembership,
+        roots: Iterable[Address],
+        always_traverse_roots: bool = True,
+    ) -> None:
+        object.__setattr__(self, "package_field_set_types", union_membership.get(PackageFieldSet))
+        object.__setattr__(self, "roots", FrozenOrderedSet(roots))
+        object.__setattr__(self, "always_traverse_roots", always_traverse_roots)
+        super().__init__()
+
+    def __call__(
+        self, target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> DepsTraversalBehavior:
+        if isinstance(field, SpecialCasedDependencies):
+            return DepsTraversalBehavior.EXCLUDE
+        if self.always_traverse_roots and target.address in self.roots:
+            return DepsTraversalBehavior.INCLUDE
+        if any(
+            field_set_type.is_applicable(target) for field_set_type in self.package_field_set_types
+        ):
+            return DepsTraversalBehavior.EXCLUDE
+        return DepsTraversalBehavior.INCLUDE
+
+
 def rules():
-    return collect_rules()
+    return (*collect_rules(), *distdir.rules())

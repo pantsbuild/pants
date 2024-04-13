@@ -47,8 +47,8 @@ def assert_deps_parsed(
     rule_runner: RuleRunner,
     content: str,
     *,
-    expected_imports: dict[str, ImpInfo] = {},
-    expected_assets: list[str] = [],
+    expected_imports: dict[str, ImpInfo] | None = None,
+    expected_assets: list[str] | None = None,
     filename: str = "project/foo.py",
     constraints: str = ">=3.6",
     string_imports: bool = True,
@@ -56,7 +56,18 @@ def assert_deps_parsed(
     assets: bool = True,
     assets_min_slashes: int = 1,
 ) -> None:
-    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    expected_imports = expected_imports or {}
+    expected_assets = expected_assets or []
+    rule_runner.set_options(
+        [
+            f"--python-infer-string-imports={string_imports}",
+            f"--python-infer-string-imports-min-dots={string_imports_min_dots}",
+            f"--python-infer-assets={assets}",
+            f"--python-infer-assets-min-slashes={assets_min_slashes}",
+            "--python-infer-use-rust-parser",
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
     rule_runner.write_files(
         {
             "BUILD": f"python_source(name='t', source={repr(filename)})",
@@ -70,10 +81,6 @@ def assert_deps_parsed(
             ParsePythonDependenciesRequest(
                 tgt[PythonSourceField],
                 InterpreterConstraints([constraints]),
-                string_imports=string_imports,
-                string_imports_min_dots=string_imports_min_dots,
-                assets=assets,
-                assets_min_slashes=assets_min_slashes,
             )
         ],
     )
@@ -103,11 +110,11 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             ignored1 as alias1,  # pants: no-infer-dep
             ignored2 as \\
                 alias2,  # pants: no-infer-dep
-            ignored3 as  # pants: no-infer-dep
-                alias3,
-            ignored4 as alias4, ignored4,  # pants: no-infer-dep
-            not_ignored2, \\
-            not_ignored3
+            ignored3 as
+                alias3,  # pants: no-infer-dep
+            not_ignored2 as alias4, ignored3,  # pants: no-infer-dep
+            not_ignored3, \\
+            not_ignored4
         )
         from multiline_import2 import (ignored1,  # pants: no-infer-dep
             not_ignored)
@@ -120,7 +127,6 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
         rule_runner,
         content,
         expected_imports={
-            "__future__.print_function": ImpInfo(lineno=1, weak=False),
             "os": ImpInfo(lineno=3, weak=False),
             "os.path": ImpInfo(lineno=5, weak=False),
             "typing.TYPE_CHECKING": ImpInfo(lineno=6, weak=False),
@@ -129,8 +135,9 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             "project.demo.Demo": ImpInfo(lineno=11, weak=False),
             "project.demo.OriginalName": ImpInfo(lineno=12, weak=False),
             "multiline_import1.not_ignored1": ImpInfo(lineno=16, weak=False),
-            "multiline_import1.not_ignored2": ImpInfo(lineno=23, weak=False),
-            "multiline_import1.not_ignored3": ImpInfo(lineno=24, weak=False),
+            "multiline_import1.not_ignored2": ImpInfo(lineno=22, weak=False),
+            "multiline_import1.not_ignored3": ImpInfo(lineno=23, weak=False),
+            "multiline_import1.not_ignored4": ImpInfo(lineno=24, weak=False),
             "multiline_import2.not_ignored": ImpInfo(lineno=27, weak=False),
             "project.circular_dep.CircularDep": ImpInfo(lineno=30, weak=False),
         },
@@ -143,16 +150,16 @@ def test_dunder_import_call(rule_runner: RuleRunner) -> None:
         __import__("pkg_resources")
         __import__("dunder_import_ignored")  # pants: no-infer-dep
         __import__(  # pants: no-infer-dep
-            "not_ignored_but_looks_like_it_could_be"
+            "ignored"
         )
         __import__(
-            "ignored"  # pants: no-infer-dep
+            "also_ignored"  # pants: no-infer-dep
         )
         __import__(
-            "also_not_ignored_but_looks_like_it_could_be"
+            "also_also_ignored"
         )  # pants: no-infer-dep
         __import__(
-            "ignored_too" \\
+            "not_ignored" \\
             # pants: no-infer-dep
         )
         __import__(
@@ -165,8 +172,7 @@ def test_dunder_import_call(rule_runner: RuleRunner) -> None:
         content,
         expected_imports={
             "pkg_resources": ImpInfo(lineno=1, weak=False),
-            "not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=4, weak=False),
-            "also_not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=10, weak=False),
+            "not_ignored": ImpInfo(lineno=13, weak=False),
         },
     )
 
@@ -275,6 +281,29 @@ def test_relative_imports(rule_runner: RuleRunner, basename: str) -> None:
     )
 
 
+def test_issue_18958(rule_runner: RuleRunner) -> None:
+    content = dedent(
+        """\
+        try:
+            # uh oh
+            from one import thing, other_thing
+        except ImportError:
+            from .one import thing, other_thing
+        """
+    )
+    assert_deps_parsed(
+        rule_runner,
+        content,
+        filename="a/b/c/d.py",
+        expected_imports={
+            "one.thing": ImpInfo(lineno=3, weak=True),
+            "one.other_thing": ImpInfo(lineno=3, weak=True),
+            "a.b.c.one.thing": ImpInfo(lineno=5, weak=False),
+            "a.b.c.one.other_thing": ImpInfo(lineno=5, weak=False),
+        },
+    )
+
+
 @pytest.mark.parametrize("min_dots", [1, 2, 3, 4])
 def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
     content = dedent(
@@ -293,15 +322,31 @@ def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
             'a.b2.c.D',
             'a.b.c_狗',
 
-            # Definitely invalid strings
+            # Invalid module names are no longer permitted
+            '.',
+            '..',
+            'a.b.',
             '..a.b.c.d',
-            'a.B.d',
             'a.2b.d',
             'a..b..c',
             'a.b.c.d.2Bar',
-            'a.b_c.D.bar',
-            'a.b_c.D.Bar',
             'a.2b.c.D',
+            'a.b.c_狗.',
+
+            # Explicitly ignored strings
+            'w.x',  # pants: no-infer-dep
+            'w.x.Foo',  # pants: no-infer-dep
+            'w.x.y.z',  # pants: no-infer-dep
+            'w.x.y.z.Foo',  # pants: no-infer-dep
+            'w.x.y.z.FooBar',  # pants: no-infer-dep
+            'u.v.w.x.y.z.Baz',  # pants: no-infer-dep
+
+            # Definitely invalid strings
+            'I/have/a/slash',
+            'I\\\\have\\\\backslashes',
+            'I have whitespace',
+            '\\ttabby',
+            '\\nnewliney',
         ]
 
         for module in modules:
@@ -325,9 +370,15 @@ def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
     expected = {sym: info for sym, info in potentially_valid.items() if sym.count(".") >= min_dots}
 
     assert_deps_parsed(
-        rule_runner, content, expected_imports=expected, string_imports_min_dots=min_dots
+        rule_runner,
+        content,
+        expected_imports=expected,
+        string_imports_min_dots=min_dots,
+        assets=False,
     )
-    assert_deps_parsed(rule_runner, content, string_imports=False, expected_imports={})
+    assert_deps_parsed(
+        rule_runner, content, string_imports=False, expected_imports={}, assets=False
+    )
 
 
 def test_real_import_beats_string_import(rule_runner: RuleRunner) -> None:
@@ -349,6 +400,34 @@ def test_real_import_beats_tryexcept_import(rule_runner: RuleRunner) -> None:
             """
         ),
         expected_imports={"one.two.three": ImpInfo(lineno=1, weak=False)},
+    )
+
+
+def test_issue_17283(rule_runner: RuleRunner) -> None:
+    assert_deps_parsed(
+        rule_runner,
+        dedent(
+            """\
+                import foo
+
+                from one.two import (
+
+                  three,
+
+                  four,  # pants: no-infer-dep
+
+                  five,
+                )
+
+                from bar import baz
+            """
+        ),
+        expected_imports={
+            "foo": ImpInfo(lineno=1, weak=False),
+            "one.two.three": ImpInfo(lineno=5, weak=False),
+            "one.two.five": ImpInfo(lineno=9, weak=False),
+            "bar.baz": ImpInfo(lineno=12, weak=False),
+        },
     )
 
 
@@ -467,6 +546,7 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
             "treat.as.a.regular.import.not.a.string.import": ImpInfo(lineno=11, weak=False),
             "dep.from.str": ImpInfo(lineno=13, weak=True),
         },
+        expected_assets=["/dev/null"],
     )
 
 
@@ -484,6 +564,9 @@ def test_assets(rule_runner: RuleRunner, min_slashes: int) -> None:
             'data/subdir1/subdir2/a.json',
             'data/subdir1/subdir2/subdir3/a.json',
             '狗/狗.狗',
+            'data/a.b/c.d',
+            'data/extensionless',
+            'a/........',
 
             # Looks weird, but Unix and pathlib treat repeated "/" as one slash.
             # Our parsing, however considers this as multiple slashes.
@@ -492,13 +575,12 @@ def test_assets(rule_runner: RuleRunner, min_slashes: int) -> None:
 
             # Probably invalid assets.
             'noslashes',
-            'data/database',  # Unfortunately, extenionless files don't get matched.
 
             # Definitely invalid assets.
-            'a/........',
+            'I have whitespace',
+            '\\ttabby\\ttabby',
             '\\n/foo.json',
-            'data/a.b/c.d',
-            'windows\\style.txt',
+            'windows\\\\style.txt',
         ]
         """
     )
@@ -512,6 +594,9 @@ def test_assets(rule_runner: RuleRunner, min_slashes: int) -> None:
         "data/subdir1/subdir2/a.json",
         "data/subdir1/subdir2/subdir3/a.json",
         "狗/狗.狗",
+        "data/a.b/c.d",
+        "data/extensionless",
+        "a/........",
         "//foo.bar",
         "//foo/////bar.txt",
     }

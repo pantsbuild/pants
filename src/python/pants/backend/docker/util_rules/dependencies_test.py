@@ -8,10 +8,10 @@ import pytest
 from pants.backend.docker.goals import package_image
 from pants.backend.docker.subsystems import dockerfile_parser
 from pants.backend.docker.target_types import DockerImageDependenciesField, DockerImageTarget
-from pants.backend.docker.util_rules import dockerfile
+from pants.backend.docker.util_rules import docker_build_args, dockerfile
 from pants.backend.docker.util_rules.dependencies import (
-    InjectDockerDependencies,
-    inject_docker_dependencies,
+    InferDockerDependencies,
+    infer_docker_dependencies,
 )
 from pants.backend.go.goals import package_binary as package_go_binary
 from pants.backend.go.target_types import GoBinaryTarget
@@ -21,7 +21,7 @@ from pants.backend.python.target_types import PexBinariesGeneratorTarget, PexBin
 from pants.backend.python.util_rules import pex
 from pants.core.goals import package
 from pants.engine.addresses import Address
-from pants.engine.target import GenerateTargetsRequest, InjectedDependencies
+from pants.engine.target import GenerateTargetsRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -32,15 +32,16 @@ def rule_runner() -> RuleRunner:
         rules=[
             *dockerfile.rules(),
             *dockerfile_parser.rules(),
+            *docker_build_args.rules(),
             package.find_all_packageable_targets,
             *package_image.rules(),
             *package_pex_binary.rules(),
             *package_go_binary.rules(),
             *pex.rules(),
-            inject_docker_dependencies,
+            infer_docker_dependencies,
             py_target_types_rules.generate_targets_from_pex_binaries,
             UnionRule(GenerateTargetsRequest, py_target_types_rules.GenerateTargetsFromPexBinaries),
-            QueryRule(InjectedDependencies, (InjectDockerDependencies,)),
+            QueryRule(InferredDependencies, (InferDockerDependencies,)),
         ],
         target_types=[
             DockerImageTarget,
@@ -90,7 +91,7 @@ def rule_runner() -> RuleRunner:
         ),
     ],
 )
-def test_inject_docker_dependencies(files, rule_runner: RuleRunner) -> None:
+def test_infer_docker_dependencies(files, rule_runner: RuleRunner) -> None:
     dockerfile_content = dedent(
         """\
             ARG BASE_IMAGE=:base
@@ -123,11 +124,11 @@ def test_inject_docker_dependencies(files, rule_runner: RuleRunner) -> None:
     )
 
     tgt = rule_runner.get_target(Address("project/image/test", target_name="image"))
-    injected = rule_runner.request(
-        InjectedDependencies,
-        [InjectDockerDependencies(tgt[DockerImageDependenciesField])],
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferDockerDependencies(tgt[DockerImageDependenciesField])],
     )
-    assert injected == InjectedDependencies(
+    assert inferred == InferredDependencies(
         [
             Address("project/image/test", target_name="base"),
             Address("project/hello/main/py", target_name="main_binary"),
@@ -135,3 +136,40 @@ def test_inject_docker_dependencies(files, rule_runner: RuleRunner) -> None:
             Address("project/hello/main/go", target_name="go_bin"),
         ]
     )
+
+
+def test_does_not_infer_dependency_when_docker_build_arg_overwrites(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/upstream/BUILD": dedent(
+                """\
+                docker_image(
+                  name="image",
+                  repository="upstream/{name}",
+                  image_tags=["1.0"],
+                  instructions=["FROM alpine:3.16.1"],
+                )
+                """
+            ),
+            "src/downstream/BUILD": "docker_image(name='image')",
+            "src/downstream/Dockerfile": dedent(
+                """\
+                ARG BASE_IMAGE=src/upstream:image
+                FROM $BASE_IMAGE
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/downstream", target_name="image"))
+    rule_runner.set_options(
+        ["--docker-build-args=BASE_IMAGE=alpine:3.17.0"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferDockerDependencies(tgt[DockerImageDependenciesField])],
+    )
+    assert inferred == InferredDependencies([])

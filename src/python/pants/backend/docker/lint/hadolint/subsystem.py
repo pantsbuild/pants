@@ -14,12 +14,12 @@ class Hadolint(TemplatedExternalTool):
     name = "Hadolint"
     help = "A linter for Dockerfiles."
 
-    default_version = "v2.10.0"
+    default_version = "v2.12.1-beta"
     default_known_versions = [
-        "v2.10.0|macos_x86_64|59f0523069a857ae918b8ac0774230013f7bcc00c1ea28119c2311353120867a|2514960",
-        "v2.10.0|macos_arm64 |59f0523069a857ae918b8ac0774230013f7bcc00c1ea28119c2311353120867a|2514960",  # same as mac x86
-        "v2.10.0|linux_x86_64|8ee6ff537341681f9e91bae2d5da451b15c575691e33980893732d866d3cefc4|2301804",
-        "v2.10.0|linux_arm64 |b53d5ab10707a585c9e72375d51b7357522300b5329cfa3f91e482687176e128|27954520",
+        "v2.12.1-beta|macos_x86_64 |911008b09e88b9ce62dbd12345af8f4c933370ebcfb01211d934f1e0a4d9aecc|19743768",
+        "v2.12.1-beta|macos_arm64 |911008b09e88b9ce62dbd12345af8f4c933370ebcfb01211d934f1e0a4d9aecc|19743768",  # same as mac x86
+        "v2.12.1-beta|linux_x86_64|d0779284293475905cfa4b3a7b5c433eca6d731e45b5df0e157f46b4e6311888|2426420",
+        "v2.12.1-beta|linux_arm64 |5997119de9b8332a003be938baff3ebd2ff17dfb62e2bceccd59bd9c112599ce|24002600",
     ]
     default_url_template = (
         "https://github.com/hadolint/hadolint/releases/download/{version}/hadolint-{platform}"
@@ -34,7 +34,6 @@ class Hadolint(TemplatedExternalTool):
     skip = SkipOption("lint")
     args = ArgsListOption(example="--format json")
     config = FileOption(
-        "--config",
         default=None,
         advanced=True,
         help=lambda cls: softwrap(
@@ -48,7 +47,6 @@ class Hadolint(TemplatedExternalTool):
         ),
     )
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=lambda cls: softwrap(

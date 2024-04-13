@@ -22,6 +22,7 @@ def known_scope_infos() -> list[ScopeInfo]:
         ScopeInfo("test", is_goal=True),
         ScopeInfo("jvm", is_goal=False),
         ScopeInfo("reporting", is_goal=False),
+        ScopeInfo("bsp", is_goal=True, is_builtin=True),
         # TODO: move help related tests closer to `pants.goal.help` to avoid this cludge.
         *(goal.get_scope_info() for goal in builtin_goals()),
     ]
@@ -125,8 +126,8 @@ def goal_split_test(command_line: str, **expected):
     [
         # Basic arg splitting, various flag combos.
         (
-            "./pants --check-long-flag --gg -ltrace check --cc test --ii "
-            "src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz",
+            "./pants --check-long-flag --gg -ltrace check --cc test --ii"
+            + " src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz",
             dict(
                 expected_goals=["check", "test"],
                 expected_scope_to_flags={
@@ -138,9 +139,9 @@ def goal_split_test(command_line: str, **expected):
             ),
         ),
         (
-            "./pants --fff=arg check --gg-gg=arg-arg test --iii "
-            "--check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz -ltrace "
-            "--another-global",
+            "./pants --fff=arg check --gg-gg=arg-arg test --iii"
+            + " --check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz -ltrace"
+            + " --another-global",
             dict(
                 expected_goals=["check", "test"],
                 expected_scope_to_flags={
@@ -238,9 +239,9 @@ def test_passthru_args(splitter: ArgSplitter) -> None:
     )
     assert_valid_split(
         splitter,
-        "./pants -lerror --fff=arg check --gg-gg=arg-arg test --iii "
-        "--check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz -- "
-        "passthru1 passthru2 -linfo",
+        "./pants -lerror --fff=arg check --gg-gg=arg-arg test --iii"
+        + " --check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz --"
+        + " passthru1 passthru2 -linfo",
         expected_goals=["check", "test"],
         expected_scope_to_flags={
             "": ["-lerror", "--fff=arg"],
@@ -311,21 +312,21 @@ def help_no_arguments_test(command_line: str, *scopes: str, **expected):
         help_no_arguments_test("./pants help-all", "help-all", expected_help_all=True),
         help_test(
             "./pants --help-advanced --help",
-            expected_goals=["help"],
+            expected_goals=["help-advanced"],
             expected_scope_to_flags={"": [], "help": [], "help-advanced": []},
             expected_specs=[],
-            expected_help_advanced=True,
+            expected_help_advanced=False,
         ),
         help_test(
             "./pants --help --help-advanced --builtin-option --help-advanced-option",
-            expected_goals=["help-advanced"],
+            expected_goals=["help"],
             expected_scope_to_flags={
                 "": [],
-                "help": ["--builtin-option"],
-                "help-advanced": ["--option"],
+                "help": [],
+                "help-advanced": ["--builtin-option", "--option"],
             },
             expected_specs=[],
-            expected_help_advanced=False,
+            expected_help_advanced=True,
         ),
         help_test(
             "./pants -f",
@@ -403,10 +404,16 @@ def help_no_arguments_test(command_line: str, *scopes: str, **expected):
         ),
         help_test(
             "./pants check help-all test --help",
-            expected_goals=["check", "test", "help"],
+            expected_goals=["check", "test", "help-all"],
             expected_scope_to_flags={"": [], "check": [], "help": [], "help-all": [], "test": []},
             expected_specs=[],
-            expected_help_all=True,
+            expected_help_all=False,
+        ),
+        help_test(
+            "./pants bsp --help",
+            expected_goals=["bsp"],
+            expected_scope_to_flags={"": [], "help": [], "bsp": []},
+            expected_specs=[],
         ),
     ],
 )

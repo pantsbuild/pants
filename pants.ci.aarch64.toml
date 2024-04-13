@@ -1,0 +1,8 @@
+[GLOBAL]
+# Our physical aarch64 CI instance is a very burly machine with 80 cores.
+# A single GHA self-hosted runner can only run one job at a time, so to use
+# more of the machine's resources, we run multiple self-hosted runners on it
+# and constrain each one here so they don't all try and use all the cores.
+# TODO: Control this externally, on the machine itself?
+rule_threads_core = 8
+process_execution_local_parallelism = 16

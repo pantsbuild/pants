@@ -11,7 +11,8 @@ from pants.build_graph.address import Address
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, Targets
 from pants.jvm.dependency_inference.jvm_artifact_mappings import JVM_ARTIFACT_MAPPINGS
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirement
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     JvmArtifactArtifactField,
@@ -20,9 +21,9 @@ from pants.jvm.target_types import (
     JvmProvidesTypesField,
     JvmResolveField,
 )
+from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 _ResolveName = str
@@ -67,7 +68,7 @@ class MutableTrieNode:
         "first_party",
     ]  # don't use a `dict` to store attrs
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.children: dict[str, MutableTrieNode] = {}
         self.recursive: bool = False
         self.addresses: dict[SymbolNamespace, OrderedSet[Address]] = defaultdict(OrderedSet)
@@ -106,26 +107,35 @@ class MutableTrieNode:
 FrozenTrieNodeItem = Tuple[str, bool, FrozenDict[SymbolNamespace, FrozenOrderedSet[Address]], bool]
 
 
-@frozen_after_init
+@dataclass(frozen=True)
 class FrozenTrieNode:
     __slots__ = [
-        "_is_frozen",
         "_children",
         "_recursive",
         "_addresses",
         "_first_party",
     ]  # don't use a `dict` to store attrs (speeds up attr access significantly)
 
+    _children: FrozenDict[str, FrozenTrieNode]
+    _recursive: bool
+    _addresses: FrozenDict[SymbolNamespace, FrozenOrderedSet[Address]]
+    _first_party: bool
+
     def __init__(self, node: MutableTrieNode) -> None:
         children = {}
         for key, child in node.children.items():
             children[key] = FrozenTrieNode(child)
-        self._children: FrozenDict[str, FrozenTrieNode] = FrozenDict(children)
-        self._recursive: bool = node.recursive
-        self._addresses: FrozenDict[SymbolNamespace, FrozenOrderedSet[Address]] = FrozenDict(
-            {ns: FrozenOrderedSet(addresses) for ns, addresses in node.addresses.items()}
+
+        object.__setattr__(self, "_children", FrozenDict(children))
+        object.__setattr__(self, "_recursive", node.recursive)
+        object.__setattr__(
+            self,
+            "_addresses",
+            FrozenDict(
+                {ns: FrozenOrderedSet(addresses) for ns, addresses in node.addresses.items()}
+            ),
         )
-        self._first_party: bool = node.first_party
+        object.__setattr__(self, "_first_party", node.first_party)
 
     def find_child(self, name: str) -> FrozenTrieNode | None:
         return self._children.get(name)
@@ -195,7 +205,9 @@ class FrozenTrieNode:
     def to_json_dict(self) -> dict[str, Any]:
         return {
             "children": {name: child.to_json_dict() for name, child in self._children.items()},
-            **({"addresses": [str(a) for a in self._addresses]} if self._addresses else {}),
+            "addresses": {
+                ns: [str(a) for a in addresses] for ns, addresses in self._addresses.items()
+            },
             "recursive": self._recursive,
             "first_party": self._first_party,
         }
@@ -342,19 +354,67 @@ async def compute_java_third_party_symbol_mapping(
     )
 
 
-class ConflictingJvmArtifactVersion(ValueError):
+class ConflictingJvmArtifactVersionInResolveError(ValueError):
     def __init__(
-        self, group: str, artifact: str, required_version: str, found_coordinate: Coordinate
+        self,
+        *,
+        subsystem: str,
+        requirement_source: str | None = None,
+        resolve_name: str,
+        required_version: str,
+        conflicting_coordinate: Coordinate,
     ) -> None:
-        self.group: str = group
-        self.artifact: str = artifact
-        self.required_version: str = required_version
-        self.found_coordinate: Coordinate = found_coordinate
+        source = f" from {requirement_source}" if requirement_source else ""
+        msg = (
+            f"The JVM resolve `{resolve_name}` contains a `jvm_artifact` for version {conflicting_coordinate.version} "
+            f"of {subsystem}. This conflicts with version {required_version} which is the configured version "
+            f"of {subsystem} for this resolve{source}. "
+            "Please remove the `jvm_artifact` target with JVM coordinate "
+            f"{conflicting_coordinate.to_coord_str()}, then re-run "
+            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`"
+        )
+        super().__init__(msg)
 
 
-class MissingJvmArtifacts(ValueError):
-    def __init__(self, coordinates: Iterable[Coordinate | UnversionedCoordinate]) -> None:
-        self.coordinates: tuple[Coordinate | UnversionedCoordinate, ...] = tuple(coordinates)
+class MissingRequiredJvmArtifactsInResolve(ValueError):
+    def __init__(
+        self,
+        coordinates: Iterable[Coordinate | UnversionedCoordinate],
+        *,
+        subsystem: str,
+        resolve_name: str,
+        target_type: str,
+    ) -> None:
+        msg = (
+            f"The JVM resolve `{resolve_name}` is missing one or more requirements for {subsystem}. "
+            f"Since at least one JVM target type in this repository consumes a `{target_type}` target "
+            "in this resolve, this resolve must contain `jvm_artifact` targets for each requirement of "
+            f"{subsystem}.\n\n"
+            "Please add the following `jvm_artifact` target(s) somewhere in the repository and re-run "
+            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`:\n"
+        )
+        for coordinate in coordinates:
+            if isinstance(coordinate, Coordinate):
+                msg += (
+                    "\njvm_artifact(\n"
+                    f'  name="{coordinate.group}_{coordinate.artifact}",\n'
+                    f'  group="{coordinate.group}",\n'
+                    f'  artifact="{coordinate.artifact}",\n'
+                    f'  version="{coordinate.version}",\n'
+                    f'  resolve="{resolve_name}",\n'
+                    ")\n"
+                )
+            elif isinstance(coordinate, UnversionedCoordinate):
+                msg += (
+                    "\njvm_artifact(\n"
+                    f'  name="{coordinate.group}_{coordinate.artifact}",\n'
+                    f'  group="{coordinate.group}",\n'
+                    f'  artifact="{coordinate.artifact}",\n'
+                    '  version="<your preferred runtime version>",\n'
+                    f'  resolve="{resolve_name}",\n'
+                    ")\n"
+                )
+        super().__init__(msg)
 
 
 def find_jvm_artifacts_or_raise(
@@ -362,6 +422,10 @@ def find_jvm_artifacts_or_raise(
     resolve: str,
     jvm_artifact_targets: AllJvmArtifactTargets,
     jvm: JvmSubsystem,
+    *,
+    subsystem: str,
+    target_type: str,
+    requirement_source: str | None = None,
 ) -> frozenset[Address]:
     remaining_coordinates: set[Coordinate | UnversionedCoordinate] = set(required_coordinates)
 
@@ -380,11 +444,12 @@ def find_jvm_artifacts_or_raise(
                 ):
                     continue
                 if artifact.coordinate.version != coordinate.version:
-                    raise ConflictingJvmArtifactVersion(
-                        group=coordinate.group,
-                        artifact=coordinate.artifact,
+                    raise ConflictingJvmArtifactVersionInResolveError(
+                        subsystem=subsystem,
+                        requirement_source=requirement_source,
+                        resolve_name=resolve,
                         required_version=coordinate.version,
-                        found_coordinate=artifact.coordinate,
+                        conflicting_coordinate=artifact.coordinate,
                     )
             elif isinstance(coordinate, UnversionedCoordinate):
                 if (
@@ -400,7 +465,12 @@ def find_jvm_artifacts_or_raise(
             addresses.add(tgt.address)
 
     if remaining_coordinates:
-        raise MissingJvmArtifacts(remaining_coordinates)
+        raise MissingRequiredJvmArtifactsInResolve(
+            remaining_coordinates,
+            subsystem=subsystem,
+            resolve_name=resolve,
+            target_type=target_type,
+        )
 
     return frozenset(addresses)
 

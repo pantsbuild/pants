@@ -16,7 +16,6 @@ from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -30,7 +29,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (ClangFormatRequest,)),
+            QueryRule(FmtResult, (ClangFormatRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[CCSourcesGeneratorTarget],
@@ -98,16 +97,15 @@ def run_clangformat(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            ClangFormatRequest(field_sets, snapshot=input_sources.snapshot),
+            ClangFormatRequest.Batch(
+                "",
+                input_sources.snapshot.files,
+                partition_metadata=None,
+                snapshot=input_sources.snapshot,
+            ),
         ],
     )
     return fmt_result
-
-
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
 
 
 def test_success_on_formatted_file(rule_runner: RuleRunner) -> None:
@@ -117,7 +115,7 @@ def test_success_on_formatted_file(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
     )
-    assert fmt_result.output == get_snapshot(rule_runner, {"main.cpp": DEFAULT_FORMATTED_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"main.cpp": DEFAULT_FORMATTED_FILE})
     assert fmt_result.did_change is False
 
 
@@ -128,8 +126,7 @@ def test_success_on_unformatted_file(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
     )
-    assert fmt_result.skipped is False
-    assert fmt_result.output == get_snapshot(rule_runner, {"main.cpp": DEFAULT_FORMATTED_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"main.cpp": DEFAULT_FORMATTED_FILE})
     assert fmt_result.did_change is True
 
 
@@ -146,8 +143,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.cpp")),
     ]
     fmt_result = run_clangformat(rule_runner, tgts)
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"good.cpp": DEFAULT_FORMATTED_FILE, "bad.cpp": DEFAULT_FORMATTED_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good.cpp": DEFAULT_FORMATTED_FILE, "bad.cpp": DEFAULT_FORMATTED_FILE}
     )
     assert fmt_result.did_change is True
 
@@ -165,14 +162,5 @@ def test_config(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
     )
-    assert fmt_result.skipped is False
-    assert fmt_result.output == get_snapshot(rule_runner, {"main.cpp": MOZILLA_FORMATTED_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"main.cpp": MOZILLA_FORMATTED_FILE})
     assert fmt_result.did_change is True
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"main.cpp": UNFORMATTED_FILE, "BUILD": "cc_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="main.cpp"))
-    fmt_result = run_clangformat(rule_runner, [tgt], extra_args=["--clang-format-skip"])
-    assert fmt_result.skipped is True
-    assert fmt_result.did_change is False

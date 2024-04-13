@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import errno
+import getpass
 import logging
 import os
 import platform
@@ -97,6 +98,15 @@ def get_normalized_arch_name() -> str:
 
 def is_macos_big_sur() -> bool:
     return hasattr(platform, "mac_ver") and platform.mac_ver()[0].startswith("11.")
+
+
+def getuser() -> str:
+    try:
+        return getpass.getuser()
+    except KeyError:
+        # Work when running with a uid not associated with a user,
+        # e.g., in a docker container with a host uid.
+        return str(os.getuid())
 
 
 def _values(aliases: dict[str, set[str]]) -> set[str]:

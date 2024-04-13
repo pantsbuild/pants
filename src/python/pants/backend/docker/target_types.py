@@ -6,29 +6,41 @@ from __future__ import annotations
 import os
 import re
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Callable, ClassVar, Iterator, Optional, cast
 
 from typing_extensions import final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
+from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.base.build_environment import get_buildroot
+from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
+from pants.engine.collection import Collection
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import GlobMatchErrorBehavior
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AllTargets,
     AsyncFieldMixin,
     BoolField,
     Dependencies,
     DictStringToStringField,
+    Field,
     InvalidFieldException,
+    ListOfDictStringToStringField,
     OptionalSingleSourceField,
     StringField,
     StringSequenceField,
     Target,
+    Targets,
 )
+from pants.engine.unions import union
 from pants.util.docutil import bin_name, doc_url
-from pants.util.strutil import softwrap
+from pants.util.frozendict import FrozenDict
+from pants.util.strutil import help_text, softwrap
 
 # Common help text to be applied to each field that supports value interpolation.
 _interpolation_help = (
@@ -40,7 +52,7 @@ _interpolation_help = (
 class DockerImageBuildArgsField(StringSequenceField):
     alias = "extra_build_args"
     default = ()
-    help = softwrap(
+    help = help_text(
         """
         Build arguments (`--build-arg`) to use when building this image.
         Entries are either strings in the form `ARG_NAME=value` to set an explicit value;
@@ -53,7 +65,7 @@ class DockerImageBuildArgsField(StringSequenceField):
 
 class DockerImageContextRootField(StringField):
     alias = "context_root"
-    help = softwrap(
+    help = help_text(
         """
         Specify which directory to use as the Docker build context root. This affects the file
         paths to use for the `COPY` and `ADD` instructions. For example, whether
@@ -87,6 +99,7 @@ class DockerImageContextRootField(StringField):
 
 
 class DockerImageSourceField(OptionalSingleSourceField):
+    none_is_valid_value = True
     default = "Dockerfile"
 
     # When the default glob value is in effect, we don't want the normal glob match error behavior
@@ -96,7 +109,7 @@ class DockerImageSourceField(OptionalSingleSourceField):
     # to the user.
     default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
 
-    help = softwrap(
+    help = help_text(
         """
         The Dockerfile to use when building the Docker image.
 
@@ -109,7 +122,7 @@ class DockerImageSourceField(OptionalSingleSourceField):
 class DockerImageInstructionsField(StringSequenceField):
     alias = "instructions"
     required = False
-    help = softwrap(
+    help = help_text(
         """
         The `Dockerfile` content, typically one instruction per list item.
 
@@ -131,21 +144,21 @@ class DockerImageInstructionsField(StringSequenceField):
 class DockerImageTagsField(StringSequenceField):
     alias = "image_tags"
     default = ("latest",)
-    help = softwrap(
+    help = help_text(
         f"""
 
         Any tags to apply to the Docker image name (the version is usually applied as a tag).
 
         {_interpolation_help.format(kind="tag")}
 
-        See {doc_url('tagging-docker-images')}.
+        See {doc_url('docs/docker/tagging-docker-images')}.
         """
     )
 
 
 class DockerImageTargetStageField(StringField):
     alias = "target_stage"
-    help = softwrap(
+    help = help_text(
         """
         Specify target build stage, rather than building the entire `Dockerfile`.
 
@@ -165,13 +178,13 @@ class DockerImageDependenciesField(Dependencies):
 class DockerImageRegistriesField(StringSequenceField):
     alias = "registries"
     default = (ALL_DEFAULT_REGISTRIES,)
-    help = softwrap(
+    help = help_text(
         """
         List of addresses or configured aliases to any Docker registries to use for the
         built image.
 
         The address is a domain name with optional port for your registry, and any registry
-        aliases are prefixed with `@` for addresses in the [docker].registries configuration
+        aliases are prefixed with `@` for addresses in the `[docker].registries` configuration
         section.
 
         By default, all configured registries with `default = true` are used.
@@ -199,16 +212,18 @@ class DockerImageRegistriesField(StringSequenceField):
 
 class DockerImageRepositoryField(StringField):
     alias = "repository"
-    help = softwrap(
+    help = help_text(
         f"""
-        The repository name for the Docker image. e.g. "<repository>/<name>".
+        The repository name for the Docker image. e.g. `"<repository>/<name>"`.
 
         It uses the `[docker].default_repository` by default.
 
-        {_interpolation_help.format(kind="repository")}
+        {_interpolation_help.format(kind="Repository")}
 
-        Additional placeholders for the repository field are: `name`, `directory` and
-        `parent_directory`.
+        Additional placeholders for the repository field are: `name`, `directory`,
+        `parent_directory`, and `default_repository`.
+
+        Registries may also configure the repository value for specific registries.
 
         See the documentation for `[docker].default_repository` for more information.
         """
@@ -218,9 +233,7 @@ class DockerImageRepositoryField(StringField):
 class DockerImageSkipPushField(BoolField):
     alias = "skip_push"
     default = False
-    help = (
-        f"If set to true, do not push this image to registries when running `{bin_name()} publish`."
-    )
+    help = f"If true, do not push this image to registries when running `{bin_name()} publish`."
 
 
 OptionValueFormatter = Callable[[str], str]
@@ -232,23 +245,29 @@ class DockerBuildOptionFieldMixin(ABC):
     docker_build_option: ClassVar[str]
 
     @abstractmethod
-    def option_values(self, *, value_formatter: OptionValueFormatter) -> Iterator[str]:
+    def option_values(
+        self, *, value_formatter: OptionValueFormatter, global_build_hosts_options: dict
+    ) -> Iterator[str]:
         """Subclasses must implement this, to turn their `self.value` into none, one or more option
         values."""
 
     @final
-    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
-        for value in self.option_values(value_formatter=value_formatter):
+    def options(
+        self, value_formatter: OptionValueFormatter, global_build_hosts_options
+    ) -> Iterator[str]:
+        for value in self.option_values(
+            value_formatter=value_formatter, global_build_hosts_options=global_build_hosts_options
+        ):
             yield from (self.docker_build_option, value)
 
 
 class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictStringToStringField):
     alias = "image_labels"
-    help = softwrap(
+    help = help_text(
         f"""
         Provide image metadata.
 
-        {_interpolation_help.format(kind="label value")}
+        {_interpolation_help.format(kind="Label value")}
 
         See [Docker labels](https://docs.docker.com/config/labels-custom-metadata/#manage-labels-on-objects)
         for more information.
@@ -256,22 +275,177 @@ class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictSt
     )
     docker_build_option = "--label"
 
-    def option_values(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+    def option_values(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
         for label, value in (self.value or {}).items():
             yield f"{label}={value_formatter(value)}"
+
+
+class DockerImageBuildImageExtraHostsField(DockerBuildOptionFieldMixin, DictStringToStringField):
+    alias = "extra_build_hosts"
+    help = help_text(
+        """
+        Extra hosts entries to be added to a container's `/etc/hosts` file.
+
+        Use `[docker].build_hosts` to set default host entries for all images.
+        """
+    )
+    docker_build_option = "--add-host"
+
+    def option_values(
+        self, value_formatter: OptionValueFormatter, global_build_hosts_options: dict = {}
+    ) -> Iterator[str]:
+        if self.value:
+            merged_values = {**global_build_hosts_options, **self.value}
+            for label, value in merged_values.items():
+                yield f"{label}:{value_formatter(value)}"
+
+
+class DockerBuildOptionFieldMultiValueDictMixin(DictStringToStringField):
+    """Inherit this mixin class to provide options in the form of `--flag=key1=value1,key2=value2`
+    to `docker build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
+        if self.value:
+            yield f"{self.docker_build_option}=" + ",".join(
+                f"{key}={value_formatter(value)}" for key, value in self.value.items()
+            )
+
+
+class DockerBuildOptionFieldListOfMultiValueDictMixin(ListOfDictStringToStringField):
+    """Inherit this mixin class to provide multiple key-value options to docker build:
+
+    `--flag=key1=value1,key2=value2 --flag=key3=value3,key4=value4`
+    """
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
+        if self.value:
+            for item in self.value:
+                yield f"{self.docker_build_option}=" + ",".join(
+                    f"{key}={value_formatter(value)}" for key, value in item.items()
+                )
+
+
+class DockerBuildKitOptionField:
+    """Mixin to indicate a BuildKit-specific option."""
+
+    @abstractmethod
+    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+        ...
+
+    required_help = "This option requires BuildKit to be enabled via the Docker subsystem options."
+
+
+class DockerImageBuildImageCacheToField(
+    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
+):
+    alias = "cache_to"
+    help = help_text(
+        f"""
+        Export image build cache to an external cache destination.
+
+        Note that Docker [supports](https://docs.docker.com/build/cache/backends/#multiple-caches)
+        multiple cache sources - Pants will pass these as multiple `--cache_from` arguments to the
+        Docker CLI. Docker will only use the first cache hit (i.e. the image exists) in the build.
+
+        {DockerBuildKitOptionField.required_help}
+
+        Example:
+
+            docker_image(
+                name="example-local-cache-backend",
+                cache_to={{
+                    "type": "local",
+                    "dest": "/tmp/docker-cache/example"
+                }},
+                cache_from=[{{
+                    "type": "local",
+                    "src": "/tmp/docker-cache/example"
+                }}]
+            )
+
+        {_interpolation_help.format(kind="Values")}
+        """
+    )
+    docker_build_option = "--cache-to"
+
+
+class DockerImageBuildImageCacheFromField(
+    DockerBuildOptionFieldListOfMultiValueDictMixin,
+    ListOfDictStringToStringField,
+    DockerBuildKitOptionField,
+):
+    alias = "cache_from"
+    help = help_text(
+        f"""
+        Use external cache sources when building the image.
+
+        {DockerBuildKitOptionField.required_help}
+
+        Example:
+
+            docker_image(
+                name="example-local-cache-backend",
+                cache_to={{
+                    "type": "local",
+                    "dest": "/tmp/docker-cache/primary"
+                }},
+                cache_from=[
+                    {{
+                        "type": "local",
+                        "src": "/tmp/docker-cache/primary"
+                    }},
+                    {{
+                        "type": "local",
+                        "src": "/tmp/docker-cache/secondary"
+                    }}
+                ]
+            )
+
+        {_interpolation_help.format(kind="Values")}
+        """
+    )
+    docker_build_option = "--cache-from"
+
+
+class DockerImageBuildImageOutputField(
+    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
+):
+    alias = "output"
+    default = FrozenDict({"type": "docker"})
+    help = help_text(
+        f"""
+        Sets the export action for the build result.
+
+        {DockerBuildKitOptionField.required_help}
+
+        When using `pants publish` to publish Docker images to a registry, the output type
+        must be 'docker', as `publish` expects that the built images exist in the local
+        image store.
+
+        {_interpolation_help.format(kind="Values")}
+        """
+    )
+    docker_build_option = "--output"
 
 
 class DockerImageBuildSecretsOptionField(
     AsyncFieldMixin, DockerBuildOptionFieldMixin, DictStringToStringField
 ):
     alias = "secrets"
-    help = softwrap(
+    help = help_text(
         """
         Secret files to expose to the build (only if BuildKit enabled).
 
         Secrets may use absolute paths, or paths relative to your build root, or the BUILD file
-        if prefixed with `./`. The id should be valid as used by the Docker build `--secret`
-        option. See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more
+        if prefixed with `./`. Paths to your home directory will be automatically expanded.
+        The id should be valid as used by the Docker build `--secret` option.
+        See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more
         information.
 
         Example:
@@ -280,6 +454,7 @@ class DockerImageBuildSecretsOptionField(
                 secrets={
                     "mysecret": "/var/secrets/some-secret",
                     "repo-secret": "src/proj/secrets/some-secret",
+                    "home-dir-secret": "~/.config/some-secret",
                     "target-secret": "./secrets/some-secret",
                 }
             )
@@ -296,18 +471,19 @@ class DockerImageBuildSecretsOptionField(
             full_path = os.path.join(
                 get_buildroot(),
                 self.address.spec_path if re.match(r"\.{1,2}/", path) else "",
-                path,
+                os.path.expanduser(path),
             )
+
             yield f"id={secret},src={os.path.normpath(full_path)}"
 
 
 class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequenceField):
     alias = "ssh"
     default = ()
-    help = softwrap(
+    help = help_text(
         """
         SSH agent socket or keys to expose to the build (only if BuildKit enabled)
-        (format: default|<id>[=<socket>|<key>[,<key>]])
+        (format: `default|<id>[=<socket>|<key>[,<key>]]`)
 
         The exposed agent and/or keys can then be used in your `Dockerfile` by mounting them in
         your `RUN` instructions:
@@ -325,6 +501,103 @@ class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequence
         yield from cast("tuple[str]", self.value)
 
 
+class DockerBuildOptionFieldValueMixin(Field):
+    """Inherit this mixin class to provide unary options (i.e. option in the form of `--flag=value`)
+    to `docker build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self, *args, **kwargs) -> Iterator[str]:
+        if self.value is not None:
+            yield f"{self.docker_build_option}={self.value}"
+
+
+class DockerBuildOptionFieldMultiValueMixin(StringSequenceField):
+    """Inherit this mixin class to provide options in the form of `--flag=value1,value2` to `docker
+    build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self, *args, **kwargs) -> Iterator[str]:
+        if self.value:
+            yield f"{self.docker_build_option}={','.join(list(self.value))}"
+
+
+class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
+    alias = "pull"
+    default = False
+    help = help_text(
+        """
+        If true, then docker will always attempt to pull a newer version of the image.
+
+        NOTE: This option cannot be used on images that build off of "transitive" base images
+        referenced by address (i.e. `FROM path/to/your/base/Dockerfile`).
+        """
+    )
+    docker_build_option = "--pull"
+
+
+class DockerBuildOptionFlagFieldMixin(BoolField, ABC):
+    """Inherit this mixin class to provide optional flags (i.e. add `--flag` only when the value is
+    `True`) to `docker build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self, *args, **kwargs) -> Iterator[str]:
+        if self.value:
+            yield f"{self.docker_build_option}"
+
+
+class DockerImageBuildSquashOptionField(DockerBuildOptionFlagFieldMixin):
+    alias = "squash"
+    default = False
+    help = help_text(
+        """
+        If true, then docker will squash newly built layers into a single new layer.
+
+        Note that this option is only supported on a Docker daemon with experimental features enabled.
+        """
+    )
+    docker_build_option = "--squash"
+
+
+class DockerImageBuildNetworkOptionField(DockerBuildOptionFieldValueMixin, StringField):
+    alias = "build_network"
+    default = None
+    help = help_text(
+        """
+        Sets the networking mode for the run commands during build.
+        Supported standard values are: bridge, host, none, and container:<name|id>.
+        Any other value is taken as a custom network's name to which the container should connect to.
+        """
+    )
+    docker_build_option = "--network"
+
+
+class DockerImageBuildPlatformOptionField(
+    DockerBuildOptionFieldMultiValueMixin, StringSequenceField
+):
+    alias = "build_platform"
+    default = None
+    help = help_text(
+        """
+        Set the target platform(s) for the build.
+        """
+    )
+    docker_build_option = "--platform"
+
+
+class DockerImageRunExtraArgsField(StringSequenceField):
+    alias: ClassVar[str] = "extra_run_args"
+    default = ()
+    help = help_text(
+        lambda: f"Extra arguments to pass into the invocation of `docker run`. These are in addition to those at the `[{DockerOptions.options_scope}].run_args`"
+    )
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -338,20 +611,30 @@ class DockerImageTarget(Target):
         DockerImageRegistriesField,
         DockerImageRepositoryField,
         DockerImageBuildImageLabelsOptionField,
+        DockerImageBuildImageExtraHostsField,
         DockerImageBuildSecretsOptionField,
         DockerImageBuildSSHOptionField,
         DockerImageSkipPushField,
         DockerImageTargetStageField,
+        DockerImageBuildPullOptionField,
+        DockerImageBuildSquashOptionField,
+        DockerImageBuildNetworkOptionField,
+        DockerImageBuildPlatformOptionField,
+        DockerImageBuildImageCacheToField,
+        DockerImageBuildImageCacheFromField,
+        DockerImageBuildImageOutputField,
+        DockerImageRunExtraArgsField,
+        OutputPathField,
         RestartableField,
     )
-    help = softwrap(
+    help = help_text(
         """
         The `docker_image` target describes how to build and tag a Docker image.
 
         Any dependencies, as inferred or explicitly specified, will be included in the Docker
         build context, after being packaged if applicable.
 
-        By default, will use a Dockerfile from the same directory as the BUILD file this target
+        By default, it will use a Dockerfile from the same directory as the BUILD file this target
         is defined in. Point at another file with the `source` field, or use the `instructions`
         field to have the Dockerfile contents verbatim directly in the BUILD file.
 
@@ -367,3 +650,35 @@ class DockerImageTarget(Target):
 
         """
     )
+
+
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class DockerImageTagsRequest:
+    """A request to provide additional image tags."""
+
+    target: Target
+
+    @classmethod
+    def is_applicable(cls, target: Target) -> bool:
+        """Whether to provide additional tags for this target or not."""
+        return True
+
+
+class DockerImageTags(Collection[str]):
+    """Additional image tags to apply to built Docker images."""
+
+
+class AllDockerImageTargets(Targets):
+    pass
+
+
+@rule
+def all_docker_targets(all_targets: AllTargets) -> AllDockerImageTargets:
+    return AllDockerImageTargets(
+        [tgt for tgt in all_targets if tgt.has_field(DockerImageSourceField)]
+    )
+
+
+def rules():
+    return collect_rules()

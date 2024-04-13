@@ -11,17 +11,18 @@ from pants.backend.helm.goals import package
 from pants.backend.helm.goals.package import BuiltHelmArtifact, HelmPackageFieldSet
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import HelmChartTarget
+from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.testutil import (
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
-    K8S_SERVICE_FILE,
+    K8S_SERVICE_TEMPLATE,
     gen_chart_file,
 )
 from pants.backend.helm.util_rules import chart, sources, tool
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
-from pants.core.util_rules import config_files, external_tool, stripped_source_files
-from pants.engine.rules import QueryRule, SubsystemRule
+from pants.core.util_rules import config_files, external_tool, source_files
+from pants.engine.rules import QueryRule
 from pants.source.source_root import rules as source_root_rules
 from pants.testutil.rule_runner import RuleRunner
 
@@ -36,18 +37,17 @@ def rule_runner() -> RuleRunner:
             *tool.rules(),
             *chart.rules(),
             *package.rules(),
-            *stripped_source_files.rules(),
+            *source_files.rules(),
             *source_root_rules(),
             *sources.rules(),
-            SubsystemRule(HelmSubsystem),
+            *target_types_rules(),
+            *HelmSubsystem.rules(),
             QueryRule(BuiltPackage, [HelmPackageFieldSet]),
         ],
     )
 
 
 def _assert_build_package(rule_runner: RuleRunner, *, chart_name: str, chart_version: str) -> None:
-    rule_runner.set_options(["--source-root-patterns=['src/*']"])
-
     target = rule_runner.get_target(Address(f"src/{chart_name}", target_name=chart_name))
     field_set = HelmPackageFieldSet.create(target)
 
@@ -59,7 +59,7 @@ def _assert_build_package(rule_runner: RuleRunner, *, chart_name: str, chart_ver
     assert result.artifacts[0].relpath == os.path.join(
         dest_dir, f"{chart_name}-{chart_version}.tgz"
     )
-    assert result.artifacts[0].metadata
+    assert result.artifacts[0].info
 
 
 def test_helm_package(rule_runner: RuleRunner) -> None:
@@ -72,7 +72,7 @@ def test_helm_package(rule_runner: RuleRunner) -> None:
             f"src/{chart_name}/Chart.yaml": gen_chart_file(chart_name, version=chart_version),
             f"src/{chart_name}/values.yaml": HELM_VALUES_FILE,
             f"src/{chart_name}/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            f"src/{chart_name}/templates/service.yaml": K8S_SERVICE_FILE,
+            f"src/{chart_name}/templates/service.yaml": K8S_SERVICE_TEMPLATE,
         }
     )
 
@@ -91,7 +91,7 @@ def test_helm_package_with_custom_output_path(rule_runner: RuleRunner) -> None:
             f"src/{chart_name}/Chart.yaml": gen_chart_file(chart_name, version=chart_version),
             f"src/{chart_name}/values.yaml": HELM_VALUES_FILE,
             f"src/{chart_name}/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            f"src/{chart_name}/templates/service.yaml": K8S_SERVICE_FILE,
+            f"src/{chart_name}/templates/service.yaml": K8S_SERVICE_TEMPLATE,
         }
     )
 

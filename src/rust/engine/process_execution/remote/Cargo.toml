@@ -1,0 +1,54 @@
+[package]
+version = "0.0.1"
+edition = "2021"
+name = "remote"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+async-stream = { workspace = true }
+async-trait = { workspace = true }
+async-lock = { workspace = true }
+protos = { path = "../../protos" }
+bytes = { workspace = true }
+derivative = { workspace = true }
+# deepsize = { workspace = true, features=["log"] }
+grpc_util = { path = "../../grpc_util" }
+fs = { path = "../../fs" }
+futures = { workspace = true }
+hashing = { path = "../../hashing" }
+libc = { workspace = true }
+log = { workspace = true }
+store = { path = "../../fs/store" }
+task_executor = { path = "../../task_executor" }
+concrete_time = { path = "../../concrete_time" }
+tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio-rustls = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
+workunit_store = { path = "../../workunit_store" }
+async-oncecell = { workspace = true }
+once_cell = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+rand = { workspace = true }
+tonic = { workspace = true, features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+process_execution = { path = ".." }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+parking_lot = { workspace = true }
+opendal = { workspace = true }
+remote_provider = { path = "../../remote_provider" }
+remote_provider_reapi = { path = "../../remote_provider/remote_provider_reapi" }
+
+[dev-dependencies]
+env_logger = { workspace = true }
+maplit = { workspace = true }
+mock = { path = "../../testutil/mock" }
+parking_lot = { workspace = true }
+sharded_lmdb = { path = "../../sharded_lmdb" }
+tempfile = { workspace = true }
+testutil = { path = "../../testutil" }
+tokio = { workspace = true, features = ["macros"] }
+
+[lints]
+workspace = true

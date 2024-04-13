@@ -7,11 +7,11 @@ import itertools
 import logging
 import urllib.parse
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path, PurePath
 from typing import Any, Iterator, Mapping, Sequence, cast
 
 import toml
-from packaging.utils import canonicalize_name as canonicalize_project_name
 from packaging.version import InvalidVersion, Version
 from typing_extensions import TypedDict
 
@@ -20,34 +20,22 @@ from pants.backend.python.macros.common_fields import (
     RequirementsOverrideField,
     TypeStubsModuleMappingField,
 )
-from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.macros.common_requirements_rule import _generate_requirements
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import (
-    PythonRequirementModulesField,
-    PythonRequirementResolveField,
-    PythonRequirementsField,
-    PythonRequirementTarget,
-    PythonRequirementTypeStubModulesField,
-)
+from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementTarget
 from pants.base.build_root import BuildRoot
-from pants.core.target_types import (
-    TargetGeneratorSourcesHelperSourcesField,
-    TargetGeneratorSourcesHelperTarget,
-)
-from pants.engine.addresses import Address
-from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    Dependencies,
     GeneratedTargets,
     GenerateTargetsRequest,
-    InvalidFieldException,
     SingleSourceField,
     TargetGenerator,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
+from pants.util.pip_requirement import PipRequirement
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -129,10 +117,16 @@ def parse_str_version(attributes: str, **kwargs: str) -> str:
                 return Version(version_str)
             except InvalidVersion:
                 raise InvalidVersion(
-                    f'Failed to parse requirement {proj_name} = "{req}" in {fp} loaded by the '
-                    "poetry_requirements macro.\n\nIf you believe this requirement is valid, "
-                    "consider opening an issue at https://github.com/pantsbuild/pants/issues so "
-                    "that we can update Pants' Poetry macro to support this."
+                    softwrap(
+                        f"""
+                        Failed to parse requirement {proj_name} = "{req}" in {fp} loaded by the
+                        poetry_requirements macro.
+
+                        If you believe this requirement is valid, consider opening an issue at
+                        https://github.com/pantsbuild/pants/issues so that we can update Pants'
+                        Poetry macro to support this.
+                        """
+                    )
                 )
 
         if not req:
@@ -182,18 +176,17 @@ def parse_python_constraint(constr: str | None, fp: str) -> str:
         return list(itertools.chain(*[i.split(",") for i in lst]))
 
     def prepend(version: str) -> str:
-        return (
-            f"python_version{''.join(i for i in version if i in valid_specifiers)} '"
-            f"{''.join(i for i in version if i not in valid_specifiers)}'"
-        )
+        valid_versions = "".join(i for i in version if i in valid_specifiers)
+        invalid_versions = "".join(i for i in version if i not in valid_specifiers)
+        return f"python_version{valid_versions} '{invalid_versions}'"
 
     prepend_and_clean = [
         [prepend(".".join(j.split(".")[:2])) for j in conv_and(i)] for i in ver_parsed
     ]
     return (
-        f"{'(' if len(or_and_split) > 1 else ''}"
-        f"{') or ('.join([' and '.join(i) for i in prepend_and_clean])}"
-        f"{')' if len(or_and_split) > 1 else ''}"
+        ("(" if len(or_and_split) > 1 else "")
+        + (") or (".join([" and ".join(i) for i in prepend_and_clean]))
+        + (")" if len(or_and_split) > 1 else "")
     )
 
 
@@ -261,7 +254,7 @@ def add_markers(base: str, attributes: PyprojectAttr, fp) -> str:
     if not markers_lookup and not python_lookup:
         return base
 
-    result = f"{base};("
+    result = f"{base} ;("
 
     if markers_lookup:
         result += f"{markers_lookup})"
@@ -319,8 +312,12 @@ def handle_dict_attr(
 
     if len(base) == 0:
         raise ValueError(
-            f"{proj_name} is not formatted correctly; at minimum provide either a version, url, path "
-            "or git location for your dependency. "
+            softwrap(
+                f"""
+                {proj_name} is not formatted correctly; at minimum provide either a version, url,
+                path or git location for your dependency.
+                """
+            )
         )
 
     return add_markers(base, attributes, fp)
@@ -331,7 +328,6 @@ def parse_single_dependency(
     attributes: str | Mapping[str, str | Sequence] | Sequence[Mapping[str, str | Sequence]],
     pyproject_toml: PyProjectToml,
 ) -> Iterator[PipRequirement]:
-
     if isinstance(attributes, str):
         # E.g. `foo = "~1.1~'.
         yield PipRequirement.parse(
@@ -356,8 +352,12 @@ def parse_single_dependency(
                 yield PipRequirement.parse(req_str)
     else:
         raise AssertionError(
-            "Error: invalid Poetry requirement format. Expected type of requirement attributes to "
-            f"be string, dict, or list, but was of type {type(attributes).__name__}."
+            softwrap(
+                f"""
+                Error: invalid Poetry requirement format. Expected type of requirement attributes to
+                be string, dict, or list, but was of type {type(attributes).__name__}.
+                """
+            )
         )
 
 
@@ -367,9 +367,14 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[PipRequirement]:
         poetry_vals = parsed["tool"]["poetry"]
     except KeyError:
         raise KeyError(
-            f"No section `tool.poetry` found in {pyproject_toml.toml_relpath}, which "
-            "is loaded by Pants from a `poetry_requirements` macro. "
-            "Did you mean to set up Poetry?"
+            softwrap(
+                f"""
+                No section `tool.poetry` found in {pyproject_toml.toml_relpath}, which
+                is loaded by Pants from a `poetry_requirements` macro.
+
+                Did you mean to set up Poetry?
+                """
+            )
         )
     dependencies = poetry_vals.get("dependencies", {})
     # N.B.: The "python" dependency is a special dependency required by Poetry that only serves to
@@ -386,16 +391,32 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[PipRequirement]:
     dev_dependencies = poetry_vals.get("dev-dependencies", {})
     if not dependencies and not dev_dependencies and not group_deps:
         logger.warning(
-            "No requirements defined in any Poetry dependency groups, tool.poetry.dependencies and "
-            f"tool.poetry.dev-dependencies in {pyproject_toml.toml_relpath}, which is loaded "
-            "by Pants from a poetry_requirements macro. Did you mean to populate these "
-            "with requirements?"
+            softwrap(
+                f"""
+                No requirements defined in any Poetry dependency groups, tool.poetry.dependencies
+                and tool.poetry.dev-dependencies in {pyproject_toml.toml_relpath}, which is loaded
+                by Pants from a poetry_requirements macro. Did you mean to populate these
+                with requirements?
+                """
+            )
         )
 
     return set(
         itertools.chain.from_iterable(
             parse_single_dependency(proj, attr, pyproject_toml)
             for proj, attr in {**dependencies, **dev_dependencies, **group_deps}.items()
+        )
+    )
+
+
+def parse_poetry_requirements(
+    build_root: BuildRoot, file_contents: bytes, file_path: str
+) -> set[PipRequirement]:
+    return parse_pyproject_toml(
+        PyProjectToml(
+            build_root=PurePath(build_root.path),
+            toml_relpath=PurePath(file_path),
+            toml_contents=file_contents.decode(),
         )
     )
 
@@ -412,7 +433,7 @@ class PoetryRequirementsSourceField(SingleSourceField):
 
 class PoetryRequirementsTargetGenerator(TargetGenerator):
     alias = "poetry_requirements"
-    help = "Generate a `python_requirement` for each entry in a Poetry pyproject.toml."
+    help = "Generate a `python_requirement` for each entry in a Poetry `pyproject.toml`."
     generated_target_cls = PythonRequirementTarget
     # Note that this does not have a `dependencies` field.
     core_fields = (
@@ -432,78 +453,18 @@ class GenerateFromPoetryRequirementsRequest(GenerateTargetsRequest):
 
 @rule(desc="Generate `python_requirement` targets from Poetry pyproject.toml", level=LogLevel.DEBUG)
 async def generate_from_python_requirement(
-    request: GenerateFromPoetryRequirementsRequest, build_root: BuildRoot, python_setup: PythonSetup
+    request: GenerateFromPoetryRequirementsRequest,
+    build_root: BuildRoot,
+    union_membership: UnionMembership,
+    python_setup: PythonSetup,
 ) -> GeneratedTargets:
-    generator = request.generator
-    pyproject_rel_path = generator[PoetryRequirementsSourceField].value
-    pyproject_full_path = generator[PoetryRequirementsSourceField].file_path
-    overrides = {
-        canonicalize_project_name(k): v
-        for k, v in request.require_unparametrized_overrides().items()
-    }
-
-    file_tgt = TargetGeneratorSourcesHelperTarget(
-        {TargetGeneratorSourcesHelperSourcesField.alias: pyproject_rel_path},
-        Address(
-            request.template_address.spec_path,
-            target_name=request.template_address.target_name,
-            relative_file_path=pyproject_rel_path,
-        ),
+    result = await _generate_requirements(
+        request,
+        union_membership,
+        python_setup,
+        parse_requirements_callback=partial(parse_poetry_requirements, build_root),
     )
-
-    digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
-            [pyproject_full_path],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin=f"{generator}'s field `{PoetryRequirementsSourceField.alias}`",
-        ),
-    )
-
-    requirements = parse_pyproject_toml(
-        PyProjectToml(
-            build_root=PurePath(build_root.path),
-            toml_relpath=PurePath(pyproject_full_path),
-            toml_contents=digest_contents[0].content.decode(),
-        )
-    )
-
-    module_mapping = generator[ModuleMappingField].value
-    stubs_mapping = generator[TypeStubsModuleMappingField].value
-
-    def generate_tgt(parsed_req: PipRequirement) -> PythonRequirementTarget:
-        normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
-        tgt_overrides = overrides.pop(normalized_proj_name, {})
-        if Dependencies.alias in tgt_overrides:
-            tgt_overrides[Dependencies.alias] = list(tgt_overrides[Dependencies.alias]) + [
-                file_tgt.address.spec
-            ]
-
-        return PythonRequirementTarget(
-            {
-                **request.template,
-                PythonRequirementsField.alias: [parsed_req],
-                PythonRequirementModulesField.alias: module_mapping.get(normalized_proj_name),
-                PythonRequirementTypeStubModulesField.alias: stubs_mapping.get(
-                    normalized_proj_name
-                ),
-                # This may get overridden by `tgt_overrides`, which will have already added in
-                # the file tgt.
-                Dependencies.alias: [file_tgt.address.spec],
-                **tgt_overrides,
-            },
-            request.template_address.create_generated(parsed_req.project_name),
-        )
-
-    result = tuple(generate_tgt(requirement) for requirement in requirements) + (file_tgt,)
-
-    if overrides:
-        raise InvalidFieldException(
-            f"Unused key in the `overrides` field for {request.template_address}: "
-            f"{sorted(overrides)}"
-        )
-
-    return GeneratedTargets(generator, result)
+    return GeneratedTargets(request.generator, result)
 
 
 def rules():

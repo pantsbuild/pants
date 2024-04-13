@@ -4,115 +4,81 @@
 from __future__ import annotations
 
 import logging
-import os.path
 from textwrap import dedent
 from typing import Iterable
 
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.dependency_inference.rules import import_rules
+from pants.backend.python.dependency_inference.rules import UnownedDependencyError, import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     ConsoleScript,
     EntryPoint,
+    Executable,
     PexBinariesGeneratorTarget,
     PexBinary,
-    PexBinaryDependenciesField,
     PexEntryPointField,
+    PexExecutableField,
     PexScriptField,
     PythonDistribution,
-    PythonDistributionDependenciesField,
     PythonRequirementsField,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
-    PythonSourceTarget,
-    PythonTestsGeneratorTarget,
-    PythonTestsTimeoutField,
-    PythonTestTarget,
-    PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
     normalize_module_mapping,
-    parse_requirements_file,
 )
 from pants.backend.python.target_types_rules import (
-    InjectPexBinaryEntryPointDependency,
-    InjectPythonDistributionDependencies,
+    InferPexBinaryEntryPointDependency,
+    InferPythonDistributionDependencies,
+    PexBinaryEntryPointDependencyInferenceFieldSet,
+    PythonDistributionDependenciesInferenceFieldSet,
     resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import python_sources
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.engine.addresses import Address
-from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
-    InjectedDependencies,
+    InferredDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
     InvalidTargetException,
-    SingleSourceField,
     Tags,
 )
-from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
+from pants.util.pip_requirement import PipRequirement
+from pants.util.strutil import softwrap
 
 
 def test_pex_binary_validation() -> None:
-    def create_tgt(*, script: str | None = None, entry_point: str | None = None) -> PexBinary:
+    def create_tgt(
+        *, script: str | None = None, executable: str | None = None, entry_point: str | None = None
+    ) -> PexBinary:
         return PexBinary(
-            {PexScriptField.alias: script, PexEntryPointField.alias: entry_point},
+            {
+                PexScriptField.alias: script,
+                PexExecutableField.alias: executable,
+                PexEntryPointField.alias: entry_point,
+            },
             Address("", target_name="t"),
         )
 
     with pytest.raises(InvalidTargetException):
+        create_tgt(script="foo", executable="foo", entry_point="foo")
+    with pytest.raises(InvalidTargetException):
+        create_tgt(script="foo", executable="foo")
+    with pytest.raises(InvalidTargetException):
         create_tgt(script="foo", entry_point="foo")
+    with pytest.raises(InvalidTargetException):
+        create_tgt(executable="foo", entry_point="foo")
     assert create_tgt(script="foo")[PexScriptField].value == ConsoleScript("foo")
+    assert create_tgt(executable="foo")[PexExecutableField].value == Executable("foo")
     assert create_tgt(entry_point="foo")[PexEntryPointField].value == EntryPoint("foo")
-
-
-def test_timeout_calculation() -> None:
-    def assert_timeout_calculated(
-        *,
-        field_value: int | None,
-        expected: int | None,
-        global_default: int | None = None,
-        global_max: int | None = None,
-        timeouts_enabled: bool = True,
-    ) -> None:
-        field = PythonTestsTimeoutField(field_value, Address("", target_name="tests"))
-        pytest = create_subsystem(
-            PyTest,
-            timeouts=timeouts_enabled,
-            timeout_default=global_default,
-            timeout_maximum=global_max,
-        )
-        assert field.calculate_from_global_options(pytest) == expected
-
-    assert_timeout_calculated(field_value=10, expected=10)
-    assert_timeout_calculated(field_value=20, global_max=10, expected=10)
-    assert_timeout_calculated(field_value=None, global_default=20, expected=20)
-    assert_timeout_calculated(field_value=None, expected=None)
-    assert_timeout_calculated(field_value=None, global_default=20, global_max=10, expected=10)
-    assert_timeout_calculated(field_value=10, timeouts_enabled=False, expected=None)
-
-
-@pytest.mark.parametrize(
-    ["entry_point", "expected"],
-    (
-        ("path.to.module", []),
-        ("path.to.module:func", []),
-        ("lambda.py", ["project/dir/lambda.py"]),
-        ("lambda.py:func", ["project/dir/lambda.py"]),
-    ),
-)
-def test_entry_point_filespec(entry_point: str | None, expected: list[str]) -> None:
-    field = PexEntryPointField(entry_point, Address("project/dir"))
-    assert field.filespec == {"includes": expected}
 
 
 def test_entry_point_validation(caplog) -> None:
@@ -186,14 +152,22 @@ def test_resolve_pex_binary_entry_point() -> None:
         assert_resolved(entry_point="*.py", expected=EntryPoint("doesnt matter"), is_file=True)
 
 
-def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
+@pytest.mark.parametrize(
+    ["python_infer_unowned_dependency_behavior"], [("ignore",), ("warning",), ("error",)]
+)
+def test_infer_pex_binary_entry_point_dependency(
+    python_infer_unowned_dependency_behavior, caplog
+) -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_types_rules.rules(),
             *import_rules(),
-            QueryRule(InjectedDependencies, [InjectPexBinaryEntryPointDependency]),
+            QueryRule(InferredDependencies, [InferPexBinaryEntryPointDependency]),
         ],
         target_types=[PexBinary, PythonRequirementTarget, PythonSourcesGeneratorTarget],
+    )
+    rule_runner.set_options(
+        [f"--python-infer-unowned-dependency-behavior={python_infer_unowned_dependency_behavior}"]
     )
     rule_runner.write_files(
         {
@@ -246,54 +220,78 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
         }
     )
 
-    def assert_injected(address: Address, *, expected: Address | None) -> None:
+    def assert_inferred(address: Address, *, expected: Address | None) -> None:
         tgt = rule_runner.get_target(address)
-        injected = rule_runner.request(
-            InjectedDependencies,
-            [InjectPexBinaryEntryPointDependency(tgt[PexBinaryDependenciesField])],
+        inferred = rule_runner.request(
+            InferredDependencies,
+            [
+                InferPexBinaryEntryPointDependency(
+                    PexBinaryEntryPointDependencyInferenceFieldSet.create(tgt)
+                )
+            ],
         )
-        assert injected == InjectedDependencies([expected] if expected else [])
+        assert inferred == InferredDependencies([expected] if expected else [])
 
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="first_party"),
         expected=Address("project", relative_file_path="app.py"),
     )
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="first_party_func"),
         expected=Address("project", relative_file_path="app.py"),
     )
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="first_party_shorthand"),
         expected=Address("project", relative_file_path="app.py"),
     )
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="first_party_shorthand_func"),
         expected=Address("project", relative_file_path="app.py"),
     )
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="third_party"),
         expected=Address("", target_name="ansicolors"),
     )
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="third_party_func"),
         expected=Address("", target_name="ansicolors"),
     )
-    assert_injected(Address("project", target_name="unrecognized"), expected=None)
+    assert_inferred(Address("project", target_name="unrecognized"), expected=None)
 
     # Warn if there's ambiguity, meaning we cannot infer.
     caplog.clear()
-    assert_injected(Address("project", target_name="ambiguous"), expected=None)
-    assert len(caplog.records) == 1
+    if python_infer_unowned_dependency_behavior == "error":
+        with pytest.raises(ExecutionError) as ambiguous_error:
+            assert_inferred(Address("project", target_name="ambiguous"), expected=None)
+        assert isinstance(ambiguous_error.value.wrapped_exceptions[0], UnownedDependencyError)
+    else:
+        assert_inferred(Address("project", target_name="ambiguous"), expected=None)
     assert (
-        "project:ambiguous has the field `entry_point='ambiguous.py'`, which maps to the Python "
-        "module `project.ambiguous`"
-    ) in caplog.text
+        softwrap(
+            """
+            project:ambiguous has the field `entry_point='ambiguous.py'`, which maps to the Python
+            module `project.ambiguous`
+            """
+        )
+        in caplog.text
+    )
     assert "['project/ambiguous.py:dep1', 'project/ambiguous.py:dep2']" in caplog.text
+
+    # assert that the message for the PEX entrypoint was respected
+    if python_infer_unowned_dependency_behavior == "warning":
+        assert len(caplog.records) == 2
+        assert (
+            "The entrypoint EntryPoint(module='ambiguous.py', function=None) might refer to the following"
+            in caplog.text
+        )
+    else:
+        # the "error" case raises it as an error, so it doesn't appear in caplog
+        assert len(caplog.records) == 1
 
     # Test that ignores can disambiguate an otherwise ambiguous entry point. Ensure we don't log a
     # warning about ambiguity.
     caplog.clear()
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="disambiguated"),
         expected=Address("project", target_name="dep1", relative_file_path="ambiguous.py"),
     )
@@ -302,7 +300,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     # Test that using a file path results in ignoring all targets which are not an ancestor. We can
     # do this because we know the file name must be in the current directory or subdir of the
     # `pex_binary`.
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="another_root__file_used"),
         expected=Address(
             "project",
@@ -310,17 +308,38 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
             relative_file_path="ambiguous_in_another_root.py",
         ),
     )
-    caplog.clear()
-    assert_injected(Address("project", target_name="another_root__module_used"), expected=None)
-    assert len(caplog.records) == 1
-    assert (
-        "['project/ambiguous_in_another_root.py:ambiguous_in_another_root', 'src/py/project/"
-        "ambiguous_in_another_root.py']"
-    ) in caplog.text
 
-    # Test that we can turn off the injection.
+    caplog.clear()
+    if python_infer_unowned_dependency_behavior == "error":
+        with pytest.raises(ExecutionError) as ambiguous_error_2:
+            assert_inferred(
+                Address("project", target_name="another_root__module_used"), expected=None
+            )
+        assert isinstance(ambiguous_error_2.value.wrapped_exceptions[0], UnownedDependencyError)
+    else:
+        assert_inferred(Address("project", target_name="another_root__module_used"), expected=None)
+    assert (
+        softwrap(
+            """
+            ['project/ambiguous_in_another_root.py:ambiguous_in_another_root',
+            'src/py/project/ambiguous_in_another_root.py']
+            """
+        )
+        in caplog.text
+    )
+    if python_infer_unowned_dependency_behavior == "warning":
+        assert len(caplog.records) == 2
+        assert (
+            "The entrypoint EntryPoint(module='project.ambiguous_in_another_root', function=None) might refer to the following"
+            in caplog.text
+        )
+    else:
+        # the "error" case raises it as an error, so it doesn't appear in caplog
+        assert len(caplog.records) == 1
+
+    # Test that we can turn off the inference.
     rule_runner.set_options(["--no-python-infer-entry-points"])
-    assert_injected(Address("project", target_name="first_party"), expected=None)
+    assert_inferred(Address("project", target_name="first_party"), expected=None)
 
 
 def test_requirements_field() -> None:
@@ -346,35 +365,14 @@ def test_requirements_field() -> None:
     with pytest.raises(InvalidFieldException) as exc:
         PythonRequirementsField(["not valid! === 3.1"], Address("demo"))
     assert (
-        f"Invalid requirement 'not valid! === 3.1' in the '{PythonRequirementsField.alias}' "
-        f"field for the target demo:"
-    ) in str(exc.value)
-
-
-def test_parse_requirements_file() -> None:
-    content = dedent(
-        r"""\
-        # Comment.
-        --find-links=https://duckduckgo.com
-        -r more_reqs.txt
-        ansicolors>=1.18.0
-        Django==3.2 ; python_version>'3'
-        Un-Normalized-PROJECT  # Inline comment.
-        pip@ git+https://github.com/pypa/pip.git
-        setuptools==54.1.2; python_version >= "3.6" \
-            --hash=sha256:dd20743f36b93cbb8724f4d2ccd970dce8b6e6e823a13aa7e5751bb4e674c20b \
-            --hash=sha256:ebd0148faf627b569c8d2a1b20f5d3b09c873f12739d71c7ee88f037d5be82ff
-        wheel==1.2.3 --hash=sha256:dd20743f36b93cbb8724f4d2ccd970dce8b6e6e823a13aa7e5751bb4e674c20b
-        """
+        softwrap(
+            f"""
+            Invalid requirement 'not valid! === 3.1' in the '{PythonRequirementsField.alias}'
+            field for the target demo:
+            """
+        )
+        in str(exc.value)
     )
-    assert set(parse_requirements_file(content, rel_path="foo.txt")) == {
-        PipRequirement.parse("ansicolors>=1.18.0"),
-        PipRequirement.parse("Django==3.2 ; python_version>'3'"),
-        PipRequirement.parse("Un-Normalized-PROJECT"),
-        PipRequirement.parse("pip@ git+https://github.com/pypa/pip.git"),
-        PipRequirement.parse("setuptools==54.1.2; python_version >= '3.6'"),
-        PipRequirement.parse("wheel==1.2.3"),
-    }
 
 
 def test_resolve_python_distribution_entry_points_required_fields() -> None:
@@ -383,13 +381,13 @@ def test_resolve_python_distribution_entry_points_required_fields() -> None:
         ResolvePythonDistributionEntryPointsRequest()
 
 
-def test_inject_python_distribution_dependencies() -> None:
+def test_infer_python_distribution_dependencies() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_types_rules.rules(),
             *import_rules(),
             *python_sources.rules(),
-            QueryRule(InjectedDependencies, [InjectPythonDistributionDependencies]),
+            QueryRule(InferredDependencies, [InferPythonDistributionDependencies]),
         ],
         target_types=[
             PythonDistribution,
@@ -478,20 +476,24 @@ def test_inject_python_distribution_dependencies() -> None:
         }
     )
 
-    def assert_injected(address: Address, expected: list[Address]) -> None:
+    def assert_inferred(address: Address, expected: list[Address]) -> None:
         tgt = rule_runner.get_target(address)
-        injected = rule_runner.request(
-            InjectedDependencies,
-            [InjectPythonDistributionDependencies(tgt[PythonDistributionDependenciesField])],
+        inferred = rule_runner.request(
+            InferredDependencies,
+            [
+                InferPythonDistributionDependencies(
+                    PythonDistributionDependenciesInferenceFieldSet.create(tgt)
+                )
+            ],
         )
-        assert injected == InjectedDependencies(expected)
+        assert inferred == InferredDependencies(expected)
 
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="dist-a"),
         [Address("project", target_name="my_binary")],
     )
 
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="dist-b"),
         [
             Address("project", target_name="my_binary"),
@@ -499,14 +501,14 @@ def test_inject_python_distribution_dependencies() -> None:
         ],
     )
 
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="third_dep"),
         [
             Address("", target_name="ansicolors"),
         ],
     )
 
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="third_dep2"),
         [
             Address("", target_name="ansicolors"),
@@ -531,9 +533,14 @@ def test_unrecognized_resolve_names_error(
             unrecognized, ["valid1", "valid2", "valid3"], description_of_origin="foo"
         )
     assert (
-        f"Unrecognized resolve {name_str} from foo: "
-        f"{bad_entry_str}\n\nAll valid resolve names: ['valid1', 'valid2', 'valid3']"
-    ) in str(exc.value)
+        softwrap(
+            f"""
+            Unrecognized resolve {name_str} from foo:
+            {bad_entry_str}\n\nAll valid resolve names: ['valid1', 'valid2', 'valid3']
+            """
+        )
+        in str(exc.value)
+    )
 
 
 @pytest.mark.parametrize(
@@ -555,43 +562,20 @@ def test_normalize_module_mapping(
 # -----------------------------------------------------------------------------------------------
 
 
-def test_generate_source_and_test_targets() -> None:
+def test_pex_binary_targets() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_types_rules.rules(),
             *import_rules(),
             *python_sources.rules(),
-            QueryRule(_TargetParametrizations, [Address]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
-        target_types=[
-            PythonTestsGeneratorTarget,
-            PythonSourcesGeneratorTarget,
-            PythonTestUtilsGeneratorTarget,
-            PexBinariesGeneratorTarget,
-        ],
+        target_types=[PexBinariesGeneratorTarget],
     )
     rule_runner.write_files(
         {
             "src/py/BUILD": dedent(
                 """\
-                python_sources(
-                    name='lib',
-                    sources=['**/*.py', '!**/*_test.py', '!**/conftest.py'],
-                    overrides={'f1.py': {'tags': ['overridden']}},
-                )
-
-                python_tests(
-                    name='tests',
-                    sources=['**/*_test.py'],
-                    overrides={'f1_test.py': {'tags': ['overridden']}},
-                )
-
-                python_test_utils(
-                    name='test_utils',
-                    sources=['**/conftest.py'],
-                    overrides={'conftest.py': {'tags': ['overridden']}},
-                )
-
                 pex_binaries(
                     name="pexes",
                     entry_points=[
@@ -607,32 +591,8 @@ def test_generate_source_and_test_targets() -> None:
                 )
                 """
             ),
-            "src/py/f1.py": "",
-            "src/py/f1_test.py": "",
-            "src/py/conftest.py": "",
-            "src/py/f2.py": "",
-            "src/py/f2_test.py": "",
-            "src/py/subdir/f.py": "",
-            "src/py/subdir/f_test.py": "",
-            "src/py/subdir/conftest.py": "",
         }
     )
-
-    def gen_source_tgt(
-        rel_fp: str, tags: list[str] | None = None, *, tgt_name: str
-    ) -> PythonSourceTarget:
-        return PythonSourceTarget(
-            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
-            Address("src/py", target_name=tgt_name, relative_file_path=rel_fp),
-            residence_dir=os.path.dirname(os.path.join("src/py", rel_fp)),
-        )
-
-    def gen_test_tgt(rel_fp: str, tags: list[str] | None = None) -> PythonTestTarget:
-        return PythonTestTarget(
-            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
-            Address("src/py", target_name="tests", relative_file_path=rel_fp),
-            residence_dir=os.path.dirname(os.path.join("src/py", rel_fp)),
-        )
 
     def gen_pex_binary_tgt(entry_point: str, tags: list[str] | None = None) -> PexBinary:
         return PexBinary(
@@ -641,35 +601,15 @@ def test_generate_source_and_test_targets() -> None:
             residence_dir="src/py",
         )
 
-    sources_generated = rule_runner.request(
-        _TargetParametrizations, [Address("src/py", target_name="lib")]
-    ).parametrizations
-    tests_generated = rule_runner.request(
-        _TargetParametrizations, [Address("src/py", target_name="tests")]
-    ).parametrizations
-    test_utils_generated = rule_runner.request(
-        _TargetParametrizations, [Address("src/py", target_name="test_utils")]
-    ).parametrizations
-    pex_binaries_generated = rule_runner.request(
-        _TargetParametrizations, [Address("src/py", target_name="pexes")]
-    ).parametrizations
-
-    assert set(sources_generated.values()) == {
-        gen_source_tgt("f1.py", tags=["overridden"], tgt_name="lib"),
-        gen_source_tgt("f2.py", tgt_name="lib"),
-        gen_source_tgt("subdir/f.py", tgt_name="lib"),
-    }
-    assert set(tests_generated.values()) == {
-        gen_test_tgt("f1_test.py", tags=["overridden"]),
-        gen_test_tgt("f2_test.py"),
-        gen_test_tgt("subdir/f_test.py"),
-    }
-
-    assert set(test_utils_generated.values()) == {
-        gen_source_tgt("conftest.py", tags=["overridden"], tgt_name="test_utils"),
-        gen_source_tgt("subdir/conftest.py", tgt_name="test_utils"),
-    }
-    assert set(pex_binaries_generated.values()) == {
+    result = rule_runner.request(
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("src/py", target_name="pexes"), description_of_origin="tests"
+            )
+        ],
+    ).parametrizations.values()
+    assert set(result) == {
         gen_pex_binary_tgt("f1.py"),
         gen_pex_binary_tgt("f2:foo", tags=["overridden"]),
         gen_pex_binary_tgt("subdir.f.py", tags=["overridden"]),

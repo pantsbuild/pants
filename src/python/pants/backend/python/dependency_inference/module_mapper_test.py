@@ -3,8 +3,11 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import PurePath
 from textwrap import dedent
+from types import FunctionType
+from typing import Iterable, Tuple
 
 import pytest
 from packaging.utils import canonicalize_name as canonicalize_project_name
@@ -18,15 +21,21 @@ from pants.backend.codegen.protobuf.target_types import rules as protobuf_target
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_MODULE_MAPPING,
+    DEFAULT_MODULE_PATTERN_MAPPING,
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
+    DEFAULT_TYPE_STUB_MODULE_PATTERN_MAPPING,
+    first_group_hyphen_to_underscore,
+    two_groups_hyphens_two_replacements_with_suffix,
 )
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonModuleMapping,
     ModuleProvider,
     ModuleProviderType,
+    PossibleModuleProvider,
     PythonModuleOwners,
     PythonModuleOwnersRequest,
     ThirdPartyPythonModuleMapping,
+    generate_mappings_from_pattern,
     module_from_stripped_path,
 )
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
@@ -52,6 +61,30 @@ def test_default_module_mapping_is_normalized() -> None:
         ), "Please update `DEFAULT_TYPE_STUB_MODULE_MAPPING` to use canonical project names"
 
 
+def test_default_module_mapping_uses_tuples() -> None:
+    for modules in [
+        *DEFAULT_MODULE_MAPPING.values(),
+        *DEFAULT_TYPE_STUB_MODULE_MAPPING.values(),
+    ]:
+        assert isinstance(modules, tuple)
+        assert len(modules) > 0
+
+
+def test_default_module_pattern_mapping_keys_and_value_types() -> None:
+    for pattern, replacements in [
+        *DEFAULT_MODULE_PATTERN_MAPPING.items(),
+        *DEFAULT_TYPE_STUB_MODULE_PATTERN_MAPPING.items(),
+    ]:
+        assert isinstance(pattern, re.Pattern)
+        assert isinstance(replacements, Iterable)
+        for replacement in replacements:
+            assert (
+                isinstance(replacement, FunctionType)
+                or isinstance(replacement, str)
+                or callable(replacement)
+            )
+
+
 @pytest.mark.parametrize(
     "stripped_path,expected",
     [
@@ -72,13 +105,16 @@ def test_first_party_modules_mapping() -> None:
         Address("", relative_file_path="root.py"), ModuleProviderType.IMPL
     )
     util_provider = ModuleProvider(
-        Address("src/python/util", relative_file_path="strutil.py"), ModuleProviderType.IMPL
+        Address("src/python/util", relative_file_path="strutil.py"),
+        ModuleProviderType.IMPL,
     )
     util_stubs_provider = ModuleProvider(
-        Address("src/python/util", relative_file_path="strutil.pyi"), ModuleProviderType.TYPE_STUB
+        Address("src/python/util", relative_file_path="strutil.pyi"),
+        ModuleProviderType.TYPE_STUB,
     )
     test_provider = ModuleProvider(
-        Address("tests/python/project_test", relative_file_path="test.py"), ModuleProviderType.IMPL
+        Address("tests/python/project_test", relative_file_path="test.py"),
+        ModuleProviderType.IMPL,
     )
     mapping = FirstPartyPythonModuleMapping(
         FrozenDict(
@@ -99,36 +135,48 @@ def test_first_party_modules_mapping() -> None:
     )
 
     def assert_addresses(
-        mod: str, expected: tuple[ModuleProvider, ...], *, resolve: str | None = None
+        mod: str,
+        expected: tuple[PossibleModuleProvider, ...],
+        *,
+        resolve: str | None = None,
     ) -> None:
         assert mapping.providers_for_module(mod, resolve=resolve) == expected
 
-    assert_addresses("root", (root_provider,))
-    assert_addresses("root.func", (root_provider,))
+    root_provider0 = PossibleModuleProvider(root_provider, 0)
+    root_provider1 = PossibleModuleProvider(root_provider, 1)
+    util_provider0 = PossibleModuleProvider(util_provider, 0)
+    util_provider1 = PossibleModuleProvider(util_provider, 1)
+    util_stubs_provider0 = PossibleModuleProvider(util_stubs_provider, 0)
+    util_stubs_provider1 = PossibleModuleProvider(util_stubs_provider, 1)
+    test_provider0 = PossibleModuleProvider(test_provider, 0)
+    test_provider1 = PossibleModuleProvider(test_provider, 1)
+
+    assert_addresses("root", (root_provider0,))
+    assert_addresses("root.func", (root_provider1,))
     assert_addresses("root.submodule.func", ())
 
-    assert_addresses("util.strutil", (util_provider, util_stubs_provider))
-    assert_addresses("util.strutil.ensure_text", (util_provider, util_stubs_provider))
+    assert_addresses("util.strutil", (util_provider0, util_stubs_provider0))
+    assert_addresses("util.strutil.ensure_text", (util_provider1, util_stubs_provider1))
     assert_addresses("util", ())
 
-    assert_addresses("project_test.test", (test_provider,))
-    assert_addresses("project_test.test.TestDemo", (test_provider,))
+    assert_addresses("project_test.test", (test_provider0,))
+    assert_addresses("project_test.test.TestDemo", (test_provider1,))
     assert_addresses("project_test", ())
     assert_addresses("project.test", ())
 
-    assert_addresses("ambiguous", (root_provider, util_provider))
-    assert_addresses("ambiguous.func", (root_provider, util_provider))
+    assert_addresses("ambiguous", (root_provider0, util_provider0))
+    assert_addresses("ambiguous.func", (root_provider1, util_provider1))
     assert_addresses("ambiguous.submodule.func", ())
 
-    assert_addresses("util.ambiguous", (util_provider, test_provider))
-    assert_addresses("util.ambiguous.Foo", (util_provider, test_provider))
+    assert_addresses("util.ambiguous", (util_provider0, test_provider0))
+    assert_addresses("util.ambiguous.Foo", (util_provider1, test_provider1))
     assert_addresses("util.ambiguous.Foo.method", ())
 
-    assert_addresses("two_resolves", (root_provider, test_provider), resolve=None)
-    assert_addresses("two_resolves.foo", (root_provider, test_provider), resolve=None)
+    assert_addresses("two_resolves", (root_provider0, test_provider0), resolve=None)
+    assert_addresses("two_resolves.foo", (root_provider1, test_provider1), resolve=None)
     assert_addresses("two_resolves.foo.bar", (), resolve=None)
-    assert_addresses("two_resolves", (root_provider,), resolve="default")
-    assert_addresses("two_resolves", (test_provider,), resolve="another")
+    assert_addresses("two_resolves", (root_provider0,), resolve="default")
+    assert_addresses("two_resolves", (test_provider0,), resolve="another")
 
 
 def test_third_party_modules_mapping() -> None:
@@ -144,49 +192,68 @@ def test_third_party_modules_mapping() -> None:
         Address("", target_name="submodule"), ModuleProviderType.IMPL
     )
     mapping = ThirdPartyPythonModuleMapping(
-        {
-            "default-resolve": FrozenDict(
-                {
-                    "colors": (colors_provider, colors_stubs_provider),
-                    "pants": (pants_provider,),
-                    "req.submodule": (submodule_provider,),
-                    "pants.testutil": (pants_testutil_provider,),
-                    "two_resolves": (colors_provider,),
-                }
-            ),
-            "another-resolve": FrozenDict({"two_resolves": (pants_provider,)}),
-        }
+        FrozenDict(
+            {
+                "default-resolve": FrozenDict(
+                    {
+                        "colors": (colors_provider, colors_stubs_provider),
+                        "pants": (pants_provider,),
+                        "req.submodule": (submodule_provider,),
+                        "pants.testutil": (pants_testutil_provider,),
+                        "two_resolves": (colors_provider,),
+                    }
+                ),
+                "another-resolve": FrozenDict({"two_resolves": (pants_provider,)}),
+            }
+        )
     )
 
     def assert_addresses(
-        mod: str, expected: tuple[ModuleProvider, ...], *, resolve: str | None = None
+        mod: str,
+        expected: tuple[PossibleModuleProvider, ...],
+        *,
+        resolve: str | None = None,
     ) -> None:
         assert mapping.providers_for_module(mod, resolve) == expected
 
-    assert_addresses("colors", (colors_provider, colors_stubs_provider))
-    assert_addresses("colors.red", (colors_provider, colors_stubs_provider))
+    colors_provider0 = PossibleModuleProvider(colors_provider, 0)
+    colors_provider1 = PossibleModuleProvider(colors_provider, 1)
+    colors_provider2 = PossibleModuleProvider(colors_provider, 2)
+    colors_stubs_provider0 = PossibleModuleProvider(colors_stubs_provider, 0)
+    colors_stubs_provider1 = PossibleModuleProvider(colors_stubs_provider, 1)
+    pants_provider0 = PossibleModuleProvider(pants_provider, 0)
+    pants_provider1 = PossibleModuleProvider(pants_provider, 1)
+    pants_provider2 = PossibleModuleProvider(pants_provider, 2)
+    pants_provider3 = PossibleModuleProvider(pants_provider, 3)
+    pants_testutil_provider0 = PossibleModuleProvider(pants_testutil_provider, 0)
+    pants_testutil_provider1 = PossibleModuleProvider(pants_testutil_provider, 1)
+    submodule_provider0 = PossibleModuleProvider(submodule_provider, 0)
+    submodule_provider1 = PossibleModuleProvider(submodule_provider, 1)
 
-    assert_addresses("pants", (pants_provider,))
-    assert_addresses("pants.task", (pants_provider,))
-    assert_addresses("pants.task.task", (pants_provider,))
-    assert_addresses("pants.task.task.Task", (pants_provider,))
+    assert_addresses("colors", (colors_provider0, colors_stubs_provider0))
+    assert_addresses("colors.red", (colors_provider1, colors_stubs_provider1))
 
-    assert_addresses("pants.testutil", (pants_testutil_provider,))
-    assert_addresses("pants.testutil.foo", (pants_testutil_provider,))
+    assert_addresses("pants", (pants_provider0,))
+    assert_addresses("pants.task", (pants_provider1,))
+    assert_addresses("pants.task.task", (pants_provider2,))
+    assert_addresses("pants.task.task.Task", (pants_provider3,))
 
-    assert_addresses("req.submodule", (submodule_provider,))
-    assert_addresses("req.submodule.foo", (submodule_provider,))
+    assert_addresses("pants.testutil", (pants_testutil_provider0,))
+    assert_addresses("pants.testutil.foo", (pants_testutil_provider1,))
+
+    assert_addresses("req.submodule", (submodule_provider0,))
+    assert_addresses("req.submodule.foo", (submodule_provider1,))
     assert_addresses("req.another", ())
     assert_addresses("req", ())
 
     assert_addresses("unknown", ())
     assert_addresses("unknown.pants", ())
 
-    assert_addresses("two_resolves", (colors_provider, pants_provider), resolve=None)
-    assert_addresses("two_resolves.foo", (colors_provider, pants_provider), resolve=None)
-    assert_addresses("two_resolves.foo.bar", (colors_provider, pants_provider), resolve=None)
-    assert_addresses("two_resolves", (colors_provider,), resolve="default-resolve")
-    assert_addresses("two_resolves", (pants_provider,), resolve="another-resolve")
+    assert_addresses("two_resolves", (colors_provider0, pants_provider0), resolve=None)
+    assert_addresses("two_resolves.foo", (colors_provider1, pants_provider1), resolve=None)
+    assert_addresses("two_resolves.foo.bar", (colors_provider2, pants_provider2), resolve=None)
+    assert_addresses("two_resolves", (colors_provider0,), resolve="default-resolve")
+    assert_addresses("two_resolves", (pants_provider0,), resolve="another-resolve")
 
 
 @pytest.fixture
@@ -256,13 +323,19 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                     {
                         "project.util.dirutil": (
                             ModuleProvider(
-                                Address("src/python/project/util", relative_file_path="dirutil.py"),
+                                Address(
+                                    "src/python/project/util",
+                                    relative_file_path="dirutil.py",
+                                ),
                                 ModuleProviderType.IMPL,
                             ),
                         ),
                         "project.util.tarutil": (
                             ModuleProvider(
-                                Address("src/python/project/util", relative_file_path="tarutil.py"),
+                                Address(
+                                    "src/python/project/util",
+                                    relative_file_path="tarutil.py",
+                                ),
                                 ModuleProviderType.IMPL,
                             ),
                         ),
@@ -272,15 +345,24 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                     {
                         "multiple_owners": (
                             ModuleProvider(
-                                Address("build-support", relative_file_path="multiple_owners.py"),
+                                Address(
+                                    "build-support",
+                                    relative_file_path="multiple_owners.py",
+                                ),
                                 ModuleProviderType.IMPL,
                             ),
                             ModuleProvider(
-                                Address("src/python", relative_file_path="multiple_owners.py"),
+                                Address(
+                                    "src/python",
+                                    relative_file_path="multiple_owners.py",
+                                ),
                                 ModuleProviderType.IMPL,
                             ),
                             ModuleProvider(
-                                Address("src/python", relative_file_path="multiple_owners.pyi"),
+                                Address(
+                                    "src/python",
+                                    relative_file_path="multiple_owners.pyi",
+                                ),
                                 ModuleProviderType.TYPE_STUB,
                             ),
                         ),
@@ -333,11 +415,13 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         stub_modules: list[str] | None = None,
         resolve: str = "default",
     ) -> str:
-        return (
-            f"python_requirement(name='{tgt_name}', requirements=['{req_str}'], "
-            f"modules={modules or []},"
-            f"type_stub_modules={stub_modules or []},"
-            f"resolve={repr(resolve)})"
+        return dedent(
+            f"""\
+            python_requirement(name='{tgt_name}', requirements=['{req_str}'],
+            modules={modules or []},
+            type_stub_modules={stub_modules or []},
+            resolve={repr(resolve)})
+            """
         )
 
     build_file = "\n\n".join(
@@ -358,7 +442,20 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             req("multiple_owners2", "multiple_owners==2", resolve="another"),
             req("multiple_owners_types", "types-multiple_owners==1", resolve="another"),
             # Only assume it's a type stubs dep if we are certain it's not an implementation.
-            req("looks_like_stubs", "looks-like-stubs-types", modules=["looks_like_stubs"]),
+            req(
+                "looks_like_stubs",
+                "looks-like-stubs-types",
+                modules=["looks_like_stubs"],
+            ),
+            req("google-cloud-hardyhar", "google-cloud-hardyhar"),
+            req("google-cloud-secret-manager", "google-cloud-secret-manager"),
+            req("azure-keyvault-secrets", "azure-keyvault-secrets"),
+            req("django-model-utils", "model_utils"),
+            req("django-taggit", "taggit"),
+            req(
+                "opentelemetry-instrumentation-botocore",
+                "opentelemetry-instrumentation-botocore",
+            ),
         ]
     )
     rule_runner.write_files({"BUILD": build_file})
@@ -366,91 +463,188 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         ["--python-resolves={'default': '', 'another': ''}", "--python-enable-resolves"]
     )
     result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
-    assert result == ThirdPartyPythonModuleMapping(
-        {
-            "another": FrozenDict(
-                {
-                    "multiple_owners": (
-                        ModuleProvider(
-                            Address("", target_name="multiple_owners2"), ModuleProviderType.IMPL
+    expected = ThirdPartyPythonModuleMapping(
+        FrozenDict(
+            {
+                "another": FrozenDict(
+                    {
+                        "multiple_owners": (
+                            ModuleProvider(
+                                Address("", target_name="multiple_owners2"),
+                                ModuleProviderType.IMPL,
+                            ),
+                            ModuleProvider(
+                                Address("", target_name="multiple_owners_types"),
+                                ModuleProviderType.TYPE_STUB,
+                            ),
                         ),
-                        ModuleProvider(
-                            Address("", target_name="multiple_owners_types"),
-                            ModuleProviderType.TYPE_STUB,
+                    }
+                ),
+                "default": FrozenDict(
+                    {
+                        "azure.keyvault.secrets": (
+                            ModuleProvider(
+                                Address("", target_name="azure-keyvault-secrets"),
+                                ModuleProviderType.IMPL,
+                            ),
                         ),
-                    ),
-                }
-            ),
-            "default": FrozenDict(
-                {
-                    "file_dist": (
-                        ModuleProvider(
-                            Address("", target_name="file_dist"), ModuleProviderType.IMPL
+                        "file_dist": (
+                            ModuleProvider(
+                                Address("", target_name="file_dist"),
+                                ModuleProviderType.IMPL,
+                            ),
                         ),
-                    ),
-                    "looks_like_stubs": (
-                        ModuleProvider(
-                            Address("", target_name="looks_like_stubs"), ModuleProviderType.IMPL
+                        "google.cloud.hardyhar": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
                         ),
-                    ),
-                    "mapped_module": (
-                        ModuleProvider(Address("", target_name="modules"), ModuleProviderType.IMPL),
-                    ),
-                    "multiple_owners": (
-                        ModuleProvider(
-                            Address("", target_name="multiple_owners1"), ModuleProviderType.IMPL
+                        "google.cloud.hardyhar_v1": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
                         ),
-                    ),
-                    "req1": (
-                        ModuleProvider(Address("", target_name="req1"), ModuleProviderType.IMPL),
-                    ),
-                    "typed_dep1": (
-                        ModuleProvider(
-                            Address("", target_name="typed-dep1"), ModuleProviderType.TYPE_STUB
+                        "google.cloud.hardyhar_v2": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
                         ),
-                    ),
-                    "typed_dep2": (
-                        ModuleProvider(
-                            Address("", target_name="typed-dep2"), ModuleProviderType.TYPE_STUB
+                        "google.cloud.hardyhar_v3": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
                         ),
-                    ),
-                    "typed_dep3": (
-                        ModuleProvider(
-                            Address("", target_name="typed-dep3"), ModuleProviderType.TYPE_STUB
+                        "google.cloud.secretmanager": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-secret-manager"),
+                                ModuleProviderType.IMPL,
+                            ),
                         ),
-                    ),
-                    "typed_dep4": (
-                        ModuleProvider(
-                            Address("", target_name="typed-dep4"), ModuleProviderType.TYPE_STUB
+                        "google.cloud.secretmanager_v1": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-secret-manager"),
+                                ModuleProviderType.IMPL,
+                            ),
                         ),
-                    ),
-                    "typed_dep5": (
-                        ModuleProvider(
-                            Address("", target_name="typed-dep5"), ModuleProviderType.TYPE_STUB
+                        "google.cloud.secretmanager_v2": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-secret-manager"),
+                                ModuleProviderType.IMPL,
+                            ),
                         ),
-                    ),
-                    "un_normalized_project": (
-                        ModuleProvider(
-                            Address("", target_name="un_normalized"), ModuleProviderType.IMPL
+                        "google.cloud.secretmanager_v3": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-secret-manager"),
+                                ModuleProviderType.IMPL,
+                            ),
                         ),
-                    ),
-                    "vcs_dist": (
-                        ModuleProvider(
-                            Address("", target_name="vcs_dist"), ModuleProviderType.IMPL
+                        "looks_like_stubs": (
+                            ModuleProvider(
+                                Address("", target_name="looks_like_stubs"),
+                                ModuleProviderType.IMPL,
+                            ),
                         ),
-                    ),
-                }
-            ),
-        }
+                        "mapped_module": (
+                            ModuleProvider(
+                                Address("", target_name="modules"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "model_utils": (
+                            ModuleProvider(
+                                Address("", target_name="django-model-utils"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "multiple_owners": (
+                            ModuleProvider(
+                                Address("", target_name="multiple_owners1"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "opentelemetry.instrumentation.botocore": (
+                            ModuleProvider(
+                                Address(
+                                    "",
+                                    target_name="opentelemetry-instrumentation-botocore",
+                                ),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "req1": (
+                            ModuleProvider(
+                                Address("", target_name="req1"), ModuleProviderType.IMPL
+                            ),
+                        ),
+                        "taggit": (
+                            ModuleProvider(
+                                Address("", target_name="django-taggit"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "typed_dep1": (
+                            ModuleProvider(
+                                Address("", target_name="typed-dep1"),
+                                ModuleProviderType.TYPE_STUB,
+                            ),
+                        ),
+                        "typed_dep2": (
+                            ModuleProvider(
+                                Address("", target_name="typed-dep2"),
+                                ModuleProviderType.TYPE_STUB,
+                            ),
+                        ),
+                        "typed_dep3": (
+                            ModuleProvider(
+                                Address("", target_name="typed-dep3"),
+                                ModuleProviderType.TYPE_STUB,
+                            ),
+                        ),
+                        "typed_dep4": (
+                            ModuleProvider(
+                                Address("", target_name="typed-dep4"),
+                                ModuleProviderType.TYPE_STUB,
+                            ),
+                        ),
+                        "typed_dep5": (
+                            ModuleProvider(
+                                Address("", target_name="typed-dep5"),
+                                ModuleProviderType.TYPE_STUB,
+                            ),
+                        ),
+                        "un_normalized_project": (
+                            ModuleProvider(
+                                Address("", target_name="un_normalized"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "vcs_dist": (
+                            ModuleProvider(
+                                Address("", target_name="vcs_dist"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                    }
+                ),
+            }
+        )
     )
+    assert result == expected
 
 
 def test_map_module_to_address(rule_runner: RuleRunner) -> None:
     def assert_owners(
-        module: str, expected: list[Address], expected_ambiguous: list[Address] | None = None
+        module: str,
+        expected: list[Address],
+        expected_ambiguous: list[Address] | None = None,
     ) -> None:
         owners = rule_runner.request(
-            PythonModuleOwners, [PythonModuleOwnersRequest(module, resolve="python-default")]
+            PythonModuleOwners,
+            [PythonModuleOwnersRequest(module, resolve="python-default")],
         )
         assert list(owners.unambiguous) == expected
         assert list(owners.ambiguous) == (expected_ambiguous or [])
@@ -492,6 +686,14 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
                 """\
                 python_sources()
                 python_requirement(name="dep", requirements=["dep_with_stub"])
+                """
+            ),
+            # Namespace package split between first- and third-party, disambiguated by ancestry level.
+            "root/namespace/__init__.py": "",
+            "root/namespace/BUILD": dedent(
+                """\
+                python_requirement(name="thirdparty", requirements=["namespace.thirdparty"])
+                python_source(name="init", source="__init__.py")
                 """
             ),
             # Ambiguity.
@@ -550,7 +752,10 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
     assert_owners("valid_dep", [Address("", target_name="valid_dep")])
     assert_owners(
         "dep_w_stub",
-        [Address("", target_name="dep_w_stub"), Address("", target_name="dep_w_stub-types")],
+        [
+            Address("", target_name="dep_w_stub"),
+            Address("", target_name="dep_w_stub-types"),
+        ],
     )
     assert_owners("script", [Address("", target_name="script")])
     assert_owners("no_stub.app", expected=[Address("root/no_stub", relative_file_path="app.py")])
@@ -562,7 +767,8 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
         ],
     )
     assert_owners(
-        "package.subdir", [Address("root/package/subdir", relative_file_path="__init__.py")]
+        "package.subdir",
+        [Address("root/package/subdir", relative_file_path="__init__.py")],
     )
     assert_owners(
         "dep_with_stub",
@@ -571,6 +777,7 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
             Address("root", relative_file_path="dep_with_stub.pyi"),
         ],
     )
+    assert_owners("namespace.thirdparty", [Address("root/namespace", target_name="thirdparty")])
 
     assert_owners(
         "ambiguous_3rdparty",
@@ -617,6 +824,62 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_resolving_ambiguity_by_filesystem_proximity(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [
+            "--source-root-patterns=['root1', 'root2', 'root3']",
+            "--python-infer-ambiguity-resolution=by_source_root",
+        ]
+    )
+    rule_runner.write_files(
+        {
+            "root1/aa/bb/BUILD": "python_sources()",
+            "root1/aa/bb/foo.py": "",
+            "root1/aa/cc/BUILD": "python_sources()",
+            "root1/aa/cc/bar.py": "from aa.bb import foo",
+            "root2/aa/bb/BUILD": "python_sources()",
+            "root2/aa/bb/foo.py": "",
+            "root2/aa/dd/baz.py": "from aa.bb import foo",
+            "root3/aa/ee/BUILD": "python_sources()",
+            "root3/aa/ee/foo.py": "from aa.bb import foo",
+        }
+    )
+
+    owners = rule_runner.request(
+        PythonModuleOwners,
+        [PythonModuleOwnersRequest("aa.bb.foo", None, locality=None)],
+    )
+    assert list(owners.unambiguous) == []
+    assert list(owners.ambiguous) == [
+        Address("root1/aa/bb", relative_file_path="foo.py"),
+        Address("root2/aa/bb", relative_file_path="foo.py"),
+    ]
+
+    owners = rule_runner.request(
+        PythonModuleOwners,
+        [PythonModuleOwnersRequest("aa.bb.foo", None, locality="root1/")],
+    )
+    assert list(owners.unambiguous) == [Address("root1/aa/bb", relative_file_path="foo.py")]
+    assert list(owners.ambiguous) == []
+
+    owners = rule_runner.request(
+        PythonModuleOwners,
+        [PythonModuleOwnersRequest("aa.bb.foo", None, locality="root2/")],
+    )
+    assert list(owners.unambiguous) == [Address("root2/aa/bb", relative_file_path="foo.py")]
+    assert list(owners.ambiguous) == []
+
+    owners = rule_runner.request(
+        PythonModuleOwners,
+        [PythonModuleOwnersRequest("aa.bb.foo", None, locality="root3/")],
+    )
+    assert list(owners.unambiguous) == []
+    assert list(owners.ambiguous) == [
+        Address("root1/aa/bb", relative_file_path="foo.py"),
+        Address("root2/aa/bb", relative_file_path="foo.py"),
+    ]
+
+
 def test_map_module_considers_resolves(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -653,7 +916,7 @@ def test_map_module_considers_resolves(rule_runner: RuleRunner) -> None:
 
 
 def test_issue_15111(rule_runner: RuleRunner) -> None:
-    """Ensure we can handle when a single address implement multiple modules.
+    """Ensure we can handle when a single address provides multiple modules.
 
     This is currently only possible with third-party targets.
     """
@@ -663,16 +926,103 @@ def test_issue_15111(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--python-enable-resolves"])
     result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
     assert result == ThirdPartyPythonModuleMapping(
-        {
-            "python-default": FrozenDict(
-                {
-                    "docopt": (
-                        ModuleProvider(Address("", target_name="req"), ModuleProviderType.IMPL),
-                        ModuleProvider(
-                            Address("", target_name="req"), ModuleProviderType.TYPE_STUB
+        FrozenDict(
+            {
+                "python-default": FrozenDict(
+                    {
+                        "docopt": (
+                            ModuleProvider(Address("", target_name="req"), ModuleProviderType.IMPL),
+                            ModuleProvider(
+                                Address("", target_name="req"),
+                                ModuleProviderType.TYPE_STUB,
+                            ),
                         ),
-                    ),
-                }
-            )
-        }
+                    }
+                )
+            }
+        )
     )
+
+
+@pytest.mark.parametrize(
+    ("proj_name", "expected_modules"),
+    [
+        (
+            "google-cloud-hardyhar",
+            (
+                "google.cloud.hardyhar",
+                "google.cloud.hardyhar_v1",
+                "google.cloud.hardyhar_v2",
+                "google.cloud.hardyhar_v3",
+            ),
+        ),
+        (
+            "python-jose",
+            ("jose",),
+        ),
+        (
+            "opentelemetry-instrumentation-tornado",
+            ("opentelemetry.instrumentation.tornado",),
+        ),
+        ("azure-mgmt-consumption", ("azure.mgmt.consumption",)),
+        ("azure-keyvault", ("azure.keyvault",)),
+        (
+            "django-admin-cursor-paginator",
+            ("admin_cursor_paginator",),
+        ),
+        (
+            "django-dotenv",
+            ("dotenv",),
+        ),
+        ("oslo-service", ("oslo_service",)),
+        ("pyopenssl", tuple()),
+        ("", tuple()),
+    ],
+)
+def test_generate_mappings_from_pattern_matches_para(
+    proj_name: str, expected_modules: Tuple[str]
+) -> None:
+    assert generate_mappings_from_pattern(proj_name, is_type_stub=False) == expected_modules
+
+
+@pytest.mark.parametrize(
+    ("proj_name", "expected_modules"),
+    [
+        (
+            "types-requests",
+            ("requests",),
+        ),
+        (
+            "botocore-stubs",
+            ("botocore",),
+        ),
+        (
+            "django-types",
+            ("django",),
+        ),
+        (
+            "types_requests",
+            ("requests",),
+        ),
+        (
+            "botocore_stubs",
+            ("botocore",),
+        ),
+        (
+            "django_types",
+            ("django",),
+        ),
+        ("", tuple()),
+    ],
+)
+def test_generate_type_stub_mappings_from_pattern_matches_para(
+    proj_name: str, expected_modules: Tuple[str]
+) -> None:
+    assert generate_mappings_from_pattern(proj_name, is_type_stub=True) == expected_modules
+
+
+def test_number_of_capture_groups_for_functions() -> None:
+    with pytest.raises(ValueError):
+        re.sub("foo", first_group_hyphen_to_underscore, "foo")
+    with pytest.raises(ValueError):
+        re.sub("foo", two_groups_hyphens_two_replacements_with_suffix, "foo")

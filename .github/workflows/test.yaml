@@ -1,59 +1,44 @@
 # GENERATED, DO NOT EDIT!
-# To change, edit `build-support/bin/generate_github_workflows.py` and run:
-#   ./pants run build-support/bin/generate_github_workflows.py
+# To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
+#   ./pants run src/python/pants_release/generate_github_workflows.py
 
 
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
 env:
   PANTS_CONFIG_FILES: +['pants.ci.toml']
   RUST_BACKTRACE: all
 jobs:
-  bootstrap_pants_linux:
+  bootstrap_pants_linux_arm64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Bootstrap Pants, test+lint Rust (Linux)
-    needs: check_labels
-    runs-on: ubuntu-20.04
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Bootstrap Pants, test Rust (Linux-ARM64)
+    needs:
+    - classify_changes
+    runs-on:
+    - self-hosted
+    - Linux
+    - ARM64
     steps:
     - name: Check out code
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
-
-        '
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}-v1
-        path: '~/.rustup/toolchains/1.61.0-*
+        key: Linux-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.77.0-*
 
           ~/.rustup/update-hashes
 
@@ -61,50 +46,26 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v3
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
       with:
-        key: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}-v1
-
-          '
-        path: '~/.cargo/registry
-
-          ~/.cargo/git
-
-          '
-        restore-keys: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-
-
-          '
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
-      run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
-
-        '
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-
-          '
-        path: '.pants
+        key: Linux-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
+        path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Bootstrap Pants
-      run: './pants --version
-
-        '
-    - name: Validate CI config
-      run: './pants run build-support/bin/generate_github_workflows.py -- --check
-
-        '
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
       run: './pants list ::
 
@@ -117,94 +78,59 @@ jobs:
         ./pants help subsystems
 
         '
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-bootstrap-linux
-        path: .pants.d/pants.log
+        name: logs-bootstrap-Linux-ARM64
+        path: .pants.d/workdir/*.log
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
-        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
-        path: '.pants
+        name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
+        path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: '!contains(env.COMMIT_MESSAGE, ''[ci skip-rust]'')'
-      name: Test and Lint Rust
-      run: 'sudo apt-get install -y pkg-config fuse libfuse-dev
-
-        ./build-support/bin/check_rust_pre_commit.sh
-
-        ./cargo test --all --tests -- --nocapture
-
-        ./cargo check --benches
-
-        '
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
-    timeout-minutes: 40
-  bootstrap_pants_macos:
+    - env:
+        TMPDIR: ${{ runner.temp }}
+      if: needs.classify_changes.outputs.rust == 'true'
+      name: Test Rust
+      run: ./cargo test --locked --tests -- --nocapture --test-threads=8
+    timeout-minutes: 60
+  bootstrap_pants_linux_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Bootstrap Pants, test Rust (macOS)
-    needs: check_labels
-    runs-on: macos-10.15
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Bootstrap Pants, test and lint Rust (Linux-x86_64)
+    needs:
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
     steps:
-    - env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: github.event_name == 'pull_request'
-      name: Ensure category label
-      uses: mheap/github-action-required-labels@v1
-      with:
-        count: 1
-        labels: category:new feature, category:user api change, category:plugin api
-          change, category:performance, category:bugfix, category:documentation, category:internal
-        mode: exactly
     - name: Check out code
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}-v1
-        path: '~/.rustup/toolchains/1.61.0-*
+        key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.77.0-*
 
           ~/.rustup/update-hashes
 
@@ -212,74 +138,178 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v3
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
       with:
-        key: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}-v1
-
-          '
-        path: '~/.cargo/registry
-
-          ~/.cargo/git
-
-          '
-        restore-keys: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-
-
-          '
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
-      run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
-
-        '
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-
-          '
-        path: '.pants
+        key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
+        path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Bootstrap Pants
-      run: './pants --version
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
+    - name: Run smoke tests
+      run: './pants list ::
+
+        ./pants roots
+
+        ./pants help goals
+
+        ./pants help targets
+
+        ./pants help subsystems
 
         '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-bootstrap-Linux-x86_64
+        path: .pants.d/workdir/*.log
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
-        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
-        path: '.pants
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: 'src/python/pants/bin/native_client
+
+          src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine.so.metadata'
+    - name: Validate CI config
+      run: './pants run src/python/pants_release/generate_github_workflows.py -- --check
+
+        '
+    - env:
+        TMPDIR: ${{ runner.temp }}
+      if: needs.classify_changes.outputs.rust == 'true'
+      name: Test and lint Rust
+      run: 'sudo apt-get install -y pkg-config fuse libfuse-dev
+
+        ./build-support/bin/check_rust_pre_commit.sh
+
+        ./cargo test --locked --all --tests --benches -- --nocapture
+
+        ./cargo doc'
+    timeout-minutes: 60
+  bootstrap_pants_macos11_x86_64:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Bootstrap Pants, test Rust (macOS11-x86_64)
+    needs:
+    - classify_changes
+    runs-on:
+    - macos-11
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
+    - name: Cache Rust toolchain
+      uses: actions/cache@v3
+      with:
+        key: macOS11-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.77.0-*
+
+          ~/.rustup/update-hashes
+
+          ~/.rustup/settings.toml
+
+          '
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
+    - id: get-engine-hash
+      name: Get native engine hash
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
+      shell: bash
+    - name: Cache native engine
+      uses: actions/cache@v3
+      with:
+        key: macOS11-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
+        path: 'src/python/pants/bin/native_client
+
+          src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine.so.metadata'
+    - name: Bootstrap Pants
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
+    - name: Run smoke tests
+      run: './pants list ::
+
+        ./pants roots
+
+        ./pants help goals
+
+        ./pants help targets
+
+        ./pants help subsystems
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-bootstrap-macOS11-x86_64
+        path: .pants.d/workdir/*.log
+    - name: Upload native binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
+        path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
     - env:
         TMPDIR: ${{ runner.temp }}
-      if: '!contains(env.COMMIT_MESSAGE, ''[ci skip-rust]'')'
+      if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
-      run: ./cargo test --tests -- --nocapture
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
-    timeout-minutes: 40
-  build_wheels_linux_x86_64:
-    container: quay.io/pypa/manylinux2014_x86_64:latest
+      run: ./cargo test --locked --tests -- --nocapture
+    timeout-minutes: 60
+  build_wheels_linux_arm64:
+    container:
+      image: ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf
     env:
+      MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Build wheels and fs_util (Linux x86/64)
-    needs: check_labels
-    runs-on: ubuntu-20.04
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
+    name: Build wheels (Linux-ARM64)
+    needs:
+    - classify_changes
+    runs-on:
+    - self-hosted
+    - Linux
+    - ARM64
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -287,117 +317,131 @@ jobs:
         fetch-depth: 10
     - name: Configure Git
       run: git config --global safe.directory "$GITHUB_WORKSPACE"
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - name: Install rustup
-      run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
-        -v -y --default-toolchain none
+      run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
 
-        echo "PATH=${PATH}:${HOME}/.cargo/bin" >> $GITHUB_ENV
+        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
         '
     - name: Expose Pythons
-      run: echo "PATH=${PATH}:/opt/python/cp37-cp37m/bin:/opt/python/cp38-cp38/bin:/opt/python/cp39-cp39/bin"
-        >> $GITHUB_ENV
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+      run: 'echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - env:
-        PANTS_CONFIG_FILES: +['pants.ci.toml']
-      if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
+        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
-      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-
-        ./build-support/bin/release.sh build-local-pex
-
-        ./build-support/bin/release.sh build-wheels
-
-        USE_PY38=true ./build-support/bin/release.sh build-wheels
-
-        USE_PY39=true ./build-support/bin/release.sh build-wheels
-
-        ./build-support/bin/release.sh build-fs-util
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
-        PANTS_CONFIG_FILES: +['pants.ci.toml']
-      if: github.event_name == 'push'
-      name: Build fs_util
-      run: ./build-support/bin/release.sh build-fs-util
-    - if: always()
+        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-linux
-        path: .pants.d/pants.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      if: github.event_name == 'push'
-      name: Deploy to S3
-      run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 65
-  build_wheels_macos_x86_64:
+        name: logs-wheels-and-pex-Linux-ARM64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
+  build_wheels_linux_x86_64:
+    container:
+      image: quay.io/pypa/manylinux2014_x86_64:latest
     env:
+      MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Build wheels and fs_util (macOS x86/64)
-    needs: check_labels
-    runs-on: macos-10.15
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
+    name: Build wheels (Linux-x86_64)
+    needs:
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
     steps:
     - name: Check out code
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+    - name: Configure Git
+      run: git config --global safe.directory "$GITHUB_WORKSPACE"
+    - name: Install rustup
+      run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
 
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
         '
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      run: 'echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
+
+        '
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - env:
+        PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+      name: Build wheels
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-wheels-and-pex-Linux-x86_64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
+  build_wheels_macos10_15_x86_64:
+    env:
+      MODE: debug
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
+    name: Build wheels (macOS10-15-x86_64)
+    needs:
+    - classify_changes
+    runs-on:
+    - self-hosted
+    - macOS-10.15-X64
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}-v1
-        path: '~/.rustup/toolchains/1.61.0-*
+        key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.77.0-*
 
           ~/.rustup/update-hashes
 
@@ -405,165 +449,331 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v3
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
       with:
-        key: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}-v1
-
-          '
-        path: '~/.cargo/registry
-
-          ~/.cargo/git
-
-          '
-        restore-keys: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-
-
-          '
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
     - env:
         ARCHFLAGS: -arch x86_64
-        PANTS_CONFIG_FILES: +['pants.ci.toml']
-      if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
       name: Build wheels
-      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-
-        ./build-support/bin/release.sh build-local-pex
-
-        ./build-support/bin/release.sh build-wheels
-
-        USE_PY38=true ./build-support/bin/release.sh build-wheels
-
-        USE_PY39=true ./build-support/bin/release.sh build-wheels
-
-        ./build-support/bin/release.sh build-fs-util
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         ARCHFLAGS: -arch x86_64
-        PANTS_CONFIG_FILES: +['pants.ci.toml']
-      if: github.event_name == 'push'
-      name: Build fs_util
-      run: ./build-support/bin/release.sh build-fs-util
-    - if: always()
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-macos
-        path: .pants.d/pants.log
+        name: logs-wheels-and-pex-macOS10-15-x86_64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
+  build_wheels_macos11_arm64:
+    env:
+      MODE: debug
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
+    name: Build wheels (macOS11-ARM64)
+    needs:
+    - classify_changes
+    runs-on:
+    - self-hosted
+    - macOS-11-ARM64
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
+    - name: Cache Rust toolchain
+      uses: actions/cache@v3
+      with:
+        key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.77.0-*
+
+          ~/.rustup/update-hashes
+
+          ~/.rustup/settings.toml
+
+          '
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
     - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      if: github.event_name == 'push'
-      name: Deploy to S3
-      run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 80
+        ARCHFLAGS: -arch arm64
+      name: Build wheels
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        ARCHFLAGS: -arch arm64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-wheels-and-pex-macOS11-ARM64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
   check_labels:
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+    if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has a category label
-    runs-on: ubuntu-20.04
+    runs-on:
+    - ubuntu-20.04
     steps:
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: github.event_name == 'pull_request'
       name: Ensure category label
-      uses: mheap/github-action-required-labels@v1
+      uses: mheap/github-action-required-labels@v4.0.0
       with:
         count: 1
-        labels: category:new feature, category:user api change, category:plugin api
-          change, category:performance, category:bugfix, category:documentation, category:internal
+        labels: category:new feature, category:user api change, category:plugin api change, category:performance, category:bugfix,
+          category:documentation, category:internal
         mode: exactly
+  classify_changes:
+    if: github.repository_owner == 'pantsbuild'
+    name: Classify changes
+    outputs:
+      ci_config: ${{ steps.classify.outputs.ci_config }}
+      docs: ${{ steps.classify.outputs.docs }}
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+      other: ${{ steps.classify.outputs.other }}
+      release: ${{ steps.classify.outputs.release }}
+      rust: ${{ steps.classify.outputs.rust }}
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - id: classify
+      name: Classify changed files
+      run: "if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_SHA ]]; then\n  # push: compare to the immediate parent, which should\
+        \ already be fetched\n  # (checkout's fetch_depth defaults to 10)\n  comparison_sha=$(git rev-parse HEAD^)\nelse\n\
+        \  # pull request: compare to the base branch, ensuring that commit exists\n  git fetch --depth=1 \"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\
+        \n  comparison_sha=\"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\nfi\necho \"comparison_sha=$comparison_sha\"\n\naffected=$(git\
+        \ diff --name-only \"$comparison_sha\" HEAD | python build-support/bin/classify_changed_files.py)\necho \"Affected:\"\
+        \nif [[ \"${affected}\" == \"docs\" ]]; then\n  echo \"docs_only=true\" | tee -a $GITHUB_OUTPUT\nfi\nfor i in ${affected};\
+        \ do\n  echo \"${i}=true\" | tee -a $GITHUB_OUTPUT\ndone\n"
   lint_python:
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Lint Python and Shell
-    needs: bootstrap_pants_linux
-    runs-on: ubuntu-20.04
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
     steps:
     - name: Check out code
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Launch bazel-remote
+      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
+        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
+        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
+        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
+        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
+        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
+        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
+        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
+        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
+        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
+        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
+        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
+        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
+        \n"
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
     - name: Lint
-      run: './pants update-build-files --check
-
-        ./pants lint check ''**''
+      run: './pants lint check ::
 
         '
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-lint
-        path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
+        name: logs-lint-Linux-x86_64
+        path: .pants.d/workdir/*.log
     timeout-minutes: 30
-  test_python_linux_0:
-    if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Test Python (Linux) Shard 0/3
-    needs: bootstrap_pants_linux
-    runs-on: ubuntu-20.04
+  merge_ok:
+    if: always()
+    name: Merge OK
+    needs:
+    - set_merge_ok
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - run: "merge_ok=\"${{ needs.set_merge_ok.outputs.merge_ok }}\"\nif [[ \"${merge_ok}\" == \"true\" ]]; then\n    echo\
+        \ \"Merge OK\"\n    exit 0\nelse\n    echo \"Merge NOT OK\"\n    exit 1\nfi\n"
+  set_merge_ok:
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    name: Set Merge OK
+    needs:
+    - classify_changes
+    - check_labels
+    - bootstrap_pants_linux_arm64
+    - bootstrap_pants_linux_x86_64
+    - bootstrap_pants_macos11_x86_64
+    - build_wheels_linux_arm64
+    - build_wheels_linux_x86_64
+    - build_wheels_macos10_15_x86_64
+    - build_wheels_macos11_arm64
+    - check_labels
+    - classify_changes
+    - lint_python
+    - test_python_linux_arm64
+    - test_python_linux_x86_64_0
+    - test_python_linux_x86_64_1
+    - test_python_linux_x86_64_2
+    - test_python_linux_x86_64_3
+    - test_python_linux_x86_64_4
+    - test_python_linux_x86_64_5
+    - test_python_linux_x86_64_6
+    - test_python_linux_x86_64_7
+    - test_python_linux_x86_64_8
+    - test_python_linux_x86_64_9
+    - test_python_macos11_x86_64
+    outputs:
+      merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - id: set_merge_ok
+      run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
+  test_python_linux_arm64:
+    env:
+      PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-ARM64)
+    needs:
+    - bootstrap_pants_linux_arm64
+    - classify_changes
+    runs-on:
+    - self-hosted
+    - Linux
+    - ARM64
     steps:
     - name: Check out code
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python tests
+      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
 
         '
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-ARM64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-python-test-Linux-ARM64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
+  test_python_linux_x86_64_0:
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 0/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Launch bazel-remote
+      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
+        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
+        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
+        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
+        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
+        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
+        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
+        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
+        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
+        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
+        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
+        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
+        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
+        \n"
     - name: Install AdoptJDK
       uses: actions/setup-java@v3
       with:
@@ -572,84 +782,89 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.17.1
+        go-version: 1.19.5
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "$HOME/.thrift"
+      run: 'mkdir -p "${HOME}/.thrift"
 
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "$HOME/.thrift/thrift"
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
 
-        chmod +x "$HOME/.thrift/thrift"
+        chmod +x "${HOME}/.thrift/thrift"
 
-        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 0/10
+      run: './pants test --shard=0/10 ::
 
         '
-    - name: Run Python test shard 0/3
-      run: './pants test --shard=0/3 ::
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-linux-0_3
-        path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
+        name: logs-python-test-0_10-Linux-x86_64
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
-  test_python_linux_1:
-    if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Test Python (Linux) Shard 1/3
-    needs: bootstrap_pants_linux
-    runs-on: ubuntu-20.04
+  test_python_linux_x86_64_1:
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 1/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
     steps:
     - name: Check out code
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Launch bazel-remote
+      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
+        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
+        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
+        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
+        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
+        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
+        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
+        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
+        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
+        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
+        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
+        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
+        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
+        \n"
     - name: Install AdoptJDK
       uses: actions/setup-java@v3
       with:
@@ -658,84 +873,89 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.17.1
+        go-version: 1.19.5
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "$HOME/.thrift"
+      run: 'mkdir -p "${HOME}/.thrift"
 
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "$HOME/.thrift/thrift"
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
 
-        chmod +x "$HOME/.thrift/thrift"
+        chmod +x "${HOME}/.thrift/thrift"
 
-        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 1/10
+      run: './pants test --shard=1/10 ::
 
         '
-    - name: Run Python test shard 1/3
-      run: './pants test --shard=1/3 ::
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-linux-1_3
-        path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
+        name: logs-python-test-1_10-Linux-x86_64
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
-  test_python_linux_2:
-    if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Test Python (Linux) Shard 2/3
-    needs: bootstrap_pants_linux
-    runs-on: ubuntu-20.04
+  test_python_linux_x86_64_2:
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 2/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
     steps:
     - name: Check out code
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Launch bazel-remote
+      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
+        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
+        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
+        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
+        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
+        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
+        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
+        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
+        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
+        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
+        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
+        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
+        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
+        \n"
     - name: Install AdoptJDK
       uses: actions/setup-java@v3
       with:
@@ -744,129 +964,755 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.17.1
+        go-version: 1.19.5
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "$HOME/.thrift"
+      run: 'mkdir -p "${HOME}/.thrift"
 
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "$HOME/.thrift/thrift"
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
 
-        chmod +x "$HOME/.thrift/thrift"
+        chmod +x "${HOME}/.thrift/thrift"
 
-        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 2/10
+      run: './pants test --shard=2/10 ::
 
         '
-    - name: Run Python test shard 2/3
-      run: './pants test --shard=2/3 ::
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-linux-2_3
-        path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
+        name: logs-python-test-2_10-Linux-x86_64
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
-  test_python_macos:
+  test_python_linux_x86_64_3:
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 3/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Launch bazel-remote
+      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
+        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
+        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
+        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
+        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
+        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
+        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
+        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
+        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
+        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
+        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
+        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
+        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
+        \n"
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 3/10
+      run: './pants test --shard=3/10 ::
+
+        '
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-python-test-3_10-Linux-x86_64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
+  test_python_linux_x86_64_4:
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 4/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Launch bazel-remote
+      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
+        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
+        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
+        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
+        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
+        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
+        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
+        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
+        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
+        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
+        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
+        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
+        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
+        \n"
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 4/10
+      run: './pants test --shard=4/10 ::
+
+        '
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-python-test-4_10-Linux-x86_64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
+  test_python_linux_x86_64_5:
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 5/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Launch bazel-remote
+      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
+        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
+        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
+        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
+        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
+        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
+        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
+        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
+        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
+        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
+        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
+        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
+        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
+        \n"
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 5/10
+      run: './pants test --shard=5/10 ::
+
+        '
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-python-test-5_10-Linux-x86_64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
+  test_python_linux_x86_64_6:
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 6/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Launch bazel-remote
+      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
+        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
+        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
+        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
+        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
+        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
+        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
+        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
+        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
+        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
+        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
+        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
+        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
+        \n"
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 6/10
+      run: './pants test --shard=6/10 ::
+
+        '
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-python-test-6_10-Linux-x86_64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
+  test_python_linux_x86_64_7:
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 7/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Launch bazel-remote
+      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
+        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
+        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
+        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
+        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
+        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
+        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
+        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
+        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
+        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
+        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
+        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
+        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
+        \n"
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 7/10
+      run: './pants test --shard=7/10 ::
+
+        '
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-python-test-7_10-Linux-x86_64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
+  test_python_linux_x86_64_8:
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 8/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Launch bazel-remote
+      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
+        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
+        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
+        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
+        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
+        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
+        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
+        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
+        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
+        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
+        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
+        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
+        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
+        \n"
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 8/10
+      run: './pants test --shard=8/10 ::
+
+        '
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-python-test-8_10-Linux-x86_64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
+  test_python_linux_x86_64_9:
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 9/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Launch bazel-remote
+      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
+        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
+        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
+        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
+        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
+        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
+        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
+        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
+        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
+        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
+        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
+        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
+        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
+        \n"
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 9/10
+      run: './pants test --shard=9/10 ::
+
+        '
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-python-test-9_10-Linux-x86_64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
+  test_python_macos11_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
-    if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Test Python (macOS)
-    needs: bootstrap_pants_macos
-    runs-on: macos-10.15
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (macOS11-x86_64)
+    needs:
+    - bootstrap_pants_macos11_x86_64
+    - classify_changes
+    runs-on:
+    - macos-11
     steps:
     - name: Check out code
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - name: Install AdoptJDK
       uses: actions/setup-java@v3
       with:
         distribution: adopt
         java-version: '11'
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python tests
+      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
 
         '
-    - name: Run Python tests
-      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior'
-    - if: always()
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/macOS11-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-macos
-        path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
-    timeout-minutes: 60
+        name: logs-python-test-macOS11-x86_64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
 name: Pull Request CI
 'on':
   pull_request: {}
   push:
-    branches-ignore:
-    - dependabot/**
+    branches:
+    - main
+    - 2.*.x

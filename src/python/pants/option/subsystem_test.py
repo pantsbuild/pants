@@ -3,8 +3,10 @@
 
 import pytest
 
+from pants.engine.unions import UnionMembership
 from pants.option.config import Config
 from pants.option.errors import OptionsError
+from pants.option.option_types import BoolOption, StrListOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.subsystem import Subsystem
@@ -49,6 +51,7 @@ def test_is_valid_scope_name() -> None:
     check_true("foo-bar0-1ba22z")
     check_true("foo_bar")
 
+    check_false("pants")
     check_false("Foo")
     check_false("fOo")
     check_false("foo.bar")
@@ -70,6 +73,33 @@ def test_register_options_blessed(caplog) -> None:
         args=["./pants"],
         bootstrap_option_values=None,
     )
-    GoodToGo.register_options_on_scope(options)
+    GoodToGo.register_options_on_scope(options, UnionMembership({}))
 
     assert not caplog.records, "The current blessed means of registering options should never warn."
+
+
+def test_register_plugin_options() -> None:
+    class Electrical(Subsystem):
+        options_scope = "electrical"
+
+    class LampPlugin:
+        is_on = BoolOption(default=False, help="Luxo Jr.")
+
+    class Blender:
+        contents = StrListOption(help="brrrrr")
+
+    options = Options.create(
+        env={},
+        config=Config.load([]),
+        known_scope_infos=[Electrical.get_scope_info()],
+        args=["./pants"],
+        bootstrap_option_values=None,
+    )
+    Electrical.register_options_on_scope(
+        options,
+        UnionMembership({Electrical.PluginOption: [LampPlugin, Blender]}),
+    )
+
+    electrical_subsystem = Electrical(options.for_scope(Electrical.options_scope))
+    assert not electrical_subsystem.options.is_on
+    assert electrical_subsystem.options.contents == []

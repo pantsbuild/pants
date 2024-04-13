@@ -6,7 +6,7 @@ import logging
 from collections import defaultdict
 from textwrap import fill, indent
 
-from pants.backend.project_info.dependees import Dependees, DependeesRequest
+from pants.backend.project_info.dependents import Dependents, DependentsRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -16,7 +16,6 @@ from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
     AllTargets,
-    AllTargetsRequest,
     RegisteredTargetTypes,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -34,18 +33,17 @@ class PyConstraintsSubsystem(Outputting, GoalSubsystem):
     help = "Determine what Python interpreter constraints are used by files/targets."
 
     summary = BoolOption(
-        "--summary",
         default=False,
         help=softwrap(
             """
             Output a CSV summary of interpreter constraints for your whole repository. The
             headers are `Target`, `Constraints`, `Transitive Constraints`, `# Dependencies`,
-            and `# Dependees`.
+            and `# Dependents`.
 
             This information can be useful when prioritizing a migration from one Python version to
-            another (e.g. to Python 3). Use `# Dependencies` and `# Dependees` to help prioritize
+            another (e.g. to Python 3). Use `# Dependencies` and `# Dependents` to help prioritize
             which targets are easiest to port (low # dependencies) and highest impact to port
-            (high # dependees).
+            (high # dependents).
 
             Use a tool like Pandas or Excel to process the CSV. Use the option
             `--py-constraints-output-file=summary.csv` to write directly to a file.
@@ -56,6 +54,7 @@ class PyConstraintsSubsystem(Outputting, GoalSubsystem):
 
 class PyConstraintsGoal(Goal):
     subsystem_cls = PyConstraintsSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
@@ -68,14 +67,19 @@ async def py_constraints(
     union_membership: UnionMembership,
 ) -> PyConstraintsGoal:
     if py_constraints_subsystem.summary:
+        dependents_header = "# Dependents"
         if addresses:
             console.print_stderr(
-                "The `py-constraints --summary` goal does not take file/target arguments. Run "
-                "`help py-constraints` for more details."
+                softwrap(
+                    """
+                    The `py-constraints --summary` goal does not take file/target arguments. Run
+                    `help py-constraints` for more details.
+                    """
+                )
             )
             return PyConstraintsGoal(exit_code=1)
 
-        all_targets = await Get(AllTargets, AllTargetsRequest())
+        all_targets = await Get(AllTargets)
         all_python_targets = tuple(
             t for t in all_targets if t.has_field(InterpreterConstraintsField)
         )
@@ -94,8 +98,8 @@ async def py_constraints(
             for transitive_targets in transitive_targets_per_tgt
         ]
 
-        dependees_per_root = await MultiGet(
-            Get(Dependees, DependeesRequest([tgt.address], transitive=True, include_roots=False))
+        dependents_per_root = await MultiGet(
+            Get(Dependents, DependentsRequest([tgt.address], transitive=True, include_roots=False))
             for tgt in all_python_targets
         )
 
@@ -105,14 +109,14 @@ async def py_constraints(
                 "Constraints": str(constraints),
                 "Transitive Constraints": str(transitive_constraints),
                 "# Dependencies": len(transitive_targets.dependencies),
-                "# Dependees": len(dependees),
+                dependents_header: len(dependents),
             }
-            for tgt, constraints, transitive_constraints, transitive_targets, dependees in zip(
+            for tgt, constraints, transitive_constraints, transitive_targets, dependents in zip(
                 all_python_targets,
                 constraints_per_tgt,
                 transitive_constraints_per_tgt,
                 transitive_targets_per_tgt,
-                dependees_per_root,
+                dependents_per_root,
             )
         ]
 
@@ -124,7 +128,7 @@ async def py_constraints(
                     "Constraints",
                     "Transitive Constraints",
                     "# Dependencies",
-                    "# Dependees",
+                    dependents_header,
                 ],
             )
             writer.writeheader()
@@ -145,8 +149,12 @@ async def py_constraints(
             if tgt_type.class_has_field(InterpreterConstraintsField, union_membership)
         )
         logger.warning(
-            "No Python files/targets matched for the `py-constraints` goal. All target types with "
-            f"Python interpreter constraints: {', '.join(target_types_with_constraints)}"
+            softwrap(
+                f"""
+                No Python files/targets matched for the `py-constraints` goal. All target types with
+                Python interpreter constraints: {', '.join(target_types_with_constraints)}
+                """
+            )
         )
         return PyConstraintsGoal(exit_code=0)
 
@@ -160,11 +168,13 @@ async def py_constraints(
     with py_constraints_subsystem.output(console) as output_stdout:
         output_stdout(f"Final merged constraints: {final_constraints}\n")
         if len(addresses) > 1:
-            merged_constraints_warning = (
-                "(These are the constraints used if you were to depend on all of the input "
-                "files/targets together, even though they may end up never being used together in "
-                "the real world. Consider using a more precise query or running "
-                f"`{bin_name()} py-constraints --summary`.)\n"
+            merged_constraints_warning = softwrap(
+                f"""
+                (These are the constraints used if you were to depend on all of the input
+                files/targets together, even though they may end up never being used together in
+                the real world. Consider using a more precise query or running
+                `{bin_name()} py-constraints --summary`.)\n
+                """
             )
             output_stdout(indent(fill(merged_constraints_warning, 80), "  "))
 

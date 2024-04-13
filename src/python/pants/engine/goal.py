@@ -1,17 +1,21 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 from abc import abstractmethod
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import Enum
 from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Type, cast
 
 from typing_extensions import final
 
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.unions import UnionMembership
 from pants.option.option_types import StrOption
 from pants.option.scope import ScopeInfo
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import doc_url
 from pants.util.meta import classproperty
 
 if TYPE_CHECKING:
@@ -75,12 +79,40 @@ class Goal:
     ```
 
     Since `@goal_rules` always run in order to produce side effects (generally: console output),
-    they are not cacheable, and the `Goal` product of a `@goal_rule` contains only a exit_code
+    they are not cacheable, and the `Goal` product of a `@goal_rule` contains only an exit_code
     value to indicate whether the rule exited cleanly.
     """
 
+    class EnvironmentBehavior(Enum):
+        """Indicates that the goal will always operate on the local environment target.
+
+        This is largely the same behavior as Pants has had pre-2.15.
+        """
+
+        LOCAL_ONLY = 2
+
+        f""" Indicates that the goal chooses the environments to use to execute rules within the goal.
+
+        This requires migration work to be done by the goal author. See
+        {doc_url('docs/writing-plugins/common-plugin-tasks/plugin-upgrade-guide')}.
+        """
+        USES_ENVIRONMENTS = 3
+
     exit_code: int
     subsystem_cls: ClassVar[Type[GoalSubsystem]]
+
+    f"""Indicates that a Goal has been migrated to compute EnvironmentNames to build targets in.
+
+    All goals in `pantsbuild/pants` should be migrated before the 2.15.x branch is cut, but end
+    user goals have until `2.17.0.dev4` to migrate.
+
+    See {doc_url('docs/writing-plugins/common-plugin-tasks/plugin-upgrade-guide')}.
+    """
+    environment_behavior: ClassVar[EnvironmentBehavior]
+
+    @classmethod
+    def _selects_environments(cls) -> bool:
+        return cls.environment_behavior == Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
     @final
     @classproperty
@@ -97,7 +129,6 @@ class Outputting:
     """
 
     output_file = StrOption(
-        "--output-file",
         default=None,
         metavar="<path>",
         help="Output the goal's stdout to this file. If unspecified, outputs to stdout.",
@@ -105,7 +136,7 @@ class Outputting:
 
     @final
     @contextmanager
-    def output(self, console: "Console") -> Iterator[Callable[[str], None]]:
+    def output(self, console: Console) -> Iterator[Callable[[str], None]]:
         """Given a Console, yields a function for writing data to stdout, or a file.
 
         The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
@@ -115,7 +146,7 @@ class Outputting:
 
     @final
     @contextmanager
-    def output_sink(self, console: "Console") -> Iterator:
+    def output_sink(self, console: Console) -> Iterator:
         stdout_file = None
         if self.output_file:
             stdout_file = open(self.output_file, "w")
@@ -132,7 +163,6 @@ class Outputting:
 
 class LineOriented(Outputting):
     sep = StrOption(
-        "--sep",
         default="\\n",
         metavar="<separator>",
         help="String to use to separate lines in line-oriented output.",
@@ -140,7 +170,7 @@ class LineOriented(Outputting):
 
     @final
     @contextmanager
-    def line_oriented(self, console: "Console") -> Iterator[Callable[[str], None]]:
+    def line_oriented(self, console: Console) -> Iterator[Callable[[str], None]]:
         """Given a Console, yields a function for printing lines to stdout or a file.
 
         The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
@@ -148,3 +178,25 @@ class LineOriented(Outputting):
         sep = self.sep.encode().decode("unicode_escape")
         with self.output_sink(console) as output_sink:
             yield lambda msg: print(msg, file=output_sink, end=sep)
+
+
+@dataclass(frozen=True)
+class CurrentExecutingGoals(EngineAwareReturnType):
+    executing: dict[str, type[Goal]] = field(default_factory=dict)
+
+    def __hash__(self) -> int:
+        return hash(tuple(self.executing.keys()))
+
+    def is_running(self, goal: str) -> bool:
+        return goal in self.executing
+
+    @contextmanager
+    def _execute(self, goal: type[Goal]) -> Iterator[None]:
+        self.executing[goal.name] = goal
+        try:
+            yield
+        finally:
+            self.executing.pop(goal.name, None)
+
+    def cacheable(self) -> bool:
+        return False

@@ -9,11 +9,11 @@ from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateT
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import rule
 from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.goals.lockfile import rules as lockfile_rules
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.common import Coordinate
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
@@ -30,7 +30,6 @@ class MockJvmTool(JvmToolBase):
     default_version = "1.3"
     default_artifacts = ("org.hamcrest:hamcrest-core:{version}",)
     default_lockfile_resource = ("pants.backend.jvm.resolve", "mock-tool.default.lockfile.txt")
-    default_lockfile_url = ""
 
 
 class MockJvmToolLockfileSentinel(GenerateToolLockfileSentinel):
@@ -80,7 +79,7 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
             *lockfile_rules(),
             generate_test_tool_lockfile_request,
             generate_internal_test_tool_lockfile_request,
-            SubsystemRule(MockJvmTool),
+            *MockJvmTool.rules(),
             QueryRule(GenerateJvmLockfile, (MockJvmToolLockfileSentinel,)),
             QueryRule(GenerateJvmLockfile, (MockInternalToolLockfileSentinel,)),
             QueryRule(DigestContents, (Digest,)),

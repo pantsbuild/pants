@@ -3,13 +3,13 @@
 
 from __future__ import annotations
 
-import functools
 import itertools
+import re
 from collections import defaultdict
-from typing import Iterable, Iterator, Sequence, Tuple, TypeVar
+from typing import Iterable, Iterator, Protocol, Sequence, Tuple, TypeVar
 
+from packaging.requirements import InvalidRequirement
 from pkg_resources import Requirement
-from typing_extensions import Protocol
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
@@ -20,6 +20,7 @@ from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import softwrap
 
 
 # This protocol allows us to work with any arbitrary FieldSet. See
@@ -56,6 +57,26 @@ def interpreter_constraints_contains(
     return InterpreterConstraints(a).contains(InterpreterConstraints(b), interpreter_universe)
 
 
+@memoized
+def parse_constraint(constraint: str) -> Requirement:
+    """Parse an interpreter constraint, e.g., CPython>=2.7,<3.
+
+    We allow shorthand such as `>=3.7`, which gets expanded to `CPython>=3.7`. See Pex's
+    interpreter.py's `parse_requirement()`.
+    """
+    try:
+        parsed_requirement = Requirement.parse(constraint)
+    except ValueError as err:
+        try:
+            parsed_requirement = Requirement.parse(f"CPython{constraint}")
+        except ValueError:
+            raise InvalidRequirement(
+                f"Failed to parse Python interpreter constraint `{constraint}`: {err.args[0]}"
+            )
+
+    return parsed_requirement
+
+
 # Normally we would subclass `DeduplicatedCollection`, but we want a custom constructor.
 class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter):
     @classmethod
@@ -69,7 +90,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         # We need to sort the component constraints for each requirement _before_ sorting the entire list
         # for the ordering to be correct.
         parsed_constraints = (
-            i if isinstance(i, Requirement) else self.parse_constraint(i) for i in constraints
+            i if isinstance(i, Requirement) else parse_constraint(i) for i in constraints
         )
         super().__init__(sorted(parsed_constraints, key=lambda c: str(c)))
 
@@ -79,18 +100,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
     def debug_hint(self) -> str:
         return str(self)
 
-    @staticmethod
-    def parse_constraint(constraint: str) -> Requirement:
-        """Parse an interpreter constraint, e.g., CPython>=2.7,<3.
-
-        We allow shorthand such as `>=3.7`, which gets expanded to `CPython>=3.7`. See Pex's
-        interpreter.py's `parse_requirement()`.
-        """
-        try:
-            parsed_requirement = Requirement.parse(constraint)
-        except ValueError:
-            parsed_requirement = Requirement.parse(f"CPython{constraint}")
-        return parsed_requirement
+    @property
+    def description(self) -> str:
+        return str(sorted(str(c) for c in self))
 
     @classmethod
     def merge(cls, ics: Iterable[InterpreterConstraints]) -> InterpreterConstraints:
@@ -99,7 +111,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         )
 
     @classmethod
-    def merge_constraint_sets(cls, constraint_sets: Iterable[Iterable[str]]) -> list[Requirement]:
+    def merge_constraint_sets(
+        cls, constraint_sets: Iterable[Iterable[str]]
+    ) -> frozenset[Requirement]:
         """Given a collection of constraints sets, merge by ORing within each individual constraint
         set and ANDing across each distinct constraint set.
 
@@ -108,7 +122,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         """
         # A sentinel to indicate a requirement that is impossible to satisfy (i.e., one that
         # requires two different interpreter types).
-        impossible = Requirement.parse("IMPOSSIBLE")
+        impossible = parse_constraint("IMPOSSIBLE")
 
         # Each element (a Set[ParsedConstraint]) will get ANDed. We use sets to deduplicate
         # identical top-level parsed constraint sets.
@@ -118,15 +132,18 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         # the others, without having to deal with the vacuous case below.
         constraint_sets = [cs for cs in constraint_sets if cs]
         if not constraint_sets:
-            return []
+            return frozenset()
 
         parsed_constraint_sets: set[frozenset[Requirement]] = set()
         for constraint_set in constraint_sets:
             # Each element (a ParsedConstraint) will get ORed.
             parsed_constraint_set = frozenset(
-                cls.parse_constraint(constraint) for constraint in constraint_set
+                parse_constraint(constraint) for constraint in constraint_set
             )
             parsed_constraint_sets.add(parsed_constraint_set)
+
+        if len(parsed_constraint_sets) == 1:
+            return next(iter(parsed_constraint_sets))
 
         def and_constraints(parsed_constraints: Sequence[Requirement]) -> Requirement:
             merged_specs: set[tuple[str, str]] = set()
@@ -137,29 +154,23 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 merged_specs.update(parsed_constraint.specs)
 
             formatted_specs = ",".join(f"{op}{version}" for op, version in merged_specs)
-            return Requirement.parse(f"{expected_interpreter}{formatted_specs}")
+            return parse_constraint(f"{expected_interpreter}{formatted_specs}")
 
-        def cmp_constraints(req1: Requirement, req2: Requirement) -> int:
-            if req1.project_name != req2.project_name:
-                return -1 if req1.project_name < req2.project_name else 1
-            if req1.specs == req2.specs:
-                return 0
-            return -1 if req1.specs < req2.specs else 1
-
-        ored_constraints = sorted(
-            {
-                and_constraints(constraints_product)
-                for constraints_product in itertools.product(*parsed_constraint_sets)
-            },
-            key=functools.cmp_to_key(cmp_constraints),
+        ored_constraints = (
+            and_constraints(constraints_product)
+            for constraints_product in itertools.product(*parsed_constraint_sets)
         )
-        ret = [cs for cs in ored_constraints if cs != impossible]
+        ret = frozenset(cs for cs in ored_constraints if cs != impossible)
         if not ret:
             # There are no possible combinations.
             attempted_str = " AND ".join(f"({' OR '.join(cs)})" for cs in constraint_sets)
             raise ValueError(
-                "These interpreter constraints cannot be merged, as they require "
-                f"conflicting interpreter types: {attempted_str}"
+                softwrap(
+                    f"""
+                    These interpreter constraints cannot be merged, as they require
+                    conflicting interpreter types: {attempted_str}
+                    """
+                )
             )
         return ret
 
@@ -173,7 +184,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         NB: Because Python targets validate that they have ICs which are a subset of their
         dependencies, merging constraints like this is only necessary when you are _mixing_ code
-        which might not have any inter-dependencies, such as when you're merging un-related roots.
+        which might not have any interdependencies, such as when you're merging unrelated roots.
         """
         fields = [
             tgt[InterpreterConstraintsField]
@@ -268,7 +279,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                         )
                         req_strs.extend(f"!={major}.{minor}.{p}" for p in invalid_patches)
                         req_str = ",".join(req_strs)
-                        snapped = Requirement.parse(req_str)
+                        snapped = parse_constraint(req_str)
                         return InterpreterConstraints([snapped])
         return None
 
@@ -348,20 +359,28 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             if major == 2:
                 if minor != 7:
                     raise AssertionError(
-                        "Unexpected value in `[python].interpreter_versions_universe`: "
-                        f"{major_minor}. Expected the only Python 2 value to be '2.7', given that "
-                        f"all other versions are unmaintained or do not exist."
+                        softwrap(
+                            f"""
+                            Unexpected value in `[python].interpreter_versions_universe`:
+                            {major_minor}. Expected the only Python 2 value to be '2.7', given that
+                            all other versions are unmaintained or do not exist.
+                            """
+                        )
                     )
                 minors.append((2, minor))
             elif major == 3:
                 minors.append((3, minor))
             else:
                 raise AssertionError(
-                    "Unexpected value in `[python].interpreter_versions_universe`: "
-                    f"{major_minor}. Expected to only include '2.7' and/or Python 3 versions, "
-                    "given that Python 3 will be the last major Python version. Please open an "
-                    "issue at https://github.com/pantsbuild/pants/issues/new if this is no longer "
-                    "true."
+                    softwrap(
+                        f"""
+                        Unexpected value in `[python].interpreter_versions_universe`:
+                        {major_minor}. Expected to only include '2.7' and/or Python 3 versions,
+                        given that Python 3 will be the last major Python version. Please open an
+                        issue at https://github.com/pantsbuild/pants/issues/new if this is no longer
+                        true.
+                        """
+                    )
                 )
 
         valid_patches = FrozenOrderedSet(
@@ -372,12 +391,17 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         if not valid_patches:
             raise ValueError(
-                f"The interpreter constraints `{self}` are not compatible with any of the "
-                "interpreter versions from `[python].interpreter_versions_universe`.\n\n"
-                "Please either change these interpreter constraints or update the "
-                "`interpreter_versions_universe` to include the interpreters set in these "
-                f"constraints. Run `{bin_name()} help-advanced python` for more information on the "
-                "`interpreter_versions_universe` option."
+                softwrap(
+                    f"""
+                    The interpreter constraints `{self}` are not compatible with any of the
+                    interpreter versions from `[python].interpreter_versions_universe`.
+
+                    Please either change these interpreter constraints or update the
+                    `interpreter_versions_universe` to include the interpreters set in these
+                    constraints. Run `{bin_name()} help-advanced python` for more information on the
+                    `interpreter_versions_universe` option.
+                    """
+                )
             )
 
         return valid_patches
@@ -403,6 +427,89 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             result.add(f"{major}.{minor}")
         return tuple(result)
 
+    def major_minor_version_when_single_and_entire(self) -> None | tuple[int, int]:
+        """Returns the (major, minor) version that these constraints cover, if they cover all of
+        exactly one major minor version, without rules about patch versions.
+
+        This is a best effort function, e.g. for using during inference that can be overridden.
+
+        Examples:
+
+        All of these return (3, 9): `==3.9.*`, `CPython==3.9.*`, `>=3.9,<3.10`, `<3.10,>=3.9`
+
+        All of these return None:
+
+        - `==3.9.10`: restricted to a single patch version
+        - `==3.9`: restricted to a single patch version (0, implicitly)
+        - `==3.9.*,!=3.9.2`: excludes a patch
+        - `>=3.9,<3.11`: more than one major version
+        - `>=3.9,<3.11,!=3.10`: too complicated to understand it only includes 3.9
+        - more than one requirement in the list: too complicated
+        """
+
+        try:
+            return _major_minor_version_when_single_and_entire(self)
+        except _NonSimpleMajorMinor:
+            return None
+
 
 def _major_minor_to_int(major_minor: str) -> tuple[int, int]:
     return tuple(int(x) for x in major_minor.split(".", maxsplit=1))  # type: ignore[return-value]
+
+
+class _NonSimpleMajorMinor(Exception):
+    pass
+
+
+_ANY_PATCH_VERSION = re.compile(r"^(?P<major>\d+)\.(?P<minor>\d+)(?P<any_patch>\.\*)?$")
+
+
+def _parse_simple_version(version: str, require_any_patch: bool) -> tuple[int, int]:
+    match = _ANY_PATCH_VERSION.fullmatch(version)
+    if match is None or (require_any_patch and match.group("any_patch") is None):
+        raise _NonSimpleMajorMinor()
+
+    return int(match.group("major")), int(match.group("minor"))
+
+
+def _major_minor_version_when_single_and_entire(ics: InterpreterConstraints) -> tuple[int, int]:
+    if len(ics) != 1:
+        raise _NonSimpleMajorMinor()
+
+    req = next(iter(ics))
+
+    just_cpython = req.project_name == "CPython" and not req.extras and not req.marker
+    if not just_cpython:
+        raise _NonSimpleMajorMinor()
+
+    # ==major.minor or ==major.minor.*
+    if len(req.specs) == 1:
+        operator, version = next(iter(req.specs))
+        if operator != "==":
+            raise _NonSimpleMajorMinor()
+
+        return _parse_simple_version(version, require_any_patch=True)
+
+    # >=major.minor,<major.(minor+1)
+    if len(req.specs) == 2:
+        (operator_lo, version_lo), (operator_hi, version_hi) = iter(req.specs)
+
+        if operator_lo != ">=":
+            # if the lo operator isn't >=, they might be in the wrong order (or, if not, the check
+            # below will catch them)
+            operator_lo, operator_hi = operator_hi, operator_lo
+            version_lo, version_hi = version_hi, version_lo
+
+        if operator_lo != ">=" and operator_hi != "<":
+            raise _NonSimpleMajorMinor()
+
+        major_lo, minor_lo = _parse_simple_version(version_lo, require_any_patch=False)
+        major_hi, minor_hi = _parse_simple_version(version_hi, require_any_patch=False)
+
+        if major_lo == major_hi and minor_lo + 1 == minor_hi:
+            return major_lo, minor_lo
+
+        raise _NonSimpleMajorMinor()
+
+    # anything else we don't understand
+    raise _NonSimpleMajorMinor()

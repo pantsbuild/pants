@@ -2,8 +2,11 @@
 version = "0.0.1"
 edition = "2021"
 name = "address"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-peg = "0.8"
+peg = { workspace = true }
+
+[lints]
+workspace = true

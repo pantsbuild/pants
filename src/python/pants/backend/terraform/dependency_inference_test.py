@@ -4,14 +4,21 @@ import textwrap
 
 import pytest
 
-from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.terraform import dependency_inference
 from pants.backend.terraform.dependency_inference import (
+    InferTerraformDeploymentDependenciesRequest,
     InferTerraformModuleDependenciesRequest,
     ParseTerraformModuleSources,
+    TerraformDeploymentDependenciesInferenceFieldSet,
     TerraformHcl2Parser,
+    TerraformModuleDependenciesInferenceFieldSet,
 )
-from pants.backend.terraform.target_types import TerraformModuleTarget
+from pants.backend.terraform.target_types import (
+    TerraformBackendTarget,
+    TerraformDeploymentTarget,
+    TerraformModuleTarget,
+    TerraformVarFileTarget,
+)
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.process import ProcessResult
@@ -31,13 +38,18 @@ from pants.util.ordered_set import FrozenOrderedSet
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[TerraformModuleTarget],
+        target_types=[
+            TerraformModuleTarget,
+            TerraformDeploymentTarget,
+            TerraformBackendTarget,
+            TerraformVarFileTarget,
+        ],
         rules=[
             *external_tool.rules(),
             *source_files.rules(),
-            *pex_rules(),
             *dependency_inference.rules(),
             QueryRule(InferredDependencies, [InferTerraformModuleDependenciesRequest]),
+            QueryRule(InferredDependencies, [InferTerraformDeploymentDependenciesRequest]),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(ProcessResult, [ParseTerraformModuleSources]),
         ],
@@ -49,7 +61,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_dependency_inference(rule_runner: RuleRunner) -> None:
+def test_dependency_inference_module(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/tf/modules/foo/BUILD": "terraform_module()\n",
@@ -83,7 +95,11 @@ def test_dependency_inference(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("src/tf/resources/grok"))
     inferred_deps = rule_runner.request(
         InferredDependencies,
-        [InferTerraformModuleDependenciesRequest(target.get(SourcesField))],
+        [
+            InferTerraformModuleDependenciesRequest(
+                TerraformModuleDependenciesInferenceFieldSet.create(target)
+            )
+        ],
     )
     assert inferred_deps == InferredDependencies(
         FrozenOrderedSet(
@@ -94,6 +110,87 @@ def test_dependency_inference(rule_runner: RuleRunner) -> None:
             ]
         ),
     )
+
+
+def test_dependency_inference_deployment(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/tf/BUILD": "terraform_module(name='mod')\nterraform_deployment(name='deployment',root_module=':mod')",
+            "src/tf/main.tf": "",
+        }
+    )
+
+    target = rule_runner.get_target(Address("src/tf", target_name="deployment"))
+    inferred_deps = rule_runner.request(
+        InferredDependencies,
+        [
+            InferTerraformDeploymentDependenciesRequest(
+                TerraformDeploymentDependenciesInferenceFieldSet.create(target)
+            )
+        ],
+    )
+    assert inferred_deps == InferredDependencies(
+        FrozenOrderedSet([Address("src/tf", target_name="mod")])
+    )
+
+
+def test_dependency_inference_autoinfered_files(rule_runner: RuleRunner) -> None:
+    """Check that autoinference on tfvars and tfbackends works."""
+    rule_runner.write_files(
+        {
+            "src/tf/BUILD": 'terraform_module(name="mod")\nterraform_deployment(name="deployment",root_module=":mod",)\nterraform_backend(name="tfbackend", source="main.tfbackend")\nterraform_var_files(name="tfvars")',
+            "src/tf/main.tf": "",
+            "src/tf/main.tfvars": "",
+            "src/tf/main.tfbackend": "",
+        }
+    )
+    target = rule_runner.get_target(Address("src/tf", target_name="deployment"))
+    inferred_deps = rule_runner.request(
+        InferredDependencies,
+        [
+            InferTerraformDeploymentDependenciesRequest(
+                TerraformDeploymentDependenciesInferenceFieldSet.create(target)
+            )
+        ],
+    )
+    assert set(inferred_deps.include) == {
+        Address("src/tf", target_name=tgt) for tgt in ("mod", "tfbackend", "tfvars")
+    }
+
+
+def test_dependency_inference_autoinfered_override(rule_runner: RuleRunner) -> None:
+    """Check that autoinference on tfvars and tfbackends can be overridden."""
+    rule_runner.write_files(
+        {
+            "src/tf/BUILD": textwrap.dedent(
+                """\
+                terraform_module(name="mod")
+                terraform_deployment(name="deployment",root_module=":mod",dependencies=[":0.tfbackend",":0.tfvars"])
+                terraform_backend(name="0.tfbackend", source="0.tfbackend")
+                terraform_backend(name="1.tfbackend", source="1.tfbackend")
+                terraform_var_files(name="0.tfvars", sources=["0.tfvars"])
+                terraform_var_files(name="1.tfvars", sources=["1.tfvars"])
+                """
+            ),
+            "src/tf/main.tf": "",
+            "src/tf/0.tfvars": "",
+            "src/tf/1.tfvars": "",
+            "src/tf/0.tfbackend": "",
+            "src/tf/1.tfbackend": "",
+        }
+    )
+    target = rule_runner.get_target(Address("src/tf", target_name="deployment"))
+    inferred_deps = rule_runner.request(
+        InferredDependencies,
+        [
+            InferTerraformDeploymentDependenciesRequest(
+                TerraformDeploymentDependenciesInferenceFieldSet.create(target)
+            )
+        ],
+    )
+    assert set(inferred_deps.include) == {
+        Address("src/tf", target_name=tgt) for tgt in ("mod", "0.tfvars", "0.tfbackend")
+    }
 
 
 @pytest.mark.platform_specific_behavior
@@ -145,7 +242,7 @@ def test_generate_lockfile_without_python_backend() -> None:
     run_pants(
         [
             "--backend-packages=pants.backend.experimental.terraform",
-            "--terraform-hcl2-parser-lockfile=tf.lock",
+            "--python-resolves={'terraform-hcl2-parser':'tf.lock'}",
             "generate-lockfiles",
             "--resolve=terraform-hcl2-parser",
         ]

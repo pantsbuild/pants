@@ -14,8 +14,6 @@ from pants.bsp.util_rules.targets import (
     BSPBuildTargetsMetadataResult,
     BSPCompileRequest,
     BSPCompileResult,
-    BSPResolveFieldFactoryRequest,
-    BSPResolveFieldFactoryResult,
     BSPResourcesRequest,
     BSPResourcesResult,
 )
@@ -28,7 +26,6 @@ from pants.jvm.bsp.compile import rules as jvm_compile_rules
 from pants.jvm.bsp.resources import _jvm_bsp_resources
 from pants.jvm.bsp.resources import rules as jvm_resources_rules
 from pants.jvm.compile import ClasspathEntryRequestFactory
-from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 
 LANGUAGE_ID = "java"
@@ -50,26 +47,13 @@ class JavaMetadataFieldSet(FieldSet):
     resolve: JvmResolveField
 
 
-class JavaBSPResolveFieldFactoryRequest(BSPResolveFieldFactoryRequest):
-    resolve_prefix = "jvm"
-
-
 class JavaBSPBuildTargetsMetadataRequest(BSPBuildTargetsMetadataRequest):
     language_id = LANGUAGE_ID
     can_merge_metadata_from = ()
     field_set_type = JavaMetadataFieldSet
+
     resolve_prefix = "jvm"
     resolve_field = JvmResolveField
-
-
-@rule
-def bsp_resolve_field_factory(
-    request: JavaBSPResolveFieldFactoryRequest,
-    jvm: JvmSubsystem,
-) -> BSPResolveFieldFactoryResult:
-    return BSPResolveFieldFactoryResult(
-        lambda target: target.get(JvmResolveField).normalized_value(jvm)
-    )
 
 
 @rule
@@ -111,8 +95,9 @@ async def handle_bsp_java_options_request(
             target=request.bsp_target_id,
             options=(),
             classpath=(),
+            # TODO: Why is this hardcoded and not under pants_workdir?
             class_directory=build_root.pathlib_path.joinpath(
-                f".pants.d/bsp/{jvm_classes_directory(request.bsp_target_id)}"
+                ".pants.d", "bsp", jvm_classes_directory(request.bsp_target_id)
             ).as_uri(),
         )
     )
@@ -169,7 +154,6 @@ def rules():
         *jvm_compile_rules(),
         *jvm_resources_rules(),
         UnionRule(BSPLanguageSupport, JavaBSPLanguageSupport),
-        UnionRule(BSPResolveFieldFactoryRequest, JavaBSPResolveFieldFactoryRequest),
         UnionRule(BSPBuildTargetsMetadataRequest, JavaBSPBuildTargetsMetadataRequest),
         UnionRule(BSPHandlerMapping, JavacOptionsHandlerMapping),
         UnionRule(BSPCompileRequest, JavaBSPCompileRequest),

@@ -37,7 +37,8 @@ from pants.jvm.compile import (
 )
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
-from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirements
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
 
@@ -197,6 +198,8 @@ async def compile_kotlin_source(
     )
     output: ClasspathEntry | None = None
     if process_result.exit_code == 0:
+        # NB: `kotlinc` produces reproducible JARs by default, so there is no need for an additional
+        # stripping step.
         output = ClasspathEntry(
             process_result.output_digest, (output_file,), direct_dependency_classpath_entries
         )

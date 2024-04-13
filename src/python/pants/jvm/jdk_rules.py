@@ -13,15 +13,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import ClassVar, Iterable, Mapping
 
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
-from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import CoarsenedTarget
 from pants.jvm.compile import ClasspathEntry
-from pants.jvm.resolve.common import Coordinate, Coordinates
+from pants.jvm.resolve.coordinate import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
@@ -30,7 +30,7 @@ from pants.option.global_options import GlobalOptions
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty, frozen_after_init
+from pants.util.meta import classproperty
 from pants.util.strutil import fmt_memory_size, softwrap
 
 logger = logging.getLogger(__name__)
@@ -101,13 +101,20 @@ class JdkEnvironment:
     jdk_preparation_script: ClassVar[str] = f"{bin_dir}/jdk.sh"
     java_home: ClassVar[str] = "__java_home"
 
-    def args(self, bash: BashBinary, classpath_entries: Iterable[str]) -> tuple[str, ...]:
+    def args(
+        self, bash: BashBinary, classpath_entries: Iterable[str], chroot: str | None = None
+    ) -> tuple[str, ...]:
+        def in_chroot(path: str) -> str:
+            if not chroot:
+                return path
+            return os.path.join(chroot, path)
+
         return (
             bash.path,
-            self.jdk_preparation_script,
+            in_chroot(self.jdk_preparation_script),
             f"{self.java_home}/bin/java",
             "-cp",
-            ":".join([self.nailgun_jar, *classpath_entries]),
+            ":".join([in_chroot(self.nailgun_jar), *classpath_entries]),
         )
 
     @property
@@ -189,7 +196,13 @@ async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
 
 @rule
 async def prepare_jdk_environment(
-    jvm: JvmSubsystem, coursier: Coursier, nailgun_: Nailgun, bash: BashBinary, request: JdkRequest
+    jvm: JvmSubsystem,
+    jvm_env_aware: JvmSubsystem.EnvironmentAware,
+    coursier: Coursier,
+    nailgun_: Nailgun,
+    bash: BashBinary,
+    request: JdkRequest,
+    env_target: EnvironmentTarget,
 ) -> JdkEnvironment:
     nailgun = nailgun_.classpath_entry
 
@@ -201,19 +214,24 @@ async def prepare_jdk_environment(
     if version is DefaultJdk.SYSTEM:
         coursier_jdk_option = "--system-jvm"
     else:
-        coursier_jdk_option = shlex.quote(f"--jvm={version}")
+        coursier_jdk_option = f"--jvm={version}"
 
-    # TODO(#14386) This argument re-writing code should be done in a more standardised way.
-    # See also `run_deploy_jar` for other argument re-writing code.
+    if not coursier.jvm_index:
+        coursier_options = ["java-home", coursier_jdk_option]
+    else:
+        jvm_index_option = f"--jvm-index={coursier.jvm_index}"
+        coursier_options = ["java-home", jvm_index_option, coursier_jdk_option]
+
+    # TODO(#16104) This argument re-writing code should use the native {chroot} support.
+    # See also `run` for other argument re-writing code.
     def prefixed(arg: str) -> str:
+        quoted = shlex.quote(arg)
         if arg.startswith("__"):
-            return f"${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{arg}"
+            return f"${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{quoted}"
         else:
-            return arg
+            return quoted
 
-    optionally_prefixed_coursier_args = [
-        prefixed(arg) for arg in coursier.args(["java-home", coursier_jdk_option])
-    ]
+    optionally_prefixed_coursier_args = [prefixed(arg) for arg in coursier.args(coursier_options)]
     # NB: We `set +e` in the subshell to ensure that it exits as well.
     #  see https://unix.stackexchange.com/a/23099
     java_home_command = " ".join(("set +e;", *optionally_prefixed_coursier_args))
@@ -235,7 +253,7 @@ async def prepare_jdk_environment(
             immutable_input_digests=coursier.immutable_input_digests,
             env=env,
             description=f"Ensure download of JDK {coursier_jdk_option}.",
-            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+            cache_scope=env_target.executable_search_path_cache_scope(),
             level=LogLevel.DEBUG,
         ),
     )
@@ -258,7 +276,7 @@ async def prepare_jdk_environment(
 
     # TODO: Locate `ln`.
     version_comment = "\n".join(f"# {line}" for line in java_version.splitlines())
-    jdk_preparation_script = textwrap.dedent(
+    jdk_preparation_script = textwrap.dedent(  # noqa: PNT20
         f"""\
         # pants javac script using Coursier {coursier_jdk_option}. `java -version`:"
         {version_comment}
@@ -291,7 +309,7 @@ async def prepare_jdk_environment(
                 ]
             ),
         ),
-        global_jvm_options=jvm.global_options,
+        global_jvm_options=jvm_env_aware.global_options,
         nailgun_jar=os.path.join(JdkEnvironment.bin_dir, nailgun.filenames[0]),
         coursier=coursier,
         jre_major_version=jre_major_version,
@@ -299,8 +317,7 @@ async def prepare_jdk_environment(
     )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class JvmProcess:
     jdk: JdkEnvironment
     argv: tuple[str, ...]
@@ -313,11 +330,11 @@ class JvmProcess:
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
     timeout_seconds: int | float | None
-    platform: Platform | None
     extra_immutable_input_digests: FrozenDict[str, Digest]
     extra_env: FrozenDict[str, str]
     cache_scope: ProcessCacheScope | None
     use_nailgun: bool
+    remote_cache_speculation_delay: int | None
 
     def __init__(
         self,
@@ -334,28 +351,33 @@ class JvmProcess:
         extra_immutable_input_digests: Mapping[str, Digest] | None = None,
         extra_env: Mapping[str, str] | None = None,
         timeout_seconds: int | float | None = None,
-        platform: Platform | None = None,
         cache_scope: ProcessCacheScope | None = None,
         use_nailgun: bool = True,
+        remote_cache_speculation_delay: int | None = None,
     ):
-        self.jdk = jdk
-        self.argv = tuple(argv)
-        self.classpath_entries = tuple(classpath_entries)
-        self.input_digest = input_digest
-        self.description = description
-        self.level = level
-        self.extra_jvm_options = tuple(extra_jvm_options or ())
-        self.extra_nailgun_keys = tuple(extra_nailgun_keys or ())
-        self.output_files = tuple(output_files or ())
-        self.output_directories = tuple(output_directories or ())
-        self.timeout_seconds = timeout_seconds
-        self.platform = platform
-        self.cache_scope = cache_scope
-        self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
-        self.extra_env = FrozenDict(extra_env or {})
-        self.use_nailgun = use_nailgun
+        object.__setattr__(self, "jdk", jdk)
+        object.__setattr__(self, "argv", tuple(argv))
+        object.__setattr__(self, "classpath_entries", tuple(classpath_entries))
+        object.__setattr__(self, "input_digest", input_digest)
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "level", level)
+        object.__setattr__(self, "extra_jvm_options", tuple(extra_jvm_options or ()))
+        object.__setattr__(self, "extra_nailgun_keys", tuple(extra_nailgun_keys or ()))
+        object.__setattr__(self, "output_files", tuple(output_files or ()))
+        object.__setattr__(self, "output_directories", tuple(output_directories or ()))
+        object.__setattr__(self, "timeout_seconds", timeout_seconds)
+        object.__setattr__(self, "cache_scope", cache_scope)
+        object.__setattr__(
+            self, "extra_immutable_input_digests", FrozenDict(extra_immutable_input_digests or {})
+        )
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
+        object.__setattr__(self, "use_nailgun", use_nailgun)
+        object.__setattr__(self, "remote_cache_speculation_delay", remote_cache_speculation_delay)
 
-        if not use_nailgun and extra_nailgun_keys:
+        self.__post_init__()
+
+    def __post_init__(self):
+        if not self.use_nailgun and self.extra_nailgun_keys:
             raise AssertionError(
                 "`JvmProcess` specified nailgun keys, but has `use_nailgun=False`. Either "
                 "specify `extra_nailgun_keys=None` or `use_nailgun=True`."
@@ -367,9 +389,8 @@ _JVM_HEAP_SIZE_UNITS = ["", "k", "m", "g"]
 
 @rule
 async def jvm_process(
-    bash: BashBinary, request: JvmProcess, global_options: GlobalOptions
+    bash: BashBinary, request: JvmProcess, jvm: JvmSubsystem, global_options: GlobalOptions
 ) -> Process:
-
     jdk = request.jdk
 
     immutable_input_digests = {
@@ -411,6 +432,12 @@ async def jvm_process(
     if request.use_nailgun:
         use_nailgun = [*jdk.immutable_input_digests, *request.extra_nailgun_keys]
 
+    remote_cache_speculation_delay_millis = 0
+    if request.remote_cache_speculation_delay is not None:
+        remote_cache_speculation_delay_millis = request.remote_cache_speculation_delay
+    elif request.use_nailgun:
+        remote_cache_speculation_delay_millis = jvm.nailgun_remote_cache_speculation_delay
+
     return Process(
         [*jdk.args(bash, request.classpath_entries), *jvm_options, *request.argv],
         input_digest=request.input_digest,
@@ -420,11 +447,11 @@ async def jvm_process(
         level=request.level,
         output_directories=request.output_directories,
         env=env,
-        platform=request.platform,
         timeout_seconds=request.timeout_seconds,
         append_only_caches=jdk.append_only_caches,
         output_files=request.output_files,
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
+        remote_cache_speculation_delay_millis=remote_cache_speculation_delay_millis,
     )
 
 

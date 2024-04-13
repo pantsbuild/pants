@@ -3,23 +3,9 @@
 
 from __future__ import annotations
 
-import os
-from textwrap import dedent
-
 import pytest
 
-from pants.backend.shell import target_types
-from pants.backend.shell.target_types import (
-    ShellSourcesGeneratorTarget,
-    ShellSourceTarget,
-    Shunit2Shell,
-    Shunit2TestsGeneratorTarget,
-    Shunit2TestTarget,
-)
-from pants.engine.addresses import Address
-from pants.engine.internals.graph import _TargetParametrizations
-from pants.engine.target import SingleSourceField, Tags
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.backend.shell.target_types import Shunit2Shell
 
 
 @pytest.mark.parametrize(
@@ -62,70 +48,3 @@ def test_shunit2_shell_parse_shebang(content: bytes, expected: Shunit2Shell | No
         assert result is None
     else:
         assert result == expected
-
-
-def test_generate_source_and_test_targets() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            *target_types.rules(),
-            QueryRule(_TargetParametrizations, [Address]),
-        ],
-        target_types=[Shunit2TestsGeneratorTarget, ShellSourcesGeneratorTarget],
-    )
-    rule_runner.write_files(
-        {
-            "src/sh/BUILD": dedent(
-                """\
-                shell_sources(
-                    name='lib',
-                    sources=['**/*.sh', '!**/*_test.sh'],
-                    overrides={'f1.sh': {'tags': ['overridden']}},
-                )
-
-                shunit2_tests(
-                    name='tests',
-                    sources=['**/*_test.sh'],
-                    overrides={'f1_test.sh': {'tags': ['overridden']}},
-                )
-                """
-            ),
-            "src/sh/f1.sh": "",
-            "src/sh/f1_test.sh": "",
-            "src/sh/f2.sh": "",
-            "src/sh/f2_test.sh": "",
-            "src/sh/subdir/f.sh": "",
-            "src/sh/subdir/f_test.sh": "",
-        }
-    )
-
-    def gen_source_tgt(rel_fp: str, tags: list[str] | None = None) -> ShellSourceTarget:
-        return ShellSourceTarget(
-            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
-            Address("src/sh", target_name="lib", relative_file_path=rel_fp),
-            residence_dir=os.path.dirname(os.path.join("src/sh", rel_fp)),
-        )
-
-    def gen_test_tgt(rel_fp: str, tags: list[str] | None = None) -> Shunit2TestTarget:
-        return Shunit2TestTarget(
-            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
-            Address("src/sh", target_name="tests", relative_file_path=rel_fp),
-            residence_dir=os.path.dirname(os.path.join("src/sh", rel_fp)),
-        )
-
-    sources_generated = rule_runner.request(
-        _TargetParametrizations, [Address("src/sh", target_name="lib")]
-    ).parametrizations
-    tests_generated = rule_runner.request(
-        _TargetParametrizations, [Address("src/sh", target_name="tests")]
-    ).parametrizations
-
-    assert set(sources_generated.values()) == {
-        gen_source_tgt("f1.sh", tags=["overridden"]),
-        gen_source_tgt("f2.sh"),
-        gen_source_tgt("subdir/f.sh"),
-    }
-    assert set(tests_generated.values()) == {
-        gen_test_tgt("f1_test.sh", tags=["overridden"]),
-        gen_test_tgt("f2_test.sh"),
-        gen_test_tgt("subdir/f_test.sh"),
-    }

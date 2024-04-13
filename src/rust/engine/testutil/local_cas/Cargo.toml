@@ -2,11 +2,13 @@
 name = "local_cas"
 version = "0.0.1"
 edition = "2021"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
 mock = { path = "../mock" }
-clap = "3"
-env_logger = "0.9.0"
+clap = { workspace = true }
+env_logger = { workspace = true }
 
+[lints]
+workspace = true

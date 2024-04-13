@@ -16,18 +16,40 @@ import (
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
-// This file was adapted from Go src/go/build/build.go at commit 7c694fbad1ed6f2f825fd09cf7a86da3be549cea
-// on 2022-02-25.
+// This file was adapted from Go toolchain:
+// https://github.com/golang/go/blob/2da8a55584aa65ce1b67431bb8ecebf66229d462/src/go/build/build.go
+
+// unixOS is the set of GOOS values matched by the "unix" build tag.
+// This is not used for filename matching.
+// This list also appears in cmd/dist/build.go and
+// cmd/go/internal/imports/build.go.
+var unixOS = map[string]bool{
+	"aix":       true,
+	"android":   true,
+	"darwin":    true,
+	"dragonfly": true,
+	"freebsd":   true,
+	"hurd":      true,
+	"illumos":   true,
+	"ios":       true,
+	"linux":     true,
+	"netbsd":    true,
+	"openbsd":   true,
+	"solaris":   true,
+}
 
 // matchTag reports whether the name is one of:
 //
-//      cgo (if cgo is enabled)
-//      $GOOS
-//      $GOARCH
-//      ctxt.Compiler
-//      linux (if GOOS = android)
-//      solaris (if GOOS = illumos)
-//      tag (if tag is listed in ctxt.BuildTags or ctxt.ReleaseTags)
+//	cgo (if cgo is enabled)
+//	$GOOS
+//	$GOARCH
+//	ctxt.Compiler
+//	linux (if GOOS = android)
+//	solaris (if GOOS = illumos)
+//	darwin (if GOOS = ios)
+//	unix (if this is a Unix GOOS)
+//	boringcrypto (if GOEXPERIMENT=boringcrypto is enabled)
+//	tag (if tag is listed in ctxt.BuildTags or ctxt.ReleaseTags)
 //
 // It records all consulted tags in allTags.
 func matchTag(ctxt *build.Context, name string, allTags map[string]bool) bool {
@@ -50,6 +72,12 @@ func matchTag(ctxt *build.Context, name string, allTags map[string]bool) bool {
 	}
 	if ctxt.GOOS == "ios" && name == "darwin" {
 		return true
+	}
+	if name == "unix" && unixOS[ctxt.GOOS] {
+		return true
+	}
+	if name == "boringcrypto" {
+		name = "goexperiment.boringcrypto" // boringcrypto is an old name for goexperiment.boringcrypto
 	}
 
 	// other tags

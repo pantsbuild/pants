@@ -1,0 +1,78 @@
+---
+    title: Common subsystem tasks
+    sidebar_position: 999
+---
+
+Common tasks for Subsystems
+
+---
+
+## Skipping individual targets
+
+Many subsystems allow skipping specific targets. For example, you might have Python files that you want to not typecheck with mypy. In Pants, this is achieved with a `skip_*` field on the target. This is simple to implement.
+
+1. Create a field for skipping your tool
+
+```python
+from pants.engine.target import BoolField
+
+class SkipFortranLintField(BoolField):
+	alias = "skip_fortran_lint"
+	default = False
+	help = "If true, don't run fortran-lint on this target's code."
+```
+
+2. Register this field on the appropriate targets.
+
+```python
+def rules():
+	return [
+		FortranSourceTarget.register_plugin_field(SkipFortranLintField),
+	]
+```
+
+3. Add this field as part of your subsystems `opt_out` method:
+
+```python
+from dataclasses import dataclass
+
+from pants.engine.target import FieldSet, Target
+
+
+@dataclass
+class FortranLintFieldSet(FieldSet):
+    required_fields = (FortranSourceField,)
+
+    source: FortranSourceField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipFortranLintField).value
+```
+
+## Making subsystems exportable with their default lockfile
+
+:::note Support depends on language backend of the subsystem
+Only some language backends support `pants export`. These include the Python and JVM backends. Only tools which are themselves written to use a backend with this feature can be exported. For example, a Python-based tool which operates on a different language is exportable.
+
+
+1. Make the subsystem a subclass of `ExportableTool`
+
+:::note Language backends may have done this in their Tool base class. For example, the Python backend with `PythonToolRequirementsBase` and JVM with `JvmToolBase` are already subclasses.
+
+```python
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.core.goals.resolves import ExportableTool
+
+class FortranLint(PythonToolBase, ExportableTool):
+    ...
+```
+
+2. Register your class with a `UnionRule` with `ExportableTool`
+
+```python
+def rules():
+	return [
+		UnionRule(ExportableTool, FortranLint)
+	]
+```

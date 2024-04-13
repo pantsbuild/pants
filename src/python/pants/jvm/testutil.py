@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import dataclasses
 import os
 from dataclasses import dataclass
 
@@ -11,9 +12,11 @@ import pytest
 
 from pants.build_graph.address import Address
 from pants.core.util_rules import system_binaries
+from pants.core.util_rules.archive import ExtractedArchive, MaybeExtractArchiveRequest
 from pants.core.util_rules.system_binaries import UnzipBinary
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, PathGlobs, RemovePrefix, Snapshot
+from pants.engine.fs import CreateDigest, DigestContents, PathGlobs, RemovePrefix
+from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
@@ -103,7 +106,24 @@ def rules():
     return [
         *collect_rules(),
         *system_binaries.rules(),
+        QueryRule(CoarsenedTargets, (Addresses,)),
         QueryRule(RenderedClasspath, (Classpath,)),
         QueryRule(RenderedClasspath, (ClasspathEntry,)),
-        QueryRule(CoarsenedTargets, (Addresses,)),
+        QueryRule(Targets, (Addresses,)),
     ]
+
+
+def _get_jar_contents_snapshot(
+    rule_runner: RuleRunner, *, filename: str, digest: Digest
+) -> Snapshot:
+    contents = rule_runner.request(DigestContents, [digest])
+    files_content = [content for content in contents if content.path == filename]
+    assert len(files_content) == 1
+
+    renamed_digest = rule_runner.request(
+        Digest, [CreateDigest([dataclasses.replace(files_content[0], path=f"{filename}.zip")])]
+    )
+    extracted_jar = rule_runner.request(
+        ExtractedArchive, [MaybeExtractArchiveRequest(renamed_digest)]
+    )
+    return rule_runner.request(Snapshot, [extracted_jar.digest])

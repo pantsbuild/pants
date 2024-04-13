@@ -22,9 +22,13 @@ from pants.engine.target import MultipleSourcesField, SourcesPathsRequest, Targe
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
+class MyMultipleSourcesField(MultipleSourcesField):
+    pass
+
+
 class TargetWithSources(Target):
     alias = "target"
-    core_fields = (MultipleSourcesField,)
+    core_fields = (MyMultipleSourcesField,)
 
 
 @pytest.fixture

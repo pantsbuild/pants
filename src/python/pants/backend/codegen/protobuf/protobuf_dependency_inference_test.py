@@ -9,13 +9,11 @@ import pytest
 from pants.backend.codegen.protobuf import protobuf_dependency_inference
 from pants.backend.codegen.protobuf.protobuf_dependency_inference import (
     InferProtobufDependencies,
+    ProtobufDependencyInferenceFieldSet,
     ProtobufMapping,
     parse_proto_imports,
 )
-from pants.backend.codegen.protobuf.target_types import (
-    ProtobufSourceField,
-    ProtobufSourcesGeneratorTarget,
-)
+from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
@@ -164,7 +162,8 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
     def run_dep_inference(address: Address) -> InferredDependencies:
         tgt = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferProtobufDependencies(tgt[ProtobufSourceField])]
+            InferredDependencies,
+            [InferProtobufDependencies(ProtobufDependencyInferenceFieldSet.create(tgt))],
         )
 
     assert run_dep_inference(

@@ -3,20 +3,47 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from itertools import chain
 from typing import Iterator
 
 #
-# Note: This file is used as an pex entry point in the execution sandbox.
+# Note: This file is used as a pex entry point in the execution sandbox.
 #
+
+
+@dataclass(frozen=True)
+class ParsedDockerfileInfo:
+    """Keep fields in sync with `dockerfile_parser.py:DockerfileInfo`."""
+
+    source: str
+    build_args: tuple[str, ...]  # "ARG_NAME=VALUE", ...
+    copy_source_paths: tuple[str, ...]
+    from_image_build_args: tuple[str, ...]  # "ARG_NAME=UPSTREAM_TARGET_ADDRESS", ...
+    version_tags: tuple[str, ...]  # "STAGE TAG", ...
 
 
 _address_regexp = re.compile(
     r"""
-    (?://)?[^:# ]*:[^:#!@?/\= ]+(?:\#[^:#!@?= ]+)?$
+    # Optionally root:ed.
+    (?://)?
+    # Optional path.
+    [^:# ]*
+    # Optional target name.
+    (?::[^:#!@?/\= ]+)?
+    # Optional generated name.
+    (?:\#[^:#!@?= ]+)?
+    # Optional parametrizations.
+    (?:@
+      # key=value
+      [^=: ]+=[^,: ]*
+      # Optional additional `,key=value`s
+      (?:,[^=: ]+=[^,: ]*)*
+    )?
+    $
     """,
     re.VERBOSE,
 )
@@ -44,47 +71,69 @@ _image_ref_regexp = re.compile(
 )
 
 
-def main(cmd: str, args: list[str]) -> None:
+def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
     # import here to allow the rest of the file to be tested without a dependency on dockerfile
     from dockerfile import Command, parse_file, parse_string  # pants: no-infer-dep
 
     @dataclass(frozen=True)
     class ParsedDockerfile:
+        filename: str
         commands: tuple[Command, ...]
 
         @classmethod
         def from_file(cls, dockerfile: str) -> ParsedDockerfile:
-            return cls(parse_file(dockerfile))
+            return cls(dockerfile, parse_file(dockerfile))
 
         @classmethod
         def from_string(cls, dockerfile_contents: str) -> ParsedDockerfile:
-            return cls(parse_string(dockerfile_contents))
+            return cls("<text>", parse_string(dockerfile_contents))
+
+        def get_info(self) -> ParsedDockerfileInfo:
+            return ParsedDockerfileInfo(
+                source=self.filename,
+                build_args=self.build_args(),
+                copy_source_paths=self.copy_source_paths(),
+                from_image_build_args=self.from_image_build_args(),
+                version_tags=self.baseimage_tags(),
+            )
 
         def get_all(self, command_name: str) -> Iterator[Command]:
             for command in self.commands:
                 if command.cmd.upper() == command_name:
                     yield command
 
-        def copy_source_paths(self) -> Iterator[str]:
-            for copy in self.get_all("COPY"):
-                if copy.flags:
-                    # Do not consider COPY --from=... instructions etc.
-                    continue
-                # The last element of copy.value is the destination.
-                yield from copy.value[:-1]
-
-        def from_image_addresses(self) -> Iterator[str]:
+        def from_image_build_args(self) -> tuple[str, ...]:
             build_args = {
-                key: value
+                key: value.strip("\"'")
                 for key, has_value, value in [
                     build_arg.partition("=") for build_arg in self.build_args()
                 ]
                 if has_value and valid_address(value)
             }
 
-            for image_build_arg in self.from_image_build_args():
-                if image_build_arg in build_args:
-                    yield build_args[image_build_arg]
+            return tuple(
+                f"{image_build_arg}={build_args[image_build_arg]}"
+                for image_build_arg in self.from_image_build_arg_names()
+                if image_build_arg in build_args
+            )
+
+        @staticmethod
+        def _get_image_ref_build_arg(image_ref: str) -> str | None:
+            build_arg = re.match(r"\$\{?([a-zA-Z0-9_]+)\}?$", image_ref)
+            return build_arg.group(1) if build_arg else None
+
+        def from_image_build_arg_names(self) -> Iterator[str]:
+            """Return build args used as the image ref in `FROM` instructions.
+
+            Example:
+
+                ARG BASE_IMAGE
+                FROM ${BASE_IMAGE}
+            """
+            for cmd in self.get_all("FROM"):
+                build_arg = self._get_image_ref_build_arg(cmd.value[0])
+                if build_arg:
+                    yield build_arg
 
         def from_baseimages(self) -> Iterator[tuple[str, tuple[str, ...]]]:
             for idx, cmd in enumerate(self.get_all("FROM")):
@@ -98,11 +147,15 @@ def main(cmd: str, args: list[str]) -> None:
         def baseimage_tags(self) -> tuple[str, ...]:
             """Return all base image tags, prefix with the stage alias or index.
 
+            In case the base image is entirely made up of a build arg, use that with a `build-arg:`
+            prefix.
+
             Example:
 
                 FROM base:1.0 AS build
                 ...
                 FROM interim
+                FROM $argname as dynamic
                 ...
                 FROM final as out
 
@@ -110,12 +163,17 @@ def main(cmd: str, args: list[str]) -> None:
 
                 build 1.0
                 stage1 latest
+                dynamic build-arg:argname
                 out latest
             """
 
             def _get_tag(image_ref: str) -> str | None:
                 """The image ref is in the form `registry/repo/name[/...][:tag][@digest]` and where
-                `digest` is `sha256:hex value`."""
+                `digest` is `sha256:hex value`, or a build arg reference with $ARG."""
+                if image_ref.startswith("$"):
+                    build_arg = self._get_image_ref_build_arg(image_ref)
+                    if build_arg:
+                        return f"build-arg:{build_arg}"
                 parsed = re.match(_image_ref_regexp, image_ref)
                 if not parsed:
                     return None
@@ -137,51 +195,26 @@ def main(cmd: str, args: list[str]) -> None:
             """Return all defined build args, including any default values."""
             return tuple(cmd.original[4:].strip() for cmd in self.get_all("ARG"))
 
-        def from_image_build_args(self) -> Iterator[str]:
-            """Return build args used as the image ref in `FROM` instructions.
-
-            Example:
-
-                ARG BASE_IMAGE
-                FROM ${BASE_IMAGE}
-            """
-            for cmd in self.get_all("FROM"):
-                image_ref = cmd.value[0]
-                build_arg = re.match(r"\$\{?([a-zA-Z0-9_]+)\}?$", image_ref)
-                if build_arg:
-                    yield build_arg.group(1)
-
-        def copy_source_references(self) -> tuple[str, ...]:
+        def copy_source_paths(self) -> tuple[str, ...]:
             """Return all files referenced from the build context using COPY instruction."""
-            return tuple(chain(*(cmd.value[:-1] for cmd in self.get_all("COPY"))))
+            # Exclude COPY --from instructions, as they don't refer to files from the build context.
+            return tuple(
+                chain(
+                    *(
+                        cmd.value[:-1]
+                        for cmd in self.get_all("COPY")
+                        if all("--from" not in flag for flag in cmd.flags)
+                    )
+                )
+            )
 
-    for parsed in map(ParsedDockerfile.from_file, args):
-        if cmd == "from-image-addresses":
-            for addr in parsed.from_image_addresses():
-                print(addr)
-        elif cmd == "copy-source-paths":
-            for addr in parsed.copy_source_paths():
-                print(addr)
-        elif cmd == "version-tags":
-            for tag in parsed.baseimage_tags():
-                print(tag)
-        elif cmd == "build-args":
-            for arg in parsed.build_args():
-                print(arg)
-        elif cmd == "from-image-build-args":
-            for build_arg in parsed.from_image_build_args():
-                print(build_arg)
-        elif cmd == "copy-sources":
-            for src in parsed.copy_source_references():
-                print(src)
+    for parsed in map(ParsedDockerfile.from_file, dockerfile_names):
+        yield parsed.get_info()
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 2:
-        for idx, cmd in enumerate(sys.argv[1].split(",")):
-            if idx:
-                print("---")
-            main(cmd.strip(), sys.argv[2:])
+    if len(sys.argv) > 1:
+        print(json.dumps([asdict(info) for info in main(*sys.argv[1:])]))
     else:
-        print(f"Not enough arguments.\nUsage: {sys.argv[0]} [COMMAND,COMMAND,...] [DOCKERFILE ...]")
+        print(f"Not enough arguments.\nUsage: {sys.argv[0]} [DOCKERFILE ...]")
         sys.exit(1)

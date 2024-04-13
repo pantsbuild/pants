@@ -9,12 +9,11 @@ from pants.build_graph.address import (
     Address,
     AddressInput,
     AddressParseException,
-    InvalidParameters,
-    InvalidSpecPath,
-    InvalidTargetName,
-    UnsupportedWildcard,
+    InvalidParametersError,
+    InvalidSpecPathError,
+    InvalidTargetNameError,
+    UnsupportedWildcardError,
 )
-from pants.util.frozendict import FrozenDict
 
 
 def test_address_input_parse_spec() -> None:
@@ -27,13 +26,13 @@ def test_address_input_parse_spec() -> None:
         generated_component: str | None = None,
         relative_to: str | None = None,
     ) -> None:
-        ai = AddressInput.parse(spec, relative_to=relative_to)
+        ai = AddressInput.parse(spec, relative_to=relative_to, description_of_origin="tests")
         assert ai.path_component == path_component
         if target_component is None:
             assert ai.target_component is None
         else:
             assert ai.target_component == target_component
-        assert ai.parameters == FrozenDict(parameters or {})
+        assert ai.parameters == (parameters or {})
         if generated_component is None:
             assert ai.generated_component is None
         else:
@@ -108,8 +107,8 @@ def test_address_input_parse_spec() -> None:
     ["..", ".", "//..", "//.", "a/.", "a/..", "../a", "a/../a", "a/:a", "a/b/:b", "/a", "///a"],
 )
 def test_address_input_parse_bad_path_component(spec: str) -> None:
-    with pytest.raises(InvalidSpecPath):
-        AddressInput.parse(spec)
+    with pytest.raises(InvalidSpecPathError):
+        AddressInput.parse(spec, description_of_origin="tests")
 
 
 @pytest.mark.parametrize(
@@ -121,7 +120,7 @@ def test_address_input_parse_bad_path_component(spec: str) -> None:
 )
 def test_address_input_parse(spec: str, expected: str) -> None:
     with pytest.raises(AddressParseException) as e:
-        AddressInput.parse(spec)
+        AddressInput.parse(spec, description_of_origin="tests")
     assert expected in str(e.value)
 
 
@@ -139,8 +138,8 @@ def test_address_input_parse(spec: str, expected: str) -> None:
     ],
 )
 def test_address_bad_target_component(spec: str) -> None:
-    with pytest.raises(InvalidTargetName):
-        AddressInput.parse(spec).dir_to_address()
+    with pytest.raises(InvalidTargetNameError):
+        AddressInput.parse(spec, description_of_origin="tests").dir_to_address()
 
 
 @pytest.mark.parametrize(
@@ -154,20 +153,20 @@ def test_address_bad_target_component(spec: str) -> None:
     ],
 )
 def test_address_bad_wildcard(spec: str) -> None:
-    with pytest.raises(UnsupportedWildcard):
-        AddressInput.parse(spec).dir_to_address()
+    with pytest.raises(UnsupportedWildcardError):
+        AddressInput.parse(spec, description_of_origin="tests").dir_to_address()
 
 
 @pytest.mark.parametrize("spec", ["//:t#gen!", "//:t#gen?", "//:t#gen=", "//:t#gen#"])
 def test_address_generated_name(spec: str) -> None:
-    with pytest.raises(InvalidTargetName):
-        AddressInput.parse(spec).dir_to_address()
+    with pytest.raises(InvalidTargetNameError):
+        AddressInput.parse(spec, description_of_origin="tests").dir_to_address()
 
 
 @pytest.mark.parametrize("spec", ["//:t@k=#gen", "//:t@k#gen=v"])
 def test_address_invalid_params(spec: str) -> None:
-    with pytest.raises(InvalidParameters):
-        AddressInput.parse(spec).dir_to_address()
+    with pytest.raises(InvalidParametersError):
+        AddressInput.parse(spec, description_of_origin="tests").dir_to_address()
 
 
 def test_address_input_subproject_spec() -> None:
@@ -177,6 +176,7 @@ def test_address_input_subproject_spec() -> None:
             spec,
             relative_to=relative_to,
             subproject_roots=["subprojectA", "path/to/subprojectB"],
+            description_of_origin="tests",
         )
 
     # Ensure that a spec in subprojectA is determined correctly.
@@ -220,42 +220,44 @@ def test_address_input_subproject_spec() -> None:
 
 
 def test_address_input_from_file() -> None:
-    assert AddressInput("a/b/c.txt", target_component=None).file_to_address() == Address(
-        "a/b", relative_file_path="c.txt"
-    )
+    assert AddressInput.parse(
+        "a/b/c.txt", description_of_origin="tests"
+    ).file_to_address() == Address("a/b", relative_file_path="c.txt")
 
-    assert AddressInput("a/b/c.txt", target_component="original").file_to_address() == Address(
-        "a/b", target_name="original", relative_file_path="c.txt"
-    )
-    assert AddressInput("a/b/c.txt", target_component="../original").file_to_address() == Address(
-        "a", target_name="original", relative_file_path="b/c.txt"
-    )
-    assert AddressInput(
-        "a/b/c.txt", target_component="../../original"
+    assert AddressInput.parse(
+        "a/b/c.txt:original", description_of_origin="tests"
+    ).file_to_address() == Address("a/b", target_name="original", relative_file_path="c.txt")
+    assert AddressInput.parse(
+        "a/b/c.txt:../original", description_of_origin="tests"
+    ).file_to_address() == Address("a", target_name="original", relative_file_path="b/c.txt")
+    assert AddressInput.parse(
+        "a/b/c.txt:../../original", description_of_origin="tests"
     ).file_to_address() == Address("", target_name="original", relative_file_path="a/b/c.txt")
 
     # These refer to targets "below" the file, which is illegal.
-    with pytest.raises(InvalidTargetName):
-        AddressInput("f.txt", target_component="subdir/tgt").file_to_address()
-    with pytest.raises(InvalidTargetName):
-        AddressInput("f.txt", target_component="subdir../tgt").file_to_address()
-    with pytest.raises(InvalidTargetName):
-        AddressInput("a/f.txt", target_component="../a/original").file_to_address()
+    with pytest.raises(InvalidTargetNameError):
+        AddressInput.parse("f.txt:subdir/tgt", description_of_origin="tests").file_to_address()
+    with pytest.raises(InvalidTargetNameError):
+        AddressInput.parse("f.txt:subdir../tgt", description_of_origin="tests").file_to_address()
+    with pytest.raises(InvalidTargetNameError):
+        AddressInput.parse("a/f.txt:../a/original", description_of_origin="tests").file_to_address()
 
     # Top-level files must include a target_name.
-    with pytest.raises(InvalidTargetName):
-        AddressInput("f.txt").file_to_address()
-    assert AddressInput("f.txt", target_component="tgt").file_to_address() == Address(
-        "", relative_file_path="f.txt", target_name="tgt"
-    )
+    with pytest.raises(InvalidTargetNameError):
+        AddressInput.parse("f.txt", description_of_origin="tests").file_to_address()
+    assert AddressInput.parse(
+        "f.txt:tgt", description_of_origin="tests"
+    ).file_to_address() == Address("", relative_file_path="f.txt", target_name="tgt")
 
 
 def test_address_input_from_dir() -> None:
-    assert AddressInput("a").dir_to_address() == Address("a")
-    assert AddressInput("a", target_component="b").dir_to_address() == Address("a", target_name="b")
-    assert AddressInput(
-        "a", target_component="b", generated_component="gen"
-    ).dir_to_address() == Address("a", target_name="b", generated_name="gen")
+    assert AddressInput.parse("a", description_of_origin="tests").dir_to_address() == Address("a")
+    assert AddressInput.parse("a:b", description_of_origin="tests").dir_to_address() == Address(
+        "a", target_name="b"
+    )
+    assert AddressInput.parse("a:b#gen", description_of_origin="tests").dir_to_address() == Address(
+        "a", target_name="b", generated_name="gen"
+    )
 
 
 def test_address_normalize_target_name() -> None:
@@ -266,11 +268,11 @@ def test_address_normalize_target_name() -> None:
 
 
 def test_address_validate_build_in_spec_path() -> None:
-    with pytest.raises(InvalidSpecPath):
+    with pytest.raises(InvalidSpecPathError):
         Address("a/b/BUILD")
-    with pytest.raises(InvalidSpecPath):
+    with pytest.raises(InvalidSpecPathError):
         Address("a/b/BUILD.ext")
-    with pytest.raises(InvalidSpecPath):
+    with pytest.raises(InvalidSpecPathError):
         Address("a/b/BUILD", target_name="foo")
 
     # It's fine to use BUILD in the relative_file_path, target_name, or generated_name, though.
@@ -280,8 +282,6 @@ def test_address_validate_build_in_spec_path() -> None:
 
 
 def test_address_equality() -> None:
-    assert "Not really an address" != Address("a/b", target_name="c")
-
     assert Address("dir") == Address("dir")
     assert Address("dir") == Address("dir", target_name="dir")
     assert Address("dir") != Address("another_dir")
@@ -444,53 +444,83 @@ def test_address_create_generated() -> None:
 @pytest.mark.parametrize(
     "addr,expected",
     [
-        (Address("a/b/c"), AddressInput("a/b/c", target_component="c")),
-        (Address("a/b/c", target_name="tgt"), AddressInput("a/b/c", "tgt")),
+        (
+            Address("a/b/c"),
+            AddressInput.parse("a/b/c:c", description_of_origin="tests"),
+        ),
+        (
+            Address("a/b/c", target_name="tgt"),
+            AddressInput.parse("a/b/c:tgt", description_of_origin="tests"),
+        ),
         (
             Address("a/b/c", target_name="tgt", generated_name="gen"),
-            AddressInput("a/b/c", "tgt", generated_component="gen"),
+            AddressInput.parse("a/b/c:tgt#gen", description_of_origin="tests"),
         ),
         (
             Address("a/b/c", target_name="tgt", generated_name="dir/gen"),
-            AddressInput("a/b/c", "tgt", generated_component="dir/gen"),
+            AddressInput.parse("a/b/c:tgt#dir/gen", description_of_origin="tests"),
         ),
-        (Address("a/b/c", relative_file_path="f.txt"), AddressInput("a/b/c/f.txt")),
+        (
+            Address("a/b/c", relative_file_path="f.txt"),
+            AddressInput.parse("a/b/c/f.txt", description_of_origin="tests"),
+        ),
         (
             Address("a/b/c", relative_file_path="f.txt", target_name="tgt"),
-            AddressInput("a/b/c/f.txt", "tgt"),
+            AddressInput.parse("a/b/c/f.txt:tgt", description_of_origin="tests"),
         ),
-        (Address("", target_name="tgt"), AddressInput("", "tgt")),
+        (
+            Address("", target_name="tgt"),
+            AddressInput.parse("//:tgt", description_of_origin="tests"),
+        ),
         (
             Address("", target_name="tgt", generated_name="gen"),
-            AddressInput("", "tgt", generated_component="gen"),
+            AddressInput.parse("//:tgt#gen", description_of_origin="tests"),
         ),
-        (Address("", target_name="tgt", relative_file_path="f.txt"), AddressInput("f.txt", "tgt")),
+        (
+            Address("", target_name="tgt", relative_file_path="f.txt"),
+            AddressInput.parse("//f.txt:tgt", description_of_origin="tests"),
+        ),
         (
             Address("a/b/c", relative_file_path="subdir/f.txt"),
-            AddressInput("a/b/c/subdir/f.txt", "../c"),
+            AddressInput.parse("a/b/c/subdir/f.txt:../c", description_of_origin="tests"),
         ),
         (
             Address("a/b/c", relative_file_path="subdir/f.txt", target_name="tgt"),
-            AddressInput("a/b/c/subdir/f.txt", "../tgt"),
+            AddressInput.parse(
+                "a/b/c/subdir/f.txt:../tgt",
+                description_of_origin="tests",
+            ),
         ),
         (
             Address("", target_name="t", parameters={"k": "v"}),
-            AddressInput("", "t", parameters=FrozenDict({"k": "v"})),
+            AddressInput.parse(
+                "//:t@k=v",
+                description_of_origin="tests",
+            ),
         ),
         (
             Address("", target_name="t", parameters={"k": "v"}, generated_name="gen"),
-            AddressInput("", "t", parameters=FrozenDict({"k": "v"}), generated_component="gen"),
+            AddressInput.parse(
+                "//:t#gen@k=v",
+                description_of_origin="tests",
+            ),
         ),
         (
             Address("", target_name="t", parameters={"k": ""}),
-            AddressInput("", "t", parameters=FrozenDict({"k": ""})),
+            AddressInput.parse(
+                "//:t@k=",
+                description_of_origin="tests",
+            ),
         ),
         (
             Address("", target_name="t", parameters={"k1": "v1", "k2": "v2"}),
-            AddressInput("", "t", parameters=FrozenDict({"k1": "v1", "k2": "v2"})),
+            AddressInput.parse(
+                "//:t@k1=v1,k2=v2",
+                description_of_origin="tests",
+            ),
         ),
     ],
 )
 def test_address_spec_to_address_input(addr: Address, expected: AddressInput) -> None:
     """Check that Address.spec <-> AddressInput.parse() is idempotent."""
-    assert AddressInput.parse(addr.spec) == expected
+    assert AddressInput.parse(addr.spec, description_of_origin="tests") == expected

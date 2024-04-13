@@ -7,6 +7,10 @@ from textwrap import dedent
 
 import pytest
 
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
@@ -18,16 +22,14 @@ from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.engine.addresses import Addresses
-from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import CoarsenedTargets, Targets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.goals import lockfile
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
-from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
+from pants.jvm.resolve.coursier_test_util import EMPTY_JVM_LOCKFILE
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -47,6 +49,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *jvm_tool.rules(),
             *source_files.rules(),
+            *strip_jar.rules(),
             *javac_rules(),
             *javac_check_rules(),
             *util_rules(),
@@ -114,7 +117,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": "java_sources(name='lib')",
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
@@ -154,7 +157,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
@@ -189,7 +192,7 @@ def test_compile_jdk_specified_in_build_file(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "ExampleLib.java": JAVA_LIB_JDK12_SOURCE,
         }
     )
@@ -218,7 +221,7 @@ def test_compile_jdk_12_file_fails_with_jdk_11(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "ExampleLib.java": JAVA_LIB_JDK12_SOURCE,
         }
     )
@@ -245,7 +248,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "ExampleLib.java": JAVA_LIB_SOURCE,
             "OtherLib.java": dedent(
                 """\
@@ -323,7 +326,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "a/BUILD": dedent(
                 """\
                 java_sources(
@@ -409,7 +412,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                 public class Main implements A {}
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "a/BUILD": dedent(
                 """\
                 java_sources(
@@ -493,7 +496,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
                 class Other implements B {}
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "lib/BUILD": dedent(
                 """\
                 java_sources(
@@ -552,7 +555,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "Example.java": JAVA_LIB_MAIN_SOURCE,
             "lib/BUILD": dedent(
                 """\
@@ -593,7 +596,7 @@ def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "package-info.java": dedent(
                 """
                 package org.pantsbuild.example;
@@ -632,7 +635,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 """
             ),
             "Example.java": JAVA_LIB_MAIN_SOURCE,
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
         }
     )
     request = CompileJavaSourceRequest(
@@ -646,46 +649,38 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
     assert "package org.pantsbuild.example.lib does not exist" in fallible_result.stderr
 
 
-@maybe_skip_jdk_test
-def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
-    joda_coord = Coordinate(group="joda-time", artifact="joda-time", version="2.10.10")
-    resolved_joda_lockfile = TestCoursierWrapper.new(
-        entries=(
-            CoursierLockfileEntry(
-                coord=joda_coord,
-                file_name="joda-time-2.10.10.jar",
-                direct_dependencies=Coordinates([]),
-                dependencies=Coordinates([]),
-                file_digest=FileDigest(
-                    fingerprint="dd8e7c92185a678d1b7b933f31209b6203c8ffa91e9880475a1be0346b9617e3",
-                    serialized_bytes_length=644419,
-                ),
-            ),
-        )
+@pytest.fixture
+def joda_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "joda.test.lock",
+        ["joda-time:joda-time:2.10.10"],
     )
+
+
+@pytest.fixture
+def joda_lockfile(joda_lockfile_def: JVMLockfileFixtureDefinition, request) -> JVMLockfileFixture:
+    return joda_lockfile_def.load(request)
+
+
+@maybe_skip_jdk_test
+def test_compile_with_maven_deps(
+    rule_runner: RuleRunner, joda_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
-                jvm_artifact(
-                    name = "joda-time_joda-time",
-                    group = "joda-time",
-                    artifact = "joda-time",
-                    version = "2.10.10",
-                )
-
                 java_sources(
                     name = 'main',
 
                     dependencies = [
-                        ':joda-time_joda-time',
+                        '3rdparty/jvm:joda-time_joda-time',
                     ]
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": resolved_joda_lockfile.serialize(
-                [ArtifactRequirement(coordinate=joda_coord)]
-            ),
+            "3rdparty/jvm/BUILD": joda_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": joda_lockfile.serialized_lockfile,
             "Example.java": dedent(
                 """
                 package org.pantsbuild.example;
@@ -722,11 +717,10 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'main',
-
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "Example.java": dedent(
                 """
                 package org.pantsbuild.example;

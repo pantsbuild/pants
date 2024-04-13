@@ -1,13 +1,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Any, Mapping
+import os
+from typing import Any, Mapping, Protocol
 
-from typing_extensions import Protocol
 
-
-class RelPathOracle(Protocol):
-    def rel_path(self) -> str:
+class FilePathOracle(Protocol):
+    def filepath(self) -> str:
         ...
 
 
@@ -20,17 +19,17 @@ class ParseContext:
     """
 
     def __init__(
-        self, build_root: str, type_aliases: Mapping[str, Any], rel_path_oracle: RelPathOracle
+        self, build_root: str, type_aliases: Mapping[str, Any], filepath_oracle: FilePathOracle
     ) -> None:
         """Create a ParseContext.
 
         :param build_root: The absolute path to the build root.
         :param type_aliases: A dictionary of BUILD file symbols.
-        :param rel_path_oracle: An oracle than can be queried for the current BUILD file path.
+        :param filepath_oracle: An oracle than can be queried for the current BUILD file name.
         """
         self._build_root = build_root
         self._type_aliases = type_aliases
-        self._rel_path_oracle = rel_path_oracle
+        self._filepath_oracle = filepath_oracle
 
     def create_object(self, alias: str, *args: Any, **kwargs: Any) -> Any:
         """Constructs the type with the given alias using the given args and kwargs.
@@ -54,11 +53,11 @@ class ParseContext:
 
     @property
     def rel_path(self) -> str:
-        """Relative path from the build root to the BUILD file being parsed.
+        """Relative path from the build root to the directory of the BUILD file being parsed.
 
         :API: public
         """
-        return self._rel_path_oracle.rel_path()
+        return os.path.dirname(self._filepath_oracle.filepath())
 
     @property
     def build_root(self) -> str:

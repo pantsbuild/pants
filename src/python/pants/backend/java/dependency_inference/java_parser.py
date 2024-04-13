@@ -15,13 +15,12 @@ from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateT
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, DigestContents, Directory, FileContent
 from pants.engine.internals.native_engine import MergeDigests, RemovePrefix
-from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessResult, ProductDescription
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
-from pants.option.global_options import ProcessCleanupOption
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -31,7 +30,7 @@ logger = logging.getLogger(__name__)
 _LAUNCHER_BASENAME = "PantsJavaParserLauncher.java"
 
 
-class JavaParserToolLockfileSentinel(GenerateToolLockfileSentinel):
+class JavaParserToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = "java-parser"
 
 
@@ -53,23 +52,15 @@ class JavaParserCompiledClassfiles:
 @rule(level=LogLevel.DEBUG)
 async def resolve_fallible_result_to_analysis(
     fallible_result: FallibleJavaSourceDependencyAnalysisResult,
-    process_cleanup: ProcessCleanupOption,
 ) -> JavaSourceDependencyAnalysis:
-    # TODO(#12725): Just convert directly to a ProcessResult like this:
-    # result = await Get(ProcessResult, FallibleProcessResult, fallible_result.process_result)
-    if fallible_result.process_result.exit_code == 0:
-        analysis_contents = await Get(
-            DigestContents, Digest, fallible_result.process_result.output_digest
-        )
-        analysis = json.loads(analysis_contents[0].content)
-        return JavaSourceDependencyAnalysis.from_json_dict(analysis)
-    raise ProcessExecutionFailure(
-        fallible_result.process_result.exit_code,
-        fallible_result.process_result.stdout,
-        fallible_result.process_result.stderr,
-        "Java source dependency analysis failed.",
-        process_cleanup=process_cleanup.val,
+    desc = ProductDescription("Java source dependency analysis failed.")
+    result = await Get(
+        ProcessResult,
+        {fallible_result.process_result: FallibleProcessResult, desc: ProductDescription},
     )
+    analysis_contents = await Get(DigestContents, Digest, result.output_digest)
+    analysis = json.loads(analysis_contents[0].content)
+    return JavaSourceDependencyAnalysis.from_json_dict(analysis)
 
 
 @rule(level=LogLevel.DEBUG)
@@ -218,7 +209,7 @@ def generate_java_parser_lockfile_request(
             {
                 "com.fasterxml.jackson.core:jackson-databind:2.12.4",
                 "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.12.4",
-                "com.github.javaparser:javaparser-symbol-solver-core:3.23.0",
+                "com.github.javaparser:javaparser-symbol-solver-core:3.25.5",
             }
         ),
         artifact_option_name="n/a",

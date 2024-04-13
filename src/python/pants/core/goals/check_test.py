@@ -8,6 +8,8 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Iterable, Optional, Sequence, Tuple, Type
 
+import pytest
+
 from pants.core.goals.check import (
     Check,
     CheckRequest,
@@ -17,18 +19,32 @@ from pants.core.goals.check import (
     check,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import Workspace
+from pants.engine.environment import EnvironmentName
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, Workspace
+from pants.engine.platform import Platform
+from pants.engine.process import (
+    FallibleProcessResult,
+    ProcessExecutionEnvironment,
+    ProcessResultMetadata,
+)
 from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
+from pants.util.meta import classproperty
+from pants.util.strutil import Simplifier
+
+
+class MockMultipleSourcesField(MultipleSourcesField):
+    pass
 
 
 class MockTarget(Target):
     alias = "mock_target"
-    core_fields = (MultipleSourcesField,)
+    core_fields = (MockMultipleSourcesField,)
 
 
 class MockCheckFieldSet(FieldSet):
@@ -48,12 +64,16 @@ class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
         addresses = [config.address for config in self.field_sets]
         return CheckResults(
             [CheckResult(self.exit_code(addresses), "", "")],
-            checker_name=self.name,
+            checker_name=self.tool_name,
         )
 
 
 class SuccessfulRequest(MockCheckRequest):
-    name = "SuccessfulChecker"
+    tool_name = "Successful Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "successfulchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -61,7 +81,11 @@ class SuccessfulRequest(MockCheckRequest):
 
 
 class FailingRequest(MockCheckRequest):
-    name = "FailingChecker"
+    tool_name = "Failing Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "failingchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -69,7 +93,11 @@ class FailingRequest(MockCheckRequest):
 
 
 class ConditionallySucceedsRequest(MockCheckRequest):
-    name = "ConditionallySucceedsChecker"
+    tool_name = "Conditionally Succeeds Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "conditionallysucceedschecker"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -79,7 +107,11 @@ class ConditionallySucceedsRequest(MockCheckRequest):
 
 
 class SkippedRequest(MockCheckRequest):
-    name = "SkippedChecker"
+    tool_name = "Skipped Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "skippedchecker"
 
     @staticmethod
     def exit_code(_) -> int:
@@ -87,7 +119,7 @@ class SkippedRequest(MockCheckRequest):
 
     @property
     def check_results(self) -> CheckResults:
-        return CheckResults([], checker_name=self.name)
+        return CheckResults([], checker_name=self.tool_name)
 
 
 class InvalidField(MultipleSourcesField):
@@ -100,7 +132,11 @@ class InvalidFieldSet(MockCheckFieldSet):
 
 class InvalidRequest(MockCheckRequest):
     field_set_type = InvalidFieldSet
-    name = "InvalidChecker"
+    tool_name = "Invalid Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "invalidchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -136,8 +172,16 @@ def run_typecheck_rule(
             mock_gets=[
                 MockGet(
                     output_type=CheckResults,
-                    input_type=CheckRequest,
-                    mock=lambda field_set_collection: field_set_collection.check_results,
+                    input_types=(
+                        CheckRequest,
+                        EnvironmentName,
+                    ),
+                    mock=lambda field_set_collection, _: field_set_collection.check_results,
+                ),
+                MockGet(
+                    output_type=EnvironmentName,
+                    input_types=(EnvironmentNameRequest,),
+                    mock=lambda a: EnvironmentName(a.raw_value),
                 ),
             ],
             union_membership=union_membership,
@@ -168,20 +212,22 @@ def test_summary() -> None:
     assert stderr == dedent(
         """\
 
-        ✕ ConditionallySucceedsChecker failed.
-        ✕ FailingChecker failed.
-        ✓ SuccessfulChecker succeeded.
+        ✕ Conditionally Succeeds Checker failed.
+        ✕ Failing Checker failed.
+        ✓ Successful Checker succeeded.
         """
     )
 
     exit_code, stderr = run_typecheck_rule(
-        request_types=requests, targets=targets, only=[FailingRequest.name, SuccessfulRequest.name]
+        request_types=requests,
+        targets=targets,
+        only=[FailingRequest.tool_id, SuccessfulRequest.tool_id],
     )
     assert stderr == dedent(
         """\
 
-        ✕ FailingChecker failed.
-        ✓ SuccessfulChecker succeeded.
+        ✕ Failing Checker failed.
+        ✓ Successful Checker succeeded.
         """
     )
 
@@ -238,3 +284,38 @@ def test_streaming_output_partitions() -> None:
 
         """
     )
+
+
+def test_from_fallible_process_result_output_prepping() -> None:
+    # Check that this calls the simplifier.
+    class DistinctiveException(Exception):
+        pass
+
+    class SubSimplifier(Simplifier):
+        def simplify(self, v: bytes | str) -> str:
+            raise DistinctiveException()
+
+    with pytest.raises(DistinctiveException):
+        CheckResult.from_fallible_process_result(
+            FallibleProcessResult(
+                exit_code=0,
+                stdout=b"",
+                stdout_digest=EMPTY_FILE_DIGEST,
+                stderr=b"",
+                stderr_digest=EMPTY_FILE_DIGEST,
+                output_digest=EMPTY_DIGEST,
+                metadata=ProcessResultMetadata(
+                    0,
+                    ProcessExecutionEnvironment(
+                        environment_name=None,
+                        platform=Platform.create_for_localhost().value,
+                        docker_image=None,
+                        remote_execution=False,
+                        remote_execution_extra_platform_properties=[],
+                    ),
+                    "ran_locally",
+                    0,
+                ),
+            ),
+            output_simplifier=SubSimplifier(),
+        )

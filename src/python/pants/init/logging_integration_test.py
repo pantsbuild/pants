@@ -16,6 +16,7 @@ class LogSubsystem(GoalSubsystem):
 
 class LogGoal(Goal):
     subsystem_cls = LogSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule

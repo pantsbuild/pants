@@ -3,24 +3,28 @@
 
 from __future__ import annotations
 
+import functools
 import inspect
 import sys
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from types import FrameType, ModuleType
 from typing import (
     Any,
     Callable,
+    Coroutine,
     Iterable,
     Mapping,
     Optional,
+    Protocol,
     Sequence,
     Tuple,
     Type,
     TypeVar,
     Union,
+    cast,
     get_type_hints,
+    overload,
 )
 
 from typing_extensions import ParamSpec
@@ -28,31 +32,26 @@ from typing_extensions import ParamSpec
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.goal import Goal
 from pants.engine.internals.rule_visitor import collect_awaitables
-from pants.engine.internals.selectors import AwaitableConstraints
+from pants.engine.internals.selectors import AwaitableConstraints, Call
 from pants.engine.internals.selectors import Effect as Effect  # noqa: F401
 from pants.engine.internals.selectors import Get as Get  # noqa: F401
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
+from pants.engine.internals.selectors import concurrently as concurrently  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 PANTS_RULES_MODULE_KEY = "__pants_rules__"
 
 
-# NB: This violates Python naming conventions of using snake_case for functions. This is because
-# SubsystemRule behaves very similarly to UnionRule and RootRule, and we want to use the same
-# naming scheme.
-#
-# We could refactor this to be a class with __call__() defined, but we would lose the `@memoized`
-# decorator.
-@memoized
-def SubsystemRule(subsystem: Type[Subsystem]) -> TaskRule:
-    """Returns a TaskRule that constructs an instance of the subsystem."""
-    return TaskRule(**subsystem.signature())
+def implicitly(*args) -> dict[str, Any]:
+    # NB: This function does not have a `TypedDict` return type, because the `@rule` decorator
+    # cannot adjust the type of the `@rule` function to include a keyword argument (keyword
+    # arguments are not supported by PEP-612).
+    return {"__implicitly": args}
 
 
 class RuleType(Enum):
@@ -61,17 +60,34 @@ class RuleType(Enum):
     uncacheable_rule = "_uncacheable_rule"
 
 
+P = ParamSpec("P")
+R = TypeVar("R")
+SyncRuleT = Callable[P, R]
+AsyncRuleT = Callable[P, Coroutine[Any, Any, R]]
+RuleDecorator = Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]
+
+
+def _rule_call_trampoline(rule_id: str, output_type: type, func: Callable[P, R]) -> Callable[P, R]:
+    @functools.wraps(func)  # type: ignore
+    async def wrapper(*args, __implicitly: Sequence[Any] = (), **kwargs):
+        call = Call(rule_id, output_type, args, *__implicitly)  # type: ignore[call-overload]
+        return await call
+
+    return cast(Callable[P, R], wrapper)
+
+
 def _make_rule(
     func_id: str,
     rule_type: RuleType,
     return_type: Type,
-    parameter_types: Iterable[Type],
+    parameter_types: dict[str, Type],
+    masked_types: Iterable[Type],
     *,
     cacheable: bool,
     canonical_name: str,
     desc: Optional[str],
     level: LogLevel,
-) -> Callable[[Callable], Callable]:
+) -> RuleDecorator:
     """A @decorator that declares that a particular static function may be used as a TaskRule.
 
     :param rule_type: The specific decorator used to declare the rule.
@@ -90,22 +106,29 @@ def _make_rule(
     if rule_type == RuleType.goal_rule and not is_goal_cls:
         raise TypeError("An `@goal_rule` must return a subclass of `engine.goal.Goal`.")
 
-    def wrapper(func):
-        if not inspect.isfunction(func):
+    def wrapper(original_func):
+        if not inspect.isfunction(original_func):
             raise ValueError("The @rule decorator must be applied innermost of all decorators.")
 
-        awaitables = FrozenOrderedSet(collect_awaitables(func))
+        awaitables = FrozenOrderedSet(collect_awaitables(original_func))
 
         validate_requirements(func_id, parameter_types, awaitables, cacheable)
 
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
-        func.__line_number__ = func.__code__.co_firstlineno
+        original_func.__line_number__ = original_func.__code__.co_firstlineno
 
+        func = _rule_call_trampoline(canonical_name, return_type, original_func)
+
+        # NB: The named definition of the rule ends up wrapped in a trampoline to handle memoization
+        # and implicit arguments for direct by-name calls. But the `TaskRule` takes a reference to
+        # the original unwrapped function, which avoids the need for a special protocol when the
+        # engine invokes a @rule under memoization.
         func.rule = TaskRule(
             return_type,
-            parameter_types,
-            func,
-            input_gets=awaitables,
+            FrozenDict(parameter_types),
+            awaitables,
+            masked_types,
+            original_func,
             canonical_name=canonical_name,
             desc=desc,
             level=level,
@@ -156,24 +179,36 @@ def _ensure_type_annotation(
     return type_annotation
 
 
-PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "desc", "level"}
+PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "canonical_name_suffix", "desc", "level"}
+# We aren't sure if these'll stick around or be removed at some point, so they are "private"
+# and should only be used in Pants' codebase.
+PRIVATE_RULE_DECORATOR_ARGUMENTS = {
+    # Allows callers to override the type Pants will use for the params listed.
+    #
+    # It is assumed (but not enforced) that the provided type is a subclass of the annotated type.
+    # (We assume but not enforce since this is likely to be used with unions, which has the same
+    # assumption between the union base and its members).
+    "_param_type_overrides",
+    # Allows callers to prevent the given list of types from being included in the identity of
+    # a @rule. Although the type may be in scope for callers, it will not be consumable in the
+    # `@rule` which declares the type masked.
+    "_masked_types",
+}
 # We don't want @rule-writers to use 'rule_type' or 'cacheable' as kwargs directly,
 # but rather set them implicitly based on the rule annotation.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
 IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"rule_type", "cacheable"}
 
 
-def rule_decorator(func, **kwargs) -> Callable:
+def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs) -> AsyncRuleT:
     if not inspect.isfunction(func):
         raise ValueError("The @rule decorator expects to be placed on a function.")
-
-    if hasattr(func, "rule_helper"):
-        raise ValueError("Cannot use both @rule and @rule_helper")
 
     if (
         len(
             set(kwargs)
             - PUBLIC_RULE_DECORATOR_ARGUMENTS
+            - PRIVATE_RULE_DECORATOR_ARGUMENTS
             - IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS
         )
         != 0
@@ -184,6 +219,8 @@ def rule_decorator(func, **kwargs) -> Callable:
 
     rule_type: RuleType = kwargs["rule_type"]
     cacheable: bool = kwargs["cacheable"]
+    masked_types: tuple[type, ...] = tuple(kwargs.get("_masked_types", ()))
+    param_type_overrides: dict[str, type] = kwargs.get("_param_type_overrides", {})
 
     func_id = f"@rule {func.__module__}:{func.__name__}"
     type_hints = get_type_hints(func)
@@ -192,20 +229,38 @@ def rule_decorator(func, **kwargs) -> Callable:
         name=f"{func_id} return",
         raise_type=MissingReturnTypeAnnotation,
     )
-    parameter_types = tuple(
-        _ensure_type_annotation(
-            type_annotation=type_hints.get(parameter),
+
+    func_params = inspect.signature(func).parameters
+    for parameter in param_type_overrides:
+        if parameter not in func_params:
+            raise ValueError(
+                f"Unknown parameter name in `param_type_overrides`: {parameter}."
+                + f" Parameter names: '{', '.join(func_params)}'"
+            )
+
+    parameter_types = {
+        parameter: _ensure_type_annotation(
+            type_annotation=param_type_overrides.get(parameter, type_hints.get(parameter)),
             name=f"{func_id} parameter {parameter}",
             raise_type=MissingParameterTypeAnnotation,
         )
-        for parameter in inspect.signature(func).parameters
-    )
+        for parameter in func_params
+    }
     is_goal_cls = issubclass(return_type, Goal)
 
     # Set a default canonical name if one is not explicitly provided to the module and name of the
-    # function that implements it. This is used as the workunit name.
+    # function that implements it, plus an optional suffix. This is used as the workunit name.
+    # The suffix is a convenient way to disambiguate multiple rules registered dynamically from the
+    # same static code (by overriding the inferred param types in the @rule decorator).
+    # TODO: It is not yet clear how dynamically registered rules whose names are generated
+    #  with a suffix will work in practice with the new call-by-name semantics.
+    #  For now the suffix serves to ensure unique names. Whether they are useful is another matter.
+    suffix = kwargs.get("canonical_name_suffix", "")
     effective_name = kwargs.get(
-        "canonical_name", f"{func.__module__}.{func.__qualname__}".replace(".<locals>", "")
+        "canonical_name",
+        f"{func.__module__}.{func.__qualname__}{('_' + suffix) if suffix else ''}".replace(
+            ".<locals>", ""
+        ),
     )
 
     # Set a default description, which is used in the dynamic UI and stacktraces.
@@ -246,6 +301,7 @@ def rule_decorator(func, **kwargs) -> Callable:
         rule_type,
         return_type,
         parameter_types,
+        masked_types,
         cacheable=cacheable,
         canonical_name=effective_name,
         desc=effective_desc,
@@ -255,28 +311,30 @@ def rule_decorator(func, **kwargs) -> Callable:
 
 def validate_requirements(
     func_id: str,
-    parameter_types: Tuple[Type, ...],
+    parameter_types: dict[str, Type],
     awaitables: Tuple[AwaitableConstraints, ...],
     cacheable: bool,
 ) -> None:
     # TODO: Technically this will also fire for an @_uncacheable_rule, but we don't expose those as
     # part of the API, so it's OK for these errors not to mention them.
-    for ty in parameter_types:
+    for ty in parameter_types.values():
         if cacheable and issubclass(ty, SideEffecting):
             raise ValueError(
                 f"A `@rule` that is not a @goal_rule ({func_id}) may not have "
                 f"a side-effecting parameter: {ty}."
             )
     for awaitable in awaitables:
-        input_type_side_effecting = issubclass(awaitable.input_type, SideEffecting)
+        input_type_side_effecting = [
+            it for it in awaitable.input_types if issubclass(it, SideEffecting)
+        ]
         if input_type_side_effecting and not awaitable.is_effect:
             raise ValueError(
-                f"A `Get` may not request a side-effecting type ({awaitable.input_type}). "
+                f"A `Get` may not request side-effecting types ({input_type_side_effecting}). "
                 f"Use `Effect` instead: `{awaitable}`."
             )
         if not input_type_side_effecting and awaitable.is_effect:
             raise ValueError(
-                f"An `Effect` should not be used with a pure type ({awaitable.input_type}). "
+                f"An `Effect` should not be used with pure types ({awaitable.input_types}). "
                 f"Use `Get` instead: `{awaitable}`."
             )
         if cacheable and awaitable.is_effect:
@@ -286,7 +344,7 @@ def validate_requirements(
             )
 
 
-def inner_rule(*args, **kwargs) -> Callable:
+def inner_rule(*args, **kwargs) -> AsyncRuleT | RuleDecorator:
     if len(args) == 1 and inspect.isfunction(args[0]):
         return rule_decorator(*args, **kwargs)
     else:
@@ -297,11 +355,45 @@ def inner_rule(*args, **kwargs) -> Callable:
         return wrapper
 
 
-def rule(*args, **kwargs) -> Callable:
+@overload
+def rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
+    ...
+
+
+@overload
+def rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
+    ...
+
+
+@overload
+def rule(
+    *args, func: None = None, **kwargs: Any
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]:
+    ...
+
+
+def rule(*args, **kwargs):
     return inner_rule(*args, **kwargs, rule_type=RuleType.rule, cacheable=True)
 
 
-def goal_rule(*args, **kwargs) -> Callable:
+@overload
+def goal_rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
+    ...
+
+
+@overload
+def goal_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
+    ...
+
+
+@overload
+def goal_rule(
+    *args, func: None = None, **kwargs: Any
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]:
+    ...
+
+
+def goal_rule(*args, **kwargs):
     if "level" not in kwargs:
         kwargs["level"] = LogLevel.DEBUG
     return inner_rule(*args, **kwargs, rule_type=RuleType.goal_rule, cacheable=False)
@@ -309,63 +401,11 @@ def goal_rule(*args, **kwargs) -> Callable:
 
 # This has a "private" name, as we don't (yet?) want it to be part of the rule API, at least
 # until we figure out the implications, and have a handle on the semantics and use-cases.
-def _uncacheable_rule(*args, **kwargs) -> Callable:
+def _uncacheable_rule(*args, **kwargs) -> AsyncRuleT | RuleDecorator:
     return inner_rule(*args, **kwargs, rule_type=RuleType.uncacheable_rule, cacheable=False)
 
 
-P = ParamSpec("P")
-R = TypeVar("R")
-
-
-def rule_helper(func: Callable[P, R]) -> Callable[P, R]:
-    """Decorator which marks a function as a "rule helper".
-
-    Functions marked as rule helpers are allowed to be called by rules and other rule helpers
-    and can `await Get/MultiGet`. The rule parser adds these functions' awaitables to the rule's
-    awaitables.
-
-    There are a few restrictions:
-        1. Rule helpers must be "private". I.e. start with an underscore
-        2. Rule hlpers must be `async`
-        3. Rule helpers can't be rules
-        4. Rule helpers must be accessed by attributes chained from a module variable (see below)
-
-    To explain restriction 4, consider the following:
-    ```
-        from some_mod import helper_function, attribute
-
-        ...
-
-        some_instance = AClass()
-
-        @rule
-        async def my_rule(arg: RequestType) -> ReturnType
-            await helper_function()  # OK
-            await attribute.helper()  # OK (assuming `helper` is a @rule_helper)
-            await attribute.otherattr.helper()  # OK (assuming `helper` is a @rule_helper)
-            await some_instance.helper()  # OK (assuming `helper` is a @rule_helper)
-
-            await AClass().helper()  # Not OK, won't collect awaitables from `helper`
-
-            func_var = AClass()
-            await func_var.helper()  # Not OK, won't collect awaitables from `helper`
-            await arg.helper()  # Not OK, won't collect awaitables from `helper`
-    ```
-    """
-    if not func.__name__.startswith("_"):
-        raise ValueError("@rule_helpers must be private. I.e. start with an underscore.")
-
-    if hasattr(func, "rule"):
-        raise ValueError("Cannot use both @rule and @rule_helper.")
-
-    if not inspect.iscoroutinefunction(func):
-        raise ValueError("@rule_helpers must be async.")
-
-    setattr(func, "rule_helper", func)
-    return func
-
-
-class Rule(ABC):
+class Rule(Protocol):
     """Rules declare how to produce products for the product graph.
 
     A rule describes what dependencies must be provided to produce a particular product. They also
@@ -373,7 +413,6 @@ class Rule(ABC):
     """
 
     @property
-    @abstractmethod
     def output_type(self):
         """An output `type` for the rule."""
 
@@ -383,103 +422,78 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
 
     If no namespaces are given, collects all the @rules in the caller's module namespace.
     """
+
     if not namespaces:
         currentframe = inspect.currentframe()
         assert isinstance(currentframe, FrameType)
         caller_frame = currentframe.f_back
-        caller_module = inspect.getmodule(caller_frame)
-        assert isinstance(caller_module, ModuleType)
-        namespaces = (caller_module,)
+        assert isinstance(caller_frame, FrameType)
+
+        global_items = caller_frame.f_globals
+        namespaces = (global_items,)
 
     def iter_rules():
         for namespace in namespaces:
             mapping = namespace.__dict__ if isinstance(namespace, ModuleType) else namespace
-            for name, item in mapping.items():
+            for item in mapping.values():
                 if not callable(item):
                     continue
                 rule = getattr(item, "rule", None)
                 if isinstance(rule, TaskRule):
-                    for input in rule.input_selectors:
+                    for input in rule.parameters.values():
                         if issubclass(input, Subsystem):
-                            yield SubsystemRule(input)
+                            yield from input.rules()
+                        if issubclass(input, Subsystem.EnvironmentAware):
+                            yield from input.subsystem.rules()
                     if issubclass(rule.output_type, Goal):
-                        yield SubsystemRule(rule.output_type.subsystem_cls)
+                        yield from rule.output_type.subsystem_cls.rules()
                     yield rule
 
     return list(iter_rules())
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class TaskRule(Rule):
+@dataclass(frozen=True)
+class TaskRule:
     """A Rule that runs a task function when all of its input selectors are satisfied.
 
     NB: This API is not meant for direct consumption. To create a `TaskRule` you should always
     prefer the `@rule` constructor.
     """
 
-    _output_type: Type
-    input_selectors: Tuple[Type, ...]
-    input_gets: Tuple[AwaitableConstraints, ...]
+    output_type: Type
+    parameters: FrozenDict[str, Type]
+    awaitables: Tuple[AwaitableConstraints, ...]
+    masked_types: Tuple[Type, ...]
     func: Callable
-    cacheable: bool
     canonical_name: str
-    desc: Optional[str]
-    level: LogLevel
-
-    def __init__(
-        self,
-        output_type: Type,
-        input_selectors: Iterable[Type],
-        func: Callable,
-        input_gets: Iterable[AwaitableConstraints],
-        canonical_name: str,
-        desc: Optional[str] = None,
-        level: LogLevel = LogLevel.TRACE,
-        cacheable: bool = True,
-    ) -> None:
-        self._output_type = output_type
-        self.input_selectors = tuple(input_selectors)
-        self.input_gets = tuple(input_gets)
-        self.func = func
-        self.cacheable = cacheable
-        self.canonical_name = canonical_name
-        self.desc = desc
-        self.level = level
+    desc: Optional[str] = None
+    level: LogLevel = LogLevel.TRACE
+    cacheable: bool = True
 
     def __str__(self):
         return "(name={}, {}, {!r}, {}, gets={})".format(
             getattr(self, "name", "<not defined>"),
             self.output_type.__name__,
-            self.input_selectors,
+            self.parameters.values(),
             self.func.__name__,
-            self.input_gets,
+            self.awaitables,
         )
 
-    @property
-    def output_type(self):
-        return self._output_type
 
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class QueryRule(Rule):
+@dataclass(frozen=True)
+class QueryRule:
     """A QueryRule declares that a given set of Params will be used to request an output type.
 
     Every callsite to `Scheduler.product_request` should have a corresponding QueryRule to ensure
     that the relevant portions of the RuleGraph are generated.
     """
 
-    _output_type: Type
+    output_type: Type
     input_types: Tuple[Type, ...]
 
-    def __init__(self, output_type: Type, input_types: Sequence[Type]) -> None:
-        self._output_type = output_type
-        self.input_types = tuple(input_types)
-
-    @property
-    def output_type(self):
-        return self._output_type
+    def __init__(self, output_type: Type, input_types: Iterable[Type]) -> None:
+        object.__setattr__(self, "output_type", output_type)
+        object.__setattr__(self, "input_types", tuple(input_types))
 
 
 @dataclass(frozen=True)

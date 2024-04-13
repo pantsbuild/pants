@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from typing import DefaultDict
 
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
-from pants.backend.shell.shell_setup import ShellSetup
-from pants.backend.shell.target_types import ShellSourceField
+from pants.backend.shell.subsystems.shell_setup import ShellSetup
+from pants.backend.shell.target_types import ShellDependenciesField, ShellSourceField
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
@@ -22,15 +22,14 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessCacheSco
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
-    Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
     Targets,
-    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -95,13 +94,13 @@ PATH_FROM_SHELLCHECK_ERROR = re.compile(r"Not following: (.+) was not specified 
 
 @rule
 async def parse_shell_imports(
-    request: ParseShellImportsRequest, shellcheck: Shellcheck
+    request: ParseShellImportsRequest, shellcheck: Shellcheck, platform: Platform
 ) -> ParsedShellImports:
     # We use Shellcheck to parse for us by running it against each file in isolation, which means
     # that all `source` statements will error. Then, we can extract the problematic paths from the
     # JSON output.
     downloaded_shellcheck = await Get(
-        DownloadedExternalTool, ExternalToolRequest, shellcheck.get_request(Platform.current)
+        DownloadedExternalTool, ExternalToolRequest, shellcheck.get_request(platform)
     )
     input_digest = await Get(Digest, MergeDigests([request.digest, downloaded_shellcheck.digest]))
     process_result = await Get(
@@ -150,8 +149,16 @@ async def parse_shell_imports(
     return ParsedShellImports(paths)
 
 
+@dataclass(frozen=True)
+class ShellDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (ShellSourceField, ShellDependenciesField)
+
+    source: ShellSourceField
+    dependencies: ShellDependenciesField
+
+
 class InferShellDependencies(InferDependenciesRequest):
-    infer_from = ShellSourceField
+    infer_from = ShellDependenciesInferenceFieldSet
 
 
 @rule(desc="Inferring Shell dependencies by analyzing imports")
@@ -161,11 +168,10 @@ async def infer_shell_dependencies(
     if not shell_setup.dependency_inference:
         return InferredDependencies([])
 
-    address = request.sources_field.address
-    wrapped_tgt = await Get(WrappedTarget, Address, address)
+    address = request.field_set.address
     explicitly_provided_deps, hydrated_sources = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
-        Get(HydratedSources, HydrateSourcesRequest(request.sources_field)),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
+        Get(HydratedSources, HydrateSourcesRequest(request.field_set.source)),
     )
     assert len(hydrated_sources.snapshot.files) == 1
 

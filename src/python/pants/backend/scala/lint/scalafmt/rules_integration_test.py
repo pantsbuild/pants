@@ -3,33 +3,28 @@
 from __future__ import annotations
 
 import textwrap
+from typing import overload
 
 import pytest
 
 from pants.backend.scala import target_types
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.lint.scalafmt import skip_field
-from pants.backend.scala.lint.scalafmt.rules import (
-    GatherScalafmtConfigFilesRequest,
-    ScalafmtConfigFiles,
-    ScalafmtFieldSet,
-    ScalafmtRequest,
-    find_nearest_ancestor_file,
-)
+from pants.backend.scala.lint.scalafmt.rules import PartitionInfo, ScalafmtFieldSet, ScalafmtRequest
 from pants.backend.scala.lint.scalafmt.rules import rules as scalafmt_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.build_graph.address import Address
-from pants.core.goals.fmt import FmtResult
-from pants.core.util_rules import config_files, source_files
+from pants.core.goals.fmt import FmtResult, Partitions
+from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import CreateDigest, Digest, FileContent, PathGlobs, Snapshot
+from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -44,16 +39,17 @@ def rule_runner() -> RuleRunner:
             *coursier_setup_rules(),
             *external_tool_rules(),
             *source_files.rules(),
+            *stripped_source_files.rules(),
+            *strip_jar.rules(),
             *scalac_rules(),
             *util_rules(),
             *jdk_rules(),
             *target_types.rules(),
             *scalafmt_rules(),
             *skip_field.rules(),
-            QueryRule(FmtResult, (ScalafmtRequest,)),
-            QueryRule(SourceFiles, (SourceFilesRequest,)),
+            QueryRule(Partitions, (ScalafmtRequest.PartitionRequest,)),
+            QueryRule(FmtResult, (ScalafmtRequest.Batch,)),
             QueryRule(Snapshot, (PathGlobs,)),
-            QueryRule(ScalafmtConfigFiles, (GatherScalafmtConfigFilesRequest,)),
         ],
         target_types=[ScalaSourceTarget, ScalaSourcesGeneratorTarget],
     )
@@ -101,27 +97,57 @@ runner.dialect = scala213
 """
 
 
-def run_scalafmt(rule_runner: RuleRunner, targets: list[Target]) -> FmtResult:
+@overload
+def run_scalafmt(
+    rule_runner: RuleRunner, targets: list[Target], expected_partitions: None = None
+) -> FmtResult:
+    ...
+
+
+@overload
+def run_scalafmt(
+    rule_runner: RuleRunner, targets: list[Target], expected_partitions: dict[str, tuple[str, ...]]
+) -> list[FmtResult]:
+    ...
+
+
+def run_scalafmt(
+    rule_runner: RuleRunner,
+    targets: list[Target],
+    expected_partitions: dict[str, tuple[str, ...]] | None = None,
+) -> FmtResult | list[FmtResult]:
     field_sets = [ScalafmtFieldSet.create(tgt) for tgt in targets]
-    input_sources = rule_runner.request(
-        SourceFiles,
+    partitions = rule_runner.request(
+        Partitions[PartitionInfo],
         [
-            SourceFilesRequest(field_set.source for field_set in field_sets),
+            ScalafmtRequest.PartitionRequest(tuple(field_sets)),
         ],
     )
-    fmt_result = rule_runner.request(
-        FmtResult,
-        [
-            ScalafmtRequest(field_sets, snapshot=input_sources.snapshot),
-        ],
-    )
-    return fmt_result
+    if expected_partitions:
+        assert len(partitions) == len(expected_partitions)
+        for partition in partitions:
+            assert partition.metadata is not None
 
-
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
+            config_file = partition.metadata.config_snapshot.files[0]
+            assert config_file in expected_partitions
+            assert partition.elements == expected_partitions[config_file]
+    else:
+        assert len(partitions) == 1
+    fmt_results = [
+        rule_runner.request(
+            FmtResult,
+            [
+                ScalafmtRequest.Batch(
+                    "",
+                    partition.elements,
+                    partition_metadata=partition.metadata,
+                    snapshot=rule_runner.request(Snapshot, [PathGlobs(partition.elements)]),
+                )
+            ],
+        )
+        for partition in partitions
+    ]
+    return fmt_results if expected_partitions else fmt_results[0]
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
@@ -134,7 +160,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="Foo.scala"))
     fmt_result = run_scalafmt(rule_runner, [tgt])
-    assert fmt_result.output == get_snapshot(rule_runner, {"Foo.scala": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"Foo.scala": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -148,7 +174,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="Bar.scala"))
     fmt_result = run_scalafmt(rule_runner, [tgt])
-    assert fmt_result.output == get_snapshot(rule_runner, {"Bar.scala": FIXED_BAD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"Bar.scala": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -166,8 +192,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="Bar.scala")),
     ]
     fmt_result = run_scalafmt(rule_runner, tgts)
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"Foo.scala": GOOD_FILE, "Bar.scala": FIXED_BAD_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"Foo.scala": GOOD_FILE, "Bar.scala": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
 
@@ -194,58 +220,17 @@ def test_multiple_config_files(rule_runner: RuleRunner) -> None:
             Address("foo/bar", target_name="bar", relative_file_path="Bar.scala")
         ),
     ]
-    fmt_result = run_scalafmt(rule_runner, tgts)
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"foo/Foo.scala": GOOD_FILE, "foo/bar/Bar.scala": FIXED_BAD_FILE_INDENT_4}
+    fmt_results = run_scalafmt(
+        rule_runner,
+        tgts,
+        expected_partitions={
+            SCALAFMT_CONF_FILENAME: ("foo/Foo.scala",),
+            "foo/bar/" + SCALAFMT_CONF_FILENAME: ("foo/bar/Bar.scala",),
+        },
     )
-    assert fmt_result.did_change is True
-
-
-def test_find_nearest_ancestor_file() -> None:
-    files = {"grok.conf", "foo/bar/grok.conf", "hello/world/grok.conf"}
-    assert find_nearest_ancestor_file(files, "foo/bar", "grok.conf") == "foo/bar/grok.conf"
-    assert find_nearest_ancestor_file(files, "foo/bar/", "grok.conf") == "foo/bar/grok.conf"
-    assert find_nearest_ancestor_file(files, "foo", "grok.conf") == "grok.conf"
-    assert find_nearest_ancestor_file(files, "foo/", "grok.conf") == "grok.conf"
-    assert find_nearest_ancestor_file(files, "foo/xyzzy", "grok.conf") == "grok.conf"
-    assert find_nearest_ancestor_file(files, "foo/xyzzy", "grok.conf") == "grok.conf"
-    assert find_nearest_ancestor_file(files, "", "grok.conf") == "grok.conf"
-    assert find_nearest_ancestor_file(files, "hello", "grok.conf") == "grok.conf"
-    assert find_nearest_ancestor_file(files, "hello/", "grok.conf") == "grok.conf"
-    assert (
-        find_nearest_ancestor_file(files, "hello/world/foo", "grok.conf") == "hello/world/grok.conf"
+    assert not fmt_results[0].did_change
+    assert fmt_results[0].output == rule_runner.make_snapshot({"foo/Foo.scala": GOOD_FILE})
+    assert fmt_results[1].did_change
+    assert fmt_results[1].output == rule_runner.make_snapshot(
+        {"foo/bar/Bar.scala": FIXED_BAD_FILE_INDENT_4}
     )
-    assert (
-        find_nearest_ancestor_file(files, "hello/world/foo/", "grok.conf")
-        == "hello/world/grok.conf"
-    )
-
-    files2 = {"foo/bar/grok.conf", "hello/world/grok.conf"}
-    assert find_nearest_ancestor_file(files2, "foo", "grok.conf") is None
-    assert find_nearest_ancestor_file(files2, "foo/", "grok.conf") is None
-    assert find_nearest_ancestor_file(files2, "", "grok.conf") is None
-
-
-def test_gather_scalafmt_config_files(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            SCALAFMT_CONF_FILENAME: "",
-            f"foo/bar/{SCALAFMT_CONF_FILENAME}": "",
-            f"hello/{SCALAFMT_CONF_FILENAME}": "",
-            "hello/Foo.scala": "",
-            "hello/world/Foo.scala": "",
-            "foo/bar/Foo.scala": "",
-            "foo/bar/xyyzzy/Foo.scala": "",
-            "foo/blah/Foo.scala": "",
-        }
-    )
-
-    snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.scala"])])
-    request = rule_runner.request(ScalafmtConfigFiles, [GatherScalafmtConfigFilesRequest(snapshot)])
-    assert sorted(request.source_dir_to_config_file.items()) == [
-        ("foo/bar", "foo/bar/.scalafmt.conf"),
-        ("foo/bar/xyyzzy", "foo/bar/.scalafmt.conf"),
-        ("foo/blah", ".scalafmt.conf"),
-        ("hello", "hello/.scalafmt.conf"),
-        ("hello/world", "hello/.scalafmt.conf"),
-    ]

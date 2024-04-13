@@ -1,46 +1,35 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import json
-import os
 from textwrap import dedent
-from typing import Optional
+from typing import Callable, Optional
 
 import pytest
 
-from pants.backend.python.target_types import PexExecutionMode
+from pants.backend.python.target_types import PexExecutionMode, PexLayout
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 
 
-@pytest.mark.parametrize(
-    ("entry_point", "execution_mode", "include_tools"),
-    [
-        ("app.py", None, True),
-        ("app.py", PexExecutionMode.VENV, False),
-        ("app.py:main", PexExecutionMode.ZIPAPP, True),
-        ("app.py:main", None, False),
-    ],
-)
-def test_run_sample_script(
-    entry_point: str, execution_mode: Optional[PexExecutionMode], include_tools: bool
-) -> None:
-    """Test that we properly run a `pex_binary` target.
-
-    This checks a few things:
-    - We can handle source roots.
-    - We properly load third party requirements.
-    - We propagate the error code.
-    """
+def run_generic_test(
+    *,
+    entry_point: str = "app.py",
+    execution_mode: Optional[PexExecutionMode] = None,
+    include_tools: bool = False,
+    layout: Optional[PexLayout] = None,
+    venv_site_packages_copies: bool = False,
+) -> Callable[..., PantsResult]:
     sources = {
         "src_root1/project/app.py": dedent(
             """\
             import sys
-            from utils.strutil import upper_case
-
+            from utils.strutil import my_file
+            from codegen.hello_pb2 import Hi
 
             def main():
-                print(upper_case("Hello world."))
                 print("Hola, mundo.", file=sys.stderr)
+                print(my_file())
                 sys.exit(23)
 
             if __name__ == "__main__":
@@ -51,48 +40,95 @@ def test_run_sample_script(
             f"""\
             python_sources(name='lib')
             pex_binary(
+              name="binary",
               entry_point={entry_point!r},
               execution_mode={execution_mode.value if execution_mode is not None else None!r},
               include_tools={include_tools!r},
+              layout={layout.value if layout is not None else None!r},
+              venv_site_packages_copies={venv_site_packages_copies!r},
             )
             """
         ),
         "src_root2/utils/strutil.py": dedent(
             """\
-            def upper_case(s):
-                return s.upper()
+            def my_file():
+                return __file__
             """
         ),
         "src_root2/utils/BUILD": "python_sources()",
+        "src_root2/codegen/hello.proto": 'syntax = "proto3";\nmessage Hi {{}}',
+        "src_root2/codegen/BUILD": dedent(
+            """\
+            protobuf_sources()
+            python_requirement(name='protobuf', requirements=['protobuf'])
+            """
+        ),
     }
 
     def run(*extra_args: str, **extra_env: str) -> PantsResult:
         with setup_tmpdir(sources) as tmpdir:
             args = [
                 "--backend-packages=pants.backend.python",
+                "--backend-packages=pants.backend.codegen.protobuf.python",
                 f"--source-root-patterns=['/{tmpdir}/src_root1', '/{tmpdir}/src_root2']",
                 "--pants-ignore=__pycache__",
                 "--pants-ignore=/src/python",
                 "run",
-                f"{tmpdir}/src_root1/project/app.py",
+                f"{tmpdir}/src_root1/project:binary",
                 *extra_args,
             ]
             return run_pants(args, extra_env=extra_env)
 
     result = run()
+
     assert "Hola, mundo.\n" in result.stderr
-    assert result.stdout == "HELLO WORLD.\n"
+    file = result.stdout.strip()
+    assert "src_root2" not in file
+    assert file.endswith("utils/strutil.py")
+    if layout == PexLayout.LOOSE:
+        # Loose PEXs execute their own code directly
+        assert "pants-sandbox-" in file
+    else:
+        assert "pants-sandbox-" not in file
     assert result.exit_code == 23
+
+    return run
+
+
+@pytest.mark.parametrize("entry_point", ["app.py", "app.py:main"])
+def test_entry_point(
+    entry_point: str,
+):
+    run_generic_test(entry_point=entry_point)
+
+
+@pytest.mark.parametrize("execution_mode", [None, PexExecutionMode.VENV])
+@pytest.mark.parametrize("include_tools", [True, False])
+def test_execution_mode_and_include_tools(
+    execution_mode: Optional[PexExecutionMode],
+    include_tools: bool,
+):
+    run = run_generic_test(
+        execution_mode=execution_mode,
+        include_tools=include_tools,
+    )
 
     if include_tools:
         result = run("--", "info", PEX_TOOLS="1")
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.stderr
         pex_info = json.loads(result.stdout)
         assert (execution_mode is PexExecutionMode.VENV) == pex_info["venv"]
         assert ("prepend" if execution_mode is PexExecutionMode.VENV else "false") == pex_info[
             "venv_bin_path"
         ]
-        assert pex_info["strip_pex_env"] is False
+        assert pex_info["strip_pex_env"]
+
+
+@pytest.mark.parametrize("layout", PexLayout)
+def test_layout(
+    layout: Optional[PexLayout],
+):
+    run_generic_test(layout=layout)
 
 
 def test_no_strip_pex_env_issues_12057() -> None:
@@ -114,7 +150,10 @@ def test_no_strip_pex_env_issues_12057() -> None:
         "src/BUILD": dedent(
             """\
             python_sources(name="lib")
-            pex_binary(entry_point="app.py")
+            pex_binary(
+                name="binary",
+                entry_point="app.py"
+            )
             """
         ),
     }
@@ -123,43 +162,10 @@ def test_no_strip_pex_env_issues_12057() -> None:
             "--backend-packages=pants.backend.python",
             f"--source-root-patterns=['/{tmpdir}/src']",
             "run",
-            f"{tmpdir}/src/app.py",
+            f"{tmpdir}/src:binary",
         ]
         result = run_pants(args)
         assert result.exit_code == 42, result.stderr
-
-
-def test_no_leak_pex_root_issues_12055() -> None:
-    read_config_result = run_pants(["help-all"])
-    read_config_result.assert_success()
-    config_data = json.loads(read_config_result.stdout)
-    global_advanced_options = {
-        option["config_key"]: [
-            ranked_value["value"] for ranked_value in option["value_history"]["ranked_values"]
-        ][-1]
-        for option in config_data["scope_to_help_info"][""]["advanced"]
-    }
-    named_caches_dir = global_advanced_options["named_caches_dir"]
-
-    sources = {
-        "src/app.py": "import os; print(os.environ['PEX_ROOT'])",
-        "src/BUILD": dedent(
-            """\
-            python_sources(name="lib")
-            pex_binary(entry_point="app.py")
-            """
-        ),
-    }
-    with setup_tmpdir(sources) as tmpdir:
-        args = [
-            "--backend-packages=pants.backend.python",
-            f"--source-root-patterns=['/{tmpdir}/src']",
-            "run",
-            f"{tmpdir}/src/app.py",
-        ]
-        result = run_pants(args)
-        result.assert_success()
-        assert os.path.join(named_caches_dir, "pex_root") == result.stdout.strip()
 
 
 def test_local_dist() -> None:
@@ -201,9 +207,55 @@ def test_local_dist() -> None:
             "--backend-packages=pants.backend.python",
             f"--source-root-patterns=['/{tmpdir}']",
             "run",
-            f"{tmpdir}/foo/main.py",
+            f"{tmpdir}/foo:bin",
         ]
         result = run_pants(args)
+        assert result.stdout == "LOCAL DIST\n"
+
+
+def test_local_dist_with_executable_main() -> None:
+    sources = {
+        "foo/bar.py": "BAR = 'LOCAL DIST'",
+        "foo/setup.py": dedent(
+            """\
+            from setuptools import setup  # pants: no-infer-dep
+
+            # Double-brace the package_dir to avoid setup_tmpdir treating it as a format.
+            setup(name="foo", version="9.8.7", packages=["foo"], package_dir={{"foo": "."}},)
+            """
+        ),
+        "foo/foo-bar-main": "from foo.bar import BAR; print(BAR)",
+        "foo/BUILD": dedent(
+            """\
+            python_sources(name="lib", sources=["bar.py", "setup.py"])
+
+            python_sources(name="main_exe", sources=["foo-bar-main"])
+
+            python_distribution(
+                name="dist",
+                dependencies=[":lib"],
+                provides=python_artifact(name="foo", version="9.8.7"),
+                sdist=False,
+                generate_setup=False,
+            )
+
+            pex_binary(
+                name="bin",
+                executable="foo-bar-main",
+                # Force-exclude any dep on bar.py, so the only way to consume it is via the dist.
+                dependencies=[":main_exe", ":dist", "!!:lib"])
+            """
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.python",
+            f"--source-root-patterns=['/{tmpdir}']",
+            "run",
+            f"{tmpdir}/foo:bin",
+        ]
+        result = run_pants(args)
+        result.assert_success()
         assert result.stdout == "LOCAL DIST\n"
 
 

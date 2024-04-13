@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import Mapping
@@ -17,21 +18,23 @@ from pants.core.util_rules.system_binaries import (
     BinaryShims,
     BinaryShimsRequest,
 )
-from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
+logger = logging.getLogger(__name__)
 
-# The base class is decorated with `frozen_after_init`.
-@dataclass
+
+@dataclass(frozen=True)
 class DockerBinary(BinaryPath):
     """The `docker` binary."""
 
     extra_env: Mapping[str, str]
     extra_input_digests: Mapping[str, Digest] | None
+
+    is_podman: bool
 
     def __init__(
         self,
@@ -39,9 +42,11 @@ class DockerBinary(BinaryPath):
         fingerprint: str | None = None,
         extra_env: Mapping[str, str] | None = None,
         extra_input_digests: Mapping[str, Digest] | None = None,
+        is_podman: bool = False,
     ) -> None:
-        self.extra_env = {} if extra_env is None else extra_env
-        self.extra_input_digests = extra_input_digests
+        object.__setattr__(self, "extra_env", {} if extra_env is None else extra_env)
+        object.__setattr__(self, "extra_input_digests", extra_input_digests)
+        object.__setattr__(self, "is_podman", is_podman)
         super().__init__(path, fingerprint)
 
     def _get_process_environment(self, env: Mapping[str, str]) -> Mapping[str, str]:
@@ -64,9 +69,15 @@ class DockerBinary(BinaryPath):
         build_args: DockerBuildArgs,
         context_root: str,
         env: Mapping[str, str],
+        use_buildx: bool,
         extra_args: tuple[str, ...] = (),
     ) -> Process:
-        args = [self.path, "build", *extra_args]
+        if use_buildx:
+            build_commands = ["buildx", "build"]
+        else:
+            build_commands = ["build"]
+
+        args = [self.path, *build_commands, *extra_args]
 
         for tag in tags:
             args.extend(["--tag", tag])
@@ -88,6 +99,8 @@ class DockerBinary(BinaryPath):
             env=self._get_process_environment(env),
             input_digest=digest,
             immutable_input_digests=self.extra_input_digests,
+            # We must run the docker build commands every time, even if nothing has changed,
+            # in case the user ran `docker image rm` outside of Pants.
             cache_scope=ProcessCacheScope.PER_SESSION,
         )
 
@@ -117,27 +130,39 @@ class DockerBinary(BinaryPath):
         )
 
 
-@dataclass(frozen=True)
-class DockerBinaryRequest:
-    pass
-
-
 @rule(desc="Finding the `docker` binary and related tooling", level=LogLevel.DEBUG)
-async def find_docker(
-    docker_request: DockerBinaryRequest, docker_options: DockerOptions
+async def get_docker(
+    docker_options: DockerOptions, docker_options_env_aware: DockerOptions.EnvironmentAware
 ) -> DockerBinary:
-    env = await Get(Environment, EnvironmentRequest(["PATH"]))
-    search_path = docker_options.executable_search_path(env)
-    request = BinaryPathRequest(
-        binary_name="docker",
-        search_path=search_path,
-        test=BinaryPathTest(args=["-v"]),
-    )
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="interact with the docker daemon")
+    search_path = docker_options_env_aware.executable_search_path
+
+    first_path: BinaryPath | None = None
+    is_podman = False
+
+    if getattr(docker_options.options, "experimental_enable_podman", False):
+        # Enable podman support with `pants.backend.experimental.docker.podman`
+        request = BinaryPathRequest(
+            binary_name="podman",
+            search_path=search_path,
+            test=BinaryPathTest(args=["-v"]),
+        )
+        paths = await Get(BinaryPaths, BinaryPathRequest, request)
+        first_path = paths.first_path
+        if first_path:
+            is_podman = True
+            logger.warning("podman found. Podman support is experimental.")
+
+    if not first_path:
+        request = BinaryPathRequest(
+            binary_name="docker",
+            search_path=search_path,
+            test=BinaryPathTest(args=["-v"]),
+        )
+        paths = await Get(BinaryPaths, BinaryPathRequest, request)
+        first_path = paths.first_path_or_raise(request, rationale="interact with the docker daemon")
 
     if not docker_options.tools:
-        return DockerBinary(first_path.path, first_path.fingerprint)
+        return DockerBinary(first_path.path, first_path.fingerprint, is_podman=is_podman)
 
     tools = await Get(
         BinaryShims,
@@ -145,25 +170,19 @@ async def find_docker(
         BinaryShimsRequest.for_binaries(
             *docker_options.tools,
             rationale="use docker",
-            output_directory="bin",
             search_path=search_path,
         ),
     )
-    tools_path = ".shims"
-    extra_env = {"PATH": os.path.join("{chroot}", tools_path, tools.bin_directory)}
-    extra_input_digests = {tools_path: tools.digest}
+    extra_env = {"PATH": tools.path_component}
+    extra_input_digests = tools.immutable_input_digests
 
     return DockerBinary(
         first_path.path,
         first_path.fingerprint,
         extra_env=extra_env,
         extra_input_digests=extra_input_digests,
+        is_podman=is_podman,
     )
-
-
-@rule
-async def get_docker() -> DockerBinary:
-    return await Get(DockerBinary, DockerBinaryRequest())
 
 
 def rules():

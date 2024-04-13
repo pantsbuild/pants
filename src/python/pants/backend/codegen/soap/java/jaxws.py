@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.util.docutil import git_url
 
 
 class JaxWsTools(JvmToolBase):
@@ -15,5 +14,3 @@ class JaxWsTools(JvmToolBase):
         "pants.backend.codegen.soap.java",
         "jaxws.default.lockfile.txt",
     )
-    default_lockfile_path = "pants/backend/codegen/soap/java/jaxws.default.lockfile.txt"
-    default_lockfile_url = git_url(default_lockfile_path)

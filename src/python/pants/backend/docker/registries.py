@@ -8,6 +8,7 @@ from typing import Any, Iterator
 
 from pants.option.parser import Parser
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 ALL_DEFAULT_REGISTRIES = "<all default registries>"
 
@@ -24,6 +25,18 @@ class DockerRegistryOptionsNotFoundError(DockerRegistryError):
         )
 
 
+class DockerRegistryAddressCollisionError(DockerRegistryError):
+    def __init__(self, first, second):
+        message = softwrap(
+            f"""
+            Duplicated docker registry address for aliases: {first.alias}, {second.alias}.
+            Each registry `address` in `[docker].registries` must be unique.
+            """
+        )
+
+        super().__init__(message)
+
+
 @dataclass(frozen=True)
 class DockerRegistryOptions:
     address: str
@@ -31,6 +44,8 @@ class DockerRegistryOptions:
     default: bool = False
     skip_push: bool = False
     extra_image_tags: tuple[str, ...] = ()
+    repository: str | None = None
+    use_local_alias: bool = False
 
     @classmethod
     def from_dict(cls, alias: str, d: dict[str, Any]) -> DockerRegistryOptions:
@@ -42,9 +57,14 @@ class DockerRegistryOptions:
             extra_image_tags=tuple(
                 d.get("extra_image_tags", DockerRegistryOptions.extra_image_tags)
             ),
+            repository=Parser.to_value_type(d.get("repository"), str, None),
+            use_local_alias=Parser.ensure_bool(d.get("use_local_alias", False)),
         )
 
     def register(self, registries: dict[str, DockerRegistryOptions]) -> None:
+        if self.address in registries:
+            collision = registries[self.address]
+            raise DockerRegistryAddressCollisionError(collision, self)
         registries[self.address] = self
         if self.alias:
             registries[f"@{self.alias}"] = self
@@ -79,5 +99,5 @@ class DockerRegistries:
             elif alias_or_address == ALL_DEFAULT_REGISTRIES:
                 yield from self.default
             else:
-                # Assume a explicit address from the BUILD file.
+                # Assume an explicit address from the BUILD file.
                 yield DockerRegistryOptions(address=alias_or_address)

@@ -13,7 +13,7 @@ import pytest
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_integration_test import PantsResult, run_pants_with_workdir
 from pants.util.contextutil import temporary_dir
-from pants.vcs.changed import DependeesOption
+from pants.vcs.changed import DependentsOption
 
 
 def _run_git(command: list[str]) -> None:
@@ -33,7 +33,7 @@ def repo() -> Iterator[str]:
             ".gitignore": dedent(
                 f"""\
                 {Path(worktree).relative_to(get_buildroot())}
-                .pids
+                .pants.d/pids
                 __pycache__
                 .coverage.*  # For some reason, CI adds these files
                 """
@@ -92,7 +92,7 @@ def reset_edits() -> None:
 def _run_pants_goal(
     workdir: str,
     goal: str,
-    dependees: DependeesOption = DependeesOption.NONE,
+    dependents: DependentsOption = DependentsOption.NONE,
     *,
     extra_args: list[str] | None = None,
 ) -> PantsResult:
@@ -100,7 +100,8 @@ def _run_pants_goal(
         [
             *(extra_args or ()),
             "--changed-since=HEAD",
-            f"--changed-dependees={dependees.value}",
+            "--print-stacktrace",
+            f"--changed-dependents={dependents.value}",
             goal,
         ],
         workdir=workdir,
@@ -111,23 +112,23 @@ def _run_pants_goal(
 def assert_list_stdout(
     workdir: str,
     expected: list[str],
-    dependees: DependeesOption = DependeesOption.NONE,
+    dependents: DependentsOption = DependentsOption.NONE,
     *,
     extra_args: list[str] | None = None,
 ) -> None:
-    result = _run_pants_goal(workdir, "list", dependees=dependees, extra_args=extra_args)
+    result = _run_pants_goal(workdir, "list", dependents=dependents, extra_args=extra_args)
     result.assert_success()
     assert sorted(result.stdout.strip().splitlines()) == sorted(expected)
 
 
 def assert_count_loc(
     workdir: str,
-    dependees: DependeesOption = DependeesOption.NONE,
+    dependents: DependentsOption = DependentsOption.NONE,
     *,
     expected_num_files: int,
     extra_args: list[str] | None = None,
 ) -> None:
-    result = _run_pants_goal(workdir, "count-loc", dependees=dependees, extra_args=extra_args)
+    result = _run_pants_goal(workdir, "count-loc", dependents=dependents, extra_args=extra_args)
     result.assert_success()
     if expected_num_files:
         assert f"Total                        {expected_num_files}" in result.stdout
@@ -142,8 +143,8 @@ def test_no_changes(repo: str) -> None:
 
 def test_change_no_deps(repo: str) -> None:
     append_to_file("standalone.sh", "# foo")
-    for dependees in DependeesOption:
-        assert_list_stdout(repo, ["//:standalone"], dependees)
+    for dependents in DependentsOption:
+        assert_list_stdout(repo, ["//:standalone"], dependents)
         assert_count_loc(repo, expected_num_files=1)
 
 
@@ -152,14 +153,14 @@ def test_change_transitive_dep(repo: str) -> None:
     assert_list_stdout(repo, ["//transitive.sh:lib"])
     assert_count_loc(repo, expected_num_files=1)
 
-    assert_list_stdout(repo, ["//dep.sh:lib", "//transitive.sh:lib"], DependeesOption.DIRECT)
-    assert_count_loc(repo, DependeesOption.DIRECT, expected_num_files=2)
+    assert_list_stdout(repo, ["//dep.sh:lib", "//transitive.sh:lib"], DependentsOption.DIRECT)
+    assert_count_loc(repo, DependentsOption.DIRECT, expected_num_files=2)
 
     assert_list_stdout(
-        repo, ["//app.sh:lib", "//dep.sh:lib", "//transitive.sh:lib"], DependeesOption.TRANSITIVE
+        repo, ["//app.sh:lib", "//dep.sh:lib", "//transitive.sh:lib"], DependentsOption.TRANSITIVE
     )
 
-    assert_count_loc(repo, DependeesOption.TRANSITIVE, expected_num_files=3)
+    assert_count_loc(repo, DependentsOption.TRANSITIVE, expected_num_files=3)
 
 
 def test_unowned_file(repo: str) -> None:
@@ -183,22 +184,22 @@ def test_delete_generated_target(repo: str) -> None:
     * https://github.com/pantsbuild/pants/issues/14975
     """
     delete_file("transitive.sh")
-    for dependees in DependeesOption:
-        assert_list_stdout(repo, ["//:lib"], dependees)
-        assert_count_loc(repo, dependees, expected_num_files=2)
+    for dependents in DependentsOption:
+        assert_list_stdout(repo, ["//:lib"], dependents)
+        assert_count_loc(repo, dependents, expected_num_files=2)
 
     # Make sure that our fix for https://github.com/pantsbuild/pants/issues/15544 does not break
     # this test when using `--tag`.
-    for dependees in (DependeesOption.NONE, DependeesOption.TRANSITIVE):
-        assert_list_stdout(repo, ["//:lib"], dependees, extra_args=["--tag=a"])
-        assert_count_loc(repo, dependees, expected_num_files=1, extra_args=["--tag=a"])
+    for dependents in (DependentsOption.NONE, DependentsOption.TRANSITIVE):
+        assert_list_stdout(repo, ["//:lib"], dependents, extra_args=["--tag=a"])
+        assert_count_loc(repo, dependents, expected_num_files=1, extra_args=["--tag=a"])
 
     # If we also edit a sibling generated target, we should still (for now at least) include the
     # target generator.
     append_to_file("app.sh", "# foo")
-    for dependees in DependeesOption:
-        assert_list_stdout(repo, ["//:lib", "//app.sh:lib"], dependees)
-        assert_count_loc(repo, dependees, expected_num_files=2)
+    for dependents in DependentsOption:
+        assert_list_stdout(repo, ["//:lib", "//app.sh:lib"], dependents)
+        assert_count_loc(repo, dependents, expected_num_files=2)
 
 
 def test_delete_atom_target(repo: str) -> None:
@@ -249,9 +250,9 @@ def test_tag_filtering(repo: str) -> None:
     assert_list_stdout(repo, ["//:standalone"], extra_args=["--tag=-b"])
     assert_count_loc(repo, expected_num_files=1, extra_args=["--tag=-b"])
 
-    assert_list_stdout(repo, ["//dep.sh:lib"], DependeesOption.TRANSITIVE, extra_args=["--tag=+b"])
+    assert_list_stdout(repo, ["//dep.sh:lib"], DependentsOption.TRANSITIVE, extra_args=["--tag=+b"])
     assert_count_loc(
-        repo, DependeesOption.TRANSITIVE, expected_num_files=1, extra_args=["--tag=+b"]
+        repo, DependentsOption.TRANSITIVE, expected_num_files=1, extra_args=["--tag=+b"]
     )
 
     # Regression test for https://github.com/pantsbuild/pants/issues/14977: make sure a generated
@@ -261,22 +262,33 @@ def test_tag_filtering(repo: str) -> None:
     assert_list_stdout(
         repo,
         ["//app.sh:lib", "//transitive.sh:lib"],
-        DependeesOption.TRANSITIVE,
+        DependentsOption.TRANSITIVE,
         extra_args=["--tag=-b"],
     )
     assert_count_loc(
-        repo, DependeesOption.TRANSITIVE, expected_num_files=2, extra_args=["--tag=-b"]
+        repo, DependentsOption.TRANSITIVE, expected_num_files=2, extra_args=["--tag=-b"]
     )
 
     # Regression test for https://github.com/pantsbuild/pants/issues/15544. Don't filter
-    # `--changed-since` roots until the very end if using `--changed-dependees`.
+    # `--changed-since` roots until the very end if using `--changed-dependents`.
     #
     # We change `dep.sh`, which has the tag `b`. When we filter for only tag `a`, we should still
-    # find the dependees of `dep.sh`, like `app.sh`, and only then apply the filter.
+    # find the dependents of `dep.sh`, like `app.sh`, and only then apply the filter.
     reset_edits()
     append_to_file("dep.sh", "# foo")
-    assert_list_stdout(repo, [], DependeesOption.NONE, extra_args=["--tag=a"])
-    assert_count_loc(repo, DependeesOption.NONE, expected_num_files=0, extra_args=["--tag=a"])
+    assert_list_stdout(repo, [], DependentsOption.NONE, extra_args=["--tag=a"])
+    assert_count_loc(repo, DependentsOption.NONE, expected_num_files=0, extra_args=["--tag=a"])
 
-    assert_list_stdout(repo, ["//app.sh:lib"], DependeesOption.TRANSITIVE, extra_args=["--tag=a"])
-    assert_count_loc(repo, DependeesOption.TRANSITIVE, expected_num_files=1, extra_args=["--tag=a"])
+    assert_list_stdout(repo, ["//app.sh:lib"], DependentsOption.TRANSITIVE, extra_args=["--tag=a"])
+    assert_count_loc(
+        repo, DependentsOption.TRANSITIVE, expected_num_files=1, extra_args=["--tag=a"]
+    )
+
+
+def test_pants_ignored_file(repo: str) -> None:
+    """Regression test for
+    https://github.com/pantsbuild/pants/issues/15655#issuecomment-1140081185."""
+    create_file(".ignored/f.txt", "")
+    for dependents in (DependentsOption.NONE, DependentsOption.DIRECT):
+        assert_list_stdout(repo, [], dependents)
+        assert_count_loc(repo, dependents, expected_num_files=0)

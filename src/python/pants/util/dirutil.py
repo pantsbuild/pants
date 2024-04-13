@@ -13,9 +13,8 @@ import threading
 import uuid
 from collections import defaultdict
 from contextlib import contextmanager
-from typing import Any, Callable, DefaultDict, Iterator, Sequence, overload
-
-from typing_extensions import Literal
+from pathlib import Path
+from typing import Any, Callable, DefaultDict, Iterable, Iterator, Literal, Sequence, overload
 
 from pants.util.strutil import ensure_text
 
@@ -62,7 +61,7 @@ def fast_relpath_optional(path: str, start: str) -> str | None:
     return None
 
 
-def safe_mkdir(directory: str, clean: bool = False) -> None:
+def safe_mkdir(directory: str | Path, clean: bool = False) -> None:
     """Ensure a directory is present.
 
     If it's not there, create it.  If it is, no-op. If clean is True, ensure the dir is empty.
@@ -78,12 +77,14 @@ def safe_mkdir(directory: str, clean: bool = False) -> None:
             raise
 
 
-def safe_mkdir_for(path: str, clean: bool = False) -> None:
+def safe_mkdir_for(path: str | Path, clean: bool = False) -> None:
     """Ensure that the parent directory for a file is present.
 
     If it's not there, create it. If it is, no-op.
     """
-    safe_mkdir(os.path.dirname(path), clean=clean)
+    dirname = os.path.dirname(path)
+    if dirname:
+        safe_mkdir(dirname, clean=clean)
 
 
 def safe_file_dump(
@@ -236,7 +237,7 @@ def register_rmtree(directory: str, cleaner: _MkdtempCleanerType = _mkdtemp_atex
     return directory
 
 
-def safe_rmtree(directory: str) -> None:
+def safe_rmtree(directory: str | Path) -> None:
     """Delete a directory if it's present. If it's not present, no-op.
 
     Note that if the directory argument is a symlink, only the symlink will
@@ -259,7 +260,7 @@ def safe_open(filename, *args, **kwargs):
     return open(filename, *args, **kwargs)
 
 
-def safe_delete(filename: str) -> None:
+def safe_delete(filename: str | Path) -> None:
     """Delete a file safely.
 
     If it's not present, no-op.
@@ -437,3 +438,24 @@ def rm_rf(name: str) -> None:
         elif e.errno != errno.ENOENT:
             # Pass on 'No such file or directory', otherwise re-raise OSError to surface perm issues etc.
             raise
+
+
+def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
+    """For a list of file paths, returns a dict of directory path -> files in that dir."""
+    ret = defaultdict(set)
+    for path in paths:
+        dirname, filename = os.path.split(path)
+        ret[dirname].add(filename)
+    return ret
+
+
+def find_nearest_ancestor_file(files: set[str], dir: str, filename: str) -> str | None:
+    """Given a filename return the nearest ancestor file of that name in the directory hierarchy."""
+    while True:
+        candidate_config_file_path = os.path.join(dir, filename)
+        if candidate_config_file_path in files:
+            return candidate_config_file_path
+
+        if dir == "":
+            return None
+        dir = os.path.dirname(dir)

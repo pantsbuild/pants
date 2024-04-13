@@ -35,7 +35,7 @@ def run_goal(targets: list[MockTarget], *, show_documented: bool = False) -> tup
             mock_gets=[
                 MockGet(
                     output_type=UnexpandedTargets,
-                    input_type=Addresses,
+                    input_types=(Addresses,),
                     mock=lambda _: UnexpandedTargets(targets),
                 )
             ],

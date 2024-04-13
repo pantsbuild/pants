@@ -165,3 +165,38 @@ def test_create_tar_archive(rule_runner: RuleRunner, format: ArchiveFormat) -> N
     extracted_archive = rule_runner.request(ExtractedArchive, [created_digest])
     digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
+
+
+@pytest.mark.parametrize(
+    "format", [ArchiveFormat.TAR, ArchiveFormat.TGZ, ArchiveFormat.TXZ, ArchiveFormat.TBZ2]
+)
+def test_create_tar_archive_in_root_dir(rule_runner: RuleRunner, format: ArchiveFormat) -> None:
+    """Validates that a .tar archive can be created with only a filename.
+
+    The specific requirements of creating a tar led to a situation where the CreateArchive code
+    assumed the output file had a directory component, attempting to create a directory called ""
+    if this assumption didn't hold. In 2.14 creating the "" directory became an error, which meant
+    CreateArchive broke. This guards against that break reoccurring.
+
+    Issue: https://github.com/pantsbuild/pants/issues/17545
+    """
+    output_filename = f"a.{format.value}"
+    input_snapshot = rule_runner.make_snapshot(FILES)
+    created_digest = rule_runner.request(
+        Digest,
+        [CreateArchive(input_snapshot, output_filename=output_filename, format=format)],
+    )
+
+    digest_contents = rule_runner.request(DigestContents, [created_digest])
+    assert len(digest_contents) == 1
+    io = BytesIO()
+    io.write(digest_contents[0].content)
+    io.seek(0)
+    compression = "" if format == ArchiveFormat.TAR else f"{format.value[4:]}"  # Strip `tar.`.
+    with tarfile.open(fileobj=io, mode=f"r:{compression}") as tf:
+        assert set(tf.getnames()) == set(FILES.keys())
+
+    # We also use Pants to extract the created archive, which checks for idempotency.
+    extracted_archive = rule_runner.request(ExtractedArchive, [created_digest])
+    digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
+    assert digest_contents == EXPECTED_DIGEST_CONTENTS

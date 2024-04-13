@@ -7,7 +7,5 @@ python_tests(name="target_types_test", sources=["target_types_test.py"])
 python_tests(
     name="rules_test",
     sources=["rules_test.py"],
-    timeout=240,
-    # We want to make sure the default lockfile works for both macOS and Linux.
-    tags=["platform_specific_behavior"],
+    timeout=300,
 )

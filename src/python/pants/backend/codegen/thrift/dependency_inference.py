@@ -9,18 +9,21 @@ from typing import DefaultDict
 
 from pants.backend.codegen.thrift import thrift_parser
 from pants.backend.codegen.thrift.subsystem import ThriftSubsystem
-from pants.backend.codegen.thrift.target_types import AllThriftTargets, ThriftSourceField
+from pants.backend.codegen.thrift.target_types import (
+    AllThriftTargets,
+    ThriftDependenciesField,
+    ThriftSourceField,
+)
 from pants.backend.codegen.thrift.thrift_parser import ParsedThrift, ParsedThriftRequest
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
-    Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
-    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -66,8 +69,16 @@ async def map_thrift_files(thrift_targets: AllThriftTargets) -> ThriftMapping:
     )
 
 
+@dataclass(frozen=True)
+class ThriftDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (ThriftSourceField, ThriftDependenciesField)
+
+    source: ThriftSourceField
+    dependencies: ThriftDependenciesField
+
+
 class InferThriftDependencies(InferDependenciesRequest):
-    infer_from = ThriftSourceField
+    infer_from = ThriftDependenciesInferenceFieldSet
 
 
 @rule(desc="Inferring Thrift dependencies by analyzing imports")
@@ -77,11 +88,10 @@ async def infer_thrift_dependencies(
     if not thrift.dependency_inference:
         return InferredDependencies([])
 
-    address = request.sources_field.address
-    wrapped_tgt = await Get(WrappedTarget, Address, address)
+    address = request.field_set.address
     explicitly_provided_deps, parsed_thrift = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
-        Get(ParsedThrift, ParsedThriftRequest(request.sources_field)),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
+        Get(ParsedThrift, ParsedThriftRequest(request.field_set.source)),
     )
 
     result: OrderedSet[Address] = OrderedSet()
@@ -98,7 +108,7 @@ async def infer_thrift_dependencies(
                 context=softwrap(
                     f"""
                     The target {address} imports `{import_path}` in the file
-                    {wrapped_tgt.target[ThriftSourceField].file_path}
+                    {request.field_set.source.file_path}
                     """
                 ),
             )

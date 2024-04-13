@@ -73,9 +73,21 @@ async def map_first_party_scala_targets_to_symbols(
     for (address, resolve), analysis in address_and_analysis:
         namespace = _symbol_namespace(address)
         for symbol in analysis.provided_symbols:
-            mapping[resolve].insert(symbol, [address], first_party=True, namespace=namespace)
+            mapping[resolve].insert(
+                symbol.name,
+                [address],
+                first_party=True,
+                namespace=namespace,
+                recursive=symbol.recursive,
+            )
         for symbol in analysis.provided_symbols_encoded:
-            mapping[resolve].insert(symbol, [address], first_party=True, namespace=namespace)
+            mapping[resolve].insert(
+                symbol.name,
+                [address],
+                first_party=True,
+                namespace=namespace,
+                recursive=symbol.recursive,
+            )
 
     return SymbolMap((resolve, node.frozen()) for resolve, node in mapping.items())
 

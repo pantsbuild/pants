@@ -3,32 +3,31 @@
 
 from __future__ import annotations
 
-import logging
+import itertools
+import os.path
 from collections import defaultdict
 from dataclasses import dataclass
-from pathlib import PurePath
-from typing import Iterable
+from operator import itemgetter
 
-from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.poetry import (
-    POETRY_LAUNCHER,
-    PoetrySubsystem,
-    create_pyproject_toml,
-)
-from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
-from pants.backend.python.subsystems.repos import PythonRepos
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
-    EntryPoint,
+    PythonRequirementFindLinksField,
     PythonRequirementResolveField,
     PythonRequirementsField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.pex_cli import PexCliProcess
-from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.backend.python.util_rules.pex_cli import PexCliProcess, maybe_log_pex_stderr
+from pants.backend.python.util_rules.pex_environment import PexSubsystem
+from pants.backend.python.util_rules.pex_requirements import (
+    PexRequirements,
+    ResolvePexConfig,
+    ResolvePexConfigRequest,
+)
 from pants.core.goals.generate_lockfiles import (
+    DEFAULT_TOOL_LOCKFILE,
     GenerateLockfile,
     GenerateLockfileResult,
     GenerateLockfilesSubsystem,
@@ -38,59 +37,27 @@ from pants.core.goals.generate_lockfiles import (
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
+from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.process import ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.option.subsystem import _construct_subsystem
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
-
-logger = logging.getLogger(__name__)
+from pants.util.pip_requirement import PipRequirement
 
 
 @dataclass(frozen=True)
 class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
+    find_links: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
-    use_pex: bool
-
-    @classmethod
-    def from_tool(
-        cls,
-        subsystem: PythonToolRequirementsBase,
-        interpreter_constraints: InterpreterConstraints | None = None,
-        *,
-        use_pex: bool,
-        extra_requirements: Iterable[str] = (),
-    ) -> GeneratePythonLockfile:
-        """Create a request for a dedicated lockfile for the tool.
-
-        If the tool determines its interpreter constraints by using the constraints of user code,
-        rather than the option `--interpreter-constraints`, you must pass the arg
-        `interpreter_constraints`.
-        """
-        if not subsystem.uses_custom_lockfile:
-            return cls(
-                requirements=FrozenOrderedSet(),
-                interpreter_constraints=InterpreterConstraints(),
-                resolve_name=subsystem.options_scope,
-                lockfile_dest=subsystem.lockfile,
-                use_pex=use_pex,
-            )
-        return cls(
-            requirements=FrozenOrderedSet((*subsystem.all_requirements, *extra_requirements)),
-            interpreter_constraints=(
-                interpreter_constraints
-                if interpreter_constraints is not None
-                else subsystem.interpreter_constraints
-            ),
-            resolve_name=subsystem.options_scope,
-            lockfile_dest=subsystem.lockfile,
-            use_pex=use_pex,
-        )
 
     @property
     def requirements_hex_digest(self) -> str:
@@ -103,148 +70,107 @@ def wrap_python_lockfile_request(request: GeneratePythonLockfile) -> WrappedGene
     return WrappedGenerateLockfile(request)
 
 
-class MaybeWarnPythonRepos:
-    pass
+@dataclass(frozen=True)
+class _PipArgsAndConstraintsSetup:
+    resolve_config: ResolvePexConfig
+    args: tuple[str, ...]
+    digest: Digest
 
 
-class MaybeWarnPythonReposRequest:
-    pass
+async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAndConstraintsSetup:
+    resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
 
+    args = list(resolve_config.pex_args())
+    digests = []
 
-@rule
-def maybe_warn_python_repos(
-    _: MaybeWarnPythonReposRequest, python_repos: PythonRepos
-) -> MaybeWarnPythonRepos:
-    def warn_python_repos(option: str) -> None:
-        logger.warning(
-            f"The option `[python-repos].{option}` is configured, but it does not work when using "
-            "Poetry for lockfile generation. Lockfile generation will fail if the relevant "
-            "requirements cannot be located on PyPI.\n\n"
-            "Instead, you can use Pex to generate lockfiles by setting "
-            "`[python].lockfile_generator = 'pex'.\n\n"
-            "Alternatively, you can disable lockfiles by setting "
-            "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`. You can also manually "
-            "generate a lockfile, such as by using pip-compile or `pip freeze`. Set the "
-            "`[tool].lockfile` option to the path you manually generated. When manually "
-            "maintaining lockfiles, set `[python].invalid_lockfile_behavior = 'ignore'. For user "
-            "lockfiles from `[python].resolves`, set "
-            "`[python].resolves_generate_lockfiles = false`."
-        )
+    if resolve_config.constraints_file:
+        args.append(f"--constraints={resolve_config.constraints_file.path}")
+        digests.append(resolve_config.constraints_file.digest)
 
-    if python_repos.repos:
-        warn_python_repos("repos")
-    if python_repos.indexes != (python_repos.pypi_index,):
-        warn_python_repos("indexes")
-    return MaybeWarnPythonRepos()
+    input_digest = await Get(Digest, MergeDigests(digests))
+    return _PipArgsAndConstraintsSetup(resolve_config, tuple(args), input_digest)
 
 
 @rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
 async def generate_lockfile(
     req: GeneratePythonLockfile,
-    poetry_subsystem: PoetrySubsystem,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
-    python_repos: PythonRepos,
     python_setup: PythonSetup,
+    pex_subsystem: PexSubsystem,
 ) -> GenerateLockfileResult:
-    if req.use_pex:
-        pip_args_file = "__pip_args.txt"
-        pip_args_file_content = "\n".join(
-            [f"--no-binary {pkg}" for pkg in python_setup.no_binary]
-            + [f"--only-binary {pkg}" for pkg in python_setup.only_binary]
-        )
-        pip_args_file_digest = await Get(
-            Digest, CreateDigest([FileContent(pip_args_file, pip_args_file_content.encode())])
-        )
-        header_delimiter = "//"
-        result = await Get(
-            ProcessResult,
-            PexCliProcess(
-                subcommand=("lock", "create"),
-                extra_args=(
-                    "--output=lock.json",
-                    "--no-emit-warnings",
-                    # See https://github.com/pantsbuild/pants/issues/12458. For now, we always
-                    # generate universal locks because they have the best compatibility. We may
-                    # want to let users change this, as `style=strict` is safer.
-                    "--style=universal",
-                    "--resolver-version",
-                    "pip-2020-resolver",
-                    # This makes diffs more readable when lockfiles change.
-                    "--indent=2",
-                    "-r",
-                    pip_args_file,
-                    *python_repos.pex_args,
-                    *python_setup.manylinux_pex_args,
-                    *req.interpreter_constraints.generate_pex_arg_list(),
-                    *req.requirements,
-                ),
-                additional_input_digest=pip_args_file_digest,
-                output_files=("lock.json",),
-                description=f"Generate lockfile for {req.resolve_name}",
-                # Instead of caching lockfile generation with LMDB, we instead use the invalidation
-                # scheme from `lockfile_metadata.py` to check for stale/invalid lockfiles. This is
-                # necessary so that our invalidation is resilient to deleting LMDB or running on a
-                # new machine.
+    pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
+
+    header_delimiter = "//"
+    result = await Get(
+        ProcessResult,
+        PexCliProcess(
+            subcommand=("lock", "create"),
+            extra_args=(
+                "--output=lock.json",
+                # See https://github.com/pantsbuild/pants/issues/12458. For now, we always
+                # generate universal locks because they have the best compatibility. We may
+                # want to let users change this, as `style=strict` is safer.
+                "--style=universal",
+                "--pip-version",
+                python_setup.pip_version,
+                "--resolver-version",
+                "pip-2020-resolver",
+                # PEX files currently only run on Linux and Mac machines; so we hard code this
+                # limit on lock universality to avoid issues locking due to irrelevant
+                # Windows-only dependency issues. See this Pex issue that originated from a
+                # Pants user issue presented in Slack:
+                #   https://github.com/pex-tool/pex/issues/1821
                 #
-                # We disable caching with LMDB so that when you generate a lockfile, you always get
-                # the most up-to-date snapshot of the world. This is generally desirable and also
-                # necessary to avoid an awkward edge case where different developers generate
-                # different lockfiles even when generating at the same time. See
-                # https://github.com/pantsbuild/pants/issues/12591.
-                cache_scope=ProcessCacheScope.PER_SESSION,
+                # At some point it will probably make sense to expose `--target-system` for
+                # configuration.
+                "--target-system",
+                "linux",
+                "--target-system",
+                "mac",
+                # This makes diffs more readable when lockfiles change.
+                "--indent=2",
+                *(f"--find-links={link}" for link in req.find_links),
+                *pip_args_setup.args,
+                *req.interpreter_constraints.generate_pex_arg_list(),
+                *req.requirements,
             ),
-        )
-    else:
-        header_delimiter = "#"
-        await Get(MaybeWarnPythonRepos, MaybeWarnPythonReposRequest())
-        _pyproject_toml = create_pyproject_toml(
-            req.requirements, req.interpreter_constraints
-        ).encode()
-        _pyproject_toml_digest, _launcher_digest = await MultiGet(
-            Get(Digest, CreateDigest([FileContent("pyproject.toml", _pyproject_toml)])),
-            Get(Digest, CreateDigest([POETRY_LAUNCHER])),
-        )
+            additional_input_digest=pip_args_setup.digest,
+            output_files=("lock.json",),
+            description=f"Generate lockfile for {req.resolve_name}",
+            # Instead of caching lockfile generation with LMDB, we instead use the invalidation
+            # scheme from `lockfile_metadata.py` to check for stale/invalid lockfiles. This is
+            # necessary so that our invalidation is resilient to deleting LMDB or running on a
+            # new machine.
+            #
+            # We disable caching with LMDB so that when you generate a lockfile, you always get
+            # the most up-to-date snapshot of the world. This is generally desirable and also
+            # necessary to avoid an awkward edge case where different developers generate
+            # different lockfiles even when generating at the same time. See
+            # https://github.com/pantsbuild/pants/issues/12591.
+            cache_scope=ProcessCacheScope.PER_SESSION,
+        ),
+    )
 
-        _poetry_pex = await Get(
-            VenvPex,
-            PexRequest,
-            poetry_subsystem.to_pex_request(
-                main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem), sources=_launcher_digest
-            ),
-        )
-
-        # WONTFIX(#12314): Wire up Poetry to named_caches.
-        # WONTFIX(#12314): Wire up all the pip options like indexes.
-        _lock_result = await Get(
-            ProcessResult,
-            VenvPexProcess(
-                _poetry_pex,
-                argv=("lock",),
-                input_digest=_pyproject_toml_digest,
-                output_files=("poetry.lock", "pyproject.toml"),
-                description=f"Generate lockfile for {req.resolve_name}",
-                cache_scope=ProcessCacheScope.PER_SESSION,
-            ),
-        )
-        result = await Get(
-            ProcessResult,
-            VenvPexProcess(
-                _poetry_pex,
-                argv=("export", "-o", req.lockfile_dest),
-                input_digest=_lock_result.output_digest,
-                output_files=(req.lockfile_dest,),
-                description=(
-                    f"Exporting Poetry lockfile to requirements.txt format for {req.resolve_name}"
-                ),
-                level=LogLevel.DEBUG,
-            ),
-        )
+    maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 
     initial_lockfile_digest_contents = await Get(DigestContents, Digest, result.output_digest)
-    # TODO(#12314) Improve error message on `Requirement.parse`
     metadata = PythonLockfileMetadata.new(
-        req.interpreter_constraints,
-        {PipRequirement.parse(i) for i in req.requirements},
+        valid_for_interpreter_constraints=req.interpreter_constraints,
+        requirements={
+            PipRequirement.parse(
+                i,
+                description_of_origin=f"the lockfile {req.lockfile_dest} for the resolve {req.resolve_name}",
+            )
+            for i in req.requirements
+        },
+        manylinux=pip_args_setup.resolve_config.manylinux,
+        requirement_constraints=(
+            set(pip_args_setup.resolve_config.constraints_file.constraints)
+            if pip_args_setup.resolve_config.constraints_file
+            else set()
+        ),
+        only_binary=set(pip_args_setup.resolve_config.only_binary),
+        no_binary=set(pip_args_setup.resolve_config.no_binary),
     )
     lockfile_with_header = metadata.add_header_to_lockfile(
         initial_lockfile_digest_contents[0].content,
@@ -257,7 +183,15 @@ async def generate_lockfile(
     final_lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])
     )
-    return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest)
+
+    if req.diff:
+        diff = await _generate_python_lockfile_diff(
+            final_lockfile_digest, req.resolve_name, req.lockfile_dest
+        )
+    else:
+        diff = None
+
+    return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest, diff)
 
 
 class RequestedPythonUserResolveNames(RequestedUserResolveNames):
@@ -268,12 +202,24 @@ class KnownPythonUserResolveNamesRequest(KnownUserResolveNamesRequest):
     pass
 
 
+def python_exportable_tools(union_membership: UnionMembership) -> dict[str, type[PythonToolBase]]:
+    exportable_tools = union_membership.get(ExportableTool)
+    names_of_python_tools: dict[str, type[PythonToolBase]] = {
+        e.options_scope: e for e in exportable_tools if issubclass(e, PythonToolBase)  # type: ignore  # mypy isn't narrowing with `issubclass`
+    }
+    return names_of_python_tools
+
+
 @rule
 def determine_python_user_resolves(
-    _: KnownPythonUserResolveNamesRequest, python_setup: PythonSetup
+    _: KnownPythonUserResolveNamesRequest,
+    python_setup: PythonSetup,
+    union_membership: UnionMembership,
 ) -> KnownUserResolveNames:
+    python_tool_resolves = ExportableTool.filter_for_subclasses(union_membership, PythonToolBase)
+
     return KnownUserResolveNames(
-        names=tuple(python_setup.resolves.keys()),
+        names=(*python_setup.resolves.keys(), *python_tool_resolves.keys()),
         option_name="[python].resolves",
         requested_resolve_names_cls=RequestedPythonUserResolveNames,
     )
@@ -281,34 +227,115 @@ def determine_python_user_resolves(
 
 @rule
 async def setup_user_lockfile_requests(
-    requested: RequestedPythonUserResolveNames, all_targets: AllTargets, python_setup: PythonSetup
+    requested: RequestedPythonUserResolveNames,
+    all_targets: AllTargets,
+    python_setup: PythonSetup,
+    union_membership: UnionMembership,
 ) -> UserGenerateLockfiles:
     if not (python_setup.enable_resolves and python_setup.resolves_generate_lockfiles):
         return UserGenerateLockfiles()
 
     resolve_to_requirements_fields = defaultdict(set)
+    find_links: set[str] = set()
     for tgt in all_targets:
         if not tgt.has_fields((PythonRequirementResolveField, PythonRequirementsField)):
             continue
         resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
         resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
+        find_links.update(tgt[PythonRequirementFindLinksField].value or ())
 
-    return UserGenerateLockfiles(
-        GeneratePythonLockfile(
-            requirements=PexRequirements.create_from_requirement_fields(
-                resolve_to_requirements_fields[resolve],
-                constraints_strings=(),
-            ).req_strings,
-            interpreter_constraints=InterpreterConstraints(
-                python_setup.resolves_to_interpreter_constraints.get(
-                    resolve, python_setup.interpreter_constraints
+    tools = ExportableTool.filter_for_subclasses(union_membership, PythonToolBase)
+
+    out = []
+    for resolve in requested:
+        if resolve in python_setup.resolves:
+            out.append(
+                GeneratePythonLockfile(
+                    requirements=PexRequirements.req_strings_from_requirement_fields(
+                        resolve_to_requirements_fields[resolve]
+                    ),
+                    find_links=FrozenOrderedSet(find_links),
+                    interpreter_constraints=InterpreterConstraints(
+                        python_setup.resolves_to_interpreter_constraints.get(
+                            resolve, python_setup.interpreter_constraints
+                        )
+                    ),
+                    resolve_name=resolve,
+                    lockfile_dest=python_setup.resolves[resolve],
+                    diff=False,
                 )
-            ),
-            resolve_name=resolve,
-            lockfile_dest=python_setup.resolves[resolve],
-            use_pex=python_setup.generate_lockfiles_with_pex,
-        )
-        for resolve in requested
+            )
+        else:
+            tool_cls: type[PythonToolBase] = tools[resolve]
+            tool = await _construct_subsystem(tool_cls)
+
+            # TODO: we shouldn't be managing default ICs in lockfile identification.
+            #   We should find a better place to do this or a better way to default
+            if tool.register_interpreter_constraints:
+                ic = tool.interpreter_constraints
+            else:
+                ic = InterpreterConstraints(tool.default_interpreter_constraints)
+
+            out.append(
+                GeneratePythonLockfile(
+                    requirements=FrozenOrderedSet(sorted(tool.requirements)),
+                    find_links=FrozenOrderedSet(find_links),
+                    interpreter_constraints=ic,
+                    resolve_name=resolve,
+                    lockfile_dest=DEFAULT_TOOL_LOCKFILE,
+                    diff=False,
+                )
+            )
+
+    return UserGenerateLockfiles(out)
+
+
+@dataclass(frozen=True)
+class PythonSyntheticLockfileTargetsRequest(SyntheticTargetsRequest):
+    """Register the type used to create synthetic targets for Python lockfiles.
+
+    As the paths for all lockfiles are known up-front, we set the `path` field to
+    `SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS` so that we get a single request for all
+    our synthetic targets rather than one request per directory.
+    """
+
+    path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
+
+
+def synthetic_lockfile_target_name(resolve: str) -> str:
+    return f"_{resolve}_lockfile"
+
+
+@rule
+async def python_lockfile_synthetic_targets(
+    request: PythonSyntheticLockfileTargetsRequest,
+    python_setup: PythonSetup,
+) -> SyntheticAddressMaps:
+    if not python_setup.enable_synthetic_lockfiles:
+        return SyntheticAddressMaps()
+
+    resolves = [
+        (os.path.dirname(lockfile), os.path.basename(lockfile), name)
+        for name, lockfile in python_setup.resolves.items()
+    ]
+
+    return SyntheticAddressMaps.for_targets_request(
+        request,
+        [
+            (
+                os.path.join(spec_path, "BUILD.python-lockfiles"),
+                tuple(
+                    TargetAdaptor(
+                        "_lockfiles",
+                        name=synthetic_lockfile_target_name(name),
+                        sources=[lockfile],
+                        __description_of_origin__=f"the [python].resolves option {name!r}",
+                    )
+                    for _, lockfile, name in lockfiles
+                ),
+            )
+            for spec_path, lockfiles in itertools.groupby(sorted(resolves), key=itemgetter(0))
+        ],
     )
 
 
@@ -318,4 +345,5 @@ def rules():
         UnionRule(GenerateLockfile, GeneratePythonLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownPythonUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedPythonUserResolveNames),
+        UnionRule(SyntheticTargetsRequest, PythonSyntheticLockfileTargetsRequest),
     )

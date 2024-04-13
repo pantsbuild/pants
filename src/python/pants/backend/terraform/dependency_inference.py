@@ -2,66 +2,56 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Sequence
 
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.backend.terraform.target_types import TerraformModuleSourcesField
+from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.backend.terraform.target_types import (
+    TerraformBackendTarget,
+    TerraformDependenciesField,
+    TerraformDeploymentFieldSet,
+    TerraformModuleSourcesField,
+    TerraformVarFileTarget,
+)
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.base.specs import DirGlobSpec, RawSpecs
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.goals.tailor import group_by_dir
+from pants.base.specs import DirGlobSpec, DirLiteralSpec, RawSpecs
+from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.native_engine import Address, AddressInput
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
+    FieldSet,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
+    Target,
     Targets,
 )
 from pants.engine.unions import UnionRule
-from pants.util.docutil import git_url
+from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+from pants.util.resources import read_resource
 
 
 class TerraformHcl2Parser(PythonToolRequirementsBase):
     options_scope = "terraform-hcl2-parser"
     help = "Used to parse Terraform modules to infer their dependencies."
 
-    default_version = "python-hcl2==3.0.5"
+    default_requirements = ["python-hcl2>=3.0.5,<5"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.terraform", "hcl2.lock")
-    default_lockfile_path = "src/python/pants/backend/terraform/hcl2.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
-
-
-class TerraformHcl2ParserLockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = TerraformHcl2Parser.options_scope
-
-
-@rule
-def setup_lockfile_request(
-    _: TerraformHcl2ParserLockfileSentinel,
-    hcl2_parser: TerraformHcl2Parser,
-    python_setup: PythonSetup,
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        hcl2_parser, use_pex=python_setup.generate_lockfiles_with_pex
-    )
 
 
 @dataclass(frozen=True)
@@ -71,7 +61,7 @@ class ParserSetup:
 
 @rule
 async def setup_parser(hcl2_parser: TerraformHcl2Parser) -> ParserSetup:
-    parser_script_content = pkgutil.get_data("pants.backend.terraform", "hcl2_parser.py")
+    parser_script_content = read_resource("pants.backend.terraform", "hcl2_parser.py")
     if not parser_script_content:
         raise ValueError("Unable to find source to hcl2_parser.py wrapper script.")
 
@@ -115,15 +105,22 @@ async def setup_process_for_parse_terraform_module_sources(
     return process
 
 
+@dataclass(frozen=True)
+class TerraformModuleDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (TerraformModuleSourcesField,)
+
+    sources: TerraformModuleSourcesField
+
+
 class InferTerraformModuleDependenciesRequest(InferDependenciesRequest):
-    infer_from = TerraformModuleSourcesField
+    infer_from = TerraformModuleDependenciesInferenceFieldSet
 
 
 @rule
 async def infer_terraform_module_dependencies(
     request: InferTerraformModuleDependenciesRequest,
 ) -> InferredDependencies:
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources))
 
     paths = OrderedSet(
         filename for filename in hydrated_sources.snapshot.files if filename.endswith(".tf")
@@ -143,6 +140,7 @@ async def infer_terraform_module_dependencies(
         RawSpecs(
             dir_globs=tuple(DirGlobSpec(path) for path in candidate_spec_paths),
             unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+            description_of_origin="the `terraform_module` dependency inference rule",
         ),
     )
     # TODO: Need to either implement the standard ambiguous dependency logic or ban >1 terraform_module
@@ -153,10 +151,103 @@ async def infer_terraform_module_dependencies(
     return InferredDependencies(terraform_module_addresses)
 
 
+@dataclass(frozen=True)
+class TerraformDeploymentDependenciesInferenceFieldSet(TerraformDeploymentFieldSet):
+    pass
+
+
+class InferTerraformDeploymentDependenciesRequest(InferDependenciesRequest):
+    infer_from = TerraformDeploymentDependenciesInferenceFieldSet
+
+
+def find_targets_of_type(tgts, of_type) -> tuple:
+    if tgts:
+        return tuple(e for e in tgts if isinstance(e, of_type))
+    else:
+        return ()
+
+
+@dataclass(frozen=True)
+class TerraformDeploymentInvocationFilesRequest:
+    """TODO: is there a way to convert between FS? We could convert the inference FS to the deployment FS itself"""
+
+    address: Address
+    dependencies: TerraformDependenciesField
+
+
+@dataclass(frozen=True)
+class TerraformDeploymentInvocationFiles:
+    """The files passed in to the invocation of `terraform`"""
+
+    backend_configs: tuple[TerraformBackendTarget, ...]
+    vars_files: tuple[TerraformVarFileTarget, ...]
+
+
+@rule
+async def get_terraform_backend_and_vars(
+    field_set: TerraformDeploymentInvocationFilesRequest,
+) -> TerraformDeploymentInvocationFiles:
+    this_address = field_set.address
+
+    explicit_deps = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(field_set.dependencies)
+    )
+    tgts_in_dir, explicit_deps_tgt = await MultiGet(
+        Get(
+            Targets,
+            RawSpecs(
+                description_of_origin="terraform infer deployment dependencies",
+                dir_literals=(DirLiteralSpec(this_address.spec_path),),
+            ),
+        ),
+        Get(Targets, Addresses(explicit_deps.includes)),
+    )
+    return identify_terraform_backend_and_vars(explicit_deps_tgt, tgts_in_dir)
+
+
+def identify_terraform_backend_and_vars(
+    explicit_deps: Sequence[Target], tgts_in_dir: Sequence[Target]
+) -> TerraformDeploymentInvocationFiles:
+    has_explicit_backend = find_targets_of_type(explicit_deps, TerraformBackendTarget)
+    if not has_explicit_backend:
+        # Note: Terraform does not support multiple backends, but dep inference isn't the place to enforce that
+        backend_targets = find_targets_of_type(tgts_in_dir, TerraformBackendTarget)
+    else:
+        backend_targets = has_explicit_backend
+
+    has_explicit_var = find_targets_of_type(explicit_deps, TerraformVarFileTarget)
+    if not has_explicit_var:
+        vars_targets = find_targets_of_type(tgts_in_dir, TerraformVarFileTarget)
+    else:
+        vars_targets = has_explicit_var
+
+    return TerraformDeploymentInvocationFiles(backend_targets, vars_targets)
+
+
+@rule
+async def infer_terraform_deployment_dependencies(
+    request: InferTerraformDeploymentDependenciesRequest,
+) -> InferredDependencies:
+    root_module_address_input = request.field_set.root_module.to_address_input()
+    root_module = await Get(Address, AddressInput, root_module_address_input)
+    deps = [root_module]
+
+    invocation_files = await Get(
+        TerraformDeploymentInvocationFiles,
+        TerraformDeploymentInvocationFilesRequest(
+            request.field_set.address, request.field_set.dependencies
+        ),
+    )
+    deps.extend(e.address for e in invocation_files.backend_configs)
+    deps.extend(e.address for e in invocation_files.vars_files)
+
+    return InferredDependencies(deps)
+
+
 def rules():
     return [
         *collect_rules(),
-        *lockfile.rules(),
+        *pex_rules(),
         UnionRule(InferDependenciesRequest, InferTerraformModuleDependenciesRequest),
-        UnionRule(GenerateToolLockfileSentinel, TerraformHcl2ParserLockfileSentinel),
+        UnionRule(InferDependenciesRequest, InferTerraformDeploymentDependenciesRequest),
     ]

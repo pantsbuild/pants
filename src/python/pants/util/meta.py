@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
-from dataclasses import FrozenInstanceError as FrozenInstanceError
-from functools import wraps
 from typing import Any, Callable, Optional, Type, TypeVar, Union
 
 T = TypeVar("T")
@@ -57,6 +55,33 @@ with an @classproperty decorator.""".format(
         return callable_field()
 
 
+def runtime_ignore_subscripts(cls: C) -> C:
+    """Use as a decorator on a class to make it subscriptable at runtime, returning the class.
+
+    Generally, this is used inside the `else` of a `TYPE_CHECKING` check.
+
+    Usage:
+    >>> if TYPE_CHECKING:
+    ...     class MyClass(Generic[...]):
+    ...         ...
+    ... else:
+    ...     @runtime_ignore_subscripts
+    ...     class MyClass:
+    ...         ...
+    ...
+    >>> MyClass[int] is MyClass
+    True
+    """
+
+    @classmethod  # type: ignore[misc]
+    def __class_getitem__(cls, item):
+        return cls
+
+    cls.__class_getitem__ = __class_getitem__
+
+    return cls
+
+
 def classproperty(func: Callable[..., T]) -> T:
     """Use as a decorator on a method definition to make it a class-level attribute.
 
@@ -105,42 +130,3 @@ class _ClassDecoratorWithSentinelAttribute(ABC):
 
     def is_instance(self, obj: Type) -> bool:
         return getattr(obj, "_decorated_type_checkable_type", None) is type(self)
-
-
-def frozen_after_init(cls: C) -> C:
-    """Class decorator to freeze any modifications to the object after __init__() is done.
-
-    The primary use case is for @dataclasses who cannot use frozen=True due to the need for a custom
-    __init__(), but who still want to remain as immutable as possible (e.g. for safety with the V2
-    engine). When using with dataclasses, this should be the first decorator applied, i.e. be used
-    before @dataclass.
-    """
-
-    prev_init = cls.__init__
-    prev_setattr = cls.__setattr__
-
-    def freeze_instance(self) -> None:
-        self._is_frozen = True
-
-    def unfreeze_instance(self) -> None:
-        self._is_frozen = False
-
-    @wraps(prev_init)
-    def new_init(self, *args: Any, **kwargs: Any) -> None:
-        prev_init(self, *args, **kwargs)
-        self._freeze_instance()
-
-    @wraps(prev_setattr)
-    def new_setattr(self, key: str, value: Any) -> None:
-        if getattr(self, "_is_frozen", False) and key != "_is_frozen":
-            raise FrozenInstanceError(
-                f"Attempting to modify the attribute {key} after the object {self} was created."
-            )
-        prev_setattr(self, key, value)  # type: ignore[call-arg]
-
-    cls._freeze_instance = freeze_instance
-    cls._unfreeze_instance = unfreeze_instance
-    cls.__init__ = new_init
-    cls.__setattr__ = new_setattr  # type: ignore[assignment]
-
-    return cls

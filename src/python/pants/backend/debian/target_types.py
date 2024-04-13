@@ -14,12 +14,12 @@ from pants.engine.target import (
     Target,
 )
 from pants.util.docutil import bin_name, doc_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
 class DebianSources(MultipleSourcesField):
     required = True
-    help = softwrap(
+    help = help_text(
         """
         Paths that will be included in the package to be produced such as Debian metadata files.
         You must include a DEBIAN/control file.
@@ -70,7 +70,7 @@ class DebianSources(MultipleSourcesField):
 
 class DebianSymlinks(DictStringToStringField):
     alias = "symlinks"
-    help = softwrap(
+    help = help_text(
         """
         Symlinks to create for each target being packaged.
 
@@ -88,7 +88,7 @@ class DebianInstallPrefix(StringField):
 class DebianPackageDependencies(SpecialCasedDependencies):
     alias = "packages"
     required = True
-    help = softwrap(
+    help = help_text(
         f"""
         Addresses to any targets that can be built with `{bin_name()} package`, e.g.
         `["project:app"]`.
@@ -97,7 +97,7 @@ class DebianPackageDependencies(SpecialCasedDependencies):
         It will include the results in your Debian package using the same name they would normally have,
         but without the `--distdir` prefix (e.g. `dist/`).
 
-        You can include anything that can be uilt by `{bin_name()} package`, e.g. a `pex_binary`,
+        You can include anything that can be built by `{bin_name()} package`, e.g. a `pex_binary`,
         a `python_distribution`, or an `archive`.
         """
     )
@@ -113,13 +113,13 @@ class DebianPackage(Target):
         DebianInstallPrefix,
         DebianPackageDependencies,
     )
-    help = softwrap(
-        f""""
+    help = help_text(
+        f"""
         A Debian package containing an artifact.
 
-        This will not install the package, only create a .deb file
-        that you can then distribute and install, e.g. via dpkg.
+        This will not install the package, only create a `.deb` file
+        that you can then distribute and install, e.g. via `dpkg`.
 
-        "See {doc_url('debian-package')}.
+        See {doc_url('reference/targets/debian_package')}.
         """
     )

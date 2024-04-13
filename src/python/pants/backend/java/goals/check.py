@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 class JavacCheckRequest(CheckRequest):
     field_set_type = JavaFieldSet
-    name = JavacSubsystem.options_scope
+    tool_name = JavacSubsystem.options_scope
 
 
 @rule(desc="Check javac compilation", level=LogLevel.DEBUG)
@@ -54,7 +54,7 @@ async def javac_check(
 
     # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
     exit_code = next((result.exit_code for result in results if result.exit_code != 0), 0)
-    return CheckResults([CheckResult(exit_code, "", "")], checker_name=request.name)
+    return CheckResults([CheckResult(exit_code, "", "")], checker_name=request.tool_name)
 
 
 def rules():

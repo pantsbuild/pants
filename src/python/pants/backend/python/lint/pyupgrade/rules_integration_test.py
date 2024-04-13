@@ -11,12 +11,10 @@ from pants.backend.python.lint.pyupgrade.rules import rules as pyupgrade_rules
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
 from pants.backend.python.lint.pyupgrade.subsystem import rules as pyupgrade_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fix import FixResult
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -31,7 +29,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (PyUpgradeRequest,)),
+            QueryRule(FixResult, (PyUpgradeRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -54,7 +52,7 @@ def run_pyupgrade(
     *,
     extra_args: list[str] | None = None,
     pyupgrade_arg: str = "--py36-plus",
-) -> FmtResult:
+) -> FixResult:
     rule_runner.set_options(
         [
             "--backend-packages=pants.backend.python.lint.pyupgrade",
@@ -70,19 +68,18 @@ def run_pyupgrade(
             SourceFilesRequest(field_set.source for field_set in field_sets),
         ],
     )
-    fmt_result = rule_runner.request(
-        FmtResult,
+    fix_result = rule_runner.request(
+        FixResult,
         [
-            PyUpgradeRequest(field_sets, snapshot=input_sources.snapshot),
+            PyUpgradeRequest.Batch(
+                "",
+                input_sources.snapshot.files,
+                partition_metadata=None,
+                snapshot=input_sources.snapshot,
+            ),
         ],
     )
-    return fmt_result
-
-
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
+    return fix_result
 
 
 @pytest.mark.platform_specific_behavior
@@ -93,22 +90,33 @@ def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snaps
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": PY_36_GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_pyupgrade(
+    fix_result = run_pyupgrade(
         rule_runner,
         [tgt],
         extra_args=[f"--pyupgrade-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": PY_36_GOOD_FILE})
-    assert fmt_result.did_change is False
+    assert fix_result.output == rule_runner.make_snapshot({"f.py": PY_36_GOOD_FILE})
+    assert fix_result.did_change is False
+
+
+def test_convergance(rule_runner: RuleRunner) -> None:
+    # NB: Testing the fact that we re-run pyupgrade until it converges
+    percent_s_string_formatting = '"%s %s" % (foo, bar)\n'
+    rule_runner.write_files(
+        {"f.py": percent_s_string_formatting, "BUILD": "python_sources(name='t')"}
+    )
+    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
+    fix_result = run_pyupgrade(rule_runner, [tgt], extra_args=["--pyupgrade-args=--py36-plus"])
+    assert fix_result.output == rule_runner.make_snapshot({"f.py": 'f"{foo} {bar}"\n'})
+    assert fix_result.did_change is True
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": PY_36_BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_pyupgrade(rule_runner, [tgt])
-    assert fmt_result.skipped is False
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": PY_36_FIXED_BAD_FILE})
-    assert fmt_result.did_change is True
+    fix_result = run_pyupgrade(rule_runner, [tgt])
+    assert fix_result.output == rule_runner.make_snapshot({"f.py": PY_36_FIXED_BAD_FILE})
+    assert fix_result.did_change is True
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
@@ -119,11 +127,11 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
     ]
-    fmt_result = run_pyupgrade(rule_runner, tgts)
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"good.py": PY_36_GOOD_FILE, "bad.py": PY_36_FIXED_BAD_FILE}
+    fix_result = run_pyupgrade(rule_runner, tgts)
+    assert fix_result.output == rule_runner.make_snapshot(
+        {"good.py": PY_36_GOOD_FILE, "bad.py": PY_36_FIXED_BAD_FILE}
     )
-    assert fmt_result.did_change is True
+    assert fix_result.did_change is True
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
@@ -133,20 +141,12 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(
         Address("", target_name="t", relative_file_path="some_file_name.py")
     )
-    fmt_result = run_pyupgrade(
+    fix_result = run_pyupgrade(
         rule_runner,
         [tgt],
         pyupgrade_arg="--py38-plus",
     )
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"some_file_name.py": PY_38_FIXED_BAD_FILE}
+    assert fix_result.output == rule_runner.make_snapshot(
+        {"some_file_name.py": PY_38_FIXED_BAD_FILE}
     )
-    assert fmt_result.did_change is True
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": PY_36_BAD_FILE, "BUILD": "python_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_pyupgrade(rule_runner, [tgt], extra_args=["--pyupgrade-skip"])
-    assert fmt_result.skipped is True
-    assert fmt_result.did_change is False
+    assert fix_result.did_change is True

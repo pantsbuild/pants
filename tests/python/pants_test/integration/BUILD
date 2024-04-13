@@ -43,7 +43,7 @@ python_tests(name="prelude_integration", sources=["prelude_integration_test.py"]
 python_tests(
     name="remote_cache_integration",
     sources=["remote_cache_integration_test.py"],
-    dependencies=["testprojects/src/python:hello_directory"],
+    dependencies=["testprojects/src/jvm:lib_directory"],
     timeout=180,
 )
 
@@ -54,5 +54,14 @@ python_tests(
     runtime_package_dependencies=[
         "src/python/pants:pants-packaged",
         "src/python/pants/testutil:testutil_wheel",
+    ],
+)
+
+python_tests(
+    name="plugin_requirements_integration",
+    sources=["plugin_requirements_integration_test.py"],
+    timeout=240,
+    dependencies=[
+        "testprojects:pants_plugins_directory",
     ],
 )

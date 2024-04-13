@@ -1,0 +1,19 @@
+[package]
+version = "0.0.1"
+edition = "2021"
+name = "pantsd"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+hex = { workspace = true }
+libc = { workspace = true }
+log = { workspace = true }
+options = { path = "../options" }
+sha2 = { workspace = true }
+sysinfo = { workspace = true }
+tempfile = { workspace = true }
+uname = { workspace = true }
+
+[lints]
+workspace = true

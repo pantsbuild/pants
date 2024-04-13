@@ -11,6 +11,7 @@ from pants.engine.target import (
     Target,
     TargetFilesGenerator,
     Targets,
+    generate_multiple_sources_field_help_message,
 )
 from pants.util.logging import LogLevel
 
@@ -55,6 +56,9 @@ class WsdlSourceTarget(Target):
 class WsdlSourcesGeneratingSourcesField(MultipleSourcesField):
     default = ("*.wsdl",)
     expected_file_extensions = (".wsdl",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['utils.wsdl', 'models/*.wsdl', '!ignore_me.wsdl']`"
+    )
 
 
 class WsdlSourcesGeneratorTarget(TargetFilesGenerator):

@@ -3,13 +3,21 @@
 
 from __future__ import annotations
 
-import re
+import os.path
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, TypeVar
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address, BuildFileAddress
+from pants.engine.addresses import Addresses
+from pants.engine.collection import Collection
+from pants.engine.env_vars import EnvironmentVars
+from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
+from pants.engine.internals.dep_rules import (
+    BuildFileDependencyRules,
+    BuildFileDependencyRulesParserState,
+)
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.target import RegisteredTargetTypes, Tags, Target
@@ -19,6 +27,9 @@ from pants.util.memo import memoized_property
 
 class DuplicateNameError(MappingError):
     """Indicates more than one top-level object was found with the same name."""
+
+
+AddressMapT = TypeVar("AddressMapT", bound="AddressMap")
 
 
 @dataclass(frozen=True)
@@ -35,6 +46,11 @@ class AddressMap:
         build_file_content: str,
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
+        env_vars: EnvironmentVars,
+        is_bootstrap: bool,
+        defaults: BuildFileDefaultsParserState,
+        dependents_rules: BuildFileDependencyRulesParserState | None,
+        dependencies_rules: BuildFileDependencyRulesParserState | None,
     ) -> AddressMap:
         """Parses a source for targets.
 
@@ -42,12 +58,27 @@ class AddressMap:
         the same namespace but from a separate source are left as unresolved pointers.
         """
         try:
-            target_adaptors = parser.parse(filepath, build_file_content, extra_symbols)
+            target_adaptors = parser.parse(
+                filepath,
+                build_file_content,
+                extra_symbols,
+                env_vars,
+                is_bootstrap,
+                defaults,
+                dependents_rules,
+                dependencies_rules,
+            )
         except Exception as e:
-            raise MappingError(f"Failed to parse ./{filepath}:\n{e}")
+            raise MappingError(f"Failed to parse ./{filepath}:\n{type(e).__name__}: {e}")
+        return cls.create(filepath, target_adaptors)
+
+    @classmethod
+    def create(
+        cls: type[AddressMapT], filepath: str, target_adaptors: Iterable[TargetAdaptor]
+    ) -> AddressMapT:
         name_to_target_adaptors: dict[str, TargetAdaptor] = {}
         for target_adaptor in target_adaptors:
-            name = target_adaptor.name
+            name = target_adaptor.name or os.path.basename(os.path.dirname(filepath))
             if name in name_to_target_adaptors:
                 duplicate = name_to_target_adaptors[name]
                 raise DuplicateNameError(
@@ -75,14 +106,27 @@ class AddressFamily:
 
     :param namespace: The namespace path of this address family.
     :param name_to_target_adaptors: A dict mapping from name to the target adaptor.
+    :param defaults: The default target field values, per target type, applicable for this address family.
+    :param dependents_rules: The rules to apply on incoming dependencies to targets in this family.
+    :param dependencies_rules: The rules to apply on the outgoing dependencies from targets in this family.
     """
 
     # The directory from which the adaptors were parsed.
     namespace: str
     name_to_target_adaptors: dict[str, tuple[str, TargetAdaptor]]
+    defaults: BuildFileDefaults
+    dependents_rules: BuildFileDependencyRules | None
+    dependencies_rules: BuildFileDependencyRules | None
 
     @classmethod
-    def create(cls, spec_path: str, address_maps: Iterable[AddressMap]) -> AddressFamily:
+    def create(
+        cls,
+        spec_path: str,
+        address_maps: Iterable[AddressMap],
+        defaults: BuildFileDefaults = BuildFileDefaults({}),
+        dependents_rules: BuildFileDependencyRules | None = None,
+        dependencies_rules: BuildFileDependencyRules | None = None,
+    ) -> AddressFamily:
         """Creates an address family from the given set of address maps.
 
         :param spec_path: The directory prefix shared by all address_maps.
@@ -104,7 +148,7 @@ class AddressFamily:
                 if name in name_to_target_adaptors:
                     previous_path, _ = name_to_target_adaptors[name]
                     raise DuplicateNameError(
-                        f"A target with name {name!r} is already defined in {previous_path!r}, but"
+                        f"A target with name {name!r} is already defined in {previous_path!r}, but "
                         f"is also defined in {address_map.path!r}. Because both targets share the "
                         f"same namespace of {spec_path!r}, this is not allowed."
                     )
@@ -112,6 +156,9 @@ class AddressFamily:
         return AddressFamily(
             namespace=spec_path,
             name_to_target_adaptors=dict(sorted(name_to_target_adaptors.items())),
+            defaults=defaults,
+            dependents_rules=dependents_rules,
+            dependencies_rules=dependencies_rules,
         )
 
     @memoized_property
@@ -143,7 +190,7 @@ class AddressFamily:
         return target_adaptor
 
     def __hash__(self):
-        return hash(self.namespace)
+        return hash((self.namespace, self.defaults))
 
     def __repr__(self) -> str:
         return (
@@ -160,7 +207,6 @@ class SpecsFilter:
     is_specified: bool
     filter_subsystem_filter: TargetFilter
     tags_filter: TargetFilter
-    exclude_target_regexps_filter: TargetFilter
 
     @classmethod
     def create(
@@ -169,13 +215,7 @@ class SpecsFilter:
         registered_target_types: RegisteredTargetTypes,
         *,
         tags: Iterable[str],
-        exclude_target_regexps: Iterable[str],
     ) -> SpecsFilter:
-        exclude_patterns = tuple(re.compile(pattern) for pattern in exclude_target_regexps)
-
-        def exclude_target_regexps_filter(tgt: Target) -> bool:
-            return all(p.search(tgt.address.spec) is None for p in exclude_patterns)
-
         def tags_outer_filter(tag: str) -> TargetFilter:
             def tags_inner_filter(tgt: Target) -> bool:
                 return tag in (tgt.get(Tags).value or [])
@@ -185,17 +225,21 @@ class SpecsFilter:
         tags_filter = and_filters(create_filters(tags, tags_outer_filter))
 
         return SpecsFilter(
-            is_specified=bool(filter_subsystem.is_specified() or tags or exclude_target_regexps),
+            is_specified=bool(filter_subsystem.is_specified() or tags),
             filter_subsystem_filter=filter_subsystem.all_filters(registered_target_types),
             tags_filter=tags_filter,
-            exclude_target_regexps_filter=exclude_target_regexps_filter,
         )
 
     def matches(self, target: Target) -> bool:
         """Check that the target matches the provided `--tag` and `--exclude-target-regexp`
         options."""
-        return (
-            self.tags_filter(target)
-            and self.filter_subsystem_filter(target)
-            and self.exclude_target_regexps_filter(target)
-        )
+        return self.tags_filter(target) and self.filter_subsystem_filter(target)
+
+
+class AddressFamilies(Collection[AddressFamily]):
+    def addresses(self) -> Addresses:
+        return Addresses(self._base_addresses())
+
+    def _base_addresses(self) -> Iterable[Address]:
+        for family in self:
+            yield from family.addresses_to_target_adaptors

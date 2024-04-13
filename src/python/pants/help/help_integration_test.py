@@ -33,7 +33,8 @@ def test_help_advanced_global() -> None:
 def test_help_targets() -> None:
     pants_run = run_pants(["help", "targets"])
     pants_run.assert_success()
-    assert "archive          A ZIP or TAR file containing loose files" in pants_run.stdout
+    lines = [" ".join(line.split()) for line in pants_run.stdout.splitlines()]
+    assert "archive A ZIP or TAR file containing loose files and code packages." in lines
     assert "to get help for a specific target" in pants_run.stdout
 
 
@@ -175,7 +176,7 @@ def test_help_provided_target_plugin_field() -> None:
 
             A publishable Python setuptools distribution (e.g. an sdist or wheel).
 
-            See {doc_url("python-distributions")}.
+            See {doc_url("docs/python/overview/building-distributions")}.
 
 
             Activated by pants.backend.python

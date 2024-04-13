@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 from typing import Iterable
 
+from pants.backend.python.subsystems import ipython
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
@@ -53,7 +54,7 @@ def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: Py
         raise NoCompatibleResolveException.bad_input_roots(
             root_targets,
             maybe_get_resolve=maybe_get_resolve,
-            doc_url_slug="python-third-party-dependencies#multiple-lockfiles",
+            doc_url_slug="docs/python/overview/lockfiles#multiple-lockfiles",
             workaround=softwrap(
                 f"""
                 To work around this, choose which resolve you want to use from above. Then, run
@@ -70,6 +71,7 @@ def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: Py
 
 class PythonRepl(ReplImplementation):
     name = "python"
+    supports_args = False
 
 
 @rule(level=LogLevel.DEBUG)
@@ -88,7 +90,6 @@ async def create_python_repl_request(
         LocalDistsPex,
         LocalDistsPexRequest(
             request.addresses,
-            internal_only=True,
             interpreter_constraints=interpreter_constraints,
         ),
     )
@@ -108,15 +109,14 @@ async def create_python_repl_request(
     )
 
     complete_pex_env = pex_env.in_workspace()
-    args = complete_pex_env.create_argv(
-        request.in_chroot(requirements_pex.name), python=requirements_pex.python
-    )
+    args = complete_pex_env.create_argv(request.in_chroot(requirements_pex.name))
 
     chrooted_source_roots = [request.in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
-        **complete_pex_env.environment_dict(python_configured=requirements_pex.python is not None),
+        **complete_pex_env.environment_dict(python=requirements_pex.python),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
         "PEX_PATH": request.in_chroot(local_dists.pex.name),
+        "PEX_INTERPRETER_HISTORY": "1" if python_setup.repl_history else "0",
     }
 
     return ReplRequest(digest=merged_digest, args=args, extra_env=extra_env)
@@ -124,6 +124,7 @@ async def create_python_repl_request(
 
 class IPythonRepl(ReplImplementation):
     name = "ipython"
+    supports_args = True
 
 
 @rule(level=LogLevel.DEBUG)
@@ -154,7 +155,6 @@ async def create_ipython_repl_request(
         LocalDistsPex,
         LocalDistsPexRequest(
             request.addresses,
-            internal_only=True,
             interpreter_constraints=interpreter_constraints,
             sources=sources,
         ),
@@ -173,15 +173,13 @@ async def create_ipython_repl_request(
     )
 
     complete_pex_env = pex_env.in_workspace()
-    args = list(
-        complete_pex_env.create_argv(request.in_chroot(ipython_pex.name), python=ipython_pex.python)
-    )
+    args = list(complete_pex_env.create_argv(request.in_chroot(ipython_pex.name)))
     if ipython.ignore_cwd:
         args.append("--ignore-cwd")
 
     chrooted_source_roots = [request.in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
-        **complete_pex_env.environment_dict(python_configured=ipython_pex.python is not None),
+        **complete_pex_env.environment_dict(python=ipython_pex.python),
         "PEX_PATH": os.pathsep.join(
             [
                 request.in_chroot(requirements_pex.name),
@@ -197,6 +195,7 @@ async def create_ipython_repl_request(
 def rules():
     return [
         *collect_rules(),
+        *ipython.rules(),
         UnionRule(ReplImplementation, PythonRepl),
         UnionRule(ReplImplementation, IPythonRepl),
     ]

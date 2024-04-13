@@ -20,7 +20,8 @@ from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, get
 
 
 def init_repo(remote_name: str, remote: PurePath) -> None:
-    subprocess.check_call(["git", "init", "--initial-branch=main"])
+    subprocess.check_call(["git", "init"])
+    subprocess.check_call(["git", "symbolic-ref", "HEAD", "refs/heads/main"])
     subprocess.check_call(["git", "config", "user.email", "you@example.com"])
     subprocess.check_call(["git", "config", "user.name", "Your Name"])
     subprocess.check_call(["git", "remote", "add", remote_name, str(remote)])
@@ -31,7 +32,8 @@ def origin(tmp_path: Path) -> Path:
     origin = tmp_path / "origin"
     origin.mkdir()
     with pushd(origin.as_posix()):
-        subprocess.check_call(["git", "init", "--bare", "--initial-branch=main"])
+        subprocess.check_call(["git", "init", "--bare"])
+        subprocess.check_call(["git", "symbolic-ref", "HEAD", "refs/heads/main"])
     return origin
 
 
@@ -136,6 +138,9 @@ def test_integration(worktree: Path, readme_file: Path, git: MutatingGitWorktree
 
     assert {"README"} == git.changed_files()
     assert {"README", "INSTALL"} == git.changed_files(include_untracked=True)
+
+    (worktree / "WITH SPACE").write_text("space in path")
+    assert {"README", "INSTALL", "WITH SPACE"} == git.changed_files(include_untracked=True)
 
     # Confirm that files outside of a given relative_to path are ignored
     assert set() == git.changed_files(relative_to="non-existent")
@@ -271,8 +276,8 @@ def test_bad_ref_stderr_issues_13396(git: MutatingGitWorktree) -> None:
     with pytest.raises(
         GitBinaryException,
         match=re.escape(
-            "fatal: ambiguous argument 'HEAD~1000': unknown revision or path not in the working "
-            "tree.\n"
+            "fatal: ambiguous argument 'HEAD~1000': unknown revision or path not in the working"
+            + " tree.\n"
         ),
     ):
         git.changes_in(diffspec="HEAD~1000")

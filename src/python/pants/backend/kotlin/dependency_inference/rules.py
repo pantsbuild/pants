@@ -14,14 +14,11 @@ from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
-    Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
-    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
@@ -31,14 +28,23 @@ from pants.jvm.dependency_inference.artifact_mapper import (
     find_jvm_artifacts_or_raise,
 )
 from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
-from pants.jvm.resolve.common import Coordinate
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import OrderedSet
 
 
+@dataclass(frozen=True)
+class KotlinSourceDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (KotlinSourceField, KotlinDependenciesField, JvmResolveField)
+
+    source: KotlinSourceField
+    dependencies: KotlinDependenciesField
+    resolve: JvmResolveField
+
+
 class InferKotlinSourceDependencies(InferDependenciesRequest):
-    infer_from = KotlinSourceField
+    infer_from = KotlinSourceDependenciesInferenceFieldSet
 
 
 @rule(desc="Inferring Kotlin dependencies by analyzing sources")
@@ -51,12 +57,10 @@ async def infer_kotlin_dependencies_via_source_analysis(
     if not kotlin_infer_subsystem.imports:
         return InferredDependencies([])
 
-    address = request.sources_field.address
-    wrapped_tgt = await Get(WrappedTarget, Address, address)
-    tgt = wrapped_tgt.target
+    address = request.field_set.address
     explicitly_provided_deps, analysis = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])),
-        Get(KotlinSourceDependencyAnalysis, SourceFilesRequest([request.sources_field])),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
+        Get(KotlinSourceDependencyAnalysis, SourceFilesRequest([request.field_set.source])),
     )
 
     symbols: OrderedSet[str] = OrderedSet()
@@ -65,7 +69,7 @@ async def infer_kotlin_dependencies_via_source_analysis(
     if kotlin_infer_subsystem.consumed_types:
         symbols.update(analysis.fully_qualified_consumed_symbols())
 
-    resolve = tgt[JvmResolveField].normalized_value(jvm)
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     dependencies: OrderedSet[Address] = OrderedSet()
     for symbol in symbols:
@@ -84,8 +88,16 @@ async def infer_kotlin_dependencies_via_source_analysis(
     return InferredDependencies(dependencies)
 
 
-class InjectKotlinRuntimeDependencyRequest(InjectDependenciesRequest):
-    inject_for = KotlinDependenciesField
+@dataclass(frozen=True)
+class KotlinRuntimeDependencyInferenceFieldSet(FieldSet):
+    required_fields = (KotlinDependenciesField, JvmResolveField)
+
+    dependencies: KotlinDependenciesField
+    resolve: JvmResolveField
+
+
+class InferKotlinRuntimeDependencyRequest(InferDependenciesRequest):
+    infer_from = KotlinRuntimeDependencyInferenceFieldSet
 
 
 @dataclass(frozen=True)
@@ -106,8 +118,6 @@ async def resolve_kotlin_runtime_for_resolve(
     kotlin_subsystem: KotlinSubsystem,
 ) -> KotlinRuntimeForResolve:
     kotlin_version = kotlin_subsystem.version_for_resolve(request.resolve_name)
-
-    # TODO: Nicer exception messages if this fails due to the resolve missing a jar.
     addresses = find_jvm_artifacts_or_raise(
         required_coordinates=[
             Coordinate(
@@ -129,26 +139,24 @@ async def resolve_kotlin_runtime_for_resolve(
         resolve=request.resolve_name,
         jvm_artifact_targets=jvm_artifact_targets,
         jvm=jvm,
+        subsystem="the Kotlin runtime",
+        target_type="kotlin_sources",
+        requirement_source="the relevant entry for this resolve in the `[kotlin].version_for_resolve` option",
     )
     return KotlinRuntimeForResolve(addresses)
 
 
-@rule(desc="Inject dependency on Kotlin runtime artifacts for Kotlin targets.")
-async def inject_kotlin_stdlib_dependency(
-    request: InjectKotlinRuntimeDependencyRequest,
+@rule(desc="Infer dependency on Kotlin runtime artifacts for Kotlin targets.")
+async def infer_kotlin_stdlib_dependency(
+    request: InferKotlinRuntimeDependencyRequest,
     jvm: JvmSubsystem,
-) -> InjectedDependencies:
-    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    target = wrapped_target.target
-
-    if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
-    resolve = target[JvmResolveField].normalized_value(jvm)
+) -> InferredDependencies:
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     kotlin_runtime_target_info = await Get(
         KotlinRuntimeForResolve, KotlinRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies(kotlin_runtime_target_info.addresses)
+    return InferredDependencies(kotlin_runtime_target_info.addresses)
 
 
 def rules():
@@ -159,5 +167,5 @@ def rules():
         *jvm_symbol_mapper.rules(),
         *artifact_mapper.rules(),
         UnionRule(InferDependenciesRequest, InferKotlinSourceDependencies),
-        UnionRule(InjectDependenciesRequest, InjectKotlinRuntimeDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferKotlinRuntimeDependencyRequest),
     )

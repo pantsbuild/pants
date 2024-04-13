@@ -8,27 +8,33 @@ from textwrap import dedent
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import JVMLockfileFixture
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.scala.compile.scalac import CompileScalaSourceRequest
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.dependency_inference.rules import rules as scala_dep_inf_rules
 from pants.backend.scala.goals.check import ScalacCheckRequest
 from pants.backend.scala.goals.check import rules as scalac_check_rules
-from pants.backend.scala.target_types import ScalacPluginTarget, ScalaSourcesGeneratorTarget
+from pants.backend.scala.resolve.artifact import rules as scala_artifact_rules
+from pants.backend.scala.target_types import (
+    ScalaArtifactTarget,
+    ScalacPluginTarget,
+    ScalaSourcesGeneratorTarget,
+)
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
-from pants.core.util_rules import source_files
+from pants.core.util_rules import source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Addresses
-from pants.engine.internals.native_engine import FileDigest
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -47,19 +53,31 @@ def rule_runner() -> RuleRunner:
             *coursier_fetch_rules(),
             *jdk_rules.rules(),
             *scalac_check_rules(),
+            *strip_jar.rules(),
             *scalac_rules(),
             *source_files.rules(),
+            *stripped_source_files.rules(),
             *target_types_rules(),
             *testutil.rules(),
             *util_rules(),
             *scala_dep_inf_rules(),
+            *scala_artifact_rules(),
+            *system_binaries.rules(),
             QueryRule(CheckResults, (ScalacCheckRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(FallibleClasspathEntry, (CompileScalaSourceRequest,)),
             QueryRule(RenderedClasspath, (CompileScalaSourceRequest,)),
             QueryRule(ClasspathEntry, (CompileScalaSourceRequest,)),
         ],
-        target_types=[JvmArtifactTarget, ScalaSourcesGeneratorTarget, ScalacPluginTarget],
+        target_types=[
+            JvmArtifactTarget,
+            ScalaArtifactTarget,
+            ScalaSourcesGeneratorTarget,
+            ScalacPluginTarget,
+        ],
+        objects={
+            "parametrize": Parametrize,
+        },
     )
     rule_runner.set_options(
         args=["--scala-version-for-resolve={'jvm-default':'2.13.8'}"],
@@ -68,9 +86,19 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-scala_stdlib_jvm_lockfile = pytest.mark.jvm_lockfile(
-    path="scala-library-2.13.test.lock", requirements=["org.scala-lang:scala-library:2.13.8"]
-)
+@pytest.fixture
+def scala_stdlib_jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "scala-library-2.13.test.lock",
+        ["org.scala-lang:scala-library:2.13.8"],
+    )
+
+
+@pytest.fixture
+def scala_stdlib_jvm_lockfile(
+    scala_stdlib_jvm_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scala_stdlib_jvm_lockfile_def.load(request)
 
 
 SCALA_LIB_SOURCE = dedent(
@@ -111,8 +139,9 @@ SCALA_LIB_MAIN_SOURCE = dedent(
 
 
 @maybe_skip_jdk_test
-@scala_stdlib_jvm_lockfile
-def test_compile_no_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
+def test_compile_no_deps(
+    rule_runner: RuleRunner, scala_stdlib_jvm_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -122,8 +151,8 @@ def test_compile_no_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixtu
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": scala_stdlib_jvm_lockfile.serialized_lockfile,
             "ExampleLib.scala": SCALA_LIB_SOURCE,
         }
     )
@@ -137,7 +166,6 @@ def test_compile_no_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixtu
     )
     assert classpath.content == {
         ".ExampleLib.scala.lib.scalac.jar": {
-            "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/lib/C.class",
         }
     }
@@ -157,8 +185,9 @@ def test_compile_no_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixtu
 
 
 @maybe_skip_jdk_test
-@scala_stdlib_jvm_lockfile
-def test_compile_no_deps_jdk_12(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
+def test_compile_no_deps_jdk_12(
+    rule_runner: RuleRunner, scala_stdlib_jvm_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -169,8 +198,8 @@ def test_compile_no_deps_jdk_12(rule_runner: RuleRunner, jvm_lockfile: JVMLockfi
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": scala_stdlib_jvm_lockfile.serialized_lockfile,
             "ExampleLib.scala": SCALA_LIB_JDK12_SOURCE,
         }
     )
@@ -186,9 +215,8 @@ def test_compile_no_deps_jdk_12(rule_runner: RuleRunner, jvm_lockfile: JVMLockfi
 
 @logging
 @maybe_skip_jdk_test
-@scala_stdlib_jvm_lockfile
 def test_compile_jdk_12_file_fails_on_jdk_11(
-    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+    rule_runner: RuleRunner, scala_stdlib_jvm_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
@@ -200,8 +228,8 @@ def test_compile_jdk_12_file_fails_on_jdk_11(
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": scala_stdlib_jvm_lockfile.serialized_lockfile,
             "ExampleLib.scala": SCALA_LIB_JDK12_SOURCE,
         }
     )
@@ -222,8 +250,9 @@ def test_compile_jdk_12_file_fails_on_jdk_11(
 
 @logging
 @maybe_skip_jdk_test
-@scala_stdlib_jvm_lockfile
-def test_compile_with_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
+def test_compile_with_deps(
+    rule_runner: RuleRunner, scala_stdlib_jvm_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -236,8 +265,8 @@ def test_compile_with_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": scala_stdlib_jvm_lockfile.serialized_lockfile,
             "Example.scala": SCALA_LIB_MAIN_SOURCE,
             "lib/BUILD": dedent(
                 """\
@@ -262,7 +291,6 @@ def test_compile_with_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
     )
     assert classpath.content == {
         ".Example.scala.main.scalac.jar": {
-            "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/Main$.class",
             "org/pantsbuild/example/Main.class",
         }
@@ -270,9 +298,8 @@ def test_compile_with_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
 
 
 @maybe_skip_jdk_test
-@scala_stdlib_jvm_lockfile
 def test_compile_with_missing_dep_fails(
-    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+    rule_runner: RuleRunner, scala_stdlib_jvm_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
@@ -284,8 +311,8 @@ def test_compile_with_missing_dep_fails(
                 """
             ),
             "Example.scala": SCALA_LIB_MAIN_SOURCE,
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": scala_stdlib_jvm_lockfile.serialized_lockfile,
         }
     )
     request = CompileScalaSourceRequest(
@@ -302,15 +329,28 @@ def test_compile_with_missing_dep_fails(
     )
 
 
+@pytest.fixture
+def joda_jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "joda-time.test.lock",
+        [
+            "joda-time:joda-time:2.10.10",
+            "org.scala-lang:scala-library:2.13.8",
+        ],
+    )
+
+
+@pytest.fixture
+def joda_jvm_lockfile(
+    joda_jvm_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return joda_jvm_lockfile_def.load(request)
+
+
 @maybe_skip_jdk_test
-@pytest.mark.jvm_lockfile(
-    path="joda-time.test.lock",
-    requirements=[
-        "joda-time:joda-time:2.10.10",
-        "org.scala-lang:scala-library:2.13.8",
-    ],
-)
-def test_compile_with_maven_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
+def test_compile_with_maven_deps(
+    rule_runner: RuleRunner, joda_jvm_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -321,8 +361,8 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockf
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": joda_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": joda_jvm_lockfile.serialized_lockfile,
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -352,7 +392,6 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockf
     )
     assert classpath.content == {
         ".Example.scala.main.scalac.jar": {
-            "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/Main$.class",
             "org/pantsbuild/example/Main.class",
         }
@@ -360,9 +399,8 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockf
 
 
 @maybe_skip_jdk_test
-@scala_stdlib_jvm_lockfile
 def test_compile_with_undeclared_jvm_artifact_target_fails(
-    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+    rule_runner: RuleRunner, scala_stdlib_jvm_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
@@ -373,8 +411,8 @@ def test_compile_with_undeclared_jvm_artifact_target_fails(
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": scala_stdlib_jvm_lockfile.serialized_lockfile,
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -404,9 +442,8 @@ def test_compile_with_undeclared_jvm_artifact_target_fails(
 
 
 @maybe_skip_jdk_test
-@scala_stdlib_jvm_lockfile
 def test_compile_with_undeclared_jvm_artifact_dependency_fails(
-    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+    rule_runner: RuleRunner, scala_stdlib_jvm_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
@@ -424,8 +461,8 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": scala_stdlib_jvm_lockfile.serialized_lockfile,
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -454,19 +491,27 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(
     assert "error: object joda is not a member of package org" in fallible_result.stderr
 
 
-acyclic_jvm_lockfile = pytest.mark.jvm_lockfile(
-    path="acyclic.test.lock",
-    requirements=[
-        "com.lihaoyi:acyclic_2.13:0.2.1",
-        "org.scala-lang:scala-library:2.13.8",
-    ],
-)
+@pytest.fixture
+def acyclic_jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "acyclic.test.lock",
+        [
+            "com.lihaoyi:acyclic_2.13:0.2.1",
+            "org.scala-lang:scala-library:2.13.8",
+        ],
+    )
+
+
+@pytest.fixture
+def acyclic_jvm_lockfile(
+    acyclic_jvm_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return acyclic_jvm_lockfile_def.load(request)
 
 
 @maybe_skip_jdk_test
-@acyclic_jvm_lockfile
 def test_compile_with_scalac_plugin(
-    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+    rule_runner: RuleRunner, acyclic_jvm_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
@@ -482,8 +527,8 @@ def test_compile_with_scalac_plugin(
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": acyclic_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": acyclic_jvm_lockfile.serialized_lockfile,
             "lib/A.scala": dedent(
                 """
                 package lib
@@ -525,9 +570,8 @@ def test_compile_with_scalac_plugin(
 
 
 @maybe_skip_jdk_test
-@acyclic_jvm_lockfile
 def test_compile_with_local_scalac_plugin(
-    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+    rule_runner: RuleRunner, acyclic_jvm_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
@@ -543,8 +587,8 @@ def test_compile_with_local_scalac_plugin(
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": acyclic_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": acyclic_jvm_lockfile.serialized_lockfile,
             "lib/A.scala": dedent(
                 """
                 package lib
@@ -584,21 +628,32 @@ def test_compile_with_local_scalac_plugin(
     assert "error: Unwanted cyclic dependency" in fallible_result.stderr
 
 
+@pytest.fixture
+def multiple_scala_plugins_jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "multiple-scalac-plugins.test.lock",
+        [
+            "com.olegpy:better-monadic-for_2.13:0.3.1",
+            "org.typelevel:kind-projector_2.13.8:0.13.2",
+            "org.scala-lang:scala-compiler:2.13.8",
+            "org.scala-lang:scala-library:2.13.8",
+            "org.scala-lang:scala-reflect:2.13.8",
+            "net.java.dev.jna:jna:5.3.1",
+            "org.jline:jline:3.19.0",
+        ],
+    )
+
+
+@pytest.fixture
+def multiple_scala_plugins_jvm_lockfile(
+    multiple_scala_plugins_jvm_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return multiple_scala_plugins_jvm_lockfile_def.load(request)
+
+
 @maybe_skip_jdk_test
-@pytest.mark.jvm_lockfile(
-    path="multiple-scalac-plugins.test.lock",
-    requirements=[
-        "com.olegpy:better-monadic-for_2.13:0.3.1",
-        "org.typelevel:kind-projector_2.13.8:0.13.2",
-        "org.scala-lang:scala-compiler:2.13.8",
-        "org.scala-lang:scala-library:2.13.8",
-        "org.scala-lang:scala-reflect:2.13.8",
-        "net.java.dev.jna:jna:5.3.1",
-        "org.jline:jline:3.19.0",
-    ],
-)
 def test_compile_with_multiple_scalac_plugins(
-    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+    rule_runner: RuleRunner, multiple_scala_plugins_jvm_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
@@ -619,8 +674,8 @@ def test_compile_with_multiple_scalac_plugins(
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": multiple_scala_plugins_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": multiple_scala_plugins_jvm_lockfile.serialized_lockfile,
             "lib/A.scala": dedent(
                 """\
                 trait Functor[F[_]] {
@@ -672,18 +727,24 @@ def test_compile_with_multiple_scalac_plugins(
     rule_runner.request(RenderedClasspath, [request])
 
 
-# TODO: This test demonstrates the limits of the current structure of the test lockfiles support: It
-# needs multiple lockfiles, but `jvm_lockfile` is essentially a singleton because the relevant
-# `pytest.mark.jvm_lockfile` can only be applied once. Separate fixture functions do not help, each with
-# their own `pytest.mark.jvm_lockfile`, because those marks are ignored for fixture functions.
+@pytest.fixture
+def scala_2_12_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "scala-library-2.12.test.lock", ["org.scala-lang:scala-library:2.12.15"]
+    )
+
+
+@pytest.fixture
+def scala_2_12_lockfile(
+    scala_2_12_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scala_2_12_lockfile_def.load(request)
+
+
 @maybe_skip_jdk_test
-def test_compile_with_multiple_scala_versions(rule_runner: RuleRunner) -> None:
-    scala_library_coord_2_12 = Coordinate(
-        group="org.scala-lang", artifact="scala-library", version="2.12.15"
-    )
-    scala_library_coord_2_13 = Coordinate(
-        group="org.scala-lang", artifact="scala-library", version="2.13.8"
-    )
+def test_compile_with_multiple_scala_versions(
+    rule_runner: RuleRunner, scala_2_12_lockfile, scala_stdlib_jvm_lockfile
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -696,51 +757,17 @@ def test_compile_with_multiple_scala_versions(rule_runner: RuleRunner) -> None:
                     name = 'main_2.13',
                     resolve = "scala2.13",
                 )
-                jvm_artifact(
-                  name="org.scala-lang_scala-library_2.12.15",
-                  group="org.scala-lang",
-                  artifact="scala-library",
-                  version="2.12.15",
-                  resolve="scala2.12",
-                )
-                jvm_artifact(
-                  name="org.scala-lang_scala-library_2.13.8",
-                  group="org.scala-lang",
-                  artifact="scala-library",
-                  version="2.13.8",
-                  resolve="scala2.13",
-                )
                 """
             ),
             "Example.scala": SCALA_LIB_SOURCE,
-            "3rdparty/jvm/scala2.12.lock": TestCoursierWrapper.new(
-                entries=(
-                    CoursierLockfileEntry(
-                        coord=scala_library_coord_2_12,
-                        file_name="org.scala-lang_scala-library_2.12.15.jar",
-                        direct_dependencies=Coordinates([]),
-                        dependencies=Coordinates([]),
-                        file_digest=FileDigest(
-                            "e518bb640e2175de5cb1f8e326679b8d975376221f1b547757de429bbf4563f0",
-                            5443542,
-                        ),
-                    ),
-                ),
-            ).serialize([ArtifactRequirement(scala_library_coord_2_12)]),
-            "3rdparty/jvm/scala2.13.lock": TestCoursierWrapper.new(
-                entries=(
-                    CoursierLockfileEntry(
-                        coord=scala_library_coord_2_13,
-                        file_name="org.scala-lang_scala-library_2.13.8.jar",
-                        direct_dependencies=Coordinates([]),
-                        dependencies=Coordinates([]),
-                        file_digest=FileDigest(
-                            "a0882b82514190c2bac7d1a459872a75f005fc0f3e88b2bc0390367146e35db7",
-                            6003601,
-                        ),
-                    ),
-                ),
-            ).serialize([ArtifactRequirement(scala_library_coord_2_13)]),
+            "3rdparty/jvm/BUILD.2_12": scala_2_12_lockfile.requirements_as_jvm_artifact_targets(
+                version_in_target_name=True, resolve="scala2.12"
+            ),
+            "3rdparty/jvm/scala2.12.lock": scala_2_12_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD.2_13": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(
+                version_in_target_name=True, resolve="scala2.13"
+            ),
+            "3rdparty/jvm/scala2.13.lock": scala_stdlib_jvm_lockfile.serialized_lockfile,
         }
     )
     rule_runner.set_options(
@@ -789,3 +816,350 @@ def test_compile_with_multiple_scala_versions(rule_runner: RuleRunner) -> None:
         ".Example.scala.main_2.13.scalac.jar",
         "org.scala-lang_scala-library_2.13.8.jar",
     ]
+
+
+@pytest.fixture
+def scala3_stdlib_jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "scala-library-3.test.lock",
+        ["org.scala-lang:scala3-library_3:3.2.0"],
+    )
+
+
+@pytest.fixture
+def scala3_stdlib_jvm_lockfile(
+    scala3_stdlib_jvm_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scala3_stdlib_jvm_lockfile_def.load(request)
+
+
+@maybe_skip_jdk_test
+def test_compile_no_deps_scala3(
+    rule_runner: RuleRunner, scala3_stdlib_jvm_lockfile: JVMLockfileFixture
+) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                scala_sources(
+                    name = 'lib',
+                )
+                """
+            ),
+            "3rdparty/jvm/BUILD": scala3_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": scala3_stdlib_jvm_lockfile.serialized_lockfile,
+            "ExampleLib.scala": SCALA_LIB_SOURCE,
+        }
+    )
+    rule_runner.set_options(
+        args=[
+            "--scala-version-for-resolve={'jvm-default': '3.2.0'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    coarsened_target = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="", target_name="lib")
+    )
+
+    classpath = rule_runner.request(
+        RenderedClasspath,
+        [CompileScalaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
+    )
+    assert classpath.content == {
+        ".ExampleLib.scala.lib.scalac.jar": {
+            "org/pantsbuild/example/lib/C.class",
+            "org/pantsbuild/example/lib/C.tasty",
+        }
+    }
+
+    # Additionally validate that `check` works.
+    check_results = rule_runner.request(
+        CheckResults,
+        [
+            ScalacCheckRequest(
+                [ScalacCheckRequest.field_set_type.create(coarsened_target.representative)]
+            )
+        ],
+    )
+    assert len(check_results.results) == 1
+    check_result = check_results.results[0]
+    assert check_result.exit_code == 0
+
+
+@pytest.fixture
+def cats_jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "cats.test.lock",
+        [
+            "org.typelevel:cats-core_2.13:2.9.0",
+            "org.scala-lang:scala-library:2.13.8",
+        ],
+    )
+
+
+@pytest.fixture
+def cats_jvm_lockfile(
+    cats_jvm_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return cats_jvm_lockfile_def.load(request)
+
+
+@maybe_skip_jdk_test
+def test_compile_dep_on_scala_artifact(
+    rule_runner: RuleRunner,
+    scala_stdlib_jvm_lockfile: JVMLockfileFixture,
+    cats_jvm_lockfile: JVMLockfileFixture,
+) -> None:
+    third_party_build_file = scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets() + dedent(
+        """\
+        scala_artifact(
+            name = "cats",
+            group = "org.typelevel",
+            artifact = "cats-core",
+            version = "2.9.0"
+        )
+        """
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                scala_sources(
+                    name = 'lib',
+                    dependencies = ["3rdparty/jvm:cats"]
+                )
+                """
+            ),
+            "3rdparty/jvm/BUILD": third_party_build_file,
+            "3rdparty/jvm/default.lock": cats_jvm_lockfile.serialized_lockfile,
+            "ExampleLib.scala": dedent(
+                """
+                import cats._
+                import cats.implicits._
+
+                object ExampleLib {
+                    val values = Functor[List].map(List(1, 2, 3, 4))(_.toString)
+                }
+                """
+            ),
+        }
+    )
+
+    rule_runner.set_options(
+        args=[
+            "--scala-version-for-resolve={'jvm-default': '2.13.8'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    coarsened_target = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="", target_name="lib")
+    )
+
+    classpath = rule_runner.request(
+        RenderedClasspath,
+        [CompileScalaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
+    )
+    assert classpath.content == {
+        ".ExampleLib.scala.lib.scalac.jar": {
+            "ExampleLib$.class",
+            "ExampleLib.class",
+        }
+    }
+
+
+@pytest.fixture
+def acyclic_scala212_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "acyclic-scala212.test.lock",
+        [
+            "com.lihaoyi:acyclic_2.12:0.2.1",
+            "org.scala-lang:scala-library:2.12.15",
+        ],
+    )
+
+
+@pytest.fixture
+def acyclic_scala212_lockfile(
+    acyclic_scala212_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return acyclic_scala212_lockfile_def.load(request)
+
+
+@maybe_skip_jdk_test
+def test_cross_compile_with_scalac_plugin(
+    rule_runner: RuleRunner,
+    acyclic_jvm_lockfile: JVMLockfileFixture,
+    acyclic_scala212_lockfile: JVMLockfileFixture,
+    scala_2_12_lockfile: JVMLockfileFixture,
+    scala_stdlib_jvm_lockfile: JVMLockfileFixture,
+) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/BUILD": dedent(
+                """\
+                scala_artifact(
+                    name="acyclic",
+                    group="com.lihaoyi",
+                    artifact="acyclic",
+                    version="0.2.1",
+                    resolve=parametrize("scala2.12", "scala2.13"),
+                )
+                """
+            ),
+            "3rdparty/jvm/BUILD.2_12": scala_2_12_lockfile.requirements_as_jvm_artifact_targets(
+                version_in_target_name=True, resolve="scala2.12"
+            ),
+            "3rdparty/jvm/BUILD.2_13": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(
+                version_in_target_name=True, resolve="scala2.13"
+            ),
+            "3rdparty/jvm/scala213.lock": acyclic_jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/scala212.lock": acyclic_scala212_lockfile.serialized_lockfile,
+            "lib/BUILD": dedent(
+                """\
+                scalac_plugin(
+                    name = "acyclic",
+                    artifact = "3rdparty/jvm:acyclic",
+                )
+
+                scala_sources(
+                    name="main",
+                    scalac_plugins=["acyclic"],
+                    resolve=parametrize("scala2.12", "scala2.13")
+                )
+                """
+            ),
+            "lib/A.scala": dedent(
+                """
+                package lib
+                import acyclic.file
+
+                class A {
+                  val b: B = null
+                }
+                """
+            ),
+            "lib/B.scala": dedent(
+                """
+                package lib
+
+                class B {
+                  val a: A = null
+                }
+                """
+            ),
+        }
+    )
+
+    rule_runner.set_options(
+        [
+            '--scala-version-for-resolve={"scala2.12":"2.12.15","scala2.13":"2.13.8"}',
+            '--jvm-resolves={"scala2.12":"3rdparty/jvm/scala212.lock","scala2.13":"3rdparty/jvm/scala213.lock"}',
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    classpath_2_12 = rule_runner.request(
+        FallibleClasspathEntry,
+        [
+            CompileScalaSourceRequest(
+                component=expect_single_expanded_coarsened_target(
+                    rule_runner,
+                    Address(
+                        spec_path="lib",
+                        target_name="main",
+                        relative_file_path="A.scala",
+                        parameters={"resolve": "scala2.12"},
+                    ),
+                ),
+                resolve=make_resolve(rule_runner, "scala2.12", "3rdparty/jvm/scala212.lock"),
+            )
+        ],
+    )
+
+    assert classpath_2_12.result == CompileResult.FAILED and classpath_2_12.stderr
+    assert "error: Unwanted cyclic dependency" in classpath_2_12.stderr
+
+    classpath_2_13 = rule_runner.request(
+        FallibleClasspathEntry,
+        [
+            CompileScalaSourceRequest(
+                component=expect_single_expanded_coarsened_target(
+                    rule_runner,
+                    Address(
+                        spec_path="lib",
+                        target_name="main",
+                        relative_file_path="A.scala",
+                        parameters={"resolve": "scala2.13"},
+                    ),
+                ),
+                resolve=make_resolve(rule_runner, "scala2.13", "3rdparty/jvm/scala213.lock"),
+            )
+        ],
+    )
+
+    assert classpath_2_13.result == CompileResult.FAILED and classpath_2_13.stderr
+    assert "error: Unwanted cyclic dependency" in classpath_2_13.stderr
+
+
+@pytest.fixture
+def scala2_semanticdb_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "semanticdb-scalac-2.13.test.lock",
+        ["org.scala-lang:scala-library:2.13.12", "org.scalameta:semanticdb-scalac_2.13.12:4.8.14"],
+    )
+
+
+@pytest.fixture
+def scala2_semanticdb_lockfile(
+    scala2_semanticdb_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scala2_semanticdb_lockfile_def.load(request)
+
+
+@maybe_skip_jdk_test
+def test_scalac_plugin_extra_output(
+    rule_runner: RuleRunner, scala2_semanticdb_lockfile: JVMLockfileFixture
+) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": scala2_semanticdb_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scala2_semanticdb_lockfile.requirements_as_jvm_artifact_targets(),
+            "src/jvm/Foo.scala": dedent(
+                """\
+                import scala.collection.immutable
+                object Foo { immutable.Seq.empty[Int] }
+                """
+            ),
+            "src/jvm/BUILD": dedent(
+                """\
+                scalac_plugin(
+                    name="semanticdb",
+                    artifact="//3rdparty/jvm:org.scalameta_semanticdb-scalac_2.13.12",
+                )
+
+                scala_sources(scalac_plugins=["semanticdb"])
+                """
+            ),
+        }
+    )
+
+    rule_runner.set_options(
+        [
+            f"--source-root-patterns={repr(['src/jvm'])}",
+            f"--scala-version-for-resolve={repr({'jvm-default': '2.13.12'})}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    request = CompileScalaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="src/jvm")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    rendered_classpath = rule_runner.request(RenderedClasspath, [request])
+    assert (
+        "META-INF/semanticdb/Foo.scala.semanticdb"
+        in rendered_classpath.content["src.jvm.Foo.scala.scalac.jar"]
+    )

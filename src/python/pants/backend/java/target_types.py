@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pants.engine.rules import collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    Dependencies,
     FieldSet,
     MultipleSourcesField,
     SingleSourceField,
@@ -16,11 +15,17 @@ from pants.engine.target import (
     TargetFilesGenerator,
     generate_multiple_sources_field_help_message,
 )
+from pants.jvm import target_types as jvm_target_types
 from pants.jvm.target_types import (
+    JunitTestExtraEnvVarsField,
     JunitTestSourceField,
+    JunitTestTimeoutField,
+    JvmDependenciesField,
     JvmJdkField,
+    JvmMainClassNameField,
     JvmProvidesTypesField,
     JvmResolveField,
+    JvmRunnableSourceFieldSet,
 )
 
 
@@ -33,7 +38,7 @@ class JavaGeneratorSourcesField(MultipleSourcesField):
 
 
 @dataclass(frozen=True)
-class JavaFieldSet(FieldSet):
+class JavaFieldSet(JvmRunnableSourceFieldSet):
     required_fields = (JavaSourceField,)
 
     sources: JavaSourceField
@@ -60,7 +65,9 @@ class JunitTestTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         JavaJunitTestSourceField,
-        Dependencies,
+        JunitTestTimeoutField,
+        JunitTestExtraEnvVarsField,
+        JvmDependenciesField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -84,7 +91,9 @@ class JunitTestsGeneratorTarget(TargetFilesGenerator):
     generated_target_cls = JunitTestTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
-        Dependencies,
+        JunitTestTimeoutField,
+        JunitTestExtraEnvVarsField,
+        JvmDependenciesField,
         JvmJdkField,
         JvmProvidesTypesField,
         JvmResolveField,
@@ -101,9 +110,10 @@ class JavaSourceTarget(Target):
     alias = "java_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        JvmDependenciesField,
         JavaSourceField,
         JvmResolveField,
+        JvmMainClassNameField,
         JvmProvidesTypesField,
         JvmJdkField,
     )
@@ -126,13 +136,18 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
     generated_target_cls = JavaSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
-        Dependencies,
+        JvmDependenciesField,
         JvmResolveField,
         JvmJdkField,
+        JvmMainClassNameField,
         JvmProvidesTypesField,
     )
     help = "Generate a `java_source` target for each file in the `sources` field."
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        *jvm_target_types.rules(),
+        *JavaFieldSet.jvm_rules(),
+    ]

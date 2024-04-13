@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.build_graph.address import Address
+from pants.engine.environment import EnvironmentName
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
 from pants.jvm.dependency_inference.artifact_mapper import (
@@ -38,7 +39,7 @@ class JvmFirstPartyPackageMappingException(Exception):
     pass
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class FirstPartyMappingRequest:
     """An entry point for a specific implementation of mapping JVM package names to owning targets.

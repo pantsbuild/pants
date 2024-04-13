@@ -12,7 +12,3 @@ python_tests(
 )
 
 resources(name="test_resources", sources=["*.test.lock"])
-
-python_test_utils(
-    name="test_utils",
-)

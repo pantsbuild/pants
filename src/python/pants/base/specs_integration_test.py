@@ -6,6 +6,7 @@ from __future__ import annotations
 from textwrap import dedent
 
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
+from pants.testutil.python_interpreter_selection import skip_unless_python39_present
 
 SOURCES = {
     # NB: This uses recursive globs for the `python_sources` and `python_tests` target generators,
@@ -67,6 +68,7 @@ def run(args: list[str]) -> PantsResult:
     return result
 
 
+@skip_unless_python39_present
 def test_address_literal() -> None:
     """Semantics:
 
@@ -78,11 +80,12 @@ def test_address_literal() -> None:
         assert run(["list", *list_specs]).stdout.splitlines() == list_specs
 
         test_result = run(["test", f"{tmpdir}/py:tests"]).stderr
-        assert f"{tmpdir}/py/utils/strutil_test.py:../tests succeeded." in test_result
-        assert f"{tmpdir}/py/base/common_test.py:../tests succeeded." in test_result
+        assert f"{tmpdir}/py/utils/strutil_test.py:../tests - succeeded." in test_result
+        assert f"{tmpdir}/py/base/common_test.py:../tests - succeeded." in test_result
         assert f"{tmpdir}/py:tests" not in test_result
 
 
+@skip_unless_python39_present
 def test_sibling_addresses() -> None:
     """Semantics:
 
@@ -106,20 +109,21 @@ def test_sibling_addresses() -> None:
         # Even though no `python_test` targets are explicitly defined in `util/`, a generated
         # target is resident there.
         test_result = run(["test", f"{tmpdir}/py/utils:"]).stderr
-        assert f"{tmpdir}/py/utils/strutil_test.py:../tests succeeded." in test_result
+        assert f"{tmpdir}/py/utils/strutil_test.py:../tests - succeeded." in test_result
         assert f"{tmpdir}/py/base/common_test.py:../tests" not in test_result
         assert f"{tmpdir}/py:tests" not in test_result
 
         # Even though no `_test.py` files live in this dir, we match the `python_tests` target
         # and replace it with its generated targets.
         test_result = run(["test", f"{tmpdir}/py:"]).stderr
-        assert f"{tmpdir}/py/utils/strutil_test.py:../tests succeeded." in test_result
+        assert f"{tmpdir}/py/utils/strutil_test.py:../tests - succeeded." in test_result
         assert f"{tmpdir}/py/base/common_test.py:../tests" in test_result
         assert f"{tmpdir}/py:tests" not in test_result
 
 
+@skip_unless_python39_present
 def test_descendent_addresses() -> None:
-    """Semantics are the same as sibling addreses, only recursive."""
+    """Semantics are the same as sibling addresses, only recursive."""
     with setup_tmpdir(SOURCES) as tmpdir:
         assert run(["list", f"{tmpdir}/py::"]).stdout.splitlines() == [
             f"{tmpdir}/py:bin",
@@ -133,23 +137,20 @@ def test_descendent_addresses() -> None:
         ]
 
         test_result = run(["test", f"{tmpdir}/py::"]).stderr
-        assert f"{tmpdir}/py/utils/strutil_test.py:../tests succeeded." in test_result
+        assert f"{tmpdir}/py/utils/strutil_test.py:../tests - succeeded." in test_result
         assert f"{tmpdir}/py/base/common_test.py:../tests" in test_result
         assert f"{tmpdir}/py:tests" not in test_result
 
 
+@skip_unless_python39_present
 def test_file_arg() -> None:
     """Semantics: find the 'owning' target, using generated target rather than target generator
     when possible (regardless of project introspection vs. "build" goal).
-
-    Also, check that we support 'secondary ownership', e.g. a `pex_binary` being associated with
-    the the file `app.py` even though it does not have a `sources` field.
     """
     with setup_tmpdir(SOURCES) as tmpdir:
         assert run(
             ["list", f"{tmpdir}/py/app.py", f"{tmpdir}/py/utils/strutil_test.py"]
         ).stdout.splitlines() == [
-            f"{tmpdir}/py:bin",
             f"{tmpdir}/py/app.py:lib",
             f"{tmpdir}/py/utils/strutil_test.py:../tests",
         ]

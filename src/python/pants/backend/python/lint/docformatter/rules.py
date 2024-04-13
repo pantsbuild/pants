@@ -8,13 +8,12 @@ from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.engine.fs import Digest
-from pants.engine.internals.native_engine import Snapshot
-from pants.engine.process import ProcessResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.util_rules.partitions import PartitionerType
+from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
+from pants.option.global_options import KeepSandboxes
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -30,38 +29,54 @@ class DocformatterFieldSet(FieldSet):
         return tgt.get(SkipDocformatterField).value
 
 
-class DocformatterRequest(FmtRequest):
+class DocformatterRequest(FmtTargetsRequest):
     field_set_type = DocformatterFieldSet
-    name = Docformatter.options_scope
+    tool_subsystem = Docformatter
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Format with docformatter", level=LogLevel.DEBUG)
-async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
-    if docformatter.skip:
-        return FmtResult.skip(formatter_name=request.name)
+async def docformatter_fmt(
+    request: DocformatterRequest.Batch, docformatter: Docformatter, keep_sandboxes: KeepSandboxes
+) -> FmtResult:
     docformatter_pex = await Get(VenvPex, PexRequest, docformatter.to_pex_request())
+    description = f"Run Docformatter on {pluralize(len(request.files), 'file')}."
     result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         VenvPexProcess(
             docformatter_pex,
             argv=(
                 "--in-place",
                 *docformatter.args,
-                *request.snapshot.files,
+                *request.files,
             ),
             input_digest=request.snapshot.digest,
-            output_files=request.snapshot.files,
-            description=(f"Run Docformatter on {pluralize(len(request.field_sets), 'file')}."),
+            output_files=request.files,
+            description=description,
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot)
+    # Docformatter 1.6.0+ very annoyingly returns an exit code of 3 if run with `--in-place`
+    # and any files changed. Earlier versions do not return this code in fmt mode.
+    # (All versions return 3 in check mode if any files would have changed, but that is
+    # not an issue here).
+    if result.exit_code not in [0, 3]:
+        # TODO(#12725):It would be more straightforward to force the exception with:
+        # result = await Get(ProcessResult, FallibleProcessResult, result)
+        raise ProcessExecutionFailure(
+            result.exit_code,
+            result.stdout,
+            result.stderr,
+            description,
+            keep_sandboxes=keep_sandboxes,
+        )
+
+    return await FmtResult.create(request, result)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtRequest, DocformatterRequest),
+        *DocformatterRequest.rules(),
         *pex.rules(),
     ]

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
-from pants.backend.go.subsystems.golang import GoRoot
+from pants.backend.go.util_rules.goroot import GoRoot
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule

@@ -12,10 +12,6 @@ extend-ignore:
   E741,
   # line break before binary operator  (conflicts with Black)
   W503,
-  # Bad class attribute (enable once fixed)
-  PB10,
-  # `open()` not within a context manager (possibly enable once fixed)
-  PB13,
   # Implicitly concatenated string literals over multiple lines
   NIC002,
   # Implicitly concatenated bytes literals over multiple lines
@@ -25,4 +21,5 @@ extend-ignore:
 
 [flake8:local-plugins]
 extension =
-    PANTSBIN = bin_name_checker:check_for_hardcoded_pants_bin_name
+    PNT20 = dedent_use_checker:check_for_dedent_imports
+    PNT30 = await_in_loop:check_for_await_in_loop

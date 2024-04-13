@@ -20,6 +20,7 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Dependencies, DependenciesRequest
 from pants.jvm.jdk_rules import rules as java_util_rules
 from pants.jvm.resolve import jvm_tool
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -33,6 +34,7 @@ def rule_runner() -> RuleRunner:
             *java_dep_inference_rules(),
             *java_target_rules(),
             *java_util_rules(),
+            *strip_jar.rules(),
             *javac_rules(),
             *java_symbol_mapper.rules(),
             *source_files.rules(),

@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from pants.backend.codegen.thrift.apache.python import subsystem
+from pants.backend.codegen.thrift.apache.python.additional_fields import ThriftPythonResolveField
 from pants.backend.codegen.thrift.apache.python.subsystem import ThriftPythonSubsystem
 from pants.backend.codegen.thrift.apache.rules import (
     GeneratedThriftSources,
@@ -11,18 +14,24 @@ from pants.backend.codegen.thrift.apache.rules import (
 )
 from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField
 from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
-from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
+from pants.backend.python.dependency_inference.module_mapper import (
+    PythonModuleOwners,
+    PythonModuleOwnersRequest,
+)
+from pants.backend.python.dependency_inference.subsystem import (
+    AmbiguityResolution,
+    PythonInferSubsystem,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonResolveField, PythonSourceField
-from pants.engine.addresses import Address
+from pants.backend.python.target_types import PythonSourceField
 from pants.engine.fs import AddPrefix, Digest, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
-    InjectDependenciesRequest,
-    InjectedDependencies,
-    WrappedTarget,
+    InferDependenciesRequest,
+    InferredDependencies,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -63,27 +72,49 @@ async def generate_python_from_thrift(
     return GeneratedSources(source_root_restored)
 
 
-class InjectApacheThriftPythonDependencies(InjectDependenciesRequest):
-    inject_for = ThriftDependenciesField
+@dataclass(frozen=True)
+class ApacheThriftPythonDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (ThriftDependenciesField, ThriftPythonResolveField)
+
+    dependencies: ThriftDependenciesField
+    python_resolve: ThriftPythonResolveField
+
+
+class InferApacheThriftPythonDependencies(InferDependenciesRequest):
+    infer_from = ApacheThriftPythonDependenciesInferenceFieldSet
 
 
 @rule
 async def find_apache_thrift_python_requirement(
-    request: InjectApacheThriftPythonDependencies,
+    request: InferApacheThriftPythonDependencies,
     thrift_python: ThriftPythonSubsystem,
     python_setup: PythonSetup,
-    # TODO(#12946): Make this a lazy Get once possible.
-    module_mapping: ThirdPartyPythonModuleMapping,
-) -> InjectedDependencies:
+    python_infer_subsystem: PythonInferSubsystem,
+) -> InferredDependencies:
     if not thrift_python.infer_runtime_dependency:
-        return InjectedDependencies()
+        return InferredDependencies([])
 
-    wrapped_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    resolve = wrapped_tgt.target.get(PythonResolveField).normalized_value(python_setup)
+    resolve = request.field_set.python_resolve.normalized_value(python_setup)
+
+    locality = None
+    if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root:
+        source_root = await Get(
+            SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
+        )
+        locality = source_root.path
+
+    addresses_for_thrift = await Get(
+        PythonModuleOwners,
+        PythonModuleOwnersRequest(
+            "thrift",
+            resolve=resolve,
+            locality=locality,
+        ),
+    )
 
     addr = find_python_runtime_library_or_raise_error(
-        module_mapping,
-        request.dependencies_field.address,
+        addresses_for_thrift,
+        request.field_set.address,
         "thrift",
         resolve=resolve,
         resolves_enabled=python_setup.enable_resolves,
@@ -91,7 +122,7 @@ async def find_apache_thrift_python_requirement(
         recommended_requirement_url="https://pypi.org/project/thrift/",
         disable_inference_option=f"[{thrift_python.options_scope}].infer_runtime_dependency",
     )
-    return InjectedDependencies([addr])
+    return InferredDependencies([addr])
 
 
 def rules():
@@ -99,5 +130,5 @@ def rules():
         *collect_rules(),
         *subsystem.rules(),
         UnionRule(GenerateSourcesRequest, GeneratePythonFromThriftRequest),
-        UnionRule(InjectDependenciesRequest, InjectApacheThriftPythonDependencies),
+        UnionRule(InferDependenciesRequest, InferApacheThriftPythonDependencies),
     )

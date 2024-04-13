@@ -17,20 +17,20 @@ from pants.core.goals.publish import (
     PublishRequest,
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, Digest, MergeDigests, Snapshot
 from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import BoolField, StringSequenceField
 from pants.option.global_options import GlobalOptions
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 logger = logging.getLogger(__name__)
 
 
 class PythonRepositoriesField(StringSequenceField):
     alias = "repositories"
-    help = softwrap(
+    help = help_text(
         """
         List of URL addresses or Twine repository aliases where to publish the Python package.
 
@@ -112,27 +112,22 @@ def twine_env_suffix(repo: str) -> str:
     return f"_{repo[1:]}".replace("-", "_").upper() if repo.startswith("@") else ""
 
 
-def twine_env_request(repo: str) -> EnvironmentRequest:
+def twine_env_request(repo: str) -> EnvironmentVarsRequest:
     suffix = twine_env_suffix(repo)
-    req = EnvironmentRequest(
-        [
-            f"{var}{suffix}"
-            for var in [
-                "TWINE_USERNAME",
-                "TWINE_PASSWORD",
-                "TWINE_REPOSITORY_URL",
-            ]
-        ]
-    )
+    env_vars = [
+        "TWINE_USERNAME",
+        "TWINE_PASSWORD",
+        "TWINE_REPOSITORY_URL",
+    ]
+    req = EnvironmentVarsRequest(env_vars + [f"{var}{suffix}" for var in env_vars])
     return req
 
 
-def twine_env(env: Environment, repo: str) -> Environment:
+def twine_env(env: EnvironmentVars, repo: str) -> EnvironmentVars:
     suffix = twine_env_suffix(repo)
-    if not suffix:
-        return env
-
-    return Environment({key.rsplit(suffix, maxsplit=1)[0]: value for key, value in env.items()})
+    return EnvironmentVars(
+        {key.rsplit(suffix, maxsplit=1)[0] if suffix else key: value for key, value in env.items()}
+    )
 
 
 @rule
@@ -157,7 +152,7 @@ async def twine_upload(
         skip = f"(by `{request.field_set.skip_twine.alias}` on {request.field_set.address})"
     elif not request.field_set.repositories.value:
         # I'd rather have used the opt_out mechanism on the field set, but that gives no hint as to
-        # why the target was not applicable..
+        # why the target was not applicable.
         skip = f"(no `{request.field_set.repositories.alias}` specified for {request.field_set.address})"
 
     if skip:
@@ -185,7 +180,7 @@ async def twine_upload(
     )
     pex_proc_requests = []
     twine_envs = await MultiGet(
-        Get(Environment, EnvironmentRequest, twine_env_request(repo))
+        Get(EnvironmentVars, EnvironmentVarsRequest, twine_env_request(repo))
         for repo in request.field_set.repositories.value
     )
 

@@ -7,7 +7,7 @@ from pants.backend.codegen.protobuf.target_types import (
 )
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
 from pants.engine.target import StringField
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class ProtobufPythonInterpreterConstraintsField(InterpreterConstraintsField):
@@ -20,7 +20,7 @@ class ProtobufPythonResolveField(PythonResolveField):
 
 class PythonSourceRootField(StringField):
     alias = "python_source_root"
-    help = softwrap(
+    help = help_text(
         """
         The source root to generate Python sources under.
 
@@ -33,10 +33,15 @@ def rules():
     return [
         ProtobufSourceTarget.register_plugin_field(ProtobufPythonInterpreterConstraintsField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(
-            ProtobufPythonInterpreterConstraintsField
+            ProtobufPythonInterpreterConstraintsField,
+            as_moved_field=True,
         ),
         ProtobufSourceTarget.register_plugin_field(ProtobufPythonResolveField),
-        ProtobufSourcesGeneratorTarget.register_plugin_field(ProtobufPythonResolveField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(
+            ProtobufPythonResolveField, as_moved_field=True
+        ),
         ProtobufSourceTarget.register_plugin_field(PythonSourceRootField),
-        ProtobufSourcesGeneratorTarget.register_plugin_field(PythonSourceRootField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(
+            PythonSourceRootField, as_moved_field=True
+        ),
     ]

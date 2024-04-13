@@ -3,10 +3,11 @@
 
 import unittest
 
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.scheduler import ExecutionError
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.testutil import rule_runner
 
 
 class OptionsInitializerTest(unittest.TestCase):
@@ -17,18 +18,23 @@ class OptionsInitializerTest(unittest.TestCase):
             allow_pantsrc=False,
         )
 
-        env = CompleteEnvironment({})
+        env = CompleteEnvironmentVars({})
+        initializer = OptionsInitializer(options_bootstrapper, rule_runner.EXECUTOR)
         with self.assertRaises(ExecutionError):
-            OptionsInitializer(options_bootstrapper).build_config_and_options(
-                options_bootstrapper, env, raise_=True
-            )
+            initializer.build_config(options_bootstrapper, env)
 
     def test_global_options_validation(self) -> None:
         # Specify an invalid combination of options.
         ob = OptionsBootstrapper.create(
-            env={}, args=["--backend-packages=[]", "--remote-execution"], allow_pantsrc=False
+            env={},
+            args=["--backend-packages=[]", "--no-watch-filesystem", "--loop"],
+            allow_pantsrc=False,
         )
-        env = CompleteEnvironment({})
+        env = CompleteEnvironmentVars({})
+        initializer = OptionsInitializer(ob, rule_runner.EXECUTOR)
         with self.assertRaises(ExecutionError) as exc:
-            OptionsInitializer(ob).build_config_and_options(ob, env, raise_=True)
-        self.assertIn("The `--remote-execution` option requires", str(exc.exception))
+            initializer.build_config(ob, env)
+        self.assertIn(
+            "The `--no-watch-filesystem` option may not be set if `--pantsd` or `--loop` is set.",
+            str(exc.exception),
+        )

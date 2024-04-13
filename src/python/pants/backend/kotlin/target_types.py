@@ -5,9 +5,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.engine.rules import collect_rules
+from pants.engine.internals.native_engine import AddressInput
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
     Dependencies,
     FieldSet,
     MultipleSourcesField,
@@ -19,12 +20,16 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.jvm.target_types import (
+    JunitTestExtraEnvVarsField,
     JunitTestSourceField,
+    JunitTestTimeoutField,
     JvmJdkField,
+    JvmMainClassNameField,
     JvmProvidesTypesField,
     JvmResolveField,
+    JvmRunnableSourceFieldSet,
 )
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class KotlinSourceField(SingleSourceField):
@@ -36,7 +41,7 @@ class KotlinGeneratorSourcesField(MultipleSourcesField):
 
 
 class KotlincConsumedPluginIdsField(StringSequenceField):
-    help = softwrap(
+    help = help_text(
         """
         The IDs of Kotlin compiler plugins that this source file requires.
 
@@ -53,7 +58,7 @@ class KotlincConsumedPluginIdsField(StringSequenceField):
 
 
 @dataclass(frozen=True)
-class KotlinFieldSet(FieldSet):
+class KotlinFieldSet(JvmRunnableSourceFieldSet):
     required_fields = (KotlinSourceField,)
 
     sources: KotlinSourceField
@@ -85,6 +90,7 @@ class KotlinSourceTarget(Target):
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
+        JvmMainClassNameField,
     )
     help = "A single Kotlin source file containing application or library code."
 
@@ -110,6 +116,7 @@ class KotlinSourcesGeneratorTarget(TargetFilesGenerator):
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,
+        JvmMainClassNameField,
     )
     help = "Generate a `kotlin_source` target for each file in the `sources` field."
 
@@ -134,6 +141,8 @@ class KotlinJunitTestTarget(Target):
         KotlinJunitTestDependenciesField,
         KotlinJunitTestSourceField,
         KotlincConsumedPluginIdsField,
+        JunitTestTimeoutField,
+        JunitTestExtraEnvVarsField,
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,
@@ -159,6 +168,8 @@ class KotlinJunitTestsGeneratorTarget(TargetFilesGenerator):
     moved_fields = (
         KotlinJunitTestDependenciesField,
         KotlincConsumedPluginIdsField,
+        JunitTestTimeoutField,
+        JunitTestExtraEnvVarsField,
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,
@@ -171,15 +182,25 @@ class KotlinJunitTestsGeneratorTarget(TargetFilesGenerator):
 # -----------------------------------------------------------------------------------------------
 
 
-class KotlincPluginArtifactField(StringField):
+class KotlincPluginArtifactField(StringField, AsyncFieldMixin):
     alias = "artifact"
     required = True
+    value: str
     help = "The address of a `jvm_artifact` that defines a plugin for `kotlinc`."
+
+    def to_address_input(self) -> AddressInput:
+        return AddressInput.parse(
+            self.value,
+            relative_to=self.address.spec_path,
+            description_of_origin=(
+                f"the `{self.alias}` field in the `{KotlincPluginTarget.alias}` target {self.address}"
+            ),
+        )
 
 
 class KotlincPluginIdField(StringField):
     alias = "plugin_id"
-    help = softwrap(
+    help = help_text(
         """
         The ID for `kotlinc` to use when setting options for the plugin.
 
@@ -190,7 +211,7 @@ class KotlincPluginIdField(StringField):
 
 class KotlincPluginArgsField(StringSequenceField):
     alias = "plugin_args"
-    help = softwrap(
+    help = help_text(
         """
         Optional list of argument to pass to the plugin.
         """
@@ -205,7 +226,7 @@ class KotlincPluginTarget(Target):
         KotlincPluginIdField,
         KotlincPluginArgsField,
     )
-    help = softwrap(
+    help = help_text(
         """
         A plugin for `kotlinc`.
 
@@ -214,14 +235,17 @@ class KotlincPluginTarget(Target):
         plugin if that name cannot be inferred from the `name` of this target.
 
         The standard `kotlinc` plugins are available via the following artifact coordinates and IDs:
+
         * All-open: `org.jetbrains.kotlin:kotlin-allopen:VERSION` (ID: `all-open`)
         * No-arg: `org.jetbrains.kotlin:kotlin-noarg:VERSION` (ID: `no-arg`)
         * SAM with receiver: `org.jetbrains.kotlin:kotlin-sam-with-receiver:VERSION` (ID: `sam-with-receiver`)
         * kapt (annotation processor): `org.jetbrains.kotlin:org.jetbrains.kotlin:kotlin-annotation-processing-embeddable:VERSION` (ID: `kapt3`)
-        * Seralization: `org.jetbrains.kotlin:kotlin-serialization:VERSION` (ID: `serialization`)
+        * Serialization: `org.jetbrains.kotlin:kotlin-serialization:VERSION` (ID: `serialization`)
         """
     )
 
 
 def rules():
-    return collect_rules()
+    return [
+        *KotlinFieldSet.jvm_rules(),
+    ]

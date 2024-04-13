@@ -11,8 +11,14 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import ClassVar, Iterable, Iterator, Sequence
 
+from pants.core.target_types import (
+    FilesGeneratingSourcesField,
+    FileSourceField,
+    RelocatedFilesOriginalTargetsField,
+)
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
@@ -30,9 +36,8 @@ from pants.engine.unions import UnionMembership, union
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import strip_v2_chroot_path
+from pants.util.strutil import Simplifier
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +61,7 @@ class _ClasspathEntryRequestClassification(Enum):
     INCOMPATIBLE = auto()
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class ClasspathEntryRequest(metaclass=ABCMeta):
     """A request for a ClasspathEntry for the given CoarsenedTarget and resolve.
@@ -121,7 +126,7 @@ class ClasspathEntryRequestFactory:
         if len(compatible) == 1:
             if not root and compatible[0].root_only:
                 raise ClasspathRootOnlyWasInner(
-                    "The following targets had dependees, but can only be used as roots in a "
+                    "The following targets had dependents, but can only be used as roots in a "
                     f"build graph:\n{component.bullet_list()}"
                 )
             return compatible[0](component, resolve, None)
@@ -211,8 +216,7 @@ def calculate_jvm_request_types(union_membership: UnionMembership) -> ClasspathE
     return ClasspathEntryRequestFactory(tuple(cpe_impls), sources_by_impl)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class ClasspathEntry:
     """A JVM classpath entry represented as a series of JAR files, and their dependencies.
 
@@ -223,8 +227,15 @@ class ClasspathEntry:
     This class additionally keeps filenames in order to preserve classpath ordering for the
     `classpath_arg` method: although Digests encode filenames, they are stored sorted.
 
+    If `[jvm].reproducible_jars`, then all JARs in a classpath entry must have had timestamps
+    stripped -- either natively, or via the `pants.jvm.strip_jar` rules.
+
     TODO: Move to `classpath.py`.
     TODO: Generalize via https://github.com/pantsbuild/pants/issues/13112.
+
+    Note: Non-jar artifacts (e.g., executables with "exe" packaging) may end up on the classpath if
+    they are dependencies.
+    TODO: Does there need to be a filtering mechanism to exclude non-jar artifacts in the default case?
     """
 
     digest: Digest
@@ -237,9 +248,9 @@ class ClasspathEntry:
         filenames: Iterable[str] = (),
         dependencies: Iterable[ClasspathEntry] = (),
     ):
-        self.digest = digest
-        self.filenames = tuple(filenames)
-        self.dependencies = FrozenOrderedSet(dependencies)
+        object.__setattr__(self, "digest", digest)
+        object.__setattr__(self, "filenames", tuple(filenames))
+        object.__setattr__(self, "dependencies", FrozenOrderedSet(dependencies))
 
     @classmethod
     def merge(cls, digest: Digest, entries: Iterable[ClasspathEntry]) -> ClasspathEntry:
@@ -327,19 +338,16 @@ class FallibleClasspathEntry(EngineAwareReturnType):
         process_result: FallibleProcessResult,
         output: ClasspathEntry | None,
         *,
-        strip_chroot_path: bool = False,
+        output_simplifier: Simplifier = Simplifier(),
     ) -> FallibleClasspathEntry:
-        def prep_output(s: bytes) -> str:
-            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
-
         exit_code = process_result.exit_code
-        stderr = prep_output(process_result.stderr)
+        stderr = output_simplifier.simplify(process_result.stderr)
         return cls(
             description=description,
             result=(CompileResult.SUCCEEDED if exit_code == 0 else CompileResult.FAILED),
             output=output,
             exit_code=exit_code,
-            stdout=prep_output(process_result.stdout),
+            stdout=output_simplifier.simplify(process_result.stdout),
             stderr=stderr,
         )
 
@@ -412,12 +420,21 @@ def classpath_dependency_requests(
         them = coarsened_dep.representative.address
         return us.spec_path == them.spec_path and us.target_name == them.target_name
 
+    def ignore_because_file(coarsened_dep: CoarsenedTarget) -> bool:
+        return sum(
+            1
+            for t in coarsened_dep.members
+            if t.has_field(FileSourceField)
+            or t.has_field(FilesGeneratingSourcesField)
+            or t.has_field(RelocatedFilesOriginalTargetsField)
+        ) == len(coarsened_dep.members)
+
     return ClasspathEntryRequests(
         classpath_entry_request.for_targets(
             component=coarsened_dep, resolve=request.request.resolve
         )
         for coarsened_dep in request.request.component.dependencies
-        if not ignore_because_generated(coarsened_dep)
+        if not ignore_because_generated(coarsened_dep) and not ignore_because_file(coarsened_dep)
     )
 
 

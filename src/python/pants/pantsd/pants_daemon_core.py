@@ -6,13 +6,12 @@ from __future__ import annotations
 import logging
 import threading
 from contextlib import contextmanager
-from typing import Iterator
-
-from typing_extensions import Protocol
+from typing import Iterator, Protocol
 
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.native_engine import PyExecutor
+from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import AuthPluginResult, DynamicRemoteOptions
@@ -118,7 +117,7 @@ class PantsDaemonCore:
             raise e
 
     def prepare(
-        self, options_bootstrapper: OptionsBootstrapper, env: CompleteEnvironment
+        self, options_bootstrapper: OptionsBootstrapper, env: CompleteEnvironmentVars
     ) -> tuple[GraphScheduler, OptionsInitializer]:
         """Get a scheduler for the given options_bootstrapper.
 
@@ -126,17 +125,22 @@ class PantsDaemonCore:
         """
 
         with self._handle_exceptions():
-            build_config, options = self._options_initializer.build_config_and_options(
-                options_bootstrapper, env, raise_=True
+            build_config = self._options_initializer.build_config(options_bootstrapper, env)
+            union_membership = UnionMembership.from_rules(build_config.union_rules)
+            options = self._options_initializer.options(
+                options_bootstrapper, env, build_config, union_membership, raise_=True
             )
 
         scheduler_restart_explanation: str | None = None
 
-        # Because these options are computed dynamically via side-effects like reading from a file,
+        # Because these options are computed dynamically via side effects like reading from a file,
         # they need to be re-evaluated every run. We only reinitialize the scheduler if changes
         # were made, though.
         dynamic_remote_options, auth_plugin_result = DynamicRemoteOptions.from_options(
-            options, env, self._prior_auth_plugin_result
+            options,
+            env,
+            self._prior_auth_plugin_result,
+            remote_auth_plugin_func=build_config.remote_auth_plugin_func,
         )
         remote_options_changed = (
             self._prior_dynamic_remote_options is not None

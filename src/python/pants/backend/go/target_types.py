@@ -4,29 +4,204 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from typing import Iterable, Optional, Sequence, Tuple
 
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
+from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
-from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
     BoolField,
     Dependencies,
-    IntField,
     InvalidFieldException,
     InvalidTargetException,
     MultipleSourcesField,
     StringField,
+    StringSequenceField,
     Target,
     TargetGenerator,
+    TriBoolField,
     ValidNumbers,
     generate_multiple_sources_field_help_message,
 )
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
+
+# -----------------------------------------------------------------------------------------------
+# Build option fields
+# -----------------------------------------------------------------------------------------------
+
+
+class GoCgoEnabledField(TriBoolField):
+    """Enables Cgo support."""
+
+    alias = "cgo_enabled"
+    help = help_text(
+        """
+        Enable Cgo support, which allows Go and C code to interact. This option must be enabled for any
+        packages making use of Cgo to actually be compiled with Cgo support.
+
+        This field can be specified on several different target types, including `go_binary` and `go_mod` target
+        types. If this field is specified on a `go_binary` target, then that instance takes precedence over other
+        configuration when building the applicable executable. The applicable `go_mod` target will be checked next
+        as a fallback. Finally, if neither target specifies this field, then the value will be taken from
+        the value of the `[golang].cgo_enabled` option. (Note: That option will be deprecated in a future Pants
+        version.)
+
+        See https://go.dev/blog/cgo and https://pkg.go.dev/cmd/cgo for additional information about Cgo.
+        """
+    )
+
+
+class GoRaceDetectorEnabledField(TriBoolField):
+    """Enables the Go data race detector."""
+
+    alias = "race"
+    help = help_text(
+        """
+        Enable compiling the binary with the Go data race detector.
+
+        See https://go.dev/doc/articles/race_detector for additional information about the Go data race detector.
+        """
+    )
+
+
+class GoTestRaceDetectorEnabledField(GoRaceDetectorEnabledField):
+    alias = "test_race"
+    help = help_text(
+        """
+        Enable compiling this package's test binary with the Go data race detector.
+
+        See https://go.dev/doc/articles/race_detector for additional information about the Go data race detector.
+        """
+    )
+
+
+class GoMemorySanitizerEnabledField(TriBoolField):
+    """Enables the C/C++ memory sanitizer."""
+
+    alias = "msan"
+    help = help_text(
+        """
+        Enable interoperation between Go code and the C/C++ "memory sanitizer."
+
+        See https://github.com/google/sanitizers/wiki/MemorySanitizer for additional information about
+        the C/C++ memory sanitizer.
+        """
+    )
+
+
+class GoTestMemorySanitizerEnabledField(GoRaceDetectorEnabledField):
+    alias = "test_msan"
+    help = help_text(
+        """
+        Enable interoperation between Go code and the C/C++ "memory sanitizer" when building this package's
+        test binary.
+
+        See https://github.com/google/sanitizers/wiki/MemorySanitizer for additional information about
+        the C/C++ memory sanitizer.
+        """
+    )
+
+
+class GoAddressSanitizerEnabledField(TriBoolField):
+    """Enables the C/C++ address sanitizer."""
+
+    alias = "asan"
+    help = help_text(
+        """
+        Enable interoperation between Go code and the C/C++ "address sanitizer."
+
+        See https://github.com/google/sanitizers/wiki/AddressSanitizer for additional information about
+        the C/C++ address sanitizer.
+        """
+    )
+
+
+class GoTestAddressSanitizerEnabledField(GoRaceDetectorEnabledField):
+    alias = "test_asan"
+    help = help_text(
+        """
+        Enable interoperation between Go code and the C/C++ "address sanitizer" when building this package's
+        test binary.
+
+        See https://github.com/google/sanitizers/wiki/AddressSanitizer for additional information about
+        the C/C++ address sanitizer.
+        """
+    )
+
+
+class GoAssemblerFlagsField(StringSequenceField):
+    alias = "assembler_flags"
+    help = help_text(
+        """
+        Extra flags to pass to the Go assembler (i.e., `go tool asm`) when assembling Go-format assembly code.
+
+        Note: These flags will not be added to gcc/clang-format assembly that is assembled in packages using Cgo.
+
+        This field can be specified on several different target types:
+
+        - On `go_mod` targets, the assembler flags are used when building any package involving the module
+        including both first-party (i.e., `go_package` targets) and third-party dependencies.
+
+        - On `go_binary` targets, the assembler flags are used when building any packages comprising that binary
+        including third-party dependencies. These assembler flags will be added after any assembler flags
+        added by any `assembler_flags` field set on the applicable `go_mod` target.
+
+        - On `go_package` targets, the assembler flags are used only for building that specific package and not
+        for any other package. These assembler flags will be added after any assembler flags added by any
+        `assembler_flags` field set on the applicable `go_mod` target or applicable `go_binary` target.
+
+        Run `go doc cmd/asm` to see the flags supported by `go tool asm`.
+        """
+    )
+
+
+class GoCompilerFlagsField(StringSequenceField):
+    alias = "compiler_flags"
+    help = help_text(
+        """
+        Extra flags to pass to the Go compiler (i.e., `go tool compile`) when compiling Go code.
+
+        This field can be specified on several different target types:
+
+        - On `go_mod` targets, the compiler flags are used when compiling any package involving the module
+        including both first-party (i.e., `go_package` targets) and third-party dependencies.
+
+        - On `go_binary` targets, the compiler flags are used when compiling any packages comprising that binary
+        including third-party dependencies. These compiler flags will be added after any compiler flags
+        added by any `compiler_flags` field set on the applicable `go_mod` target.
+
+        - On `go_package` targets, the compiler flags are used only for compiling that specific package and not
+        for any other package. These compiler flags will be added after any compiler flags added by any
+        `compiler_flags` field set on the applicable `go_mod` target or applicable `go_binary` target.
+
+        Run `go doc cmd/compile` to see the flags supported by `go tool compile`.
+        """
+    )
+
+
+class GoLinkerFlagsField(StringSequenceField):
+    alias = "linker_flags"
+    help = help_text(
+        """
+        Extra flags to pass to the Go linker (i.e., `go tool link`) when linking Go binaries.
+
+        This field can be specified on several different target types:
+
+        - On `go_mod` targets, the linker flags are used when linking any binary involving the module
+        including both `go_binary` targets and test binaries for `go_package` targets within the module.
+
+        - On `go_binary` targets, the linker flags are used when linking that binary. These linker flags
+        will be added after any linker flags added by any `linker_flags` field set on the applicable
+        `go_mod` target.
+
+        Run `go doc cmd/link` to see the flags supported by `go tool link`.
+        """
+    )
+
 
 # -----------------------------------------------------------------------------------------------
 # `go_third_party_package` target
@@ -35,7 +210,7 @@ from pants.util.strutil import softwrap
 
 class GoImportPathField(StringField):
     alias = "import_path"
-    help = softwrap(
+    help = help_text(
         """
         Import path in Go code to import this package.
 
@@ -53,7 +228,7 @@ class GoThirdPartyPackageDependenciesField(Dependencies):
 class GoThirdPartyPackageTarget(Target):
     alias = "go_third_party_package"
     core_fields = (*COMMON_TARGET_FIELDS, GoThirdPartyPackageDependenciesField, GoImportPathField)
-    help = softwrap(
+    help = help_text(
         """
         A package from a third-party Go module.
 
@@ -122,7 +297,7 @@ class GoModDependenciesField(Dependencies):
 
 class GoModTarget(TargetGenerator):
     alias = "go_mod"
-    help = softwrap(
+    help = help_text(
         """
         A first-party Go module (corresponding to a `go.mod` file).
 
@@ -138,6 +313,13 @@ class GoModTarget(TargetGenerator):
         *COMMON_TARGET_FIELDS,
         GoModDependenciesField,
         GoModSourcesField,
+        GoCgoEnabledField,
+        GoRaceDetectorEnabledField,
+        GoMemorySanitizerEnabledField,
+        GoAddressSanitizerEnabledField,
+        GoAssemblerFlagsField,
+        GoCompilerFlagsField,
+        GoLinkerFlagsField,
     )
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = ()
@@ -149,8 +331,27 @@ class GoModTarget(TargetGenerator):
 
 
 class GoPackageSourcesField(MultipleSourcesField):
-    default = ("*.go", "*.s")
-    expected_file_extensions = (".go", ".s")
+    default = ("*.go",)
+    expected_file_extensions = (
+        ".go",
+        ".s",
+        ".S",
+        ".sx",
+        ".c",
+        ".h",
+        ".hh",
+        ".hpp",
+        ".hxx",
+        ".cc",
+        ".cpp",
+        ".cxx",
+        ".m",
+        ".f",
+        ".F",
+        ".for",
+        ".f90",
+        ".syso",
+    )
     ban_subdirectories = True
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['example.go', '*_test.go', '!test_ignore.go']`"
@@ -179,15 +380,12 @@ class SkipGoTestsField(BoolField):
     help = "If true, don't run this package's tests."
 
 
-class GoTestTimeoutField(IntField):
-    alias = "test_timeout"
-    help = softwrap(
-        """
-        A timeout (in seconds) when running this package's tests.
+class GoTestExtraEnvVarsField(TestExtraEnvVarsField):
+    alias = "test_extra_env_vars"
 
-        If this field is not set, the test will never time out.
-        """
-    )
+
+class GoTestTimeoutField(TestTimeoutField):
+    alias = "test_timeout"
     valid_numbers = ValidNumbers.positive_and_zero
 
 
@@ -197,10 +395,16 @@ class GoPackageTarget(Target):
         *COMMON_TARGET_FIELDS,
         GoPackageDependenciesField,
         GoPackageSourcesField,
+        GoTestExtraEnvVarsField,
         GoTestTimeoutField,
+        GoTestRaceDetectorEnabledField,
+        GoTestMemorySanitizerEnabledField,
+        GoTestAddressSanitizerEnabledField,
+        GoAssemblerFlagsField,
+        GoCompilerFlagsField,
         SkipGoTestsField,
     )
-    help = softwrap(
+    help = help_text(
         """
         A first-party Go package (corresponding to a directory with `.go` files).
 
@@ -217,7 +421,7 @@ class GoPackageTarget(Target):
 
 class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
     alias = "main"
-    help = softwrap(
+    help = help_text(
         """
         Address of the `go_package` with the `main` for this binary.
 
@@ -226,19 +430,6 @@ class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
         """
     )
     value: str
-
-
-@dataclass(frozen=True)
-class GoBinaryMainPackage:
-    address: Address
-
-
-@dataclass(frozen=True)
-class GoBinaryMainPackageRequest(EngineAwareParameter):
-    field: GoBinaryMainPackageField
-
-    def debug_hint(self) -> str:
-        return self.field.address.spec
 
 
 class GoBinaryDependenciesField(Dependencies):
@@ -254,6 +445,35 @@ class GoBinaryTarget(Target):
         OutputPathField,
         GoBinaryMainPackageField,
         GoBinaryDependenciesField,
+        GoCgoEnabledField,
+        GoRaceDetectorEnabledField,
+        GoMemorySanitizerEnabledField,
+        GoAddressSanitizerEnabledField,
+        GoAssemblerFlagsField,
+        GoCompilerFlagsField,
+        GoLinkerFlagsField,
         RestartableField,
+        EnvironmentField,
     )
     help = "A Go binary."
+
+
+# -----------------------------------------------------------------------------------------------
+# Support for codegen targets that need to specify an owning go_mod target
+# -----------------------------------------------------------------------------------------------
+
+
+class GoOwningGoModAddressField(StringField):
+    alias = "go_mod_address"
+    help = help_text(
+        """
+        Address of the `go_mod` target representing the Go module that this target is part of.
+
+        This field is similar to the `resolve` field used in the Python and JVM backends. If a codegen
+        target such as `protobuf_sources` will be used in multiple Go modules, then you should use
+        the `parametrize` built-in to parametrize that `protobuf_sources` target for each Go module.
+
+        If there is a single `go_mod` target in the repository, then this field defaults to the address
+        for that single `go_mod` target.
+        """
+    )

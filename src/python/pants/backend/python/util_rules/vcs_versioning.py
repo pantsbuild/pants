@@ -23,19 +23,22 @@ from pants.backend.python.target_types import (
     VCSVersion,
     VCSVersionDummySourceField,
     VersionGenerateToField,
+    VersionLocalSchemeField,
     VersionTagRegexField,
     VersionTemplateField,
+    VersionVersionSchemeField,
 )
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import ProcessResult
+from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, GeneratedSources, GenerateSourcesRequest, Targets
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 from pants.vcs.git import GitWorktreeRequest, MaybeGitWorktree
 
 
@@ -55,13 +58,18 @@ async def generate_python_from_setuptools_scm(
     request: GeneratePythonFromSetuptoolsSCMRequest,
     setuptools_scm: SetuptoolsSCM,
 ) -> GeneratedSources:
-    # A GitWorktreeRequest is uncacheable, so this enclosing rule will run every time its result
-    # is needed, meaning it will always return a result based on the current underlying git state.
+    # A MaybeGitWorktree is uncacheable, so this enclosing rule will run every time its result
+    # is needed, and the process invocation below caches at session scope, meaning this rule
+    # will always return a result based on the current underlying git state.
     maybe_git_worktree = await Get(MaybeGitWorktree, GitWorktreeRequest())
     if not maybe_git_worktree.git_worktree:
         raise VCSVersioningError(
-            f"Trying to determine the version for the {request.protocol_target.address} target at "
-            f"{request.protocol_target.address}, but you are not running in a git worktree."
+            softwrap(
+                f"""
+                Trying to determine the version for the {request.protocol_target.address} target at
+                {request.protocol_target.address}, but you are not running in a git worktree.
+                """
+            )
         )
 
     # Generate the setuptools_scm config. We don't use any existing pyproject.toml config,
@@ -72,9 +80,12 @@ async def generate_python_from_setuptools_scm(
     # directory" and "where should I write output to".
     config: dict[str, dict[str, dict[str, str]]] = {}
     tool_config = config.setdefault("tool", {}).setdefault("setuptools_scm", {})
-    tag_regex = request.protocol_target[VersionTagRegexField].value
-    if tag_regex:
+    if tag_regex := request.protocol_target[VersionTagRegexField].value:
         tool_config["tag_regex"] = tag_regex
+    if version_scheme := request.protocol_target[VersionVersionSchemeField].value:
+        tool_config["version_scheme"] = version_scheme
+    if local_scheme := request.protocol_target[VersionLocalSchemeField].value:
+        tool_config["local_scheme"] = local_scheme
     config_path = "pyproject.synthetic.toml"
 
     input_digest_get = Get(
@@ -99,6 +110,7 @@ async def generate_python_from_setuptools_scm(
             input_digest=input_digest,
             description=f"Run setuptools_scm for {request.protocol_target.address.spec}",
             level=LogLevel.INFO,
+            cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
     version = result.stdout.decode().strip()

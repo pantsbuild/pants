@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Tuple, Union
 
 # Note: several of these types are re-exported as the public API of `engine/fs.py`.
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
@@ -23,7 +23,7 @@ from pants.engine.internals.native_engine import MergeDigests as MergeDigests
 from pants.engine.internals.native_engine import RemovePrefix as RemovePrefix
 from pants.engine.internals.native_engine import Snapshot as Snapshot
 from pants.engine.rules import QueryRule
-from pants.util.meta import frozen_after_init
+from pants.util.frozendict import FrozenDict
 
 if TYPE_CHECKING:
     from pants.engine.internals.scheduler import SchedulerSession
@@ -53,6 +53,12 @@ class FileContent:
     content: bytes
     is_executable: bool = False
 
+    def __post_init__(self):
+        if not isinstance(self.content, bytes):
+            raise TypeError(
+                f"Expected 'content' to be bytes, but got {type(self.content).__name__}"
+            )
+
     def __repr__(self) -> str:
         return (
             f"FileContent(path={self.path}, content=(len:{len(self.content)}), "
@@ -71,6 +77,24 @@ class FileEntry:
     path: str
     file_digest: FileDigest
     is_executable: bool = False
+
+
+@dataclass(frozen=True)
+class SymlinkEntry:
+    """A symlink pointing to a target path.
+
+    For the symlink target:
+        - uses a forward slash `/` path separator.
+        - can be relative to the parent directory of the symlink or can be an absolute path starting with `/`.
+        - Allows `..` components anywhere in the path (as logical canonicalization may lead to
+            different behavior in the presence of directory symlinks).
+
+    See also the REAPI for a SymlinkNode:
+    https://github.com/bazelbuild/remote-apis/blob/aa29b91f336b9be2c5370297210b67a6654c0b72/build/bazel/remote/execution/v2/remote_execution.proto#L882
+    """
+
+    path: str
+    target: str
 
 
 @dataclass(frozen=True)
@@ -96,16 +120,17 @@ class DigestContents(Collection[FileContent]):
     """
 
 
-class DigestEntries(Collection[Union[FileEntry, Directory]]):
+class DigestEntries(Collection[Union[FileEntry, SymlinkEntry, Directory]]):
     """The indirect file contents of a Digest.
 
-    DigestEntries is a collection of FileContent and Directory instances representing, respecively,
-    actual files and empty directories present in the Digest.
+    DigestEntries is a collection of FileEntry/SymlinkEntry/Directory instances representing,
+    respectively, actual files, actual symlinks, and empty directories present in the Digest.
     """
 
 
-class CreateDigest(Collection[Union[FileContent, FileEntry, Directory]]):
-    """A request to create a Digest with the input FileContent and/or Directory values.
+class CreateDigest(Collection[Union[FileContent, FileEntry, SymlinkEntry, Directory]]):
+    """A request to create a Digest with the input FileContent/FileEntry/SymlinkEntry/Directory
+    values.
 
     The engine will create any parent directories necessary, e.g. `FileContent('a/b/c.txt')` will
     result in `a/`, `a/b`, and `a/b/c.txt` being created. You only need to use `Directory` to
@@ -127,8 +152,7 @@ class GlobExpansionConjunction(Enum):
     all_match = "all_match"
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class PathGlobs:
     globs: Tuple[str, ...]
     glob_match_error_behavior: GlobMatchErrorBehavior
@@ -158,10 +182,10 @@ class PathGlobs:
 
         # NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method
         # will need to be aware of any changes to this object's definition.
-        self.globs = tuple(sorted(globs))
-        self.glob_match_error_behavior = glob_match_error_behavior
-        self.conjunction = conjunction
-        self.description_of_origin = description_of_origin
+        object.__setattr__(self, "globs", tuple(sorted(globs)))
+        object.__setattr__(self, "glob_match_error_behavior", glob_match_error_behavior)
+        object.__setattr__(self, "conjunction", conjunction)
+        object.__setattr__(self, "description_of_origin", description_of_origin)
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -203,6 +227,10 @@ class PathGlobsAndRoot:
 class DigestSubset:
     """A request to get a subset of a digest.
 
+    The digest will be traversed symlink-oblivious to match the provided globs. If you require a
+    symlink-aware subset, you can access the digest's entries `Get(DigestEntries, Digest, digest)`,
+    filter them out, and create a new digest: `Get(Digest, CreateDigest(...))`.
+
     Example:
 
         result = await Get(Digest, DigestSubset(original_digest, PathGlobs(["subdir1", "f.txt"]))
@@ -226,26 +254,58 @@ class DownloadFile:
 
 
 @dataclass(frozen=True)
+class NativeDownloadFile:
+    """Retrieve the contents of a file via an HTTP GET request or directly for local file:// URLs.
+
+    This request is handled directly by the native engine without any additional coercion by plugins,
+    and therefore should only be used in cases where the URL is known to be publicly accessible.
+    Otherwise, callers should use `DownloadFile`.
+
+    The auth_headers are part of this nodes' cache key for memoization (changing a header invalidates
+    prior results) but are not part of the underlying cache key for the local/remote cache (changing
+    a header won't re-download a file if the file was previously downloaded).
+    """
+
+    url: str
+    expected_digest: FileDigest
+    # NB: This mapping can be of any arbitrary headers, but should be limited to those required for
+    # authorization.
+    auth_headers: FrozenDict[str, str]
+
+    def __init__(
+        self, url: str, expected_digest: FileDigest, auth_headers: Mapping[str, str] | None = None
+    ) -> None:
+        object.__setattr__(self, "url", url)
+        object.__setattr__(self, "expected_digest", expected_digest)
+        object.__setattr__(self, "auth_headers", FrozenDict(auth_headers or {}))
+
+
+@dataclass(frozen=True)
 class Workspace(SideEffecting):
     """A handle for operations that mutate the local filesystem."""
 
-    _scheduler: "SchedulerSession"
+    _scheduler: SchedulerSession
     _enforce_effects: bool = True
 
     def write_digest(
-        self, digest: Digest, *, path_prefix: Optional[str] = None, side_effecting: bool = True
+        self,
+        digest: Digest,
+        *,
+        path_prefix: Optional[str] = None,
+        clear_paths: Sequence[str] = (),
+        side_effecting: bool = True,
     ) -> None:
         """Write a digest to disk, relative to the build root.
 
         You should not use this in a `for` loop due to slow performance. Instead, call `await
         Get(Digest, MergeDigests)` beforehand.
 
-        As an advanced usecase, if the digest is known to be written to a temporary or idempotent
+        As an advanced use-case, if the digest is known to be written to a temporary or idempotent
         location, side_effecting=False may be passed to avoid tracking this write as a side effect.
         """
         if side_effecting:
             self.side_effected()
-        self._scheduler.write_digest(digest, path_prefix=path_prefix)
+        self._scheduler.write_digest(digest, path_prefix=path_prefix, clear_paths=clear_paths)
 
 
 @dataclass(frozen=True)
@@ -266,18 +326,17 @@ class SnapshotDiff:
     changed_files: tuple[str, ...] = ()
 
     @classmethod
-    def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> "SnapshotDiff":
+    def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> SnapshotDiff:
         return cls(*ours._diff(theirs))
 
 
 def rules():
-    # Keep in sync with `intrinsics.rs`.
     return (
         QueryRule(Digest, (CreateDigest,)),
         QueryRule(Digest, (PathGlobs,)),
         QueryRule(Digest, (AddPrefix,)),
         QueryRule(Digest, (RemovePrefix,)),
-        QueryRule(Digest, (DownloadFile,)),
+        QueryRule(Digest, (NativeDownloadFile,)),
         QueryRule(Digest, (MergeDigests,)),
         QueryRule(Digest, (DigestSubset,)),
         QueryRule(DigestContents, (Digest,)),

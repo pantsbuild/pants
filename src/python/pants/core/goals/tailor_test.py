@@ -10,7 +10,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.base.specs import AddressLiteralSpec, DirLiteralSpec, FileLiteralSpec, RawSpecs
+from pants.base.specs import DirGlobSpec, DirLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.core.goals import tailor
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -24,9 +24,9 @@ from pants.core.goals.tailor import (
     TailorSubsystem,
     UniquelyNamedPutativeTargets,
     default_sources_for_target_type,
-    group_by_dir,
+    has_source_or_sources_field,
     make_content_str,
-    specs_to_dirs,
+    resolve_specs_with_build,
 )
 from pants.core.util_rules import source_files
 from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
@@ -34,10 +34,12 @@ from pants.engine.internals.build_files import extract_build_file_options
 from pants.engine.rules import Get, QueryRule, rule
 from pants.engine.target import MultipleSourcesField, Target
 from pants.engine.unions import UnionRule
-from pants.source.filespec import Filespec, matches_filespec
+from pants.source.filespec import FilespecMatcher
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.dirutil import group_by_dir
+from pants.util.strutil import softwrap
 
 
 class MockPutativeTargetsRequest:
@@ -79,11 +81,9 @@ async def find_fortran_targets(
     all_fortran_files = await Get(Paths, PathGlobs, req.path_globs("*.f90"))
     unowned_shell_files = set(all_fortran_files.files) - set(all_owned_sources)
 
-    tests_filespec = Filespec(includes=list(FortranTestsSources.default))
+    tests_filespec_matcher = FilespecMatcher(FortranTestsSources.default, ())
     test_filenames = set(
-        matches_filespec(
-            tests_filespec, paths=[os.path.basename(path) for path in unowned_shell_files]
-        )
+        tests_filespec_matcher.matches([os.path.basename(path) for path in unowned_shell_files])
     )
     test_files = {path for path in unowned_shell_files if os.path.basename(path) in test_filenames}
     sources_files = set(unowned_shell_files) - test_files
@@ -151,6 +151,12 @@ def test_default_sources_for_target_type() -> None:
     assert default_sources_for_target_type(FortranLibraryTarget) == FortranLibrarySources.default
     assert default_sources_for_target_type(FortranTestsTarget) == FortranTestsSources.default
     assert default_sources_for_target_type(FortranModule) == tuple()
+
+
+def test_has_source_or_sources_field() -> None:
+    assert has_source_or_sources_field(FortranLibraryTarget)
+    assert has_source_or_sources_field(FortranTestsTarget)
+    assert not has_source_or_sources_field(FortranModule)
 
 
 def test_make_content_str() -> None:
@@ -413,61 +419,6 @@ def test_build_file_lacks_leading_whitespace(rule_runner: RuleRunner, header: st
         assert content.lstrip() == content
 
 
-def test_group_by_dir() -> None:
-    paths = {
-        "foo/bar/baz1.ext",
-        "foo/bar/baz1_test.ext",
-        "foo/bar/qux/quux1.ext",
-        "foo/__init__.ext",
-        "foo/bar/__init__.ext",
-        "foo/bar/baz2.ext",
-        "foo/bar1.ext",
-        "foo1.ext",
-        "__init__.ext",
-    }
-    assert {
-        "": {"__init__.ext", "foo1.ext"},
-        "foo": {"__init__.ext", "bar1.ext"},
-        "foo/bar": {"__init__.ext", "baz1.ext", "baz1_test.ext", "baz2.ext"},
-        "foo/bar/qux": {"quux1.ext"},
-    } == group_by_dir(paths)
-
-
-def test_specs_to_dirs() -> None:
-    assert specs_to_dirs(RawSpecs()) == ("",)
-    assert specs_to_dirs(RawSpecs(address_literals=(AddressLiteralSpec("src/python/foo"),))) == (
-        "src/python/foo",
-    )
-    assert specs_to_dirs(RawSpecs(dir_literals=(DirLiteralSpec("src/python/foo"),))) == (
-        "src/python/foo",
-    )
-    assert specs_to_dirs(
-        RawSpecs(
-            address_literals=(
-                AddressLiteralSpec("src/python/foo"),
-                AddressLiteralSpec("src/python/bar"),
-            )
-        )
-    ) == ("src/python/foo", "src/python/bar")
-
-    with pytest.raises(ValueError):
-        specs_to_dirs(RawSpecs(file_literals=(FileLiteralSpec("src/python/foo.py"),)))
-
-    with pytest.raises(ValueError):
-        specs_to_dirs(RawSpecs(address_literals=(AddressLiteralSpec("src/python/bar", "tgt"),)))
-
-    with pytest.raises(ValueError):
-        specs_to_dirs(
-            RawSpecs(
-                address_literals=(
-                    AddressLiteralSpec(
-                        "src/python/bar", target_component=None, generated_component="gen"
-                    ),
-                )
-            )
-        )
-
-
 def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -480,7 +431,7 @@ def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:
         }
     )
     result = rule_runner.run_goal_rule(
-        TailorGoal, args=["--alias-mapping={'fortran_library': 'my_fortran_lib'}"]
+        TailorGoal, args=["--alias-mapping={'fortran_library': 'my_fortran_lib'}", "::"]
     )
     assert result.exit_code == 0
     assert result.stdout == dedent(
@@ -524,7 +475,7 @@ def test_tailor_rule_check_mode(rule_runner: RuleRunner) -> None:
         {"foo/bar1_test.f90": "", "foo/BUILD": "fortran_library()", "baz/qux1.f90": ""}
     )
     result = rule_runner.run_goal_rule(
-        TailorGoal, global_args=["--pants-bin-name=./custom_pants"], args=["--check"]
+        TailorGoal, global_args=["--pants-bin-name=./custom_pants"], args=["--check", "::"]
     )
     assert result.exit_code == 1
     assert result.stdout == dedent(
@@ -568,9 +519,11 @@ def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
 
     with pytest.raises(AssertionError) as excinfo:
         _ = PutativeTarget.for_target_type(FortranModule, "dir", "dir", ["a.f90"])
-    expected_msg = (
-        "A target of type FortranModule was proposed at address dir:dir with explicit sources a.f90, "
-        "but this target type does not have a `source` or `sources` field."
+    expected_msg = softwrap(
+        """
+        A target of type FortranModule was proposed at address dir:dir with explicit sources a.f90,
+        but this target type does not have a `source` or `sources` field.
+        """
     )
     assert str(excinfo.value) == expected_msg
 
@@ -635,3 +588,44 @@ def test_filter_by_ignores() -> None:
         ),
     )
     assert set(result) == set(valid_ptgts)
+
+
+@pytest.mark.parametrize("build_file_name", ["BUILD", "OTHER_NAME"])
+def test_resolve_specs_targetting_build_files(build_file_name) -> None:
+    specs = Specs(
+        includes=RawSpecs(
+            description_of_origin="CLI arguments",
+            dir_literals=(DirLiteralSpec(f"src/{build_file_name}"), DirLiteralSpec("src/dir")),
+            dir_globs=(DirGlobSpec("src/other/"),),
+            file_literals=(FileLiteralSpec(f"src/exists/{build_file_name}.suffix"),),
+        ),
+        ignores=RawSpecs(
+            description_of_origin="CLI arguments",
+            dir_literals=(DirLiteralSpec(f"bad/{build_file_name}"), DirLiteralSpec("bad/dir")),
+            dir_globs=(DirGlobSpec("bad/other/"),),
+            file_literals=(FileLiteralSpec(f"bad/exists/{build_file_name}.suffix"),),
+        ),
+    )
+    build_file_patterns = (build_file_name, f"{build_file_name}.*")
+    resolved = resolve_specs_with_build(specs, build_file_patterns)
+
+    assert resolved.includes.file_literals == tuple()
+    assert resolved.ignores.file_literals == tuple()
+
+    assert resolved.includes.dir_literals == (
+        DirLiteralSpec("src/exists"),
+        DirLiteralSpec("src"),
+        DirLiteralSpec("src/dir"),
+    )
+    assert resolved.ignores.dir_literals == (
+        DirLiteralSpec("bad/exists"),
+        DirLiteralSpec("bad"),
+        DirLiteralSpec("bad/dir"),
+    )
+
+    assert resolved.includes.dir_globs == (
+        DirGlobSpec("src/other/"),
+    ), "did not passthrough other spec type"
+    assert resolved.ignores.dir_globs == (
+        DirGlobSpec("bad/other/"),
+    ), "did not passthrough other spec type"

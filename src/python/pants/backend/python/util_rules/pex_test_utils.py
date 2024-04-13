@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, Iterable, Iterator, Mapping
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import MainSpecification, PexLayout
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
@@ -25,7 +24,9 @@ from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, PexRequirements
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessResult
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.util.pip_requirement import PipRequirement
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -36,14 +37,18 @@ class ExactRequirement:
     @classmethod
     def parse(cls, requirement: str) -> ExactRequirement:
         req = PipRequirement.parse(requirement)
-        assert len(req.specs) == 1, (
-            f"Expected an exact requirement with only 1 specifier, given {requirement} with "
-            f"{len(req.specs)} specifiers"
+        assert len(req.specs) == 1, softwrap(
+            f"""
+            Expected an exact requirement with only 1 specifier, given {requirement} with
+            {len(req.specs)} specifiers
+            """
         )
         operator, version = req.specs[0]
-        assert operator == "==", (
-            f"Expected an exact requirement using only the '==' specifier, given {requirement} "
-            f"using the {operator!r} operator"
+        assert operator == "==", softwrap(
+            f"""
+            Expected an exact requirement using only the '==' specifier, given {requirement}
+            using the {operator!r} operator
+            """
         )
         return cls(project_name=req.project_name, version=version)
 
@@ -64,59 +69,38 @@ class PexData:
 
 
 def get_all_data(rule_runner: RuleRunner, pex: Pex | VenvPex) -> PexData:
+    # We fish PEX-INFO out of the pex manually rather than running PEX_TOOLS, as
+    # we don't know if the pex can run on the current system.
     if isinstance(pex, VenvPex):
         digest = pex.digest
         sandbox_path = pex.pex_filename
-        process = rule_runner.request(
-            Process,
-            [
-                VenvPexProcess(
-                    pex,
-                    argv=["info"],
-                    extra_env=dict(PEX_TOOLS="1"),
-                    description="Extract PEX-INFO.",
-                ),
-            ],
-        )
     else:
         digest = pex.digest
         sandbox_path = pex.name
-        pex_pex = rule_runner.request(PexPEX, [])
-        process = rule_runner.request(
-            Process,
-            [
-                PexProcess(
-                    Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
-                    argv=["-m", "pex.tools", pex.name, "info"],
-                    input_digest=pex.digest,
-                    extra_env=dict(PEX_INTERPRETER="1"),
-                    description="Extract PEX-INFO.",
-                )
-            ],
-        )
 
     rule_runner.scheduler.write_digest(digest)
-    local_path = PurePath(rule_runner.build_root) / "test.pex"
-    result = rule_runner.request(ProcessResult, [process])
-    pex_info_content = result.stdout.decode()
+    local_path = PurePath(rule_runner.build_root) / sandbox_path
 
     is_zipapp = zipfile.is_zipfile(local_path)
     if is_zipapp:
         with zipfile.ZipFile(local_path, "r") as zipfp:
             files = tuple(zipfp.namelist())
+            pex_info_content = zipfp.read("PEX-INFO")
     else:
         files = tuple(
             os.path.normpath(os.path.relpath(os.path.join(root, path), local_path))
             for root, dirs, files in os.walk(local_path)
             for path in dirs + files
         )
+        with open(os.path.join(local_path, "PEX-INFO"), "rb") as fp:
+            pex_info_content = fp.read()
 
     return PexData(
         pex=pex,
         is_zipapp=is_zipapp,
         sandbox_path=PurePath(sandbox_path),
         local_path=local_path,
-        info=json.loads(pex_info_content),
+        info=json.loads(pex_info_content.decode()),
         files=files,
     )
 
@@ -149,11 +133,7 @@ def create_pex_and_get_all_data(
         additional_args=additional_pex_args,
         layout=layout,
     )
-    rule_runner.set_options(
-        ["--backend-packages=pants.backend.python", *additional_pants_args],
-        env=env,
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-    )
+    rule_runner.set_options(additional_pants_args, env=env, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
     pex: Pex | VenvPex
     if pex_type == Pex:

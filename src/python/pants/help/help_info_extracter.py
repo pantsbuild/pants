@@ -3,25 +3,50 @@
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 import inspect
 import json
+from collections import defaultdict, namedtuple
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional, Tuple, Type, Union, cast, get_type_hints
+from itertools import chain
+from operator import attrgetter
+from pathlib import Path
+from typing import (
+    Any,
+    Callable,
+    DefaultDict,
+    Iterator,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+    get_type_hints,
+)
 
+import pkg_resources
+
+import pants.backend
 from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.core.util_rules.environments import option_field_name_for
 from pants.engine.goal import GoalSubsystem
-from pants.engine.rules import TaskRule
+from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsInfo, Registrar
+from pants.engine.rules import Rule, TaskRule
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionMembership, UnionRule, is_union
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
 from pants.option.scope import ScopeInfo
 from pants.util.frozendict import LazyFrozenDict
-from pants.util.strutil import first_paragraph
+from pants.util.strutil import first_paragraph, strval
+
+T = TypeVar("T")
 
 
 class HelpJSONEncoder(json.JSONEncoder):
@@ -64,7 +89,9 @@ class OptionHelpInfo:
                             scope context (e.g., [--baz, --no-baz, --qux])
     env_var: The environment variable that set's the option.
     config_key: The config key for this option (in the section named for its scope).
-
+    target_field_name: The name for the field that overrides this option in `local_environment`,
+                       `remote_environment`, or `docker_environment`, if the option is environment-
+                       aware, else `None`.
     typ: The type of the option.
     default: The value of this option if no flags are specified (derived from config and env vars).
     help: The help message registered for this option.
@@ -73,6 +100,7 @@ class OptionHelpInfo:
     removal_version: If deprecated: The version at which this option is to be removed.
     removal_hint: If deprecated: The removal hint message registered for this option.
     choices: If this option has a constrained set of choices, a tuple of the stringified choices.
+    fromfile: Supports reading the option value from a file when using `@filepath`.
     """
 
     display_args: tuple[str, ...]
@@ -81,6 +109,7 @@ class OptionHelpInfo:
     unscoped_cmd_line_args: tuple[str, ...]
     env_var: str
     config_key: str
+    target_field_name: str | None
     typ: type
     default: Any
     help: str
@@ -91,6 +120,7 @@ class OptionHelpInfo:
     choices: tuple[str, ...] | None
     comma_separated_choices: str | None
     value_history: OptionValueHistory | None
+    fromfile: bool
 
 
 @dataclass(frozen=True)
@@ -196,7 +226,7 @@ class TargetFieldHelpInfo:
         return cls(
             alias=field.alias,
             provider=provider,
-            description=field.help,
+            description=strval(field.help),
             type_hint=type_hint,
             required=field.required,
             default=(
@@ -230,11 +260,12 @@ class TargetTypeHelpInfo:
             # TargetGenerator, they are legal arguments... and that is what most help consumers
             # are interested in.
             fields.extend(target_type.moved_fields)
+        helpstr = strval(target_type.help)
         return cls(
             alias=target_type.alias,
             provider=provider,
-            summary=first_paragraph(target_type.help),
-            description=target_type.help,
+            summary=first_paragraph(helpstr),
+            description=helpstr,
             fields=tuple(
                 TargetFieldHelpInfo.create(
                     field,
@@ -266,7 +297,7 @@ class RuleInfo:
     provider: str
     output_type: str
     input_types: tuple[str, ...]
-    input_gets: tuple[str, ...]
+    awaitables: tuple[str, ...]
 
     @classmethod
     def create(cls, rule: TaskRule, provider: str) -> RuleInfo:
@@ -275,10 +306,108 @@ class RuleInfo:
             description=rule.desc,
             documentation=maybe_cleandoc(rule.func.__doc__),
             provider=provider,
-            input_types=tuple(selector.__name__ for selector in rule.input_selectors),
-            input_gets=tuple(str(constraints) for constraints in rule.input_gets),
+            input_types=tuple(typ.__name__ for typ in rule.parameters.values()),
+            awaitables=tuple(str(constraints) for constraints in rule.awaitables),
             output_type=rule.output_type.__name__,
         )
+
+
+@dataclass(frozen=True)
+class PluginAPITypeInfo:
+    """A container for help information for a plugin API type.
+
+    Plugin API types are used as input parameters and output results for rules.
+    """
+
+    name: str
+    module: str
+    documentation: str | None
+    provider: str
+    is_union: bool
+    union_type: str | None
+    union_members: tuple[str, ...]
+    dependencies: tuple[str, ...]
+    dependents: tuple[str, ...]
+    returned_by_rules: tuple[str, ...]
+    consumed_by_rules: tuple[str, ...]
+    used_in_rules: tuple[str, ...]
+
+    @classmethod
+    def create(
+        cls, api_type: type, rules: Sequence[Rule | UnionRule], **kwargs
+    ) -> PluginAPITypeInfo:
+        union_type: str | None = None
+        for rule in filter(cls._member_type_for(api_type), rules):
+            # All filtered rules out of `_member_type_for` will be `UnionRule`s.
+            union_type = cast(UnionRule, rule).union_base.__name__
+            break
+
+        task_rules = [rule for rule in rules if isinstance(rule, TaskRule)]
+
+        return cls(
+            name=api_type.__name__,
+            module=api_type.__module__,
+            documentation=maybe_cleandoc(api_type.__doc__),
+            is_union=is_union(api_type),
+            union_type=union_type,
+            consumed_by_rules=cls._all_rules(cls._rule_consumes(api_type), task_rules),
+            returned_by_rules=cls._all_rules(cls._rule_returns(api_type), task_rules),
+            used_in_rules=cls._all_rules(cls._rule_uses(api_type), task_rules),
+            **kwargs,
+        )
+
+    @staticmethod
+    def _all_rules(
+        satisfies: Callable[[TaskRule], bool], rules: Sequence[TaskRule]
+    ) -> tuple[str, ...]:
+        return tuple(sorted(rule.canonical_name for rule in filter(satisfies, rules)))
+
+    @staticmethod
+    def _rule_consumes(api_type: type) -> Callable[[TaskRule], bool]:
+        def satisfies(rule: TaskRule) -> bool:
+            return api_type in rule.parameters.values()
+
+        return satisfies
+
+    @staticmethod
+    def _rule_returns(api_type: type) -> Callable[[TaskRule], bool]:
+        def satisfies(rule: TaskRule) -> bool:
+            return rule.output_type is api_type
+
+        return satisfies
+
+    @staticmethod
+    def _rule_uses(api_type: type) -> Callable[[TaskRule], bool]:
+        def satisfies(rule: TaskRule) -> bool:
+            return any(
+                api_type in (*constraint.input_types, constraint.output_type)
+                for constraint in rule.awaitables
+            )
+
+        return satisfies
+
+    @staticmethod
+    def _member_type_for(api_type: type) -> Callable[[Rule | UnionRule], bool]:
+        def satisfies(rule: Rule | UnionRule) -> bool:
+            return isinstance(rule, UnionRule) and rule.union_member is api_type
+
+        return satisfies
+
+
+@dataclass(frozen=True)
+class BackendHelpInfo:
+    name: str
+    description: str
+    enabled: bool
+    provider: str
+
+
+@dataclass(frozen=True)
+class BuildFileSymbolHelpInfo:
+    name: str
+    is_target: bool
+    signature: str | None
+    documentation: str | None
 
 
 @dataclass(frozen=True)
@@ -289,6 +418,10 @@ class AllHelpInfo:
     name_to_goal_info: LazyFrozenDict[str, GoalHelpInfo]
     name_to_target_type_info: LazyFrozenDict[str, TargetTypeHelpInfo]
     name_to_rule_info: LazyFrozenDict[str, RuleInfo]
+    name_to_api_type_info: LazyFrozenDict[str, PluginAPITypeInfo]
+    name_to_backend_help_info: LazyFrozenDict[str, BackendHelpInfo]
+    name_to_build_file_info: LazyFrozenDict[str, BuildFileSymbolHelpInfo]
+    env_var_to_help_info: LazyFrozenDict[str, OptionHelpInfo]
 
     def non_deprecated_option_scope_help_infos(self):
         for oshi in self.scope_to_help_info.values():
@@ -315,6 +448,7 @@ class HelpInfoExtracter:
         union_membership: UnionMembership,
         consumed_scopes_mapper: ConsumedScopesMapper,
         registered_target_types: RegisteredTargetTypes,
+        build_symbols: BuildFileSymbolsInfo,
         build_configuration: BuildConfiguration | None = None,
     ) -> AllHelpInfo:
         def option_scope_help_info_loader_for(
@@ -341,7 +475,9 @@ class HelpInfoExtracter:
                 return HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
                     scope_info.description,
                     options.get_parser(scope_info.scope),
-                    scope_info.is_goal,
+                    # `filter` should be treated as a subsystem for `help`, even though it still
+                    # works as a goal for backwards compatibility.
+                    scope_info.is_goal if scope_info.scope != "filter" else False,
                     provider,
                     scope_info.deprecated_scope,
                 )
@@ -379,7 +515,7 @@ class HelpInfoExtracter:
                     ),
                     get_field_type_provider=lambda field_type: cls.get_provider(
                         build_configuration.union_rule_to_providers.get(
-                            UnionRule(target_type._plugin_field_cls, field_type)
+                            UnionRule(target_type.PluginField, field_type)
                         )
                         if build_configuration is not None
                         else None
@@ -387,6 +523,9 @@ class HelpInfoExtracter:
                 )
 
             return load
+
+        def lazily(value: T) -> Callable[[], T]:
+            return lambda: value
 
         known_scope_infos = sorted(options.known_scope_to_info.values(), key=lambda x: x.scope)
         scope_to_help_info = LazyFrozenDict(
@@ -397,11 +536,25 @@ class HelpInfoExtracter:
             }
         )
 
+        env_var_to_help_info = LazyFrozenDict(
+            {
+                ohi.env_var: lazily(ohi)
+                for oshi in scope_to_help_info.values()
+                for ohi in chain(oshi.basic, oshi.advanced, oshi.deprecated)
+            }
+        )
+
         name_to_goal_info = LazyFrozenDict(
             {
                 scope_info.scope: goal_help_info_loader_for(scope_info)
                 for scope_info in known_scope_infos
-                if scope_info.is_goal and not scope_info.scope.startswith("_")
+                if (
+                    scope_info.is_goal
+                    and not scope_info.scope.startswith("_")
+                    # `filter` should be treated as a subsystem for `help`, even though it still
+                    # works as a goal for backwards compatibility.
+                    and scope_info.scope != "filter"
+                )
             }
         )
 
@@ -409,11 +562,7 @@ class HelpInfoExtracter:
             {
                 alias: target_type_info_for(target_type)
                 for alias, target_type in registered_target_types.aliases_to_types.items()
-                if (
-                    not alias.startswith("_")
-                    and target_type.removal_version is None
-                    and alias != target_type.deprecated_alias
-                )
+                if (target_type.removal_version is None and alias != target_type.deprecated_alias)
             }
         )
 
@@ -422,6 +571,10 @@ class HelpInfoExtracter:
             name_to_goal_info=name_to_goal_info,
             name_to_target_type_info=name_to_target_type_info,
             name_to_rule_info=cls.get_rule_infos(build_configuration),
+            name_to_api_type_info=cls.get_api_type_infos(build_configuration, union_membership),
+            name_to_backend_help_info=cls.get_backend_help_info(options),
+            name_to_build_file_info=cls.get_build_file_info(build_symbols),
+            env_var_to_help_info=env_var_to_help_info,
         )
 
     @staticmethod
@@ -456,7 +609,7 @@ class HelpInfoExtracter:
     def compute_metavar(kwargs):
         """Compute the metavar to display in help for an option registered with these kwargs."""
 
-        stringify = lambda t: HelpInfoExtracter.stringify_type(t)
+        stringify = HelpInfoExtracter.stringify_type
 
         metavar = kwargs.get("metavar")
         if not metavar:
@@ -501,6 +654,11 @@ class HelpInfoExtracter:
     def maybe_cleandoc(doc: str | None) -> str | None:
         return doc and inspect.cleandoc(doc)
 
+    @staticmethod
+    def get_module_docstring(filename: str) -> str:
+        with open(filename) as fd:
+            return ast.get_docstring(ast.parse(fd.read(), filename)) or ""
+
     @classmethod
     def get_rule_infos(
         cls, build_configuration: BuildConfiguration | None
@@ -519,6 +677,257 @@ class HelpInfoExtracter:
                 rule.canonical_name: rule_info_loader(rule, cls.get_provider(providers))
                 for rule, providers in build_configuration.rule_to_providers.items()
                 if isinstance(rule, TaskRule)
+            }
+        )
+
+    @classmethod
+    def get_api_type_infos(
+        cls, build_configuration: BuildConfiguration | None, union_membership: UnionMembership
+    ) -> LazyFrozenDict[str, PluginAPITypeInfo]:
+        if build_configuration is None:
+            return LazyFrozenDict({})
+
+        # The type narrowing achieved with the above `if` does not extend to the created closures of
+        # the nested functions in this body, so instead we capture it in a new variable.
+        bc = build_configuration
+
+        known_providers = cast(
+            "set[str]",
+            set(
+                chain.from_iterable(
+                    chain.from_iterable(cast(dict, providers).values())
+                    for providers in (
+                        bc.subsystem_to_providers,
+                        bc.target_type_to_providers,
+                        bc.rule_to_providers,
+                        bc.union_rule_to_providers,
+                    )
+                )
+            ),
+        )
+
+        def _find_provider(api_type: type) -> str:
+            provider = api_type.__module__
+            while provider:
+                if provider in known_providers:
+                    return provider
+                if "." not in provider:
+                    break
+                provider = provider.rsplit(".", 1)[0]
+            # Unknown provider, depend directly on the type's module.
+            return api_type.__module__
+
+        def _rule_dependencies(rule: TaskRule) -> Iterator[type]:
+            yield from rule.parameters.values()
+            for constraint in rule.awaitables:
+                yield constraint.output_type
+
+        def _extract_api_types() -> Iterator[tuple[type, str, tuple[type, ...]]]:
+            """Return all possible types we encounter in all known rules with provider and
+            dependencies."""
+            for rule, providers in bc.rule_to_providers.items():
+                if not isinstance(rule, TaskRule):
+                    continue
+                provider = cls.get_provider(providers)
+                yield rule.output_type, provider, tuple(_rule_dependencies(rule))
+
+                for constraint in rule.awaitables:
+                    for input_type in constraint.input_types:
+                        yield input_type, _find_provider(input_type), ()
+
+            union_bases: set[type] = set()
+            for union_rule, providers in bc.union_rule_to_providers.items():
+                provider = cls.get_provider(providers)
+                union_bases.add(union_rule.union_base)
+                yield union_rule.union_member, provider, (union_rule.union_base,)
+
+            for union_base in union_bases:
+                yield union_base, _find_provider(union_base), ()
+
+        all_types_with_dependencies = list(_extract_api_types())
+        all_types = {api_type for api_type, _, _ in all_types_with_dependencies}
+        type_graph: DefaultDict[type, dict[str, tuple[str, ...]]] = defaultdict(dict)
+
+        # Calculate type graph.
+        for api_type in all_types:
+            # Collect all providers first, as we need them up-front for the dependencies/dependents.
+            type_graph[api_type]["providers"] = tuple(
+                sorted(
+                    {
+                        provider
+                        for a_type, provider, _ in all_types_with_dependencies
+                        if provider and a_type is api_type
+                    }
+                )
+            )
+
+        for api_type in all_types:
+            # Resolve type dependencies to providers.
+            type_graph[api_type]["dependencies"] = tuple(
+                sorted(
+                    set(
+                        chain.from_iterable(
+                            type_graph[dependency].setdefault(
+                                "providers", (_find_provider(dependency),)
+                            )
+                            for a_type, _, dependencies in all_types_with_dependencies
+                            if a_type is api_type
+                            for dependency in dependencies
+                        )
+                    )
+                    - set(
+                        # Exclude providers from list of dependencies.
+                        type_graph[api_type]["providers"]
+                    )
+                )
+            )
+
+        # Add a dependent on the target type for each dependency.
+        type_dependents: DefaultDict[type, set[str]] = defaultdict(set)
+        for _, provider, dependencies in all_types_with_dependencies:
+            if not provider:
+                continue
+            for target_type in dependencies:
+                type_dependents[target_type].add(provider)
+        for api_type, dependents in type_dependents.items():
+            type_graph[api_type]["dependents"] = tuple(
+                sorted(
+                    dependents
+                    - set(
+                        # Exclude providers from list of dependents.
+                        type_graph[api_type]["providers"][0]
+                    )
+                )
+            )
+
+        rules = cast(
+            "tuple[Rule | UnionRule]",
+            tuple(
+                chain(
+                    bc.rule_to_providers.keys(),
+                    bc.union_rule_to_providers.keys(),
+                )
+            ),
+        )
+
+        def get_api_type_info_loader(api_type: type) -> Callable[[], PluginAPITypeInfo]:
+            def load() -> PluginAPITypeInfo:
+                return PluginAPITypeInfo.create(
+                    api_type,
+                    rules,
+                    provider=", ".join(type_graph[api_type]["providers"]),
+                    dependencies=type_graph[api_type]["dependencies"],
+                    dependents=type_graph[api_type].get("dependents", ()),
+                    union_members=tuple(
+                        sorted(member.__name__ for member in union_membership.get(api_type))
+                    ),
+                )
+
+            return load
+
+        return LazyFrozenDict(
+            {
+                f"{api_type.__module__}.{api_type.__name__}": get_api_type_info_loader(api_type)
+                for api_type in sorted(all_types, key=attrgetter("__name__"))
+            }
+        )
+
+    @classmethod
+    def get_backend_help_info(cls, options: Options) -> LazyFrozenDict[str, BackendHelpInfo]:
+        DiscoveredBackend = namedtuple(
+            "DiscoveredBackend", "provider, name, register_py, enabled", defaults=(False,)
+        )
+
+        def discover_source_backends(root: Path, is_source_root: bool) -> set[DiscoveredBackend]:
+            provider = root.name
+            source_root = f"{root}/" if is_source_root else f"{root.parent}/"
+            register_pys = root.glob("**/register.py")
+            backends = {
+                DiscoveredBackend(
+                    provider,
+                    str(register_py.parent).replace(source_root, "").replace("/", "."),
+                    str(register_py),
+                )
+                for register_py in register_pys
+            }
+            return backends
+
+        def discover_plugin_backends(entry_point_name: str) -> set[DiscoveredBackend]:
+            backends = {
+                DiscoveredBackend(
+                    entry_point.dist.project_name,
+                    entry_point.module_name,
+                    str(
+                        Path(entry_point.dist.location)
+                        / (entry_point.module_name.replace(".", "/") + ".py")
+                    ),
+                    True,
+                )
+                for entry_point in pkg_resources.iter_entry_points(entry_point_name)
+                if entry_point.dist is not None
+            }
+            return backends
+
+        global_options = options.for_global_scope()
+        builtin_backends = discover_source_backends(
+            Path(pants.backend.__file__).parent.parent, is_source_root=False
+        )
+        inrepo_backends = chain.from_iterable(
+            discover_source_backends(Path(path_entry), is_source_root=True)
+            for path_entry in global_options.pythonpath
+        )
+        plugin_backends = discover_plugin_backends("pantsbuild.plugin")
+        enabled_backends = {
+            "pants.core",
+            "pants.backend.project_info",
+            *global_options.backend_packages,
+        }
+
+        def get_backend_help_info_loader(
+            discovered_backend: DiscoveredBackend,
+        ) -> Callable[[], BackendHelpInfo]:
+            def load() -> BackendHelpInfo:
+                return BackendHelpInfo(
+                    name=discovered_backend.name,
+                    description=cls.get_module_docstring(discovered_backend.register_py),
+                    enabled=(
+                        discovered_backend.enabled or discovered_backend.name in enabled_backends
+                    ),
+                    provider=discovered_backend.provider,
+                )
+
+            return load
+
+        return LazyFrozenDict(
+            {
+                discovered_backend.name: get_backend_help_info_loader(discovered_backend)
+                for discovered_backend in sorted(
+                    chain(builtin_backends, inrepo_backends, plugin_backends)
+                )
+            }
+        )
+
+    @staticmethod
+    def get_build_file_info(
+        build_symbols: BuildFileSymbolsInfo,
+    ) -> LazyFrozenDict[str, BuildFileSymbolHelpInfo]:
+        def get_build_file_symbol_help_info_loader(
+            symbol: BuildFileSymbolInfo,
+        ) -> Callable[[], BuildFileSymbolHelpInfo]:
+            def load() -> BuildFileSymbolHelpInfo:
+                return BuildFileSymbolHelpInfo(
+                    name=symbol.name,
+                    is_target=isinstance(symbol.value, Registrar),
+                    signature=symbol.signature,
+                    documentation=symbol.help,
+                )
+
+            return load
+
+        return LazyFrozenDict(
+            {
+                symbol.name: get_build_file_symbol_help_info_loader(symbol)
+                for symbol in build_symbols.info.values()
             }
         )
 
@@ -617,6 +1026,10 @@ class HelpInfoExtracter:
         # Global options have three env var variants. The last one is the most human-friendly.
         env_var = Parser.get_env_var_names(self._scope, dest)[-1]
 
+        target_field_name = f"{self._scope_prefix}_{option_field_name_for(args)}".replace("-", "_")
+        environment_aware = kwargs.get("environment_aware") is True
+        fromfile = kwargs.get("fromfile", False)
+
         ret = OptionHelpInfo(
             display_args=tuple(display_args),
             comma_separated_display_args=", ".join(display_args),
@@ -624,6 +1037,7 @@ class HelpInfoExtracter:
             unscoped_cmd_line_args=tuple(unscoped_cmd_line_args),
             env_var=env_var,
             config_key=dest,
+            target_field_name=target_field_name if environment_aware else None,
             typ=typ,
             default=default,
             help=help_msg,
@@ -634,5 +1048,6 @@ class HelpInfoExtracter:
             choices=choices,
             comma_separated_choices=None if choices is None else ", ".join(choices),
             value_history=None,
+            fromfile=fromfile,
         )
         return ret

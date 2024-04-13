@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import unittest.mock
 from enum import Enum
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
@@ -121,35 +122,29 @@ def test_other_options() -> None:
     class MyBaseSubsystem(Subsystem):
         def __init__(self):
             self.options = SimpleNamespace()
-            self.options.enum_opt = MyEnum.Val2
-            self.options.optional_enum_opt = MyEnum.Val2
-            self.options.dyn_enum_opt = MyEnum.Val2
-            self.options.enum_list_opt = [MyEnum.Val2]
-            self.options.dyn_enum_list_opt = [MyEnum.Val2]
-            self.options.defaultless_enum_list_opt = [MyEnum.Val2]
-            self.options.dict_opt = {"key1": "val1"}
+            self.options.enum_prop = MyEnum.Val2
+            self.options.optional_enum_prop = MyEnum.Val2
+            self.options.dyn_enum_prop = MyEnum.Val2
+            self.options.enum_list_prop = [MyEnum.Val2]
+            self.options.dyn_enum_list_prop = [MyEnum.Val2]
+            self.options.defaultless_enum_list_prop = [MyEnum.Val2]
+            self.options.dict_prop = {"key1": "val1"}
 
-        enum_prop = EnumOption("--enum-opt", default=MyEnum.Val1, help="")
+        enum_prop = EnumOption(default=MyEnum.Val1, help="")
         dyn_enum_prop = EnumOption(
-            "--dyn-enum-opt",
             default=lambda cls: cls.dyn_default,
             enum_type=MyEnum,
             help=lambda cls: f"{cls.dyn_help}",
         )
-        optional_enum_prop = EnumOption(
-            "--optional-enum-opt", enum_type=MyEnum, default=None, help=""
-        )
-        enum_list_prop = EnumListOption("--enum-list-opt", default=[MyEnum.Val1], help="")
+        optional_enum_prop = EnumOption(enum_type=MyEnum, default=None, help="")
+        enum_list_prop = EnumListOption(default=[MyEnum.Val1], help="")
         dyn_enum_list_prop = EnumListOption(
-            "--dyn-enum-list-opt",
             enum_type=MyEnum,
             default=lambda cls: cls.dyn_default_list,
             help=lambda cls: f"{cls.dyn_help}",
         )
-        defaultless_enum_list_prop = EnumListOption(
-            "--defaultless-enum-list-opt", enum_type=MyEnum, help=""
-        )
-        dict_prop = DictOption[Any]("--dict-opt", help="")
+        defaultless_enum_list_prop = EnumListOption(enum_type=MyEnum, help="")
+        dict_prop = DictOption[Any](help="")
 
     class MySubsystem(MyBaseSubsystem):
         dyn_help = "Dynamic Help"
@@ -157,19 +152,21 @@ def test_other_options() -> None:
         dyn_default_list = [MyEnum.Val1]
 
     assert list(collect_options_info(MySubsystem)) == [
-        opt_info("--enum-opt", default=MyEnum.Val1, help="", type=MyEnum),
-        opt_info("--dyn-enum-opt", default=MyEnum.Val1, type=MyEnum, help="Dynamic Help"),
-        opt_info("--optional-enum-opt", default=None, help="", type=MyEnum),
-        opt_info("--enum-list-opt", default=[MyEnum.Val1], help="", type=list, member_type=MyEnum),
+        opt_info("--enum-prop", default=MyEnum.Val1, help="", type=MyEnum),
+        opt_info("--dyn-enum-prop", default=MyEnum.Val1, type=MyEnum, help="Dynamic Help"),
+        opt_info("--optional-enum-prop", default=None, help="", type=MyEnum),
+        opt_info("--enum-list-prop", default=[MyEnum.Val1], help="", type=list, member_type=MyEnum),
         opt_info(
-            "--dyn-enum-list-opt",
+            "--dyn-enum-list-prop",
             default=[MyEnum.Val1],
             help="Dynamic Help",
             type=list,
             member_type=MyEnum,
         ),
-        opt_info("--defaultless-enum-list-opt", default=[], help="", type=list, member_type=MyEnum),
-        opt_info("--dict-opt", default={}, help="", type=dict),
+        opt_info(
+            "--defaultless-enum-list-prop", default=[], help="", type=list, member_type=MyEnum
+        ),
+        opt_info("--dict-prop", default={}, help="", type=dict),
     ]
 
     my_subsystem = MySubsystem()
@@ -189,8 +186,11 @@ def test_specialized_options() -> None:
 
         def __init__(self):
             self.options = SimpleNamespace()
-            self.options.skip = True
-            self.options.args = ["--arg1"]
+            self.options.skip_prop1 = True
+            self.options.skip_prop2 = True
+            self.options.args_prop1 = ["--arg1"]
+            self.options.args_prop2 = ["--arg1"]
+            self.options.args_prop3 = ["--arg1"]
 
         skip_prop1 = SkipOption("fmt", "lint")
         skip_prop2 = SkipOption("fmt")
@@ -207,7 +207,7 @@ def test_specialized_options() -> None:
 
     def expected_skip_opt_info(help: str):
         return opt_info(
-            "--skip",
+            unittest.mock.ANY,
             help=help,
             default=False,
             type=bool,
@@ -215,7 +215,7 @@ def test_specialized_options() -> None:
 
     def expected_args_opt_info(help: str):
         return opt_info(
-            "--args",
+            unittest.mock.ANY,
             member_type=shell_str,
             help=help,
             default=[],
@@ -223,8 +223,10 @@ def test_specialized_options() -> None:
         )
 
     assert list(collect_options_info(MySubsystem)) == [
-        expected_skip_opt_info("Don't use Wrench when running `./pants fmt` and `./pants lint`."),
-        expected_skip_opt_info("Don't use Wrench when running `./pants fmt`."),
+        expected_skip_opt_info(
+            "If true, don't use Wrench when running `./pants fmt` and `./pants lint`."
+        ),
+        expected_skip_opt_info("If true, don't use Wrench when running `./pants fmt`."),
         expected_args_opt_info(
             "Arguments to pass directly to Wrench, e.g. `--my-subsystem-args='--foo'`."
         ),
@@ -236,7 +238,7 @@ def test_specialized_options() -> None:
         ),
     ]
     assert list(collect_options_info(SubsystemWithName)) == [
-        expected_skip_opt_info("Don't use Hammer when running `./pants fmt`."),
+        expected_skip_opt_info("If true, don't use Hammer when running `./pants fmt`."),
         expected_args_opt_info(
             "Arguments to pass directly to Hammer, e.g. `--other-subsystem-args='--nail'`."
         ),
@@ -257,7 +259,6 @@ def test_advanced_params():
             self.options = SimpleNamespace()
 
         prop = StrOption(
-            "--opt",
             default=None,
             help="",
             advanced=True,
@@ -267,7 +268,7 @@ def test_advanced_params():
             fromfile=True,
             metavar="META",
             mutually_exclusive_group="group",
-            removal_hint="it's purple",
+            removal_hint=lambda cls: f"{cls.__name__} is purple",
             removal_version="99.9.9",
         )
 
@@ -278,7 +279,7 @@ def test_advanced_params():
     assert flag_options["mutually_exclusive_group"] == "group"
     assert flag_options["default_help_repr"] == "Help!"
     assert flag_options["removal_version"] == "99.9.9"
-    assert flag_options["removal_hint"] == "it's purple"
+    assert flag_options["removal_hint"] == "MySubsystem is purple"
     assert flag_options["daemon"]
     assert not flag_options["fingerprint"]
 
@@ -286,12 +287,12 @@ def test_advanced_params():
 def test_subsystem_option_ordering() -> None:
     class MySubsystemBase(Subsystem):
         # Make sure these are out of alphabetical order
-        z_prop = StrOption("--z", default=None, help="")
-        y_prop = StrOption("--y", default=None, help="")
+        z = StrOption(default=None, help="")
+        y = StrOption(default=None, help="")
 
     class MySubsystem(MySubsystemBase):
-        b_prop = StrOption("--b", default=None, help="")
-        a_prop = StrOption("--a", default=None, help="")
+        b = StrOption(default=None, help="")
+        a = StrOption(default=None, help="")
 
     assert list(collect_options_info(MySubsystem)) == [
         opt_info("--z", type=str, default=None, help=""),
@@ -331,15 +332,13 @@ def test_register_if(cls) -> None:
     extra_kwargs = {"enum_type": MyEnum} if cls in {EnumOption, EnumListOption} else {}
 
     class MySubsystemBase(Subsystem):
-        registered_prop = cls(
-            "--registered",
+        registered = cls(
             register_if=lambda cls: cls.truthy,
             default=None,
             **extra_kwargs,
             help="",
         )
-        not_registered_prop = cls(
-            "--not-registered",
+        not_registered = cls(
             register_if=lambda cls: cls.falsey,
             default=None,
             **extra_kwargs,
@@ -362,64 +361,62 @@ def test_property_types() -> None:
         def __init__(self):
             pass
 
-        str_opt = StrOption("--opt", default="", help="")
-        optional_str_opt = StrOption("--opt", default=None, help="")
-        int_opt = IntOption("--opt", default=0, help="")
-        optional_int_opt = IntOption("--opt", default=None, help="")
-        float_opt = FloatOption("--opt", default=1.0, help="")
-        optional_float_opt = FloatOption("--opt", default=None, help="")
-        bool_opt = BoolOption("--opt", default=True, help="")
-        optional_bool_opt = BoolOption("--opt", default=None, help="")
-        target_opt = TargetOption("--opt", default="", help="")
-        optional_target_opt = TargetOption("--opt", default=None, help="")
-        dir_opt = DirOption("--opt", default="", help="")
-        optional_dir_opt = DirOption("--opt", default=None, help="")
-        file_opt = FileOption("--opt", default="", help="")
-        optional_file_opt = FileOption("--opt", default=None, help="")
-        shellstr_opt = ShellStrOption("--opt", default="", help="")
-        optional_shellstr_opt = ShellStrOption("--opt", default=None, help="")
-        memorysize_opt = MemorySizeOption("--opt", default=1, help="")
-        optional_memorysize_opt = MemorySizeOption("--opt", default=None, help="")
+        str_opt = StrOption(default="", help="")
+        optional_str_opt = StrOption(default=None, help="")
+        int_opt = IntOption(default=0, help="")
+        optional_int_opt = IntOption(default=None, help="")
+        float_opt = FloatOption(default=1.0, help="")
+        optional_float_opt = FloatOption(default=None, help="")
+        bool_opt = BoolOption(default=True, help="")
+        optional_bool_opt = BoolOption(default=None, help="")
+        target_opt = TargetOption(default="", help="")
+        optional_target_opt = TargetOption(default=None, help="")
+        dir_opt = DirOption(default="", help="")
+        optional_dir_opt = DirOption(default=None, help="")
+        file_opt = FileOption(default="", help="")
+        optional_file_opt = FileOption(default=None, help="")
+        shellstr_opt = ShellStrOption(default="", help="")
+        optional_shellstr_opt = ShellStrOption(default=None, help="")
+        memorysize_opt = MemorySizeOption(default=1, help="")
+        optional_memorysize_opt = MemorySizeOption(default=None, help="")
 
         # List opts
-        str_list_opt = StrListOption("--opt", help="")
-        int_list_opt = IntListOption("--opt", help="")
-        float_list_opt = FloatListOption("--opt", help="")
-        bool_list_opt = BoolListOption("--opt", help="")
-        target_list_opt = TargetListOption("--opt", help="")
-        dir_list_opt = DirListOption("--opt", help="")
-        file_list_opt = FileListOption("--opt", help="")
-        shellstr_list_opt = ShellStrListOption("--opt", help="")
-        memorysize_list_opt = MemorySizeListOption("--opt", help="")
+        str_list_opt = StrListOption(help="")
+        int_list_opt = IntListOption(help="")
+        float_list_opt = FloatListOption(help="")
+        bool_list_opt = BoolListOption(help="")
+        target_list_opt = TargetListOption(help="")
+        dir_list_opt = DirListOption(help="")
+        file_list_opt = FileListOption(help="")
+        shellstr_list_opt = ShellStrListOption(help="")
+        memorysize_list_opt = MemorySizeListOption(help="")
         # And just test one dynamic default
-        dyn_str_list_opt = StrListOption("--opt", default=lambda cls: cls.default, help="")
+        dyn_str_list_opt = StrListOption(default=lambda cls: cls.default, help="")
 
         # Enum opts
-        enum_opt = EnumOption("--opt", default=MyEnum.Val1, help="")
-        optional_enum_opt = EnumOption("--opt", enum_type=MyEnum, default=None, help="")
-        dyn_enum_opt = EnumOption(
-            "--opt", enum_type=MyEnum, default=lambda cls: cls.default, help=""
-        )
+        enum_opt = EnumOption(default=MyEnum.Val1, help="")
+        optional_enum_opt = EnumOption(enum_type=MyEnum, default=None, help="")
+        dyn_enum_opt = EnumOption(enum_type=MyEnum, default=lambda cls: cls.default, help="")
         # mypy correctly complains about not matching any possibilities
-        enum_opt_bad = EnumOption("--opt", default=None, help="")  # type: ignore[call-overload]
-        enum_list_opt1 = EnumListOption("--opt", default=[MyEnum.Val1], help="")
-        enum_list_opt2 = EnumListOption("--opt", enum_type=MyEnum, help="")
+        enum_opt_bad = EnumOption(default=None, help="")  # type: ignore[call-overload]
+        enum_list_opt1 = EnumListOption(default=[MyEnum.Val1], help="")
+        enum_list_opt2 = EnumListOption(enum_type=MyEnum, help="")
         dyn_enum_list_opt = EnumListOption(
-            "--opt", enum_type=MyEnum, default=lambda cls: cls.default_list, help=""
+            enum_type=MyEnum, default=lambda cls: cls.default_list, help=""
         )
         # mypy correctly complains about needing a type annotation
-        enum_list_bad_opt = EnumListOption("--opt", default=[], help="")  # type: ignore[var-annotated]
+        enum_list_bad_opt = EnumListOption(default=[], help="")  # type: ignore[var-annotated]
 
         # Dict opts
-        dict_opt1 = DictOption[str]("--opt", help="")
-        dict_opt2 = DictOption[Any]("--opt", default=dict(key="val"), help="")
+        dict_opt1 = DictOption[str](help="")
+        dict_opt2 = DictOption[Any](default=dict(key="val"), help="")
         # mypy correctly complains about needing a type annotation
-        dict_opt3 = DictOption("--opt", help="")  # type: ignore[var-annotated]
-        dict_opt4 = DictOption("--opt", default={"key": "val"}, help="")
-        dict_opt5 = DictOption("--opt", default=dict(key="val"), help="")
-        dict_opt6 = DictOption("--opt", default=dict(key=1), help="")
-        dict_opt7 = DictOption("--opt", default=dict(key1=1, key2="str"), help="")
-        dyn_dict_opt = DictOption[str]("--opt", default=lambda cls: cls.default, help="")
+        dict_opt3 = DictOption(help="")  # type: ignore[var-annotated]
+        dict_opt4 = DictOption(default={"key": "val"}, help="")
+        dict_opt5 = DictOption(default=dict(key="val"), help="")
+        dict_opt6 = DictOption(default=dict(key=1), help="")
+        dict_opt7 = DictOption(default=dict(key1=1, key2="str"), help="")
+        dyn_dict_opt = DictOption[str](default=lambda cls: cls.default, help="")
 
         # Specialized Opts
         skip_opt = SkipOption("fmt")

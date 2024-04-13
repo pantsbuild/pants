@@ -7,7 +7,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
-from typing import cast
+from typing import DefaultDict, cast
 
 from pants.backend.docker.goals.package_image import BuiltDockerImage
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -20,9 +20,9 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishRequest,
 )
-from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.process import InteractiveProcess, InteractiveProcessRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import Get, collect_rules, rule
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,10 @@ class PublishDockerImageFieldSet(PublishFieldSet):
 
 @rule
 async def push_docker_images(
-    request: PublishDockerImageRequest, docker: DockerBinary, options: DockerOptions
+    request: PublishDockerImageRequest,
+    docker: DockerBinary,
+    options: DockerOptions,
+    options_env_aware: DockerOptions.EnvironmentAware,
 ) -> PublishProcesses:
     tags = tuple(
         chain.from_iterable(
@@ -71,25 +74,27 @@ async def push_docker_images(
             ]
         )
 
-    env = await Get(Environment, EnvironmentRequest(options.env_vars))
-    skip_push = defaultdict(set)
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(options_env_aware.env_vars))
+    skip_push_reasons: DefaultDict[str, DefaultDict[str, set[str]]] = defaultdict(
+        lambda: defaultdict(set)
+    )
     jobs: list[PublishPackages] = []
     refs: list[str] = []
-    processes: list[Get] = []
+    processes: list[InteractiveProcess] = []
 
     for tag in tags:
         for registry in options.registries().registries.values():
-            if tag.startswith(registry.address) and registry.skip_push:
-                skip_push[registry.alias].add(tag)
+            if registry.skip_push and tag.startswith(f"{registry.address}/"):
+                skip_push_reasons["skip_push"][registry.alias].add(tag)
+                break
+            if registry.use_local_alias and tag.startswith(f"{registry.alias}/"):
+                skip_push_reasons["use_local_alias"][registry.alias].add(tag)
                 break
         else:
             refs.append(tag)
-            processes.append(
-                Get(InteractiveProcess, InteractiveProcessRequest(docker.push_image(tag, env)))
-            )
+            processes.append(InteractiveProcess.from_process(docker.push_image(tag, env)))
 
-    interactive_processes = await MultiGet(processes)
-    for ref, process in zip(refs, interactive_processes):
+    for ref, process in zip(refs, processes):
         jobs.append(
             PublishPackages(
                 names=(ref,),
@@ -97,12 +102,12 @@ async def push_docker_images(
             )
         )
 
-    if skip_push:
+    for reason, skip_push in skip_push_reasons.items():
         for name, skip_tags in skip_push.items():
             jobs.append(
                 PublishPackages(
                     names=tuple(skip_tags),
-                    description=f"(by `skip_push` on registry @{name})",
+                    description=f"(by `{reason}` on registry @{name})",
                 ),
             )
 

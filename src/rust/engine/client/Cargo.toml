@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "client"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [[bin]]
@@ -10,19 +10,15 @@ name = "pants"
 path = "src/main.rs"
 
 [dependencies]
-env_logger = "0.9.0"
-futures = "0.3"
-libc = "0.2"
-log = "0.4"
+env_logger = { workspace = true }
+log = { workspace = true }
 nailgun = { path = "../nailgun" }
-nix = "0.24"
+nix = { workspace = true }
 options = { path = "../options" }
-sha2 = "0.10"
-strum = "0.24"
-strum_macros = "0.24"
-sysinfo = "0.20.0"
-tokio = { version = "1.16", features = ["rt-multi-thread", "macros", "net", "io-std", "io-util"] }
-uname = "0.1"
+pantsd = { path = "../pantsd" }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "io-std", "io-util"] }
 
-[dev-dependencies]
-tempfile = "3"
+[lints]
+workspace = true

@@ -10,20 +10,21 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
+    DigestEntries,
     Directory,
     FileContent,
-    Snapshot,
+    SymlinkEntry,
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
-    InteractiveProcessRequest,
+    InteractiveProcessResult,
     Process,
     ProcessCacheScope,
     ProcessResult,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 from pants.util.contextutil import environment_as
 
 
@@ -32,7 +33,8 @@ def new_rule_runner() -> RuleRunner:
         rules=[
             QueryRule(ProcessResult, [Process]),
             QueryRule(FallibleProcessResult, [Process]),
-            QueryRule(InteractiveProcess, [InteractiveProcessRequest]),
+            QueryRule(InteractiveProcessResult, [InteractiveProcess]),
+            QueryRule(DigestEntries, [Digest]),
         ],
     )
 
@@ -111,14 +113,14 @@ def test_output_digest(rule_runner: RuleRunner, working_directory) -> None:
 
 def test_timeout(rule_runner: RuleRunner) -> None:
     process = Process(
-        argv=("/bin/bash", "-c", "/bin/sleep 0.2; /bin/echo -n 'European Burmese'"),
+        argv=("/bin/bash", "-c", "/bin/sleep 0.5; /bin/echo -n 'European Burmese'"),
         timeout_seconds=0.1,
         description="sleepy-cat",
     )
     result = rule_runner.request(FallibleProcessResult, [process])
     assert result.exit_code != 0
-    assert b"Exceeded timeout" in result.stdout
-    assert b"sleepy-cat" in result.stdout
+    assert b"Exceeded timeout" in result.stderr
+    assert b"sleepy-cat" in result.stderr
 
 
 def test_failing_process(rule_runner: RuleRunner) -> None:
@@ -140,6 +142,7 @@ def test_cache_scope_always(rule_runner: RuleRunner) -> None:
     )
     result_one = rule_runner.request(FallibleProcessResult, [process])
     rule_runner.new_session("session two")
+    rule_runner.set_options([])
     result_two = rule_runner.request(FallibleProcessResult, [process])
     assert result_one is result_two
 
@@ -152,7 +155,9 @@ def test_cache_scope_successful(rule_runner: RuleRunner) -> None:
         description="success",
     )
     result_one = rule_runner.request(FallibleProcessResult, [process])
+
     rule_runner.new_session("session one")
+    rule_runner.set_options([])
     result_two = rule_runner.request(FallibleProcessResult, [process])
     assert result_one is result_two
 
@@ -164,7 +169,9 @@ def test_cache_scope_successful(rule_runner: RuleRunner) -> None:
     )
     result_three = rule_runner.request(FallibleProcessResult, [process])
     result_four = rule_runner.request(FallibleProcessResult, [process])
+
     rule_runner.new_session("session two")
+    rule_runner.set_options([])
     result_five = rule_runner.request(FallibleProcessResult, [process])
     assert result_three is result_four
     assert result_four != result_five
@@ -198,6 +205,7 @@ def test_cache_scope_per_restart() -> None:
     success_cache_failure_res1 = run1(success_cache_failure)
 
     runner_one.new_session("new session")
+    runner_one.set_options([])
     always_cache_success_res2 = run1(always_cache_success)
     always_cache_failure_res2 = run1(always_cache_failure)
     success_cache_success_res2 = run1(success_cache_success)
@@ -230,7 +238,9 @@ def test_cache_scope_per_session(rule_runner: RuleRunner) -> None:
     result_one = rule_runner.request(FallibleProcessResult, [process])
     result_two = rule_runner.request(FallibleProcessResult, [process])
     assert result_one is result_two
+
     rule_runner.new_session("next attempt")
+    rule_runner.set_options([])
     result_three = rule_runner.request(FallibleProcessResult, [process])
     # Should re-run in a new Session.
     assert result_one != result_three
@@ -253,34 +263,39 @@ def test_create_files(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"hellogoodbye"
 
 
-def test_interactive_process_cannot_have_input_files_and_workspace() -> None:
-    mock_digest = Digest(EMPTY_DIGEST.fingerprint, 1)
-    with pytest.raises(ValueError):
-        InteractiveProcess(argv=["/bin/echo"], input_digest=mock_digest, run_in_workspace=True)
+def test_process_output_symlink_aware(rule_runner: RuleRunner) -> None:
+    process = Process(
+        argv=("/bin/ln", "-s", "dest", "source"),
+        output_files=["source"],
+        description="",
+        working_directory="",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    entries = rule_runner.request(DigestEntries, [result.output_digest])
+    assert entries == DigestEntries([SymlinkEntry("source", "dest")])
 
 
-def test_interactive_process_cannot_have_append_only_caches_and_workspace() -> None:
-    with pytest.raises(ValueError):
-        InteractiveProcess(
-            argv=["/bin/echo"], append_only_caches={"foo": "bar"}, run_in_workspace=True
-        )
-
-
-def test_interactive_process_immutable_input_digests(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("run_in_workspace", [True, False])
+def test_interactive_process_inputs(rule_runner: RuleRunner, run_in_workspace: bool) -> None:
     digest0 = rule_runner.request(Digest, [CreateDigest([FileContent("file0", b"")])])
     digest1 = rule_runner.request(Digest, [CreateDigest([FileContent("file1", b"")])])
     digest2 = rule_runner.request(
         Digest, [CreateDigest([FileContent("file2", b""), FileContent("file3", b"")])]
     )
-    process = Process(
-        argv=["foo", "bar"],
-        description="dummy",
+    process = InteractiveProcess(
+        argv=["/bin/bash", "-c", "ls -1 '{chroot}'"],
         env={"BAZ": "QUX"},
         input_digest=digest0,
         immutable_input_digests={"prefix1": digest1, "prefix2": digest2},
+        append_only_caches={"cache_name": "append_only0"},
+        run_in_workspace=run_in_workspace,
     )
-    iproc = rule_runner.request(InteractiveProcess, [InteractiveProcessRequest(process)])
-    assert iproc.argv == process.argv
-    assert iproc.env == process.env
-    snapshot = rule_runner.request(Snapshot, [iproc.input_digest])
-    assert snapshot.files == ("file0", "prefix1/file1", "prefix2/file2", "prefix2/file3")
+    with mock_console(rule_runner.options_bootstrapper) as (_, stdio_reader):
+        result = rule_runner.run_interactive_process(process)
+        assert result.exit_code == 0
+        assert set(stdio_reader.get_stdout().splitlines()) == {
+            "append_only0",
+            "file0",
+            "prefix1",
+            "prefix2",
+        }

@@ -2,13 +2,17 @@
 version = "0.0.1"
 edition = "2021"
 name = "task_executor"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-arc-swap = "1.5"
-futures = "0.3"
-lazy_static = "1"
+futures = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+parking_lot = { workspace = true }
 stdio = { path = "../stdio" }
-tokio = { version = "1.16", features = ["rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 workunit_store = { path = "../workunit_store" }
+
+[lints]
+workspace = true

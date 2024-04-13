@@ -14,6 +14,7 @@ from pants.util.memo import (
 )
 
 
+# TODO[13244]
 def test_function_application_positional():
     calculations = []
 
@@ -29,6 +30,7 @@ def test_function_application_positional():
     assert [(2, 3), (3, 2)] == calculations
 
 
+# TODO[13244]
 def test_function_application_kwargs():
     calculations = []
 
@@ -44,6 +46,7 @@ def test_function_application_kwargs():
     assert [(2, 3)] == calculations
 
 
+# TODO[13244]
 def test_function_application_mixed():
     calculations = []
 
@@ -59,6 +62,7 @@ def test_function_application_mixed():
     assert [(("a",), {"fred": 42, "jane": True}), (("a", 42), {"jane": True})] == calculations
 
 
+# TODO[13244]
 def test_function_application_potentially_ambiguous_parameters():
     calculations = []
 
@@ -73,6 +77,7 @@ def test_function_application_potentially_ambiguous_parameters():
     assert [((("a", 42),), {}), ((), {"a": 42})] == calculations
 
 
+# TODO[13244]
 def test_key_factory():
     def create_key(num):
         return num % 2
@@ -94,6 +99,7 @@ def test_key_factory():
     assert [2, 3] == calculations
 
 
+# TODO[13244]
 def test_cache_factory():
     class SingleEntryMap(dict):
         def __setitem__(self, key, value):
@@ -117,6 +123,7 @@ def test_cache_factory():
     assert [2, 3, 2] == calculations
 
 
+# TODO[13244]
 def test_forget():
     calculations = []
 
@@ -140,6 +147,7 @@ def test_forget():
     assert [2, 3, 2] == calculations
 
 
+# TODO[13244]
 def test_clear():
     calculations = []
 
@@ -173,6 +181,7 @@ class _Called:
         return self._calls
 
 
+# TODO[13244]
 def test_instancemethod_application_id_eq():
     class Foo(_Called):
         @memoized
@@ -190,6 +199,7 @@ def test_instancemethod_application_id_eq():
     assert 2, foo2.calls()
 
 
+# TODO[13244]
 def test_instancemethod_application_degenerate_eq():
     class Foo(_Called):
         @memoized
@@ -224,6 +234,7 @@ def test_instancemethod_application_degenerate_eq():
     assert 4 == foo2.calls_per_instance()
 
 
+# TODO[13244]
 def test_descriptor_application_invalid():
     with pytest.raises(ValueError):
         # Can't decorate a descriptor
@@ -234,6 +245,7 @@ def test_descriptor_application_invalid():
                 pass
 
 
+# TODO[13244]
 def test_memoized_method():
     class Foo:
         _x = "x0"
@@ -251,6 +263,16 @@ def test_memoized_method():
     assert "x1y1" == foo.method("y1")
 
 
+# TODO[13244]
+#
+# These tests are not type checked, due to missing `-> None` !!
+# `def test_memoized_class_methods() -> None:` fails to:
+#
+# src/python/pants/util/memo_test.py:274:39: error: Argument 1 to "class_method" of "Foo" has
+# incompatible type "str"; expected "Foo" [arg-type]
+#        assert "x1y1" == Foo.class_method("y1")
+#
+# Would be good to also test that @memoized_classmethod() works.
 def test_memoized_class_methods():
     class Foo:
         _x = "x0"
@@ -274,6 +296,7 @@ def test_memoized_class_methods():
     assert "x1y1" == Foo.class_method("y1")
 
 
+# TODO[13244]
 def test_descriptor_application_valid():
     class Foo(_Called):
         @property
@@ -290,6 +313,7 @@ def test_descriptor_application_valid():
     assert 2 == foo2.calls
 
 
+# TODO[13244]
 def test_memoized_property():
     class Foo(_Called):
         @memoized_property
@@ -308,6 +332,7 @@ def test_memoized_property():
         foo2.calls = None
 
 
+# TODO[13244]
 def test_mutable_memoized_property():
     class Foo(_Called):
         @testable_memoized_property
@@ -326,6 +351,7 @@ def test_mutable_memoized_property():
     assert foo2.calls is None
 
 
+# TODO[13244]
 def test_memoized_property_forget():
     class Foo(_Called):
         @memoized_property

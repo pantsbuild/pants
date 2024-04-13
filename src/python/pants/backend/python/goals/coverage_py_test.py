@@ -9,6 +9,7 @@ from pants.backend.python.goals.coverage_py import (
     CoverageSubsystem,
     create_or_update_coverage_config,
     get_branch_value_from_config,
+    get_namespace_value_from_config,
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import (
@@ -51,14 +52,18 @@ def resolve_config(path: str | None, content: str | None) -> str:
 
     mock_gets = [
         MockGet(
-            output_type=ConfigFiles, input_type=ConfigFilesRequest, mock=mock_find_existing_config
+            output_type=ConfigFiles,
+            input_types=(ConfigFilesRequest,),
+            mock=mock_find_existing_config,
         ),
-        MockGet(output_type=DigestContents, input_type=Digest, mock=mock_read_existing_config),
-        MockGet(output_type=Digest, input_type=CreateDigest, mock=mock_create_final_config),
+        MockGet(output_type=DigestContents, input_types=(Digest,), mock=mock_read_existing_config),
+        MockGet(output_type=Digest, input_types=(CreateDigest,), mock=mock_create_final_config),
     ]
 
     result = run_rule_with_mocks(
-        create_or_update_coverage_config, rule_args=[coverage_subsystem], mock_gets=mock_gets
+        create_or_update_coverage_config,
+        rule_args=[coverage_subsystem],
+        mock_gets=mock_gets,  # type: ignore[arg-type]
     )
     assert result.digest == EMPTY_DIGEST
     assert len(resolved_config) == 1
@@ -330,6 +335,105 @@ def test_get_branch_value_from_config() -> None:
                     relative_files: False
                     branch: True
                     foo: bar
+                    """
+            ),
+        )
+        is True
+    )
+
+
+def namespace(path: str, content: str) -> bool:
+    fc = FileContent(path, content.encode())
+    return get_namespace_value_from_config(fc)
+
+
+def test_get_namespace_value_from_config() -> None:
+    assert (
+        namespace(
+            "pyproject.toml",
+            dedent(
+                """\
+        [tool.coverage.report]
+        foo = "bar"
+        """
+            ),
+        )
+        is False
+    )
+
+    assert (
+        namespace(
+            "pyproject.toml",
+            dedent(
+                """\
+        [tool.coverage.report]
+        include_namespace_packages = true
+        """
+            ),
+        )
+        is True
+    )
+
+    assert (
+        namespace(
+            "pyproject.toml",
+            dedent(
+                """\
+            [tool.coverage]
+                [tool.coverage.report]
+                include_namespace_packages = true
+            """
+            ),
+        )
+        is True
+    )
+
+    assert (
+        namespace(
+            ".coveragerc",
+            dedent(
+                """\
+                [report]
+                foo: bar
+                """
+            ),
+        )
+        is False
+    )
+
+    assert (
+        namespace(
+            ".coveragerc",
+            dedent(
+                """\
+                    [report]
+                    include_namespace_packages: True
+                    """
+            ),
+        )
+        is True
+    )
+
+    assert (
+        namespace(
+            "setup.cfg",
+            dedent(
+                """\
+                [coverage:report]
+                foo: bar
+                """
+            ),
+        )
+        is False
+    )
+
+    assert (
+        namespace(
+            "setup.cfg",
+            dedent(
+                """\
+                    [coverage:report]
+                    include_namespace_packages: True
                     """
             ),
         )

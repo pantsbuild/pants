@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-import pstats
 import shutil
 import subprocess
 import sys
@@ -16,7 +15,6 @@ from pants.util.contextutil import (
     InvalidZipPath,
     environment_as,
     hermetic_environment_as,
-    maybe_profiled,
     open_zip,
     pushd,
     temporary_dir,
@@ -76,6 +74,9 @@ class TestContextutilTest:
         with self.ensure_user_defined_in_environment():
             with hermetic_environment_as():
                 assert "USER" not in os.environ
+        with self.ensure_user_defined_in_environment():
+            with hermetic_environment_as("USER"):
+                assert "USER" in os.environ
 
     def test_hermetic_environment_subprocesses(self) -> None:
         with self.ensure_user_defined_in_environment():
@@ -199,17 +200,3 @@ class TestContextutilTest:
 
         with temporary_dir(permissions=0o644) as path:
             assert 0o644 == os.stat(path)[0] & 0o777
-
-    def test_maybe_profiled(self) -> None:
-        with temporary_dir() as td:
-            profile_path = os.path.join(td, "profile.prof")
-
-            with maybe_profiled(profile_path):
-                for _ in range(5):
-                    print("test")
-
-            # Ensure the profile data was written.
-            assert os.path.exists(profile_path)
-
-            # Ensure the profile data is valid.
-            pstats.Stats(profile_path).print_stats()

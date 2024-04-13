@@ -7,6 +7,10 @@ from typing import Iterable
 
 import pytest
 
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.codegen.protobuf.scala.rules import GenerateScalaFromProtobufRequest
 from pants.backend.codegen.protobuf.scala.rules import rules as scala_protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
@@ -15,24 +19,36 @@ from pants.backend.codegen.protobuf.target_types import (
 )
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
 from pants.backend.scala import target_types
+from pants.backend.scala.compile.scalac import CompileScalaSourceRequest
 from pants.backend.scala.compile.scalac import rules as scalac_rules
+from pants.backend.scala.dependency_inference.rules import rules as scala_dep_inf_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, distdir, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestContents
-from pants.engine.internals.native_engine import FileDigest
 from pants.engine.rules import QueryRule
-from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
-from pants.jvm import classpath
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    GeneratedSources,
+    HydratedSources,
+    HydrateSourcesRequest,
+)
+from pants.jvm import classpath, testutil
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.jdk_rules import rules as jdk_rules
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
+from pants.jvm.testutil import (
+    RenderedClasspath,
+    expect_single_expanded_coarsened_target,
+    make_resolve,
+    maybe_skip_jdk_test,
+)
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -58,34 +74,23 @@ message HelloReply {
 }
 """
 
-SCALAPB_RESOLVE = TestCoursierWrapper.new(
-    entries=(
-        CoursierLockfileEntry(
-            coord=Coordinate(
-                group="com.thesamet.scalapb",
-                artifact="scalapb-runtime_2.13",
-                version="0.11.6",
-            ),
-            file_name="scalapb-runtime_2.13-0.11.6.jar",
-            direct_dependencies=Coordinates([]),
-            dependencies=Coordinates([]),
-            file_digest=FileDigest(
-                "439b613f40b9ac43db4d68de5bef36befc56393d9c9cd002e2b965ce94f6f793",
-                2426575,
-            ),
-        ),
-    ),
-).serialize(
-    [
-        ArtifactRequirement(
-            Coordinate(
-                group="com.thesamet.scalapb",
-                artifact="scalapb-runtime_2.13",
-                version="0.11.6",
-            )
-        )
-    ]
-)
+
+@pytest.fixture
+def scalapb_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "scalapb.test.lock",
+        [
+            "com.thesamet.scalapb:scalapb-runtime_2.13:0.11.6",
+            "org.scala-lang:scala-library:2.13.6",
+        ],
+    )
+
+
+@pytest.fixture
+def scalapb_lockfile(
+    scalapb_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scalapb_lockfile_def.load(request)
 
 
 @pytest.fixture
@@ -98,7 +103,9 @@ def rule_runner() -> RuleRunner:
             *coursier_setup_rules(),
             *external_tool_rules(),
             *source_files.rules(),
+            *strip_jar.rules(),
             *scalac_rules(),
+            *scala_dep_inf_rules(),
             *util_rules(),
             *jdk_rules(),
             *target_types.rules(),
@@ -107,9 +114,12 @@ def rule_runner() -> RuleRunner:
             *scala_protobuf_rules(),
             *artifact_mapper.rules(),
             *distdir.rules(),
+            *testutil.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateScalaFromProtobufRequest]),
             QueryRule(DigestContents, (Digest,)),
+            QueryRule(RenderedClasspath, (CompileScalaSourceRequest,)),
+            QueryRule(Addresses, (DependenciesRequest,)),
         ],
         target_types=[
             ScalaSourceTarget,
@@ -143,23 +153,23 @@ def assert_files_generated(
         GeneratedSources,
         [GenerateScalaFromProtobufRequest(protocol_sources.snapshot, tgt)],
     )
-    sources_contents = rule_runner.request(DigestContents, [generated_sources.snapshot.digest])
-    for sc in sources_contents:
-        print(f"{sc.path}:\n{sc.content.decode()}")
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
-def test_generates_scala(rule_runner: RuleRunner) -> None:
+@maybe_skip_jdk_test
+def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileFixture) -> None:
     # This tests a few things:
     #  * We generate the correct file names.
     #  * Protobuf files can import other protobuf files, and those can import others
     #    (transitive dependencies). We'll only generate the requested target, though.
     #  * We can handle multiple source roots, which need to be preserved in the final output.
+    #  * Dependency inference between Scala and Protobuf sources.
     rule_runner.write_files(
         {
             "src/protobuf/dir1/f.proto": dedent(
                 """\
                 syntax = "proto3";
+                option java_package = "org.pantsbuild.scala.proto";
 
                 package dir1;
 
@@ -173,14 +183,16 @@ def test_generates_scala(rule_runner: RuleRunner) -> None:
             "src/protobuf/dir1/f2.proto": dedent(
                 """\
                 syntax = "proto3";
+                option java_package = "org.pantsbuild.scala.proto";
 
                 package dir1;
                 """
             ),
             "src/protobuf/dir1/BUILD": "protobuf_sources()",
-            "src/protobuf/dir2/f.proto": dedent(
+            "src/protobuf/dir2/f3.proto": dedent(
                 """\
                 syntax = "proto3";
+                option java_package = "org.pantsbuild.scala.proto";
 
                 package dir2;
 
@@ -195,22 +207,24 @@ def test_generates_scala(rule_runner: RuleRunner) -> None:
 
                 package test_protos;
 
-                import "dir2/f.proto";
+                import "dir2/f3.proto";
                 """
             ),
             "tests/protobuf/test_protos/BUILD": (
                 "protobuf_sources(dependencies=['src/protobuf/dir2'])"
             ),
-            "3rdparty/jvm/default.lock": SCALAPB_RESOLVE,
-            "3rdparty/BUILD": dedent(
+            "3rdparty/jvm/default.lock": scalapb_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scalapb_lockfile.requirements_as_jvm_artifact_targets(),
+            "src/jvm/BUILD": "scala_sources()",
+            "src/jvm/ScalaPBExample.scala": dedent(
                 """\
-                jvm_artifact(
-                  name="com.thesamet.scalapb_scalapb-runtime_2.13",
-                  group="com.thesamet.scalapb",
-                  artifact="scalapb-runtime_2.13",
-                  version="0.11.6",
-                  resolve="jvm-default",
-                )
+                package org.pantsbuild.scala.example
+
+                import org.pantsbuild.scala.proto.f.Person
+
+                trait TestScrooge {
+                  val person: Person
+                }
                 """
             ),
         }
@@ -220,29 +234,47 @@ def test_generates_scala(rule_runner: RuleRunner) -> None:
         assert_files_generated(
             rule_runner,
             addr,
-            source_roots=["src/python", "/src/protobuf", "/tests/protobuf"],
+            source_roots=["src/python", "/src/protobuf", "/tests/protobuf", "src/jvm"],
             expected_files=list(expected),
         )
 
     assert_gen(
         Address("src/protobuf/dir1", relative_file_path="f.proto"),
-        ("src/protobuf/dir1/f/FProto.scala", "src/protobuf/dir1/f/Person.scala"),
+        (
+            "src/protobuf/org/pantsbuild/scala/proto/f/FProto.scala",
+            "src/protobuf/org/pantsbuild/scala/proto/f/Person.scala",
+        ),
     )
     assert_gen(
         Address("src/protobuf/dir1", relative_file_path="f2.proto"),
-        ["src/protobuf/dir1/f2/F2Proto.scala"],
+        ["src/protobuf/org/pantsbuild/scala/proto/f2/F2Proto.scala"],
     )
     assert_gen(
-        Address("src/protobuf/dir2", relative_file_path="f.proto"),
-        ["src/protobuf/dir2/f/FProto.scala"],
+        Address("src/protobuf/dir2", relative_file_path="f3.proto"),
+        ["src/protobuf/org/pantsbuild/scala/proto/f3/F3Proto.scala"],
     )
     assert_gen(
         Address("tests/protobuf/test_protos", relative_file_path="f.proto"),
         ["tests/protobuf/test_protos/f/FProto.scala"],
     )
 
+    tgt = rule_runner.get_target(Address("src/jvm", relative_file_path="ScalaPBExample.scala"))
+    dependencies = rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
+    assert Address("src/protobuf/dir1", relative_file_path="f.proto") in dependencies
 
-def test_top_level_proto_root(rule_runner: RuleRunner) -> None:
+    coarsened_target = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="src/jvm")
+    )
+    _ = rule_runner.request(
+        RenderedClasspath,
+        [CompileScalaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
+    )
+
+
+@maybe_skip_jdk_test
+def test_top_level_proto_root(
+    rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "protos/f.proto": dedent(
@@ -253,18 +285,8 @@ def test_top_level_proto_root(rule_runner: RuleRunner) -> None:
                 """
             ),
             "protos/BUILD": "protobuf_sources()",
-            "3rdparty/jvm/default.lock": SCALAPB_RESOLVE,
-            "3rdparty/BUILD": dedent(
-                """\
-                jvm_artifact(
-                  name="com.thesamet.scalapb_scalapb-runtime_2.13",
-                  group="com.thesamet.scalapb",
-                  artifact="scalapb-runtime_2.13",
-                  version="0.11.6",
-                  resolve="jvm-default",
-                )
-                """
-            ),
+            "3rdparty/jvm/default.lock": scalapb_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scalapb_lockfile.requirements_as_jvm_artifact_targets(),
         }
     )
     assert_files_generated(
@@ -275,7 +297,9 @@ def test_top_level_proto_root(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_generates_fs2_grpc_via_jvm_plugin(rule_runner: RuleRunner) -> None:
+def test_generates_fs2_grpc_via_jvm_plugin(
+    rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "protos/BUILD": "protobuf_sources()",
@@ -297,18 +321,8 @@ def test_generates_fs2_grpc_via_jvm_plugin(rule_runner: RuleRunner) -> None:
             }
             """
             ),
-            "3rdparty/jvm/default.lock": SCALAPB_RESOLVE,
-            "3rdparty/BUILD": dedent(
-                """\
-                jvm_artifact(
-                  name="com.thesamet.scalapb_scalapb-runtime_2.13",
-                  group="com.thesamet.scalapb",
-                  artifact="scalapb-runtime_2.13",
-                  version="0.11.6",
-                  resolve="jvm-default",
-                )
-                """
-            ),
+            "3rdparty/jvm/default.lock": scalapb_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scalapb_lockfile.requirements_as_jvm_artifact_targets(),
         }
     )
     assert_files_generated(

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from typing import Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
@@ -18,6 +18,7 @@ from pants.option.parser import Parser
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +85,12 @@ class Options:
         for si in sorted(scope_infos, key=lambda _si: _si.scope):
             if si.scope in original_scopes:
                 raise cls.DuplicateScopeError(
-                    f"Scope `{si.scope}` claimed by {si}, was also claimed "
-                    f"by {original_scopes[si.scope]}."
+                    softwrap(
+                        f"""
+                        Scope `{si.scope}` claimed by {si}, was also claimed
+                        by {original_scopes[si.scope]}.
+                        """
+                    )
                 )
             original_scopes[si.scope] = si
             ret.add(si)
@@ -122,10 +127,15 @@ class Options:
 
         if split_args.passthru and len(split_args.goals) > 1:
             raise cls.AmbiguousPassthroughError(
-                f"Specifying multiple goals (in this case: {split_args.goals}) "
-                "along with passthrough args (args after `--`) is ambiguous.\n"
-                "Try either specifying only a single goal, or passing the passthrough args "
-                "directly to the relevant consumer via its associated flags."
+                softwrap(
+                    f"""
+                    Specifying multiple goals (in this case: {split_args.goals})
+                    along with passthrough args (args after `--`) is ambiguous.
+
+                    Try either specifying only a single goal, or passing the passthrough args
+                    directly to the relevant consumer via its associated flags.
+                    """
+                )
             )
 
         if bootstrap_option_values:
@@ -167,7 +177,7 @@ class Options:
     ) -> None:
         """The low-level constructor for an Options instance.
 
-        Dependees should use `Options.create` instead.
+        Dependents should use `Options.create` instead.
         """
         self._builtin_goal = builtin_goal
         self._goals = goals
@@ -217,6 +227,10 @@ class Options:
         return self._known_scope_to_info
 
     @property
+    def known_scope_to_scoped_args(self) -> dict[str, frozenset[str]]:
+        return {scope: parser.known_scoped_args for scope, parser in self._parser_by_scope.items()}
+
+    @property
     def scope_to_flags(self) -> dict[str, list[str]]:
         return self._scope_to_flags
 
@@ -226,7 +240,9 @@ class Options:
         section_to_valid_options = {}
         for scope in self.known_scope_to_info:
             section = GLOBAL_SCOPE_CONFIG_SECTION if scope == GLOBAL_SCOPE else scope
-            section_to_valid_options[section] = set(self.for_scope(scope, check_deprecations=False))
+            section_to_valid_options[section] = set(
+                self.for_scope(scope, check_deprecations=False, log_parser_warnings=True)
+            )
         global_config.verify(section_to_valid_options)
 
     def is_known_scope(self, scope: str) -> bool:
@@ -258,7 +274,12 @@ class Options:
         return register
 
     def get_parser(self, scope: str) -> Parser:
-        """Returns the parser for the given scope, so code can register on it directly."""
+        """Returns the parser for the given scope, so code can register on it directly.
+
+        :param scope: The scope to retrieve the parser for.
+        :return: The parser for the given scope.
+        :raises pants.option.errors.ConfigValidationError: if the scope is not known.
+        """
         try:
             return self._parser_by_scope[scope]
         except KeyError:
@@ -273,7 +294,7 @@ class Options:
           2) The entire ScopeInfo is deprecated (as in the case of deprecated SubsystemDependencies),
              meaning that the options live in one location.
 
-        In the first case, this method has the sideeffect of merging options values from deprecated
+        In the first case, this method has the side effect of merging options values from deprecated
         scopes into the given values.
         """
         si = self.known_scope_to_info[scope]
@@ -325,19 +346,27 @@ class Options:
 
     # TODO: Eagerly precompute backing data for this?
     @memoized_method
-    def for_scope(self, scope: str, check_deprecations: bool = True) -> OptionValueContainer:
+    def for_scope(
+        self, scope: str, check_deprecations: bool = True, log_parser_warnings: bool = False
+    ) -> OptionValueContainer:
         """Return the option values for the given scope.
 
         Values are attributes of the returned object, e.g., options.foo.
         Computed lazily per scope.
 
         :API: public
+        :param scope: The scope to get options for.
+        :param check_deprecations: Whether to check for any deprecations conditions.
+        :return: An OptionValueContainer representing the option values for the given scope.
+        :raises pants.option.errors.ConfigValidationError: if the scope is unknown.
         """
 
         values_builder = OptionValueContainerBuilder()
         flags_in_scope = self._scope_to_flags.get(scope, [])
         parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
-        values = self.get_parser(scope).parse_args(parse_args_request)
+        values = self.get_parser(scope).parse_args(
+            parse_args_request, log_warnings=log_parser_warnings
+        )
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
@@ -351,8 +380,9 @@ class Options:
         self,
         scope: str,
         daemon_only: bool = False,
-    ):
-        """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
+    ) -> list[tuple[str, type, Any]]:
+        """Returns a list of fingerprintable (option name, option type, option value) pairs for the
+        given scope.
 
         Options are fingerprintable by default, but may be registered with "fingerprint=False".
 
@@ -366,18 +396,19 @@ class Options:
         pairs = []
         parser = self.get_parser(scope)
         # Sort the arguments, so that the fingerprint is consistent.
-        for (_, kwargs) in sorted(parser.option_registrations_iter()):
+        for _, kwargs in sorted(parser.option_registrations_iter()):
             if not kwargs.get("fingerprint", True):
                 continue
             if daemon_only and not kwargs.get("daemon", False):
                 continue
-            val = self.for_scope(scope)[kwargs["dest"]]
+            dest = kwargs["dest"]
+            val = self.for_scope(scope)[dest]
             # If we have a list then we delegate to the fingerprinting implementation of the members.
             if is_list_option(kwargs):
                 val_type = kwargs.get("member_type", str)
             else:
                 val_type = kwargs.get("type", str)
-            pairs.append((val_type, val))
+            pairs.append((dest, val_type, val))
         return pairs
 
     def __getitem__(self, scope: str) -> OptionValueContainer:

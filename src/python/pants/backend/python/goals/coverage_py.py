@@ -12,17 +12,13 @@ from typing import Any, MutableMapping, cast
 
 import toml
 
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -49,7 +45,7 @@ from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure,
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
-from pants.option.global_options import ProcessCleanupOption
+from pants.option.global_options import KeepSandboxes
 from pants.option.option_types import (
     BoolOption,
     EnumListOption,
@@ -59,7 +55,6 @@ from pants.option.option_types import (
     StrOption,
 )
 from pants.source.source_root import AllSourceRoots
-from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -90,6 +85,7 @@ class CoverageReportType(Enum):
     HTML = ("html", None)
     RAW = ("raw", None)
     JSON = ("json", None)
+    LCOV = ("lcov", None)
 
     _report_name: str
 
@@ -112,23 +108,18 @@ class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     help = "Configuration for Python test coverage measurement."
 
-    default_version = "coverage[toml]>=5.5,<5.6"
     default_main = ConsoleScript("coverage")
+    default_requirements = ["coverage[toml]>=6.5,<8"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "coverage_py.lock")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/coverage_py.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     filter = StrListOption(
-        "--filter",
         help=softwrap(
             """
             A list of Python modules or filesystem paths to use in the coverage report, e.g.
-            `['helloworld_test', 'helloworld/util/dirutil'].
+            `['helloworld_test', 'helloworld/util/dirutil']`.
 
             Both modules and directory paths are recursive: any submodules or child paths,
             respectively, will be included.
@@ -141,19 +132,16 @@ class CoverageSubsystem(PythonToolBase):
             """
         ),
     )
-    reports = EnumListOption(
-        "--report",
+    report = EnumListOption(
         default=[CoverageReportType.CONSOLE],
         help="Which coverage report type(s) to emit.",
     )
     _output_dir = StrOption(
-        "--output-dir",
         default=str(PurePath("{distdir}", "coverage", "python")),
         advanced=True,
         help="Path to write the Pytest Coverage report to. Must be relative to the build root.",
     )
     config = FileOption(
-        "--config",
         default=None,
         advanced=True,
         help=lambda cls: softwrap(
@@ -167,7 +155,6 @@ class CoverageSubsystem(PythonToolBase):
         ),
     )
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=lambda cls: softwrap(
@@ -181,7 +168,6 @@ class CoverageSubsystem(PythonToolBase):
         ),
     )
     global_report = BoolOption(
-        "--global-report",
         default=False,
         help=softwrap(
             """
@@ -193,14 +179,13 @@ class CoverageSubsystem(PythonToolBase):
         ),
     )
     fail_under = FloatOption(
-        "--fail-under",
         default=None,
         help=softwrap(
             """
             Fail if the total combined coverage percentage for all tests is less than this
             number.
 
-            Use this instead of setting fail_under in a coverage.py config file,
+            Use this instead of setting `fail_under` in a coverage.py config file,
             as the config will apply to each test separately, while you typically want this
             to apply to the combined coverage for all tests run.
 
@@ -208,7 +193,7 @@ class CoverageSubsystem(PythonToolBase):
             check to trigger.
 
             Note also that if you specify a non-integral value, you must
-            also set [report] precision properly in the coverage.py config file to make use
+            also set `[report] precision` properly in the coverage.py config file to make use
             of the decimal places. See https://coverage.readthedocs.io/en/latest/config.html.
             """
         ),
@@ -233,26 +218,13 @@ class CoverageSubsystem(PythonToolBase):
         )
 
 
-class CoveragePyLockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = CoverageSubsystem.options_scope
-
-
-@rule
-def setup_coverage_lockfile(
-    _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem, python_setup: PythonSetup
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        coverage, use_pex=python_setup.generate_lockfiles_with_pex
-    )
-
-
 @dataclass(frozen=True)
 class PytestCoverageData(CoverageData):
-    address: Address
+    addresses: tuple[Address, ...]
     digest: Digest
 
 
-class PytestCoverageDataCollection(CoverageDataCollection):
+class PytestCoverageDataCollection(CoverageDataCollection[PytestCoverageData]):
     element_type = PytestCoverageData
 
 
@@ -271,9 +243,15 @@ def _parse_toml_config(fc: FileContent) -> MutableMapping[str, Any]:
         return toml.loads(fc.content.decode())
     except toml.TomlDecodeError as exc:
         raise InvalidCoverageConfigError(
-            f"Failed to parse the coverage.py config `{fc.path}` as TOML. Please either fix "
-            f"the config or update `[coverage-py].config` and/or "
-            f"`[coverage-py].config_discovery`.\n\nParse error: {repr(exc)}"
+            softwrap(
+                f"""
+                Failed to parse the coverage.py config `{fc.path}` as TOML. Please either fix
+                the config or update `[coverage-py].config` and/or
+                `[coverage-py].config_discovery`.
+
+                Parse error: {repr(exc)}
+                """
+            )
         )
 
 
@@ -284,9 +262,14 @@ def _parse_ini_config(fc: FileContent) -> configparser.ConfigParser:
         return cp
     except configparser.Error as exc:
         raise InvalidCoverageConfigError(
-            f"Failed to parse the coverage.py config `{fc.path}` as INI. Please either fix "
-            f"the config or update `[coverage-py].config` and/or `[coverage-py].config_discovery`."
-            f"\n\nParse error: {repr(exc)}"
+            softwrap(
+                f"""
+                Failed to parse the coverage.py config `{fc.path}` as INI. Please either fix
+                the config or update `[coverage-py].config` and/or `[coverage-py].config_discovery`.
+
+                Parse error: {repr(exc)}
+                """
+            )
         )
 
 
@@ -328,6 +311,23 @@ def get_branch_value_from_config(fc: FileContent) -> bool:
     if not cp.has_section(run_section):
         return False
     return cp.getboolean(run_section, "branch", fallback=False)
+
+
+def get_namespace_value_from_config(fc: FileContent) -> bool:
+    if PurePath(fc.path).suffix == ".toml":
+        all_config = _parse_toml_config(fc)
+        return bool(
+            all_config.get("tool", {})
+            .get("coverage", {})
+            .get("report", {})
+            .get("include_namespace_packages", False)
+        )
+
+    cp = _parse_ini_config(fc)
+    report_section = "coverage:report" if fc.path in ("tox.ini", "setup.cfg") else "report"
+    if not cp.has_section(report_section):
+        return False
+    return cp.getboolean(report_section, "include_namespace_packages", fallback=False)
 
 
 @rule
@@ -376,18 +376,20 @@ async def merge_coverage_data(
 ) -> MergedCoverageData:
     if len(data_collection) == 1 and not coverage.global_report:
         coverage_data = data_collection[0]
-        return MergedCoverageData(coverage_data.digest, (coverage_data.address,))
+        return MergedCoverageData(coverage_data.digest, coverage_data.addresses)
 
     coverage_digest_gets = []
     coverage_data_file_paths = []
-    addresses = []
+    addresses: list[Address] = []
     for data in data_collection:
+        path_prefix = data.addresses[0].path_safe_spec
+        if len(data.addresses) > 1:
+            path_prefix = f"{path_prefix}+{len(data.addresses)-1}-others"
+
         # We prefix each .coverage file with its corresponding address to avoid collisions.
-        coverage_digest_gets.append(
-            Get(Digest, AddPrefix(data.digest, prefix=data.address.path_safe_spec))
-        )
-        coverage_data_file_paths.append(f"{data.address.path_safe_spec}/.coverage")
-        addresses.append(data.address)
+        coverage_digest_gets.append(Get(Digest, AddPrefix(data.digest, prefix=path_prefix)))
+        coverage_data_file_paths.append(f"{path_prefix}/.coverage")
+        addresses.extend(data.addresses)
 
     if coverage.global_report:
         # It's important to set the `branch` value in the empty base report to the value it will
@@ -396,6 +398,9 @@ async def merge_coverage_data(
         # See https://github.com/pantsbuild/pants/issues/14542 .
         config_contents = await Get(DigestContents, Digest, coverage_config.digest)
         branch = get_branch_value_from_config(config_contents[0]) if config_contents else False
+        namespace_packages = (
+            get_namespace_value_from_config(config_contents[0]) if config_contents else False
+        )
         global_coverage_base_dir = PurePath("__global_coverage__")
         global_coverage_config_path = global_coverage_base_dir / "pyproject.toml"
         global_coverage_config_content = toml.dumps(
@@ -406,7 +411,10 @@ async def merge_coverage_data(
                             "relative_files": True,
                             "source": [source_root.path for source_root in source_roots],
                             "branch": branch,
-                        }
+                        },
+                        "report": {
+                            "include_namespace_packages": namespace_packages,
+                        },
                     }
                 }
             }
@@ -483,7 +491,7 @@ async def generate_coverage_reports(
     coverage_setup: CoverageSetup,
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
-    process_cleanup: ProcessCleanupOption,
+    keep_sandboxes: KeepSandboxes,
     distdir: DistDir,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
@@ -492,12 +500,11 @@ async def generate_coverage_reports(
     )
     sources = await Get(
         PythonSourceFiles,
-        # Coverage sometimes includes non-Python files in its `.coverage` data. We need to
-        # ensure that they're present when generating the report. We include all the files included
-        # by `pytest_runner.py`.
-        PythonSourceFilesRequest(
-            transitive_targets.closure, include_files=True, include_resources=True
-        ),
+        # Coverage sometimes includes non-Python files in its `.coverage` data, so we
+        # include resources here. We don't include files because relocated_files targets
+        # may cause digest merge collisions. So anything you compute coverage over must
+        # be a source file or a resource.
+        PythonSourceFilesRequest(transitive_targets.closure, include_resources=True),
     )
     input_digest = await Get(
         Digest,
@@ -515,7 +522,7 @@ async def generate_coverage_reports(
     result_snapshot = await Get(Snapshot, Digest, merged_coverage_data.coverage_data)
     coverage_reports: list[CoverageReport] = []
     output_dir: PurePath = coverage_subsystem.output_dir(distdir)
-    for report_type in coverage_subsystem.reports:
+    for report_type in coverage_subsystem.report:
         if report_type == CoverageReportType.RAW:
             coverage_reports.append(
                 FilesystemCoverageReport(
@@ -533,7 +540,8 @@ async def generate_coverage_reports(
         report_types.append(report_type)
         output_file = (
             f"coverage.{report_type.value}"
-            if report_type in {CoverageReportType.XML, CoverageReportType.JSON}
+            if report_type
+            in {CoverageReportType.XML, CoverageReportType.JSON, CoverageReportType.LCOV}
             else None
         )
         args = [report_type.report_name, f"--rcfile={coverage_config.path}"]
@@ -562,7 +570,7 @@ async def generate_coverage_reports(
                 res.stdout,
                 res.stderr,
                 proc.description,
-                process_cleanup=process_cleanup.val,
+                keep_sandboxes=keep_sandboxes,
             )
 
     # In practice if one result triggers --fail-under, they all will, but no need to rely on that.
@@ -590,15 +598,15 @@ def _get_coverage_report(
     if report_type == CoverageReportType.CONSOLE:
         return ConsoleCoverageReport(coverage_insufficient, result_stdout.decode())
 
-    report_file: PurePath | None
-    if report_type == CoverageReportType.HTML:
-        report_file = output_dir / "htmlcov" / "index.html"
-    elif report_type == CoverageReportType.XML:
-        report_file = output_dir / "coverage.xml"
-    elif report_type == CoverageReportType.JSON:
-        report_file = output_dir / "coverage.json"
-    else:
-        raise ValueError(f"Invalid coverage report type: {report_type}")
+    try:
+        report_file = {
+            CoverageReportType.HTML: output_dir / "htmlcov" / "index.html",
+            CoverageReportType.XML: output_dir / "coverage.xml",
+            CoverageReportType.JSON: output_dir / "coverage.json",
+            CoverageReportType.LCOV: output_dir / "coverage.lcov",
+        }[report_type]
+    except KeyError:
+        raise ValueError(f"Invalid coverage report type: {report_type}") from None
 
     return FilesystemCoverageReport(
         coverage_insufficient=coverage_insufficient,
@@ -612,7 +620,5 @@ def _get_coverage_report(
 def rules():
     return [
         *collect_rules(),
-        *lockfile.rules(),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
-        UnionRule(GenerateToolLockfileSentinel, CoveragePyLockfileSentinel),
     ]

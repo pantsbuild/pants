@@ -19,8 +19,8 @@ files(name="print_env_directory", sources=["print_env/**/*"])
 
 files(name="sources_directory", sources=["sources/**/*"])
 
-experimental_run_shell_command(
+run_shell_command(
     name="cmd",
-    command='{{ tree {chroot}; echo "in: $CHROOT"; }} | tee output.log',
-    dependencies=[":hello_directory"],
+    command='{ find {chroot} -type f; echo "in: $CHROOT"; } | tee output.log',
+    execution_dependencies=[":hello_directory"],
 )

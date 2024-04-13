@@ -1,14 +1,17 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-"""https://github.com/asottile/pyupgrade.
 
-A tool  to automatically upgrade syntax for newer versions of the language.
-"""
+import logging
 
-from pants.backend.python.lint.pyupgrade import rules as pyupgrade_rules
-from pants.backend.python.lint.pyupgrade import skip_field, subsystem
+from pants.backend.python.lint.pyupgrade.register import rules as pyupgrade_rules
+
+logger = logging.getLogger(__name__)
 
 
 def rules():
-    return (*pyupgrade_rules.rules(), *skip_field.rules(), *subsystem.rules())
+    logger.warning(
+        "DEPRECATED: The pyupgrade plugin has moved to `pants.backend.python.lint.pyupgrade`"
+        + " (and from the `fmt` goal to the `fix` goal)."
+    )
+    return pyupgrade_rules()

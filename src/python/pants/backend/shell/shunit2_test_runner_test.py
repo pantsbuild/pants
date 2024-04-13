@@ -33,7 +33,7 @@ from pants.engine.fs import FileContent
     ],
 )
 def test_add_source_shunit2(original: str, expected: str) -> None:
-    result = add_source_shunit2(FileContent("f.sh", original.encode())).content.decode()
+    result = add_source_shunit2(FileContent("f.sh", original.encode()), "shunit2").content.decode()
     print(result)
     assert result == expected
 

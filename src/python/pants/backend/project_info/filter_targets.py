@@ -18,7 +18,7 @@ from pants.util.docutil import bin_name
 from pants.util.enums import match
 from pants.util.filtering import TargetFilter, and_filters, create_filters
 from pants.util.memo import memoized
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
 class TargetGranularity(Enum):
@@ -29,7 +29,7 @@ class TargetGranularity(Enum):
 
 class FilterSubsystem(LineOriented, GoalSubsystem):
     name = "filter"
-    help = softwrap(
+    help = help_text(
         """
         Filter the input targets based on various criteria.
 
@@ -44,12 +44,10 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
     )
 
     target_type = StrListOption(
-        "--target-type",
         metavar="[+-]type1,type2,...",
         help="Filter on these target types, e.g. `resources` or `python_sources`.",
     )
     granularity = EnumOption(
-        "--granularity",
         default=TargetGranularity.all_targets,
         help=softwrap(
             """
@@ -59,12 +57,10 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
         ),
     )
     address_regex = StrListOption(
-        "--address-regex",
         metavar="[+-]regex1,regex2,...",
         help="Filter on target addresses matching these regexes.",
     )
     tag_regex = StrListOption(
-        "--tag-regex",
         metavar="[+-]regex1,regex2,...",
         help="Filter on targets with tags matching these regexes.",
     )
@@ -128,10 +124,6 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
         return bool(self.target_type or self.address_regex or self.tag_regex or self.granularity)
 
 
-class FilterGoal(Goal):
-    subsystem_cls = FilterSubsystem
-
-
 def compile_regex(regex: str) -> Pattern:
     try:
         return re.compile(regex)
@@ -150,12 +142,19 @@ def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
     )
 
 
+class FilterGoal(Goal):
+    subsystem_cls = FilterSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
+
+
 @goal_rule
 def filter_targets(
     addresses: Addresses, filter_subsystem: FilterSubsystem, console: Console
 ) -> FilterGoal:
+    # When removing, also remove the special casing in `help_info_extractor.py` to reclassify the
+    # subsystem as not a goal with `pants_help`.
     warn_or_error(
-        "2.14.0.dev0",
+        "3.0.0.dev0",
         "using `filter` as a goal",
         softwrap(
             f"""
@@ -173,8 +172,7 @@ def filter_targets(
             """
         ),
     )
-    # `SpecsFilter` will have already filtered for us. There isn't much reason for this goal to
-    # exist anymore.
+    # `SpecsFilter` will have already filtered for us.
     with filter_subsystem.line_oriented(console) as print_stdout:
         for address in sorted(addresses):
             print_stdout(address.spec)

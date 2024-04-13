@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from textwrap import dedent
+from typing import Any
 
 import pytest
 
@@ -12,7 +13,7 @@ from pants.backend.codegen.protobuf.lint.buf.lint_rules import BufFieldSet, BufL
 from pants.backend.codegen.protobuf.lint.buf.lint_rules import rules as buf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
@@ -28,7 +29,8 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *stripped_source_files.rules(),
             *target_types_rules(),
-            QueryRule(LintResults, [BufLintRequest]),
+            QueryRule(Partitions, [BufLintRequest.PartitionRequest]),
+            QueryRule(LintResult, [BufLintRequest.Batch]),
         ],
         target_types=[ProtobufSourcesGeneratorTarget],
     )
@@ -53,11 +55,18 @@ def run_buf(
         ],
         env_inherit={"PATH"},
     )
-    results = rule_runner.request(
-        LintResults,
-        [BufLintRequest(BufFieldSet.create(tgt) for tgt in targets)],
+    partitions = rule_runner.request(
+        Partitions[BufFieldSet, Any],
+        [BufLintRequest.PartitionRequest(tuple(BufFieldSet.create(tgt) for tgt in targets))],
     )
-    return results.results
+    results = []
+    for partition in partitions:
+        result = rule_runner.request(
+            LintResult,
+            [BufLintRequest.Batch("", partition.elements, partition.metadata)],
+        )
+        results.append(result)
+    return tuple(results)
 
 
 def assert_success(
@@ -197,4 +206,56 @@ def test_dependencies(rule_runner: RuleRunner) -> None:
     )
     assert_success(
         rule_runner, tgt, source_roots=["src/python", "/src/protobuf", "/tests/protobuf"]
+    )
+
+
+def test_config_discovery(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/v1/f.proto": BAD_FILE,
+            "foo/v1/BUILD": "protobuf_sources(name='t')",
+            "buf.yaml": dedent(
+                """\
+             version: v1
+             lint:
+               ignore_only:
+                 FIELD_LOWER_SNAKE_CASE:
+                   - foo/v1/f.proto
+             """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("foo/v1", target_name="t", relative_file_path="f.proto"))
+
+    assert_success(
+        rule_runner,
+        tgt,
+    )
+
+
+def test_config_file_submitted(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/v1/f.proto": BAD_FILE,
+            "foo/v1/BUILD": "protobuf_sources(name='t')",
+            # Intentionally placed somewhere config_discovery can't see.
+            "foo/buf.yaml": dedent(
+                """\
+             version: v1
+             lint:
+               ignore_only:
+                 FIELD_LOWER_SNAKE_CASE:
+                   - foo/v1/f.proto
+             """,
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("foo/v1", target_name="t", relative_file_path="f.proto"))
+
+    assert_success(
+        rule_runner,
+        tgt,
+        extra_args=["--buf-config=foo/buf.yaml"],
     )

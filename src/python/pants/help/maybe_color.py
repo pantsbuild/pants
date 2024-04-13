@@ -3,7 +3,12 @@
 
 from typing import List
 
+from colors import color as ansicolor
 from colors import cyan, green, magenta, red, yellow
+
+
+def _orange(s: str, **kwargs):
+    return ansicolor(s, "orange", **kwargs)
 
 
 class MaybeColor:
@@ -11,9 +16,14 @@ class MaybeColor:
 
     def __init__(self, color: bool) -> None:
         self._color = color
-        noop = lambda x: x
+
+        def noop(x, **_):
+            return x
+
+        self.maybe_color = ansicolor if color else noop
         self.maybe_cyan = cyan if color else noop
         self.maybe_green = green if color else noop
+        self.maybe_orange = _orange if color else noop
         self.maybe_red = red if color else noop
         self.maybe_magenta = magenta if color else noop
         self.maybe_yellow = yellow if color else noop

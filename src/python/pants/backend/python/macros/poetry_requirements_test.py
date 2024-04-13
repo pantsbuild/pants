@@ -9,6 +9,7 @@ from textwrap import dedent
 import pytest
 from packaging.version import Version
 
+from pants.backend.python.goals import lockfile
 from pants.backend.python.macros import poetry_requirements
 from pants.backend.python.macros.poetry_requirements import (
     PoetryRequirementsTargetGenerator,
@@ -22,13 +23,14 @@ from pants.backend.python.macros.poetry_requirements import (
     parse_single_dependency,
     parse_str_version,
 )
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
-from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.util.pip_requirement import PipRequirement
+from pants.util.strutil import softwrap
 
 # ---------------------------------------------------------------------------------
 # pyproject.toml parsing
@@ -105,45 +107,57 @@ def test_handle_str(test, exp) -> None:
     assert parse_str_version(test, proj_name="foo", file_path="", extras_str="") == f"foo {exp}"
 
 
-def test_add_markers() -> None:
+def assert_equal_requirements(actual: str | None, expected: str) -> None:
+    assert actual is not None
+    assert PipRequirement.parse(expected) == PipRequirement.parse(actual)
 
-    attr_mark = PyprojectAttr({"markers": "platform_python_implementation == 'CPython'"})
-    assert (
-        add_markers("foo==1.0.0", attr_mark, "somepath")
-        == "foo==1.0.0;(platform_python_implementation == 'CPython')"
+
+def test_add_markers() -> None:
+    attr_mark = PyprojectAttr(markers="platform_python_implementation == 'CPython'")
+    assert_equal_requirements(
+        add_markers("foo==1.0.0", attr_mark, "somepath"),
+        "foo==1.0.0;(platform_python_implementation == 'CPython')",
     )
 
     attr_mark_adv = PyprojectAttr(
-        {"markers": "platform_python_implementation == 'CPython' or sys_platform == 'win32'"}
+        markers="platform_python_implementation == 'CPython' or sys_platform == 'win32'"
     )
-    assert (
-        add_markers("foo==1.0.0", attr_mark_adv, "somepath")
-        == "foo==1.0.0;(platform_python_implementation == 'CPython' or sys_platform == 'win32')"
+    assert_equal_requirements(
+        add_markers("foo==1.0.0", attr_mark_adv, "somepath"),
+        "foo==1.0.0;(platform_python_implementation == 'CPython' or sys_platform == 'win32')",
     )
-    attr_basic_both = PyprojectAttr({"python": "3.6"})
+    attr_basic_both = PyprojectAttr(python="3.6")
     attr_basic_both.update(attr_mark)
 
-    assert (
-        add_markers("foo==1.0.0", attr_basic_both, "somepath")
-        == "foo==1.0.0;(platform_python_implementation == 'CPython') and (python_version == '3.6')"
+    assert_equal_requirements(
+        add_markers("foo==1.0.0", attr_basic_both, "somepath"),
+        "foo==1.0.0;(platform_python_implementation == 'CPython') and (python_version == '3.6')",
     )
     attr_adv_py_both = PyprojectAttr(
-        {"python": "^3.6", "markers": "platform_python_implementation == 'CPython'"}
+        python="^3.6", markers="platform_python_implementation == 'CPython'"
     )
-    assert add_markers("foo==1.0.0", attr_adv_py_both, "somepath") == (
-        "foo==1.0.0;(platform_python_implementation == 'CPython') and "
-        "(python_version >= '3.6' and python_version< '4.0')"
+    assert_equal_requirements(
+        add_markers("foo==1.0.0", attr_adv_py_both, "somepath"),
+        softwrap(
+            """
+            foo==1.0.0;(platform_python_implementation == 'CPython') and
+            (python_version >= '3.6' and python_version< '4.0')
+            """
+        ),
     )
 
     attr_adv_both = PyprojectAttr(
-        {
-            "python": "^3.6",
-            "markers": "platform_python_implementation == 'CPython' or sys_platform == 'win32'",
-        }
+        python="^3.6",
+        markers="platform_python_implementation == 'CPython' or sys_platform == 'win32'",
     )
-    assert add_markers("foo==1.0.0", attr_adv_both, "somepath") == (
-        "foo==1.0.0;(platform_python_implementation == 'CPython' or "
-        "sys_platform == 'win32') and (python_version >= '3.6' and python_version< '4.0')"
+    assert_equal_requirements(
+        add_markers("foo==1.0.0", attr_adv_both, "somepath"),
+        softwrap(
+            """
+            foo==1.0.0;(platform_python_implementation == 'CPython' or
+            sys_platform == 'win32') and (python_version >= '3.6' and python_version< '4.0')
+            """
+        ),
     )
 
 
@@ -167,19 +181,17 @@ def empty_pyproject_toml() -> PyProjectToml:
 def test_handle_extras(empty_pyproject_toml: PyProjectToml) -> None:
     # The case where we have both extras and path/url are tested in
     # test_handle_path/url respectively.
-    attr = PyprojectAttr({"version": "1.0.0", "extras": ["extra1"]})
+    attr = PyprojectAttr(version="1.0.0", extras=["extra1"])
     assert handle_dict_attr("requests", attr, empty_pyproject_toml) == "requests[extra1] ==1.0.0"
 
-    attr_git = PyprojectAttr(
-        {"git": "https://github.com/requests/requests.git", "extras": ["extra1"]}
-    )
+    attr_git = PyprojectAttr(git="https://github.com/requests/requests.git", extras=["extra1"])
     assert (
         handle_dict_attr("requests", attr_git, empty_pyproject_toml)
         == "requests[extra1] @ git+https://github.com/requests/requests.git"
     )
 
     assert handle_dict_attr("requests", attr, empty_pyproject_toml) == "requests[extra1] ==1.0.0"
-    attr_multi = PyprojectAttr({"version": "1.0.0", "extras": ["extra1", "extra2", "extra3"]})
+    attr_multi = PyprojectAttr(version="1.0.0", extras=["extra1", "extra2", "extra3"])
     assert (
         handle_dict_attr("requests", attr_multi, empty_pyproject_toml)
         == "requests[extra1,extra2,extra3] ==1.0.0"
@@ -188,31 +200,29 @@ def test_handle_extras(empty_pyproject_toml: PyProjectToml) -> None:
 
 def test_handle_git(empty_pyproject_toml: PyProjectToml) -> None:
     def assert_git(extra_opts: PyprojectAttr, suffix: str) -> None:
-        attr = PyprojectAttr({"git": "https://github.com/requests/requests.git"})
+        attr = PyprojectAttr(git="https://github.com/requests/requests.git")
         attr.update(extra_opts)
-        assert (
-            handle_dict_attr("requests", attr, empty_pyproject_toml)
-            == f"requests @ git+https://github.com/requests/requests.git{suffix}"
+        assert_equal_requirements(
+            handle_dict_attr("requests", attr, empty_pyproject_toml),
+            f"requests @ git+https://github.com/requests/requests.git{suffix}",
         )
 
     assert_git({}, "")
-    assert_git(PyprojectAttr({"branch": "main"}), "@main")
-    assert_git(PyprojectAttr({"tag": "v1.1.1"}), "@v1.1.1")
-    assert_git(PyprojectAttr({"rev": "1a2b3c4d"}), "#1a2b3c4d")
+    assert_git(PyprojectAttr(branch="main"), "@main")
+    assert_git(PyprojectAttr(tag="v1.1.1"), "@v1.1.1")
+    assert_git(PyprojectAttr(rev="1a2b3c4d"), "#1a2b3c4d")
     assert_git(
         PyprojectAttr(
-            {
-                "branch": "main",
-                "markers": "platform_python_implementation == 'CPython'",
-                "python": "3.6",
-            }
+            branch="main",
+            markers="platform_python_implementation == 'CPython'",
+            python="3.6",
         ),
-        "@main;(platform_python_implementation == 'CPython') and (python_version == '3.6')",
+        "@main ;(platform_python_implementation == 'CPython') and (python_version == '3.6')",
     )
 
 
 def test_handle_git_ssh(empty_pyproject_toml: PyProjectToml) -> None:
-    attr = PyprojectAttr({"git": "git@github.com:requests/requests.git"})
+    attr = PyprojectAttr(git="git@github.com:requests/requests.git")
     assert (
         handle_dict_attr("requests", attr, empty_pyproject_toml)
         == "requests @ git+ssh://git@github.com/requests/requests.git"
@@ -246,70 +256,72 @@ def test_handle_path_arg(tmp_path: Path) -> None:
     internal_project = build_root / "my_py_proj"
     internal_project.mkdir()
 
-    file_attr = PyprojectAttr({"path": "../../my_py_proj.whl"})
-    file_attr_mark = PyprojectAttr({"path": "../../my_py_proj.whl", "markers": "os_name=='darwin'"})
-    file_attr_extras = PyprojectAttr({"path": "../../my_py_proj.whl", "extras": ["extra1"]})
-    dir_attr = PyprojectAttr({"path": "../../my_py_proj"})
+    file_attr = PyprojectAttr(path="../../my_py_proj.whl")
+    file_attr_mark = PyprojectAttr(path="../../my_py_proj.whl", markers="os_name=='darwin'")
+    file_attr_extras = PyprojectAttr(path="../../my_py_proj.whl", extras=["extra1"])
+    dir_attr = PyprojectAttr(path="../../my_py_proj")
 
-    assert (
-        handle_dict_attr("my_py_proj", file_attr, one_pyproject_toml)
-        == f"my_py_proj @ file://{external_file}"
+    assert_equal_requirements(
+        handle_dict_attr("my_py_proj", file_attr, one_pyproject_toml),
+        f"my_py_proj @ file://{external_file}",
     )
 
-    assert (
-        handle_dict_attr("my_py_proj", file_attr_extras, one_pyproject_toml)
-        == f"my_py_proj[extra1] @ file://{external_file}"
+    assert_equal_requirements(
+        handle_dict_attr("my_py_proj", file_attr_extras, one_pyproject_toml),
+        f"my_py_proj[extra1] @ file://{external_file}",
     )
 
-    assert (
-        handle_dict_attr("my_py_proj", file_attr_mark, one_pyproject_toml)
-        == f"my_py_proj @ file://{external_file};(os_name=='darwin')"
+    assert_equal_requirements(
+        handle_dict_attr("my_py_proj", file_attr_mark, one_pyproject_toml),
+        f"my_py_proj @ file://{external_file} ;(os_name=='darwin')",
     )
 
-    assert (
-        handle_dict_attr("my_py_proj", file_attr, two_pyproject_toml)
-        == f"my_py_proj @ file://{internal_file}"
+    assert_equal_requirements(
+        handle_dict_attr("my_py_proj", file_attr, two_pyproject_toml),
+        f"my_py_proj @ file://{internal_file}",
     )
 
-    assert (
-        handle_dict_attr("my_py_proj", dir_attr, one_pyproject_toml)
-        == f"my_py_proj @ file://{external_project}"
+    assert_equal_requirements(
+        handle_dict_attr("my_py_proj", dir_attr, one_pyproject_toml),
+        f"my_py_proj @ file://{external_project}",
     )
 
     assert handle_dict_attr("my_py_proj", dir_attr, two_pyproject_toml) is None
 
 
 def test_handle_url_arg(empty_pyproject_toml: PyProjectToml) -> None:
-    attr = PyprojectAttr({"url": "https://my-site.com/mydep.whl"})
-    assert (
-        handle_dict_attr("my_py_proj", attr, empty_pyproject_toml)
-        == "my_py_proj @ https://my-site.com/mydep.whl"
+    attr = PyprojectAttr(url="https://my-site.com/mydep.whl")
+    assert_equal_requirements(
+        handle_dict_attr("my_py_proj", attr, empty_pyproject_toml),
+        "my_py_proj @ https://my-site.com/mydep.whl",
     )
 
-    attr_with_extra = PyprojectAttr({"extras": ["extra1"]})
+    attr_with_extra = PyprojectAttr(extras=["extra1"])
     attr_with_extra.update(attr)
-    assert (
-        handle_dict_attr("my_py_proj", attr_with_extra, empty_pyproject_toml)
-        == "my_py_proj[extra1] @ https://my-site.com/mydep.whl"
+    assert_equal_requirements(
+        handle_dict_attr("my_py_proj", attr_with_extra, empty_pyproject_toml),
+        "my_py_proj[extra1] @ https://my-site.com/mydep.whl",
     )
 
-    attr_with_mark = PyprojectAttr({"markers": "os_name=='darwin'"})
+    attr_with_mark = PyprojectAttr(markers="os_name=='darwin'")
     attr_with_mark.update(attr)
-    assert (
-        handle_dict_attr("my_py_proj", attr_with_mark, empty_pyproject_toml)
-        == "my_py_proj @ https://my-site.com/mydep.whl;(os_name=='darwin')"
+    assert_equal_requirements(
+        handle_dict_attr("my_py_proj", attr_with_mark, empty_pyproject_toml),
+        "my_py_proj @ https://my-site.com/mydep.whl ;(os_name=='darwin')",
     )
 
 
 def test_version_only(empty_pyproject_toml: PyProjectToml) -> None:
-    attr = PyprojectAttr({"version": "1.2.3"})
+    attr = PyprojectAttr(version="1.2.3")
     assert handle_dict_attr("foo", attr, empty_pyproject_toml) == "foo ==1.2.3"
 
 
 def test_py_constraints(empty_pyproject_toml: PyProjectToml) -> None:
     def assert_py_constraints(py_req: str, suffix: str) -> None:
-        attr = PyprojectAttr({"version": "1.2.3", "python": py_req})
-        assert handle_dict_attr("foo", attr, empty_pyproject_toml) == f"foo ==1.2.3;{suffix}"
+        attr = PyprojectAttr(version="1.2.3", python=py_req)
+        assert_equal_requirements(
+            handle_dict_attr("foo", attr, empty_pyproject_toml), f"foo ==1.2.3;{suffix}"
+        )
 
     assert_py_constraints("3.6", "(python_version == '3.6')")
     assert_py_constraints("3.6 || 3.7", "((python_version == '3.6') or (python_version == '3.7'))")
@@ -320,9 +332,11 @@ def test_py_constraints(empty_pyproject_toml: PyProjectToml) -> None:
     )
     assert_py_constraints(
         "~3.6 || ^3.7",
-        (
-            "((python_version >= '3.6' and python_version< '3.7') or "
-            "(python_version >= '3.7' and python_version< '4.0'))"
+        softwrap(
+            """
+            ((python_version >= '3.6' and python_version< '3.7') or
+            (python_version >= '3.7' and python_version< '4.0'))
+            """
         ),
     )
 
@@ -350,8 +364,12 @@ def test_extended_form() -> None:
     retval = parse_pyproject_toml(pyproject_toml_black)
     actual_req = {
         PipRequirement.parse(
-            "black==19.10b0; "
-            'platform_python_implementation == "CPython" and python_version == "3.6"'
+            softwrap(
+                """
+                black==19.10b0;
+                platform_python_implementation == "CPython" and python_version == "3.6"
+                """
+            )
         )
     }
     assert retval == actual_req
@@ -406,8 +424,12 @@ def test_parse_multi_reqs() -> None:
         PipRequirement.parse('foo>=1.9; python_version >= "2.7" and python_version < "3.0"'),
         PipRequirement.parse('foo<3.0.0,>=2.0; python_version == "3.4" or python_version == "3.5"'),
         PipRequirement.parse(
-            "black==19.10b0; "
-            'platform_python_implementation == "CPython" and python_version == "3.6"'
+            softwrap(
+                """
+                black==19.10b0;
+                platform_python_implementation == "CPython" and python_version == "3.6"
+                """
+            ).strip()
         ),
         PipRequirement.parse("isort<5.6,>=5.5.1"),
     }
@@ -423,8 +445,9 @@ def test_parse_multi_reqs() -> None:
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            *lockfile.rules(),
             *poetry_requirements.rules(),
-            QueryRule(_TargetParametrizations, [Address]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
         target_types=[PoetryRequirementsTargetGenerator],
     )
@@ -439,7 +462,14 @@ def assert_poetry_requirements(
     pyproject_toml_relpath: str = "pyproject.toml",
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, pyproject_toml_relpath: pyproject_toml})
-    result = rule_runner.request(_TargetParametrizations, [Address("", target_name="reqs")])
+    result = rule_runner.request(
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("", target_name="reqs"), description_of_origin="tests"
+            )
+        ],
+    )
     assert set(result.parametrizations.values()) == expected_targets
 
 
@@ -529,6 +559,35 @@ def test_source_override(rule_runner: RuleRunner) -> None:
                 address=Address("", target_name="reqs", generated_name="ansicolors"),
             ),
             TargetGeneratorSourcesHelperTarget({"source": "subdir/pyproject.toml"}, file_addr),
+        },
+    )
+
+
+def test_lockfile_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--python-enable-resolves"])
+    file_addr = Address("", target_name="reqs", relative_file_path="pyproject.toml")
+    lock_addr = Address(
+        "3rdparty/python", target_name="_python-default_lockfile", relative_file_path="default.lock"
+    )
+    assert_poetry_requirements(
+        rule_runner,
+        "poetry_requirements(name='reqs')",
+        dedent(
+            """\
+            [tool.poetry.dependencies]
+            ansicolors = ">=1.18.0"
+            [tool.poetry.dev-dependencies]
+            """
+        ),
+        expected_targets={
+            PythonRequirementTarget(
+                {
+                    "dependencies": [file_addr.spec, lock_addr.spec],
+                    "requirements": ["ansicolors>=1.18.0"],
+                },
+                address=Address("", target_name="reqs", generated_name="ansicolors"),
+            ),
+            TargetGeneratorSourcesHelperTarget({"source": file_addr.filename}, file_addr),
         },
     )
 

@@ -15,8 +15,6 @@ from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -30,7 +28,7 @@ def rule_runner() -> RuleRunner:
             *docformatter_subsystem_rules(),
             *source_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (DocformatterRequest,)),
+            QueryRule(FmtResult, (DocformatterRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -59,16 +57,15 @@ def run_docformatter(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            DocformatterRequest(field_sets, snapshot=input_sources.snapshot),
+            DocformatterRequest.Batch(
+                "",
+                input_sources.snapshot.files,
+                partition_metadata=None,
+                snapshot=input_sources.snapshot,
+            ),
         ],
     )
     return fmt_result
-
-
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
 
 
 @pytest.mark.platform_specific_behavior
@@ -84,7 +81,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
         [tgt],
         extra_args=[f"--docformatter-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"f.py": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -92,7 +89,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     fmt_result = run_docformatter(rule_runner, [tgt])
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": FIXED_BAD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"f.py": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -105,8 +102,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
     ]
     fmt_result = run_docformatter(rule_runner, tgts)
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"good.py": GOOD_FILE, "bad.py": FIXED_BAD_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good.py": GOOD_FILE, "bad.py": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
 
@@ -120,15 +117,7 @@ def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
         [tgt],
         extra_args=["--docformatter-args='--make-summary-multi-line'"],
     )
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": content})
-    assert fmt_result.did_change is False
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_docformatter(rule_runner, [tgt], extra_args=["--docformatter-skip"])
-    assert fmt_result.skipped is True
+    assert fmt_result.output == rule_runner.make_snapshot({"f.py": content})
     assert fmt_result.did_change is False
 
 
@@ -139,10 +128,10 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
 
     good_tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="good.pyi"))
     fmt_result = run_docformatter(rule_runner, [good_tgt])
-    assert fmt_result.output == get_snapshot(rule_runner, {"good.pyi": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"good.pyi": GOOD_FILE})
     assert not fmt_result.did_change
 
     bad_tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.pyi"))
     fmt_result = run_docformatter(rule_runner, [bad_tgt])
-    assert fmt_result.output == get_snapshot(rule_runner, {"bad.pyi": FIXED_BAD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"bad.pyi": FIXED_BAD_FILE})
     assert fmt_result.did_change

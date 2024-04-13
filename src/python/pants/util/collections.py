@@ -11,6 +11,7 @@ from sys import getsizeof
 from typing import Any, Callable, Iterable, Iterator, MutableMapping, TypeVar
 
 from pants.engine.internals import native_engine
+from pants.util.strutil import softwrap
 
 
 def recursively_update(d: MutableMapping, d2: MutableMapping) -> None:
@@ -79,8 +80,12 @@ def ensure_list(
     for i, x in enumerate(val):
         if not isinstance(x, expected_type):
             raise ValueError(
-                f"Not all elements of the iterable have type {expected_type}. Encountered the "
-                f"element {x} of type {type(x)} at index {i}."
+                softwrap(
+                    f"""
+                    Not all elements of the iterable have type {expected_type}. Encountered the
+                    element {x} of type {type(x)} at index {i}.
+                    """
+                )
             )
         result.append(x)
     return result

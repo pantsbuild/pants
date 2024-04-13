@@ -9,18 +9,18 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.python.goals import package_dists
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.register import rules as python_rules
 from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
+from pants.backend.python.target_types_rules import rules as python_target_type_rules
+from pants.core.goals import package, publish
 from pants.core.goals.publish import (
     Publish,
     PublishFieldSet,
     PublishPackages,
     PublishProcesses,
     PublishRequest,
-    rules,
 )
-from pants.core.register import rules as core_rules
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import rule
 from pants.engine.target import StringSequenceField
@@ -68,9 +68,10 @@ async def mock_publish(request: MockPublishRequest) -> PublishProcesses:
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *core_rules(),
-            *python_rules(),
-            *rules(),
+            *package.rules(),
+            *publish.rules(),
+            *package_dists.rules(),
+            *python_target_type_rules(),
             mock_publish,
             PythonDistribution.register_plugin_field(MockRepositoriesField),
             *PublishTestFieldSet.rules(),

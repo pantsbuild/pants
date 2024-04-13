@@ -6,7 +6,7 @@ Plugins implement the publish protocol that provides this goal with the processe
 publish the artifacts.
 
 The publish protocol consists of defining two union members and one rule, returning the processes to
-run. See the doc for the corresponding classses in this module for details on the classes to define.
+run. See the doc for the corresponding classes in this module for details on the classes to define.
 
 Example rule:
 
@@ -29,10 +29,11 @@ from typing import ClassVar, Generic, Type, TypeVar
 
 from typing_extensions import final
 
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
@@ -57,7 +58,7 @@ class PublishOutputData(FrozenDict[str, ImmutableValue]):
     pass
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class PublishRequest(Generic[_F]):
     """Implement a union member subclass of this union class along with a PublishFieldSet subclass
@@ -86,7 +87,7 @@ class PublishRequest(Generic[_F]):
 _T = TypeVar("_T", bound=PublishRequest)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     """FieldSet for PublishRequest.
@@ -123,7 +124,7 @@ class PublishPackages:
     The `names` should list all artifacts being published by the `process` command.
 
     The `process` may be `None`, indicating that it will not be published. This will be logged as
-    `skipped`. If the process returns a non zero exit code, it will be logged as `failed`.
+    `skipped`. If the process returns a non-zero exit code, it will be logged as `failed`.
 
     The `description` may be a reason explaining why the publish was skipped, or identifying which
     repository the artifacts are published to.
@@ -172,7 +173,6 @@ class PublishSubsystem(GoalSubsystem):
         return PackageFieldSet in union_membership and PublishFieldSet in union_membership
 
     output = StrOption(
-        "--output",
         default=None,
         help="Filename for JSON structured publish information.",
     )
@@ -180,10 +180,13 @@ class PublishSubsystem(GoalSubsystem):
 
 class Publish(Goal):
     subsystem_cls = PublishSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
 
 @goal_rule
-async def run_publish(console: Console, publish: PublishSubsystem) -> Publish:
+async def run_publish(
+    console: Console, publish: PublishSubsystem, local_environment: ChosenLocalEnvironmentName
+) -> Publish:
     target_roots_to_package_field_sets, target_roots_to_publish_field_sets = await MultiGet(
         Get(
             TargetRootsToFieldSets,
@@ -241,7 +244,10 @@ async def run_publish(console: Console, publish: PublishSubsystem) -> Publish:
             continue
 
         logger.debug(f"Execute {pub.process}")
-        res = await Effect(InteractiveProcessResult, InteractiveProcess, pub.process)
+        res = await Effect(
+            InteractiveProcessResult,
+            {pub.process: InteractiveProcess, local_environment.val: EnvironmentName},
+        )
         if res.exit_code == 0:
             sigil = console.sigil_succeeded()
             status = "published"
@@ -304,9 +310,12 @@ class _PublishJsonEncoder(json.JSONEncoder):
 
 
 @rule
-async def package_for_publish(request: PublishProcessesRequest) -> PublishProcesses:
+async def package_for_publish(
+    request: PublishProcessesRequest, local_environment: ChosenLocalEnvironmentName
+) -> PublishProcesses:
     packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in request.package_field_sets
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+        for field_set in request.package_field_sets
     )
 
     for pkg in packages:
@@ -319,8 +328,10 @@ async def package_for_publish(request: PublishProcessesRequest) -> PublishProces
     publish = await MultiGet(
         Get(
             PublishProcesses,
-            PublishRequest,
-            field_set._request(packages),
+            {
+                field_set._request(packages): PublishRequest,
+                local_environment.val: EnvironmentName,
+            },
         )
         for field_set in request.publish_field_sets
     )

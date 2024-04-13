@@ -7,28 +7,29 @@ import pytest
 
 from pants.backend.helm.dependency_inference.chart import (
     FirstPartyHelmChartMapping,
+    HelmChartDependenciesInferenceFieldSet,
     InferHelmChartDependenciesRequest,
+    resolve_dependency_url,
 )
 from pants.backend.helm.dependency_inference.chart import rules as chart_infer_rules
 from pants.backend.helm.resolve import artifacts
-from pants.backend.helm.target_types import (
-    HelmArtifactTarget,
-    HelmChartMetaSourceField,
-    HelmChartTarget,
-)
+from pants.backend.helm.resolve.remotes import HelmRemotes
+from pants.backend.helm.target_types import HelmArtifactTarget, HelmChartTarget
 from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.util_rules import chart
+from pants.backend.helm.util_rules.chart_metadata import HelmChartDependency
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         target_types=[HelmArtifactTarget, HelmChartTarget],
         rules=[
             *artifacts.rules(),
@@ -39,13 +40,14 @@ def rule_runner() -> RuleRunner:
             QueryRule(InferredDependencies, (InferHelmChartDependenciesRequest,)),
         ],
     )
+    return rule_runner
 
 
 def test_build_first_party_mapping(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/BUILD": "helm_chart(name='foo')",
-            "src/Chart.yaml": dedent(
+            "src/foo/BUILD": "helm_chart(name='foo')",
+            "src/foo/Chart.yaml": dedent(
                 """\
                 apiVersion: v2
                 name: chart-name
@@ -55,7 +57,7 @@ def test_build_first_party_mapping(rule_runner: RuleRunner) -> None:
         }
     )
 
-    tgt = rule_runner.get_target(Address("src", target_name="foo"))
+    tgt = rule_runner.get_target(Address("src/foo", target_name="foo"))
     mapping = rule_runner.request(FirstPartyHelmChartMapping, [])
     assert mapping["chart-name"] == tgt.address
 
@@ -138,21 +140,17 @@ def test_infer_chart_dependencies(rule_runner: RuleRunner) -> None:
         }
     )
 
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options(
-        [
-            f"--source-root-patterns={repr(source_root_patterns)}",
-        ]
-    )
-
     tgt = rule_runner.get_target(Address("src/foo", target_name="foo"))
     inferred_deps = rule_runner.request(
-        InferredDependencies, [InferHelmChartDependenciesRequest(tgt[HelmChartMetaSourceField])]
+        InferredDependencies,
+        [InferHelmChartDependenciesRequest(HelmChartDependenciesInferenceFieldSet.create(tgt))],
     )
-    assert set(inferred_deps.dependencies) == {
-        Address("3rdparty/helm/jetstack", target_name="cert-manager"),
-        Address("src/bar", target_name="bar"),
-    }
+    assert inferred_deps == InferredDependencies(
+        [
+            Address("3rdparty/helm/jetstack", target_name="cert-manager"),
+            Address("src/bar", target_name="bar"),
+        ]
+    )
 
 
 def test_disambiguate_chart_dependencies(rule_runner: RuleRunner) -> None:
@@ -184,16 +182,16 @@ def test_disambiguate_chart_dependencies(rule_runner: RuleRunner) -> None:
         }
     )
 
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
-
     tgt = rule_runner.get_target(Address("src/foo", target_name="foo"))
     inferred_deps = rule_runner.request(
-        InferredDependencies, [InferHelmChartDependenciesRequest(tgt[HelmChartMetaSourceField])]
+        InferredDependencies,
+        [InferHelmChartDependenciesRequest(HelmChartDependenciesInferenceFieldSet.create(tgt))],
     )
-    assert set(inferred_deps.dependencies) == {
-        Address("src/bar", target_name="bar"),
-    }
+    assert inferred_deps == InferredDependencies(
+        [
+            Address("src/bar", target_name="bar"),
+        ]
+    )
 
 
 def test_raise_error_when_unknown_dependency_is_found(rule_runner: RuleRunner) -> None:
@@ -212,14 +210,30 @@ def test_raise_error_when_unknown_dependency_is_found(rule_runner: RuleRunner) -
         }
     )
 
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
-
     tgt = rule_runner.get_target(Address("src/foo", target_name="foo"))
 
     with pytest.raises(
         ExecutionError, match="Can not find any declared artifact for dependency 'bar'"
     ):
         rule_runner.request(
-            InferredDependencies, [InferHelmChartDependenciesRequest(tgt[HelmChartMetaSourceField])]
+            InferredDependencies,
+            [InferHelmChartDependenciesRequest(HelmChartDependenciesInferenceFieldSet.create(tgt))],
         )
+
+
+@pytest.mark.parametrize(
+    "dependency,expected",
+    [
+        (
+            HelmChartDependency(repository="https://repo.example.com", name="name"),
+            "https://repo.example.com/name",
+        ),
+        (
+            HelmChartDependency(repository="https://repo.example.com/", name="name"),
+            "https://repo.example.com/name",
+        ),
+    ],
+)
+def test_18629(dependency, expected) -> None:
+    """Test that we properly resolve dependency urls."""
+    assert resolve_dependency_url(HelmRemotes(tuple(), FrozenDict()), dependency) == expected

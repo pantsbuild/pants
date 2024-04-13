@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import pkgutil
 from dataclasses import dataclass
 from typing import Any, Iterator
 
@@ -13,23 +12,24 @@ from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import CreateDigest, DigestContents, Directory, FileContent
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, RemovePrefix
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessResult, ProductDescription
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import InternalJdk, JdkEnvironment, JdkRequest, JvmProcess
-from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirements
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
-from pants.option.global_options import ProcessCleanupOption
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.resources import read_resource
 
 _PARSER_KOTLIN_VERSION = "1.6.20"
 
 
-class KotlinParserToolLockfileSentinel(GenerateToolLockfileSentinel):
+class KotlinParserToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = "kotlin-parser"
 
 
@@ -144,7 +144,7 @@ async def analyze_kotlin_source_dependencies(
     source_files: SourceFiles,
 ) -> FallibleKotlinSourceDependencyAnalysisResult:
     # Use JDK 8 due to https://youtrack.jetbrains.com/issue/KTIJ-17192 and https://youtrack.jetbrains.com/issue/KT-37446.
-    request = JdkRequest("adopt:8")
+    request = JdkRequest("zulu:8.0.392")
     env = await Get(JdkEnvironment, JdkRequest, request)
     jdk = InternalJdk.from_jdk_environment(env)
 
@@ -164,7 +164,10 @@ async def analyze_kotlin_source_dependencies(
     parser_lockfile_request = await Get(
         GenerateJvmLockfileFromTool, KotlinParserToolLockfileSentinel()
     )
-    (tool_classpath, prefixed_source_files_digest,) = await MultiGet(
+    (
+        tool_classpath,
+        prefixed_source_files_digest,
+    ) = await MultiGet(
         Get(
             ToolClasspath,
             ToolClasspathRequest(lockfile=parser_lockfile_request),
@@ -207,30 +210,22 @@ async def analyze_kotlin_source_dependencies(
 @rule(level=LogLevel.DEBUG)
 async def resolve_fallible_result_to_analysis(
     fallible_result: FallibleKotlinSourceDependencyAnalysisResult,
-    process_cleanup: ProcessCleanupOption,
 ) -> KotlinSourceDependencyAnalysis:
-    # TODO(#12725): Just convert directly to a ProcessResult like this:
-    # result = await Get(ProcessResult, FallibleProcessResult, fallible_result.process_result)
-    if fallible_result.process_result.exit_code == 0:
-        analysis_contents = await Get(
-            DigestContents, Digest, fallible_result.process_result.output_digest
-        )
-        analysis = json.loads(analysis_contents[0].content)
-        return KotlinSourceDependencyAnalysis.from_json_dict(analysis)
-    raise ProcessExecutionFailure(
-        fallible_result.process_result.exit_code,
-        fallible_result.process_result.stdout,
-        fallible_result.process_result.stderr,
-        "Kotlin source dependency analysis failed.",
-        process_cleanup=process_cleanup.val,
+    desc = ProductDescription("Kotlin source dependency analysis failed.")
+    result = await Get(
+        ProcessResult,
+        {fallible_result.process_result: FallibleProcessResult, desc: ProductDescription},
     )
+    analysis_contents = await Get(DigestContents, Digest, result.output_digest)
+    analysis = json.loads(analysis_contents[0].content)
+    return KotlinSourceDependencyAnalysis.from_json_dict(analysis)
 
 
 @rule
 async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompiledClassfiles:
     dest_dir = "classfiles"
 
-    parser_source_content = pkgutil.get_data(
+    parser_source_content = read_resource(
         "pants.backend.kotlin.dependency_inference", "KotlinParser.kt"
     )
     if not parser_source_content:

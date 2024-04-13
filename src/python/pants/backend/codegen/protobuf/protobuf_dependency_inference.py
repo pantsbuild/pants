@@ -9,20 +9,23 @@ from dataclasses import dataclass
 from typing import DefaultDict
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.backend.codegen.protobuf.target_types import AllProtobufTargets, ProtobufSourceField
+from pants.backend.codegen.protobuf.target_types import (
+    AllProtobufTargets,
+    ProtobufDependenciesField,
+    ProtobufSourceField,
+)
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
-    Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -81,8 +84,16 @@ def parse_proto_imports(file_content: str) -> FrozenOrderedSet[str]:
     return FrozenOrderedSet(IMPORT_REGEX.findall(file_content))
 
 
+@dataclass(frozen=True)
+class ProtobufDependencyInferenceFieldSet(FieldSet):
+    required_fields = (ProtobufSourceField, ProtobufDependenciesField)
+
+    source: ProtobufSourceField
+    dependencies: ProtobufDependenciesField
+
+
 class InferProtobufDependencies(InferDependenciesRequest):
-    infer_from = ProtobufSourceField
+    infer_from = ProtobufDependencyInferenceFieldSet
 
 
 @rule(desc="Inferring Protobuf dependencies by analyzing imports")
@@ -92,11 +103,10 @@ async def infer_protobuf_dependencies(
     if not protoc.dependency_inference:
         return InferredDependencies([])
 
-    address = request.sources_field.address
-    wrapped_tgt = await Get(WrappedTarget, Address, address)
+    address = request.field_set.address
     explicitly_provided_deps, hydrated_sources = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
-        Get(HydratedSources, HydrateSourcesRequest(request.sources_field)),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
+        Get(HydratedSources, HydrateSourcesRequest(request.field_set.source)),
     )
     digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
     assert len(digest_contents) == 1

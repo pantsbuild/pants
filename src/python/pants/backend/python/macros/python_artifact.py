@@ -2,7 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections.abc
+import copy
+import json
 from typing import Any, Dict, List, Union
+
+from pants.util.strutil import softwrap
 
 
 def _normalize_entry_points(
@@ -11,8 +15,12 @@ def _normalize_entry_points(
     """Ensure any entry points are in the form Dict[str, Dict[str, str]]."""
     if not isinstance(all_entry_points, collections.abc.Mapping):
         raise ValueError(
-            f"The `entry_points` in `setup_py()` must be a dictionary, "
-            f"but was {all_entry_points!r} with type {type(all_entry_points).__name__}."
+            softwrap(
+                f"""
+                The `entry_points` in `python_artifact()` must be a dictionary,
+                but was {all_entry_points!r} with type {type(all_entry_points).__name__}.
+                """
+            )
         )
 
     def _values_to_entry_points(values):
@@ -22,15 +30,23 @@ def _normalize_entry_points(
             for entry_point in values:
                 if not isinstance(entry_point, str) or "=" not in entry_point:
                     raise ValueError(
-                        f"Invalid `entry_point`, expected `<name> = <entry point>`, "
-                        f"but got {entry_point!r}."
+                        softwrap(
+                            f"""
+                            Invalid `entry_point`, expected `<name> = <entry point>`,
+                            but got {entry_point!r}.
+                            """
+                        )
                     )
 
             return dict(tuple(map(str.strip, entry_point.split("=", 1))) for entry_point in values)
         raise ValueError(
-            f"The values of the `entry_points` dictionary in `setup_py()` must be "
-            f"a list of strings or a dictionary of string to string, "
-            f"but got {values!r} of type {type(values).__name__}."
+            softwrap(
+                f"""
+                The values of the `entry_points` dictionary in `python_artifact()` must be
+                a list of strings or a dictionary of string to string,
+                but got {values!r} of type {type(values).__name__}.
+                """
+            )
         )
 
     return {
@@ -41,39 +57,35 @@ def _normalize_entry_points(
 class PythonArtifact:
     """Represents a Python setup.py-based project."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         """
         :param kwargs: Passed to `setuptools.setup
-          <https://pythonhosted.org/setuptools/setuptools.html>`_.
+          <https://setuptools.pypa.io/en/latest/setuptools.html>`_.
         """
-        if "name" not in kwargs:
-            raise ValueError("`setup_py()` requires `name` to be specified.")
-        name = kwargs["name"]
-        if not isinstance(name, str):
-            raise ValueError(
-                f"The `name` in `setup_py()` must be a string, but was {repr(name)} with type "
-                f"{type(name)}."
-            )
-
         if "entry_points" in kwargs:
             # coerce entry points from Dict[str, List[str]] to Dict[str, Dict[str, str]]
             kwargs["entry_points"] = _normalize_entry_points(kwargs["entry_points"])
 
-        self._kw: Dict[str, Any] = kwargs
-        self._binaries = {}
-        self._name: str = name
-
-    @property
-    def name(self) -> str:
-        return self._name
+        self._kw: Dict[str, Any] = copy.deepcopy(kwargs)
+        # The kwargs come from a BUILD file, and can contain somewhat arbitrary nested structures,
+        # so we don't have a principled way to make them into a hashable data structure.
+        # E.g., we can't naively turn all lists into tuples because distutils checks that some
+        # fields (such as ext_modules) are lists, and doesn't accept tuples.
+        # Instead we stringify and precompute a hash to use in our own __hash__, since we know
+        # that this object is immutable.
+        self._hash: int = hash(json.dumps(kwargs, sort_keys=True))
 
     @property
     def kwargs(self) -> Dict[str, Any]:
         return self._kw
 
-    @property
-    def binaries(self):
-        return self._binaries
+    def asdict(self) -> Dict[str, Any]:
+        return self.kwargs
 
-    def __str__(self) -> str:
-        return self.name
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, PythonArtifact):
+            return False
+        return self._kw == other._kw
+
+    def __hash__(self) -> int:
+        return self._hash

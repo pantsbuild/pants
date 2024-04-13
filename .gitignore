@@ -17,14 +17,21 @@ __pycache__/
 .build.properties
 .buildcache/
 .coverage*
-.emacs.desktop
+.emacs.desktop*
 .idea
 /.vscode/
 .cache
 .pants.d
+# TODO: We can probably delete these 3. They have not been used in a long time, if ever.
+#  In fact there's a lot of things we can clean up in this .gitignore. It's not harmful
+#  to keep them, but it's nice to keep things tight and avoid questions/confusion.
 .pants.run
 .pants.workdir.file_lock
 .pants.stats
+# TODO: .pids is no longer in use (it is now under .pants.d) but Pants developers switching
+#  to older branches will still see files created under .pids, which will then linger when they
+#  switch back to main. So we keep this in main's .gitignore for a while. We can remove this,
+#  to reduce confusion, once we're no longer developing in branches prior to 2.19.x.
 .pids
 .project
 .settings
@@ -60,3 +67,4 @@ GTAGS
 /.pants.rc
 /.venv
 .tool-versions
+TAGS

@@ -3,11 +3,10 @@
 
 import difflib
 import json
+import re
 import textwrap
 from itertools import cycle
-from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
-
-from typing_extensions import Literal
+from typing import Callable, Dict, Iterable, List, Literal, Optional, Set, Tuple, cast
 
 from pants.base.build_environment import pants_version
 from pants.help.help_formatter import HelpFormatter
@@ -24,7 +23,7 @@ from pants.option.arg_splitter import (
 )
 from pants.option.scope import GLOBAL_SCOPE
 from pants.util.docutil import bin_name, terminal_width
-from pants.util.strutil import first_paragraph, hard_wrap, pluralize
+from pants.util.strutil import first_paragraph, hard_wrap, pluralize, softwrap
 
 
 class HelpPrinter(MaybeColor):
@@ -41,7 +40,16 @@ class HelpPrinter(MaybeColor):
         self._help_request = help_request
         self._all_help_info = all_help_info
         self._width = terminal_width()
-        self._reserved_names = {"api-types", "global", "goals", "subsystems", "targets", "tools"}
+        self._reserved_names = {
+            "api-types",
+            "backends",
+            "global",
+            "goals",
+            "subsystems",
+            "symbols",
+            "targets",
+            "tools",
+        }
 
     def print_help(self) -> Literal[0, 1]:
         """Print help to the console."""
@@ -75,7 +83,7 @@ class HelpPrinter(MaybeColor):
             return 1
 
     def _print_alternatives(self, match: str, all_things: Iterable[str]) -> None:
-        did_you_mean = list(difflib.get_close_matches(match, all_things))
+        did_you_mean = difflib.get_close_matches(match, all_things)
 
         if did_you_mean:
             formatted_matches = self._format_did_you_mean_matches(did_you_mean)
@@ -85,7 +93,7 @@ class HelpPrinter(MaybeColor):
         title = self.maybe_green(f"{title_text}\n{'-' * len(title_text)}")
         print(f"\n{title}\n")
 
-    def _print_table(self, table: Dict[str, Optional[str]], indent: int = 0) -> None:
+    def _print_table(self, table: Dict[str, Optional[str]]) -> None:
         longest_key = max(len(key) for key, value in table.items() if value is not None)
         for key, value in table.items():
             if value is None:
@@ -112,11 +120,19 @@ class HelpPrinter(MaybeColor):
             **_help_table(
                 self._all_help_info.name_to_target_type_info.keys(), self._print_target_help
             ),
+            **_help_table(self._symbol_names(include_targets=False), self._print_symbol_help),
+            **_help_table(
+                self._all_help_info.name_to_api_type_info.keys(), self._print_api_type_help
+            ),
             **_help_table(self._all_help_info.name_to_rule_info.keys(), self._print_rule_help),
+            **_help_table(
+                self._all_help_info.env_var_to_help_info.keys(), self._print_env_var_help
+            ),
         }
 
+    @staticmethod
     def _disambiguate_things(
-        self, things: Iterable[str], all_things: Iterable[str]
+        things: Iterable[str], all_things: Iterable[str]
     ) -> Tuple[Set[str], Set[str]]:
         """Returns two sets of strings, one with disambiguated things and the second with
         unresolvable things."""
@@ -211,6 +227,10 @@ class HelpPrinter(MaybeColor):
             self._print_all_tools()
         elif thing == "api-types":
             self._print_all_api_types()
+        elif thing == "backends":
+            self._print_all_backends(show_advanced)
+        elif thing == "symbols":
+            self._print_all_symbols(show_advanced)
 
     def _print_all_goals(self) -> None:
         goal_descriptions: Dict[str, str] = {}
@@ -231,8 +251,16 @@ class HelpPrinter(MaybeColor):
 
         for name, description in sorted(goal_descriptions.items()):
             print(format_goal(name, first_paragraph(description)))
-        specific_help_cmd = f"{bin_name()} help $goal"
-        print(f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific goal.\n")
+        specific_help_cmd = f"{bin_name()} help <goal>"
+        print(
+            softwrap(
+                f"""
+                Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific goal. If
+                you expect to see more goals listed, you may need to activate backends; run
+                `{bin_name()} help backends`.
+                """
+            )
+        )
 
     def _print_all_subsystems(self) -> None:
         self._print_title("Subsystems")
@@ -265,6 +293,8 @@ class HelpPrinter(MaybeColor):
         for alias, target_type_info in sorted(
             self._all_help_info.name_to_target_type_info.items(), key=lambda x: x[0]
         ):
+            if alias.startswith("_"):
+                continue
             alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
             summary = self._format_summary_description(
                 target_type_info.summary, chars_before_description
@@ -284,29 +314,132 @@ class HelpPrinter(MaybeColor):
 
     def _print_all_api_types(self) -> None:
         self._print_title("Plugin API Types")
-        print("TODO: #14227 will bring this back.")
+        api_type_descriptions: Dict[str, Tuple[str, str]] = {}
+        indent_api_summary = 0
+        for api_info in self._all_help_info.name_to_api_type_info.values():
+            name = api_info.name
+            if name.startswith("_"):
+                continue
+            if api_info.is_union:
+                name += " <union>"
+            summary = (api_info.documentation or "").split("\n", 1)[0]
+            api_type_descriptions[name] = (api_info.module, summary)
+            indent_api_summary = max(indent_api_summary, len(name) + 2, len(api_info.module) + 2)
+
+        for name, (module, summary) in api_type_descriptions.items():
+            name = self.maybe_cyan(name.ljust(indent_api_summary))
+            description_lines = hard_wrap(
+                summary or " ", indent=indent_api_summary, width=self._width
+            )
+            # Juggle the description lines, to inject the api type module on the second line flushed
+            # left just below the type name (potentially sharing the line with the second line of
+            # the description that will be aligned to the right).
+            if len(description_lines) > 1:
+                # Place in front of the description line.
+                description_lines[
+                    1
+                ] = f"{module:{indent_api_summary}}{description_lines[1][indent_api_summary:]}"
+            else:
+                # There is no second description line.
+                description_lines.append(module)
+            # All description lines are indented, but the first line should be indented by the api
+            # type name, so we strip that.
+            description_lines[0] = description_lines[0][indent_api_summary:]
+            description = "\n".join(description_lines)
+            print(f"{name}{description}\n")
+        api_help_cmd = f"{bin_name()} help [api_type/rule_name]"
+        print(
+            f"Use `{self.maybe_green(api_help_cmd)}` to get help for a specific API type or rule.\n"
+        )
+
+    def _print_all_backends(self, include_experimental: bool) -> None:
+        self._print_title("Backends")
+        print(
+            softwrap(
+                """
+                List with all known backends for Pants.
+
+                Enabled backends are marked with `*`. To enable a backend add it to
+                `[GLOBAL].backend_packages`.
+                """
+            ),
+            "\n",
+        )
+        backends = self._all_help_info.name_to_backend_help_info
+        provider_col_width = 3 + max(map(len, (info.provider for info in backends.values())))
+        enabled_col_width = 4
+        for info in backends.values():
+            if not (include_experimental or info.enabled) and ".experimental." in info.name:
+                continue
+            enabled = "[*] " if info.enabled else "[ ] "
+            name_col_width = max(
+                len(info.name) + 1, self._width - enabled_col_width - provider_col_width
+            )
+            name = self.maybe_cyan(f"{info.name:{name_col_width}}")
+            provider = self.maybe_magenta(info.provider) if info.enabled else info.provider
+            print(f"{enabled}{name}[{provider}]")
+            if info.description and self._width > 10:
+                print(
+                    "\n".join(
+                        hard_wrap(
+                            softwrap(info.description),
+                            indent=enabled_col_width + 1,
+                            width=self._width - enabled_col_width - 1,
+                        )
+                    )
+                )
+
+    def _symbol_names(self, include_targets: bool) -> Iterable[str]:
+        return sorted(
+            {
+                symbol.name
+                for symbol in self._all_help_info.name_to_build_file_info.values()
+                if (include_targets or not symbol.is_target) and not re.match("_[^_]", symbol.name)
+            }
+        )
+
+    def _print_all_symbols(self, include_targets: bool) -> None:
+        self._print_title("BUILD file symbols")
+        symbols = self._all_help_info.name_to_build_file_info
+        names = self._symbol_names(include_targets)
+        longest_symbol_name = max(len(name) for name in names)
+        chars_before_description = longest_symbol_name + 2
+
+        for name in sorted(names):
+            name_str = self.maybe_cyan(f"{name}".ljust(chars_before_description))
+            summary = self._format_summary_description(
+                first_paragraph(symbols[name].documentation or ""), chars_before_description
+            )
+            print(f"{name_str}{summary}\n")
 
     def _print_global_help(self):
         def print_cmd(args: str, desc: str):
-            cmd = self.maybe_green(f"{bin_name()} {args}".ljust(50))
+            cmd = self.maybe_green(f"{bin_name()} {args}".ljust(41))
             print(f"  {cmd}  {desc}")
 
         print(f"\nPants {pants_version()}")
         print("\nUsage:\n")
         print_cmd(
-            "[option ...] [goal ...] [file/target ...]",
-            "Attempt the specified goals on the specified files/targets.",
+            "[options] [goals] [inputs]",
+            "Attempt the specified goals on the specified inputs.",
         )
         print_cmd("help", "Display this usage message.")
         print_cmd("help goals", "List all installed goals.")
         print_cmd("help targets", "List all installed target types.")
         print_cmd("help subsystems", "List all configurable subsystems.")
         print_cmd("help tools", "List all external tools.")
+        print_cmd("help backends", "List all available backends.")
+        print_cmd("help-advanced backends", "List all backends, including experimental/preview.")
+        print_cmd("help symbols", "List available BUILD file symbols.")
+        print_cmd(
+            "help-advanced symbols",
+            "List all available BUILD file symbols, including target types.",
+        )
         print_cmd("help api-types", "List all plugin API types.")
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")
         print_cmd(
-            "help [target_type/goal/subsystem/api_type/rule]",
+            "help [name]",
             "Help for a target type, goal, subsystem, plugin API type or rule.",
         )
         print_cmd(
@@ -315,24 +448,20 @@ class HelpPrinter(MaybeColor):
         print_cmd("help-all", "Print a JSON object containing all help info.")
 
         print("")
-        print("  [file] can be:")
-        print(f"     {self.maybe_cyan('path/to/file.ext')}")
+        print("  [inputs] can be:")
+        print(f"     A file, e.g. {self.maybe_cyan('path/to/file.ext')}")
         glob_str = self.maybe_cyan("'**/*.ext'")
+        print(f"     A path glob, e.g. {glob_str} (in quotes to prevent premature shell expansion)")
+        print(f"     A directory, e.g. {self.maybe_cyan('path/to/dir')}")
         print(
-            f"     A path glob, such as {glob_str}, in quotes to prevent premature shell expansion."
+            f"     A directory ending in `::` to include all subdirectories, e.g. {self.maybe_cyan('path/to/dir::')}"
         )
-        print("\n  [target] can be:")
-        print(f"    {self.maybe_cyan('path/to/dir:target_name')}.")
+        print(f"     A target address, e.g. {self.maybe_cyan('path/to/dir:target_name')}.")
         print(
-            f"    {self.maybe_cyan('path/to/dir')} for a target whose name is the same as the directory name."
+            f"     Any of the above with a `-` prefix to ignore the value, e.g. {self.maybe_cyan('-path/to/ignore_me::')}"
         )
-        print(
-            f"    {self.maybe_cyan('path/to/dir:')}  to include all targets in the specified directory."
-        )
-        print(
-            f"    {self.maybe_cyan('path/to/dir::')} to include all targets found recursively under the directory.\n"
-        )
-        print(f"Documentation at {self.maybe_magenta('https://www.pantsbuild.org')}")
+
+        print(f"\nDocumentation at {self.maybe_magenta('https://www.pantsbuild.org')}")
         pypi_url = f"https://pypi.org/pypi/pantsbuild.pants/{pants_version()}"
         print(f"Download at {self.maybe_magenta(pypi_url)}")
 
@@ -360,7 +489,7 @@ class HelpPrinter(MaybeColor):
         for line in formatted_lines:
             print(line)
 
-    def _print_target_help(self, target_alias: str, show_advanced: bool) -> None:
+    def _print_target_help(self, target_alias: str, _: bool) -> None:
         self._print_title(f"`{target_alias}` target")
         tinfo = self._all_help_info.name_to_target_type_info[target_alias]
         if tinfo.description:
@@ -384,6 +513,51 @@ class HelpPrinter(MaybeColor):
                 print("\n" + formatted_desc)
         print()
 
+    def _print_symbol_help(self, name: str, _: bool) -> None:
+        self._print_title(f"`{name}` BUILD file symbol")
+        symbol = self._all_help_info.name_to_build_file_info[name]
+        if symbol.signature:
+            print(self.maybe_magenta(f"Signature: {symbol.name}{symbol.signature}\n"))
+        print("\n".join(hard_wrap(symbol.documentation or "Undocumented.", width=self._width)))
+
+    def _print_api_type_help(self, name: str, show_advanced: bool) -> None:
+        self._print_title(f"`{name}` api type")
+        type_info = self._all_help_info.name_to_api_type_info[name]
+        print("\n".join(hard_wrap(type_info.documentation or "Undocumented.", width=self._width)))
+        print()
+        self._print_table(
+            {
+                "activated by": type_info.provider,
+                "union type": type_info.union_type,
+                "union members": "\n".join(type_info.union_members) if type_info.is_union else None,
+                "dependencies": "\n".join(type_info.dependencies) if show_advanced else None,
+                "dependents": "\n".join(type_info.dependents) if show_advanced else None,
+                f"returned by {pluralize(len(type_info.returned_by_rules), 'rule')}": "\n".join(
+                    type_info.returned_by_rules
+                )
+                if show_advanced
+                else None,
+                f"consumed by {pluralize(len(type_info.consumed_by_rules), 'rule')}": "\n".join(
+                    type_info.consumed_by_rules
+                )
+                if show_advanced
+                else None,
+                f"used in {pluralize(len(type_info.used_in_rules), 'rule')}": "\n".join(
+                    type_info.used_in_rules
+                )
+                if show_advanced
+                else None,
+            }
+        )
+        print()
+        if not show_advanced:
+            print(
+                self.maybe_green(
+                    f"Include API types and rules dependency information by running "
+                    f"`{bin_name()} help-advanced {name}`.\n"
+                )
+            )
+
     def _print_rule_help(self, rule_name: str, show_advanced: bool) -> None:
         rule = self._all_help_info.name_to_rule_info[rule_name]
         title = f"`{rule_name}` rule"
@@ -397,11 +571,23 @@ class HelpPrinter(MaybeColor):
                 "activated by": rule.provider,
                 "returns": rule.output_type,
                 f"takes {pluralize(len(rule.input_types), 'input')}": ", ".join(rule.input_types),
-                f"awaits {pluralize(len(rule.input_gets), 'get')}": "\n".join(rule.input_gets)
+                f"awaits {pluralize(len(rule.awaitables), 'get')}": "\n".join(rule.awaitables)
                 if show_advanced
                 else None,
             }
         )
+        print()
+
+    def _print_env_var_help(self, env_var: str, show_advanced_and_deprecated: bool) -> None:
+        ohi = self._all_help_info.env_var_to_help_info[env_var]
+        help_formatter = HelpFormatter(
+            show_advanced=show_advanced_and_deprecated,
+            show_deprecated=show_advanced_and_deprecated,
+            color=self.color,
+        )
+        for line in help_formatter.format_option(ohi):
+            print(line)
+
         print()
 
     def _get_help_json(self) -> str:

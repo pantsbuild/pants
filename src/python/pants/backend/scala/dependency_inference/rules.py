@@ -11,45 +11,49 @@ from pants.backend.scala.compile.scalac_plugins import (
 )
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
-from pants.backend.scala.resolve.lockfile import (
-    SCALA_LIBRARY_ARTIFACT,
-    SCALA_LIBRARY_GROUP,
-    ConflictingScalaLibraryVersionInResolveError,
-    MissingScalaLibraryInResolveError,
-)
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
 from pants.backend.scala.target_types import ScalaDependenciesField, ScalaSourceField
+from pants.backend.scala.util_rules import versions
+from pants.backend.scala.util_rules.versions import (
+    ScalaArtifactsForVersionRequest,
+    ScalaArtifactsForVersionResult,
+)
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
-    Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
-    ConflictingJvmArtifactVersion,
-    MissingJvmArtifacts,
     find_jvm_artifacts_or_raise,
 )
 from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
-from pants.jvm.resolve.common import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import OrderedSet
 
 
+@dataclass(frozen=True)
+class ScalaSourceDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (ScalaSourceField, ScalaDependenciesField, JvmResolveField)
+
+    source: ScalaSourceField
+    dependencies: ScalaDependenciesField
+    resolve: JvmResolveField
+
+
 class InferScalaSourceDependencies(InferDependenciesRequest):
-    infer_from = ScalaSourceField
+    infer_from = ScalaSourceDependenciesInferenceFieldSet
 
 
 @rule(desc="Inferring Scala dependencies by analyzing sources")
@@ -62,12 +66,10 @@ async def infer_scala_dependencies_via_source_analysis(
     if not scala_infer_subsystem.imports:
         return InferredDependencies([])
 
-    address = request.sources_field.address
-    wrapped_tgt = await Get(WrappedTarget, Address, address)
-    tgt = wrapped_tgt.target
+    address = request.field_set.address
     explicitly_provided_deps, analysis = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])),
-        Get(ScalaSourceDependencyAnalysis, SourceFilesRequest([request.sources_field])),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
+        Get(ScalaSourceDependencyAnalysis, SourceFilesRequest([request.field_set.source])),
     )
 
     symbols: OrderedSet[str] = OrderedSet()
@@ -75,8 +77,10 @@ async def infer_scala_dependencies_via_source_analysis(
         symbols.update(analysis.all_imports())
     if scala_infer_subsystem.consumed_types:
         symbols.update(analysis.fully_qualified_consumed_symbols())
+    if scala_infer_subsystem.package_objects:
+        symbols.update(analysis.scopes)
 
-    resolve = tgt[JvmResolveField].normalized_value(jvm)
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     dependencies: OrderedSet[Address] = OrderedSet()
     for symbol in symbols:
@@ -95,12 +99,28 @@ async def infer_scala_dependencies_via_source_analysis(
     return InferredDependencies(dependencies)
 
 
-class InjectScalaLibraryDependencyRequest(InjectDependenciesRequest):
-    inject_for = ScalaDependenciesField
+@dataclass(frozen=True)
+class ScalaLibraryDependencyInferenceFieldSet(FieldSet):
+    required_fields = (ScalaDependenciesField, JvmResolveField)
+
+    dependencies: ScalaDependenciesField
+    resolve: JvmResolveField
 
 
-class InjectScalaPluginDependenciesRequest(InjectDependenciesRequest):
-    inject_for = ScalaDependenciesField
+class InferScalaLibraryDependencyRequest(InferDependenciesRequest):
+    infer_from = ScalaLibraryDependencyInferenceFieldSet
+
+
+@dataclass(frozen=True)
+class ScalaPluginDependencyInferenceFieldSet(FieldSet):
+    required_fields = (ScalaDependenciesField, JvmResolveField)
+
+    dependencies: ScalaDependenciesField
+    resolve: JvmResolveField
+
+
+class InferScalaPluginDependenciesRequest(InferDependenciesRequest):
+    infer_from = ScalaPluginDependencyInferenceFieldSet
 
 
 @dataclass(frozen=True)
@@ -121,59 +141,49 @@ async def resolve_scala_library_for_resolve(
     scala_subsystem: ScalaSubsystem,
 ) -> ScalaRuntimeForResolve:
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
-
-    try:
-        addresses = find_jvm_artifacts_or_raise(
-            required_coordinates=[
-                Coordinate(
-                    group=SCALA_LIBRARY_GROUP,
-                    artifact=SCALA_LIBRARY_ARTIFACT,
-                    version=scala_version,
-                )
-            ],
-            resolve=request.resolve_name,
-            jvm_artifact_targets=jvm_artifact_targets,
-            jvm=jvm,
-        )
-        return ScalaRuntimeForResolve(addresses)
-    except ConflictingJvmArtifactVersion as ex:
-        raise ConflictingScalaLibraryVersionInResolveError(
-            request.resolve_name, scala_version, ex.found_coordinate
-        )
-    except MissingJvmArtifacts:
-        raise MissingScalaLibraryInResolveError(request.resolve_name, scala_version)
-
-
-@rule(desc="Inject dependency on scala-library artifact for Scala target.")
-async def inject_scala_library_dependency(
-    request: InjectScalaLibraryDependencyRequest,
-    jvm: JvmSubsystem,
-) -> InjectedDependencies:
-    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    target = wrapped_target.target
-
-    if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
-    resolve = target[JvmResolveField].normalized_value(jvm)
-
-    scala_library_target_info = await Get(
-        ScalaRuntimeForResolve, ScalaRuntimeForResolveRequest(resolve)
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
     )
-    return InjectedDependencies(scala_library_target_info.addresses)
+
+    addresses = find_jvm_artifacts_or_raise(
+        required_coordinates=[
+            scala_artifacts.library_coordinate,
+        ],
+        resolve=request.resolve_name,
+        jvm_artifact_targets=jvm_artifact_targets,
+        jvm=jvm,
+        subsystem="the Scala runtime library",
+        target_type="scala_sources",
+        requirement_source="the relevant entry for this resolve in the `[scala].version_for_resolve` option",
+    )
+    return ScalaRuntimeForResolve(addresses)
 
 
-@rule(desc="Inject dependency on scala plugin artifacts for Scala target.")
-async def inject_scala_plugin_dependencies(
-    request: InjectScalaPluginDependenciesRequest,
-) -> InjectedDependencies:
+@rule(desc="Infer dependency on scala-library artifact for Scala target.")
+async def infer_scala_library_dependency(
+    request: InferScalaLibraryDependencyRequest,
+    jvm: JvmSubsystem,
+) -> InferredDependencies:
+    resolve = request.field_set.resolve.normalized_value(jvm)
+    scala_library_target_info = await Get(
+        ScalaRuntimeForResolve,
+        ScalaRuntimeForResolveRequest(resolve),
+    )
+    return InferredDependencies(scala_library_target_info.addresses)
+
+
+@rule(desc="Infer dependency on scala plugin artifacts for Scala target.")
+async def infer_scala_plugin_dependencies(
+    request: InferScalaPluginDependenciesRequest,
+) -> InferredDependencies:
     """Adds dependencies on plugins for scala source files, so that they get included in the
     target's resolve."""
 
-    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(request.field_set.address, description_of_origin="<infallible>"),
+    )
     target = wrapped_target.target
-
-    if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
 
     scala_plugins = await Get(
         ScalaPluginTargetsForTarget, ScalaPluginsForTargetWithoutResolveRequest(target)
@@ -181,7 +191,7 @@ async def inject_scala_plugin_dependencies(
 
     plugin_addresses = [target.address for target in scala_plugins.artifacts]
 
-    return InjectedDependencies(plugin_addresses)
+    return InferredDependencies(plugin_addresses)
 
 
 def rules():
@@ -191,7 +201,8 @@ def rules():
         *scala_parser.rules(),
         *scalac_plugins.rules(),
         *symbol_mapper.rules(),
+        *versions.rules(),
         UnionRule(InferDependenciesRequest, InferScalaSourceDependencies),
-        UnionRule(InjectDependenciesRequest, InjectScalaLibraryDependencyRequest),
-        UnionRule(InjectDependenciesRequest, InjectScalaPluginDependenciesRequest),
+        UnionRule(InferDependenciesRequest, InferScalaLibraryDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferScalaPluginDependenciesRequest),
     ]

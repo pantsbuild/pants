@@ -9,7 +9,7 @@ from textwrap import dedent
 from pants.backend.codegen.avro import target_types
 from pants.backend.codegen.avro.target_types import AvroSourcesGeneratorTarget, AvroSourceTarget
 from pants.engine.addresses import Address
-from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.target import SingleSourceField, Tags
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -18,7 +18,7 @@ def test_generate_source_targets() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_types.rules(),
-            QueryRule(_TargetParametrizations, [Address]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
         target_types=[AvroSourcesGeneratorTarget],
     )
@@ -47,7 +47,12 @@ def test_generate_source_targets() -> None:
         )
 
     generated = rule_runner.request(
-        _TargetParametrizations, [Address("src/avro", target_name="lib")]
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("src/avro", target_name="lib"), description_of_origin="tests"
+            )
+        ],
     ).parametrizations
     assert set(generated.values()) == {
         gen_tgt("f1.avsc", tags=["overridden"]),

@@ -3,52 +3,44 @@
 
 from __future__ import annotations
 
+import itertools
+import json
 import textwrap
 
 import pytest
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV2
+from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV3
 from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
-    ToolCustomLockfile,
-    ToolDefaultLockfile,
+    ResolvePexConfig,
+    ResolvePexConstraintsFile,
     _pex_lockfile_requirement_count,
-    _strip_comments_from_pex_json_lockfile,
+    get_metadata,
     is_probably_pex_json_lockfile,
-    should_validate_metadata,
+    strip_comments_from_pex_json_lockfile,
     validate_metadata,
 )
-from pants.engine.fs import FileContent
+from pants.core.util_rules.lockfile_metadata import (
+    BEGIN_LOCKFILE_HEADER,
+    END_LOCKFILE_HEADER,
+    InvalidLockfileError,
+)
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.testutil.option_util import create_subsystem
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.pip_requirement import PipRequirement
+from pants.util.strutil import comma_separated_list
 
-METADATA = PythonLockfileMetadataV2(
+METADATA = PythonLockfileMetadataV3(
     InterpreterConstraints(["==3.8.*"]),
     {PipRequirement.parse("ansicolors"), PipRequirement.parse("requests")},
+    manylinux=None,
+    requirement_constraints={PipRequirement.parse("abc")},
+    only_binary={"bdist"},
+    no_binary={"sdist"},
 )
-
-
-def create_tool_lock(
-    *,
-    default_lock: bool = False,
-    uses_source_plugins: bool = False,
-    uses_project_interpreter_constraints: bool = False,
-) -> ToolDefaultLockfile | ToolCustomLockfile:
-    common_kwargs = dict(
-        resolve_name="my_tool",
-        uses_source_plugins=uses_source_plugins,
-        uses_project_interpreter_constraints=uses_project_interpreter_constraints,
-    )
-    return (
-        ToolDefaultLockfile(file_content=FileContent("", b""), **common_kwargs)  # type: ignore[arg-type]
-        if default_lock
-        else ToolCustomLockfile(
-            file_path="lock.txt", file_path_description_of_origin="", **common_kwargs  # type: ignore[arg-type]
-        )
-    )
 
 
 def create_python_setup(
@@ -59,125 +51,114 @@ def create_python_setup(
         invalid_lockfile_behavior=behavior,
         resolves_generate_lockfiles=enable_resolves,
         interpreter_versions_universe=PythonSetup.default_interpreter_universe,
+        resolves={"a": "lock.txt"},
+        default_resolve="a",
     )
 
 
-def test_invalid_lockfile_behavior_option() -> None:
-    """Test that you can toggle between warnings, errors, and ignoring."""
+def test_get_metadata() -> None:
+    # We don't get metadata if we've been told not to validate it.
+    python_setup = create_python_setup(behavior=InvalidLockfileBehavior.ignore)
+    metadata = get_metadata(python_setup, b"", None, "dummy", "#")
+    assert metadata is None
 
-    assert not should_validate_metadata(
-        create_tool_lock(), create_python_setup(InvalidLockfileBehavior.ignore)
+    python_setup = create_python_setup(behavior=InvalidLockfileBehavior.warn)
+
+    # If we are supposed to validate Pants-generated lockfiles, but there is no header
+    # block, then it's not a Pants-generated lockfile, so succeed but return no metadata.
+    metadata = get_metadata(python_setup, b"NO HEADER HERE", None, "dummy", "#")
+    assert metadata is None
+
+    # If we are supposed to validate Pants-generated lockfiles, and there is a header
+    # block, then succeed on valid JSON.
+    valid_lock_metadata = json.dumps(
+        {
+            "valid_for_interpreter_constraints": "dummy",
+            "requirements_invalidation_digest": "dummy",
+        }
     )
-    assert should_validate_metadata(
-        create_tool_lock(), create_python_setup(InvalidLockfileBehavior.warn)
+    metadata = get_metadata(
+        python_setup,
+        f"# {BEGIN_LOCKFILE_HEADER}\n# {valid_lock_metadata}\n# {END_LOCKFILE_HEADER}\n".encode(),
+        None,
+        "dummy",
+        "#",
     )
-    assert should_validate_metadata(
-        create_tool_lock(), create_python_setup(InvalidLockfileBehavior.error)
-    )
+    assert metadata is not None
+
+    # If we are supposed to validate Pants-generated lockfiles, and there is a header
+    # block, then fail on invalid JSON.
+    with pytest.raises(InvalidLockfileError):
+        get_metadata(
+            python_setup,
+            f"# {BEGIN_LOCKFILE_HEADER}\n# NOT JSON\n# {END_LOCKFILE_HEADER}\n".encode(),
+            None,
+            "dummy",
+            "#",
+        )
+    # If we are supposed to validate Pants-generated lockfiles, and there is a header
+    # block, then fail on JSON that doesn't have the keys we expect.
+    with pytest.raises(InvalidLockfileError):
+        get_metadata(
+            python_setup,
+            f"# {BEGIN_LOCKFILE_HEADER}\n# {{ 'a': 'b' }}\n# {END_LOCKFILE_HEADER}\n".encode(),
+            None,
+            "dummy",
+            "#",
+        )
 
 
 @pytest.mark.parametrize(
-    "is_default_lock,invalid_reqs,invalid_constraints,uses_source_plugins,uses_project_ic",
+    (
+        "invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file,invalid_only_binary,"
+        + "invalid_no_binary,invalid_manylinux"
+    ),
     [
-        (is_default_lock, invalid_reqs, invalid_constraints, source_plugins, project_ics)
-        for is_default_lock in (True, False)
+        (
+            invalid_reqs,
+            invalid_interpreter_constraints,
+            invalid_constraints_file,
+            invalid_only_binary,
+            invalid_no_binary,
+            invalid_manylinux,
+        )
         for invalid_reqs in (True, False)
-        for invalid_constraints in (True, False)
-        for source_plugins in (True, False)
-        for project_ics in (True, False)
-        if (invalid_reqs or invalid_constraints)
+        for invalid_interpreter_constraints in (True, False)
+        for invalid_constraints_file in (True, False)
+        for invalid_only_binary in (True, False)
+        for invalid_no_binary in (True, False)
+        for invalid_manylinux in (True, False)
+        if (
+            invalid_reqs
+            or invalid_interpreter_constraints
+            or invalid_constraints_file
+            or invalid_only_binary
+            or invalid_no_binary
+            or invalid_manylinux
+        )
     ],
 )
-def test_validate_tool_lockfiles(
-    is_default_lock: bool,
+def test_validate_lockfiles(
     invalid_reqs: bool,
-    invalid_constraints: bool,
-    uses_source_plugins: bool,
-    uses_project_ic: bool,
+    invalid_interpreter_constraints: bool,
+    invalid_constraints_file: bool,
+    invalid_only_binary: bool,
+    invalid_no_binary: bool,
+    invalid_manylinux: bool,
     caplog,
 ) -> None:
     runtime_interpreter_constraints = (
         InterpreterConstraints(["==2.7.*"])
-        if invalid_constraints
-        else METADATA.valid_for_interpreter_constraints
-    )
-    req_strings = ["bad-req"] if invalid_reqs else [str(r) for r in METADATA.requirements]
-    requirements = create_tool_lock(
-        default_lock=is_default_lock,
-        uses_source_plugins=uses_source_plugins,
-        uses_project_interpreter_constraints=uses_project_ic,
-    )
-    validate_metadata(
-        METADATA,
-        runtime_interpreter_constraints,
-        requirements,
-        req_strings,
-        create_python_setup(InvalidLockfileBehavior.warn),
-    )
-
-    def contains(msg: str, if_: bool) -> None:
-        assert (msg in caplog.text) is if_
-
-    contains("You are using the `<default>` lockfile provided by Pants", if_=is_default_lock)
-    contains("You are using the lockfile at lock.txt", if_=not is_default_lock)
-
-    contains("You have set different requirements", if_=invalid_reqs)
-    contains("In the input requirements, but not in the lockfile: ['bad-req']", if_=invalid_reqs)
-    contains(
-        "In the lockfile, but not in the input requirements: ['ansicolors', 'requests']",
-        if_=invalid_reqs,
-    )
-    contains(".source_plugins`, and", if_=invalid_reqs and uses_source_plugins)
-
-    contains("You have set interpreter constraints", if_=invalid_constraints)
-    contains(
-        "determines its interpreter constraints based on your code's own constraints.",
-        if_=invalid_constraints and uses_project_ic,
-    )
-    contains(
-        ".interpreter_constraints`, or by using a new custom lockfile.",
-        if_=invalid_constraints and not uses_project_ic,
-    )
-
-    contains(
-        "To generate a custom lockfile based on your current configuration", if_=is_default_lock
-    )
-    contains(
-        "To regenerate your lockfile based on your current configuration", if_=not is_default_lock
-    )
-
-
-@pytest.mark.parametrize(
-    "invalid_reqs,invalid_constraints",
-    [
-        (invalid_reqs, invalid_constraints)
-        for invalid_reqs in (True, False)
-        for invalid_constraints in (True, False)
-        if (invalid_reqs or invalid_constraints)
-    ],
-)
-def test_validate_user_lockfiles(
-    invalid_reqs: bool,
-    invalid_constraints: bool,
-    caplog,
-) -> None:
-    runtime_interpreter_constraints = (
-        InterpreterConstraints(["==2.7.*"])
-        if invalid_constraints
+        if invalid_interpreter_constraints
         else METADATA.valid_for_interpreter_constraints
     )
     req_strings = FrozenOrderedSet(
         ["bad-req"] if invalid_reqs else [str(r) for r in METADATA.requirements]
     )
     lockfile = Lockfile(
-        file_path="lock.txt",
-        file_path_description_of_origin="foo",
+        url="lock.txt",
+        url_description_of_origin="foo",
         resolve_name="a",
-    )
-
-    # Ignore validation if resolves are manually managed.
-    assert not should_validate_metadata(
-        lockfile, create_python_setup(InvalidLockfileBehavior.warn, enable_resolves=False)
     )
 
     validate_metadata(
@@ -185,18 +166,49 @@ def test_validate_user_lockfiles(
         runtime_interpreter_constraints,
         lockfile,
         req_strings,
-        create_python_setup(InvalidLockfileBehavior.warn),
+        validate_consumed_req_strings=True,
+        python_setup=create_python_setup(InvalidLockfileBehavior.warn),
+        resolve_config=ResolvePexConfig(
+            indexes=(),
+            find_links=(),
+            manylinux="not-manylinux" if invalid_manylinux else None,
+            constraints_file=ResolvePexConstraintsFile(
+                EMPTY_DIGEST,
+                "c.txt",
+                FrozenOrderedSet(
+                    {PipRequirement.parse("xyz" if invalid_constraints_file else "abc")}
+                ),
+            ),
+            no_binary=FrozenOrderedSet(["not-sdist" if invalid_no_binary else "sdist"]),
+            only_binary=FrozenOrderedSet(["not-bdist" if invalid_only_binary else "bdist"]),
+            path_mappings=(),
+        ),
     )
 
     def contains(msg: str, if_: bool = True) -> None:
         assert (msg in caplog.text) is if_
 
-    contains("You are using the lockfile at lock.txt to install the resolve `a`")
+    reqs_desc = comma_separated_list(f"`{rs}`" for rs in req_strings)
     contains(
-        "The targets depend on requirements that are not in the lockfile: ['bad-req']",
+        f"You are consuming {reqs_desc} from the `a` lockfile at lock.txt "
+        "with incompatible inputs"
+    )
+    contains(
+        "The lockfile does not provide all the necessary requirements",
         if_=invalid_reqs,
     )
-    contains("The targets use interpreter constraints", if_=invalid_constraints)
+    contains(
+        "The requirements not provided by the `a` resolve are:\n  ['bad-req']",
+        if_=invalid_reqs,
+    )
+
+    contains("The inputs use interpreter constraints", if_=invalid_interpreter_constraints)
+
+    contains("The constraints file at c.txt has changed", if_=invalid_constraints_file)
+    contains("The `only_binary` arguments have changed", if_=invalid_only_binary)
+    contains("The `no_binary` arguments have changed", if_=invalid_no_binary)
+    contains("The `manylinux` argument has changed", if_=invalid_manylinux)
+
     contains("./pants generate-lockfiles --resolve=a`")
 
 
@@ -246,7 +258,7 @@ def test_is_probably_pex_json_lockfile():
 
 def test_strip_comments_from_pex_json_lockfile() -> None:
     def assert_stripped(lock: str, expected: str) -> None:
-        assert _strip_comments_from_pex_json_lockfile(lock.encode()).decode() == expected
+        assert strip_comments_from_pex_json_lockfile(lock.encode()).decode() == expected
 
     assert_stripped("{}", "{}")
     assert_stripped(
@@ -336,3 +348,78 @@ def test_pex_lockfile_requirement_count() -> None:
         )
         == 3
     )
+
+
+class TestResolvePexConfigPexArgs:
+    def pairwise(self, iterable):
+        # Drop once on 3.10
+        # https://docs.python.org/3/library/itertools.html#itertools.pairwise
+        a, b = itertools.tee(iterable)
+        next(b, None)
+        return zip(a, b)
+
+    def simple_config_args(self, manylinux=None, only_binary=None, no_binary=None):
+        return tuple(
+            ResolvePexConfig(
+                indexes=[],
+                find_links=[],
+                manylinux=manylinux,
+                constraints_file=None,
+                no_binary=FrozenOrderedSet(no_binary) if no_binary else FrozenOrderedSet(),
+                only_binary=FrozenOrderedSet(only_binary) if only_binary else FrozenOrderedSet(),
+                path_mappings=[],
+            ).pex_args()
+        )
+
+    def test_minimal(self):
+        args = self.simple_config_args()
+        assert len(args) == 2
+
+    def test_manylinux(self):
+        assert "--no-manylinux" in self.simple_config_args()
+
+        many = "manylinux2014_ppc64le"
+        args = self.simple_config_args(manylinux=many)
+        assert len(args) == 3
+        assert ("--manylinux", many) in self.pairwise(args)
+
+    def test_only_binary(self):
+        assert "--only-binary=foo" in self.simple_config_args(only_binary=["foo"])
+        assert ("--only-binary=foo", "--only-binary=bar") in self.pairwise(
+            self.simple_config_args(only_binary=["foo", "bar"])
+        )
+
+    def test_only_binary_all(self):
+        args = self.simple_config_args(only_binary=[":all:"])
+        assert "--wheel" in args
+        assert "--no-build" in args
+        assert "--only-binary" not in " ".join(args)
+
+        args = self.simple_config_args(only_binary=["foo", ":all:"])
+        assert "--wheel" in args
+        assert "--no-build" in args
+        assert "--only-binary" not in " ".join(args)
+
+    def test_only_binary_none(self):
+        assert "--wheel" not in self.simple_config_args(only_binary=[":none:"])
+        assert "--only-binary" not in " ".join(self.simple_config_args(only_binary=[":none:"]))
+        assert "--build" in self.simple_config_args(only_binary=[":none:"])
+
+    def test_no_binary(self):
+        assert "--only-build=foo" in self.simple_config_args(no_binary=["foo"])
+        assert ("--only-build=foo", "--only-build=bar") in self.pairwise(
+            self.simple_config_args(no_binary=["foo", "bar"])
+        )
+
+    def test_no_binary_all(self):
+        args = self.simple_config_args(no_binary=[":all:"])
+        assert "--build" in args
+        assert "--no-wheel" in args
+        assert "--no-binary" not in args
+
+    def test_no_binary_none(self):
+        assert "--wheel" in self.simple_config_args(no_binary=[":none:"])
+        assert "--only-build" not in " ".join(self.simple_config_args(no_binary=[":none:"]))
+
+        assert "--wheel" in self.simple_config_args(no_binary=["foo", ":none:"])
+        assert "--only-build" not in " ".join(self.simple_config_args(no_binary=["foo", ":none:"]))

@@ -23,10 +23,15 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
+from pants.engine.target import (
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import doc_url
-from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -56,14 +61,22 @@ async def isolate_local_dist_wheels(
     wheels = [wheel for wheel in wheels_snapshot.files if wheel in artifacts]
 
     if not wheels:
-        tgt = await Get(WrappedTarget, Address, dist_field_set.address)
+        tgt = await Get(
+            WrappedTarget,
+            WrappedTargetRequest(dist_field_set.address, description_of_origin="<infallible>"),
+        )
         logger.warning(
-            f"Encountered a dependency on the {tgt.target.alias} target at {dist_field_set.address}, "
-            "but this target does not produce a Python wheel artifact. Therefore this target's "
-            "code will be used directly from sources, without a distribution being built, "
-            "and any native extensions in it will not be built.\n\n"
-            f"See {doc_url('python-distributions')} for details on how to set up a "
-            f"{tgt.target.alias} target to produce a wheel."
+            softwrap(
+                f"""
+                Encountered a dependency on the {tgt.target.alias} target at {dist_field_set.address},
+                but this target does not produce a Python wheel artifact. Therefore this target's
+                code will be used directly from sources, without a distribution being built,
+                and any native extensions in it will not be built.
+
+                See {doc_url('docs/python/overview/building-distributions')} for details on how to set up a
+                {tgt.target.alias} target to produce a wheel.
+                """
+            )
         )
 
     wheels_listing_result = await Get(
@@ -88,13 +101,11 @@ async def isolate_local_dist_wheels(
     return LocalDistWheels(tuple(wheels), wheels_snapshot.digest, frozenset(provided_files))
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class LocalDistsPexRequest:
     """Request to build the local dists from the dependency closure of a set of addresses."""
 
     addresses: Addresses
-    internal_only: bool
     interpreter_constraints: InterpreterConstraints
     # The result will return these with the sources provided by the dists subtracted out.
     # This will help the caller prevent sources from appearing twice on sys.path.
@@ -104,14 +115,12 @@ class LocalDistsPexRequest:
         self,
         addresses: Iterable[Address],
         *,
-        internal_only: bool,
-        interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
+        interpreter_constraints: InterpreterConstraints,
         sources: PythonSourceFiles = PythonSourceFiles.empty(),
     ) -> None:
-        self.addresses = Addresses(addresses)
-        self.internal_only = internal_only
-        self.interpreter_constraints = interpreter_constraints
-        self.sources = sources
+        object.__setattr__(self, "addresses", Addresses(addresses))
+        object.__setattr__(self, "interpreter_constraints", interpreter_constraints)
+        object.__setattr__(self, "sources", sources)
 
 
 @dataclass(frozen=True)
@@ -173,7 +182,9 @@ async def build_local_dists(
             requirements=PexRequirements(wheels),
             interpreter_constraints=request.interpreter_constraints,
             additional_inputs=wheels_digest,
-            internal_only=request.internal_only,
+            # a "local dists" PEX is always just for consumption by some downstream Pants process,
+            # i.e. internal
+            internal_only=True,
             additional_args=["--intransitive"],
         ),
     )

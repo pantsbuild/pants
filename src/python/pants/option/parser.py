@@ -6,6 +6,7 @@ from __future__ import annotations
 import copy
 import inspect
 import json
+import logging
 import re
 import typing
 from collections import defaultdict
@@ -35,7 +36,6 @@ from pants.option.errors import (
     DefaultValueType,
     FromfileError,
     HelpType,
-    ImplicitValIsNone,
     InvalidKwarg,
     InvalidKwargNonGlobalScope,
     InvalidMemberType,
@@ -53,7 +53,9 @@ from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
-from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -138,11 +140,15 @@ class Parser:
     def scope(self) -> str:
         return self._scope
 
+    @property
+    def known_scoped_args(self) -> frozenset[str]:
+        prefix = f"{self.scope}-" if self.scope != GLOBAL_SCOPE else ""
+        return frozenset(f"--{prefix}{arg.lstrip('--')}" for arg in self._known_args)
+
     def history(self, dest: str) -> OptionValueHistory | None:
         return self._history.get(dest)
 
-    @frozen_after_init
-    @dataclass(unsafe_hash=True)
+    @dataclass(frozen=True)
     class ParseArgsRequest:
         flag_value_map: dict[str, list[Any]]
         namespace: OptionValueContainerBuilder
@@ -160,10 +166,10 @@ class Parser:
             :param flags_in_scope: Iterable of arg strings to parse into flag values.
             :param namespace: The object to register the flag values on
             """
-            self.flag_value_map = self._create_flag_value_map(flags_in_scope)
-            self.namespace = namespace
-            self.passthrough_args = passthrough_args
-            self.allow_unknown_flags = allow_unknown_flags
+            object.__setattr__(self, "flag_value_map", self._create_flag_value_map(flags_in_scope))
+            object.__setattr__(self, "namespace", namespace)
+            object.__setattr__(self, "passthrough_args", passthrough_args)
+            object.__setattr__(self, "allow_unknown_flags", allow_unknown_flags)
 
         @staticmethod
         def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, list[str | None]]:
@@ -183,13 +189,13 @@ class Parser:
                         flag_val = flag[2:]
                     if not flag_val:
                         # Either a short option with no value or a long option with no equals sign.
-                        # Important so we can distinguish between no value ('--foo') and setting to an empty
-                        # string ('--foo='), for options with an implicit_value.
                         flag_val = None
                 flag_value_map[key].append(flag_val)
             return flag_value_map
 
-    def parse_args(self, parse_args_request: ParseArgsRequest) -> OptionValueContainer:
+    def parse_args(
+        self, parse_args_request: ParseArgsRequest, log_warnings: bool = False
+    ) -> OptionValueContainer:
         """Set values for this parser's options on the namespace object.
 
         :raises: :class:`ParseError` if any flags weren't recognized.
@@ -212,41 +218,41 @@ class Parser:
             # We also check if the option is deprecated, but we only do so if the option is explicitly
             # specified as a command-line flag, so we don't spam users with deprecated option values
             # specified in config, which isn't something they control.
-            implicit_value = kwargs.get("implicit_value")
-            if implicit_value is None and self.is_bool(kwargs):
-                implicit_value = True  # Allows --foo to mean --foo=true.
-
             flag_vals: list[int | float | bool | str] = []
 
-            def add_flag_val(v: int | float | bool | str | None) -> None:
-                if v is None:
-                    if implicit_value is None:
-                        raise ParseError(
-                            f"Missing value for command line flag {arg} in {self._scope_str()}"
-                        )
-                    flag_vals.append(implicit_value)
-                else:
-                    flag_vals.append(v)
-
             for arg in args:
-                # If the user specified --no-foo on the cmd line, treat it as if the user specified
-                # --foo, but with the inverse value.
                 if self.is_bool(kwargs):
+                    vals = flag_value_map.get(arg)
+                    if vals:
+                        # Ensure that --foo is as-if --foo-true.
+                        vals[:] = [True if v is None else v for v in vals]
+                    # If the user specified --no-foo on the cmd line, treat it as if the user specified
+                    # --foo, but with the inverse value (ensuring that --no-foo is as-if --no-foo=true,
+                    # which is as-if --foo=false).
                     inverse_arg = self._inverse_arg(arg)
                     if inverse_arg in flag_value_map:
-                        flag_value_map[arg] = [self._invert(v) for v in flag_value_map[inverse_arg]]
-                        implicit_value = self._invert(implicit_value)
+                        flag_value_map[arg] = [
+                            self._invert(v) or False for v in flag_value_map[inverse_arg]
+                        ]
                         del flag_value_map[inverse_arg]
 
                 if arg in flag_value_map:
                     for v in flag_value_map[arg]:
-                        add_flag_val(v)
+                        if v is None:
+                            raise ParseError(
+                                f"Missing value for command line flag {arg} in {self._scope_str()}"
+                            )
+                        flag_vals.append(v)
                     del flag_value_map[arg]
 
             # Get the value for this option, falling back to defaults as needed.
             try:
                 value_history = self._compute_value(
-                    dest, kwargs, flag_vals, parse_args_request.passthrough_args
+                    dest,
+                    kwargs,
+                    flag_vals,
+                    parse_args_request.passthrough_args,
+                    log_warnings,
                 )
                 self._history[dest] = value_history
                 val = value_history.final_value
@@ -256,8 +262,14 @@ class Parser:
                 # BooleanConversionError), hence we reference the original exception type as type(e).
                 args_str = ", ".join(args)
                 raise type(e)(
-                    f"Error computing value for {args_str} in {self._scope_str()} (may also be "
-                    f"from PANTS_* environment variables).\nCaused by:\n{e}"
+                    softwrap(
+                        f"""
+                        Error computing value for {args_str} in {self._scope_str()} (may also be
+                        from PANTS_* environment variables). Caused by:
+
+                        {e}
+                        """
+                    )
                 )
 
             # If the option is explicitly given, check deprecation and mutual exclusion.
@@ -268,9 +280,13 @@ class Parser:
                 mutex_map[mutex_map_key].append(dest)
                 if len(mutex_map[mutex_map_key]) > 1:
                     raise MutuallyExclusiveOptionError(
-                        "Can only provide one of these mutually exclusive options in "
-                        f"{self._scope_str()}, but multiple given: "
-                        f"{', '.join(mutex_map[mutex_map_key])}"
+                        softwrap(
+                            f"""
+                            Can only provide one of these mutually exclusive options in
+                            {self._scope_str()}, but multiple given:
+                            {', '.join(mutex_map[mutex_map_key])}
+                            """
+                        )
                     )
 
             setattr(namespace, dest, val)
@@ -299,9 +315,7 @@ class Parser:
             if not ("default" in nkwargs and isinstance(nkwargs["default"], RankedValue)):
                 type_arg = nkwargs.get("type", str)
                 member_type = nkwargs.get("member_type", str)
-                default_val = self.to_value_type(
-                    nkwargs.get("default"), type_arg, member_type, dest
-                )
+                default_val = self.to_value_type(nkwargs.get("default"), type_arg, member_type)
                 if isinstance(default_val, (ListValueComponent, DictValueComponent)):
                     default_val = default_val.val
                 nkwargs["default"] = RankedValue(Rank.HARDCODED, default_val)
@@ -322,9 +336,8 @@ class Parser:
             default = kwargs.get("default")
             if default is None:
                 # Unless a tri-state bool is explicitly opted into with the `UnsetBool` default value,
-                # boolean options always have an implicit boolean-typed default. We make that default
-                # explicit here.
-                kwargs["default"] = not self.ensure_bool(kwargs.get("implicit_value", True))
+                # boolean options always have an implicit default of False. We make that explicit here.
+                kwargs["default"] = False
             elif default is UnsetBool:
                 kwargs["default"] = None
 
@@ -356,7 +369,6 @@ class Parser:
         "dest",
         "default",
         "default_help_repr",
-        "implicit_value",
         "metavar",
         "help",
         "advanced",
@@ -368,6 +380,7 @@ class Parser:
         "mutually_exclusive_group",
         "daemon",
         "passthrough",
+        "environment_aware",
     }
 
     _allowed_member_types = {
@@ -402,8 +415,6 @@ class Parser:
                 error(OptionNameDoubleDash, arg_name=arg)
 
         # Validate kwargs.
-        if "implicit_value" in kwargs and kwargs["implicit_value"] is None:
-            error(ImplicitValIsNone)
         type_arg = kwargs.get("type", str)
         if "member_type" in kwargs and type_arg != list:
             error(MemberTypeNotAllowed, type_=type_arg.__name__)
@@ -422,7 +433,7 @@ class Parser:
             if isinstance(default_value, str) and type_arg != str:
                 # attempt to parse default value, for correctness..
                 # custom function types may implement their own validation
-                default_value = self.to_value_type(default_value, type_arg, member_type, "")
+                default_value = self.to_value_type(default_value, type_arg, member_type)
                 if hasattr(default_value, "val"):
                     default_value = default_value.val
 
@@ -501,12 +512,13 @@ class Parser:
         except ValueError as error:
             raise ParseError(str(error))
 
-    def to_value_type(self, val_str, type_arg, member_type, dest):
+    @classmethod
+    def to_value_type(cls, val_str, type_arg, member_type):
         """Convert a string to a value of the option's type."""
         if val_str is None:
             return None
         if type_arg == bool:
-            return self.ensure_bool(val_str)
+            return cls.ensure_bool(val_str)
         try:
             if type_arg == list:
                 return ListValueComponent.create(val_str, member_type=member_type)
@@ -540,7 +552,7 @@ class Parser:
             env_vars = [f"PANTS_{sanitized_env_var_scope}_{udest}"]
         return env_vars
 
-    def _compute_value(self, dest, kwargs, flag_val_strs, passthru_arg_strs):
+    def _compute_value(self, dest, kwargs, flag_val_strs, passthru_arg_strs, log_warnings):
         """Compute the value to use for an option.
 
         The source of the value is chosen according to the ranking in Rank.
@@ -549,10 +561,12 @@ class Parser:
         member_type = kwargs.get("member_type", str)
 
         def to_value_type(val_str):
-            return self.to_value_type(val_str, type_arg, member_type, dest)
+            return self.to_value_type(val_str, type_arg, member_type)
 
         # Helper function to expand a fromfile=True value string, if needed.
         # May return a string or a dict/list decoded from a json/yaml file.
+        # If the fromfile is optional and the file does not exist then
+        # None will be returned.
         def expand(val_or_str):
             if (
                 kwargs.get("fromfile", True)
@@ -562,16 +576,23 @@ class Parser:
                 if val_or_str.startswith("@@"):  # Support a literal @ for fromfile values via @@.
                     return val_or_str[1:]
                 else:
-                    fromfile = val_or_str[1:]
+                    if val_or_str.startswith("@?"):  # Support an optional fromfile value via @?.
+                        fromfile, optional = val_or_str[2:], True
+                    else:
+                        fromfile, optional = val_or_str[1:], False
+                    fromfile_path = Path(get_buildroot(), fromfile)
                     try:
-                        with open(fromfile) as fp:
-                            s = fp.read().strip()
-                            if fromfile.endswith(".json"):
-                                return json.loads(s)
-                            elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
-                                return yaml.safe_load(s)
-                            else:
-                                return s
+                        if optional and not fromfile_path.exists():
+                            if log_warnings:
+                                logger.warning(f"Optional file config {fromfile!r} does not exist.")
+                            return None
+                        contents = fromfile_path.read_text()
+                        if fromfile.endswith(".json"):
+                            return json.loads(contents)
+                        elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
+                            return yaml.safe_load(contents)
+                        else:
+                            return contents.strip()
                     except (OSError, ValueError, yaml.YAMLError) as e:
                         raise FromfileError(
                             f"Failed to read {dest} in {self._scope_str()} from file {fromfile}: {e!r}"
@@ -584,7 +605,9 @@ class Parser:
         def merge_in_rank(vals):
             if not vals:
                 return None
-            expanded_vals = [to_value_type(expand(x)) for x in vals]
+            expanded_vals = [to_value_type(v) for v in (expand(i) for i in vals) if v is not None]
+            if not expanded_vals:
+                return None
             if is_list_option(kwargs):
                 return ListValueComponent.merge(expanded_vals)
             if is_dict_option(kwargs):
@@ -613,7 +636,7 @@ class Parser:
 
         # Get value from cmd-line flags.
         flag_vals = list(flag_val_strs)
-        if kwargs.get("passthrough"):
+        if kwargs.get("passthrough") and passthru_arg_strs:
             # NB: Passthrough arguments are either of type `str` or `shell_str`
             # (see self._validate): the former never need interpretation, and the latter do not
             # need interpretation when they have been provided directly via `sys.argv` as the
@@ -690,8 +713,12 @@ class Parser:
                     choices = list(type_arg)
             if choices is not None and val not in choices:
                 raise ParseError(
-                    f"`{val}` is not an allowed value for option {dest} in {self._scope_str()}. "
-                    f"Must be one of: {choices}"
+                    softwrap(
+                        f"""
+                        `{val}` is not an allowed value for option {dest} in {self._scope_str()}.
+                        Must be one of: {choices}
+                        """
+                    )
                 )
             elif type_arg == file_option:
                 check_file_exists(val)

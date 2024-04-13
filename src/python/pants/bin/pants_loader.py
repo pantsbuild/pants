@@ -1,29 +1,28 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+
 import importlib
 import locale
 import os
 import sys
 import time
 import warnings
-from textwrap import dedent
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.bin.pants_env_vars import (
     DAEMON_ENTRYPOINT,
     IGNORE_UNRECOGNIZED_ENCODING,
-    PANTSC_PROFILE,
     RECURSION_LIMIT,
 )
 from pants.bin.pants_runner import PantsRunner
-from pants.util.contextutil import maybe_profiled
+from pants.util.strutil import softwrap
 
 
 class PantsLoader:
     """Initial entrypoint for pants.
 
-    Executes a pants_runner by default, or executs a pantsd-specific entrypoint.
+    Executes a pants_runner by default, or executes a pantsd-specific entrypoint.
     """
 
     @staticmethod
@@ -56,7 +55,7 @@ class PantsLoader:
             and os.environ.get(IGNORE_UNRECOGNIZED_ENCODING, None) is None
         ):
             raise RuntimeError(
-                dedent(
+                softwrap(
                     f"""
                     Your system's preferred encoding is `{encoding}`, but Pants requires `UTF-8`.
                     Specifically, Python's `locale.getpreferredencoding()` must resolve to `UTF-8`.
@@ -86,14 +85,13 @@ class PantsLoader:
 
     @staticmethod
     def run_default_entrypoint() -> None:
-        with maybe_profiled(os.environ.get(PANTSC_PROFILE)):
-            start_time = time.time()
-            try:
-                runner = PantsRunner(args=sys.argv, env=os.environ)
-                exit_code = runner.run(start_time)
-            except KeyboardInterrupt as e:
-                print(f"Interrupted by user:\n{e}", file=sys.stderr)
-                exit_code = PANTS_FAILED_EXIT_CODE
+        start_time = time.time()
+        try:
+            runner = PantsRunner(args=sys.argv, env=os.environ)
+            exit_code = runner.run(start_time)
+        except KeyboardInterrupt as e:
+            print(f"Interrupted by user:\n{e}", file=sys.stderr)
+            exit_code = PANTS_FAILED_EXIT_CODE
         sys.exit(exit_code)
 
     @classmethod
@@ -104,7 +102,6 @@ class PantsLoader:
         sys.setrecursionlimit(int(os.environ.get(RECURSION_LIMIT, "10000")))
 
         entrypoint = os.environ.pop(DAEMON_ENTRYPOINT, None)
-
         if entrypoint:
             cls.run_alternate_entrypoint(entrypoint)
         else:

@@ -1,10 +1,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import json
 import textwrap
 from enum import Enum
-from typing import List, Optional
 
 from pants.help.help_info_extracter import OptionHelpInfo, OptionScopeHelpInfo, to_help_str
 from pants.help.maybe_color import MaybeColor
@@ -20,11 +21,11 @@ class HelpFormatter(MaybeColor):
         self._show_deprecated = show_deprecated
         self._width = terminal_width()
 
-    def format_options(self, oshi: OptionScopeHelpInfo):
+    def format_options(self, oshi: OptionScopeHelpInfo) -> list[str]:
         """Return a help message for the specified options."""
         lines = []
 
-        def add_option(ohis, *, category=None):
+        def add_option(ohis, *, category=None) -> None:
             lines.append("")
             goal_or_subsystem = "goal" if oshi.is_goal else "subsystem"
             display_scope = f"`{oshi.scope}` {goal_or_subsystem}" if oshi.scope else "Global"
@@ -49,11 +50,12 @@ class HelpFormatter(MaybeColor):
                 lines.extend([*self.format_option(ohi), ""])
 
         add_option(oshi.basic)
-        if self._show_advanced:
+        show_advanced = self._show_advanced or (not oshi.basic and oshi.advanced)
+        if show_advanced:  # show advanced options if there are no basic ones.
             add_option(oshi.advanced, category="advanced")
-        if self._show_deprecated:
+        if self._show_deprecated and oshi.deprecated:
             add_option(oshi.deprecated, category="deprecated")
-        if oshi.advanced and not self._show_advanced:
+        if not show_advanced and oshi.advanced:
             lines.append(
                 self.maybe_green(
                     f"Advanced options available. You can list them by running "
@@ -62,17 +64,17 @@ class HelpFormatter(MaybeColor):
             )
         return [*lines, ""]
 
-    def format_option(self, ohi: OptionHelpInfo) -> List[str]:
+    def format_option(self, ohi: OptionHelpInfo) -> list[str]:
         """Format the help output for a single option.
 
         :param ohi: Extracted information for option to print
         :return: Formatted help text for this option
         """
 
-        def maybe_parens(s: Optional[str]) -> str:
+        def maybe_parens(s: str | None) -> str:
             return f" ({s})" if s else ""
 
-        def format_value(ranked_val: RankedValue, prefix: str, left_padding: str) -> List[str]:
+        def format_value(ranked_val: RankedValue, prefix: str, left_padding: str) -> list[str]:
             if isinstance(ranked_val.value, (list, dict)):
                 is_enum_list = (
                     isinstance(ranked_val.value, list)
@@ -92,7 +94,7 @@ class HelpFormatter(MaybeColor):
             val_lines = [self.maybe_cyan(f"{left_padding}{line}") for line in val_lines]
             return val_lines
 
-        def wrap(s: str) -> List[str]:
+        def wrap(s: str) -> list[str]:
             return hard_wrap(s, indent=len(indent), width=self._width)
 
         indent = "      "
@@ -133,6 +135,13 @@ class HelpFormatter(MaybeColor):
             for line in format_value(rv, "overrode: ", f"{indent}    ")
         ]
         description_lines = wrap(ohi.help)
+        if ohi.target_field_name:
+            description_lines.extend(
+                wrap(
+                    f"\nCan be overriden by field `{ohi.target_field_name}` on "
+                    "`local_environment`, `docker_environment`, or `remote_environment` targets."
+                )
+            )
         lines = [
             *arg_lines,
             *choices_lines,

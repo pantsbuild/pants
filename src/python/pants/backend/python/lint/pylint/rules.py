@@ -6,83 +6,141 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Tuple
 
+import packaging
+
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
     PylintFieldSet,
     PylintFirstPartyPlugins,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.util_rules import partition, pex_from_targets
+from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.partition import (
+    _partition_by_interpreter_constraints_and_resolve,
+)
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexRequest,
+    PexResolveInfo,
     VenvPex,
     VenvPexProcess,
     VenvPexRequest,
 )
+from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.lint import REPORT_DIR, LintResult, LintResults, LintTargetsRequest
+from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.collection import Collection
+from pants.core.util_rules.partitions import Partition
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTargets, Target
-from pants.engine.unions import UnionRule
+from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class PylintPartition:
-    root_field_sets: FrozenOrderedSet[PylintFieldSet]
-    closure: FrozenOrderedSet[Target]
+class PartitionMetadata:
+    coarsened_targets: CoarsenedTargets
+    # NB: These are the same across every element in a partition
     resolve_description: str | None
     interpreter_constraints: InterpreterConstraints
 
+    @property
     def description(self) -> str:
         ics = str(sorted(str(c) for c in self.interpreter_constraints))
         return f"{self.resolve_description}, {ics}" if self.resolve_description else ics
 
 
-class PylintPartitions(Collection[PylintPartition]):
-    pass
-
-
 class PylintRequest(LintTargetsRequest):
     field_set_type = PylintFieldSet
-    name = Pylint.options_scope
+    tool_subsystem = Pylint
 
 
-def generate_argv(source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
+def generate_argv(field_sets: tuple[PylintFieldSet, ...], pylint: Pylint) -> Tuple[str, ...]:
     args = []
     if pylint.config is not None:
         args.append(f"--rcfile={pylint.config}")
     args.append("--jobs={pants_concurrency}")
     args.extend(pylint.args)
-    args.extend(source_files.files)
+    args.extend(field_set.source.file_path for field_set in field_sets)
     return tuple(args)
 
 
-@rule(level=LogLevel.DEBUG)
-async def pylint_lint_partition(
-    partition: PylintPartition, pylint: Pylint, first_party_plugins: PylintFirstPartyPlugins
+@rule(desc="Determine if necessary to partition Pylint input", level=LogLevel.DEBUG)
+async def partition_pylint(
+    request: PylintRequest.PartitionRequest[PylintFieldSet],
+    pylint: Pylint,
+    python_setup: PythonSetup,
+    first_party_plugins: PylintFirstPartyPlugins,
+) -> Partitions[PylintFieldSet, PartitionMetadata]:
+    if pylint.skip:
+        return Partitions()
+
+    first_party_ics = InterpreterConstraints.create_from_compatibility_fields(
+        first_party_plugins.interpreter_constraints_fields, python_setup
+    )
+
+    resolve_and_interpreter_constraints_to_field_sets = (
+        _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
+    )
+
+    coarsened_targets = await Get(
+        CoarsenedTargets,
+        CoarsenedTargetsRequest(field_set.address for field_set in request.field_sets),
+    )
+    coarsened_targets_by_address = coarsened_targets.by_address()
+
+    return Partitions(
+        Partition(
+            tuple(field_sets),
+            PartitionMetadata(
+                CoarsenedTargets(
+                    coarsened_targets_by_address[field_set.address] for field_set in field_sets
+                ),
+                resolve if len(python_setup.resolves) > 1 else None,
+                InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
+            ),
+        )
+        for (
+            resolve,
+            interpreter_constraints,
+        ), field_sets, in resolve_and_interpreter_constraints_to_field_sets.items()
+    )
+
+
+@rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
+async def run_pylint(
+    request: PylintRequest.Batch[PylintFieldSet, PartitionMetadata],
+    pylint: Pylint,
+    first_party_plugins: PylintFirstPartyPlugins,
+    pex_environment: PexEnvironment,
 ) -> LintResult:
+    assert request.partition_metadata is not None
+
+    # The coarsened targets in the incoming request are for all targets in the request's original
+    # partition. Since the core `lint` logic re-batches inputs according to `[lint].batch_size`,
+    # this could be many more targets than are actually needed to lint the specific batch of files
+    # received by this rule. Subset the CTs one more time here to only those that are relevant.
+    all_coarsened_targets_by_address = request.partition_metadata.coarsened_targets.by_address()
+    coarsened_targets = CoarsenedTargets(
+        all_coarsened_targets_by_address[field_set.address] for field_set in request.elements
+    )
+    coarsened_closure = tuple(coarsened_targets.closure())
+
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (fs.address for fs in partition.root_field_sets),
+            (target.address for target in coarsened_closure),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
-            hardcoded_interpreter_constraints=partition.interpreter_constraints,
+            hardcoded_interpreter_constraints=request.partition_metadata.interpreter_constraints,
         ),
     )
 
@@ -90,14 +148,14 @@ async def pylint_lint_partition(
         Pex,
         PexRequest,
         pylint.to_pex_request(
-            interpreter_constraints=partition.interpreter_constraints,
+            interpreter_constraints=request.partition_metadata.interpreter_constraints,
             extra_requirements=first_party_plugins.requirement_strings,
         ),
     )
 
-    prepare_python_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.closure))
-    field_set_sources_get = Get(
-        SourceFiles, SourceFilesRequest(fs.source for fs in partition.root_field_sets)
+    sources_get = Get(
+        PythonSourceFiles,
+        PythonSourceFilesRequest(coarsened_closure),
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
@@ -105,16 +163,19 @@ async def pylint_lint_partition(
     (
         pylint_pex,
         requirements_pex,
-        prepared_python_sources,
-        field_set_sources,
+        sources,
         report_directory,
     ) = await MultiGet(
         pylint_pex_get,
         requirements_pex_get,
-        prepare_python_sources_get,
-        field_set_sources_get,
+        sources_get,
         report_directory_digest_get,
     )
+
+    pylint_pex_info = await Get(PexResolveInfo, Pex, pylint_pex)
+    astroid_info = pylint_pex_info.find("astroid")
+    # Astroid is a transitive dependency of pylint and should always be available in the pex.
+    assert astroid_info
 
     pylint_runner_pex, config_files = await MultiGet(
         Get(
@@ -122,23 +183,25 @@ async def pylint_lint_partition(
             VenvPexRequest(
                 PexRequest(
                     output_filename="pylint_runner.pex",
-                    interpreter_constraints=partition.interpreter_constraints,
+                    interpreter_constraints=request.partition_metadata.interpreter_constraints,
                     main=pylint.main,
                     internal_only=True,
                     pex_path=[pylint_pex, requirements_pex],
                 ),
-                # TODO(John Sirois): Remove this (change to the default of symlinks) when we can
-                #  upgrade to a version of Pylint with https://github.com/PyCQA/pylint/issues/1470
-                #  resolved.
-                site_packages_copies=True,
+                pex_environment.in_sandbox(working_directory=None),
+                # Astroid < 2.9.1 had a regression that prevented the use of symlinks:
+                # https://github.com/PyCQA/pylint/issues/1470
+                site_packages_copies=(astroid_info.version < packaging.version.Version("2.9.1")),
             ),
         ),
         Get(
-            ConfigFiles, ConfigFilesRequest, pylint.config_request(field_set_sources.snapshot.dirs)
+            ConfigFiles,
+            ConfigFilesRequest,
+            pylint.config_request(sources.source_files.snapshot.dirs),
         ),
     )
 
-    pythonpath = list(prepared_python_sources.source_roots)
+    pythonpath = list(sources.source_roots)
     if first_party_plugins:
         pythonpath.append(first_party_plugins.PREFIX)
 
@@ -148,7 +211,7 @@ async def pylint_lint_partition(
             (
                 config_files.snapshot.digest,
                 first_party_plugins.sources_digest,
-                prepared_python_sources.source_files.snapshot.digest,
+                sources.source_files.snapshot.digest,
                 report_directory,
             )
         ),
@@ -158,63 +221,22 @@ async def pylint_lint_partition(
         FallibleProcessResult,
         VenvPexProcess(
             pylint_runner_pex,
-            argv=generate_argv(field_set_sources, pylint),
+            argv=generate_argv(request.elements, pylint),
             input_digest=input_digest,
             output_directories=(REPORT_DIR,),
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
-            concurrency_available=len(partition.root_field_sets),
-            description=f"Run Pylint on {pluralize(len(partition.root_field_sets), 'file')}.",
+            concurrency_available=len(request.elements),
+            description=f"Run Pylint on {pluralize(len(request.elements), 'target')}.",
             level=LogLevel.DEBUG,
         ),
     )
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
-    return LintResult.from_fallible_process_result(
-        result,
-        partition_description=partition.description(),
-        report=report,
-    )
-
-
-@rule(desc="Determine if necessary to partition Pylint input", level=LogLevel.DEBUG)
-async def pylint_determine_partitions(
-    request: PylintRequest, python_setup: PythonSetup, first_party_plugins: PylintFirstPartyPlugins
-) -> PylintPartitions:
-    resolve_and_interpreter_constraints_to_coarsened_targets = (
-        await partition._by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
-    )
-
-    first_party_ics = InterpreterConstraints.create_from_compatibility_fields(
-        first_party_plugins.interpreter_constraints_fields, python_setup
-    )
-
-    return PylintPartitions(
-        PylintPartition(
-            FrozenOrderedSet(roots),
-            FrozenOrderedSet(CoarsenedTargets(root_cts).closure()),
-            resolve if len(python_setup.resolves) > 1 else None,
-            InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
-        )
-        for (resolve, interpreter_constraints), (roots, root_cts) in sorted(
-            resolve_and_interpreter_constraints_to_coarsened_targets.items()
-        )
-    )
-
-
-@rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
-async def pylint_lint(request: PylintRequest, pylint: Pylint) -> LintResults:
-    if pylint.skip:
-        return LintResults([], linter_name=request.name)
-
-    partitions = await Get(PylintPartitions, PylintRequest, request)
-    partitioned_results = await MultiGet(
-        Get(LintResult, PylintPartition, partition) for partition in partitions
-    )
-    return LintResults(partitioned_results, linter_name=request.name)
+    return LintResult.create(request, result, report=report)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(LintTargetsRequest, PylintRequest),
+        *PylintRequest.rules(),
         *pex_from_targets.rules(),
     ]

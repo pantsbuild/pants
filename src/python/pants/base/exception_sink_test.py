@@ -40,8 +40,8 @@ def test_set_invalid_log_location():
         "created"
     ) in str(exc.value)
 
-    # NB: This target is marked with 'platform_specific_behavior' because OSX errors out here at
-    # creating a new directory with safe_mkdir(), Linux errors out trying to create the directory
+    # NB: This target is marked with 'platform_specific_behavior' because OSX may error out here at
+    # creating a new directory with safe_mkdir(), while Linux errors out trying to create the directory
     # for its log files with safe_open(). This may be due to differences in the filesystems.
     # TODO: figure out why we error out at different points here!
     with pytest.raises(ExceptionSink.ExceptionSinkError) as exc:
@@ -49,22 +49,23 @@ def test_set_invalid_log_location():
     err_str = {
         Platform.macos_arm64: (
             "The provided log location path at '/' is not writable or could not be created: "
-            "[Errno 21] Is a directory: '/'."
+            "[Errno 21] Is a directory: '/'.",
+            "Error opening fatal error log streams for log location '/': [Errno 30] Read-only file system",
         ),
         Platform.macos_x86_64: (
             "The provided log location path at '/' is not writable or could not be created: "
-            "[Errno 21] Is a directory: '/'."
+            "[Errno 21] Is a directory: '/'.",
         ),
         Platform.linux_arm64: (
             "Error opening fatal error log streams for log location '/': [Errno 13] Permission "
-            "denied:"
+            "denied:",
         ),
         Platform.linux_x86_64: (
             "Error opening fatal error log streams for log location '/': [Errno 13] Permission "
-            "denied:"
+            "denied:",
         ),
     }
-    assert match(Platform.current, err_str) in str(exc.value)
+    assert any(s in str(exc.value) for s in match(Platform.create_for_localhost(), err_str))
 
 
 def test_log_exception():

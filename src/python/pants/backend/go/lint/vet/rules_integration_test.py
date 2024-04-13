@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from textwrap import dedent
 
 import pytest
@@ -23,11 +24,10 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.rules import SubsystemRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -49,8 +49,9 @@ def rule_runner() -> RuleRunner:
             *link.rules(),
             *build_pkg.rules(),
             *assembly.rules(),
-            QueryRule(LintResults, (GoVetRequest,)),
-            SubsystemRule(GoVetSubsystem),
+            QueryRule(Partitions, [GoVetRequest.PartitionRequest]),
+            QueryRule(LintResult, [GoVetRequest.Batch]),
+            *GoVetSubsystem.rules(),
         ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
@@ -94,9 +95,18 @@ def run_go_vet(
 ) -> tuple[LintResult, ...]:
     args = extra_args or []
     rule_runner.set_options(args, env_inherit={"PATH"})
-    field_sets = [GoVetFieldSet.create(tgt) for tgt in targets]
-    lint_results = rule_runner.request(LintResults, [GoVetRequest(field_sets)])
-    return lint_results.results
+    partitions = rule_runner.request(
+        Partitions,
+        [GoVetRequest.PartitionRequest(tuple(GoVetFieldSet.create(tgt) for tgt in targets))],
+    )
+    results = []
+    for partition in partitions:
+        result = rule_runner.request(
+            LintResult,
+            [GoVetRequest.Batch("", partition.elements, partition.metadata)],
+        )
+        results.append(result)
+    return tuple(results)
 
 
 def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
@@ -119,6 +129,14 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert lint_results[0].stderr == ""
 
 
+def _check_err_msg(result_stderr: str) -> None:
+    # Note: `go vet` sometimes emits "fmt.Printf" and sometimes just "Printf", depending on conditions
+    # which are unclear so let the `fmt.` part be optional.
+    assert re.search(
+        r"./f.go:4:5: (fmt\.)?Printf format %s reads arg #1, but call has 0 args", result_stderr
+    )
+
+
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -130,10 +148,8 @@ def test_failing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     lint_results = run_go_vet(rule_runner, [tgt])
     assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 2
-    assert (
-        "./f.go:4:5: Printf format %s reads arg #1, but call has 0 args" in lint_results[0].stderr
-    )
+    assert lint_results[0].exit_code != 0
+    _check_err_msg(lint_results[0].stderr)
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
@@ -153,10 +169,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     ]
     lint_results = run_go_vet(rule_runner, tgts)
     assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 2
-    assert (
-        "bad/f.go:4:5: Printf format %s reads arg #1, but call has 0 args" in lint_results[0].stderr
-    )
+    assert lint_results[0].exit_code != 0
+    _check_err_msg(lint_results[0].stderr)
     assert "good/f.go" not in lint_results[0].stdout
 
 

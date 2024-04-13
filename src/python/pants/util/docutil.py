@@ -16,8 +16,23 @@ def terminal_width(*, fallback: int = 96, padding: int = 2) -> int:
     return shutil.get_terminal_size(fallback=(fallback, 24)).columns - padding
 
 
-def doc_url(slug: str) -> str:
-    return f"https://www.pantsbuild.org/v{MAJOR_MINOR}/docs/{slug}"
+_VERSIONED_PREFIXES = ("docs/", "reference/")
+
+
+def doc_url(path: str) -> str:
+    """Return a URL to the specified `path` on the Pants website.
+
+    The path should be the part of the URL after the domain, ignoring the version, e.g.:
+
+    - to link to https://www.pantsbuild.org/community/getting-help, pass `"/community/getting-help"`
+
+    - to link to the current version of
+      https://www.pantsbuild.org/2.19/docs/python/overview/enabling-python-support, pass
+      `"docs/python/overview/enabling-python-support"`
+    """
+    versioned = any(path.startswith(prefix) for prefix in _VERSIONED_PREFIXES)
+    version_info = f"{MAJOR_MINOR}/" if versioned else ""
+    return f"https://www.pantsbuild.org/{version_info}{path}"
 
 
 def git_url(fp: str) -> str:
@@ -36,4 +51,8 @@ def bin_name() -> str:
     # However, this assumption really breaks down when we go to test pants (or a plugin author goes
     # to test their plugin). Therefore we give a fallback and have integration test(s) to assert
     # we've set this at the right point in time.
-    return os.environ.get("PANTS_BIN_NAME", "./pants")  # noqa: PANTSBIN
+    #
+    # Note that __PANTS_BIN_NAME is set in options_bootstrapper.py based on the value of the
+    # pants_bin_name global option, so you cannot naively modify this by setting __PANTS_BIN_NAME
+    # externally. You must set that option value in one of the usual ways.
+    return os.environ.get("__PANTS_BIN_NAME", "./pants")  # noqa: PANTSBIN

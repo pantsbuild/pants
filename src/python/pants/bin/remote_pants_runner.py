@@ -11,7 +11,11 @@ from contextlib import contextmanager
 from typing import List, Mapping
 
 from pants.base.exiter import ExitCode
-from pants.engine.internals.native_engine import PantsdConnectionException, PyNailgunClient
+from pants.engine.internals.native_engine import (
+    PantsdConnectionException,
+    PyExecutor,
+    PyNailgunClient,
+)
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
@@ -114,18 +118,49 @@ class RemotePantsRunner:
         pantsd_handle = self._client.maybe_launch()
         logger.debug(f"Connecting to pantsd on port {pantsd_handle.port}")
 
-        return self._connect_and_execute(pantsd_handle, start_time)
+        executor = GlobalOptions.create_py_executor(self._bootstrap_options.for_global_scope())
+        try:
+            return self._connect_and_execute(pantsd_handle, executor, start_time)
+        finally:
+            executor.shutdown(3)
 
     def _connect_and_execute(
-        self, pantsd_handle: PantsDaemonClient.Handle, start_time: float
+        self,
+        pantsd_handle: PantsDaemonClient.Handle,
+        executor: PyExecutor,
+        start_time: float,
     ) -> ExitCode:
         global_options = self._bootstrap_options.for_global_scope()
-        executor = GlobalOptions.create_py_executor(global_options)
 
-        # Merge the nailgun TTY capability environment variables with the passed environment dict.
-        ng_env = ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
+        # NB: If an OS string is not valid UTF-8, Python encodes the non-decodable bytes
+        #  as lone surrogates (see https://peps.python.org/pep-0383/).
+        #  However when we pass these to Rust, we will fail to decode as strict UTF-8.
+        #  So we perform a lossy re-encoding to prevent this.
+        def strict_utf8(s: str) -> str:
+            return s.encode("utf-8", "replace").decode("utf-8")
+
+        strict_env = {}
+        for key, val in sorted(self._env.items()):
+            strict_key = strict_utf8(key)
+            strict_val = strict_utf8(val)
+            if strict_key == key:
+                if strict_val == val:
+                    strict_env[strict_key] = strict_val
+                else:
+                    logger.warning(f"Environment variable with non-UTF-8 value ignored: {key}")
+            else:
+                # We can only log strict_key, because logging will choke on non-UTF-8.
+                # But the reader will know what we mean.
+                logger.warning(f"Environment variable with non-UTF-8 name ignored: {strict_key}")
+
+        try:
+            # Merge the nailgun TTY capability environment variables with the passed environment dict.
+            ng_env = ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
+        except OSError as e:
+            logger.debug("Failed to execute ttynames_to_env:  %s", e)
+            ng_env = {}
         modified_env = {
-            **self._env,
+            **strict_env,
             **ng_env,
             "PANTSD_RUNTRACKER_CLIENT_START_TIME": str(start_time),
             "PANTSD_REQUEST_TIMEOUT_LIMIT": str(
@@ -158,7 +193,7 @@ class RemotePantsRunner:
                     logger.warning(f"Pantsd was unresponsive on port {port}, retrying.")
                     time.sleep(1)
 
-                    # One possible cause of the daemon being non-responsive during an attempt might be if a
+                    # One possible cause of the daemon being non-responsive during an attempt might be if
                     # another lifecycle operation is happening concurrently (incl teardown). To account for
                     # this, we won't begin attempting restarts until at least 1 attempt has passed.
                     if attempt > 1:

@@ -3,16 +3,23 @@
 
 from __future__ import annotations
 
+import textwrap
 from textwrap import dedent
 from typing import Iterable
 
 import pytest
 
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.codegen.soap.java.jaxws import JaxWsTools
 from pants.backend.codegen.soap.java.rules import GenerateJavaFromWsdlRequest
 from pants.backend.codegen.soap.java.rules import rules as java_wsdl_rules
 from pants.backend.codegen.soap.rules import rules as wsdl_rules
 from pants.backend.codegen.soap.target_types import WsdlSourceField, WsdlSourcesGeneratorTarget
+from pants.backend.experimental.java.register import rules as java_backend_rules
+from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files, stripped_source_files
@@ -21,19 +28,39 @@ from pants.engine import process
 from pants.engine.internals import graph
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
-from pants.jvm import classpath
+from pants.jvm import classpath, testutil
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.target_types import JvmArtifactTarget
+from pants.jvm.testutil import (
+    RenderedClasspath,
+    expect_single_expanded_coarsened_target,
+    make_resolve,
+)
 from pants.jvm.util_rules import rules as jdk_util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+
+
+@pytest.fixture
+def wsdl_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "wdsl.test.lock",
+        ["com.sun.xml.ws:jaxws-rt:2.3.5"],
+    )
+
+
+@pytest.fixture
+def wsdl_lockfile(wsdl_lockfile_def: JVMLockfileFixtureDefinition, request) -> JVMLockfileFixture:
+    return wsdl_lockfile_def.load(request)
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
+            *java_backend_rules(),
             *config_files.rules(),
             *classpath.rules(),
             *coursier_fetch_rules(),
@@ -48,11 +75,18 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *java_wsdl_rules(),
             *wsdl_rules(),
+            *testutil.rules(),
             QueryRule(JaxWsTools, ()),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromWsdlRequest]),
+            QueryRule(RenderedClasspath, (CompileJavaSourceRequest,)),
         ],
-        target_types=[JavaSourceTarget, JavaSourcesGeneratorTarget, WsdlSourcesGeneratorTarget],
+        target_types=[
+            JavaSourceTarget,
+            JavaSourcesGeneratorTarget,
+            JvmArtifactTarget,
+            WsdlSourcesGeneratorTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
@@ -128,11 +162,27 @@ _FOO_SERVICE_WSDL = dedent(
 )
 
 
-def test_generate_java_from_wsdl(rule_runner: RuleRunner) -> None:
+def test_generate_java_from_wsdl(
+    rule_runner: RuleRunner, wsdl_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
-            "src/wsdl/BUILD": "wsdl_sources()",
+            "src/wsdl/BUILD": "wsdl_sources(java_package='com.example.wsdl.fooservice')",
             "src/wsdl/FooService.wsdl": _FOO_SERVICE_WSDL,
+            "3rdparty/jvm/default.lock": wsdl_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": wsdl_lockfile.requirements_as_jvm_artifact_targets(),
+            "src/jvm/BUILD": "java_sources()",
+            "src/jvm/FooServiceMain.java": textwrap.dedent(
+                """\
+                package org.pantsbuild.example;
+                import com.example.wsdl.fooservice.FooService;
+                public class FooServiceMain {
+                    public static void main(String[] args) {
+                        FooService service = new FooService();
+                    }
+                }
+                """
+            ),
         }
     )
 
@@ -148,6 +198,14 @@ def test_generate_java_from_wsdl(rule_runner: RuleRunner) -> None:
             "src/wsdl/com/example/wsdl/fooservice/FooService.java",
         ),
     )
+
+    request = CompileJavaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="src/jvm")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    _ = rule_runner.request(RenderedClasspath, [request])
 
 
 def test_generate_java_module_from_wsdl(rule_runner: RuleRunner) -> None:

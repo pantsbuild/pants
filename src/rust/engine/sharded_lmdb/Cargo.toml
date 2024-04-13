@@ -1,19 +1,22 @@
 [package]
 name = "sharded_lmdb"
 version = "0.0.1"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-bytes = "1.0"
+bytes = { workspace = true }
 fs = { path = "../fs" }
-futures = "0.3"
+futures = { workspace = true }
 hashing = { path = "../hashing" }
-lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
-log = "0.4"
+lmdb-rkv = { workspace = true }
+log = { workspace = true }
 task_executor = { path = "../task_executor" }
-tempfile = "3"
+tempfile = { workspace = true }
 
 [dev-dependencies]
-parking_lot = "0.12"
-tokio = { version = "1.16", features = ["macros"] }
+parking_lot = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }
+
+[lints]
+workspace = true

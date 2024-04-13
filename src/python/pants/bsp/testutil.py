@@ -16,7 +16,7 @@ from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # ty
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection
 from pants.bsp.rules import rules as bsp_rules
-from pants.engine.internals import native_engine
+from pants.engine.internals.native_engine import PyThreadLocals
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -93,7 +93,7 @@ def setup_bsp_server(
 ):
     rule_runner = rule_runner or RuleRunner(rules=bsp_rules())
     notification_names = notification_names or set()
-    stdio_destination = native_engine.stdio_thread_get_destination()
+    thread_locals = PyThreadLocals.get_for_current_thread()
 
     with setup_pipes() as pipes:
         context = BSPContext()
@@ -107,7 +107,7 @@ def setup_bsp_server(
         )
 
         def run_bsp_server():
-            native_engine.stdio_thread_set_destination(stdio_destination)
+            thread_locals.set_for_current_thread()
             conn.run()
 
         bsp_thread = Thread(target=run_bsp_server)

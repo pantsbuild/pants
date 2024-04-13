@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import ClassVar, Generic, Sequence, Type, TypeVar
 
 import toml
-from typing_extensions import Protocol
 
 from pants.base.build_root import BuildRoot
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
@@ -43,16 +42,18 @@ from pants.bsp.spec.targets import (
     WorkspaceBuildTargetsParams,
     WorkspaceBuildTargetsResult,
 )
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import DigestContents, PathGlobs, Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import _uncacheable_rule, collect_rules, rule
 from pants.engine.target import (
+    Field,
+    FieldDefaults,
     FieldSet,
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
-    Target,
     Targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -66,39 +67,7 @@ _logger = logging.getLogger(__name__)
 _FS = TypeVar("_FS", bound=FieldSet)
 
 
-@union
-@dataclass(frozen=True)
-class BSPResolveFieldFactoryRequest(Generic[_FS]):
-    """Requests an implementation of `BSPResolveFieldFactory` which can filter resolve fields.
-
-    TODO: This is to work around the fact that Field value defaulting cannot have arbitrary
-    subsystem requirements, and so `JvmResolveField` and `PythonResolveField` have methods
-    which compute the true value of the field given a subsytem argument. Consumers need to
-    be type aware, and `@rules` cannot have dynamic requirements.
-
-    See https://github.com/pantsbuild/pants/issues/12934 about potentially allowing unions
-    (including Field registrations) to have `@rule_helper` methods, which would allow the
-    computation of an AsyncFields to directly require a subsystem.
-    """
-
-    resolve_prefix: ClassVar[str]
-
-
-# TODO: Workaround for https://github.com/python/mypy/issues/5485, because we cannot directly use
-# a Callable.
-class _ResolveFieldFactory(Protocol):
-    def __call__(self, target: Target) -> str | None:
-        pass
-
-
-@dataclass(frozen=True)
-class BSPResolveFieldFactoryResult:
-    """Computes the resolve field value for a Target, if applicable."""
-
-    resolve_field_value: _ResolveFieldFactory
-
-
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class BSPBuildTargetsMetadataRequest(Generic[_FS]):
     """Hook to allow language backends to provide metadata for BSP build targets."""
@@ -106,6 +75,9 @@ class BSPBuildTargetsMetadataRequest(Generic[_FS]):
     language_id: ClassVar[str]
     can_merge_metadata_from: ClassVar[tuple[str, ...]]
     field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
+
+    resolve_prefix: ClassVar[str]
+    resolve_field: ClassVar[type[Field]]
 
     field_sets: tuple[_FS, ...]
 
@@ -166,7 +138,7 @@ class _ParseOneBSPMappingRequest:
 async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> BSPBuildTargetInternal:
     specs_parser = SpecsParser()
     specs = specs_parser.parse_specs(
-        request.definition.addresses, convert_dir_literal_to_address_literal=False
+        request.definition.addresses, description_of_origin=f"the BSP mapping {request.name}"
     ).includes
     return BSPBuildTargetInternal(request.name, specs, request.definition)
 
@@ -175,7 +147,7 @@ async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> BSPBuild
 async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargets:
     definitions: dict[str, BSPTargetDefinition] = {}
     for config_file in bsp_goal.groups_config_files:
-        config_contents = await Get(
+        config_contents = await Get(  # noqa: PNT30: requires triage
             DigestContents,
             PathGlobs(
                 [config_file],
@@ -233,10 +205,7 @@ async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargets:
         Get(BSPBuildTargetInternal, _ParseOneBSPMappingRequest(name, definition))
         for name, definition in definitions.items()
     )
-    target_mapping = {
-        key: bsp_internal_target
-        for key, bsp_internal_target in zip(definitions.keys(), bsp_internal_targets)
-    }
+    target_mapping = dict(zip(definitions.keys(), bsp_internal_targets))
     return BSPBuildTargets(FrozenDict(target_mapping))
 
 
@@ -259,6 +228,7 @@ async def resolve_bsp_build_target_identifier(
 async def resolve_bsp_build_target_addresses(
     bsp_target: BSPBuildTargetInternal,
     union_membership: UnionMembership,
+    field_defaults: FieldDefaults,
 ) -> Targets:
     # NB: Using `RawSpecs` directly rather than `RawSpecsWithoutFileOwners` results in a rule graph cycle.
     targets = await Get(
@@ -277,17 +247,19 @@ async def resolve_bsp_build_target_addresses(
             f"prefix like `$lang:$filter`, but the configured value: `{resolve_filter}` did not."
         )
 
-    # TODO: See `BSPResolveFieldFactoryRequest` re: this awkwardness.
-    factories = await MultiGet(
-        Get(BSPResolveFieldFactoryResult, BSPResolveFieldFactoryRequest, request())
-        for request in union_membership.get(BSPResolveFieldFactoryRequest)
-        if request.resolve_prefix == resolve_prefix
-    )
+    resolve_fields = {
+        impl.resolve_field
+        for impl in union_membership.get(BSPBuildTargetsMetadataRequest)
+        if impl.resolve_prefix == resolve_prefix
+    }
 
     return Targets(
         t
         for t in targets
-        if any((factory.resolve_field_value)(t) == resolve_value for factory in factories)
+        if any(
+            t.has_field(field) and field_defaults.value_or_default(t[field]) == resolve_value
+            for field in resolve_fields
+        )
     )
 
 
@@ -564,7 +536,7 @@ async def bsp_dependency_sources(request: DependencySourcesParams) -> Dependency
 # -----------------------------------------------------------------------------------------------
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class BSPDependencyModulesRequest(Generic[_FS]):
     """Hook to allow language backends to provide dependency modules."""
@@ -662,7 +634,7 @@ async def bsp_dependency_modules(
 # -----------------------------------------------------------------------------------------------
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class BSPCompileRequest(Generic[_FS]):
     """Hook to allow language backends to compile targets."""
@@ -692,7 +664,7 @@ class BSPCompileResult:
 # -----------------------------------------------------------------------------------------------
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class BSPResourcesRequest(Generic[_FS]):
     """Hook to allow language backends to provide resources for targets."""

@@ -38,7 +38,6 @@ class CliOptions(Subsystem):
     help = "Options for configuring CLI behavior, such as command line aliases."
 
     alias = DictOption[str](
-        "--alias",
         help=softwrap(
             f"""
             Register command line aliases.
@@ -47,11 +46,11 @@ class CliOptions(Subsystem):
 
                 [cli.alias]
                 green = "fmt lint check"
-                all-changed = "--changed-since=HEAD --changed-dependees=transitive"
+                --all-changed = "--changed-since=HEAD --changed-dependents=transitive"
 
 
-            This would allow you to run `{bin_name()} green all-changed`, which is shorthand for
-            `{bin_name()} fmt lint check --changed-since=HEAD --changed-dependees=transitive`.
+            This would allow you to run `{bin_name()} green --all-changed`, which is shorthand for
+            `{bin_name()} fmt lint check --changed-since=HEAD --changed-dependents=transitive`.
 
             Notice: this option must be placed in a config file (e.g. `pants.toml` or `pantsrc`)
             to have any effect.
@@ -65,13 +64,17 @@ class CliAlias:
     definitions: FrozenDict[str, tuple[str, ...]] = field(default_factory=FrozenDict)
 
     def __post_init__(self):
-        valid_alias_re = re.compile(r"\w(\w|-)*\w$", re.IGNORECASE)
+        valid_alias_re = re.compile(r"(--)?\w(\w|-)*\w$", re.IGNORECASE)
         for alias in self.definitions.keys():
             if not re.match(valid_alias_re, alias):
                 raise CliAliasInvalidError(
-                    f"Invalid alias in `[cli].alias` option: {alias!r}. May only contain alpha "
-                    "numerical letters and the separators `-` and `_`, and may not begin/end "
-                    "with a `-`."
+                    softwrap(
+                        f"""
+                        Invalid alias in `[cli].alias` option: {alias!r}. May only contain alpha
+                        numerical letters and the separators `-` and `_`. Flags can be defined using
+                        `--`. A single dash is not allowed.
+                        """
+                    )
                 )
 
     @classmethod
@@ -87,7 +90,7 @@ class CliAlias:
                 else:
                     if arg in trail:
                         raise CliAliasCycleError(
-                            "CLI alias cycle detected in `[cli].alias` option: "
+                            "CLI alias cycle detected in `[cli].alias` option:\n"
                             + " -> ".join([arg, *trail])
                         )
                     yield from expand(definitions[arg], arg, *trail)
@@ -101,14 +104,34 @@ class CliAlias:
             )
         )
 
-    def check_name_conflicts(self, known_scopes: dict[str, ScopeInfo]) -> None:
+    def check_name_conflicts(
+        self, known_scopes: dict[str, ScopeInfo], known_flags: dict[str, frozenset[str]]
+    ) -> None:
         for alias in self.definitions.keys():
             scope = known_scopes.get(alias)
+
             if scope:
                 raise CliAliasInvalidError(
-                    f"Invalid alias in `[cli].alias` option: {alias!r}. This is already a "
-                    "registered " + ("goal." if scope.is_goal else "subsystem.")
+                    softwrap(
+                        f"""
+                        Invalid alias in `[cli].alias` option: {alias!r}. This is already a
+                        registered {"goal" if scope.is_goal else "subsystem"}.
+                        """
+                    )
                 )
+
+        for scope_name, args in known_flags.items():
+            for alias in self.definitions.keys():
+                if alias in args:
+                    scope_name = scope_name or "global"
+                    raise CliAliasInvalidError(
+                        softwrap(
+                            f"""
+                            Invalid flag-like alias in `[cli].alias` option: {alias!r}. This is
+                            already a registered flag in the {scope_name!r} scope.
+                            """
+                        )
+                    )
 
     def expand_args(self, args: tuple[str, ...]) -> tuple[str, ...]:
         if not self.definitions:

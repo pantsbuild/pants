@@ -10,9 +10,11 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Sequence, Tuple
 
 from pants.base.specs import Specs
+from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine.addresses import Addresses
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, DigestContents, FileDigest, Snapshot
-from pants.engine.internals import native_engine
+from pants.engine.internals.native_engine import PyThreadLocals
 from pants.engine.internals.scheduler import SchedulerSession, Workunit
 from pants.engine.internals.selectors import Params
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
@@ -21,6 +23,7 @@ from pants.engine.unions import UnionMembership, union
 from pants.goal.run_tracker import RunTracker
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +31,24 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------------------------
 # Streaming workunits plugin API
 # -----------------------------------------------------------------------------------------------
+
+
+def thread_locals_get_for_current_thread() -> PyThreadLocals:
+    """Gets the engine's thread local state for the current thread.
+
+    In order to safely use StreamingWorkunitContext methods from additional threads,
+    StreamingWorkunit plugins should propagate thread local state from the threads that they are
+    initialized on to any additional threads that they spawn.
+    """
+    return PyThreadLocals.get_for_current_thread()
+
+
+def thread_locals_set_for_current_thread(thread_locals: PyThreadLocals) -> None:
+    """Sets the engine's thread local state for the current thread.
+
+    See `thread_locals_get`.
+    """
+    thread_locals.set_for_current_thread()
 
 
 @dataclass(frozen=True)
@@ -84,23 +105,52 @@ class StreamingWorkunitContext:
         """Return a dict containing the canonicalized addresses of the specs for this run, and what
         files they expand to."""
 
-        (unexpanded_addresses,) = self._scheduler.product_request(
-            Addresses, [Params(self._specs, self._options_bootstrapper)]
+        params = Params(
+            self._specs,
+            self._options_bootstrapper,
+            determine_bootstrap_environment(self._scheduler),
         )
+        request = self._scheduler.execution_request([(Addresses, params), (Targets, params)])
+        unexpanded_addresses, expanded_targets = self._scheduler.execute(request)
 
-        expanded_targets = self._scheduler.product_request(
-            Targets, [Params(Addresses([addr])) for addr in unexpanded_addresses]
-        )
-        targets_dict: dict[str, list[TargetInfo]] = {}
-        for addr, targets in zip(unexpanded_addresses, expanded_targets):
-            targets_dict[addr.spec] = [
+        targets_dict: dict[str, list[TargetInfo]] = {str(addr): [] for addr in unexpanded_addresses}
+        for target in expanded_targets:
+            target_spec = str(target.address.spec)
+            source = targets_dict.get(target_spec)
+            if source is None:
+                target_gen_spec = str(target.address.maybe_convert_to_target_generator())
+                source = targets_dict.get(target_gen_spec)
+                if source is None:
+                    # This is a thing, that may need investigating to be fully understood.
+                    # merely patches over a crash here. See #18564.
+                    logger.warn(
+                        softwrap(
+                            f"""
+                            Unknown source address for target: {target_spec}
+                            Target address generator: {target_gen_spec}
+
+                            Input params:
+                            {params}
+
+                            Unexpanded addresses:
+                            {unexpanded_addresses}
+
+                            Expanded targets:
+                            {expanded_targets}
+                            """
+                        )
+                    )
+                    targets_dict[target_gen_spec or target_spec] = source = []
+
+            source.append(
                 TargetInfo(
                     filename=(
-                        tgt.address.filename if tgt.address.is_file_target else str(tgt.address)
+                        target.address.filename
+                        if target.address.is_file_target
+                        else str(target.address)
                     )
                 )
-                for tgt in targets
-            ]
+            )
         return ExpandedSpecs(targets=targets_dict)
 
 
@@ -128,9 +178,9 @@ class WorkunitsCallback(ABC):
         completed?
 
         The main reason to `return False` is if your callback logs in its final call, when
-        `finished=True`, as it may end up logging to `.pantsd.d/pants.log` instead of the console,
-        which is harder for users to find. Otherwise, most callbacks should return `True` to avoid
-        slowing down Pants from finishing the run.
+        `finished=True`, as it may end up logging to `.pants.d/workdir/pants.log` instead of the
+        console, which is harder for users to find. Otherwise, most callbacks should return `True`
+        to avoid slowing down Pants from finishing the run.
         """
 
 
@@ -149,7 +199,7 @@ class WorkunitsCallbackFactories(Tuple[WorkunitsCallbackFactory, ...]):
     """A list of registered factories for WorkunitsCallback instances."""
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class WorkunitsCallbackFactoryRequest:
     """A request for a particular WorkunitsCallbackFactory."""
 
@@ -246,9 +296,9 @@ class _InnerHandler(threading.Thread):
         self.block_until_complete = not allow_async_completion or any(
             callback.can_finish_async is False for callback in self.callbacks
         )
-        # Get the parent thread's logging destination. Note that this thread has not yet started
+        # Get the parent thread's thread locals. Note that this thread has not yet started
         # as we are only in the constructor.
-        self.logging_destination = native_engine.stdio_thread_get_destination()
+        self.thread_locals = PyThreadLocals.get_for_current_thread()
 
     def poll_workunits(self, *, finished: bool) -> None:
         workunits = self.scheduler.poll_workunits(self.max_workunit_verbosity)
@@ -261,9 +311,10 @@ class _InnerHandler(threading.Thread):
             )
 
     def run(self) -> None:
-        # First, set the thread's logging destination to the parent thread's, meaning the console.
-        native_engine.stdio_thread_set_destination(self.logging_destination)
-        while not self.stop_request.isSet():
+        # First, set the thread's thread locals to the parent thread's in order to propagate the
+        # console, workunit stores, etc.
+        self.thread_locals.set_for_current_thread()
+        while not self.stop_request.is_set():
             self.poll_workunits(finished=False)
             self.stop_request.wait(timeout=self.report_interval)
         else:
@@ -286,8 +337,8 @@ class _InnerHandler(threading.Thread):
 
 def rules():
     return [
-        QueryRule(WorkunitsCallbackFactories, (UnionMembership,)),
-        QueryRule(Targets, (Addresses,)),
-        QueryRule(Addresses, (Specs, OptionsBootstrapper)),
+        QueryRule(WorkunitsCallbackFactories, (UnionMembership, EnvironmentName)),
+        QueryRule(Targets, (Specs, OptionsBootstrapper, EnvironmentName)),
+        QueryRule(Addresses, (Specs, OptionsBootstrapper, EnvironmentName)),
         *collect_rules(),
     ]

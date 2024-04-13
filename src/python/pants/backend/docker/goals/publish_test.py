@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Callable, cast
 
 import pytest
 
-from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerFieldSet
+from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerPackageFieldSet
 from pants.backend.docker.goals.publish import (
     PublishDockerImageFieldSet,
     PublishDockerImageRequest,
@@ -17,14 +17,16 @@ from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules import docker_binary
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
-from pants.backend.docker.value_interpolation import DockerInterpolationContext
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.publish import PublishPackages, PublishProcesses
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
+from pants.engine.process import Process
 from pants.testutil.option_util import create_subsystem
+from pants.testutil.process_util import process_assertion
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
+from pants.util.value_interpolation import InterpolationContext
 
 
 @pytest.fixture
@@ -53,18 +55,20 @@ def rule_runner() -> RuleRunner:
 
 
 def build(tgt: DockerImageTarget, options: DockerOptions):
-    fs = DockerFieldSet.create(tgt)
+    fs = DockerPackageFieldSet.create(tgt)
+    image_refs = fs.image_refs(
+        options.default_repository,
+        options.registries(),
+        InterpolationContext(),
+    )
     return (
         BuiltPackage(
             EMPTY_DIGEST,
             (
                 BuiltDockerImage.create(
                     "sha256:made-up",
-                    fs.image_refs(
-                        options.default_repository,
-                        options.registries(),
-                        DockerInterpolationContext(),
-                    ),
+                    tuple(t.full_name for r in image_refs for t in r.tags),
+                    "made-up.json",
                 ),
             ),
         ),
@@ -90,22 +94,15 @@ def assert_publish(
     publish: PublishPackages,
     expect_names: tuple[str, ...],
     expect_description: str | None,
-    expect_process,
+    expect_process: Callable[[Process], None] | None,
 ) -> None:
     assert publish.names == expect_names
     assert publish.description == expect_description
     if expect_process:
-        expect_process(publish.process)
+        assert publish.process
+        expect_process(publish.process.process)
     else:
         assert publish.process is None
-
-
-def process_assertion(**assertions):
-    def assert_process(process):
-        for attr, expected in assertions.items():
-            assert getattr(process, attr) == expected
-
-    return assert_process
 
 
 def test_docker_skip_push(rule_runner: RuleRunner) -> None:

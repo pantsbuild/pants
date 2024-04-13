@@ -8,10 +8,11 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, DefaultDict
+from typing import Any, Callable, DefaultDict
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.util_rules.environments import EnvironmentsSubsystem
 from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.target import Target
@@ -29,11 +30,26 @@ logger = logging.getLogger(__name__)
 
 # No goal or target_type can have a name from this set, so that `./pants help <name>`
 # is unambiguous.
-_RESERVED_NAMES = {"api-types", "global", "goals", "subsystems", "targets", "tools"}
+_RESERVED_NAMES = {
+    "api-types",
+    "backends",
+    "global",
+    "goals",
+    "subsystems",
+    "symbols",
+    "targets",
+    "tools",
+}
 
 
 # Subsystems used outside of any rule.
-_GLOBAL_SUBSYSTEMS: set[type[Subsystem]] = {GlobalOptions, Changed, CliOptions, FilterSubsystem}
+_GLOBAL_SUBSYSTEMS: set[type[Subsystem]] = {
+    GlobalOptions,
+    Changed,
+    CliOptions,
+    FilterSubsystem,
+    EnvironmentsSubsystem,
+}
 
 
 @dataclass(frozen=True)
@@ -46,6 +62,7 @@ class BuildConfiguration:
     rule_to_providers: FrozenDict[Rule, tuple[str, ...]]
     union_rule_to_providers: FrozenDict[UnionRule, tuple[str, ...]]
     allow_unknown_options: bool
+    remote_auth_plugin_func: Callable | None
 
     @property
     def all_subsystems(self) -> tuple[type[Subsystem], ...]:
@@ -121,6 +138,7 @@ class BuildConfiguration:
             default_factory=lambda: defaultdict(list)
         )
         _allow_unknown_options: bool = False
+        _remote_auth_plugin: Callable | None = None
 
         def registered_aliases(self) -> BuildFileAliases:
             """Return the registered aliases exposed in BUILD files.
@@ -204,7 +222,7 @@ class BuildConfiguration:
 
             # "Index" the rules to normalize them and expand their dependencies.
             rule_index = RuleIndex.create(rules)
-            rules_and_queries = (*rule_index.rules, *rule_index.queries)
+            rules_and_queries: tuple[Rule, ...] = (*rule_index.rules, *rule_index.queries)
             for rule in rules_and_queries:
                 self._rule_to_providers[rule].append(plugin_or_backend)
             for union_rule in rule_index.union_rules:
@@ -243,6 +261,13 @@ class BuildConfiguration:
                 )
             for target_type in target_types:
                 self._target_type_to_providers[target_type].append(plugin_or_backend)
+                # Access the Target.PluginField here to ensure the PluginField class is
+                # created before the UnionMembership is instantiated, as the class hierarchy is
+                # walked during union membership setup.
+                _ = target_type.PluginField
+
+        def register_remote_auth_plugin(self, remote_auth_plugin: Callable) -> None:
+            self._remote_auth_plugin = remote_auth_plugin
 
         def allow_unknown_options(self, allow: bool = True) -> None:
             """Allows overriding whether Options parsing will fail for unrecognized Options.
@@ -272,4 +297,5 @@ class BuildConfiguration:
                     (k, tuple(v)) for k, v in self._union_rule_to_providers.items()
                 ),
                 allow_unknown_options=self._allow_unknown_options,
+                remote_auth_plugin_func=self._remote_auth_plugin,
             )

@@ -1,82 +1,54 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os.path
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass
-from typing import Match, Optional, Tuple, cast
+from typing import ClassVar, Match, Optional, Tuple, cast
 
-from pants.backend.python.dependency_inference.module_mapper import (
-    PythonModuleOwners,
-    PythonModuleOwnersRequest,
-)
-from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
+from pants.backend.python.util_rules.faas import (
+    PythonFaaSCompletePlatforms,
+    PythonFaaSDependencies,
+    PythonFaaSHandlerField,
+    PythonFaaSKnownRuntime,
+    PythonFaaSPex3VenvCreateExtraArgsField,
+    PythonFaaSRuntimeField,
+)
+from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.goals.package import OutputPathField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
-from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    AsyncFieldMixin,
     BoolField,
-    Dependencies,
-    DependenciesRequest,
-    ExplicitlyProvidedDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    Field,
     InvalidFieldException,
-    InvalidTargetException,
-    SecondaryOwnerMixin,
-    StringField,
     Target,
-    WrappedTarget,
 )
-from pants.engine.unions import UnionRule
-from pants.source.filespec import Filespec
-from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
-class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
-    alias = "handler"
-    required = True
-    value: str
-    help = softwrap(
-        """
+class PythonAwsLambdaHandlerField(PythonFaaSHandlerField):
+    # This doesn't matter (just needs to be fixed), but is the default name used by the AWS
+    # console when creating a Python lambda, so is as good as any
+    # https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html
+    reexported_handler_module = "lambda_function"
+
+    help = help_text(
+        f"""
         Entry point to the AWS Lambda handler.
 
-        You can specify a full module like 'path.to.module:handler_func' or use a shorthand to
-        specify a file name, using the same syntax as the `sources` field, e.g.
-        'lambda.py:handler_func'.
+        {PythonFaaSHandlerField.help}
 
-        You must use the file name shorthand for file arguments to work with this target.
+        This is re-exported at `{reexported_handler_module}.handler` in the resulting package to be
+        used as the configured handler of the Lambda in AWS. It can also be accessed under its
+        source-root-relative module path, for example: `path.to.module.handler_func`.
         """
     )
-
-    @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> str:
-        value = cast(str, super().compute_value(raw_value, address))
-        if ":" not in value:
-            raise InvalidFieldException(
-                softwrap(
-                    f"""
-                    The `{cls.alias}` field in target at {address} must end in the format
-                    `:my_handler_func`, but was {value}.
-                    """
-                )
-            )
-        return value
-
-    @property
-    def filespec(self) -> Filespec:
-        path, _, func = self.value.partition(":")
-        if not path.endswith(".py"):
-            return {"includes": []}
-        full_glob = os.path.join(self.address.spec_path, path)
-        return {"includes": [full_glob]}
 
 
 @dataclass(frozen=True)
@@ -90,134 +62,54 @@ class ResolvePythonAwsHandlerRequest:
     field: PythonAwsLambdaHandlerField
 
 
-@rule(desc="Determining the handler for a `python_awslambda` target")
-async def resolve_python_aws_handler(
-    request: ResolvePythonAwsHandlerRequest,
-) -> ResolvedPythonAwsHandler:
-    handler_val = request.field.value
-    field_alias = request.field.alias
-    address = request.field.address
-    path, _, func = handler_val.partition(":")
-
-    # If it's already a module, simply use that. Otherwise, convert the file name into a module
-    # path.
-    if not path.endswith(".py"):
-        return ResolvedPythonAwsHandler(handler_val, file_name_used=False)
-
-    # Use the engine to validate that the file exists and that it resolves to only one file.
-    full_glob = os.path.join(address.spec_path, path)
-    handler_paths = await Get(
-        Paths,
-        PathGlobs(
-            [full_glob],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin=f"{address}'s `{field_alias}` field",
-        ),
-    )
-    # We will have already raised if the glob did not match, i.e. if there were no files. But
-    # we need to check if they used a file glob (`*` or `**`) that resolved to >1 file.
-    if len(handler_paths.files) != 1:
-        raise InvalidFieldException(
-            softwrap(
-                f"""
-                Multiple files matched for the `{field_alias}` {repr(handler_val)} for the target
-                {address}, but only one file expected.
-                Are you using a glob, rather than a file name?
-
-                All matching files: {list(handler_paths.files)}.
-                """
-            )
-        )
-    handler_path = handler_paths.files[0]
-    source_root = await Get(
-        SourceRoot,
-        SourceRootRequest,
-        SourceRootRequest.for_file(handler_path),
-    )
-    stripped_source_path = os.path.relpath(handler_path, source_root.path)
-    module_base, _ = os.path.splitext(stripped_source_path)
-    normalized_path = module_base.replace(os.path.sep, ".")
-    return ResolvedPythonAwsHandler(f"{normalized_path}:{func}", file_name_used=True)
-
-
-class PythonAwsLambdaDependencies(Dependencies):
-    supports_transitive_excludes = True
-
-
-class InjectPythonLambdaHandlerDependency(InjectDependenciesRequest):
-    inject_for = PythonAwsLambdaDependencies
-
-
-@rule(desc="Inferring dependency from the python_awslambda `handler` field")
-async def inject_lambda_handler_dependency(
-    request: InjectPythonLambdaHandlerDependency,
-    python_infer_subsystem: PythonInferSubsystem,
-    python_setup: PythonSetup,
-) -> InjectedDependencies:
-    if not python_infer_subsystem.entry_points:
-        return InjectedDependencies()
-    original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    explicitly_provided_deps, handler = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
-        Get(
-            ResolvedPythonAwsHandler,
-            ResolvePythonAwsHandlerRequest(original_tgt.target[PythonAwsLambdaHandlerField]),
-        ),
-    )
-    module, _, _func = handler.val.partition(":")
-    owners = await Get(
-        PythonModuleOwners,
-        PythonModuleOwnersRequest(
-            module, resolve=original_tgt.target[PythonResolveField].normalized_value(python_setup)
-        ),
-    )
-    address = original_tgt.target.address
-    explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-        owners.ambiguous,
-        address,
-        # If the handler was specified as a file, like `app.py`, we know the module must
-        # live in the python_awslambda's directory or subdirectory, so the owners must be ancestors.
-        owners_must_be_ancestors=handler.file_name_used,
-        import_reference="module",
-        context=softwrap(
-            f"""
-            The python_awslambda target {address} has the field
-            `handler={repr(original_tgt.target[PythonAwsLambdaHandlerField].value)}`,
-            which maps to the Python module `{module}`"
-            """
-        ),
-    )
-    maybe_disambiguated = explicitly_provided_deps.disambiguated(
-        owners.ambiguous, owners_must_be_ancestors=handler.file_name_used
-    )
-    unambiguous_owners = owners.unambiguous or (
-        (maybe_disambiguated,) if maybe_disambiguated else ()
-    )
-    return InjectedDependencies(unambiguous_owners)
-
-
 class PythonAwsLambdaIncludeRequirements(BoolField):
     alias = "include_requirements"
     default = True
-    help = softwrap(
+    help = help_text(
         """
-        Whether to resolve requirements and include them in the Pex. This is most useful with Lambda
-        Layers to make code uploads smaller when deps are in layers.
+        Whether to resolve requirements and include them in the AWS Lambda artifact. This is most useful with Lambda
+        Layers to make code uploads smaller when third-party requirements are in layers.
         https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html
         """
     )
 
 
-class PythonAwsLambdaRuntime(StringField):
+class PythonAwsLambdaIncludeSources(BoolField):
+    alias = "include_sources"
+    default = True
+    help = help_text(
+        """
+        Whether to resolve first party sources and include them in the AWS Lambda artifact. This is
+        most useful to allow creating a Lambda Layer with only third-party requirements.
+        https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html
+        """
+    )
+
+
+class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
     PYTHON_RUNTIME_REGEX = r"python(?P<major>\d)\.(?P<minor>\d+)"
 
-    alias = "runtime"
-    default = None
-    help = softwrap(
+    help = help_text(
         """
         The identifier of the AWS Lambda runtime to target (pythonX.Y).
         See https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html.
+
+        N.B.: only one of this and `complete_platforms` can be set. If `runtime` is set, a default complete
+        platform is chosen, if one is known for that runtime. If you have issues either
+        packaging the AWS Lambda PEX or running it as a deployed AWS Lambda function, you should try
+        using an explicit `complete_platforms` instead.
         """
+    )
+
+    # https://gallery.ecr.aws/lambda/python
+    known_runtimes_docker_repo = "public.ecr.aws/lambda/python"
+    known_runtimes = (
+        PythonFaaSKnownRuntime(3, 6, "3.6"),
+        PythonFaaSKnownRuntime(3, 7, "3.7"),
+        PythonFaaSKnownRuntime(3, 8, "3.8-x86_64"),
+        PythonFaaSKnownRuntime(3, 9, "3.9-x86_64"),
+        PythonFaaSKnownRuntime(3, 10, "3.10-x86_64"),
+        PythonFaaSKnownRuntime(3, 11, "3.11-x86_64"),
     )
 
     @classmethod
@@ -243,43 +135,82 @@ class PythonAwsLambdaRuntime(StringField):
         mo = cast(Match, re.match(self.PYTHON_RUNTIME_REGEX, self.value))
         return int(mo.group("major")), int(mo.group("minor"))
 
+    @classmethod
+    def from_interpreter_version(cls, py_major: int, py_minor: int) -> str:
+        return f"python{py_major}.{py_minor}"
 
-class PythonAWSLambda(Target):
-    alias = "python_awslambda"
-    core_fields = (
+
+class PythonAwsLambdaLayerDependenciesField(PythonFaaSDependencies):
+    required = True
+
+
+class _AWSLambdaBaseTarget(Target):
+    core_fields: ClassVar[tuple[type[Field], ...]] = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        PythonAwsLambdaDependencies,
-        PythonAwsLambdaHandlerField,
         PythonAwsLambdaIncludeRequirements,
         PythonAwsLambdaRuntime,
-        PexCompletePlatformsField,
+        PythonFaaSCompletePlatforms,
+        PythonFaaSPex3VenvCreateExtraArgsField,
         PythonResolveField,
-    )
-    help = softwrap(
-        f"""
-        A self-contained Python function suitable for uploading to AWS Lambda.
-
-        See {doc_url('awslambda-python')}.
-        """
+        EnvironmentField,
     )
 
     def validate(self) -> None:
-        if self[PythonAwsLambdaRuntime].value is None and not self[PexCompletePlatformsField].value:
-            raise InvalidTargetException(
+        has_runtime = self[PythonAwsLambdaRuntime].value is not None
+        has_complete_platforms = self[PexCompletePlatformsField].value is not None
+
+        runtime_alias = self[PythonAwsLambdaRuntime].alias
+        complete_platforms_alias = self[PexCompletePlatformsField].alias
+
+        if has_runtime and has_complete_platforms:
+            raise ValueError(
                 softwrap(
                     f"""
-                    The `{self.alias}` target {self.address} must specify either a
-                    `{self[PythonAwsLambdaRuntime].alias}` or
-                    `{self[PexCompletePlatformsField].alias}` or both.
+                    The `{complete_platforms_alias}` takes precedence over the `{runtime_alias}` field, if
+                    it is set. Remove the `{runtime_alias}` field to only use the `{complete_platforms_alias}`
+                    value, or remove the `{complete_platforms_alias}` field to use the default platform
+                    implied by `{runtime_alias}`.
                     """
                 )
             )
 
 
+class PythonAWSLambda(_AWSLambdaBaseTarget):
+    alias = "python_aws_lambda_function"
+
+    core_fields = (
+        *_AWSLambdaBaseTarget.core_fields,
+        PythonFaaSDependencies,
+        PythonAwsLambdaHandlerField,
+    )
+    help = help_text(
+        f"""
+        A self-contained Python function suitable for uploading to AWS Lambda.
+
+        See {doc_url('docs/python/integrations/aws-lambda')}.
+        """
+    )
+
+
+class PythonAWSLambdaLayer(_AWSLambdaBaseTarget):
+    alias = "python_aws_lambda_layer"
+    core_fields = (
+        *_AWSLambdaBaseTarget.core_fields,
+        PythonAwsLambdaIncludeSources,
+        PythonAwsLambdaLayerDependenciesField,
+    )
+    help = help_text(
+        f"""
+        A Python layer suitable for uploading to AWS Lambda.
+
+        See {doc_url('docs/python/integrations/aws-lambda')}.
+        """
+    )
+
+
 def rules():
     return (
         *collect_rules(),
-        *import_rules(),
-        UnionRule(InjectDependenciesRequest, InjectPythonLambdaHandlerDependency),
+        *faas_rules(),
     )

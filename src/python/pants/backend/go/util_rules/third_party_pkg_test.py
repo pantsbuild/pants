@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os.path
+import re
 from textwrap import dedent
 
 import pytest
@@ -21,13 +22,16 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
 )
+from pants.build_graph.address import Address
 from pants.engine.fs import Digest, Snapshot
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, engine_error
@@ -52,7 +56,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[GoModTarget],
     )
-    rule_runner.set_options([], env_inherit={"PATH"})
+    rule_runner.set_options(["--golang-cgo-enabled"], env_inherit={"PATH"})
     return rule_runner
 
 
@@ -91,7 +95,15 @@ def set_up_go_mod(rule_runner: RuleRunner, go_mod: str, go_sum: str) -> Digest:
 def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
     input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
     all_packages = rule_runner.request(
-        AllThirdPartyPackages, [AllThirdPartyPackagesRequest(input_digest, "go.mod")]
+        AllThirdPartyPackages,
+        [
+            AllThirdPartyPackagesRequest(
+                Address("fake_addr_for_test", target_name="mod"),
+                input_digest,
+                "go.mod",
+                build_opts=GoBuildOptions(),
+            )
+        ],
     )
     assert set(all_packages.import_paths_to_pkg_info.keys()) == {
         "golang.org/x/text/encoding/japanese",
@@ -168,9 +180,10 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
         assert pkg_info.go_files == go_files
         assert not pkg_info.s_files
         snapshot = rule_runner.request(Snapshot, [pkg_info.digest])
-        assert set(snapshot.files) == {
+        expected_files = {
             os.path.join(dir_path, file_name) for file_name in (*go_files, *extra_files)
         }
+        assert expected_files.issubset(snapshot.files)
         assert pkg_info.minimum_go_version == minimum_go_version
 
     assert_pkg_info(
@@ -261,9 +274,21 @@ def test_invalid_go_sum(rule_runner: RuleRunner) -> None:
         ),
     )
     with engine_error(ProcessExecutionFailure, contains="SECURITY ERROR"):
-        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
+        rule_runner.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("fake_addr_for_test", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
 
 
+@pytest.mark.skip(reason="TODO(#15824)")
+@pytest.mark.no_error_if_skipped
 def test_missing_go_sum(rule_runner: RuleRunner) -> None:
     digest = set_up_go_mod(
         rule_runner,
@@ -283,9 +308,21 @@ def test_missing_go_sum(rule_runner: RuleRunner) -> None:
         ),
     )
     with engine_error(contains="github.com/google/uuid@v1.3.0: missing go.sum entry"):
-        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
+        rule_runner.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("fake_addr_for_test", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
 
 
+@pytest.mark.skip(reason="TODO(#15824)")
+@pytest.mark.no_error_if_skipped
 def test_stale_go_mod(rule_runner: RuleRunner) -> None:
     digest = set_up_go_mod(
         rule_runner,
@@ -308,7 +345,17 @@ def test_stale_go_mod(rule_runner: RuleRunner) -> None:
         ),
     )
     with engine_error(ProcessExecutionFailure, contains="updates to go.mod needed"):
-        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
+        rule_runner.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("fake_addr_for_test", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
 
 
 def test_pkg_missing(rule_runner: RuleRunner) -> None:
@@ -318,7 +365,15 @@ def test_pkg_missing(rule_runner: RuleRunner) -> None:
     ):
         rule_runner.request(
             ThirdPartyPkgAnalysis,
-            [ThirdPartyPkgAnalysisRequest("another_project.org/foo", digest, "go.mod")],
+            [
+                ThirdPartyPkgAnalysisRequest(
+                    "another_project.org/foo",
+                    Address("fake_addr_for_test", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
         )
 
 
@@ -340,82 +395,17 @@ def test_module_with_no_packages(rule_runner) -> None:
         ),
     )
     all_packages = rule_runner.request(
-        AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")]
+        AllThirdPartyPackages,
+        [
+            AllThirdPartyPackagesRequest(
+                Address("fake_addr_for_test", target_name="mod"),
+                digest,
+                "go.mod",
+                build_opts=GoBuildOptions(),
+            )
+        ],
     )
     assert not all_packages.import_paths_to_pkg_info
-
-
-def test_unsupported_sources(rule_runner: RuleRunner) -> None:
-    # `golang.org/x/mobile/bind/objc` uses `.h` files on both Linux and macOS.
-    digest = set_up_go_mod(
-        rule_runner,
-        dedent(
-            """\
-            module example.com/unsupported
-            go 1.16
-            require golang.org/x/mobile v0.0.0-20210924032853-1c027f395ef7
-            """
-        ),
-        dedent(
-            """\
-            github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802 h1:1BDTz0u9nC3//pOCMdNH+CiXJVYJh5UQNCOBG7jbELc=
-            github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-            github.com/yuin/goldmark v1.3.5 h1:dPmz1Snjq0kmkz159iL7S6WzdahUTHnHB5M56WFVifs=
-            github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
-            golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
-            golang.org/x/crypto v0.0.0-20190510104115-cbcb75029529/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
-            golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 h1:ObdrDkeb4kJdCP557AjRjq69pTHfNouLtWZG7j9rPN8=
-            golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
-            golang.org/x/exp v0.0.0-20190731235908-ec7cb31e5a56 h1:estk1glOnSVeJ9tdEZZc5mAMDZk5lNJNyJ6DvrBkTEU=
-            golang.org/x/exp v0.0.0-20190731235908-ec7cb31e5a56/go.mod h1:JhuoJpWY28nO4Vef9tZUw9qufEGTyX1+7lmHxV5q5G4=
-            golang.org/x/image v0.0.0-20190227222117-0694c2d4d067/go.mod h1:kZ7UVZpmo3dzQBMxlp+ypCbDeSB+sBbTgSJuh5dn5js=
-            golang.org/x/image v0.0.0-20190802002840-cff245a6509b h1:+qEpEAPhDZ1o0x3tHzZTQDArnOixOzGD9HUJfcg0mb4=
-            golang.org/x/image v0.0.0-20190802002840-cff245a6509b/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
-            golang.org/x/mobile v0.0.0-20190312151609-d3739f865fa6/go.mod h1:z+o9i4GpDbdi3rU15maQ/Ox0txvL9dWGYEHz965HBQE=
-            golang.org/x/mobile v0.0.0-20210924032853-1c027f395ef7 h1:CyFUjc175y/mbMjxe+WdqI72jguLyjQChKCDe9mfTvg=
-            golang.org/x/mobile v0.0.0-20210924032853-1c027f395ef7/go.mod h1:c4YKU3ZylDmvbw+H/PSvm42vhdWbuxCzbonauEAP9B8=
-            golang.org/x/mod v0.1.0/go.mod h1:0QHyrYULN0/3qlju5TqG8bIK38QM8yzMo5ekMj3DlcY=
-            golang.org/x/mod v0.4.2 h1:Gz96sIWK3OalVv/I/qNygP42zyoKp3xptRVCWRFEBvo=
-            golang.org/x/mod v0.4.2/go.mod h1:s0Qsj1ACt9ePp/hMypM3fl4fZqREWJwdYDEqhRiZZUA=
-            golang.org/x/net v0.0.0-20190311183353-d8887717615a/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
-            golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
-            golang.org/x/net v0.0.0-20190620200207-3b0461eec859/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
-            golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4 h1:4nGaVu0QrbjT/AK2PRLuQfQuh6DJve+pELhqTdAj3x0=
-            golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4/go.mod h1:p54w0d4576C0XHj96bSt6lcn1PtDYWL6XObtHCRCNQM=
-            golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
-            golang.org/x/sync v0.0.0-20210220032951-036812b2e83c h1:5KslGYwFpkhGh+Q16bwMP3cOontH8FOep7tGV86Y7SQ=
-            golang.org/x/sync v0.0.0-20210220032951-036812b2e83c/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
-            golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
-            golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
-            golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
-            golang.org/x/sys v0.0.0-20210330210617-4fbd30eecc44/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
-            golang.org/x/sys v0.0.0-20210510120138-977fb7262007 h1:gG67DSER+11cZvqIMb8S8bt0vZtiN6xWYARwirrOSfE=
-            golang.org/x/sys v0.0.0-20210510120138-977fb7262007/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
-            golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1 h1:v+OssWQX+hTHEmOBgwxdZxK4zHq3yOs8F9J7mk0PY8E=
-            golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
-            golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
-            golang.org/x/text v0.3.3 h1:cokOdA+Jmi5PJGXLlLllQSgYigAEfHXJAERHVMaCc2k=
-            golang.org/x/text v0.3.3/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
-            golang.org/x/text v0.3.7 h1:olpwvP2KacW1ZWvsR7uQhoyTYvKAupfQrRGBFM352Gk=
-            golang.org/x/text v0.3.7/go.mod h1:u+2+/6zg+i71rQMx5EYifcz6MCKuco9NR6JIITiCfzQ=
-            golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e h1:FDhOuMEY4JVRztM/gsbk+IKUQ8kj74bxZrgw87eMMVc=
-            golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
-            golang.org/x/tools v0.0.0-20190312151545-0bb0c0a6e846/go.mod h1:LCzVGOaR6xXOjkQ3onu1FJEFr0SW1gC7cKk1uF8kGRs=
-            golang.org/x/tools v0.0.0-20191119224855-298f0cb1881e/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
-            golang.org/x/tools v0.1.2 h1:kRBLX7v7Af8W7Gdbbc908OJcdgtK8bOz9Uaj8/F1ACA=
-            golang.org/x/tools v0.1.2/go.mod h1:o0xws9oXOQQZyjljx8fwUC0k7L1pTE6eaCbjGeHmOkk=
-            golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
-            golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
-            golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 h1:go1bK/D/BFZV2I8cIQd1NKEZ+0owSTG1fDTci4IqFcE=
-            golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
-            """
-        ),
-    )
-    pkg_info = rule_runner.request(
-        ThirdPartyPkgAnalysis,
-        [ThirdPartyPkgAnalysisRequest("golang.org/x/mobile/bind/objc", digest, "go.mod")],
-    )
-    assert pkg_info.error is not None
 
 
 def test_determine_pkg_info_module_with_replace_directive(rule_runner: RuleRunner) -> None:
@@ -534,7 +524,15 @@ def test_determine_pkg_info_module_with_replace_directive(rule_runner: RuleRunne
     )
     pkg_info = rule_runner.request(
         ThirdPartyPkgAnalysis,
-        [ThirdPartyPkgAnalysisRequest("github.com/hashicorp/consul/api", digest, "go.mod")],
+        [
+            ThirdPartyPkgAnalysisRequest(
+                "github.com/hashicorp/consul/api",
+                Address("fake_addr_for_test", target_name="mod"),
+                digest,
+                "go.mod",
+                build_opts=GoBuildOptions(),
+            )
+        ],
     )
     assert pkg_info.dir_path == "gopath/pkg/mod/github.com/hashicorp/consul/api@v1.3.0"
     assert "raw.go" in pkg_info.go_files
@@ -562,7 +560,15 @@ def test_ambiguous_package(rule_runner: RuleRunner) -> None:
     )
     pkg_info = rule_runner.request(
         ThirdPartyPkgAnalysis,
-        [ThirdPartyPkgAnalysisRequest("github.com/ugorji/go/codec", digest, "go.mod")],
+        [
+            ThirdPartyPkgAnalysisRequest(
+                "github.com/ugorji/go/codec",
+                Address("fake_addr_for_test", target_name="mod"),
+                digest,
+                "go.mod",
+                build_opts=GoBuildOptions(),
+            )
+        ],
     )
     assert pkg_info.error is None
     assert (
@@ -570,3 +576,34 @@ def test_ambiguous_package(rule_runner: RuleRunner) -> None:
         == "gopath/pkg/mod/github.com/ugorji/go/codec@v0.0.0-20181204163529-d75b2dcb6bc8"
     )
     assert "encode.go" in pkg_info.go_files
+
+
+def test_go_sum_with_missing_entries_triggers_error(rule_runner: RuleRunner) -> None:
+    digest = set_up_go_mod(
+        rule_runner,
+        dedent(
+            """\
+            module example.com/third-party-module
+            go 1.16
+            require github.com/google/uuid v1.3.0
+            """
+        ),
+        "",
+    )
+    msg = (
+        "For `go_mod` target `fake_addr_for_test:mod`, the go.sum file is incomplete because "
+        "it was updated while processing third-party dependency `github.com/google/uuid`."
+    )
+    with pytest.raises(ExecutionError, match=re.escape(msg)):
+        _ = rule_runner.request(
+            ThirdPartyPkgAnalysis,
+            [
+                ThirdPartyPkgAnalysisRequest(
+                    "github.com/ugorji/go/codec",
+                    Address("fake_addr_for_test", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )

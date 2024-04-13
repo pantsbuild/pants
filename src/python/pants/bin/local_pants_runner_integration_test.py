@@ -10,9 +10,13 @@ def test_print_stacktrace() -> None:
     def run(args: Sequence[str]) -> PantsResult:
         return run_pants(command=[*args, "list", "definitely-does-not-exist::"])
 
+    list_rule_name = "pants.backend.project_info.list_targets"
     no_print_stacktrace = run(["--no-print-stacktrace"])
     assert "Traceback" not in no_print_stacktrace.stderr
-    assert "traceback" not in no_print_stacktrace.stderr
+    assert "Engine traceback:" in no_print_stacktrace.stderr
+    assert list_rule_name not in no_print_stacktrace.stderr
 
     print_stacktrace = run(["--print-stacktrace"])
     assert "Traceback" in print_stacktrace.stderr
+    assert "Engine traceback:" in print_stacktrace.stderr
+    assert list_rule_name in print_stacktrace.stderr

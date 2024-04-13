@@ -2,6 +2,7 @@ package org.pantsbuild.javaparser;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.ImportDeclaration;
@@ -118,6 +119,12 @@ public class PantsJavaParserLauncher {
     String analysisOutputPath = args[0];
     String sourceToAnalyze = args[1];
 
+    // NB: We hardcode the most permissive language level in order to capture all potential
+    // sources of symbols. If certain syntax ends up deprecated in future versions, we may need to
+    // allow this to be configured.
+    StaticJavaParser.setConfiguration(
+        new ParserConfiguration()
+            .setLanguageLevel(ParserConfiguration.LanguageLevel.JAVA_17_PREVIEW));
     CompilationUnit cu = StaticJavaParser.parse(new File(sourceToAnalyze));
 
     // Get the source's declare package.

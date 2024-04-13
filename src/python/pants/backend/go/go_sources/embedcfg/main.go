@@ -11,7 +11,7 @@
 package main
 
 import (
-    "encoding/json"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -304,11 +304,9 @@ func fsValidPath(name string) bool {
 }
 
 func computeEmbedConfigs(directory string, patterns *Patterns) (*EmbedConfigs, error) {
-	// Obtain a list of files in and under the package's directory. These will be embeddable files.
-	// TODO: Support resource targets elsewhere in the repository.
-
 	configs := &EmbedConfigs{}
 
+	// Obtain a list of files in and under the package's directory. These will be embeddable files.
 	var embedSrcs []string
 	err := filepath.WalkDir(directory, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -411,7 +409,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	result, err := computeEmbedConfigs("__resources__", &patterns)
+	rootDir := os.Args[2]
+	result, err := computeEmbedConfigs(rootDir, &patterns)
 	if err != nil {
 		fmt.Printf("{\"Error\": \"Failed to find embedded resources: %s\"}", err)
 		os.Exit(1)

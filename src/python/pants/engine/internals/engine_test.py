@@ -11,6 +11,7 @@ from typing import List, Optional, Tuple
 import pytest
 
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
+from pants.base.exceptions import IntrinsicError
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -21,6 +22,7 @@ from pants.engine.fs import (
     Digest,
     DigestContents,
     FileContent,
+    MergeDigests,
     Snapshot,
 )
 from pants.engine.internals.engine_testutil import (
@@ -40,8 +42,9 @@ from pants.engine.streaming_workunit_handler import (
 from pants.engine.unions import UnionRule, union
 from pants.goal.run_tracker import RunTracker
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 class A:
@@ -194,7 +197,7 @@ class TestEngine(SchedulerTestBase):
         with pytest.raises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[(B())]))
         assert_equal_with_printing(
-            "1 Exception encountered:\n\n  Exception: An exception for B\n", str(cm.value)
+            "1 Exception encountered:\n\nException: An exception for B\n", str(cm.value)
         )
 
     def test_no_include_trace_error_multiple_paths_raises_executionerror(
@@ -209,8 +212,9 @@ class TestEngine(SchedulerTestBase):
                 """
                 2 Exceptions encountered:
 
-                  Exception: An exception for B
-                  Exception: An exception for B
+                Exception: An exception for B
+
+                (and 1 more)
                 """
             ).lstrip(),
             str(cm.value),
@@ -227,14 +231,18 @@ class TestEngine(SchedulerTestBase):
                 1 Exception encountered:
 
                 Engine traceback:
-                  in select
+                  in root
+                    ..
                   in pants.engine.internals.engine_test.nested_raise
+                    ..
+
                 Traceback (most recent call last):
                   File LOCATION-INFO, in nested_raise
                     fn_raises(x)
                   File LOCATION-INFO, in fn_raises
                     raise Exception(f"An exception for {type(x).__name__}")
                 Exception: An exception for B
+
                 """
             ).lstrip(),
             remove_locations_from_traceback(str(cm.value)),
@@ -316,7 +324,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
             callbacks=[tracker],
             report_interval_seconds=0.01,
             max_workunit_verbosity=max_workunit_verbosity,
-            specs=Specs(),
+            specs=Specs.empty(),
             options_bootstrapper=create_options_bootstrapper([]),
             allow_async_completion=False,
         )
@@ -417,7 +425,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
 
         # With the max_workunit_verbosity set to TRACE, we should see the workunit corresponding
         # to the Select node.
-        select = next(
+        root = next(
             item
             for item in finished
             if item["name"]
@@ -428,11 +436,11 @@ class TestStreamingWorkunit(SchedulerTestBase):
                 "pants.engine.internals.engine_test.rule_four",
             }
         )
-        assert select["name"] == "select"
-        assert select["level"] == "TRACE"
+        assert root["name"] == "root"
+        assert root["level"] == "TRACE"
 
         r1 = next(item for item in finished if item["name"] == "canonical_rule_one")
-        assert r1["parent_id"] == select["span_id"]
+        assert r1["parent_id"] == root["span_id"]
 
     def test_streaming_workunit_log_level_parent_rewrite(self, tmp_path: Path) -> None:
         rules = [rule_A, rule_B, rule_C, QueryRule(Alpha, (Input,))]
@@ -702,7 +710,7 @@ def test_counters(rule_runner: RuleRunner, run_tracker: RunTracker) -> None:
         callbacks=[tracker],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.TRACE,
-        specs=Specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
         allow_async_completion=False,
     )
@@ -743,7 +751,7 @@ def test_more_complicated_engine_aware(rule_runner: RuleRunner, run_tracker: Run
         callbacks=[tracker],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.TRACE,
-        specs=Specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
         allow_async_completion=False,
     )
@@ -803,7 +811,7 @@ def test_process_digests_on_streaming_workunits(
         callbacks=[tracker],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.DEBUG,
-        specs=Specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
         allow_async_completion=False,
     )
@@ -834,7 +842,7 @@ def test_process_digests_on_streaming_workunits(
         callbacks=[tracker],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.DEBUG,
-        specs=Specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
         allow_async_completion=False,
     )
@@ -897,7 +905,7 @@ def test_context_object_on_streaming_workunits(
         callbacks=[Callback()],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
-        specs=Specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
         allow_async_completion=False,
     )
@@ -927,8 +935,7 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
         }
     )
     specs = SpecsParser().parse_specs(
-        ["src/python/somefiles::", "src/python/others/b.py"],
-        convert_dir_literal_to_address_literal=False,
+        ["src/python/somefiles::", "src/python/others/b.py"], description_of_origin="tests"
     )
 
     class Callback(WorkunitsCallback):
@@ -1002,3 +1009,44 @@ def test_union_member_construction(run_tracker: RunTracker) -> None:
     )
 
     assert "yep" == rule_runner.request(str, [])
+
+
+@dataclass(frozen=True)
+class FileInput:
+    filename: str
+
+
+@dataclass(frozen=True)
+class MergedOutput:
+    digest: Digest
+
+
+class MergeErr(Exception):
+    pass
+
+
+@rule
+async def catch_merge_digests_error(file_input: FileInput) -> MergedOutput:
+    # Create two separate digests writing different contents to the same file path.
+    input_1 = CreateDigest((FileContent(path=file_input.filename, content=b"yes"),))
+    input_2 = CreateDigest((FileContent(path=file_input.filename, content=b"no"),))
+    digests = await MultiGet(Get(Digest, CreateDigest, input_1), Get(Digest, CreateDigest, input_2))
+    try:
+        merged = await Get(Digest, MergeDigests(digests))
+    except IntrinsicError as e:
+        raise MergeErr(f"error merging digests for input {file_input}: {e}")
+    return MergedOutput(merged)
+
+
+def test_catch_intrinsic_error() -> None:
+    rule_runner = RuleRunner(
+        rules=[catch_merge_digests_error, QueryRule(MergedOutput, (FileInput,))]
+    )
+    msg = softwrap(
+        """\
+        error merging digests for input FileInput(filename='some-file.txt'): Can only merge
+        Directories with no duplicates, but found 2 duplicate entries in :
+        """
+    )
+    with engine_error(MergeErr, contains=msg):
+        rule_runner.request(MergedOutput, (FileInput("some-file.txt"),))

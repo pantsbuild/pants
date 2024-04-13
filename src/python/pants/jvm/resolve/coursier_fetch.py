@@ -49,10 +49,9 @@ from pants.jvm.resolve import coursier_setup
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
     ArtifactRequirements,
-    Coordinate,
-    Coordinates,
     GatherJvmCoordinatesRequest,
 )
+from pants.jvm.resolve.coordinate import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_setup import Coursier, CoursierFetchProcess
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata, LockfileContext
@@ -100,7 +99,7 @@ class NoCompatibleResolve(Exception):
             f"{msg_prefix}:\n\n"
             f"{formatted_resolve_lists}\n\n"
             "Targets which will be merged onto the same classpath must share a resolve (from the "
-            f"[resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) field)."
+            f"[resolve]({doc_url('reference/targets/deploy_jar#resolve')}) field)."
         )
 
 
@@ -230,7 +229,18 @@ class CoursierResolvedLockfile:
         if entry is None:
             raise self._coordinate_not_found(key, coord)
 
-        return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.dependencies))
+        return (
+            entry,
+            tuple(
+                dependency_entry
+                for d in entry.dependencies
+                # The dependency might not be present in the entries due to coursier bug:
+                # https://github.com/coursier/coursier/issues/2884
+                # As a workaround, if this happens, we want to skip the dependency.
+                # TODO Drop the check once the bug is fixed.
+                if (dependency_entry := entries.get((d.group, d.artifact))) is not None
+            ),
+        )
 
     @classmethod
     def from_toml(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
@@ -293,6 +303,7 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
 @dataclass(frozen=True)
 class CoursierResolveInfo:
     coord_arg_strings: FrozenSet[str]
+    force_version_coord_arg_strings: FrozenSet[str]
     extra_args: tuple[str, ...]
     digest: Digest
 
@@ -302,7 +313,13 @@ class CoursierResolveInfo:
 
         Must be used in concert with `digest`.
         """
-        return itertools.chain(self.coord_arg_strings, self.extra_args)
+        return itertools.chain(
+            self.coord_arg_strings,
+            itertools.chain.from_iterable(
+                zip(itertools.repeat("--force-version"), self.force_version_coord_arg_strings)
+            ),
+            self.extra_args,
+        )
 
 
 @rule
@@ -353,6 +370,18 @@ async def prepare_coursier_resolve_info(
         for (req, _), path in zip(jars, jar_file_paths)
     ]
 
+    # Coursier only fetches non-jar artifact types ("packaging" in Pants parlance) if passed an `-A` option
+    # explicitly requesting that the non-jar artifact(s) be fetched. This is an addition to passing the coordinate
+    # with the desired type (packaging) value.
+    extra_types: set[str] = set()
+    for no_jar in no_jars:
+        if no_jar.coordinate.packaging != "jar":
+            extra_types.add(no_jar.coordinate.packaging)
+    if extra_types:
+        # Note: `-A` defaults to `jar,bundle` and any value set replaces (and does not supplement) those defaults,
+        # so the defaults must be included here for them to remain usable.
+        extra_args.extend(["-A", ",".join(sorted(["jar", "bundle", *extra_types]))])
+
     to_resolve = chain(no_jars, resolvable_jar_requirements)
 
     digest = await Get(
@@ -365,8 +394,17 @@ async def prepare_coursier_resolve_info(
         ),
     )
 
+    coord_arg_strings = set()
+    force_version_coord_arg_strings = set()
+    for req in to_resolve:
+        coord_arg_str = req.to_coord_arg_str()
+        coord_arg_strings.add(coord_arg_str)
+        if req.force_version:
+            force_version_coord_arg_strings.add(coord_arg_str)
+
     return CoursierResolveInfo(
-        coord_arg_strings=frozenset(req.to_coord_arg_str() for req in to_resolve),
+        coord_arg_strings=frozenset(coord_arg_strings),
+        force_version_coord_arg_strings=frozenset(force_version_coord_arg_strings),
         digest=digest,
         extra_args=tuple(extra_args),
     )
@@ -550,7 +588,12 @@ async def coursier_fetch_one_coord(
     req: ArtifactRequirement
     if request.pants_address:
         targets = await Get(
-            Targets, UnparsedAddressInputs([request.pants_address], owning_address=None)
+            Targets,
+            UnparsedAddressInputs(
+                [request.pants_address],
+                owning_address=None,
+                description_of_origin="<infallible - coursier fetch>",
+            ),
         )
         req = ArtifactRequirement(request.coord, jar=targets[0][JvmArtifactJarSourceField])
     else:

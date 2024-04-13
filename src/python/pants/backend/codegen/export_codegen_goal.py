@@ -32,6 +32,7 @@ class ExportCodegenSubsystem(GoalSubsystem):
 
 class ExportCodegen(Goal):
     subsystem_cls = ExportCodegenSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @goal_rule
@@ -45,17 +46,16 @@ async def export_codegen(
     # We run all possible code generators. Running codegen requires specifying the expected
     # output_type, so we must inspect what is possible to generate.
     all_generate_request_types = union_membership.get(GenerateSourcesRequest)
-    inputs_to_outputs = {
-        req.input: req.output for req in all_generate_request_types if req.exportable
-    }
+    inputs_to_outputs = [
+        (req.input, req.output) for req in all_generate_request_types if req.exportable
+    ]
     codegen_sources_fields_with_output = []
     for tgt in targets:
         if not tgt.has_field(SourcesField):
             continue
         sources = tgt[SourcesField]
-        for input_type in inputs_to_outputs:
+        for input_type, output_type in inputs_to_outputs:
             if isinstance(sources, input_type):
-                output_type = inputs_to_outputs[input_type]
                 codegen_sources_fields_with_output.append((sources, output_type))
 
     if not codegen_sources_fields_with_output:
@@ -63,8 +63,8 @@ async def export_codegen(
             {
                 tgt_type.alias
                 for tgt_type in registered_target_types.types
-                for input_sources in inputs_to_outputs.keys()
-                if tgt_type.class_has_field(input_sources, union_membership=union_membership)
+                for input_source in {input_source for input_source, _ in inputs_to_outputs}
+                if tgt_type.class_has_field(input_source, union_membership=union_membership)
             }
         )
         logger.warning(

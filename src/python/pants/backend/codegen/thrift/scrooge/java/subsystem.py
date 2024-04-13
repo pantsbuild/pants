@@ -13,7 +13,6 @@ class ScroogeJavaSubsystem(Subsystem):
     help = "Java-specific options for the Scrooge Thrift IDL compiler (https://twitter.github.io/scrooge/)."
 
     _runtime_dependencies = TargetListOption(
-        "--runtime-dependencies",
         help=softwrap(
             """
             A list of addresses to `jvm_artifact` targets for the runtime
@@ -28,4 +27,8 @@ class ScroogeJavaSubsystem(Subsystem):
 
     @property
     def runtime_dependencies(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self._runtime_dependencies, owning_address=None)
+        return UnparsedAddressInputs(
+            self._runtime_dependencies,
+            owning_address=None,
+            description_of_origin=f"the option `[{self.options_scope}].runtime_dependencies`",
+        )

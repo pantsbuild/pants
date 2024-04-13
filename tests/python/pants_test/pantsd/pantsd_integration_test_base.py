@@ -168,9 +168,9 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
     def pantsd_test_context(
         self, *, log_level: str = "info", extra_config: dict[str, Any] | None = None
     ) -> Iterator[tuple[str, dict[str, Any], PantsDaemonMonitor]]:
-        with temporary_dir(root_dir=os.getcwd()) as workdir_base:
-            pid_dir = os.path.join(workdir_base, ".pids")
-            workdir = os.path.join(workdir_base, ".workdir.pants.d")
+        with temporary_dir(root_dir=os.getcwd()) as dot_pants_dot_d:
+            pid_dir = os.path.join(dot_pants_dot_d, "pids")
+            workdir = os.path.join(dot_pants_dot_d, "workdir")
             print(f"\npantsd log is {workdir}/pantsd/pantsd.log")
             pantsd_config = {
                 "GLOBAL": {
@@ -182,7 +182,10 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
                         "pants.backend.python",
                         "pants.backend.python.lint.flake8",
                     ],
-                }
+                },
+                "python": {
+                    "interpreter_constraints": "['>=3.7,<3.10']",
+                },
             }
 
             if extra_config:

@@ -4,35 +4,46 @@ print_stacktrace = true
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
+  "pants.backend.build_files.fix.deprecations",
+  "pants.backend.build_files.fmt.black",
   "pants.backend.python",
-  "pants.backend.experimental.python.docs.sphinx",
-  "pants.backend.experimental.python.lint.autoflake",
+  "pants.backend.experimental.python.packaging.pyoxidizer",
+  "pants.backend.python.lint.autoflake",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
   "pants.backend.python.typecheck.mypy",
+  "pants.backend.python.lint.pyupgrade",
   "pants.backend.python.mixed_interpreter_constraints",
   "pants.backend.shell",
   "pants.backend.shell.lint.shellcheck",
   "pants.backend.shell.lint.shfmt",
   "pants.backend.docker",
   "pants.backend.docker.lint.hadolint",
+  "pants.backend.experimental.adhoc",
   "pants.backend.experimental.go",
   "pants.backend.experimental.java",
   "pants.backend.experimental.java.lint.google_java_format",
   "pants.backend.experimental.java.debug_goals",
+  "pants.backend.experimental.javascript",
+  "pants.backend.experimental.javascript.lint.prettier",
   "pants.backend.experimental.python",
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
+  "pants.backend.experimental.scala.lint.scalafix",
   "pants.backend.experimental.scala.debug_goals",
+  "pants.backend.experimental.tools.workunit_logger",
+  "pants.backend.experimental.visibility",
+  "pants.backend.tools.preamble",
+  "pants.backend.tools.taplo",
+  "pants_explorer.server",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
 ]
 plugins = [
-  "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.19.0",
+  "hdrhistogram", # For use with `--stats-log`.
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -40,6 +51,7 @@ plugins = [
 pantsd_invalidation_globs.add = [
   "!*_test.py",
   "!BUILD",
+  "!src/python/pants_release/**",
   # NB: The `target` directory is ignored via `pants_ignore` below.
   "src/rust/engine/**/*.rs",
   "src/rust/engine/**/*.toml",
@@ -54,6 +66,11 @@ pants_ignore.add = [
   "!*.class",
   # We also want to override the .gitignore'd pants.pex file
   "!/pants.pex",
+  # Ignore node modules for docs processing tools
+  "/docs/node_modules",
+  # We have Pants stuff in here
+  "!.github/",
+  "!/src/rust/engine/.cargo",
 ]
 
 build_ignore.add = [
@@ -61,29 +78,23 @@ build_ignore.add = [
   "testprojects/src/go/**",
 ]
 
-ignore_warnings.add = [
-  # TODO: `toolchain.pants.plugin==0.18.0` must still use the old `get_git` implementation.
-  "DEPRECATED: pants.base.build_environment.get_git"
-]
-
-use_deprecated_directory_cli_args_semantics = false
-
 unmatched_build_file_globs = "error"
 
-# NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
-remote_store_address = "grpcs://cache.toolchain.com:443"
-remote_instance_name = "main"
-remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
+# TODO: We would like to be able to use `validate` or `defer` here, but further hardening of
+# network codepaths is needed. See:
+#   https://github.com/pantsbuild/pants/issues/16096.
+cache_content_behavior = "fetch"
+
+[DEFAULT]
+# Tell `scie-pants` to use our `./pants` bootstrap script.
+delegate_bootstrap = true
 
 [anonymous-telemetry]
 enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
 
-
 [cli.alias]
-all-changed = "--changed-since=HEAD --changed-dependees=transitive"
-run-pyupgrade = "--backend-packages=pants.backend.experimental.python.lint.pyupgrade fmt"
-
+--all-changed = "--changed-since=HEAD --changed-dependents=transitive"
 
 [source]
 root_patterns = [
@@ -99,39 +110,51 @@ root_patterns = [
   "/",
 ]
 
+[environments-preview.names]
+# We don't define any local environments because the options system covers our cases adequately.
+docker = "//:docker_env"
+# Used for iterating on remote-execution.
+remote = "//:buildgrid_remote"
+
 [tailor]
 build_file_header = """\
-# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 """
-ignore_paths = [
-  "build-support/migration-support/BUILD",
-]
+ignore_paths = ["build-support/migration-support/BUILD"]
 ignore_adding_targets = [
   "src/python/pants:__main__",
-  "src/python/pants/backend/go/go_sources:bin",
-  "src/python/pants/backend/go/go_sources:go_sources0",
-  "src/python/pants/backend/go/go_sources/analyze_package:bin",
-  "src/python/pants/backend/go/go_sources/embedcfg:bin",
-  "src/python/pants/backend/go/go_sources/generate_testmain:bin",
   "src/python/pants/backend/docker/subsystems:dockerfile_wrapper_script",
   "src/python/pants/backend/python/dependency_inference/scripts:dependency_parser0",
   "src/python/pants/backend/terraform:hcl2_parser0",
 ]
 
+[update-build-files]
+# We use `pants.backend.build_files.fmt.black`
+fmt = false
+
 [pex]
 venv_use_symlinks = true
+# This is off by default, but we want to dogfood it before switching on for everyone.
+emit_warnings = true
 
 [python]
-# N.B.: When adjusting this to support new Python versions, you must update the Pants
-# `python_distrobution` targets, currently:
+# N.B.: When upgrading to a new Python version, you must update the Pants
+# `python_distribution` targets, currently:
 # + src/python/pants:pants-packaged
 # + src/python/pants/testutil:testutil_wheel
-interpreter_constraints = [">=3.7,<3.10"]
+# And update the PythonBuildStandalone version/URL:
+# + src/python/pants/core/subsystems/python_bootstrap.py
+interpreter_constraints = ["==3.9.*"]
 macos_big_sur_compatibility = true
-resolves = { python-default = "3rdparty/python/user_reqs.lock" }
 enable_resolves = true
-lockfile_generator = "pex"
+pip_version = "latest"
+
+[python.resolves]
+python-default = "3rdparty/python/user_reqs.lock"
+flake8 = "3rdparty/python/flake8.lock"
+mypy = "3rdparty/python/mypy.lock"
+pytest = "3rdparty/python/pytest.lock"
 
 [python-infer]
 assets = true
@@ -142,14 +165,9 @@ args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 
 [flake8]
 config = "build-support/flake8/.flake8"
-extra_requirements.add = [
-  "flake8-pantsbuild>=2.0,<3",
-  "flake8-2020>=1.6.0,<1.7.0",
-  "flake8-no-implicit-concat",
-  "flake8-comprehensions>=3.8.0,<4.0",
-]
-lockfile = "3rdparty/python/flake8.lock"
 source_plugins = ["build-support/flake8"]
+install_from_resolve = "flake8"
+requirements = ["//3rdparty/python:flake8"]
 
 [shellcheck]
 args = ["--external-sources"]
@@ -159,15 +177,10 @@ args = ["--external-sources"]
 args = ["-i 2", "-ci", "-sr"]
 
 [pytest]
-args = ["--no-header"]
-extra_requirements.add = [
-  "ipdb",
-  "pytest-html",
-  "pytest-icdiff",
-  "pygments",
-]
-lockfile = "3rdparty/python/pytest.lock"
-timeout_default = 60
+args = ["--no-header", "-vv"]
+execution_slot_var = "TEST_EXECUTION_SLOT"
+install_from_resolve = "pytest"
+requirements = ["//3rdparty/python:pytest"]
 
 [test]
 extra_env_vars = [
@@ -180,22 +193,25 @@ extra_env_vars = [
   # We'd always like complete backtraces in tests.
   "RUST_BACKTRACE=1",
 ]
+timeout_default = 60
 
 [mypy]
-interpreter_constraints = [">=3.7,<3.10"]
-extra_requirements.add = [
-  "mypy-typing-asserts",
-]
-lockfile = "3rdparty/python/mypy.lock"
+install_from_resolve = "mypy"
+requirements = ["//3rdparty/python:mypy"]
+
 
 [coverage-py]
-interpreter_constraints = [">=3.7,<3.10"]
+interpreter_constraints = ["==3.9.*"]
 
-[regex-lint]
-config = "@build-support/regexes/config.yaml"
+[preamble]
+template_by_globs = "@build-support/preambles/config.yaml"
 
 [generate-lockfiles]
-custom_command = "build-support/bin/generate_all_lockfiles.sh"
+diff = true
+
+[pyupgrade]
+args = ["--keep-runtime-typing", "--py38-plus"]
+
 
 [jvm]
 default_resolve = "jvm_testprojects"
@@ -213,61 +229,14 @@ java_parser_dev = "src/python/pants/backend/java/dependency_inference/java_parse
 # Note: The jvm_artifact targets in this resolve must be kept in sync with with the requirements
 # in `generate_scala_parser_lockfile_request`.
 scala_parser_dev = "src/python/pants/backend/scala/dependency_inference/scala_parser.lock"
+strip_jar_dev = "src/python/pants/jvm/strip_jar/strip_jar.lock"
+jar_tool_dev = "src/python/pants/jvm/jar_tool/jar_tool.lock"
 
 [scala]
 version_for_resolve = { "scala_parser_dev" = "2.13.8" }
 
-[toolchain-setup]
-repo = "pants"
-org = "pantsbuild"
+[scalac]
+args = ["-Yrangepos", "-Xlint:unused"]
 
-[buildsense]
-enable = false
-
-[pants-releases.release_notes]
-master = "src/python/pants/notes/master.rst"
-"1.0.x" = "src/python/pants/notes/1.0.x.rst"
-"1.1.x" = "src/python/pants/notes/1.1.x.rst"
-"1.2.x" = "src/python/pants/notes/1.2.x.rst"
-"1.3.x" = "src/python/pants/notes/1.3.x.rst"
-"1.4.x" = "src/python/pants/notes/1.4.x.rst"
-"1.5.x" = "src/python/pants/notes/1.5.x.rst"
-"1.6.x" = "src/python/pants/notes/1.6.x.rst"
-"1.7.x" = "src/python/pants/notes/1.7.x.rst"
-"1.8.x" = "src/python/pants/notes/1.8.x.rst"
-"1.9.x" = "src/python/pants/notes/1.9.x.rst"
-"1.10.x" = "src/python/pants/notes/1.10.x.rst"
-"1.11.x" = "src/python/pants/notes/1.11.x.rst"
-"1.12.x" = "src/python/pants/notes/1.12.x.rst"
-"1.13.x" = "src/python/pants/notes/1.13.x.rst"
-"1.14.x" = "src/python/pants/notes/1.14.x.rst"
-"1.15.x" = "src/python/pants/notes/1.15.x.rst"
-"1.16.x" = "src/python/pants/notes/1.16.x.rst"
-"1.17.x" = "src/python/pants/notes/1.17.x.rst"
-"1.18.x" = "src/python/pants/notes/1.18.x.rst"
-"1.19.x" = "src/python/pants/notes/1.19.x.rst"
-"1.20.x" = "src/python/pants/notes/1.20.x.rst"
-"1.21.x" = "src/python/pants/notes/1.21.x.rst"
-"1.22.x" = "src/python/pants/notes/1.22.x.rst"
-"1.23.x" = "src/python/pants/notes/1.23.x.rst"
-"1.24.x" = "src/python/pants/notes/1.24.x.rst"
-"1.25.x" = "src/python/pants/notes/1.25.x.rst"
-"1.26.x" = "src/python/pants/notes/1.26.x.rst"
-"1.27.x" = "src/python/pants/notes/1.27.x.rst"
-"1.28.x" = "src/python/pants/notes/1.28.x.rst"
-"1.29.x" = "src/python/pants/notes/1.29.x.rst"
-"1.30.x" = "src/python/pants/notes/1.30.x.rst"
-"2.0.x" = "src/python/pants/notes/2.0.x.rst"
-"2.1.x" = "src/python/pants/notes/2.1.x.rst"
-"2.2.x" = "src/python/pants/notes/2.2.x.md"
-"2.3.x" = "src/python/pants/notes/2.3.x.md"
-"2.4.x" = "src/python/pants/notes/2.4.x.md"
-"2.5.x" = "src/python/pants/notes/2.5.x.md"
-"2.6.x" = "src/python/pants/notes/2.6.x.md"
-"2.7.x" = "src/python/pants/notes/2.7.x.md"
-"2.8.x" = "src/python/pants/notes/2.8.x.md"
-"2.9.x" = "src/python/pants/notes/2.9.x.md"
-"2.10.x" = "src/python/pants/notes/2.10.x.md"
-"2.11.x" = "src/python/pants/notes/2.11.x.md"
-"2.12.x" = "src/python/pants/notes/2.12.x.md"
-"2.13.x" = "src/python/pants/notes/2.13.x.md"
+[scala-infer]
+force_add_siblings_as_dependencies = false

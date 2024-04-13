@@ -14,10 +14,18 @@ from pants.backend.codegen.protobuf.target_types import (
     AllProtobufTargets,
     ProtobufGrpcToggleField,
     ProtobufSourceField,
+    ProtobufSourcesGeneratorTarget,
+    ProtobufSourceTarget,
 )
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_type_rules import ImportPathToPackages
-from pants.backend.go.target_types import GoPackageSourcesField
+from pants.backend.go.dependency_inference import (
+    GoImportPathsMappingAddressSet,
+    GoModuleImportPathsMapping,
+    GoModuleImportPathsMappings,
+    GoModuleImportPathsMappingsHook,
+)
+from pants.backend.go.target_type_rules import GoImportPathMappingRequest
+from pants.backend.go.target_types import GoOwningGoModAddressField, GoPackageSourcesField
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -28,6 +36,7 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
@@ -36,15 +45,12 @@ from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
 )
-from pants.backend.go.util_rules.first_party_pkg import (
-    FallibleFirstPartyPkgAnalysis,
-    FirstPartyPkgAnalysisRequest,
-)
+from pants.backend.go.util_rules.first_party_pkg import FallibleFirstPartyPkgAnalysis
+from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.backend.python.util_rules import pex
 from pants.build_graph.address import Address
-from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -69,8 +75,6 @@ from pants.engine.target import (
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
-    InferDependenciesRequest,
-    InferredDependencies,
     SourcesPaths,
     SourcesPathsRequest,
     TransitiveTargets,
@@ -83,6 +87,7 @@ from pants.source.source_root import (
     SourceRootsRequest,
     SourceRootsResult,
 )
+from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
@@ -117,17 +122,15 @@ def parse_go_package_option(content_raw: bytes) -> str | None:
     return None
 
 
-@dataclass(frozen=True)
-class GoProtobufImportPathMapping:
-    """Maps import paths of Go Protobuf packages to the addresses."""
-
-    mapping: FrozenDict[str, tuple[Address, ...]]
+class ProtobufGoModuleImportPathsMappingsHook(GoModuleImportPathsMappingsHook):
+    pass
 
 
 @rule(desc="Map import paths for all Go Protobuf targets.", level=LogLevel.DEBUG)
 async def map_import_paths_of_all_go_protobuf_targets(
-    targets: AllProtobufTargets,
-) -> GoProtobufImportPathMapping:
+    _request: ProtobufGoModuleImportPathsMappingsHook,
+    all_protobuf_targets: AllProtobufTargets,
+) -> GoModuleImportPathsMappings:
     sources = await MultiGet(
         Get(
             HydratedSources,
@@ -137,28 +140,64 @@ async def map_import_paths_of_all_go_protobuf_targets(
                 enable_codegen=True,
             ),
         )
-        for tgt in targets
+        for tgt in all_protobuf_targets
     )
 
     all_contents = await MultiGet(
         Get(DigestContents, Digest, source.snapshot.digest) for source in sources
     )
 
-    go_protobuf_targets: dict[str, set[Address]] = defaultdict(set)
-    for tgt, contents in zip(targets, all_contents):
+    go_protobuf_mapping_metadata = []
+    owning_go_mod_gets = []
+    for tgt, contents in zip(all_protobuf_targets, all_contents):
         if not contents:
             continue
         if len(contents) > 1:
             raise AssertionError(
                 f"Protobuf target `{tgt.address}` mapped to more than one source file."
             )
+
         import_path = parse_go_package_option(contents[0].content)
         if not import_path:
             continue
-        go_protobuf_targets[import_path].add(tgt.address)
 
-    return GoProtobufImportPathMapping(
-        FrozenDict({ip: tuple(addrs) for ip, addrs in go_protobuf_targets.items()})
+        owning_go_mod_gets.append(Get(OwningGoMod, OwningGoModRequest(tgt.address)))
+        go_protobuf_mapping_metadata.append((import_path, tgt.address))
+
+    owning_go_mod_targets = await MultiGet(owning_go_mod_gets)
+
+    import_paths_by_module: dict[Address, dict[str, set[Address]]] = defaultdict(
+        lambda: defaultdict(set)
+    )
+
+    for owning_go_mod, (import_path, address) in zip(
+        owning_go_mod_targets, go_protobuf_mapping_metadata
+    ):
+        import_paths_by_module[owning_go_mod.address][import_path].add(address)
+
+    return GoModuleImportPathsMappings(
+        FrozenDict(
+            {
+                go_mod_addr: GoModuleImportPathsMapping(
+                    mapping=FrozenDict(
+                        {
+                            import_path: GoImportPathsMappingAddressSet(
+                                addresses=tuple(sorted(addresses)), infer_all=True
+                            )
+                            for import_path, addresses in import_path_mapping.items()
+                        }
+                    ),
+                    address_to_import_path=FrozenDict(
+                        {
+                            address: import_path
+                            for import_path, addresses in import_path_mapping.items()
+                            for address in addresses
+                        }
+                    ),
+                )
+                for go_mod_addr, import_path_mapping in import_paths_by_module.items()
+            }
+        )
     )
 
 
@@ -174,6 +213,7 @@ class _SetupGoProtobufPackageBuildRequest:
 
     addresses: tuple[Address, ...]
     import_path: str
+    build_opts: GoBuildOptions
 
 
 @rule
@@ -181,9 +221,8 @@ async def setup_full_package_build_request(
     request: _SetupGoProtobufPackageBuildRequest,
     protoc: Protoc,
     go_protoc_plugin: _SetupGoProtocPlugin,
-    package_mapping: ImportPathToPackages,
-    go_protobuf_mapping: GoProtobufImportPathMapping,
     analyzer: PackageAnalyzerSetup,
+    platform: Platform,
 ) -> FallibleBuildGoPackageRequest:
     output_dir = "_generated_files"
     protoc_relpath = "__protoc"
@@ -191,8 +230,13 @@ async def setup_full_package_build_request(
 
     transitive_targets, downloaded_protoc_binary, empty_output_dir = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
-        Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
+        Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)),
         Get(Digest, CreateDigest([Directory(output_dir)])),
+    )
+
+    go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(transitive_targets.roots[0].address))
+    package_mapping = await Get(
+        GoModuleImportPathsMapping, GoImportPathMappingRequest(go_mod_addr.address)
     )
 
     all_sources = await Get(
@@ -287,7 +331,7 @@ async def setup_full_package_build_request(
             input_digest=input_digest,
             description=f"Determine metadata for generated Go package for {request.import_path}",
             level=LogLevel.DEBUG,
-            env={"CGO_ENABLED": "0"},
+            env={"CGO_ENABLED": "0"},  # protobuf files should not have cgo!
         ),
     )
 
@@ -310,46 +354,46 @@ async def setup_full_package_build_request(
 
     # Obtain build requests for third-party dependencies.
     # TODO: Consider how to merge this code with existing dependency inference code.
-    dep_build_request_addrs: list[Address] = []
+    dep_build_request_addrs: set[Address] = set()
     for dep_import_path in (*analysis.imports, *analysis.test_imports, *analysis.xtest_imports):
         # Infer dependencies on other Go packages.
         candidate_addresses = package_mapping.mapping.get(dep_import_path)
         if candidate_addresses:
             # TODO: Use explicit dependencies to disambiguate? This should never happen with Go backend though.
-            if len(candidate_addresses) > 1:
-                return FallibleBuildGoPackageRequest(
-                    request=None,
-                    import_path=request.import_path,
-                    exit_code=result.exit_code,
-                    stderr=textwrap.dedent(
-                        f"""
-                        Multiple addresses match import of `{dep_import_path}`.
+            if candidate_addresses.infer_all:
+                dep_build_request_addrs.update(candidate_addresses.addresses)
+            else:
+                if len(candidate_addresses.addresses) > 1:
+                    return FallibleBuildGoPackageRequest(
+                        request=None,
+                        import_path=request.import_path,
+                        exit_code=result.exit_code,
+                        stderr=textwrap.dedent(
+                            f"""
+                            Multiple addresses match import of `{dep_import_path}`.
 
-                        addresses: {', '.join(str(a) for a in candidate_addresses)}
-                        """
-                    ).strip(),
-                )
-            dep_build_request_addrs.extend(candidate_addresses)
-
-        # Infer dependencies on other generated Go sources.
-        go_protobuf_candidate_addresses = go_protobuf_mapping.mapping.get(dep_import_path)
-        if go_protobuf_candidate_addresses:
-            dep_build_request_addrs.extend(go_protobuf_candidate_addresses)
+                            addresses: {', '.join(str(a) for a in candidate_addresses.addresses)}
+                            """
+                        ).strip(),
+                    )
+                dep_build_request_addrs.update(candidate_addresses.addresses)
 
     dep_build_requests = await MultiGet(
-        Get(BuildGoPackageRequest, BuildGoPackageTargetRequest(addr))
-        for addr in dep_build_request_addrs
+        Get(BuildGoPackageRequest, BuildGoPackageTargetRequest(addr, build_opts=request.build_opts))
+        for addr in sorted(dep_build_request_addrs)
     )
 
     return FallibleBuildGoPackageRequest(
         request=BuildGoPackageRequest(
             import_path=request.import_path,
+            pkg_name=analysis.name,
             digest=gen_sources.digest,
             dir_path=analysis.dir_path,
-            go_file_names=analysis.go_files,
-            s_file_names=analysis.s_files,
+            go_files=analysis.go_files,
+            s_files=analysis.s_files,
             direct_dependencies=dep_build_requests,
             minimum_go_version=analysis.minimum_go_version,
+            build_opts=request.build_opts,
         ),
         import_path=request.import_path,
     )
@@ -358,7 +402,6 @@ async def setup_full_package_build_request(
 @rule
 async def setup_build_go_package_request_for_protobuf(
     request: GoCodegenBuildProtobufRequest,
-    protobuf_package_mapping: GoProtobufImportPathMapping,
 ) -> FallibleBuildGoPackageRequest:
     # Hydrate the protobuf source to parse for the Go import path.
     sources = await Get(HydratedSources, HydrateSourcesRequest(request.target[ProtobufSourceField]))
@@ -373,10 +416,15 @@ async def setup_build_go_package_request_for_protobuf(
             stderr=f"No import path was set in Protobuf file via `option go_package` directive for {request.target.address}.",
         )
 
+    go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(request.target.address))
+    package_mapping = await Get(
+        GoModuleImportPathsMapping, GoImportPathMappingRequest(go_mod_addr.address)
+    )
+
     # Request the full build of the package. This indirection is necessary so that requests for two or more
     # Protobuf files in the same Go package result in a single cacheable rule invocation.
-    protobuf_target_addrs_for_import_path = protobuf_package_mapping.mapping.get(import_path)
-    if not protobuf_target_addrs_for_import_path:
+    protobuf_target_addrs_set_for_import_path = package_mapping.mapping.get(import_path)
+    if not protobuf_target_addrs_set_for_import_path:
         return FallibleBuildGoPackageRequest(
             request=None,
             import_path=import_path,
@@ -392,8 +440,9 @@ async def setup_build_go_package_request_for_protobuf(
     return await Get(
         FallibleBuildGoPackageRequest,
         _SetupGoProtobufPackageBuildRequest(
-            addresses=protobuf_target_addrs_for_import_path,
+            addresses=protobuf_target_addrs_set_for_import_path.addresses,
             import_path=import_path,
+            build_opts=request.build_opts,
         ),
     )
 
@@ -403,13 +452,14 @@ async def generate_go_from_protobuf(
     request: GenerateGoFromProtobufRequest,
     protoc: Protoc,
     go_protoc_plugin: _SetupGoProtocPlugin,
+    platform: Platform,
 ) -> GeneratedSources:
     output_dir = "_generated_files"
     protoc_relpath = "__protoc"
     protoc_go_plugin_relpath = "__protoc_gen_go"
 
     downloaded_protoc_binary, empty_output_dir, transitive_targets = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
+        Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)),
         Get(Digest, CreateDigest([Directory(output_dir)])),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])),
     )
@@ -518,7 +568,7 @@ google.golang.org/protobuf v1.27.1/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQ
 
 
 @rule
-async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
+async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
     go_mod_digest = await Get(
         Digest,
         CreateDigest(
@@ -548,7 +598,6 @@ async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go"],
                 description="Build Go protobuf plugin for `protoc`.",
-                platform=platform,
             ),
         ),
         Get(
@@ -561,7 +610,6 @@ async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go-grpc"],
                 description="Build Go gRPC protobuf plugin for `protoc`.",
-                platform=platform,
             ),
         ),
     )
@@ -588,52 +636,14 @@ async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
     return _SetupGoProtocPlugin(plugin_digest)
 
 
-class InferGoProtobufDependenciesRequest(InferDependenciesRequest):
-    infer_from = GoPackageSourcesField
-
-
-@rule(
-    desc="Infer dependencies on Protobuf sources for first-party Go packages", level=LogLevel.DEBUG
-)
-async def infer_go_dependencies(
-    request: InferGoProtobufDependenciesRequest,
-    go_protobuf_mapping: GoProtobufImportPathMapping,
-) -> InferredDependencies:
-    address = request.sources_field.address
-    maybe_pkg_analysis = await Get(
-        FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(address)
-    )
-    if maybe_pkg_analysis.analysis is None:
-        _logger.error(
-            softwrap(
-                f"""
-                Failed to analyze {maybe_pkg_analysis.import_path} for dependency inference:
-
-                {maybe_pkg_analysis.stderr}
-                """
-            )
-        )
-        return InferredDependencies([])
-    pkg_analysis = maybe_pkg_analysis.analysis
-
-    inferred_dependencies: list[Address] = []
-    for import_path in (
-        *pkg_analysis.imports,
-        *pkg_analysis.test_imports,
-        *pkg_analysis.xtest_imports,
-    ):
-        candidate_addresses = go_protobuf_mapping.mapping.get(import_path, ())
-        inferred_dependencies.extend(candidate_addresses)
-
-    return InferredDependencies(inferred_dependencies)
-
-
 def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateSourcesRequest, GenerateGoFromProtobufRequest),
         UnionRule(GoCodegenBuildRequest, GoCodegenBuildProtobufRequest),
-        UnionRule(InferDependenciesRequest, InferGoProtobufDependenciesRequest),
+        UnionRule(GoModuleImportPathsMappingsHook, ProtobufGoModuleImportPathsMappingsHook),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(GoOwningGoModAddressField),
+        ProtobufSourceTarget.register_plugin_field(GoOwningGoModAddressField),
         # Rules needed for this to pass src/python/pants/init/load_backends_integration_test.py:
         *assembly.rules(),
         *build_pkg.rules(),

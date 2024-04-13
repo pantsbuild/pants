@@ -10,21 +10,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
-from pants.base.build_environment import get_default_pants_config_file, pants_version
+from pants.base.build_environment import get_buildroot, get_default_pants_config_file, pants_version
 from pants.base.exceptions import BuildConfigurationError
+from pants.engine.unions import UnionMembership
 from pants.option.alias import CliAlias
 from pants.option.config import Config
-from pants.option.custom_types import ListValueComponent
+from pants.option.custom_types import DictValueComponent, ListValueComponent
 from pants.option.global_options import BootstrapOptions, GlobalOptions
 from pants.option.option_types import collect_options_info
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import read_file
-from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import ensure_text
+from pants.util.strutil import ensure_text, softwrap
 
 if TYPE_CHECKING:
     from pants.build_graph.build_configuration import BuildConfiguration
@@ -117,7 +117,7 @@ class OptionsBootstrapper:
         :param args: An args array.
         :param allow_pantsrc: True to allow pantsrc files to be used. Unless tests are expecting to
           consume pantsrc files, they should pass False in order to avoid reading files from
-          absolute paths. Production usecases should pass True to allow options values to make the
+          absolute paths. Production use-cases should pass True to allow options values to make the
           decision of whether to respect pantsrc files.
         """
         with warnings.catch_warnings(record=True):
@@ -167,12 +167,8 @@ class OptionsBootstrapper:
             # stuhood: This could potentially break the rust client when aliases are used:
             # https://github.com/pantsbuild/pants/pull/13228#discussion_r728223889
             alias_vals = post_bootstrap_config.get("cli", "alias")
-            alias_dict = parse_expression(
-                name="cli.alias",
-                val=alias_vals[-1] if alias_vals else "{}",
-                acceptable_types=dict,
-            )
-            alias = CliAlias.from_dict(alias_dict)
+            val = DictValueComponent.merge([DictValueComponent.create(v) for v in alias_vals]).val
+            alias = CliAlias.from_dict(val)
 
             args = alias.expand_args(tuple(args))
             bargs = cls._get_bootstrap_args(args)
@@ -182,7 +178,9 @@ class OptionsBootstrapper:
             # avoid needing to lazily import code to avoid chicken-and-egg-problems. This is the
             # earliest place it makes sense to do so and is generically used by both the local and
             # remote pants runners.
-            os.environ["PANTS_BIN_NAME"] = bootstrap_option_values.pants_bin_name
+            os.environ["__PANTS_BIN_NAME"] = munge_bin_name(
+                bootstrap_option_values.pants_bin_name, get_buildroot()
+            )
 
             env_tuples = tuple(
                 sorted(
@@ -241,7 +239,10 @@ class OptionsBootstrapper:
 
     @memoized_method
     def _full_options(
-        self, known_scope_infos: FrozenOrderedSet[ScopeInfo], allow_unknown_options: bool = False
+        self,
+        known_scope_infos: FrozenOrderedSet[ScopeInfo],
+        union_membership: UnionMembership,
+        allow_unknown_options: bool = False,
     ) -> Options:
         bootstrap_option_values = self.get_bootstrap_options().for_global_scope()
         options = Options.create(
@@ -258,12 +259,15 @@ class OptionsBootstrapper:
             if not ksi.subsystem_cls or ksi.subsystem_cls in distinct_subsystem_classes:
                 continue
             distinct_subsystem_classes.add(ksi.subsystem_cls)
-            ksi.subsystem_cls.register_options_on_scope(options)
+            ksi.subsystem_cls.register_options_on_scope(options, union_membership)
 
         return options
 
     def full_options_for_scopes(
-        self, known_scope_infos: Iterable[ScopeInfo], allow_unknown_options: bool = False
+        self,
+        known_scope_infos: Iterable[ScopeInfo],
+        union_membership: UnionMembership,
+        allow_unknown_options: bool = False,
     ) -> Options:
         """Get the full Options instance bootstrapped by this object for the given known scopes.
 
@@ -273,15 +277,22 @@ class OptionsBootstrapper:
         """
         return self._full_options(
             FrozenOrderedSet(sorted(known_scope_infos, key=lambda si: si.scope)),
+            union_membership,
             allow_unknown_options=allow_unknown_options,
         )
 
-    def full_options(self, build_configuration: BuildConfiguration) -> Options:
+    def full_options(
+        self, build_configuration: BuildConfiguration, union_membership: UnionMembership
+    ) -> Options:
         global_bootstrap_options = self.get_bootstrap_options().for_global_scope()
         if global_bootstrap_options.pants_version != pants_version():
             raise BuildConfigurationError(
-                f"Version mismatch: Requested version was {global_bootstrap_options.pants_version}, "
-                f"our version is {pants_version()}."
+                softwrap(
+                    f"""
+                    Version mismatch: Requested version was {global_bootstrap_options.pants_version},
+                    our version is {pants_version()}.
+                    """
+                )
             )
 
         # Parse and register options.
@@ -289,8 +300,28 @@ class OptionsBootstrapper:
             subsystem.get_scope_info() for subsystem in build_configuration.all_subsystems
         ]
         options = self.full_options_for_scopes(
-            known_scope_infos, allow_unknown_options=build_configuration.allow_unknown_options
+            known_scope_infos,
+            union_membership,
+            allow_unknown_options=build_configuration.allow_unknown_options,
         )
         GlobalOptions.validate_instance(options.for_global_scope())
-        self.alias.check_name_conflicts(options.known_scope_to_info)
+        self.alias.check_name_conflicts(
+            options.known_scope_to_info, options.known_scope_to_scoped_args
+        )
         return options
+
+
+def munge_bin_name(pants_bin_name: str, build_root: str) -> str:
+    # Determine a useful bin name to embed in help strings.
+    # The bin name gets embedded in help comments in generated lockfiles,
+    # so we never want to use an abspath.
+    if os.path.isabs(pants_bin_name):
+        pants_bin_name = os.path.realpath(pants_bin_name)
+        build_root = os.path.realpath(os.path.abspath(build_root))
+        # If it's in the buildroot, use the relpath from there. Otherwise use the basename.
+        pants_bin_relpath = os.path.relpath(pants_bin_name, build_root)
+        if pants_bin_relpath.startswith(".."):
+            pants_bin_name = os.path.basename(pants_bin_name)
+        else:
+            pants_bin_name = os.path.join(".", pants_bin_relpath)
+    return pants_bin_name

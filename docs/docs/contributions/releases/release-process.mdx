@@ -1,0 +1,143 @@
+---
+    title: Release process
+    sidebar_position: 1
+---
+
+How to release a new version of Pants and its plugins.
+
+---
+
+This page covers the nitty-gritty of executing a release, and is probably only interesting for maintainers. If you're interested in when and why Pants is released, please see the [Release strategy](./release-strategy.mdx) page.
+
+## Prerequisites
+
+You only need to set these up once.
+
+### Create a PGP signing key
+
+If you already have one, you can reuse it.
+
+You likely want to use the gpg implementation of pgp. On macOS, you can `brew install gpg`. Once gpg is installed, generate a new key: [https://docs.github.com/en/github/authenticating-to-github/generating-a-new-gpg-key](https://docs.github.com/en/github/authenticating-to-github/generating-a-new-gpg-key).
+
+Please use a password for your key!
+
+### Add your PGP key to GitHub.
+
+See [https://docs.github.com/en/github/authenticating-to-github/adding-a-new-gpg-key-to-your-github-account](https://docs.github.com/en/github/authenticating-to-github/adding-a-new-gpg-key-to-your-github-account).
+
+### Configure Git to use your PGP key.
+
+See [https://docs.github.com/en/github/authenticating-to-github/telling-git-about-your-signing-key](https://docs.github.com/en/github/authenticating-to-github/telling-git-about-your-signing-key).
+
+Note: the last step is required on macOS.
+
+### Authenticate with the GitHub API
+
+Ensure that you have a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) for your GitHub account in your `.netrc` file.
+
+```
+machine api.github.com
+    login <username>
+    password <token>
+```
+
+## Step 0: Preliminaries
+
+### `dev` - Check for any deprecations
+
+If this is a dev release, ensure that deprecations set to expire in the released version have been removed. To check for this, search the code for the version you're releasing. For example, `git grep 2.9.0.dev0`.
+
+If there is deprecated code that must be removed, you can either:
+
+1. Ping the person who made the deprecation to ask them to remove it.
+2. Remove it yourself, in a precursor PR.
+3. Bump the deprecation removal target back by one dev release.
+
+### `rc` - Check for cherry-picks
+
+If this is a release candidate, ensure that pending cherry-picks have been applied in the release branch. Cherry-picks are usually applied automatically, but this may not always succeed, so [check for any pending cherry-picks](https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-cherrypick+is%3Aclosed), and find the relevant ones by looking at the milestone: for instance, if doing a release for 2.16, the relevant cherry-picks are those for milestone `2.16.x` or earlier.
+
+The process may fail in one of two ways:
+
+- The cherry-picking process failed, and tagged the PR with `auto-cherry-picking-failed`: follow the instructions in the comment on the pull request. (This likely means there are merge conflicts that require manual resolution.)
+- the cherry-pick hasn't (yet) run: trigger the automation manually by going to [the GitHub Action](https://github.com/pantsbuild/pants/actions/workflows/auto-cherry-picker.yaml), clicking on the "Run workflow" button, and providing the PR number.
+
+## Step 1: Create the release commit
+
+The release commit is the commit that bumps the VERSION string. For `dev`/`a0` releases this happens in the `main` branch, in the same commit that updates the release notes and the `CONTRIBUTORS.md` file. For `rc` and stable releases, this happens in the relevant stable branch.
+
+### `dev0` - set up the new release series
+
+If this is the first dev release in a new series:
+
+1. Create a new file in ` src/python/pants/notes`, e.g. create `src/python/pants/notes/2.9.x.md`.
+   1. Copy the title and template over from the prior release, e.g. `2.8.x.md`.
+
+### Bump the VERSION
+
+From the `main` branch, run `pants run src/python/pants_release/start_release.py -- --new 2.9.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
+
+This will create a pull request that:
+
+1. updates `CONTRIBUTORS.md`
+2. bumps the `VERSION` on the branch
+
+### Merge the pull request
+
+Post the PR to the `#development` channel in Slack. Merge once approved and green.
+
+### `a0` - create a new Git branch
+
+If you're releasing an `a0` release, you must create the stable branch for that version.
+
+For example, if you're releasing `2.9.0a0`, create the branch `2.9.x` by running the command below. Make sure you are on your release commit before doing this.
+
+```bash
+$ git checkout -b 2.9.x
+$ git push upstream 2.9.x
+```
+
+## Step 2: Tag the release to trigger publishing
+
+Once you have merged the `VERSION` bump — which will be on `main` for `dev` and `a0` releases, and on the release branch for release candidates — tag the release commit to trigger wheel building and publishing.
+
+First, ensure that you are on your release branch at your version bump commit.
+
+:::note Tip: if new commits have landed after your release commit
+You can reset to your release commit by running `git reset --hard <sha>`.
+:::
+
+Then, run:
+
+```bash
+./pants run src/python/pants_release/release.py -- tag-release
+```
+
+This will tag the release with your PGP key, and push the tag to origin, which will kick off a [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/release.yaml) to build the wheels and publish them to PyPI.
+
+## Step 3: Test the release
+
+Run this script as a basic smoke test:
+
+```bash
+./pants run src/python/pants_release/release.py -- test-release
+```
+
+You should also check [GitHub Releases](https://github.com/pantsbuild/pants/releases) to ensure everything looks good. Find the version you released, then click it and confirm that the "Assets" list includes PEXes for macOS and Linux.
+
+## Step 4: Run release testing on public repositories
+
+Manually trigger a run of the [public repositories testing workflow](https://github.com/pantsbuild/pants/actions/workflows/public_repos.yaml), specifying the version just published as the "Pants version".
+
+This workflow checks out various open-source repositories that use Pants and runs the given version of Pants against them, to try to validate if they can upgrade smoothly or if there's any (obvious) bugs. The workflow runs the repositories in two configurations: first with the repo's default configuration as a baseline, and then with the specified Pants version (and any additional options).
+
+Once the workflow finishes, look through any failures and determine if there's any interesting/unknown problems, ensuring there's issues filed (and tagged with the appropriate milestone) for them. For instance, a custom plugin that is broken by a plugin API change is okay, but other sorts of breakage might not be. If there's a failure during the baseline, a similar failure during the real (non-baseline) test can be ignored, as it likely means the repository in question is broken.
+
+Alternatively, after starting the workflow, post the link to the in-progress run in `#development` in Slack, so that someone can come back to it when it does finish.
+
+## When Things Go Wrong
+
+From time to time, a release will fail. It's a complex process. The first thing to do after you've
+exhausted your knowledge and debugging skills or patience is to contact others. You might reach out
+to the development or maintainers channels on Pantbuild Slack in the absence of other ideas about
+whom to ask for help.

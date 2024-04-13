@@ -2,18 +2,22 @@
 name = "hashing"
 version = "0.0.1"
 edition = "2021"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-byteorder = "1.4"
-# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
-deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
-digest = "0.9"
-generic-array = "0.14"
-hex = "0.4.3"
-serde = { version = "1.0", features = ["derive"] }
-sha2 = "0.10"
+byteorder = { workspace = true }
+deepsize = { workspace = true }
+digest = { workspace = true }
+generic-array = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+sha2 = { workspace = true }
+tokio = { workspace = true, features = ["io-util"] }
 
 [dev-dependencies]
-serde_test = "1.0"
+serde_test = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

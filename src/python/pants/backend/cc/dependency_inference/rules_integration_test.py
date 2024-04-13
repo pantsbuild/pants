@@ -7,12 +7,13 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.cc.dependency_inference.rules import (
+    CCDependencyInferenceFieldSet,
     CCIncludeDirective,
     InferCCDependenciesRequest,
     parse_includes,
 )
 from pants.backend.cc.dependency_inference.rules import rules as cc_dep_inf_rules
-from pants.backend.cc.target_types import CCSourceField, CCSourcesGeneratorTarget, CCSourceTarget
+from pants.backend.cc.target_types import CCSourcesGeneratorTarget, CCSourceTarget
 from pants.backend.cc.target_types import rules as target_type_rules
 from pants.build_graph.address import Address
 from pants.engine.target import InferredDependencies
@@ -67,7 +68,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
-    rule_runner.set_options(["--source-root-patterns=['src/native']"])
+    rule_runner.set_options(["--source-root-patterns=['src/native', '/mylib', 'mylib/include']"])
     rule_runner.write_files(
         {
             "src/native/BUILD": "cc_sources()",
@@ -111,13 +112,30 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
                 )
                 """
             ),
+            # Test handling of imports that are nested in a public "include" (or similar) directory.
+            # This is a common project and library structure, so if possible, we should handle it gracefully.
+            "mylib/include/mylib/BUILD": "cc_sources()",
+            "mylib/include/mylib/public1.h": "int foo1() { return 1; }",
+            "mylib/include/mylib/public2.h": "int foo2() { return 2; }",
+            "mylib/src/BUILD": "cc_sources()",
+            "mylib/src/private1.h": "int bar1() { return 1; }",
+            "mylib/src/private2.h": "int bar2() { return 2; }",
+            "mylib/src/main.c": dedent(
+                """\
+                #include "mylib/public1.h"
+                #include "mylib/public2.h"
+                #include "private1.h"
+                #include "private2.h"
+                """
+            ),
         }
     )
 
     def run_dep_inference(address: Address) -> InferredDependencies:
         tgt = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferCCDependenciesRequest(tgt[CCSourceField])]
+            InferredDependencies,
+            [InferCCDependenciesRequest(CCDependencyInferenceFieldSet.create(tgt))],
         )
 
     assert run_dep_inference(
@@ -140,3 +158,15 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
     assert "The target src/native/ambiguous/main.c:main includes `ambiguous/dep.h`" in caplog.text
     assert "['src/native/ambiguous/dep.h:dep1', 'src/native/ambiguous/dep.h:dep2']" in caplog.text
     assert "disambiguated.h" not in caplog.text
+
+    caplog.clear()
+    assert run_dep_inference(
+        Address("mylib/src", relative_file_path="main.c")
+    ) == InferredDependencies(
+        [
+            Address("mylib/include/mylib", relative_file_path="public1.h"),
+            Address("mylib/include/mylib", relative_file_path="public2.h"),
+            Address("mylib/src", relative_file_path="private1.h"),
+            Address("mylib/src", relative_file_path="private2.h"),
+        ]
+    )

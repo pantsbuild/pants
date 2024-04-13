@@ -12,15 +12,7 @@ from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.chart_metadata import HelmChartMetadata
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.engine.fs import (
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    Directory,
-    MergeDigests,
-    RemovePrefix,
-    Snapshot,
-)
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, RemovePrefix, Snapshot
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -31,13 +23,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class BuiltHelmArtifact(BuiltPackageArtifact):
-    metadata: HelmChartMetadata | None = None
+    info: HelmChartMetadata | None = None
 
     @classmethod
-    def create(cls, relpath: str, metadata: HelmChartMetadata) -> BuiltHelmArtifact:
+    def create(cls, relpath: str, info: HelmChartMetadata) -> BuiltHelmArtifact:
         return cls(
             relpath=relpath,
-            metadata=metadata,
+            info=info,
             extra_log_lines=(f"Built Helm chart artifact: {relpath}",),
         )
 
@@ -56,16 +48,16 @@ async def run_helm_package(field_set: HelmPackageFieldSet) -> BuiltPackage:
         Get(Digest, CreateDigest([Directory(result_dir)])),
     )
 
-    input_digest = await Get(Digest, MergeDigests([chart.snapshot.digest, result_digest]))
-    process_output_file = os.path.join(result_dir, f"{chart.metadata.artifact_name}.tgz")
+    process_output_file = os.path.join(result_dir, f"{chart.info.artifact_name}.tgz")
 
     process_result = await Get(
         ProcessResult,
         HelmProcess(
-            argv=["package", chart.path, "-d", result_dir],
-            input_digest=input_digest,
+            argv=["package", chart.name, "-d", result_dir],
+            input_digest=result_digest,
+            extra_immutable_input_digests=chart.immutable_input_digests,
             output_files=(process_output_file,),
-            description=f"Packaging Helm chart: {field_set.address.spec_path}",
+            description=f"Packaging Helm chart: {field_set.address}",
         ),
     )
 
@@ -80,7 +72,7 @@ async def run_helm_package(field_set: HelmPackageFieldSet) -> BuiltPackage:
     return BuiltPackage(
         final_snapshot.digest,
         artifacts=tuple(
-            BuiltHelmArtifact.create(file, chart.metadata) for file in final_snapshot.files
+            BuiltHelmArtifact.create(file, chart.info) for file in final_snapshot.files
         ),
     )
 

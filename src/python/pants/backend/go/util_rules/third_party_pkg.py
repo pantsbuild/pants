@@ -3,32 +3,42 @@
 
 from __future__ import annotations
 
+import dataclasses
+import difflib
 import json
 import logging
 import os
 from dataclasses import dataclass
 from typing import Any
 
-import ijson
+import ijson.backends.python as ijson
 
-from pants.backend.go.subsystems.golang import GolangSubsystem
+from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
+from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import pkg_analyzer
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
+from pants.backend.go.util_rules.cgo import CGoCompilerFlags
+from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.core.goals.tailor import group_by_dir
+from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_DIGEST,
+    CreateDigest,
     Digest,
+    DigestContents,
     DigestSubset,
+    FileContent,
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
     Snapshot,
 )
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -48,6 +58,7 @@ class ThirdPartyPkgAnalysis:
     """
 
     import_path: str
+    name: str
 
     digest: Digest
     dir_path: str
@@ -56,9 +67,27 @@ class ThirdPartyPkgAnalysis:
     # tests directly on a third-party package.
     imports: tuple[str, ...]
     go_files: tuple[str, ...]
+    cgo_files: tuple[str, ...]
+    cgo_flags: CGoCompilerFlags
+
+    c_files: tuple[str, ...]
+    cxx_files: tuple[str, ...]
+    m_files: tuple[str, ...]
+    h_files: tuple[str, ...]
+    f_files: tuple[str, ...]
     s_files: tuple[str, ...]
 
+    syso_files: tuple[str, ...]
+
     minimum_go_version: str | None
+
+    embed_patterns: tuple[str, ...]
+    test_embed_patterns: tuple[str, ...]
+    xtest_embed_patterns: tuple[str, ...]
+
+    embed_config: EmbedConfig | None = None
+    test_embed_config: EmbedConfig | None = None
+    xtest_embed_config: EmbedConfig | None = None
 
     error: GoThirdPartyPkgError | None = None
 
@@ -71,8 +100,10 @@ class ThirdPartyPkgAnalysisRequest(EngineAwareParameter):
     """
 
     import_path: str
+    go_mod_address: Address
     go_mod_digest: Digest
     go_mod_path: str
+    build_opts: GoBuildOptions
 
     def debug_hint(self) -> str:
         return f"{self.import_path} from {self.go_mod_path}"
@@ -93,8 +124,10 @@ class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgAnalysis]):
 
 @dataclass(frozen=True)
 class AllThirdPartyPackagesRequest:
+    go_mod_address: Address
     go_mod_digest: Digest
     go_mod_path: str
+    build_opts: GoBuildOptions
 
 
 @dataclass(frozen=True)
@@ -120,12 +153,14 @@ class ModuleDescriptors:
 
 @dataclass(frozen=True)
 class AnalyzeThirdPartyModuleRequest:
+    go_mod_address: Address
     go_mod_digest: Digest
     go_mod_path: str
     import_path: str
     name: str
     version: str
     minimum_go_version: str | None
+    build_opts: GoBuildOptions
 
 
 @dataclass(frozen=True)
@@ -250,11 +285,52 @@ def _freeze_json_dict(d: dict[Any, Any]) -> FrozenDict[str, Any]:
     return FrozenDict(result)
 
 
+async def _check_go_sum_has_not_changed(
+    input_digest: Digest,
+    output_digest: Digest,
+    dir_path: str,
+    import_path: str,
+    go_mod_address: Address,
+) -> None:
+    input_entries, output_entries = await MultiGet(
+        Get(DigestContents, Digest, input_digest),
+        Get(DigestContents, Digest, output_digest),
+    )
+
+    go_sum_path = os.path.join(dir_path, "go.sum")
+
+    input_go_sum_entry: bytes | None = None
+    for entry in input_entries:
+        if entry.path == go_sum_path:
+            input_go_sum_entry = entry.content
+
+    output_go_sum_entry: bytes | None = None
+    for entry in output_entries:
+        if entry.path == go_sum_path:
+            output_go_sum_entry = entry.content
+
+    if input_go_sum_entry is not None or output_go_sum_entry is not None:
+        if input_go_sum_entry != output_go_sum_entry:
+            go_sum_diff = list(
+                difflib.unified_diff(
+                    (input_go_sum_entry or b"").decode().splitlines(),
+                    (output_go_sum_entry or b"").decode().splitlines(),
+                )
+            )
+            go_sum_diff_rendered = "\n".join(line.rstrip() for line in go_sum_diff)
+            raise ValueError(
+                f"For `{GoModTarget.alias}` target `{go_mod_address}`, the go.sum file is incomplete "
+                f"because it was updated while processing third-party dependency `{import_path}`. "
+                "Please re-generate the go.sum file by running `go mod download all` in the module directory. "
+                "(Pants does not currently have support for updating the go.sum checksum database itself.)\n\n"
+                f"Diff:\n{go_sum_diff_rendered}"
+            )
+
+
 @rule
 async def analyze_go_third_party_module(
     request: AnalyzeThirdPartyModuleRequest,
     analyzer: PackageAnalyzerSetup,
-    golang_subsystem: GolangSubsystem,
 ) -> AnalyzedThirdPartyModule:
     # Download the module.
     download_result = await Get(
@@ -262,10 +338,11 @@ async def analyze_go_third_party_module(
         GoSdkProcess(
             ("mod", "download", "-json", f"{request.name}@{request.version}"),
             input_digest=request.go_mod_digest,  # for go.sum
-            working_dir=os.path.dirname(request.go_mod_path) if request.go_mod_path else None,
+            working_dir=os.path.dirname(request.go_mod_path),
             # Allow downloads of the module sources.
             allow_downloads=True,
             output_directories=("gopath",),
+            output_files=(os.path.join(os.path.dirname(request.go_mod_path), "go.sum"),),
             description=f"Download Go module {request.name}@{request.version}.",
         ),
     )
@@ -274,6 +351,15 @@ async def analyze_go_third_party_module(
         raise AssertionError(
             f"Expected output from `go mod download` for {request.name}@{request.version}."
         )
+
+    # Make sure go.sum has not changed.
+    await _check_go_sum_has_not_changed(
+        input_digest=request.go_mod_digest,
+        output_digest=download_result.output_digest,
+        dir_path=os.path.dirname(request.go_mod_path),
+        import_path=request.import_path,
+        go_mod_address=request.go_mod_address,
+    )
 
     module_metadata = json.loads(download_result.stdout)
     module_sources_relpath = strip_sandbox_prefix(module_metadata["Dir"], "gopath/")
@@ -321,7 +407,7 @@ async def analyze_go_third_party_module(
             },
             description=f"Analyze metadata for Go third-party module: {request.name}@{request.version}",
             level=LogLevel.DEBUG,
-            env={"CGO_ENABLED": "0"},
+            env={"CGO_ENABLED": "1" if request.build_opts.cgo_enabled else "0"},
         ),
     )
 
@@ -390,16 +476,9 @@ async def analyze_go_third_party_package(
     maybe_error: GoThirdPartyPkgError | None = None
 
     for key in (
-        "CgoFiles",
         "CompiledGoFiles",
-        "CFiles",
-        "CXXFiles",
-        "MFiles",
-        "HFiles",
-        "FFiles",
         "SwigFiles",
         "SwigCXXFiles",
-        "SysoFiles",
     ):
         if key in request.pkg_json:
             maybe_error = GoThirdPartyPkgError(
@@ -410,28 +489,78 @@ async def analyze_go_third_party_package(
                 "the third-party module."
             )
 
-    package_digest = await Get(
-        Digest,
-        DigestSubset(
-            request.module_sources_digest,
-            PathGlobs(
-                [os.path.join(request.package_path, "*")],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=f"the analysis of Go package {import_path}",
-            ),
-        ),
-    )
-
     analysis = ThirdPartyPkgAnalysis(
-        digest=package_digest,
+        digest=request.module_sources_digest,
         import_path=import_path,
+        name=request.pkg_json["Name"],
         dir_path=request.package_path,
         imports=tuple(request.pkg_json.get("Imports", ())),
         go_files=tuple(request.pkg_json.get("GoFiles", ())),
+        c_files=tuple(request.pkg_json.get("CFiles", ())),
+        cxx_files=tuple(request.pkg_json.get("CXXFiles", ())),
+        m_files=tuple(request.pkg_json.get("MFiles", ())),
+        h_files=tuple(request.pkg_json.get("HFiles", ())),
+        f_files=tuple(request.pkg_json.get("FFiles", ())),
         s_files=tuple(request.pkg_json.get("SFiles", ())),
+        syso_files=tuple(request.pkg_json.get("SysoFiles", ())),
+        cgo_files=tuple(request.pkg_json.get("CgoFiles", ())),
         minimum_go_version=request.minimum_go_version,
+        embed_patterns=tuple(request.pkg_json.get("EmbedPatterns", [])),
+        test_embed_patterns=tuple(request.pkg_json.get("TestEmbedPatterns", [])),
+        xtest_embed_patterns=tuple(request.pkg_json.get("XTestEmbedPatterns", [])),
         error=maybe_error,
+        cgo_flags=CGoCompilerFlags(
+            cflags=tuple(request.pkg_json.get("CgoCFLAGS", [])),
+            cppflags=tuple(request.pkg_json.get("CgoCPPFLAGS", [])),
+            cxxflags=tuple(request.pkg_json.get("CgoCXXFLAGS", [])),
+            fflags=tuple(request.pkg_json.get("CgoFFLAGS", [])),
+            ldflags=tuple(request.pkg_json.get("CgoLDFLAGS", [])),
+            pkg_config=tuple(request.pkg_json.get("CgoPkgConfig", [])),
+        ),
     )
+
+    if analysis.embed_patterns or analysis.test_embed_patterns or analysis.xtest_embed_patterns:
+        patterns_json = json.dumps(
+            {
+                "EmbedPatterns": analysis.embed_patterns,
+                "TestEmbedPatterns": analysis.test_embed_patterns,
+                "XTestEmbedPatterns": analysis.xtest_embed_patterns,
+            }
+        ).encode("utf-8")
+        embedder, patterns_json_digest = await MultiGet(
+            Get(LoadedGoBinary, LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder")),
+            Get(Digest, CreateDigest([FileContent("patterns.json", patterns_json)])),
+        )
+        input_digest = await Get(
+            Digest,
+            MergeDigests((request.module_sources_digest, patterns_json_digest, embedder.digest)),
+        )
+        embed_result = await Get(
+            FallibleProcessResult,
+            Process(
+                ("./embedder", "patterns.json", request.package_path),
+                input_digest=input_digest,
+                description=f"Create embed mapping for {import_path}",
+                level=LogLevel.DEBUG,
+            ),
+        )
+        if embed_result.exit_code != 0:
+            return FallibleThirdPartyPkgAnalysis(
+                analysis=None,
+                import_path=import_path,
+                exit_code=1,
+                stderr=embed_result.stderr.decode(),
+            )
+        metadata = json.loads(embed_result.stdout)
+        embed_config = EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {}))
+        test_embed_config = EmbedConfig.from_json_dict(metadata.get("TestEmbedConfig", {}))
+        xtest_embed_config = EmbedConfig.from_json_dict(metadata.get("XTestEmbedConfig", {}))
+        analysis = dataclasses.replace(
+            analysis,
+            embed_config=embed_config,
+            test_embed_config=test_embed_config,
+            xtest_embed_config=xtest_embed_config,
+        )
 
     return FallibleThirdPartyPkgAnalysis(
         analysis=analysis,
@@ -461,12 +590,14 @@ async def download_and_analyze_third_party_packages(
         Get(
             AnalyzedThirdPartyModule,
             AnalyzeThirdPartyModuleRequest(
+                go_mod_address=request.go_mod_address,
                 go_mod_digest=go_mod_digest,
                 go_mod_path=request.go_mod_path,
                 import_path=mod.name,
                 name=mod.name,
                 version=mod.version,
                 minimum_go_version=mod.minimum_go_version,
+                build_opts=request.build_opts,
             ),
         )
         for mod in module_analysis.modules
@@ -485,7 +616,12 @@ async def download_and_analyze_third_party_packages(
 async def extract_package_info(request: ThirdPartyPkgAnalysisRequest) -> ThirdPartyPkgAnalysis:
     all_packages = await Get(
         AllThirdPartyPackages,
-        AllThirdPartyPackagesRequest(request.go_mod_digest, request.go_mod_path),
+        AllThirdPartyPackagesRequest(
+            request.go_mod_address,
+            request.go_mod_digest,
+            request.go_mod_path,
+            build_opts=request.build_opts,
+        ),
     )
     pkg_info = all_packages.import_paths_to_pkg_info.get(request.import_path)
     if pkg_info:
@@ -530,13 +666,32 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
         )
         return None, ThirdPartyPkgAnalysis(
             import_path=import_path,
+            name="",
             dir_path="",
             digest=EMPTY_DIGEST,
             imports=(),
             go_files=(),
+            c_files=(),
+            cxx_files=(),
+            h_files=(),
+            m_files=(),
+            f_files=(),
             s_files=(),
+            syso_files=(),
             minimum_go_version=None,
+            embed_patterns=(),
+            test_embed_patterns=(),
+            xtest_embed_patterns=(),
             error=error,
+            cgo_files=(),
+            cgo_flags=CGoCompilerFlags(
+                cflags=(),
+                cppflags=(),
+                cxxflags=(),
+                fflags=(),
+                ldflags=(),
+                pkg_config=(),
+            ),
         )
 
     if "Error" in go_list_json:
