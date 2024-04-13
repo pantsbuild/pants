@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from pants.core.goals.generate_lockfiles import (
+    DEFAULT_TOOL_LOCKFILE,
     GenerateLockfile,
     GenerateLockfileResult,
     GenerateLockfilesSubsystem,
@@ -17,6 +18,7 @@ from pants.core.goals.generate_lockfiles import (
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import MultiGet
@@ -24,11 +26,17 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.jvm.resolve import coursier_fetch
-from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
+from pants.jvm.resolve.common import (
+    ArtifactRequirement,
+    ArtifactRequirements,
+    GatherJvmCoordinatesRequest,
+)
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactResolveField, JvmResolveField
+from pants.option.subsystem import _construct_subsystem
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
@@ -97,10 +105,14 @@ class KnownJVMUserResolveNamesRequest(KnownUserResolveNamesRequest):
 
 @rule
 def determine_jvm_user_resolves(
-    _: KnownJVMUserResolveNamesRequest, jvm_subsystem: JvmSubsystem
+    _: KnownJVMUserResolveNamesRequest,
+    jvm_subsystem: JvmSubsystem,
+    union_membership: UnionMembership,
 ) -> KnownUserResolveNames:
+    jvm_tool_resolves = ExportableTool.filter_for_subclasses(union_membership, JvmToolBase)
+    names = (*jvm_subsystem.resolves.keys(), *jvm_tool_resolves.keys())
     return KnownUserResolveNames(
-        names=tuple(jvm_subsystem.resolves.keys()),
+        names=names,
         option_name=f"[{jvm_subsystem.options_scope}].resolves",
         requested_resolve_names_cls=RequestedJVMUserResolveNames,
     )
@@ -135,11 +147,46 @@ async def validate_jvm_artifacts_for_resolve(
     )
 
 
+async def _plan_generate_lockfile(resolve, resolve_to_artifacts, tools) -> Get:
+    """Generate a JVM lockfile request for each requested resolve.
+
+    This step also allows other backends to validate the proposed set of artifact requirements for
+    each resolve.
+    """
+    if resolve in resolve_to_artifacts:
+        return Get(
+            GenerateJvmLockfile,
+            _ValidateJvmArtifactsRequest(
+                artifacts=ArtifactRequirements(resolve_to_artifacts[resolve]),
+                resolve_name=resolve,
+            ),
+        )
+    elif resolve in tools:
+        tool_cls: type[JvmToolBase] = tools[resolve]
+        tool = await _construct_subsystem(tool_cls)
+
+        return Get(
+            GenerateJvmLockfile,
+            GenerateJvmLockfileFromTool,
+            GenerateJvmLockfileFromTool.create(tool),
+        )
+
+    else:
+        return Get(
+            GenerateJvmLockfile,
+            _ValidateJvmArtifactsRequest(
+                artifacts=ArtifactRequirements(()),
+                resolve_name=resolve,
+            ),
+        )
+
+
 @rule
 async def setup_user_lockfile_requests(
     requested: RequestedJVMUserResolveNames,
     all_targets: AllTargets,
     jvm_subsystem: JvmSubsystem,
+    union_membership: UnionMembership,
 ) -> UserGenerateLockfiles:
     resolve_to_artifacts: Mapping[str, OrderedSet[ArtifactRequirement]] = defaultdict(OrderedSet)
     for tgt in sorted(all_targets, key=lambda t: t.address):
@@ -149,20 +196,35 @@ async def setup_user_lockfile_requests(
         resolve = tgt[JvmResolveField].normalized_value(jvm_subsystem)
         resolve_to_artifacts[resolve].add(artifact)
 
-    # Generate a JVM lockfile request for each requested resolve. This step also allows other backends to
-    # validate the proposed set of artifact requirements for each resolve.
-    jvm_lockfile_requests = await MultiGet(
-        Get(
-            GenerateJvmLockfile,
-            _ValidateJvmArtifactsRequest(
-                artifacts=ArtifactRequirements(resolve_to_artifacts.get(resolve, ())),
-                resolve_name=resolve,
-            ),
-        )
-        for resolve in requested
-    )
+    tools = ExportableTool.filter_for_subclasses(union_membership, JvmToolBase)
+
+    gets = []
+    for resolve in requested:
+        gets.append(await _plan_generate_lockfile(resolve, resolve_to_artifacts, tools))
+
+    jvm_lockfile_requests = await MultiGet(*gets)
 
     return UserGenerateLockfiles(jvm_lockfile_requests)
+
+
+@rule
+async def setup_lockfile_request_from_tool(
+    request: GenerateJvmLockfileFromTool,
+) -> GenerateJvmLockfile:
+    artifacts = await Get(
+        ArtifactRequirements,
+        GatherJvmCoordinatesRequest(request.artifact_inputs, request.artifact_option_name),
+    )
+    return GenerateJvmLockfile(
+        artifacts=artifacts,
+        resolve_name=request.resolve_name,
+        lockfile_dest=(
+            request.write_lockfile_dest
+            if request.read_lockfile_dest != DEFAULT_TOOL_LOCKFILE
+            else DEFAULT_TOOL_LOCKFILE
+        ),
+        diff=False,
+    )
 
 
 def rules():

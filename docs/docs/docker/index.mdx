@@ -217,10 +217,10 @@ docker_image(
         "type": "local",
         "dest": "/tmp/docker-cache/pants-example"
     },
-    cache_from={
+    cache_from=[{
         "type": "local",
         "src": "/tmp/docker-cache/pants-example"
-    }
+    }]
 )
 ```
 

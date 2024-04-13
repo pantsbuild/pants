@@ -90,7 +90,6 @@ async def create_python_repl_request(
         LocalDistsPex,
         LocalDistsPexRequest(
             request.addresses,
-            internal_only=True,
             interpreter_constraints=interpreter_constraints,
         ),
     )
@@ -156,7 +155,6 @@ async def create_ipython_repl_request(
         LocalDistsPex,
         LocalDistsPexRequest(
             request.addresses,
-            internal_only=True,
             interpreter_constraints=interpreter_constraints,
             sources=sources,
         ),

@@ -189,6 +189,16 @@ To run tests, use `pants test`:
 
 The Kotlin backend currently supports JUnit tests specified using the `kotlin_junit_tests` target type.
 
+
+#### Retries
+
+Pants can automatically retry failed tests. This can help keep your builds passing even with flaky tests, like integration tests.
+
+```toml tab={"label":"pants.toml"}
+[test]
+attempts_default = 3
+```
+
 #### Setting environment variables
 
 Test runs are _hermetic_, meaning that they are stripped of the parent `pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.

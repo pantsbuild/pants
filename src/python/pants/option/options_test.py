@@ -29,7 +29,6 @@ from pants.option.errors import (
     DefaultValueType,
     FromfileError,
     HelpType,
-    ImplicitValIsNone,
     InvalidKwarg,
     InvalidMemberType,
     MemberTypeNotAllowed,
@@ -98,18 +97,6 @@ def register_bool_opts(opts: Options) -> None:
     opts.register(GLOBAL_SCOPE, "--default-true", type=bool, default=True)
     opts.register(GLOBAL_SCOPE, "--default-false", type=bool, default=False)
     opts.register(GLOBAL_SCOPE, "--unset", type=bool, default=UnsetBool)
-    opts.register(GLOBAL_SCOPE, "--implicit-true", type=bool, implicit_value=True)
-    opts.register(GLOBAL_SCOPE, "--implicit-false", type=bool, implicit_value=False)
-    opts.register(
-        GLOBAL_SCOPE,
-        "--implicit-false-default-false",
-        type=bool,
-        implicit_value=False,
-        default=False,
-    )
-    opts.register(
-        GLOBAL_SCOPE, "--implicit-false-default-true", type=bool, implicit_value=False, default=True
-    )
 
 
 def test_bool_explicit_values() -> None:
@@ -136,11 +123,6 @@ def test_bool_defaults() -> None:
 
     assert opts.unset is None
 
-    assert opts.implicit_true is False
-    assert opts.implicit_false is True
-    assert opts.implicit_false_default_false is False
-    assert opts.implicit_false_default_true is True
-
 
 def test_bool_args() -> None:
     opts = create_options(
@@ -151,10 +133,6 @@ def test_bool_args() -> None:
             "--default-true",
             "--default-false",
             "--unset",
-            "--implicit-true",
-            "--implicit-false",
-            "--implicit-false-default-false",
-            "--implicit-false-default-true",
         ],
     ).for_global_scope()
     assert opts.default_missing is True
@@ -162,11 +140,6 @@ def test_bool_args() -> None:
     assert opts.default_false is True
 
     assert opts.unset is True
-
-    assert opts.implicit_true is True
-    assert opts.implicit_false is False
-    assert opts.implicit_false_default_false is False
-    assert opts.implicit_false_default_true is False
 
 
 def test_bool_negate() -> None:
@@ -178,10 +151,6 @@ def test_bool_negate() -> None:
             "--no-default-true",
             "--no-default-false",
             "--no-unset",
-            "--no-implicit-true",
-            "--no-implicit-false",
-            "--no-implicit-false-default-false",
-            "--no-implicit-false-default-true",
         ],
     ).for_global_scope()
     assert opts.default_missing is False
@@ -190,11 +159,6 @@ def test_bool_negate() -> None:
 
     assert opts.unset is False
 
-    assert opts.implicit_true is False
-    assert opts.implicit_false is True
-    assert opts.implicit_false_default_false is True
-    assert opts.implicit_false_default_true is True
-
 
 @pytest.mark.parametrize("val", [False, True])
 def test_bool_config(val: bool) -> None:
@@ -202,10 +166,6 @@ def test_bool_config(val: bool) -> None:
         "default_missing",
         "default_true",
         "default_false",
-        "implicit_true",
-        "implicit_false",
-        "implicit_false_default_false",
-        "implicit_false_default_true",
     )
     opts = create_options(
         [GLOBAL_SCOPE], register_bool_opts, config={"GLOBAL": {opt: val for opt in opt_names}}
@@ -248,7 +208,7 @@ def no_exception():
             ),
         ),
         (
-            dict(type=bool, default="True"),
+            dict(type=bool, default=True),
             no_exception(),
         ),
         (
@@ -597,9 +557,6 @@ def _register(options):
     # Custom types.
     register_global("--listy", type=list, member_type=int, default="[1, 2, 3]")
     register_global("--dicty", type=dict, default='{"a": "b"}')
-    register_global(
-        "--dict-listy", type=list, member_type=dict, default='[{"a": 1, "b": 2}, {"c": 3}]'
-    )
     register_global("--targety", type=target_option, default="//:a")
     register_global(
         "--target-listy", type=list, member_type=target_option, default=["//:a", "//:b"]
@@ -612,9 +569,6 @@ def _register(options):
         member_type=shell_str,
         default="--default1 --default2=test",
     )
-
-    # Implicit value.
-    register_global("--implicit-valuey", default="default", implicit_value="implicit")
 
     # Mutual Exclusive options
     register_global("--mutex-foo", mutually_exclusive_group="mutex")
@@ -747,10 +701,6 @@ def test_arg_scoping() -> None:
     # Test dict-typed option.
     global_options = _parse(flags='--dicty=\'{"c": "d"}\'').for_global_scope()
     assert {"c": "d"} == global_options.dicty
-
-    # Test list-of-dict-typed option.
-    global_options = _parse(flags='--dict-listy=\'[{"c": "d"}, {"e": "f"}]\'').for_global_scope()
-    assert [{"c": "d"}, {"e": "f"}] == global_options.dict_listy
 
     # Test target-typed option.
     global_options = _parse().for_global_scope()
@@ -894,46 +844,6 @@ def test_list_option() -> None:
 
     # Overwriting cancels filters.
     check(env_val="[4]", config_val="-[4]", expected=[4])
-
-
-def test_dict_list_option() -> None:
-    def check(
-        *,
-        expected: list[dict[str, int]],
-        flags: str = "",
-        env_val: str | None = None,
-        config_val: str | None = None,
-    ) -> None:
-        env = {"PANTS_GLOBAL_DICT_LISTY": env_val} if env_val else None
-        config = {"GLOBAL": {"dict_listy": config_val}} if config_val else None
-        global_options = _parse(flags=flags, env=env, config=config).for_global_scope()
-        assert global_options.dict_listy == expected
-
-    default = [{"a": 1, "b": 2}, {"c": 3}]
-    one_element_appended = [*default, {"d": 4, "e": 5}]
-    two_elements_appended = [*one_element_appended, {"f": 6}]
-    replaced = [{"d": 4, "e": 5}, {"f": 6}]
-
-    check(expected=default)
-
-    check(flags='--dict-listy=\'{"d": 4, "e": 5}\'', expected=one_element_appended)
-    check(
-        flags='--dict-listy=\'{"d": 4, "e": 5}\' --dict-listy=\'{"f": 6}\'',
-        expected=two_elements_appended,
-    )
-    check(
-        flags='--dict-listy=\'+[{"d": 4, "e": 5}, {"f": 6}]\'',
-        expected=two_elements_appended,
-    )
-    check(flags='--dict-listy=\'[{"d": 4, "e": 5}, {"f": 6}]\'', expected=replaced)
-
-    check(env_val='{"d": 4, "e": 5}', expected=one_element_appended)
-    check(env_val='+[{"d": 4, "e": 5}, {"f": 6}]', expected=two_elements_appended)
-    check(env_val='[{"d": 4, "e": 5}, {"f": 6}]', expected=replaced)
-
-    check(config_val='{"d": 4, "e": 5}', expected=one_element_appended)
-    check(config_val='+[{"d": 4, "e": 5}, {"f": 6}]', expected=two_elements_appended)
-    check(config_val='[{"d": 4, "e": 5}, {"f": 6}]', expected=replaced)
 
 
 def test_target_list_option() -> None:
@@ -1100,7 +1010,6 @@ def test_validation() -> None:
     assertError(OptionNameDoubleDash, "badname")
     assertError(OptionNameDoubleDash, "-badname")
     assertError(InvalidKwarg, "--foo", badkwarg=42)
-    assertError(ImplicitValIsNone, "--foo", implicit_value=None)
     assertError(BooleanOptionNameWithNo, "--no-foo", type=bool)
     assertError(MemberTypeNotAllowed, "--foo", member_type=int)
     assertError(MemberTypeNotAllowed, "--foo", type=dict, member_type=int)
@@ -1108,16 +1017,6 @@ def test_validation() -> None:
     assertError(InvalidMemberType, "--foo", type=list, member_type=list)
     assertError(HelpType, "--foo", help=())
     assertError(HelpType, "--foo", help=("Help!",))
-
-
-def test_implicit_value() -> None:
-    def check(*, flag: str = "", expected: str) -> None:
-        options = _parse(flags=flag)
-        assert options.for_global_scope().implicit_valuey == expected
-
-    check(expected="default")
-    check(flag="--implicit-valuey", expected="implicit")
-    check(flag="--implicit-valuey=explicit", expected="explicit")
 
 
 def test_shadowing() -> None:
@@ -1436,8 +1335,8 @@ def assert_fromfile(parse_func, expected_append=None, append_contents=None):
         contents=dedent(
             """
             ['a',
-             1,
-             2]
+             '1',
+             '2']
             """
         ),
     )
@@ -1447,8 +1346,8 @@ def assert_fromfile(parse_func, expected_append=None, append_contents=None):
         contents=dedent(
             """
             ['a',
-             1,
-             2]
+             '1',
+             '2']
             """
         ),
         passthru_flags="bob @jake",
