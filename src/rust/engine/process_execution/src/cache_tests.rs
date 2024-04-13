@@ -3,6 +3,7 @@
 use std::convert::TryInto;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use cache::PersistentCache;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
@@ -10,6 +11,7 @@ use store::{ImmutableInputs, Store};
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::relative_paths;
+use tokio::sync::RwLock;
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
@@ -35,6 +37,7 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
         NamedCaches::new_local(named_cache_dir),
         ImmutableInputs::new(store.clone(), base_dir.path()).unwrap(),
         KeepSandboxes::Never,
+        Arc::new(RwLock::new(())),
     ));
     (runner, store, base_dir)
 }

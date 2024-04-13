@@ -59,6 +59,8 @@ pub mod named_caches;
 #[cfg(test)]
 pub mod named_caches_tests;
 
+pub(crate) mod fork_exec;
+
 extern crate uname;
 
 pub use crate::children::ManagedChild;
