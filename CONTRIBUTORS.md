@@ -199,6 +199,7 @@ Created as part of the release process.
 + Lei Wang
 + Leo Kim
 + Lex Spoon
++ Liam Deacon
 + Liam Wilson
 + Luc Cary
 + Luca Clementi
