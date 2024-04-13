@@ -11,8 +11,12 @@ HOOK_DIR="${GIT_DIR:-${REPO_ROOT}/.git}/hooks"
 HOOK_SRC_DIR="${REPO_ROOT}/build-support/githooks"
 HOOK_NAMES="$(ls "${HOOK_SRC_DIR}")"
 
+# shellcheck source=build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
+PY="$(determine_python)"
+
 RELPATH_PREFIX="$(
-  cat << EOF | python
+  cat << EOF | ${PY}
 import os
 
 print(os.path.relpath("${HOOK_SRC_DIR}", "${HOOK_DIR}"))
