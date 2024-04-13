@@ -63,6 +63,8 @@ pub(crate) mod fork_exec;
 
 pub mod workspace;
 
+pub(crate) mod fork_exec;
+
 extern crate uname;
 
 pub use crate::children::ManagedChild;

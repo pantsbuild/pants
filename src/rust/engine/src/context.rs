@@ -234,6 +234,7 @@ impl Core {
             local_execution_root_dir.to_path_buf(),
             named_caches.clone(),
             immutable_inputs.clone(),
+            spawn_lock,
         );
 
         let local_command_runner: Box<dyn CommandRunner> = Box::new(SwitchedCommandRunner::new(
