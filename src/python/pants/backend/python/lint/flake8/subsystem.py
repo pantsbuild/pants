@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
@@ -213,7 +212,6 @@ async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
         *python_sources.rules(),
         UnionRule(ExportableTool, Flake8),
     )

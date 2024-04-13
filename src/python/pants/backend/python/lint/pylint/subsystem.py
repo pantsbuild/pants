@@ -7,7 +7,6 @@ import os.path
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.lint.pylint.skip_field import SkipPylintField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
@@ -204,6 +203,5 @@ async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
         UnionRule(ExportableTool, Pylint),
     )

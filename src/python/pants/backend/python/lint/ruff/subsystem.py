@@ -85,4 +85,8 @@ class Ruff(PythonToolBase):
 
 
 def rules():
-    return (*collect_rules(), *python_sources.rules(), UnionRule(ExportableTool, Ruff))
+    return (
+        *collect_rules(),
+        *python_sources.rules(),
+        UnionRule(ExportableTool, Ruff),
+    )

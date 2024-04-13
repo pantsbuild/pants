@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.resolves import ExportableTool
@@ -43,6 +42,5 @@ class IPython(PythonToolBase):
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
         UnionRule(ExportableTool, IPython),
     )

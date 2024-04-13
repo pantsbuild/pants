@@ -7,7 +7,6 @@ import os.path
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -157,6 +156,5 @@ class PyTest(PythonToolBase):
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
         UnionRule(ExportableTool, PyTest),
     )

@@ -7,7 +7,6 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
@@ -221,7 +220,6 @@ def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         *config_files.rules(),
-        *lockfile.rules(),
         *pex_from_targets.rules(),
         UnionRule(CheckRequest, PytypeRequest),
         UnionRule(ExportableTool, Pytype),

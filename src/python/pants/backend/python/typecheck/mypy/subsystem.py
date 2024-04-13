@@ -7,7 +7,6 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -268,6 +267,5 @@ async def _mypy_interpreter_constraints(
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
         UnionRule(ExportableTool, MyPy),
     )
