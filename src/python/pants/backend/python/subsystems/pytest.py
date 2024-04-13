@@ -20,11 +20,13 @@ from pants.backend.python.target_types import (
     PythonTestsXdistConcurrencyField,
     SkipPythonTestsField,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import collect_rules
 from pants.engine.target import Target
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption, StrOption
 from pants.util.strutil import softwrap
 
@@ -156,4 +158,5 @@ def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
+        UnionRule(ExportableTool, PyTest),
     )

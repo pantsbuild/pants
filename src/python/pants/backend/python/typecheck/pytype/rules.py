@@ -31,6 +31,7 @@ from pants.backend.python.util_rules.pex import (
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import config_files
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -223,4 +224,5 @@ def rules() -> Iterable[Rule | UnionRule]:
         *lockfile.rules(),
         *pex_from_targets.rules(),
         UnionRule(CheckRequest, PytypeRequest),
+        UnionRule(ExportableTool, Pytype),
     )
