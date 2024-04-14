@@ -488,7 +488,6 @@ async def build_python_faas(
         reexported_handler_func = None
 
     repository_filename = "faas_repository.pex"
-
     pex_request = PexFromTargetsRequest(
         addresses=[request.address],
         internal_only=False,
@@ -506,7 +505,6 @@ async def build_python_faas(
 
     pex_result = await Get(Pex, PexFromTargetsRequest, pex_request)
 
-    print(request.layout)
     output_filename = request.output_path.value_or_default(
         file_ending="zip" if request.layout is PexLayout.ZIPAPP else None
     )
