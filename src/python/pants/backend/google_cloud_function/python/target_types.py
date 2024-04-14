@@ -5,7 +5,11 @@ import re
 from enum import Enum
 from typing import Match, Optional, Tuple, cast
 
-from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
+from pants.backend.python.target_types import (
+    PexCompletePlatformsField,
+    PexLayoutField,
+    PythonResolveField,
+)
 from pants.backend.python.util_rules.faas import (
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
@@ -120,6 +124,7 @@ class PythonGoogleCloudFunction(Target):
         PythonFaaSPex3VenvCreateExtraArgsField,
         PythonResolveField,
         EnvironmentField,
+        PexLayoutField,
     )
     help = help_text(
         f"""

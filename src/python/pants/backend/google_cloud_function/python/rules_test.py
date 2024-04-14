@@ -259,6 +259,7 @@ def test_pex3_venv_create_extra_args_are_passed_through() -> None:
         type=Mock(),
         output_path=Mock(),
         environment=Mock(),
+        layout=Mock(),
         pex3_venv_create_extra_args=extra_args_field,
     )
 

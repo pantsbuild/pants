@@ -431,6 +431,8 @@ class BuildPythonFaaSRequest:
 
     prefix_in_artifact: None | str = None
 
+    layout: PexLayout | None = None
+
 
 @rule
 async def build_python_faas(
@@ -486,6 +488,7 @@ async def build_python_faas(
         reexported_handler_func = None
 
     repository_filename = "faas_repository.pex"
+
     pex_request = PexFromTargetsRequest(
         addresses=[request.address],
         internal_only=False,
@@ -494,7 +497,7 @@ async def build_python_faas(
         output_filename=repository_filename,
         platforms=platforms.pex_platforms,
         complete_platforms=platforms.complete_platforms,
-        layout=PexLayout.PACKED,
+        layout=request.layout,
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
         additional_sources=additional_sources,
@@ -503,13 +506,18 @@ async def build_python_faas(
 
     pex_result = await Get(Pex, PexFromTargetsRequest, pex_request)
 
-    output_filename = request.output_path.value_or_default(file_ending="zip")
+    print(request.layout)
+    output_filename = request.output_path.value_or_default(
+        file_ending="zip" if request.layout is PexLayout.ZIPAPP else None
+    )
 
     result = await Get(
         PexVenv,
         PexVenvRequest(
             pex=pex_result,
-            layout=PexVenvLayout.FLAT_ZIPPED,
+            layout=PexVenvLayout.FLAT_ZIPPED
+            if request.layout is PexLayout.ZIPAPP
+            else PexVenvLayout.FLAT,
             platforms=platforms.pex_platforms,
             complete_platforms=platforms.complete_platforms,
             extra_args=request.pex3_venv_create_extra_args.value or (),
