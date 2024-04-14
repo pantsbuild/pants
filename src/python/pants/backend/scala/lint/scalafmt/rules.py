@@ -11,7 +11,7 @@ from pants.backend.scala.lint.scalafmt.skip_field import SkipScalafmtField
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import (
     GatherConfigFilesByDirectoriesRequest,
     GatheredConfigFilesByDirectories,
@@ -26,7 +26,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -47,10 +47,6 @@ class ScalafmtFieldSet(FieldSet):
 class ScalafmtRequest(FmtTargetsRequest):
     field_set_type = ScalafmtFieldSet
     tool_subsystem = ScalafmtSubsystem
-
-
-class ScalafmtToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = ScalafmtSubsystem.options_scope
 
 
 @dataclass(frozen=True)
@@ -85,7 +81,7 @@ async def partition_scalafmt(
     toolcp_relpath = "__toolcp"
 
     filepaths = tuple(field_set.source.file_path for field_set in request.field_sets)
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalafmtToolLockfileSentinel())
+    lockfile_request = GenerateJvmLockfileFromTool.create(tool)
     tool_classpath, config_files = await MultiGet(
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
         Get(
@@ -166,17 +162,10 @@ async def scalafmt_fmt(
     return await FmtResult.create(request, result)
 
 
-@rule
-def generate_scalafmt_lockfile_request(
-    _: ScalafmtToolLockfileSentinel, tool: ScalafmtSubsystem
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(tool)
-
-
 def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
         *ScalafmtRequest.rules(),
-        UnionRule(GenerateToolLockfileSentinel, ScalafmtToolLockfileSentinel),
+        UnionRule(ExportableTool, ScalafmtSubsystem),
     ]

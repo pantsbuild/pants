@@ -15,8 +15,8 @@ from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.backend.scala.util_rules.versions import ScalaVersion
 from pants.core.goals.fix import FixResult, FixTargetsRequest, Partitions
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import (
     GatherConfigFilesByDirectoriesRequest,
     GatheredConfigFilesByDirectories,
@@ -35,7 +35,7 @@ from pants.jvm.compile import ClasspathEntry
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
@@ -88,10 +88,6 @@ class ScalafixPartitionInfo:
     @property
     def description(self) -> str:
         return self.config_snapshot.files[0]
-
-
-class ScalafixToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = ScalafixSubsystem.options_scope
 
 
 @dataclass(frozen=True)
@@ -149,7 +145,7 @@ async def _partition_scalafix(
 
     filepaths = tuple(field_set.source.file_path for field_set in request.field_sets)
     classpath_by_filepath = dict(zip(filepaths, classpaths))
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalafixToolLockfileSentinel())
+    lockfile_request = GenerateJvmLockfileFromTool.create(scalafix)
     tool_runtime_classpath, config_files = await MultiGet(
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
         Get(
@@ -378,18 +374,11 @@ async def scalafix_lint(request: ScalafixLintRequest.Batch) -> LintResult:
     return LintResult.create(request, process_result)
 
 
-@rule
-async def generate_scalafix_lockfile_request(
-    _: ScalafixToolLockfileSentinel, tool: ScalafixSubsystem
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(tool)
-
-
 def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
         *ScalafixFixRequest.rules(),
         *ScalafixLintRequest.rules(),
-        UnionRule(GenerateToolLockfileSentinel, ScalafixToolLockfileSentinel),
+        UnionRule(ExportableTool, ScalafixSubsystem),
     ]
