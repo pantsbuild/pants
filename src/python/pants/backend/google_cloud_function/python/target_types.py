@@ -47,6 +47,7 @@ class PythonGoogleCloudFunctionRuntimes(Enum):
     PYTHON_39 = "python39"
     PYTHON_310 = "python310"
     PYTHON_311 = "python311"
+    PYTHON_312 = "python312"
 
 
 class PythonGoogleCloudFunctionRuntime(PythonFaaSRuntimeField):
