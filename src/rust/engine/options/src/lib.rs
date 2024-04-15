@@ -495,6 +495,7 @@ impl OptionParser {
             }
             derivation = Some(derivations);
         }
+
         // Removals from any source apply after adds from any source (but are themselves
         // overridden by later replacements), so we collect them here and apply them later.
         let mut removal_lists: Vec<Vec<T>> = vec![];
