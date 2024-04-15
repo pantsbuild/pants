@@ -427,12 +427,20 @@ class _TargetParametrizations(Collection[_TargetParametrization]):
             ):
                 return parametrization.original_target
 
-            # Else, see whether any of the generated targets match.
-            for candidate in parametrization.parametrization.values():
-                if address.is_parametrized_subset_of(candidate.address) and remaining_fields_match(
-                    candidate
-                ):
-                    return candidate
+        consumer_parametrize_group = consumer.address.parameters.get("parametrize")
+
+        def matching_parametrize_group(candidate: Target) -> bool:
+            return candidate.address.parameters.get("parametrize") == consumer_parametrize_group
+
+        for candidate in sorted(
+            self.parametrizations.values(), key=matching_parametrize_group, reverse=True
+        ):
+            # Else, see whether any of the generated targets match, preferring a matching
+            # parametrize group when available.
+            if address.is_parametrized_subset_of(candidate.address) and remaining_fields_match(
+                candidate
+            ):
+                return candidate
 
         raise ValueError(
             f"The explicit dependency `{address}` of the target at `{consumer.address}` does "
