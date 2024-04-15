@@ -125,12 +125,13 @@ def test_bool_explicit_values() -> None:
 
 
 def test_bool_defaults() -> None:
-    with create_options([GLOBAL_SCOPE], register_bool_opts).for_global_scope() as opts:
-        assert opts.default_missing is False
-        assert opts.default_true is True
-        assert opts.default_false is False
+    with create_options([GLOBAL_SCOPE], register_bool_opts) as opts:
+        global_opts = opts.for_global_scope()
+        assert global_opts.default_missing is False
+        assert global_opts.default_true is True
+        assert global_opts.default_false is False
 
-        assert opts.unset is None
+        assert global_opts.unset is None
 
 
 def test_bool_args() -> None:
@@ -143,12 +144,13 @@ def test_bool_args() -> None:
             "--default-false",
             "--unset",
         ],
-    ).for_global_scope() as opts:
-        assert opts.default_missing is True
-        assert opts.default_true is True
-        assert opts.default_false is True
+    ) as opts:
+        global_opts = opts.for_global_scope()
+        assert global_opts.default_missing is True
+        assert global_opts.default_true is True
+        assert global_opts.default_false is True
 
-        assert opts.unset is True
+        assert global_opts.unset is True
 
 
 def test_bool_negate() -> None:
@@ -161,12 +163,13 @@ def test_bool_negate() -> None:
             "--no-default-false",
             "--no-unset",
         ],
-    ).for_global_scope() as opts:
-        assert opts.default_missing is False
-        assert opts.default_true is False
-        assert opts.default_false is False
+    ) as opts:
+        global_opts = opts.for_global_scope()
+        assert global_opts.default_missing is False
+        assert global_opts.default_true is False
+        assert global_opts.default_false is False
 
-        assert opts.unset is False
+        assert global_opts.unset is False
 
 
 @pytest.mark.parametrize("val", [False, True])
@@ -190,8 +193,8 @@ def test_bool_invalid_value(val: Any) -> None:
         opts.register(GLOBAL_SCOPE, "--opt", type=bool)
 
     with pytest.raises(BooleanConversionError):
-        with create_options([GLOBAL_SCOPE], register, config={"GLOBAL": {"opt": val}}).for_global_scope():
-            pass
+        with create_options([GLOBAL_SCOPE], register, config={"GLOBAL": {"opt": val}}) as opts:
+            opts.for_global_scope()
 
 
 # ----------------------------------------------------------------------------------------
@@ -276,8 +279,8 @@ def test_default_value_type_assert(option_kwargs, assert_expected):
         opts.register(GLOBAL_SCOPE, "--opt", **option_kwargs)
 
     with assert_expected:
-        with create_options([GLOBAL_SCOPE], register).for_scope(GLOBAL_SCOPE):
-            pass
+        with create_options([GLOBAL_SCOPE], register) as opts:
+            opts.for_scope(GLOBAL_SCOPE)
 
 
 # ----------------------------------------------------------------------------------------

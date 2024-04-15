@@ -280,7 +280,7 @@ fn test_parse_list_options() {
     );
 
     check(
-        vec![1, 3, 4],
+        vec![1, 3],
         vec![
             (Source::Default, vec![replace(vec![0])]),
             (config_source(), vec![replace(vec![1, 2])]),
@@ -290,7 +290,7 @@ fn test_parse_list_options() {
         vec![],
         vec![("PANTS_SCOPE_FOO", "+[3, 4]")],
         "[scope]\nfoo = [1, 2]",
-        "[scope]\nfoo = '-[2, 4]'", // 2 should be removed, but not 4, since env has precedence.
+        "[scope]\nfoo = '-[2, 4]'",
     );
 
     check(
@@ -328,6 +328,63 @@ fn test_parse_list_options() {
         vec!["--scope-foo=+[5, 6, 7]"],
         vec![],
         "",
+        "",
+    );
+
+    // Filtering all instances of repeated values.
+    check(
+        vec![1, 2, 2, 4],
+        vec![
+            (Source::Default, vec![replace(vec![0])]),
+            (config_source(), vec![add(vec![1, 2, 3, 2, 0, 3, 3, 4])]),
+            (Source::Env, vec![remove(vec![0, 3])]),
+        ],
+        vec![],
+        vec![("PANTS_SCOPE_FOO", "-[0, 3]")],
+        "[scope]\nfoo.add = [1, 2, 3, 2, 0, 3, 3, 4]",
+        "",
+    );
+
+    // Filtering a value even though it was appended again at a higher rank.
+    check(
+        vec![0, 2],
+        vec![
+            (Source::Default, vec![replace(vec![0])]),
+            (config_source(), vec![add(vec![1, 2])]),
+            (Source::Env, vec![remove(vec![1])]),
+            (Source::Flag, vec![add(vec![1])]),
+        ],
+        vec!["--scope-foo=+[1]"],
+        vec![("PANTS_SCOPE_FOO", "-[1]")],
+        "[scope]\nfoo.add = [1, 2]",
+        "",
+    );
+
+    // Filtering a value even though it was appended again at the same rank.
+    check(
+        vec![0, 2],
+        vec![
+            (Source::Default, vec![replace(vec![0])]),
+            (config_source(), vec![add(vec![1, 2])]),
+            (Source::Env, vec![remove(vec![1]), add(vec![1])]),
+        ],
+        vec![],
+        vec![("PANTS_SCOPE_FOO", "-[1],+[1]")],
+        "[scope]\nfoo.add = [1, 2]",
+        "",
+    );
+
+    // Overwriting cancels filters.
+    check(
+        vec![0],
+        vec![
+            (Source::Default, vec![replace(vec![0])]),
+            (config_source(), vec![remove(vec![0])]),
+            (Source::Env, vec![replace(vec![0])]),
+        ],
+        vec![],
+        vec![("PANTS_SCOPE_FOO", "[0]")],
+        "[scope]\nfoo.remove = [0]",
         "",
     );
 }
