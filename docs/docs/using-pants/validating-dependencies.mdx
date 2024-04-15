@@ -7,7 +7,9 @@ Validating your code's dependencies.
 
 ---
 
-Visibility rules are the mechanism by which to control who may depend on whom. It is an implementation of Pants's dependency rules API. With these rules a dependency between two files (or targets) may be set for entire directory trees down to single files. A target may be selected not only by its file path but also by target type, name, and tags. (This works on a low level, so does only apply for tags provided directly on the target using the `tags` field (using `__defaults__` is also valid), i.e. tags set using `overrides` does not work.)
+Visibility rules are the mechanism by which to control who may depend on whom. It is an implementation of Pants's dependency rules API. With these rules a dependency between two files (or targets) may be set for entire directory trees down to single files. A target may be selected not only by its file path but also by target type, name, and tags.
+
+NB: Visibility rules are applied on a low level, so they can inspect metadata provided directly on a target and via `__defaults__`, but anything applied via `overrides` is opaque to the visibility rules. For example, a rule that selects tagged targets can find tags provided directly on the target using the `tags` field (like `target(tags=[...])`) or via `__defaults__` (like `__defaults__({target:dict(tags=[...])})`) but any tags in `overrides` (like `target(overrides={"foo": dict(tags=[...])})`) cannot be inspected by the visibility rules.
 
 To jump right in, start with [enabling the backend](./validating-dependencies.mdx#enable-visibility-backend) and add some rules to your BUILD files.
 
