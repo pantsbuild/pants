@@ -145,15 +145,16 @@ def test_export_venv_new_codepath(
             assert req_pex_dir == tmpdir
             assert req_pex_name == f"{resolve}.pex"
 
-            assert ppc0.argv[3:6] == (
+            assert ppc0.argv[3:7] == (
                 "venv",
                 "--pip",
                 "--collisions-ok",
+                f"--prompt={resolve}/{current_interpreter}",
             )
             if py_hermetic_scripts:
                 assert "--non-hermetic-scripts" not in ppc0.argv
             else:
-                assert ppc0.argv[6] == "--non-hermetic-scripts"
+                assert ppc0.argv[7] == "--non-hermetic-scripts"
             assert ppc0.argv[-1] == "{digest_root}"
             assert ppc0.extra_env["PEX_MODULE"] == "pex.tools"
             assert ppc0.extra_env.get("PEX_ROOT") is not None

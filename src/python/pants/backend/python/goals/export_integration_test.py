@@ -110,6 +110,12 @@ def test_export(py_resolve_format: PythonResolveExportFormat, py_hermetic_script
         ), f"expected dist-info for ansicolors '{expected_ansicolors_dir}' does not exist"
 
         if py_resolve_format == PythonResolveExportFormat.mutable_virtualenv:
+            activate_path = os.path.join(export_dir, "bin", "activate")
+            assert os.path.isfile(activate_path), "virtualenv's bin/activate is missing"
+            with open(activate_path) as activate_file:
+                prompt = f'PS1="({resolve}/{platform.python_version()}) '
+                assert prompt in activate_file.read()
+
             script_path = os.path.join(export_dir, "bin", "wheel")
             assert os.path.isfile(
                 script_path
