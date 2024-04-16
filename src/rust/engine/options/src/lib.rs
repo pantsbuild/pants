@@ -489,18 +489,29 @@ impl OptionParser {
             }
             derivation = Some(derivations);
         }
+
+        // Removals from any source apply after adds from any source (but are themselves
+        // overridden by later replacements), so we collect them here and apply them later.
+        let mut removal_lists: Vec<Vec<T>> = vec![];
+
         let mut highest_priority_source = Source::Default;
         for (source_type, source) in self.sources.iter() {
             if let Some(list_edits) = getter(source, id)? {
                 highest_priority_source = source_type.clone();
                 for list_edit in list_edits {
                     match list_edit.action {
-                        ListEditAction::Replace => list = list_edit.items,
+                        ListEditAction::Replace => {
+                            list = list_edit.items;
+                            removal_lists.clear();
+                        }
                         ListEditAction::Add => list.extend(list_edit.items),
-                        ListEditAction::Remove => remover(&mut list, &list_edit.items),
+                        ListEditAction::Remove => removal_lists.push(list_edit.items),
                     }
                 }
             }
+        }
+        for removals in removal_lists {
+            remover(&mut list, &removals);
         }
         Ok(ListOptionValue {
             derivation,

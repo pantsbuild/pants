@@ -22,7 +22,7 @@
 //     "mypy-typing-asserts==0.1.1",
 //     "node-semver==0.9.0",
 //     "packaging==21.3",
-//     "pex==2.3.0",
+//     "pex==2.3.1",
 //     "psutil==5.9.8",
 //     "pydevd-pycharm==203.5419.8",
 //     "pytest<7.1.0,>=6.2.4",
@@ -829,19 +829,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c05567e9c24a6b9faaa835c4821bad0590fbb9d5779e7caa6e1cc4978e7eb24f",
-              "url": "https://files.pythonhosted.org/packages/c2/e7/a82b05cf63a603df6e68d59ae6a68bf5064484a0718ea5033660af4b54a9/idna-3.6-py3-none-any.whl"
+              "hash": "82fee1fc78add43492d3a1898bfa6d8a904cc97d8427f683ed8e798d07761aa0",
+              "url": "https://files.pythonhosted.org/packages/e5/3e/741d8c82801c347547f8a2a06aa57dbb1992be9e948df2ea0eda2c8b79e8/idna-3.7-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9ecdbbd083b06798ae1e86adcbfe8ab1479cf864e4ee30fe4e46a003d12491ca",
-              "url": "https://files.pythonhosted.org/packages/bf/3f/ea4b9117521a1e9c50344b909be7886dd00a519552724809bb1f486986c2/idna-3.6.tar.gz"
+              "hash": "028ff3aadf0609c1fd278d8ea3089299412a7a8b9bd005dd08b9f8285bcb5cfc",
+              "url": "https://files.pythonhosted.org/packages/21/ed/f86a79a07470cb07819390452f178b3bef1d375f2ec021ecfc709fc7cf07/idna-3.7.tar.gz"
             }
           ],
           "project_name": "idna",
           "requires_dists": [],
           "requires_python": ">=3.5",
-          "version": "3.6"
+          "version": "3.7"
         },
         {
           "artifacts": [
@@ -1001,13 +1001,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6c0ccbaa99fe15174fb1560c01ba0416579a057eed7ac90453324b18356f9b40",
-              "url": "https://files.pythonhosted.org/packages/e6/1c/5e613559590ba9e0ebc74d029424afb908d9107d4a4091f2acb84f0e6a7a/pex-2.3.0-py2.py3-none-any.whl"
+              "hash": "64692a5bf6f298403aab930d22f0d836ae4736c5bc820e262e9092fe8c56f830",
+              "url": "https://files.pythonhosted.org/packages/e7/d0/fbda2a4d41d62d86ce53f5ae4fbaaee8c34070f75bb7ca009090510ae874/pex-2.3.1-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7d0fc86236192fbc14a71b25081e9c48c543d7dbc1e7b270d62eff88afd2245c",
-              "url": "https://files.pythonhosted.org/packages/a9/69/68a5301623566d11b24f1c271e56d08c846604758c27ed0a3a38b08f726d/pex-2.3.0.tar.gz"
+              "hash": "d1264c91161c21139b454744c8053e25b8aad2d15da89232181b4f38f3f54575",
+              "url": "https://files.pythonhosted.org/packages/83/4b/1855a9cd872a5eca4cd385e0f66078845f3561d359fb976be52a2a68b9d1/pex-2.3.1.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -1015,7 +1015,7 @@
             "subprocess32>=3.2.7; python_version < \"3\" and extra == \"subprocess\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.13,>=2.7",
-          "version": "2.3.0"
+          "version": "2.3.1"
         },
         {
           "artifacts": [
@@ -1101,61 +1101,61 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8ee45429555515e1f6b185e78100aea234072576aa43ab53aefcae078162fca9",
-              "url": "https://files.pythonhosted.org/packages/62/d5/5f610ebe421e85889f2e55e33b7f9a6795bd982198517d912eb1c76e1a53/pycparser-2.21-py2.py3-none-any.whl"
+              "hash": "c3702b6d3dd8c7abc1afa565d7e63d53a1d0bd86cdc24edd75470f4de499cfcc",
+              "url": "https://files.pythonhosted.org/packages/13/a3/a812df4e2dd5696d1f351d58b8fe16a405b234ad2886a0dab9183fb78109/pycparser-2.22-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e644fdec12f7872f86c58ff790da456218b10f863970249516d60a5eaca77206",
-              "url": "https://files.pythonhosted.org/packages/5e/0b/95d387f5f4433cb0f53ff7ad859bd2c6051051cebbb564f139a999ab46de/pycparser-2.21.tar.gz"
+              "hash": "491c8be9c040f5390f5bf44a5b07752bd07f56edf992381b05c701439eec10f6",
+              "url": "https://files.pythonhosted.org/packages/1d/b2/31537cf4b1ca988837256c910a668b553fceb8f069bedc4b1c826024b52c/pycparser-2.22.tar.gz"
             }
           ],
           "project_name": "pycparser",
           "requires_dists": [],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7",
-          "version": "2.21"
+          "requires_python": ">=3.8",
+          "version": "2.22"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8ee853cd12ac2ddbf0ecbac1c289f95882b2d4482258048079d13be700aa114c",
-              "url": "https://files.pythonhosted.org/packages/b6/5d/4ec16c2158b934ce2b082073cea5e90bbdb76172050dc565425a0a76beec/pydantic-1.10.14-py3-none-any.whl"
+              "hash": "28e552a060ba2740d0d2aabe35162652c1459a0b9069fe0db7f4ee0e18e74d58",
+              "url": "https://files.pythonhosted.org/packages/27/17/a9872f20809e37ad03c523994ef3e0b7420c6508fe4553b7c0d8476ee03a/pydantic-1.10.15-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "466669501d08ad8eb3c4fecd991c5e793c4e0bbd62299d05111d4f827cded64f",
-              "url": "https://files.pythonhosted.org/packages/1f/60/c062e97a456fac22b8ee56cd29dc0f6b045c5efb9d9d604985338cf061fa/pydantic-1.10.14-cp39-cp39-musllinux_1_1_i686.whl"
+              "hash": "92229f73400b80c13afcd050687f4d7e88de9234d74b27e6728aa689abcf58cc",
+              "url": "https://files.pythonhosted.org/packages/4f/fa/da8c9468b6c7eb974721af57abbbfd33537b8c29a9a2c0c788a3dc6aea1b/pydantic-1.10.15-cp39-cp39-musllinux_1_1_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d986e115e0b39604b9eee3507987368ff8148222da213cd38c359f6f57b3b347",
-              "url": "https://files.pythonhosted.org/packages/20/c7/56d06a07bbaa3396d99953faa8d8746d5a99a108f5e1154be16951eee75f/pydantic-1.10.14-cp39-cp39-macosx_11_0_arm64.whl"
+              "hash": "67f1a1fb467d3f49e1708a3f632b11c69fccb4e748a325d5a491ddc7b5d22383",
+              "url": "https://files.pythonhosted.org/packages/53/c8/b417d5016955033a7d8b57fb0ec40666cae9a36ce248b875b8d8f8164feb/pydantic-1.10.15-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "646b2b12df4295b4c3148850c85bff29ef6d0d9621a8d091e98094871a62e5c7",
-              "url": "https://files.pythonhosted.org/packages/4f/cb/8313256cfb57f641fe6feb386b1433b61c7a10b5b0c8999807d3ee22d25f/pydantic-1.10.14-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "676ed48f2c5bbad835f1a8ed8a6d44c1cd5a21121116d2ac40bd1cd3619746ed",
+              "url": "https://files.pythonhosted.org/packages/54/b3/3e806647d3ee420ab4e4e0f9c9e215b87ffd3a654ea893ab32da0726c9e5/pydantic-1.10.15-cp39-cp39-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c66609e138c31cba607d8e2a7b6a5dc38979a06c900815495b2d90ce6ded35b4",
-              "url": "https://files.pythonhosted.org/packages/c3/f5/eaa5d73b2c668dafea29a139d80cb8410c23ae2d19c2c31f60694f8a4393/pydantic-1.10.14-cp39-cp39-macosx_10_9_x86_64.whl"
+              "hash": "a980a77c52723b0dc56640ced396b73a024d4b74f02bcb2d21dbbac1debbe9d0",
+              "url": "https://files.pythonhosted.org/packages/58/3c/0606b7c07a531f27da504d547623a31e05146ea28c011fa316d331dfad8e/pydantic-1.10.15-cp39-cp39-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "282613a5969c47c83a8710cc8bfd1e70c9223feb76566f74683af889faadc0ea",
-              "url": "https://files.pythonhosted.org/packages/d4/06/bbad42388d6c7263760dc89d56aa27f5abce742abc6c31cdb54241970892/pydantic-1.10.14-cp39-cp39-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
+              "hash": "ca832e124eda231a60a041da4f013e3ff24949d94a01154b137fc2f2a43c3ffb",
+              "url": "https://files.pythonhosted.org/packages/6f/3a/1a057845b787469aa8c4ff2c126d5110d616223c82e74561b8ae56b46ec7/pydantic-1.10.15.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "46f17b832fe27de7850896f3afee50ea682220dd218f7e9c88d436788419dca6",
-              "url": "https://files.pythonhosted.org/packages/df/ab/67eda485b025e9253cce0eaede9b6158a08f62af7013a883b2c8775917b2/pydantic-1.10.14.tar.gz"
+              "hash": "51d405b42f1b86703555797270e4970a9f9bd7953f3990142e69d1037f9d9e51",
+              "url": "https://files.pythonhosted.org/packages/ac/93/0dc45c885fb3f1dcccc5e2c498f95007defbdad122998286769384afc7ba/pydantic-1.10.15-cp39-cp39-macosx_10_9_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "13e86a19dca96373dcf3190fcb8797d40a6f12f154a244a8d1e8e03b8f280593",
-              "url": "https://files.pythonhosted.org/packages/ee/2d/426c0e9058cfca47e21fa7c1f35eef63f71b9feeb232bc57f3c1aa4a4d71/pydantic-1.10.14-cp39-cp39-musllinux_1_1_x86_64.whl"
+              "hash": "2746189100c646682eff0bce95efa7d2e203420d8e1c613dc0c6b4c1d9c1fde4",
+              "url": "https://files.pythonhosted.org/packages/b0/23/87acb9a7e70a18730aa38f0f3d12e855581411b4c843531c61f384c904c5/pydantic-1.10.15-cp39-cp39-musllinux_1_1_x86_64.whl"
             }
           ],
           "project_name": "pydantic",
@@ -1165,7 +1165,7 @@
             "typing-extensions>=4.2.0"
           ],
           "requires_python": ">=3.7",
-          "version": "1.10.14"
+          "version": "1.10.15"
         },
         {
           "artifacts": [
@@ -2311,7 +2311,7 @@
   "only_builds": [],
   "only_wheels": [],
   "path_mappings": {},
-  "pex_version": "2.3.0",
+  "pex_version": "2.3.1",
   "pip_version": "24.0",
   "prefer_older_binary": false,
   "requirements": [
@@ -2328,7 +2328,7 @@
     "mypy-typing-asserts==0.1.1",
     "node-semver==0.9.0",
     "packaging==21.3",
-    "pex==2.3.0",
+    "pex==2.3.1",
     "psutil==5.9.8",
     "pydevd-pycharm==203.5419.8",
     "pytest<7.1.0,>=6.2.4",

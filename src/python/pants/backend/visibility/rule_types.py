@@ -68,20 +68,25 @@ class VisibilityRule:
     @classmethod
     def parse(
         cls,
-        rule: str,
+        rule: str | dict,
         relpath: str,
     ) -> VisibilityRule:
-        if not isinstance(rule, str):
-            raise ValueError(f"expected a path pattern string but got: {rule!r}")
-        if rule.startswith("!"):
-            action = DependencyRuleAction.DENY
-            pattern = rule[1:]
-        elif rule.startswith("?"):
-            action = DependencyRuleAction.WARN
-            pattern = rule[1:]
-        else:
-            action = DependencyRuleAction.ALLOW
+        pattern: str | dict
+        if isinstance(rule, str):
+            if rule.startswith("!"):
+                action = DependencyRuleAction.DENY
+                pattern = rule[1:]
+            elif rule.startswith("?"):
+                action = DependencyRuleAction.WARN
+                pattern = rule[1:]
+            else:
+                action = DependencyRuleAction.ALLOW
+                pattern = rule
+        elif isinstance(rule, dict):
+            action = DependencyRuleAction(rule.get("action", "allow"))
             pattern = rule
+        else:
+            raise ValueError(f"invalid visibility rule: {rule!r}")
         return cls(action, TargetGlob.parse(pattern, relpath))
 
     def match(self, address: Address, adaptor: TargetAdaptor, relpath: str) -> bool:
@@ -153,7 +158,7 @@ class VisibilityRuleSet:
         relpath = os.path.dirname(build_file)
         try:
             selectors = cast("Iterator[str | dict]", flatten(arg[0], str, dict))
-            rules = cast("Iterator[str]", flatten(arg[1:], str))
+            rules = cast("Iterator[str | dict]", flatten(arg[1:], str, dict))
             return cls(
                 build_file,
                 tuple(TargetGlob.parse(selector, relpath) for selector in selectors),
@@ -173,8 +178,8 @@ class VisibilityRuleSet:
         return tuple(map(str, self.rules))
 
     @staticmethod
-    def _noop_rule(rule: str) -> bool:
-        return not rule or rule.startswith("#")
+    def _noop_rule(rule: str | dict) -> bool:
+        return not rule or isinstance(rule, str) and rule.startswith("#")
 
     def match(self, address: Address, adaptor: TargetAdaptor, relpath: str) -> bool:
         return any(selector.match(address, adaptor, relpath) for selector in self.selectors)
