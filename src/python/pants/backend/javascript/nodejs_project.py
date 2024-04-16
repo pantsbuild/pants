@@ -79,9 +79,10 @@ class NodeJSProject:
     @property
     def immutable_install_args(self) -> tuple[str, ...]:
         if self.package_manager == "npm":
-            return ("clean-install",)
+            return ("clean-install", "--workspaces")
         if self.package_manager == "pnpm":
             return ("install", "--frozen-lockfile")
+            # return ("install",)
         if self.package_manager == "yarn":
             if nodesemver.satisfies(self.package_manager_version, "1.x"):
                 return ("install", "--frozen-lockfile")
@@ -236,12 +237,19 @@ async def find_node_js_projects(
     nodejs: NodeJS,
     resolve_names: UserChosenNodeJSResolveAliases,
 ) -> AllNodeJSProjects:
+    # TODO: If pnpm_workspace.yaml is provided for an npm-managed project, it will override the package.json["workspaces"] setting, which is not intuitive
+    # Probably pnpm_workspace.yaml should only be read for pnpm projects.
     project_paths = (
-        ProjectPaths(pkg.root_dir, ["", *pkg.workspaces])
-        if pkg not in pnpm_workspaces
-        else ProjectPaths(pkg.root_dir, ["", *pnpm_workspaces[pkg].packages])
+        (
+            ProjectPaths(pkg.root_dir, ["", *pkg.workspaces])
+            if pkg not in pnpm_workspaces
+            else ProjectPaths(pkg.root_dir, ["", *pnpm_workspaces[pkg].packages])
+        )
         for pkg in package_workspaces
     )
+
+    # for path in project_paths:
+    #     print("project_paths", path)
 
     node_js_projects = {
         _TentativeProject(

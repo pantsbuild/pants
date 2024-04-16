@@ -74,6 +74,8 @@ def test_creates_tar_for_package_json(rule_runner: RuleRunner, package_manager: 
                     "name": "ham",
                     "version": "0.0.1",
                     "browser": "lib/index.mjs",
+                    "workspaces": ["./"],
+                    "private": True
                 }
             ),
             "src/js/README.md": "",
@@ -127,6 +129,8 @@ def test_packages_files_as_resource(rule_runner: RuleRunner) -> None:
                     "version": "0.0.1",
                     "browser": "lib/index.mjs",
                     "scripts": {"build": "mkdir dist && echo 'blarb' >> dist/index.cjs"},
+                    "workspaces": ["./"],
+                    "private": True,
                 }
             ),
             "src/js/package-lock.json": json.dumps({}),
@@ -263,6 +267,8 @@ def test_extra_envs(rule_runner: RuleRunner) -> None:
                     "version": "0.0.1",
                     "browser": "lib/index.mjs",
                     "scripts": {"build": "mkdir dist && echo $FOO >> dist/index.cjs"},
+                    "workspaces": ["./"],
+                    "private": True,
                 }
             ),
             "src/js/package-lock.json": json.dumps({}),

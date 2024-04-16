@@ -85,6 +85,8 @@ def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRu
                         "build": "parcel build lib/index.mjs --dist-dir=dist --cache-dir=.parcel-cache"
                     },
                     "devDependencies": {"parcel": "^2.12.0"},
+                    "workspaces": ["./"],
+                    "private": True
                 }
             ),
             "src/js/.npmrc": "strict-peer-dependencies=false",

@@ -170,7 +170,10 @@ def test_resolve_dictates_version(
                 {
                     "name": "@the-company/project",
                     "devDependencies": {"cowsay": "^1.6.0"},
-                },
+                    "workspaces": ["./"],
+                    # Private must be True for Yarn - https://github.com/yarnpkg/yarn/issues/8580
+                    "private": True
+                }
             ),
             lockfile_path.name: lockfile_path.read_text(),
         }
