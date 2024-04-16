@@ -60,15 +60,17 @@ def rule_runner() -> RuleRunner:
 
 
 @pytest.mark.parametrize(
-    "py_resolve_format",
+    "py_resolve_format,py_hermetic_scripts",
     [
-        PythonResolveExportFormat.symlinked_immutable_virtualenv,
-        PythonResolveExportFormat.mutable_virtualenv,
+        (PythonResolveExportFormat.symlinked_immutable_virtualenv, True),
+        (PythonResolveExportFormat.mutable_virtualenv, True),
+        (PythonResolveExportFormat.mutable_virtualenv, False),
     ],
 )
 def test_export_venv_new_codepath(
     rule_runner: RuleRunner,
     py_resolve_format: PythonResolveExportFormat,
+    py_hermetic_scripts: bool,
 ) -> None:
     # We know that the current interpreter exists on the system.
     vinfo = sys.version_info
@@ -93,6 +95,7 @@ def test_export_venv_new_codepath(
     )
 
     format_flag = f"--export-py-resolve-format={py_resolve_format.value}"
+    hermetic_flags = [] if py_hermetic_scripts else ["--export-py-hermetic-scripts=false"]
     rule_runner.set_options(
         [
             *pants_args_for_python_lockfiles,
@@ -102,6 +105,7 @@ def test_export_venv_new_codepath(
             "--export-resolve=b",
             "--export-py-editable-in-resolve=['a', 'b']",
             format_flag,
+            *hermetic_flags,
         ],
         env_inherit={"PATH", "PYENV_ROOT"},
     )
@@ -141,12 +145,16 @@ def test_export_venv_new_codepath(
             assert req_pex_dir == tmpdir
             assert req_pex_name == f"{resolve}.pex"
 
-            assert ppc0.argv[3:] == (
+            assert ppc0.argv[3:6] == (
                 "venv",
                 "--pip",
                 "--collisions-ok",
-                "{digest_root}",
             )
+            if py_hermetic_scripts:
+                assert "--non-hermetic-scripts" not in ppc0.argv
+            else:
+                assert ppc0.argv[6] == "--non-hermetic-scripts"
+            assert ppc0.argv[-1] == "{digest_root}"
             assert ppc0.extra_env["PEX_MODULE"] == "pex.tools"
             assert ppc0.extra_env.get("PEX_ROOT") is not None
 
