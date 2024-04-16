@@ -94,9 +94,6 @@ class ExportPluginOptions:
             This only applies when '[python].enable_resolves' is true and when exporting a
             'mutable_virtualenv' ('symlinked_immutable_virtualenv' exports are not "full"
             virtualenvs because they must not be edited, and do not include 'pip').
-
-            NOTE: If you are using legacy exports (not using the '--resolve' option), then
-            this option has no effect. Legacy exports will not include any editable installs.
             """
         ),
         advanced=True,
@@ -114,7 +111,15 @@ class ExportPluginOptions:
             - `-E` ignores all `PYTHON*` env vars like `PYTHONPATH`.
 
             Set this to false if you need non-hermetic scripts with
-            simple python shebangs that respect vars like `PYTHONPATH`.
+            simple python shebangs that respect vars like `PYTHONPATH`,
+            to, for example, allow IDEs like PyCharm to inject its debugger,
+            coverage, or other IDE-specific libs when running a script.
+
+            This only applies when when exporting a 'mutable_virtualenv'
+            ('symlinked_immutable_virtualenv' exports are not "full"
+            virtualenvs because they are used internally by pants itself.
+            Pants requires hermetic scripts to provide its reproduciblity
+            guarantee, fine-grained caching, and other features).
             """
         ),
         advanced=True,
