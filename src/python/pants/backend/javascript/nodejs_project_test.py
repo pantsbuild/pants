@@ -74,8 +74,14 @@ def test_parses_projects(rule_runner: RuleRunner) -> None:
 @pytest.mark.parametrize(
     ("package_manager", "expected_immutable_install_args"),
     [
-        (None, ("clean-install",)),
-        ("npm@10.2.4", ("clean-install",)),
+        (
+            None,
+            (
+                "clean-install",
+                "--workspaces",
+            ),
+        ),
+        ("npm@10.2.4", ("clean-install", "--workspaces")),
         ("pnpm@7.5.0", ("install", "--frozen-lockfile")),
         ("yarn@1.22.19", ("install", "--frozen-lockfile")),
         ("yarn@2.4.3", ("install", "--immutable")),

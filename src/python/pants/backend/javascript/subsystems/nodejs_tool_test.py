@@ -170,7 +170,13 @@ def test_resolve_dictates_version(
         {
             "BUILD": "package_json(name='root_pkg')",
             "package.json": json.dumps(
-                {"name": "@the-company/project", "devDependencies": {"cowsay": "1.5.0"}}
+                {
+                    "name": "@the-company/project",
+                    "devDependencies": {"cowsay": "1.5.0"},
+                    "workspaces": ["./"],
+                    # Private must be True for Yarn - https://github.com/yarnpkg/yarn/issues/8580
+                    "private": True,
+                }
             ),
             lockfile_path.name: lockfile_path.read_text(),
         }

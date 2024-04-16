@@ -110,6 +110,9 @@ def given_package_json(*, test_script: dict[str, str], runner: dict[str, str]) -
             "scripts": {**test_script},
             "devDependencies": runner,
             "main": "./src/index.mjs",
+            "workspaces": ["./"],
+            # Private must be True for Yarn - https://github.com/yarnpkg/yarn/issues/8580
+            "private": True,
         }
     )
 
@@ -286,7 +289,7 @@ def test_jest_test_with_coverage_reporting(
                             coverage_args=['--coverage', '--coverage-directory=.coverage/'],
                             coverage_output_files=['.coverage/clover.xml'],
                         )
-                    ]
+                    ],
                 )
                 """
             ),
