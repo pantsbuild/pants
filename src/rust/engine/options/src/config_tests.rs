@@ -174,6 +174,67 @@ fn test_interpolate_config() {
 }
 
 #[test]
+fn test_default_section_scalar() {
+    fn do_test<T: PartialEq + Debug>(
+        default_foo: &str,
+        default_bar: &str,
+        overridden_bar: &str,
+        expected_foo: T,
+        expected_bar: T,
+        getter: fn(&Config, &OptionId) -> Result<Option<T>, String>,
+    ) {
+        let conf = config(&format!(
+            "[DEFAULT]\nfoo = {default_foo}\nbar={default_bar}\n[scope]\nbar={overridden_bar}\n"
+        ));
+        let actual_foo = getter(&conf, &option_id!(["scope"], "foo"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(expected_foo, actual_foo);
+
+        let actual_bar = getter(&conf, &option_id!(["scope"], "bar"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(expected_bar, actual_bar);
+    }
+
+    do_test("false", "false", "true", false, true, Config::get_bool);
+    do_test("11", "22", "33", 11, 33, Config::get_int);
+    do_test("3.14", "1.23", "99.88", 3.14, 99.88, Config::get_float);
+    do_test(
+        "\"xx\"",
+        "\"yy\"",
+        "\"zz\"",
+        "xx".to_string(),
+        "zz".to_string(),
+        Config::get_string,
+    );
+}
+
+#[test]
+fn test_default_section_list() {
+    let conf = config("[DEFAULT]\nfoo = [11]\nbar=[22]\n[scope]\nbar=[33]\n");
+    assert_eq!(
+        conf.get_int_list(&option_id!(["scope"], "foo"))
+            .unwrap()
+            .unwrap(),
+        vec![ListEdit::<i64> {
+            action: ListEditAction::Replace,
+            items: vec![11]
+        }]
+    );
+
+    assert_eq!(
+        conf.get_int_list(&option_id!(["scope"], "bar"))
+            .unwrap()
+            .unwrap(),
+        vec![ListEdit::<i64> {
+            action: ListEditAction::Replace,
+            items: vec![33]
+        }]
+    );
+}
+
+#[test]
 fn test_scalar_fromfile() {
     fn do_test<T: PartialEq + Debug>(
         content: &str,

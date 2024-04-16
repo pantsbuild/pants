@@ -16,6 +16,8 @@ use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, OptionsSource, V
 
 type InterpolationMap = HashMap<String, String>;
 
+static DEFAULT_SECTION: &str = "DEFAULT";
+
 lazy_static! {
     static ref PLACEHOLDER_RE: Regex = Regex::new(r"%\(([a-zA-Z0-9_.]+)\)s").unwrap();
 }
@@ -266,7 +268,7 @@ impl Config {
         }
 
         let default_imap =
-            add_section_to_interpolation_map(seed_values.clone(), config.get("DEFAULT"))?;
+            add_section_to_interpolation_map(seed_values.clone(), config.get(DEFAULT_SECTION))?;
 
         let new_sections: Result<Vec<(String, Value)>, String> = match config {
             Value::Table(t) => t
@@ -282,7 +284,7 @@ impl Config {
                             section
                         ));
                     }
-                    let section_imap = if section_name == "DEFAULT" {
+                    let section_imap = if section_name == *DEFAULT_SECTION {
                         default_imap.clone()
                     } else {
                         add_section_to_interpolation_map(default_imap.clone(), Some(&section))?
@@ -319,10 +321,16 @@ impl Config {
         id.name("_", NameTransform::None)
     }
 
-    fn get_value(&self, id: &OptionId) -> Option<&Value> {
+    fn get_from_section(&self, section_name: &str, option_name: &str) -> Option<&Value> {
         self.value
-            .get(id.scope.name())
-            .and_then(|table| table.get(Self::option_name(id)))
+            .get(section_name)
+            .and_then(|table| table.get(option_name))
+    }
+
+    fn get_value(&self, id: &OptionId) -> Option<&Value> {
+        let option_name = Self::option_name(id);
+        self.get_from_section(id.scope.name(), &option_name)
+            .or(self.get_from_section(DEFAULT_SECTION, &option_name))
     }
 
     fn get_list<T: FromValue + Parseable>(
@@ -330,49 +338,49 @@ impl Config {
         id: &OptionId,
     ) -> Result<Option<Vec<ListEdit<T>>>, String> {
         let mut list_edits = vec![];
-        if let Some(table) = self.value.get(id.scope.name()) {
+
+        if let Some(value) = self.get_value(id) {
             let option_name = Self::option_name(id);
-            if let Some(value) = table.get(&option_name) {
-                match value {
-                    Value::Table(sub_table) => {
-                        if sub_table.is_empty()
-                            || !sub_table.keys().collect::<HashSet<_>>().is_subset(
-                                &["add".to_owned(), "remove".to_owned()]
-                                    .iter()
-                                    .collect::<HashSet<_>>(),
-                            )
-                        {
-                            return Err(format!(
+            match value {
+                Value::Table(sub_table) => {
+                    if sub_table.is_empty()
+                        || !sub_table.keys().collect::<HashSet<_>>().is_subset(
+                            &["add".to_owned(), "remove".to_owned()]
+                                .iter()
+                                .collect::<HashSet<_>>(),
+                        )
+                    {
+                        return Err(format!(
                                 "Expected {option_name} to contain an 'add' element, a 'remove' element or both but found: {sub_table:?}"
                             ));
-                        }
-                        if let Some(add) = sub_table.get("add") {
-                            list_edits.push(ListEdit {
-                                action: ListEditAction::Add,
-                                items: T::extract_list(&format!("{option_name}.add"), add)?,
-                            });
-                        }
-                        if let Some(remove) = sub_table.get("remove") {
-                            list_edits.push(ListEdit {
-                                action: ListEditAction::Remove,
-                                items: T::extract_list(&format!("{option_name}.remove"), remove)?,
-                            });
-                        }
                     }
-                    Value::String(v) => {
-                        if let Some(es) = expand_to_list::<T>(v.to_string())
-                            .map_err(|e| e.render(self.display(id)))?
-                        {
-                            list_edits.extend(es);
-                        }
+                    if let Some(add) = sub_table.get("add") {
+                        list_edits.push(ListEdit {
+                            action: ListEditAction::Add,
+                            items: T::extract_list(&format!("{option_name}.add"), add)?,
+                        });
                     }
-                    value => list_edits.push(ListEdit {
-                        action: ListEditAction::Replace,
-                        items: T::extract_list(&option_name, value)?,
-                    }),
+                    if let Some(remove) = sub_table.get("remove") {
+                        list_edits.push(ListEdit {
+                            action: ListEditAction::Remove,
+                            items: T::extract_list(&format!("{option_name}.remove"), remove)?,
+                        });
+                    }
                 }
+                Value::String(v) => {
+                    if let Some(es) = expand_to_list::<T>(v.to_string())
+                        .map_err(|e| e.render(self.display(id)))?
+                    {
+                        list_edits.extend(es);
+                    }
+                }
+                value => list_edits.push(ListEdit {
+                    action: ListEditAction::Replace,
+                    items: T::extract_list(&option_name, value)?,
+                }),
             }
         }
+
         Ok(if list_edits.is_empty() {
             None
         } else {

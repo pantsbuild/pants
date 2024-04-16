@@ -383,6 +383,10 @@ class Options:
             self._check_and_apply_deprecations(scope, values_builder)
             values = values_builder.build()
 
+            native_values_builder = native_values.to_builder()
+            self._check_and_apply_deprecations(scope, native_values_builder)
+            native_values = native_values_builder.build()
+
         def listify_tuples(x):
             if isinstance(x, (tuple, list)):
                 return [listify_tuples(y) for y in x]
