@@ -11,11 +11,11 @@ from abc import ABCMeta
 from dataclasses import dataclass, fields, is_dataclass
 from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
 
-from pants.core.goals.deploy import DeployFieldSet
-from pants.core.goals.package import PackageFieldSet
-from pants.core.goals.publish import PublishFieldSet
-from pants.core.goals.run import RunFieldSet
-from pants.core.goals.test import TestFieldSet
+from pants.core.goals.deploy import Deploy, DeployFieldSet
+from pants.core.goals.package import Package, PackageFieldSet
+from pants.core.goals.publish import Publish, PublishFieldSet
+from pants.core.goals.run import Run, RunFieldSet
+from pants.core.goals.test import Test, TestFieldSet
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -223,7 +223,7 @@ async def _create_target_alias_to_goals_map() -> dict[str, tuple[str, ...]]:
 
     :return: A mapping from a target alias to the goals that can operate on that target.
     """
-    # TODO: This is manually curated for now - do we want to show all possible goals?
+    # This is manually curated for now - we'll have to use it a bit to determine if we want to show all goals or not
     peekable_field_sets: list[type[FieldSet]] = [
         DeployFieldSet,
         PackageFieldSet,
@@ -231,14 +231,18 @@ async def _create_target_alias_to_goals_map() -> dict[str, tuple[str, ...]]:
         RunFieldSet,
         TestFieldSet,
     ]
-    # TODO: How do we get the goal subsystem from field set? This shouldn't need to be manually maintained
+
+    # Goal holds a GoalSubsystem which has the name we care about, and it's exposed via a classmethod on Goal
+    # There is no tightly coupled relationship between a Goal/GoalSubsystem and the associated FieldSet
+    # This gets murkier with Fix/Fmt/Lint/etc... So, we'll just manually map them for now
     field_set_to_goal_map: dict[type[FieldSet], str] = {
-        DeployFieldSet: "experimental-deploy",
-        PackageFieldSet: "package",
-        PublishFieldSet: "publish",
-        RunFieldSet: "run",
-        TestFieldSet: "test",
+        DeployFieldSet: Deploy.name,
+        PackageFieldSet: Package.name,
+        PublishFieldSet: Publish.name,
+        RunFieldSet: Run.name,
+        TestFieldSet: Test.name,
     }
+
     assert len(peekable_field_sets) == len(
         field_set_to_goal_map
     ), "Must have a goal string for each field set"
