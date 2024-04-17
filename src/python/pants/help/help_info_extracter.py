@@ -43,7 +43,7 @@ from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
 from pants.option.scope import ScopeInfo
-from pants.util.frozendict import LazyFrozenDict
+from pants.util.frozendict import FrozenDict, LazyFrozenDict
 from pants.util.strutil import first_paragraph, strval
 
 T = TypeVar("T")
@@ -418,7 +418,7 @@ class AllHelpInfo:
     name_to_goal_info: LazyFrozenDict[str, GoalHelpInfo]
     name_to_target_type_info: LazyFrozenDict[str, TargetTypeHelpInfo]
     name_to_rule_info: LazyFrozenDict[str, RuleInfo]
-    name_to_api_type_info: LazyFrozenDict[str, PluginAPITypeInfo]
+    name_to_api_type_info: FrozenDict[str, PluginAPITypeInfo]
     name_to_backend_help_info: LazyFrozenDict[str, BackendHelpInfo]
     name_to_build_file_info: LazyFrozenDict[str, BuildFileSymbolHelpInfo]
     env_var_to_help_info: LazyFrozenDict[str, OptionHelpInfo]
@@ -683,7 +683,7 @@ class HelpInfoExtracter:
     @classmethod
     def get_api_type_infos(
         cls, build_configuration: BuildConfiguration | None, union_membership: UnionMembership
-    ) -> LazyFrozenDict[str, PluginAPITypeInfo]:
+    ) -> FrozenDict[str, PluginAPITypeInfo]:
         if build_configuration is None:
             return LazyFrozenDict({})
 
@@ -825,12 +825,35 @@ class HelpInfoExtracter:
 
             return load
 
-        return LazyFrozenDict(
-            {
-                f"{api_type.__module__}.{api_type.__qualname__}": get_api_type_info_loader(api_type)
-                for api_type in sorted(all_types, key=attrgetter("__name__"))
-            }
-        )
+        def merge_type_info(this: PluginAPITypeInfo, that: PluginAPITypeInfo) -> PluginAPITypeInfo:
+            def merge_tuples(l, r):
+                return tuple(sorted({*l, *r}))
+
+            return PluginAPITypeInfo(
+                this.name,
+                this.module,
+                this.documentation,
+                this.provider,
+                this.is_union,
+                this.union_type,
+                merge_tuples(this.union_members, that.union_members),
+                merge_tuples(this.dependencies, that.dependencies),
+                merge_tuples(this.dependents, that.dependents),
+                merge_tuples(this.returned_by_rules, that.returned_by_rules),
+                merge_tuples(this.consumed_by_rules, that.consumed_by_rules),
+                merge_tuples(this.used_in_rules, that.used_in_rules),
+            )
+
+        infos: dict[str, PluginAPITypeInfo] = {}
+        for api_type in sorted(all_types, key=attrgetter("__name__")):
+            api_type_name = f"{api_type.__module__}.{api_type.__qualname__}"
+            api_type_info = get_api_type_info_loader(api_type)()
+            if api_type_name in infos:
+                infos[api_type_name] = merge_type_info(infos[api_type_name], api_type_info)
+            else:
+                infos[api_type_name] = api_type_info
+
+        return FrozenDict(infos)
 
     @classmethod
     def get_backend_help_info(cls, options: Options) -> LazyFrozenDict[str, BackendHelpInfo]:
