@@ -322,7 +322,7 @@ class PluginAPITypeInfo:
     name: str
     module: str
     documentation: str | None
-    provider: str
+    provider: tuple[str, ...]
     is_union: bool
     union_type: str | None
     union_members: tuple[str, ...]
@@ -815,7 +815,7 @@ class HelpInfoExtracter:
                 return PluginAPITypeInfo.create(
                     api_type,
                     rules,
-                    provider=", ".join(type_graph[api_type]["providers"]),
+                    provider=type_graph[api_type]["providers"],
                     dependencies=type_graph[api_type]["dependencies"],
                     dependents=type_graph[api_type].get("dependents", ()),
                     union_members=tuple(
@@ -833,7 +833,7 @@ class HelpInfoExtracter:
                 this.name,
                 this.module,
                 this.documentation,
-                this.provider,
+                merge_tuples(this.provider, that.provider),
                 this.is_union,
                 this.union_type,
                 merge_tuples(this.union_members, that.union_members),
