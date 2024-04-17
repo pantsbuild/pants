@@ -7,7 +7,8 @@ use std::ffi::OsString;
 
 use super::id::{NameTransform, OptionId, Scope};
 use super::{DictEdit, OptionsSource};
-use crate::parse::{expand, expand_to_dict, expand_to_list, Parseable};
+use crate::fromfile::{expand, expand_to_dict, expand_to_list};
+use crate::parse::Parseable;
 use crate::ListEdit;
 
 #[derive(Debug)]

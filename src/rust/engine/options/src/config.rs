@@ -10,9 +10,10 @@ use regex::Regex;
 use toml::value::Table;
 use toml::Value;
 
-use super::id::{NameTransform, OptionId};
-use super::parse::{expand, expand_to_dict, expand_to_list, Parseable};
 use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, OptionsSource, Val};
+use crate::fromfile::{expand, expand_to_dict, expand_to_list};
+use crate::id::{NameTransform, OptionId};
+use crate::parse::Parseable;
 
 type InterpolationMap = HashMap<String, String>;
 

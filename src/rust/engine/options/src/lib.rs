@@ -17,6 +17,10 @@ mod env;
 #[cfg(test)]
 mod env_tests;
 
+mod fromfile;
+#[cfg(test)]
+mod fromfile_tests;
+
 mod id;
 #[cfg(test)]
 mod id_tests;
