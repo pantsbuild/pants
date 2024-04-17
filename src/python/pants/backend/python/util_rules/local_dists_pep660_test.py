@@ -217,7 +217,7 @@ def test_build_editable_local_dists(rule_runner: PythonRuleRunner) -> None:
             assert "foo-9.8.7.dist-info/entry_points.txt" in whl_files
 
 
-def test_build_editable_local_dists_direct_url_contents(rule_runner: PythonRuleRunner) -> None:
+def test_build_editable_local_dists_special_files(rule_runner: PythonRuleRunner) -> None:
     # we need multiple source roots to make sure that any dependencies
     # from other source roots do not end up listed as the direct_url.
     pkgs = ("a", "b", "c")
@@ -276,10 +276,22 @@ def test_build_editable_local_dists_direct_url_contents(rule_runner: PythonRuleR
         assert whl_content.path == f"{pkg}-9.8.7-0.editable-py3-none-any.whl"
         with io.BytesIO(whl_content.content) as fp:
             with zipfile.ZipFile(fp, "r") as whl:
+                whl_files = whl.namelist()
+
+                pth_path = f"{pkg}__pants__.pth"
+                assert pth_path in whl_files
+                with whl.open(pth_path) as pth_contents:
+                    pth_lines = pth_contents.readlines()
+
                 direct_url_path = f"{pkg}-9.8.7.dist-info/direct_url__pants__.json"
-                assert direct_url_path in whl.namelist()
+                assert direct_url_path in whl_files
                 with whl.open(direct_url_path) as direct_url_contents:
                     direct_url = json.loads(direct_url_contents.read())
+
+        # make sure inferred dep on "a" is included as well
+        assert f"{rule_runner.build_root}/root_a\n" in pth_lines
+        assert f"{rule_runner.build_root}/root_{pkg}\n" in pth_lines
+
         assert len(direct_url) == 2
         assert "dir_info" in direct_url
         assert direct_url["dir_info"] == {"editable": True}
