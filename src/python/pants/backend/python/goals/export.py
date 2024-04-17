@@ -230,11 +230,14 @@ async def do_export(
         tmpdir_under_digest_root = os.path.join("{digest_root}", tmpdir_prefix)
         merged_digest_under_tmpdir = await Get(Digest, AddPrefix(merged_digest, tmpdir_prefix))
 
+        venv_prompt = f"{req.resolve_name}/{py_version}" if req.resolve_name else py_version
+
         pex_args = [
             os.path.join(tmpdir_under_digest_root, requirements_pex.name),
             "venv",
             "--pip",
             "--collisions-ok",
+            f"--prompt={venv_prompt}",
             output_path,
         ]
         if not export_subsys.options.py_hermetic_scripts:
