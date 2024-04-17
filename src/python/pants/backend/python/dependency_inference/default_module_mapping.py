@@ -175,6 +175,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
         "opentelemetry.propagate",
         "opentelemetry.propagators",
         "opentelemetry.trace",
+        "opentelemetry.util",
     ),
     "opentelemetry-exporter-otlp": ("opentelemetry.exporter.otlp",),
     "opentelemetry-exporter-otlp-proto-grpc": ("opentelemetry.exporter.otlp.proto.grpc",),
