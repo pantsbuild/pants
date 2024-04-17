@@ -230,9 +230,11 @@ def test_build_editable_local_dists_direct_url_contents(rule_runner: PythonRuleR
                 root
                 / "BUILD": dedent(
                     f"""
+                    python_sources()
+
                     python_distribution(
                         name="dist",
-                        dependencies=["./{pkg}"],
+                        dependencies=["./{pkg}", ":root_{pkg}"],
                         provides=python_artifact(name="{pkg}", version="9.8.7"),
                         sdist=False,
                         generate_setup=False,
@@ -248,7 +250,6 @@ def test_build_editable_local_dists_direct_url_contents(rule_runner: PythonRuleR
                         name="{pkg}",
                         version="9.8.7",
                         packages=["{pkg}"],
-                        package_dir=dict({pkg}="."),
                         entry_points={{"foo.plugins": ["{pkg} = {pkg}.bar.BAR"]}},
                     )
                     """
