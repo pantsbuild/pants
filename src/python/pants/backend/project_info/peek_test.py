@@ -85,30 +85,30 @@ def test_render_json_with_single_target():
     )
     expected = dedent(
         """\
-                [
-                  {
-                    "address": "example:files_target",
-                    "target_type": "files",
-                    "dependencies": [],
-                    "description": null,
-                    "overrides": null,
-                    "sources": [
-                      "foo.txt"
-                    ],
-                    "sources_fingerprint": "b5e73bb1d7a3f8c2e7f8c43f38ab4d198e3512f082c670706df89f5abe319edf",
-                    "sources_raw": [
-                      "foo.txt"
-                    ],
-                    "tags": null
-                  }
-                ]
-                """
+        [
+          {
+            "address": "example:files_target",
+            "target_type": "files",
+            "dependencies": [],
+            "description": null,
+            "overrides": null,
+            "sources": [
+              "foo.txt"
+            ],
+            "sources_fingerprint": "b5e73bb1d7a3f8c2e7f8c43f38ab4d198e3512f082c670706df89f5abe319edf",
+            "sources_raw": [
+              "foo.txt"
+            ],
+            "tags": null
+          }
+        ]
+        """
     )
     actual = peek.render_json([target_data])
     assert actual == expected
 
 
-def test_render_json_with_single_target_exclude_defaults():
+def test_render_json_with_multiple_targets_excluding_defaults():
     target_data = [
         TargetData(
             FilesGeneratorTarget(
@@ -133,42 +133,42 @@ def test_render_json_with_single_target_exclude_defaults():
     ]
     expected = dedent(
         """\
-                [
-                  {
-                    "address": "example:files_target",
-                    "target_type": "files",
-                    "dependencies": [],
-                    "sources": [],
-                    "sources_fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                    "sources_raw": [
-                      "*.txt"
-                    ],
-                    "tags": [
-                      "zippable"
-                    ]
-                  },
-                  {
-                    "address": "example:archive_target",
-                    "target_type": "archive",
-                    "dependencies": [
-                      "foo/bar:baz",
-                      "qux:quux"
-                    ],
-                    "files": [
-                      "example:files_target"
-                    ],
-                    "format": "zip",
-                    "output_path": "my-archive.zip"
-                  }
-                ]
-                """
+        [
+          {
+            "address": "example:files_target",
+            "target_type": "files",
+            "dependencies": [],
+            "sources": [],
+            "sources_fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sources_raw": [
+              "*.txt"
+            ],
+            "tags": [
+              "zippable"
+            ]
+          },
+          {
+            "address": "example:archive_target",
+            "target_type": "archive",
+            "dependencies": [
+              "foo/bar:baz",
+              "qux:quux"
+            ],
+            "files": [
+              "example:files_target"
+            ],
+            "format": "zip",
+            "output_path": "my-archive.zip"
+          }
+        ]
+        """
     )
 
     actual = peek.render_json(target_data, exclude_defaults=True)
     assert actual == expected
 
 
-def test_render_json_with_single_target_exclude_defaults_regression():
+def test_render_json_with_single_target_excluding_defaults_regression():
     target_data = TargetData(
         FilesGeneratorTarget(
             {
@@ -184,36 +184,36 @@ def test_render_json_with_single_target_exclude_defaults_regression():
     )
     expected = dedent(
         """\
-                [
-                  {
-                    "address": "example:files_target",
-                    "target_type": "files",
-                    "dependencies": [],
-                    "overrides": {
-                      "('foo.txt',)": {
-                        "tags": [
-                          "overridden"
-                        ]
-                      }
-                    },
-                    "sources": [
-                      "bar.txt",
-                      "foo.txt"
-                    ],
-                    "sources_fingerprint": "d3dd0a1f72aaa1fb2623e7024d3ea460b798f6324805cfad5c2b751e2dfb756b",
-                    "sources_raw": [
-                      "*.txt"
-                    ]
-                  }
+        [
+          {
+            "address": "example:files_target",
+            "target_type": "files",
+            "dependencies": [],
+            "overrides": {
+              "('foo.txt',)": {
+                "tags": [
+                  "overridden"
                 ]
-                """
+              }
+            },
+            "sources": [
+              "bar.txt",
+              "foo.txt"
+            ],
+            "sources_fingerprint": "d3dd0a1f72aaa1fb2623e7024d3ea460b798f6324805cfad5c2b751e2dfb756b",
+            "sources_raw": [
+              "*.txt"
+            ]
+          }
+        ]
+        """
     )
 
     actual = peek.render_json([target_data], exclude_defaults=True)
     assert actual == expected
 
 
-def test_render_json_include_dep_rules():
+def test_render_json_including_dep_rules():
     target_data = [
         TargetData(
             FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
@@ -237,49 +237,49 @@ def test_render_json_include_dep_rules():
     ]
     expected = dedent(
         """\
-                [
-                  {
-                    "address": "foo:baz",
-                    "target_type": "files",
-                    "_applicable_dep_rules": [
-                      {
-                        "action": "ALLOW",
-                        "rule_description": "foo/BUILD[*] -> foo/BUILD[*]",
-                        "origin_address": "foo:baz",
-                        "origin_type": "files",
-                        "dependency_address": "foo/a.txt:baz",
-                        "dependency_type": "files"
-                      }
-                    ],
-                    "_dependencies_rules": [
-                      "does",
-                      "apply",
-                      "*"
-                    ],
-                    "_dependents_rules": [
-                      "fall-through",
-                      "*"
-                    ],
-                    "dependencies": [
-                      "foo/a.txt:baz"
-                    ],
-                    "sources": [
-                      "foo/a.txt"
-                    ],
-                    "sources_fingerprint": "72ceef751c940b5797530e298f4d9f66daf3c51f7d075bfb802295ffb01d5de3",
-                    "sources_raw": [
-                      "*.txt"
-                    ]
-                  }
-                ]
-                """
+        [
+          {
+            "address": "foo:baz",
+            "target_type": "files",
+            "_applicable_dep_rules": [
+              {
+                "action": "ALLOW",
+                "rule_description": "foo/BUILD[*] -> foo/BUILD[*]",
+                "origin_address": "foo:baz",
+                "origin_type": "files",
+                "dependency_address": "foo/a.txt:baz",
+                "dependency_type": "files"
+              }
+            ],
+            "_dependencies_rules": [
+              "does",
+              "apply",
+              "*"
+            ],
+            "_dependents_rules": [
+              "fall-through",
+              "*"
+            ],
+            "dependencies": [
+              "foo/a.txt:baz"
+            ],
+            "sources": [
+              "foo/a.txt"
+            ],
+            "sources_fingerprint": "72ceef751c940b5797530e298f4d9f66daf3c51f7d075bfb802295ffb01d5de3",
+            "sources_raw": [
+              "*.txt"
+            ]
+          }
+        ]
+        """
     )
 
     actual = peek.render_json(target_data, exclude_defaults=True, include_dep_rules=True)
     assert actual == expected
 
 
-def test_render_json_include_additional_info():
+def test_render_json_including_additional_info():
     target_data = TargetData(
         FilesGeneratorTarget(
             {"sources": ["foo.txt"]}, Address("example", target_name="files_target")
@@ -293,33 +293,33 @@ def test_render_json_include_additional_info():
     )
     expected = dedent(
         """\
-                [
-                  {
-                    "address": "example:files_target",
-                    "target_type": "files",
-                    "additional_info": {
-                      "test_data1": {
-                        "hello": "world"
-                      },
-                      "test_data2": [
-                        "one",
-                        "two"
-                      ]
-                    },
-                    "dependencies": [],
-                    "description": null,
-                    "overrides": null,
-                    "sources": [
-                      "foo.txt"
-                    ],
-                    "sources_fingerprint": "b5e73bb1d7a3f8c2e7f8c43f38ab4d198e3512f082c670706df89f5abe319edf",
-                    "sources_raw": [
-                      "foo.txt"
-                    ],
-                    "tags": null
-                  }
-                ]
-                """
+        [
+          {
+            "address": "example:files_target",
+            "target_type": "files",
+            "additional_info": {
+              "test_data1": {
+                "hello": "world"
+              },
+              "test_data2": [
+                "one",
+                "two"
+              ]
+            },
+            "dependencies": [],
+            "description": null,
+            "overrides": null,
+            "sources": [
+              "foo.txt"
+            ],
+            "sources_fingerprint": "b5e73bb1d7a3f8c2e7f8c43f38ab4d198e3512f082c670706df89f5abe319edf",
+            "sources_raw": [
+              "foo.txt"
+            ],
+            "tags": null
+          }
+        ]
+        """
     )
 
     actual = peek.render_json([target_data])
