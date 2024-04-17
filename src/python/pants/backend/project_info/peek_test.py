@@ -108,7 +108,7 @@ def test_render_json_with_single_target():
     assert actual == expected
 
 
-def test_render_json_with_multiple_targets_excluding_defaults():
+def test_render_json_with_multiple_targets_and_goals_excluding_defaults():
     target_data = [
         TargetData(
             FilesGeneratorTarget(
@@ -129,6 +129,7 @@ def test_render_json_with_multiple_targets_excluding_defaults():
             ),
             None,
             ("foo/bar:baz", "qux:quux"),
+            goals=("package",),
         ),
     ]
     expected = dedent(
@@ -158,6 +159,9 @@ def test_render_json_with_multiple_targets_excluding_defaults():
               "example:files_target"
             ],
             "format": "zip",
+            "goals": [
+              "package"
+            ],
             "output_path": "my-archive.zip"
           }
         ]
