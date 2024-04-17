@@ -1163,9 +1163,6 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
     complete_pex_env = pex_environment.in_sandbox(working_directory=request.working_directory)
     argv = complete_pex_env.create_argv(pex.name, *request.argv)
     env = {
-        # Set this in case this PEX was built with --no-pre-install-wheels, and thus parallelising
-        # the install on cold boot is handy.
-        "PEX_MAX_INSTALL_JOBS": str(request.concurrency_available),
         **complete_pex_env.environment_dict(python=pex.python),
         **request.extra_env,
     }
@@ -1261,12 +1258,6 @@ async def setup_venv_pex_process(
         else venv_pex.pex.argv0
     )
     argv = (pex_bin, *request.argv)
-    env = {
-        # Set this in case this PEX was built with --no-pre-install-wheels, and thus parallelising
-        # the install on cold boot is handy.
-        "PEX_MAX_INSTALL_JOBS": str(request.concurrency_available),
-        **request.extra_env,
-    }
     input_digest = (
         await Get(Digest, MergeDigests((venv_pex.digest, request.input_digest)))
         if request.input_digest
@@ -1285,7 +1276,7 @@ async def setup_venv_pex_process(
         level=request.level,
         input_digest=input_digest,
         working_directory=request.working_directory,
-        env=env,
+        env=request.extra_env,
         output_files=request.output_files,
         output_directories=request.output_directories,
         append_only_caches=append_only_caches,
