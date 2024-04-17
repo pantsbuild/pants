@@ -214,3 +214,72 @@ def test_build_editable_local_dists(rule_runner: PythonRuleRunner) -> None:
             assert "foo-9.8.7.dist-info/WHEEL" in whl_files
             assert "foo-9.8.7.dist-info/direct_url__pants__.json" in whl_files
             assert "foo-9.8.7.dist-info/entry_points.txt" in whl_files
+
+
+def test_build_editable_local_dists_direct_url_contents(rule_runner: PythonRuleRunner) -> None:
+    # we need multiple source roots to make sure that any dependencies
+    # from other source roots do not end up listed as the direct_url.
+    pkgs = ("a", "b", "c")
+    for pkg in pkgs:
+        root = PurePath(f"root_{pkg}")
+        rule_runner.write_files(
+            {
+                root / pkg / "BUILD": "python_sources()\n",
+                root / pkg / "__init__.py": "",
+                root / pkg / "bar.py": "BAR = 42" if pkg == "a" else "from a.bar import BAR",
+                root
+                / "BUILD": dedent(
+                    f"""
+                    python_distribution(
+                        name="dist",
+                        dependencies=["./{pkg}"],
+                        provides=python_artifact(name="{pkg}", version="9.8.7"),
+                        sdist=False,
+                        generate_setup=False,
+                    )
+                    """
+                ),
+                root
+                / "setup.py": dedent(
+                    f"""
+                    from setuptools import setup
+
+                    setup(
+                        name="{pkg}",
+                        version="9.8.7",
+                        packages=["{pkg}"],
+                        package_dir=dict({pkg}="."),
+                        entry_points={{"foo.plugins": ["{pkg} = {pkg}.bar.BAR"]}},
+                    )
+                    """
+                ),
+            }
+        )
+
+    args = [
+        "--source-root-patterns=root_*",
+    ]
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+
+    request = EditableLocalDistsRequest(
+        resolve=None,  # resolves is disabled
+    )
+    result = rule_runner.request(EditableLocalDists, [request])
+
+    assert result.optional_digest is not None
+    contents = rule_runner.request(DigestContents, [result.optional_digest])
+    assert len(pkgs) == len(contents)
+    for pkg, whl_content in zip(pkgs, contents):
+        assert whl_content
+        assert whl_content.path == f"{pkg}-9.8.7-0.editable-py3-none-any.whl"
+        with io.BytesIO(whl_content.content) as fp:
+            with zipfile.ZipFile(fp, "r") as whl:
+                direct_url_path = f"{pkg}-9.8.7.dist-info/direct_url__pants__.json"
+                assert direct_url_path in whl.namelist()
+                with whl.open(direct_url_path) as direct_url_contents:
+                    direct_url = json.loads(direct_url_contents.read())
+        assert len(direct_url) == 2
+        assert "dir_info" in direct_url
+        assert direct_url["dir_info"] == {"editable": True}
+        assert "url" in direct_url
+        assert direct_url["url"] == f"file://{rule_runner.build_root}/root_{pkg}"
