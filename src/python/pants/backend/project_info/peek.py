@@ -421,9 +421,7 @@ async def peek(
 
     tds = await Get(TargetDatas, UnexpandedTargets, targets)
     # This method needs to be called in a @goal_rule, otherwise it fails out with Rule errors (when called in an @rule)
-    target_alias_to_goals_map = (
-        await _create_target_alias_to_goals_map() if subsys.include_goals else {}
-    )
+    target_alias_to_goals_map = await _create_target_alias_to_goals_map()
 
     if target_alias_to_goals_map:
         # Attach the goals to the target data, in the hopes that we can pull `_create_target_alias_to_goals_map` back into `get_target_data`
