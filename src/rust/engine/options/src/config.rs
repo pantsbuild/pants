@@ -337,47 +337,67 @@ impl Config {
         &self,
         id: &OptionId,
     ) -> Result<Option<Vec<ListEdit<T>>>, String> {
-        let mut list_edits = vec![];
+        let from_scoped_section_opt = self.get_list_from_section(id.scope.name(), id)?;
 
-        if let Some(value) = self.get_value(id) {
-            let option_name = Self::option_name(id);
-            match value {
-                Value::Table(sub_table) => {
-                    if sub_table.is_empty()
-                        || !sub_table.keys().collect::<HashSet<_>>().is_subset(
-                            &["add".to_owned(), "remove".to_owned()]
-                                .iter()
-                                .collect::<HashSet<_>>(),
-                        )
-                    {
-                        return Err(format!(
+        Ok(
+            if let Some(from_default_section) = self.get_list_from_section(DEFAULT_SECTION, id)? {
+                Some(itertools::concat([
+                    from_default_section,
+                    from_scoped_section_opt.unwrap_or(vec![]),
+                ]))
+            } else {
+                from_scoped_section_opt
+            },
+        )
+    }
+
+    fn get_list_from_section<T: FromValue + Parseable>(
+        &self,
+        section_name: &str,
+        id: &OptionId,
+    ) -> Result<Option<Vec<ListEdit<T>>>, String> {
+        let mut list_edits = vec![];
+        if let Some(table) = self.value.get(section_name) {
+            let option_name = &Self::option_name(id);
+            if let Some(value) = table.get(option_name) {
+                match value {
+                    Value::Table(sub_table) => {
+                        if sub_table.is_empty()
+                            || !sub_table.keys().collect::<HashSet<_>>().is_subset(
+                                &["add".to_owned(), "remove".to_owned()]
+                                    .iter()
+                                    .collect::<HashSet<_>>(),
+                            )
+                        {
+                            return Err(format!(
                                 "Expected {option_name} to contain an 'add' element, a 'remove' element or both but found: {sub_table:?}"
                             ));
+                        }
+                        if let Some(add) = sub_table.get("add") {
+                            list_edits.push(ListEdit {
+                                action: ListEditAction::Add,
+                                items: T::extract_list(&format!("{option_name}.add"), add)?,
+                            });
+                        }
+                        if let Some(remove) = sub_table.get("remove") {
+                            list_edits.push(ListEdit {
+                                action: ListEditAction::Remove,
+                                items: T::extract_list(&format!("{option_name}.remove"), remove)?,
+                            });
+                        }
                     }
-                    if let Some(add) = sub_table.get("add") {
-                        list_edits.push(ListEdit {
-                            action: ListEditAction::Add,
-                            items: T::extract_list(&format!("{option_name}.add"), add)?,
-                        });
+                    Value::String(v) => {
+                        if let Some(es) = expand_to_list::<T>(v.to_string())
+                            .map_err(|e| e.render(self.display(id)))?
+                        {
+                            list_edits.extend(es);
+                        }
                     }
-                    if let Some(remove) = sub_table.get("remove") {
-                        list_edits.push(ListEdit {
-                            action: ListEditAction::Remove,
-                            items: T::extract_list(&format!("{option_name}.remove"), remove)?,
-                        });
-                    }
+                    value => list_edits.push(ListEdit {
+                        action: ListEditAction::Replace,
+                        items: T::extract_list(option_name, value)?,
+                    }),
                 }
-                Value::String(v) => {
-                    if let Some(es) = expand_to_list::<T>(v.to_string())
-                        .map_err(|e| e.render(self.display(id)))?
-                    {
-                        list_edits.extend(es);
-                    }
-                }
-                value => list_edits.push(ListEdit {
-                    action: ListEditAction::Replace,
-                    items: T::extract_list(&option_name, value)?,
-                }),
             }
         }
 

@@ -227,10 +227,16 @@ fn test_default_section_list() {
         conf.get_int_list(&option_id!(["scope"], "bar"))
             .unwrap()
             .unwrap(),
-        vec![ListEdit::<i64> {
-            action: ListEditAction::Replace,
-            items: vec![33]
-        }]
+        vec![
+            ListEdit::<i64> {
+                action: ListEditAction::Replace,
+                items: vec![22]
+            },
+            ListEdit::<i64> {
+                action: ListEditAction::Replace,
+                items: vec![33]
+            }
+        ]
     );
 }
 
