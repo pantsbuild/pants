@@ -18,7 +18,9 @@ from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, Envi
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
+    BUILDFileEnvVarExtractor,
     BuildFileOptions,
+    BuildFileSyntaxError,
     OptionalAddressFamily,
     evaluate_preludes,
     parse_address_family,
@@ -38,10 +40,13 @@ from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRe
 from pants.engine.target import (
     Dependencies,
     MultipleSourcesField,
+    OverridesField,
     RegisteredTargetTypes,
+    SingleSourceField,
     StringField,
     Tags,
     Target,
+    TargetFilesGenerator,
 )
 from pants.engine.unions import UnionMembership
 from pants.init.bootstrap_scheduler import BootstrapStatus
@@ -355,6 +360,23 @@ class MockTgt(Target):
     core_fields = (MockDepsField, MockMultipleSourcesField, Tags, ResolveField)
 
 
+class MockSingleSourceField(SingleSourceField):
+    pass
+
+
+class MockGeneratedTarget(Target):
+    alias = "generated"
+    core_fields = (MockDepsField, Tags, MockSingleSourceField, ResolveField)
+
+
+class MockTargetGenerator(TargetFilesGenerator):
+    alias = "generator"
+    core_fields = (MockMultipleSourcesField, OverridesField)
+    generated_target_cls = MockGeneratedTarget
+    copied_fields = ()
+    moved_fields = (MockDepsField, Tags, ResolveField)
+
+
 def test_resolve_address() -> None:
     rule_runner = RuleRunner(
         rules=[QueryRule(Address, [AddressInput]), QueryRule(MaybeAddress, [AddressInput])]
@@ -405,7 +427,7 @@ def test_resolve_address() -> None:
 def target_adaptor_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[QueryRule(TargetAdaptor, (TargetAdaptorRequest,))],
-        target_types=[MockTgt],
+        target_types=[MockTgt, MockGeneratedTarget, MockTargetGenerator],
         objects={"parametrize": Parametrize},
     )
 
@@ -496,6 +518,35 @@ def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner)
     # The defaults are not frozen until after the BUILD file have been fully parsed, so this is a
     # list rather than a tuple at this time.
     assert target_adaptor.kwargs["tags"] == ["24"]
+
+
+def test_generated_target_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                __defaults__({generated: dict(resolve="mock")}, all=dict(tags=["24"]))
+                generated(name="explicit", tags=["42"], source="e.txt")
+                generator(name='gen', sources=["g*.txt"])
+                """
+            ),
+            "e.txt": "",
+            "g1.txt": "",
+            "g2.txt": "",
+        }
+    )
+
+    explicit_target = target_adaptor_rule_runner.get_target(Address("", target_name="explicit"))
+    assert explicit_target.address.target_name == "explicit"
+    assert explicit_target.get(ResolveField).value == "mock"
+    assert explicit_target.get(Tags).value == ("42",)
+
+    implicit_target = target_adaptor_rule_runner.get_target(
+        Address("", target_name="gen", relative_file_path="g1.txt")
+    )
+    assert str(implicit_target.address) == "//g1.txt:gen"
+    assert implicit_target.get(ResolveField).value == "mock"
+    assert implicit_target.get(Tags).value == ("24",)
 
 
 def test_inherit_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -670,9 +721,9 @@ def test_build_file_address() -> None:
 def test_build_files_share_globals() -> None:
     """Test that a macro in a prelude can reference another macro in another prelude.
 
-    At some point a change was made to separate the globals/locals dict (uninentional) which has the
-    unintended side-effect of having the `__globals__` of a macro not contain references to every
-    other symbol in every other prelude.
+    At some point a change was made to separate the globals/locals dict (unintentional) which has
+    the unintended side effect of having the `__globals__` of a macro not contain references to
+    every other symbol in every other prelude.
     """
 
     symbols = run_rule_with_mocks(
@@ -944,3 +995,39 @@ def test_build_file_description_of_origin(target_adaptor_rule_runner: RuleRunner
         [TargetAdaptorRequest(Address("src", target_name="foo"), description_of_origin="test")],
     )
     assert "src/BUILD:2" == target_adaptor.description_of_origin
+
+
+@pytest.mark.parametrize(
+    "filename, contents, expect_failure, expected_message",
+    [
+        ("BUILD", "data()", False, None),
+        (
+            "BUILD.qq",
+            "data()qq",
+            True,
+            "Error parsing BUILD file BUILD.qq:1: invalid syntax\n  data()qq\n        ^",
+        ),
+        (
+            "foo/BUILD",
+            "data()\nqwe asd",
+            True,
+            "Error parsing BUILD file foo/BUILD:2: invalid syntax\n  qwe asd\n      ^",
+        ),
+    ],
+)
+def test_build_file_syntax_error(filename, contents, expect_failure, expected_message):
+    class MockFileContent:
+        def __init__(self, path, content):
+            self.path = path
+            self.content = content
+
+    if expect_failure:
+        with pytest.raises(BuildFileSyntaxError) as e:
+            BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))
+
+        formatted = str(e.value)
+
+        assert formatted == expected_message
+
+    else:
+        BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))

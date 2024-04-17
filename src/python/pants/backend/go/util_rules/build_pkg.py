@@ -963,7 +963,7 @@ async def compute_compile_action_id(
 
     h = hashlib.sha256()
 
-    # All Go action IDs have the full version (as returned by `runtime.Version()` in the key.
+    # All Go action IDs have the full version (as returned by `runtime.Version()`) in the key.
     # See https://github.com/golang/go/blob/master/src/cmd/go/internal/cache/hash.go#L32-L46
     h.update(goroot.full_version.encode())
 

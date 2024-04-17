@@ -33,6 +33,7 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
     TestTimeoutField,
+    _format_test_rerun_command,
     _format_test_summary,
     build_runtime_package_dependencies,
     run_tests,
@@ -52,6 +53,7 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_FILE_DIGEST,
     Digest,
+    FileDigest,
     MergeDigests,
     Snapshot,
     Workspace,
@@ -108,6 +110,31 @@ def make_process_result_metadata(
         ),
         source,
         source_run_id,
+    )
+
+
+def make_test_result(
+    addresses: Iterable[Address],
+    exit_code: None | int,
+    stdout_bytes: bytes = b"",
+    stdout_digest: FileDigest = EMPTY_FILE_DIGEST,
+    stderr_bytes: bytes = b"",
+    stderr_digest: FileDigest = EMPTY_FILE_DIGEST,
+    coverage_data: CoverageData | None = None,
+    output_setting: ShowOutput = ShowOutput.NONE,
+    result_metadata: None | ProcessResultMetadata = None,
+) -> TestResult:
+    """Create a TestResult with default values for most fields."""
+    return TestResult(
+        addresses=tuple(addresses),
+        exit_code=exit_code,
+        stdout_bytes=stdout_bytes,
+        stdout_digest=stdout_digest,
+        stderr_bytes=stderr_bytes,
+        stderr_digest=stderr_digest,
+        coverage_data=coverage_data,
+        output_setting=output_setting,
+        result_metadata=result_metadata,
     )
 
 
@@ -178,13 +205,9 @@ class MockTestRequest(TestRequest):
     @classmethod
     def test_result(cls, field_sets: Iterable[MockTestFieldSet]) -> TestResult:
         addresses = [field_set.address for field_set in field_sets]
-        return TestResult(
+        return make_test_result(
+            addresses,
             exit_code=cls.exit_code(addresses),
-            stdout_bytes=b"",
-            stdout_digest=EMPTY_FILE_DIGEST,
-            stderr_bytes=b"",
-            stderr_digest=EMPTY_FILE_DIGEST,
-            addresses=tuple(addresses),
             coverage_data=MockCoverageData(addresses),
             output_setting=ShowOutput.ALL,
             result_metadata=None if cls.skipped(addresses) else make_process_result_metadata("ran"),
@@ -247,6 +270,7 @@ def run_test_rule(
     report_dir: str = TestSubsystem.default_report_path,
     output: ShowOutput = ShowOutput.ALL,
     valid_targets: bool = True,
+    show_rerun_command: bool = False,
     run_id: RunId = RunId(999),
 ) -> tuple[int, str]:
     test_subsystem = create_goal_subsystem(
@@ -261,6 +285,7 @@ def run_test_rule(
         extra_env_vars=[],
         shard="",
         batch_size=1,
+        show_rerun_command=show_rerun_command,
     )
     debug_adapter_subsystem = create_subsystem(
         DebugAdapterSubsystem,
@@ -408,7 +433,39 @@ def test_skipped_target_noops(rule_runner: PythonRuleRunner) -> None:
     assert stderr.strip() == ""
 
 
-def test_summary(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize(
+    ("show_rerun_command", "expected_stderr"),
+    [
+        (
+            False,
+            # the summary is for humans, so we test it literally, to make sure the formatting is good
+            dedent(
+                """\
+
+                ✓ //:good succeeded in 1.00s (memoized).
+                ✕ //:bad failed in 1.00s (memoized).
+                """
+            ),
+        ),
+        (
+            True,
+            dedent(
+                """\
+
+                ✓ //:good succeeded in 1.00s (memoized).
+                ✕ //:bad failed in 1.00s (memoized).
+
+                To rerun the failing tests, use:
+
+                    pants test //:bad
+                """
+            ),
+        ),
+    ],
+)
+def test_summary(
+    rule_runner: PythonRuleRunner, show_rerun_command: bool, expected_stderr: str
+) -> None:
     good_address = Address("", target_name="good")
     bad_address = Address("", target_name="bad")
     skipped_address = Address("", target_name="skipped")
@@ -417,15 +474,10 @@ def test_summary(rule_runner: PythonRuleRunner) -> None:
         rule_runner,
         request_type=ConditionallySucceedsRequest,
         targets=[make_target(good_address), make_target(bad_address), make_target(skipped_address)],
+        show_rerun_command=show_rerun_command,
     )
     assert exit_code == ConditionallySucceedsRequest.exit_code((bad_address,))
-    assert stderr == dedent(
-        """\
-
-        ✓ //:good succeeded in 1.00s (memoized).
-        ✕ //:bad failed in 1.00s (memoized).
-        """
-    )
+    assert stderr == expected_stderr
 
 
 def _assert_test_summary(
@@ -436,15 +488,11 @@ def _assert_test_summary(
     result_metadata: ProcessResultMetadata | None,
 ) -> None:
     assert expected == _format_test_summary(
-        TestResult(
+        make_test_result(
+            [Address(spec_path="", target_name="dummy_address")],
             exit_code=exit_code,
-            stdout_bytes=b"",
-            stderr_bytes=b"",
-            stdout_digest=EMPTY_FILE_DIGEST,
-            stderr_digest=EMPTY_FILE_DIGEST,
-            addresses=(Address(spec_path="", target_name="dummy_address"),),
-            output_setting=ShowOutput.FAILED,
             result_metadata=result_metadata,
+            output_setting=ShowOutput.FAILED,
         ),
         RunId(run_id),
         Console(use_colors=False),
@@ -491,6 +539,64 @@ def test_format_summary_memoized_remote(rule_runner: PythonRuleRunner) -> None:
             "ran", environment_name="ubuntu", remote_execution=True, total_elapsed_ms=50
         ),
     )
+
+
+@pytest.mark.parametrize(
+    ("results", "expected"),
+    [
+        pytest.param([], None, id="no_results"),
+        pytest.param(
+            [make_test_result([Address("", target_name="t1")], exit_code=0)], None, id="one_success"
+        ),
+        pytest.param(
+            [make_test_result([Address("", target_name="t2")], exit_code=None)],
+            None,
+            id="one_no_run",
+        ),
+        pytest.param(
+            [make_test_result([Address("", target_name="t3")], exit_code=1)],
+            "To rerun the failing tests, use:\n\n    pants test //:t3",
+            id="one_failure",
+        ),
+        pytest.param(
+            [
+                make_test_result([Address("", target_name="t1")], exit_code=0),
+                make_test_result([Address("", target_name="t2")], exit_code=None),
+                make_test_result([Address("", target_name="t3")], exit_code=1),
+            ],
+            "To rerun the failing tests, use:\n\n    pants test //:t3",
+            id="one_of_each",
+        ),
+        pytest.param(
+            [
+                make_test_result([Address("path/to", target_name="t1")], exit_code=1),
+                make_test_result([Address("another/path", target_name="t2")], exit_code=2),
+                make_test_result([Address("", target_name="t3")], exit_code=3),
+            ],
+            "To rerun the failing tests, use:\n\n    pants test //:t3 another/path:t2 path/to:t1",
+            id="multiple_failures",
+        ),
+        pytest.param(
+            [
+                make_test_result(
+                    [
+                        Address(
+                            "path with spaces",
+                            target_name="$*",
+                            parameters=dict(key="value"),
+                            generated_name="gn",
+                        )
+                    ],
+                    exit_code=1,
+                )
+            ],
+            "To rerun the failing tests, use:\n\n    pants test 'path with spaces:$*#gn@key=value'",
+            id="special_characters_require_quoting",
+        ),
+    ],
+)
+def test_format_rerun_command(results: list[TestResult], expected: None | str) -> None:
+    assert expected == _format_test_rerun_command(results)
 
 
 def test_debug_target(rule_runner: PythonRuleRunner) -> None:
@@ -597,14 +703,12 @@ def assert_streaming_output(
     expected_message: str,
     result_metadata: ProcessResultMetadata = make_process_result_metadata("dummy"),
 ) -> None:
-    result = TestResult(
+    result = make_test_result(
+        addresses=(Address("demo_test"),),
         exit_code=exit_code,
         stdout_bytes=stdout.encode(),
-        stdout_digest=EMPTY_FILE_DIGEST,
         stderr_bytes=stderr.encode(),
-        stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=output_setting,
-        addresses=(Address("demo_test"),),
         result_metadata=result_metadata,
     )
     assert result.level() == expected_level
@@ -720,14 +824,11 @@ def test_timeout_calculation() -> None:
 
 
 def test_non_utf8_output() -> None:
-    test_result = TestResult(
+    test_result = make_test_result(
+        [],
         exit_code=1,  # "test error" so stdout/stderr are output in message
         stdout_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
-        stdout_digest=EMPTY_FILE_DIGEST,  # incorrect but we do not check in this test
         stderr_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
-        stderr_digest=EMPTY_FILE_DIGEST,  # incorrect but we do not check in this test
-        addresses=(),
         output_setting=ShowOutput.ALL,
-        result_metadata=None,
     )
     assert test_result.message() == "failed (exit code 1).\n��\n��\n\n"

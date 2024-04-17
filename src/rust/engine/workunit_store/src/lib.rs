@@ -541,7 +541,7 @@ impl HeavyHittersData {
 
 impl WorkunitStore {
     pub fn new(log_starting_workunits: bool, max_level: Level) -> WorkunitStore {
-        // NB: Although it would be nice not to have seperate allocations per consumer, it is
+        // NB: Although it would be nice not to have separate allocations per consumer, it is
         // difficult to use a channel like `tokio::sync::broadcast` due to that channel being bounded.
         // Subscribers receive messages at very different rates, and adjusting the workunit level
         // affects the total number of messages that might be queued at any given time.
@@ -784,7 +784,7 @@ pub struct WorkunitStoreHandle {
 }
 
 thread_local! {
-  static THREAD_WORKUNIT_STORE_HANDLE: RefCell<Option<WorkunitStoreHandle >> = RefCell::new(None)
+  static THREAD_WORKUNIT_STORE_HANDLE: RefCell<Option<WorkunitStoreHandle >> = const { RefCell::new(None) }
 }
 
 task_local! {

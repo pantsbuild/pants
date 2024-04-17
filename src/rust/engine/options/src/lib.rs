@@ -25,41 +25,73 @@ mod parse;
 #[cfg(test)]
 mod parse_tests;
 
+#[cfg(test)]
+mod tests;
+
 mod types;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::ops::Deref;
+use std::fmt::Debug;
+use std::hash::Hash;
 use std::os::unix::ffi::OsStrExt;
-use std::path;
 use std::path::Path;
 use std::rc::Rc;
+
+use serde::Deserialize;
 
 pub use self::args::Args;
 use self::config::Config;
 pub use self::env::Env;
+use crate::parse::Parseable;
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
 pub use types::OptionType;
 
+// NB: The legacy Python options parser supported dicts with member_type "Any", which means
+// the values can be arbitrarily-nested lists, tuples and dicts, including heterogeneous
+// ones that are not supported as top-level option values. We have very few dict[Any] options,
+// but there are a handful, and user plugins may also define them. Therefore we must continue
+// to support this in the Rust options parser, hence this clunky enum.
+//
+// We only use this for parsing values in dicts, as in other cases we know that the type must
+// be some scalar or string, or a uniform list of one type of scalar or string, so we can
+// parse as such.
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(untagged)]
+pub enum Val {
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    String(String),
+    List(Vec<Val>),
+    Dict(HashMap<String, Val>),
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum ListEditAction {
+pub enum ListEditAction {
     Replace,
     Add,
     Remove,
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub(crate) struct ListEdit<T> {
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ListEdit<T> {
     pub action: ListEditAction,
     pub items: Vec<T>,
 }
 
-///
-/// A source of option values.
-///
-/// This is currently a subset of the types of options the Pants python option system handles.
-/// Implementations should mimic the behavior of the equivalent python source.
-///
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum DictEditAction {
+    Replace,
+    Add,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct DictEdit {
+    pub action: DictEditAction,
+    pub items: HashMap<String, Val>,
+}
+
 pub(crate) trait OptionsSource {
     ///
     /// Get a display version of the option `id` that most closely matches the syntax used to supply
@@ -85,18 +117,13 @@ pub(crate) trait OptionsSource {
     /// Errors when this source has an option value for `id` but that value is not an int.
     ///
     /// The default implementation looks for a string value for `id` and then attempts to parse it as
-    /// a int value.
+    /// an int value.
     ///
     fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String> {
         if let Some(value) = self.get_string(id)? {
-            value.parse().map(Some).map_err(|e| {
-                format!(
-                    "Problem parsing {} value {} as an int value: {}",
-                    self.display(id),
-                    value,
-                    e
-                )
-            })
+            i64::parse(&value)
+                .map(Some)
+                .map_err(|e| e.render(self.display(id)))
         } else {
             Ok(None)
         }
@@ -104,62 +131,125 @@ pub(crate) trait OptionsSource {
 
     ///
     /// Get the float option identified by `id` from this source.
-    /// Errors when this source has an option value for `id` but that value is not a float.
+    /// Errors when this source has an option value for `id` but that value is not a float or an int
+    /// that we can coerce to a float.
     ///
     /// The default implementation looks for a string value for `id` and then attempts to parse it as
     /// a float value.
     ///
     fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String> {
         if let Some(value) = self.get_string(id)? {
-            value.parse().map(Some).map_err(|e| {
-                format!(
-                    "Problem parsing {} value {} as a float value: {}",
-                    self.display(id),
-                    value,
-                    e
-                )
-            })
+            let parsed_as_float = f64::parse(&value)
+                .map(Some)
+                .map_err(|e| e.render(self.display(id)));
+            if parsed_as_float.is_err() {
+                // See if we can parse as an int and coerce it to a float.
+                if let Ok(i) = i64::parse(&value) {
+                    return Ok(Some(i as f64));
+                }
+            }
+            parsed_as_float
         } else {
             Ok(None)
         }
     }
 
     ///
+    /// Get the bool list option identified by `id` from this source.
+    /// Errors when this source has an option value for `id` but that value is not a bool list.
+    ///
+    fn get_bool_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<bool>>>, String>;
+
+    ///
+    /// Get the int list option identified by `id` from this source.
+    /// Errors when this source has an option value for `id` but that value is not an int list.
+    ///
+    fn get_int_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<i64>>>, String>;
+
+    ///
+    /// Get the float list option identified by `id` from this source.
+    /// Errors when this source has an option value for `id` but that value is not a float list.
+    ///
+    fn get_float_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<f64>>>, String>;
+
+    ///
     /// Get the string list option identified by `id` from this source.
     /// Errors when this source has an option value for `id` but that value is not a string list.
     ///
     fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String>;
+
+    ///
+    /// Get the dict option identified by `id` from this source.
+    /// Errors when this source has an option value for `id` but that value is not a dict.
+    ///
+    fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String>;
 }
 
-#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Source {
-    Flag,
-    Env,
-    Config,
     Default,
+    Config { ordinal: usize, path: String },
+    Env,
+    Flag,
 }
 
 #[derive(Debug)]
 pub struct OptionValue<T> {
+    pub derivation: Option<Vec<(Source, T)>>,
     pub source: Source,
     pub value: T,
 }
 
-impl<T> Deref for OptionValue<T> {
-    type Target = T;
+#[derive(Debug)]
+pub struct OptionalOptionValue<T> {
+    pub derivation: Option<Vec<(Source, T)>>,
+    pub source: Source,
+    pub value: Option<T>,
+}
 
-    fn deref(&self) -> &Self::Target {
-        &self.value
+impl<T> OptionalOptionValue<T> {
+    fn unwrap(self) -> OptionValue<T> {
+        OptionValue {
+            derivation: self.derivation,
+            source: self.source,
+            value: self.value.unwrap(),
+        }
     }
+}
+
+#[derive(Debug)]
+pub struct ListOptionValue<T> {
+    pub derivation: Option<Vec<(Source, Vec<ListEdit<T>>)>>,
+    // The highest-priority source that provided edits for this value.
+    pub source: Source,
+    pub value: Vec<T>,
+}
+
+#[derive(Debug)]
+pub struct DictOptionValue {
+    pub derivation: Option<Vec<(Source, Vec<DictEdit>)>>,
+    // The highest-priority source that provided edits for this value.
+    pub source: Source,
+    pub value: HashMap<String, Val>,
 }
 
 pub struct OptionParser {
     sources: BTreeMap<Source, Rc<dyn OptionsSource>>,
+    include_derivation: bool,
 }
 
 impl OptionParser {
-    pub fn new(env: Env, args: Args, allow_pantsrc: bool) -> Result<OptionParser, String> {
-        let buildroot = BuildRoot::find()?;
+    // If config_paths is None, we'll do config file discovery. Otherwise we'll use the provided paths.
+    // The latter case is useful for tests.
+    pub fn new(
+        args: Args,
+        env: Env,
+        config_paths: Option<Vec<&str>>,
+        allow_pantsrc: bool,
+        include_derivation: bool,
+        buildroot: Option<BuildRoot>,
+    ) -> Result<OptionParser, String> {
+        let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
         let buildroot_string = String::from_utf8(buildroot.as_os_str().as_bytes().to_vec())
             .map_err(|e| {
                 format!(
@@ -180,17 +270,38 @@ impl OptionParser {
         sources.insert(Source::Flag, Rc::new(args));
         let mut parser = OptionParser {
             sources: sources.clone(),
+            include_derivation: false,
         };
 
-        fn path_join(a: &str, b: &str) -> String {
-            format!("{}{}{}", a, path::MAIN_SEPARATOR, b)
+        fn path_join(prefix: &str, suffix: &str) -> String {
+            // TODO: The calling code should traffic in Path, or OsString, not String.
+            //  For now we assume the paths are valid UTF8 strings, via unwrap().
+            Path::new(prefix).join(suffix).to_str().unwrap().to_string()
         }
 
-        let default_config_path = path_join(&buildroot_string, "pants.toml");
-        let repo_config_files = parser.parse_string_list(
-            &option_id!("pants", "config", "files"),
-            &[&default_config_path],
-        )?;
+        fn path_strip(prefix: &str, path: &str) -> String {
+            // TODO: The calling code should traffic in Path, or OsString, not String.
+            //  For now we assume the paths are valid UTF8 strings, via unwrap().
+            let path = Path::new(path);
+            path.strip_prefix(prefix)
+                .unwrap_or(path)
+                .to_str()
+                .unwrap()
+                .to_string()
+        }
+
+        let repo_config_files = match config_paths {
+            Some(paths) => paths.iter().map(|s| s.to_string()).collect(),
+            None => {
+                let default_config_path = path_join(&buildroot_string, "pants.toml");
+                parser
+                    .parse_string_list(
+                        &option_id!("pants", "config", "files"),
+                        &[&default_config_path],
+                    )?
+                    .value
+            }
+        };
 
         let subdir = |subdir_name: &str, default: &str| -> Result<String, String> {
             Ok(parser
@@ -210,75 +321,136 @@ impl OptionParser {
             ("pants_distdir".to_string(), subdir("distdir", "dist")?),
         ]);
 
-        let mut config = Config::merged(&repo_config_files, &seed_values)?;
-        sources.insert(Source::Config, Rc::new(config.clone()));
+        let mut ordinal: usize = 0;
+        for path in repo_config_files.iter() {
+            let config = Config::parse(path, &seed_values)?;
+            sources.insert(
+                Source::Config {
+                    ordinal,
+                    path: path_strip(&buildroot_string, path),
+                },
+                Rc::new(config),
+            );
+            ordinal += 1;
+        }
         parser = OptionParser {
             sources: sources.clone(),
+            include_derivation: false,
         };
 
-        if allow_pantsrc && *parser.parse_bool(&option_id!("pantsrc"), true)? {
-            for rcfile in parser.parse_string_list(
-                &option_id!("pantsrc", "files"),
-                &[
-                    "/etc/pantsrc",
-                    shellexpand::tilde("~/.pants.rc").as_ref(),
-                    ".pants.rc",
-                ],
-            )? {
+        if allow_pantsrc && parser.parse_bool(&option_id!("pantsrc"), true)?.value {
+            for rcfile in parser
+                .parse_string_list(
+                    &option_id!("pantsrc", "files"),
+                    &[
+                        "/etc/pantsrc",
+                        shellexpand::tilde("~/.pants.rc").as_ref(),
+                        ".pants.rc",
+                    ],
+                )?
+                .value
+            {
                 let rcfile_path = Path::new(&rcfile);
                 if rcfile_path.exists() {
                     let rc_config = Config::parse(rcfile_path, &seed_values)?;
-                    config = config.merge(rc_config);
+                    sources.insert(
+                        Source::Config {
+                            ordinal,
+                            path: rcfile,
+                        },
+                        Rc::new(rc_config),
+                    );
+                    ordinal += 1;
                 }
             }
         }
-        sources.insert(Source::Config, Rc::new(config));
-        Ok(OptionParser { sources })
+        Ok(OptionParser {
+            sources,
+            include_derivation,
+        })
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn parse_scalar<T: ToOwned + ?Sized>(
+        &self,
+        id: &OptionId,
+        default: Option<&T>,
+        getter: fn(&Rc<dyn OptionsSource>, &OptionId) -> Result<Option<T::Owned>, String>,
+    ) -> Result<OptionalOptionValue<T::Owned>, String> {
+        let mut derivation = None;
+        if self.include_derivation {
+            let mut derivations = vec![];
+            if let Some(def) = default {
+                derivations.push((Source::Default, def.to_owned()));
+            }
+            for (source_type, source) in self.sources.iter() {
+                if let Some(val) = getter(source, id)? {
+                    derivations.push((source_type.clone(), val));
+                }
+            }
+            derivation = Some(derivations);
+        }
+        for (source_type, source) in self.sources.iter().rev() {
+            if let Some(value) = getter(source, id)? {
+                return Ok(OptionalOptionValue {
+                    derivation,
+                    source: source_type.clone(),
+                    value: Some(value),
+                });
+            }
+        }
+        Ok(OptionalOptionValue {
+            derivation,
+            source: Source::Default,
+            value: default.map(|x| x.to_owned()),
+        })
+    }
+
+    pub fn parse_bool_optional(
+        &self,
+        id: &OptionId,
+        default: Option<bool>,
+    ) -> Result<OptionalOptionValue<bool>, String> {
+        self.parse_scalar(id, default.as_ref(), |source, id| source.get_bool(id))
+    }
+
+    pub fn parse_int_optional(
+        &self,
+        id: &OptionId,
+        default: Option<i64>,
+    ) -> Result<OptionalOptionValue<i64>, String> {
+        self.parse_scalar(id, default.as_ref(), |source, id| source.get_int(id))
+    }
+
+    pub fn parse_float_optional(
+        &self,
+        id: &OptionId,
+        default: Option<f64>,
+    ) -> Result<OptionalOptionValue<f64>, String> {
+        self.parse_scalar(id, default.as_ref(), |source, id| source.get_float(id))
+    }
+
+    pub fn parse_string_optional(
+        &self,
+        id: &OptionId,
+        default: Option<&str>,
+    ) -> Result<OptionalOptionValue<String>, String> {
+        self.parse_scalar(id, default, |source, id| source.get_string(id))
     }
 
     pub fn parse_bool(&self, id: &OptionId, default: bool) -> Result<OptionValue<bool>, String> {
-        for (source_type, source) in self.sources.iter() {
-            if let Some(value) = source.get_bool(id)? {
-                return Ok(OptionValue {
-                    source: *source_type,
-                    value,
-                });
-            }
-        }
-        Ok(OptionValue {
-            source: Source::Default,
-            value: default,
-        })
+        self.parse_bool_optional(id, Some(default))
+            .map(OptionalOptionValue::unwrap)
     }
 
     pub fn parse_int(&self, id: &OptionId, default: i64) -> Result<OptionValue<i64>, String> {
-        for (source_type, source) in self.sources.iter() {
-            if let Some(value) = source.get_int(id)? {
-                return Ok(OptionValue {
-                    source: *source_type,
-                    value,
-                });
-            }
-        }
-        Ok(OptionValue {
-            source: Source::Default,
-            value: default,
-        })
+        self.parse_int_optional(id, Some(default))
+            .map(OptionalOptionValue::unwrap)
     }
 
     pub fn parse_float(&self, id: &OptionId, default: f64) -> Result<OptionValue<f64>, String> {
-        for (source_type, source) in self.sources.iter() {
-            if let Some(value) = source.get_float(id)? {
-                return Ok(OptionValue {
-                    source: *source_type,
-                    value,
-                });
-            }
-        }
-        Ok(OptionValue {
-            source: Source::Default,
-            value: default,
-        })
+        self.parse_float_optional(id, Some(default))
+            .map(OptionalOptionValue::unwrap)
     }
 
     pub fn parse_string(
@@ -286,47 +458,170 @@ impl OptionParser {
         id: &OptionId,
         default: &str,
     ) -> Result<OptionValue<String>, String> {
+        self.parse_string_optional(id, Some(default))
+            .map(OptionalOptionValue::unwrap)
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn parse_list<T: Clone>(
+        &self,
+        id: &OptionId,
+        default: Vec<T>,
+        getter: fn(&Rc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
+        remover: fn(&mut Vec<T>, &Vec<T>),
+    ) -> Result<ListOptionValue<T>, String> {
+        let mut list = default;
+        let mut derivation = None;
+        if self.include_derivation {
+            let mut derivations = vec![(
+                Source::Default,
+                vec![ListEdit {
+                    action: ListEditAction::Replace,
+                    items: list.clone(),
+                }],
+            )];
+            for (source_type, source) in self.sources.iter() {
+                if let Some(list_edits) = getter(source, id)? {
+                    if !list_edits.is_empty() {
+                        derivations.push((source_type.clone(), list_edits));
+                    }
+                }
+            }
+            derivation = Some(derivations);
+        }
+
+        // Removals from any source apply after adds from any source (but are themselves
+        // overridden by later replacements), so we collect them here and apply them later.
+        let mut removal_lists: Vec<Vec<T>> = vec![];
+
+        let mut highest_priority_source = Source::Default;
         for (source_type, source) in self.sources.iter() {
-            if let Some(value) = source.get_string(id)? {
-                return Ok(OptionValue {
-                    source: *source_type,
-                    value,
-                });
+            if let Some(list_edits) = getter(source, id)? {
+                highest_priority_source = source_type.clone();
+                for list_edit in list_edits {
+                    match list_edit.action {
+                        ListEditAction::Replace => {
+                            list = list_edit.items;
+                            removal_lists.clear();
+                        }
+                        ListEditAction::Add => list.extend(list_edit.items),
+                        ListEditAction::Remove => removal_lists.push(list_edit.items),
+                    }
+                }
             }
         }
-        Ok(OptionValue {
-            source: Source::Default,
-            value: default.to_string(),
+        for removals in removal_lists {
+            remover(&mut list, &removals);
+        }
+        Ok(ListOptionValue {
+            derivation,
+            source: highest_priority_source,
+            value: list,
         })
+    }
+
+    // For Eq+Hash types we can use a HashSet when computing removals, which will be avg O(N+M).
+    // In practice it's likely that constructing the hash set for a tiny number of is actually
+    // slower than doing this with O(N*M) brute-force lookups, since we expect the size of the
+    // removal set to be tiny in almost any case.
+    // However this is still more than fast enough, and inoculates us against a very unlikely
+    // pathological case of a very large removal set.
+    #[allow(clippy::type_complexity)]
+    fn parse_list_hashable<T: Clone + Eq + Hash>(
+        &self,
+        id: &OptionId,
+        default: Vec<T>,
+        getter: fn(&Rc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
+    ) -> Result<ListOptionValue<T>, String> {
+        self.parse_list(id, default, getter, |list, remove| {
+            let to_remove = remove.iter().collect::<HashSet<_>>();
+            list.retain(|item| !to_remove.contains(item));
+        })
+    }
+
+    pub fn parse_bool_list(
+        &self,
+        id: &OptionId,
+        default: &[bool],
+    ) -> Result<ListOptionValue<bool>, String> {
+        self.parse_list_hashable(id, default.to_vec(), |source, id| source.get_bool_list(id))
+    }
+
+    pub fn parse_int_list(
+        &self,
+        id: &OptionId,
+        default: &[i64],
+    ) -> Result<ListOptionValue<i64>, String> {
+        self.parse_list_hashable(id, default.to_vec(), |source, id| source.get_int_list(id))
+    }
+
+    // Floats are not Eq or Hash, so we fall back to the brute-force O(N*M) lookups.
+    pub fn parse_float_list(
+        &self,
+        id: &OptionId,
+        default: &[f64],
+    ) -> Result<ListOptionValue<f64>, String> {
+        self.parse_list(
+            id,
+            default.to_vec(),
+            |source, id| source.get_float_list(id),
+            |list, to_remove| {
+                list.retain(|item| !to_remove.contains(item));
+            },
+        )
     }
 
     pub fn parse_string_list(
         &self,
         id: &OptionId,
         default: &[&str],
-    ) -> Result<Vec<String>, String> {
-        let mut list_edits = vec![];
-        for (_, source) in self.sources.iter() {
-            if let Some(edits) = source.get_string_list(id)? {
-                list_edits.extend(edits);
+    ) -> Result<ListOptionValue<String>, String> {
+        self.parse_list_hashable::<String>(
+            id,
+            default.iter().map(|s| s.to_string()).collect(),
+            |source, id| source.get_string_list(id),
+        )
+    }
+
+    pub fn parse_dict(
+        &self,
+        id: &OptionId,
+        default: HashMap<String, Val>,
+    ) -> Result<DictOptionValue, String> {
+        let mut dict = default;
+        let mut derivation = None;
+        if self.include_derivation {
+            let mut derivations = vec![(
+                Source::Default,
+                vec![DictEdit {
+                    action: DictEditAction::Replace,
+                    items: dict.clone(),
+                }],
+            )];
+            for (source_type, source) in self.sources.iter() {
+                if let Some(dict_edits) = source.get_dict(id)? {
+                    derivations.push((source_type.clone(), dict_edits));
+                }
             }
+            derivation = Some(derivations);
         }
-        let mut string_list = default.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        for list_edit in list_edits {
-            match list_edit.action {
-                ListEditAction::Replace => string_list = list_edit.items,
-                ListEditAction::Add => string_list.extend(list_edit.items),
-                ListEditAction::Remove => {
-                    let to_remove = list_edit.items.iter().collect::<HashSet<_>>();
-                    string_list = string_list
-                        .iter()
-                        .filter(|item| !to_remove.contains(item))
-                        .map(|s| s.to_owned())
-                        .collect::<Vec<String>>();
+        let mut highest_priority_source = Source::Default;
+        for (source_type, source) in self.sources.iter() {
+            if let Some(dict_edits) = source.get_dict(id)? {
+                highest_priority_source = source_type.clone();
+                for dict_edit in dict_edits {
+                    match dict_edit.action {
+                        DictEditAction::Replace => dict = dict_edit.items,
+                        DictEditAction::Add => dict.extend(dict_edit.items),
+                    }
                 }
             }
         }
-        Ok(string_list)
+        Ok(DictOptionValue {
+            derivation,
+            source: highest_priority_source,
+            value: dict,
+        })
     }
 }
 

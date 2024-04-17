@@ -40,12 +40,6 @@ def test_global_scope():
 
     do_test(["-f"], {"type": bool}, ["-f"], ["-f"])
     do_test(["--foo"], {"type": bool}, ["--[no-]foo"], ["--foo", "--no-foo"])
-    do_test(
-        ["--foo"],
-        {"type": bool, "implicit_value": False},
-        ["--[no-]foo"],
-        ["--foo", "--no-foo"],
-    )
     do_test(["-f", "--foo"], {"type": bool}, ["-f", "--[no-]foo"], ["-f", "--foo", "--no-foo"])
 
     do_test(["--foo"], {}, ["--foo=<str>"], ["--foo"])
@@ -98,13 +92,6 @@ def test_non_global_scope():
         ["--bar-baz-foo", "--no-bar-baz-foo"],
         ["--foo", "--no-foo"],
     )
-    do_test(
-        ["--foo"],
-        {"type": bool, "implicit_value": False},
-        ["--[no-]bar-baz-foo"],
-        ["--bar-baz-foo", "--no-bar-baz-foo"],
-        ["--foo", "--no-foo"],
-    )
 
 
 def test_default() -> None:
@@ -128,8 +115,6 @@ def test_default() -> None:
 
     do_test(["--foo"], {"type": bool}, "False")
     do_test(["--foo"], {"type": bool, "default": True}, "True")
-    do_test(["--foo"], {"type": bool, "implicit_value": False}, "True")
-    do_test(["--foo"], {"type": bool, "implicit_value": False, "default": False}, "False")
     do_test(["--foo"], {}, "None")
     do_test(["--foo"], {"type": int}, "None")
     do_test(["--foo"], {"type": int, "default": 42}, "42")
@@ -529,7 +514,7 @@ def test_get_all_help_info():
             "construct_scope_foo": {
                 "description": None,
                 "documentation": "A foo.",
-                "input_gets": ("Get(ScopedOptions, Scope, ..)",),
+                "awaitables": ("Get(ScopedOptions, Scope, ..)",),
                 "input_types": (),
                 "name": "construct_scope_foo",
                 "output_type": "Foo",
@@ -538,7 +523,7 @@ def test_get_all_help_info():
             "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test": {
                 "description": None,
                 "documentation": "This rule is for testing info extraction only.",
-                "input_gets": (),
+                "awaitables": (),
                 "input_types": ("Foo",),
                 "name": "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
                 "output_type": "Target",

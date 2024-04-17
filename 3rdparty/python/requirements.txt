@@ -8,10 +8,10 @@ ansicolors==1.1.8
 chevron==0.14.0
 fasteners==0.16.3
 freezegun==1.2.1
-ijson==3.1.4
+ijson==3.2.3
 packaging==21.3
-pex==2.1.152
-psutil==5.9.0
+pex==2.3.1
+psutil==5.9.8
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
 # Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most

@@ -666,14 +666,25 @@ def build_fs_util() -> None:
 def tag_release() -> None:
     banner("Tagging release")
 
+    check_head_commit()
     check_clean_git_branch()
     check_pgp()
 
     prompt_artifact_freshness()
-    prompt_to_generate_docs()
 
     run_tag_release()
     banner("Successfully tagged release")
+
+
+def check_head_commit() -> None:
+    banner("Checking current HEAD commit")
+    git("show", capture_stdout=False)
+
+    key_confirmation = input(
+        f"\nIs this the correct commit to tag for {CONSTANTS.pants_stable_version}? [Y/n]: "
+    )
+    if key_confirmation and key_confirmation.lower() != "y":
+        die("Please check out the appropriate commit first")
 
 
 def check_clean_git_branch() -> None:
@@ -722,16 +733,17 @@ def check_pgp() -> None:
 
 def run_tag_release() -> None:
     tag_name = f"release_{CONSTANTS.pants_stable_version}"
+    # If you need to re-tag a release that's already been tagged once and definitely know what
+    # you're doing, feel free to do an ad-hoc addition of --force flags here.
     git(
         "tag",
-        "-f",
         f"--local-user={get_pgp_key_id()}",
         "-m",
         f"pantsbuild.pants release {CONSTANTS.pants_stable_version}",
         tag_name,
         capture_stdout=False,
     )
-    git("push", "-f", "git@github.com:pantsbuild/pants.git", tag_name, capture_stdout=False)
+    git("push", "git@github.com:pantsbuild/pants.git", tag_name, capture_stdout=False)
 
 
 def upload_wheels_via_twine() -> None:
@@ -768,47 +780,6 @@ def prompt_artifact_freshness() -> None:
         )
     else:
         print("No stale artifacts detected.")
-
-
-def prompt_to_generate_docs() -> None:
-    has_docs_access = input(
-        softwrap(
-            """
-            The docs now need to be regenerated. Do you already have editing access to
-            readme.com? [Y/n]:
-            """
-        )
-    )
-    # This URL will work regardless of the current version, so long as we don't delete 2.5 from
-    # the docs.
-    api_key_url = "https://dash.readme.com/project/pants/v2.5/api-key"
-    docs_cmd = "./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>"
-    if has_docs_access and has_docs_access.lower() != "y":
-        print(
-            softwrap(
-                f"""
-                Please ask in the #maintainers Slack channel to be added to Readme.com. Please
-                enable two-factor authentication!
-
-                Then go to {api_key_url} to find your API key. Run this command:
-
-                    {docs_cmd}
-
-                (If you are not comfortable getting permissions, you can ask another maintainer to
-                run this script in the #maintainers Slack.)
-                """
-            )
-        )
-    else:
-        print(
-            softwrap(
-                f"""
-                Please go to {api_key_url} to find your API key. Then, run this command:
-
-                    {docs_cmd}
-            """
-            )
-        )
 
 
 # -----------------------------------------------------------------------------------------------

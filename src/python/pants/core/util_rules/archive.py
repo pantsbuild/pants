@@ -86,7 +86,7 @@ async def create_archive(
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(system_binaries_environment.system_binary_paths)}
 
-        # `tar` requires that the output filename's parent directory exists,so if the caller
+        # `tar` requires that the output filename's parent directory exists, so if the caller
         # wants the output in a directory we explicitly create it here.
         # We have to guard this path as the Rust code will crash if we give it empty paths.
         output_dir = os.path.dirname(request.output_filename)

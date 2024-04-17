@@ -19,6 +19,7 @@ from pkg_resources import Requirement
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
+    Executable,
     MainSpecification,
     PexCompletePlatformsField,
     PexLayout,
@@ -30,7 +31,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import pex_cli, pex_requirements
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
+from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX, maybe_log_pex_stderr
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
     PexEnvironment,
@@ -55,6 +56,8 @@ from pants.backend.python.util_rules.pex_requirements import (
 from pants.build_graph.address import Address
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.environments import EnvironmentTarget
+from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
+from pants.core.util_rules.stripped_source_files import rules as stripped_source_rules
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -400,10 +403,7 @@ async def find_interpreter(
     )
     path, fingerprint = result.stdout.decode().strip().splitlines()
 
-    if pex_subsystem.verbosity > 0:
-        log_output = result.stderr.decode()
-        if log_output:
-            logger.info("%s", log_output)
+    maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 
     return PythonExecutable(path=path, fingerprint=fingerprint)
 
@@ -428,7 +428,7 @@ class _BuildPexPythonSetup:
 async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexPythonSetup:
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
-    # flags are mutually exclusive. See https://github.com/pantsbuild/pex/issues/957.
+    # flags are mutually exclusive. See https://github.com/pex-tool/pex/issues/957.
     if request.platforms or request.complete_platforms:
         # Note that this means that this is not an internal-only pex.
         # TODO(#9560): consider validating that these platforms are valid with the interpreter
@@ -675,15 +675,24 @@ async def build_pex(
     argv = [
         "--output-file",
         request.output_filename,
-        "--no-emit-warnings",
         *request.additional_args,
     ]
 
     pex_python_setup = await _determine_pex_python_and_platforms(request)
     argv.extend(pex_python_setup.argv)
 
+    source_dir_name = "source_files"
+
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())
+        if isinstance(request.main, Executable):
+            # Unlike other MainSpecifiecation types (that can pass spec as-is to pex),
+            # Executable must be an actual path relative to the sandbox.
+            # request.main.spec is a python source file including its spec_path.
+            # To make it relative to the sandbox, we strip the source root
+            # and add the source_dir_name (sources get prefixed with that below).
+            stripped = await Get(StrippedFileName, StrippedFileNameRequest(request.main.spec))
+            argv.append(os.path.join(source_dir_name, stripped.value))
 
     argv.extend(
         f"--inject-args={shlex.quote(injected_arg)}" for injected_arg in request.inject_args
@@ -696,7 +705,12 @@ async def build_pex(
     if request.pex_path:
         argv.extend(["--pex-path", ":".join(pex.name for pex in request.pex_path)])
 
-    source_dir_name = "source_files"
+    if request.internal_only:
+        # An internal-only runs on a single machine, and pre-installing wheels is wasted work in
+        # that case (see https://github.com/pex-tool/pex/issues/2292#issuecomment-1854582647 for
+        # analysis).
+        argv.append("--no-pre-install-wheels")
+
     argv.append(f"--sources-directory={source_dir_name}")
     sources_digest_as_subdir = await Get(
         Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
@@ -746,10 +760,7 @@ async def build_pex(
         ),
     )
 
-    if pex_subsystem.verbosity > 0:
-        log_output = result.stderr.decode()
-        if log_output:
-            logger.info("%s", log_output)
+    maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 
     digest = (
         await Get(
@@ -1191,7 +1202,7 @@ class VenvPexProcess:
     level: LogLevel
     input_digest: Digest | None
     working_directory: str | None
-    extra_env: FrozenDict[str, str] | None
+    extra_env: FrozenDict[str, str]
     output_files: tuple[str, ...] | None
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
@@ -1224,7 +1235,7 @@ class VenvPexProcess:
         object.__setattr__(self, "level", level)
         object.__setattr__(self, "input_digest", input_digest)
         object.__setattr__(self, "working_directory", working_directory)
-        object.__setattr__(self, "extra_env", FrozenDict(extra_env) if extra_env else None)
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
         object.__setattr__(self, "output_files", tuple(output_files) if output_files else None)
         object.__setattr__(
             self, "output_directories", tuple(output_directories) if output_directories else None
@@ -1360,4 +1371,4 @@ async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInf
 
 
 def rules():
-    return [*collect_rules(), *pex_cli.rules(), *pex_requirements.rules()]
+    return [*collect_rules(), *pex_cli.rules(), *pex_requirements.rules(), *stripped_source_rules()]

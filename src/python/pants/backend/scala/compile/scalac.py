@@ -25,9 +25,11 @@ from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionResult,
     ScalaVersion,
 )
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
-from pants.engine.process import FallibleProcessResult
+from pants.core.util_rules.source_files import SourceFilesRequest
+from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, SourcesField
 from pants.engine.unions import UnionRule
@@ -44,9 +46,9 @@ from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import NO_MAIN_CLASS
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -72,6 +74,8 @@ async def compile_scala_source(
     scala: ScalaSubsystem,
     jvm: JvmSubsystem,
     scalac: Scalac,
+    bash: BashBinary,
+    zip_binary: ZipBinary,
     request: CompileScalaSourceRequest,
 ) -> FallibleClasspathEntry:
     # Request classpath entries for our direct dependencies.
@@ -98,7 +102,9 @@ async def compile_scala_source(
         component_members_with_sources,
         await MultiGet(
             Get(
-                SourceFiles,
+                # Some Scalac plugins (i.e. SemanticDB) require us to use stripped source files so the plugin
+                # would emit compilation output that correlates with the appropiate paths in the input files.
+                StrippedSourceFiles,
                 SourceFilesRequest(
                     (t.get(SourcesField),),
                     for_sources_types=(ScalaSourceField, JavaSourceField),
@@ -175,7 +181,11 @@ async def compile_scala_source(
     classpath_arg = ":".join(user_classpath.immutable_inputs_args(prefix=usercp))
 
     output_file = compute_output_jar_filename(request.component)
-    process_result = await Get(
+    compilation_output_dir = "__out"
+    compilation_empty_dir = await Get(Digest, CreateDigest([Directory(compilation_output_dir)]))
+    merged_digest = await Get(Digest, MergeDigests([sources_digest, compilation_empty_dir]))
+
+    compile_result = await Get(
         FallibleProcessResult,
         JvmProcess(
             jdk=jdk,
@@ -187,12 +197,8 @@ async def compile_scala_source(
                 *local_plugins.args(local_scalac_plugins_relpath),
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
                 *scalac.args,
-                # NB: We set a non-existent main-class so that using `-d` produces a `jar` manifest
-                # with stable content.
-                "-Xmain-class",
-                NO_MAIN_CLASS,
                 "-d",
-                output_file,
+                compilation_output_dir,
                 *sorted(
                     chain.from_iterable(
                         sources.snapshot.files
@@ -200,17 +206,44 @@ async def compile_scala_source(
                     )
                 ),
             ],
-            input_digest=sources_digest,
+            input_digest=merged_digest,
             extra_immutable_input_digests=extra_immutable_input_digests,
             extra_nailgun_keys=extra_nailgun_keys,
-            output_files=(output_file,),
+            output_directories=(compilation_output_dir,),
             description=f"Compile {request.component} with scalac",
             level=LogLevel.DEBUG,
         ),
     )
     output: ClasspathEntry | None = None
-    if process_result.exit_code == 0:
-        output_digest = process_result.output_digest
+    if compile_result.exit_code == 0:
+        # We package the outputs into a JAR file in a similar way as how it's
+        # done in the `javac.py` implementation
+        jar_result = await Get(
+            ProcessResult,
+            Process(
+                argv=[
+                    bash.path,
+                    "-c",
+                    " ".join(
+                        [
+                            "cd",
+                            compilation_output_dir,
+                            ";",
+                            zip_binary.path,
+                            "-r",
+                            f"../{output_file}",
+                            ".",
+                        ]
+                    ),
+                ],
+                input_digest=compile_result.output_digest,
+                output_files=(output_file,),
+                description=f"Capture outputs of {request.component} for scalac",
+                level=LogLevel.TRACE,
+            ),
+        )
+        output_digest = jar_result.output_digest
+
         if jvm.reproducible_jars:
             output_digest = await Get(
                 Digest, StripJarRequest(digest=output_digest, filenames=(output_file,))
@@ -220,7 +253,7 @@ async def compile_scala_source(
 
     return FallibleClasspathEntry.from_fallible_process_result(
         str(request.component),
-        process_result,
+        compile_result,
         output,
     )
 
@@ -251,5 +284,6 @@ def rules():
         *scala_artifact_rules(),
         *scalac_plugins_rules(),
         *versions.rules(),
+        *strip_jar.rules(),
         UnionRule(ClasspathEntryRequest, CompileScalaSourceRequest),
     ]

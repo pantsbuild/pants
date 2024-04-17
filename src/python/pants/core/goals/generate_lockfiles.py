@@ -8,10 +8,20 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Sequence, Tuple, cast
+from typing import (
+    Callable,
+    ClassVar,
+    Iterable,
+    Iterator,
+    Mapping,
+    Protocol,
+    Sequence,
+    Tuple,
+    Type,
+    cast,
+)
 
-from typing_extensions import Protocol
-
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
@@ -133,7 +143,7 @@ class RequestedUserResolveNames(Collection[str]):
 
 
 class PackageVersion(Protocol):
-    """Protocol for backend specific implementations, to support language ecosystem specific version
+    """Protocol for backend specific implementations, to support language-ecosystem-specific version
     formats and sort rules.
 
     May support the `int` properties `major`, `minor` and `micro` to color diff based on semantic
@@ -371,6 +381,7 @@ def determine_resolves_to_generate(
     # Resolve names must be globally unique, so check for ambiguity across backends.
     _check_ambiguous_resolve_names(all_known_user_resolve_names)
 
+    # If no resolves have been requested, we generate lockfiles for all user resolves
     if not requested_resolve_names:
         return [
             known_resolve_names.requested_resolve_names_cls(known_resolve_names.names)
@@ -414,6 +425,7 @@ def filter_tool_lockfile_requests(
     result = []
     for wrapped_req in specified_requests:
         req = wrapped_req.request
+
         if req.lockfile_dest != DEFAULT_TOOL_LOCKFILE:
             result.append(req)
             continue
@@ -435,6 +447,56 @@ def filter_tool_lockfile_requests(
             )
 
     return result
+
+
+def filter_lockfiles_for_unconfigured_exportable_tools(
+    generate_lockfile_requests: Sequence[GenerateLockfile],
+    exportabletools_by_name: dict[str, Type[ExportableTool]],
+    *,
+    resolve_specified: bool,
+) -> Tuple[Sequence[str], Sequence[GenerateLockfile]]:
+    """Filter lockfile requests for tools still using their default lockfiles."""
+
+    valid_lockfiles = []
+    errs = []
+
+    for req in generate_lockfile_requests:
+        if req.lockfile_dest != DEFAULT_TOOL_LOCKFILE:
+            valid_lockfiles.append(req)
+            continue
+
+        if req.resolve_name in exportabletools_by_name:
+            if resolve_specified:
+                # A user has asked us to generate a tool which is using a default lockfile
+                errs.append(
+                    exportabletools_by_name[
+                        req.resolve_name
+                    ].help_for_generate_lockfile_with_default_location(req.resolve_name)
+                )
+            else:
+                # When a user selects no resolves, we try generating lockfiles for all resolves.
+                # The intention is clearly to not generate lockfiles for internal tools, so we skip them here.
+                continue
+        else:
+            # Arriving at this case is either a user error or an implementation error, but we can be helpful
+            errs.append(
+                softwrap(
+                    f"""
+                    The resolve {req.resolve_name} is using the lockfile destination {DEFAULT_TOOL_LOCKFILE}.
+                    This destination is used as a sentinel to signal that internal tools should use their bundled lockfile.
+                    However, the resolve {req.resolve_name} does not appear to be an exportable tool.
+
+                    If you intended to generate a lockfile for a resolve you specified,
+                    you should specify a file as the lockfile destination.
+                    If this is indeed a tool that should be exportable, this is a bug:
+                    This tool does not appear to be exportable the way we expect.
+                    It may need a `UnionRule` to `ExportableTool`
+                    """
+                )
+            )
+            continue
+
+    return errs, valid_lockfiles
 
 
 class GenerateLockfilesSubsystem(GoalSubsystem):
@@ -542,17 +604,30 @@ async def generate_lockfiles_goal(
         )
         for sentinel in requested_tool_sentinels
     )
+    resolve_specified = bool(generate_lockfiles_subsystem.resolve)
     applicable_tool_requests = filter_tool_lockfile_requests(
         specified_tool_requests,
-        resolve_specified=bool(generate_lockfiles_subsystem.resolve),
+        resolve_specified=resolve_specified,
+    )
+    # We filter "user" requests because we're moving to combine user and tool lockfiles
+    (
+        tool_request_errors,
+        applicable_user_requests,
+    ) = filter_lockfiles_for_unconfigured_exportable_tools(
+        list(itertools.chain(*all_specified_user_requests)),
+        {e.options_scope: e for e in union_membership.get(ExportableTool)},
+        resolve_specified=resolve_specified,
     )
 
+    if tool_request_errors:
+        raise ValueError("\n\n".join(tool_request_errors))
+
     # Execute the actual lockfile generation in each request's environment.
-    # Currently, since resolves specify a single filename for output, we pick a resonable
+    # Currently, since resolves specify a single filename for output, we pick a reasonable
     # environment to execute the request in. Currently we warn if multiple environments are
     # specified.
     all_requests: Iterator[GenerateLockfile] = itertools.chain(
-        *all_specified_user_requests, applicable_tool_requests
+        applicable_user_requests, applicable_tool_requests
     )
     if generate_lockfiles_subsystem.request_diffs:
         all_requests = (replace(req, diff=True) for req in all_requests)

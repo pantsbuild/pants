@@ -1,0 +1,76 @@
+---
+    title: Setting up an IDE
+    sidebar_position: 7
+---
+
+---
+
+If you use a code-aware editor or IDE, such as PyCharm or VSCode, you may want to set it up to understand your code layout and dependencies. This will allow it to perform code navigation, auto-completion and other features that rely on code comprehension.
+
+## First-party sources
+
+To get your editor to understand the repo's first-party sources, you will probably need to tell it about the repo's [source roots](./key-concepts/source-roots.mdx). You can list those with:
+
+```shell
+$ pants roots
+```
+
+and then apply the corresponding IDE concept.
+
+For example, in PyCharm you would mark each source root as a "Sources" folder. See [Configuring Project Structure](https://www.jetbrains.com/help/pycharm/configuring-project-structure.html) to learn more.
+
+In VSCode, the Python extension will look for a file named `.env` in the current workspace folder. If the file is found, then it will be loaded and evaluated. For Python, this file can be used to set the `PYTHONPATH` variable. Having this file makes it possible to jump to definitions in the source code across multiple projects. It also makes cross-project refactoring possible.
+
+For Python, to generate the `.env` file containing all the source roots, you can use something like this:
+
+```shell
+$ ROOTS=$(pants roots)
+$ python3 -c "print('PYTHONPATH=./' + ':./'.join('''${ROOTS}'''.replace(' ', '\\ ').split('\n')) + ':\$PYTHONPATH')" > .env
+```
+
+See [Use of the PYTHONPATH variable](https://code.visualstudio.com/docs/python/environments#_use-of-the-pythonpath-variable) to learn more about using the `PYTHONPATH` variable in VSCode.
+
+## Python third-party dependencies and tools
+
+To get your editor to understand the repo's third-party Python dependencies, you will probably want to point it at a virtualenv containing those dependencies.
+
+Assuming you are using the ["resolves" feature for Python lockfiles](../python/overview/third-party-dependencies.mdx)—which we strongly recommend—Pants can export a virtualenv for each of your resolves. You can then point your IDE to whichever resolve you want to load at the time.
+
+To use the `export` goal to create a virtualenv:
+
+```
+❯ pants export --py-resolve-format=symlinked_immutable_virtualenv --resolve=python-default
+Wrote symlink to immutable virtualenv for python-default (using Python 3.9.13) to dist/export/python/virtualenvs/python-default
+```
+
+You can specify the `--resolve` flag [multiple times](./key-concepts/options.mdx#list-values) to export multiple virtualenvs at once.
+
+The `--py-resolve-format=symlinked_immutable_virtualenv` option symlinks to an immutable, internal virtualenv that does not have `pip` installed in it. This method is faster, but you must be careful not to attempt to modify the virtualenv. If you omit this flag, Pants will create a standalone, mutable virtualenv that includes `pip`, and that you can modify, but this method is slower.
+
+### Tool virtualenvs
+
+`pants export` can also create a virtualenv for each of the Python tools you use via Pants, such as `black`, `isort`, `pytest`, `mypy`, `flake8` and so on. This allows you to configure your editor to use the same version of the tool as Pants does for workflows like formatting on save. Follow [the instructions for creating a tool lockfile](../python/overview/lockfiles#lockfiles-for-tools).
+
+## Generated code
+
+If you're using [Protobuf and gRPC](../python/integrations/protobuf-and-grpc.mdx), you may want your editor to be able to index and navigate the generated source code.
+
+Normally Pants treats generated code as an internal byproduct, and doesn't expose it. But you can run the `export-codegen` goal to generate code to a well-known output location for consumption:
+
+```shell
+$ pants export-codegen ::
+```
+
+The generated code will be written to `dist/codegen`, and you can now add them as sources in the IDE. For example, in PyCharm you would mark `dist/codegen` as a "Sources" folder.
+
+Warning: you will have to manually rerun this goal when changes are made.
+
+## Remote debugging
+
+You can use PyCharm to debug code running under Pants.
+
+See the following links for instructions on how to do so under the [test goal](../python/goals/test.mdx) and under the [run goal](../python/goals/run.mdx).
+
+## IDE integrations
+
+We have not yet developed tight IDE integrations, such as a PyCharm plugin or a VSCode extension, that would allow the IDE to run Pants on your behalf. If you're interested in developing this functionality for your favorite IDE, [let us know](/community/members)!

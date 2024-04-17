@@ -4,24 +4,36 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Sequence
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.backend.terraform.target_types import TerraformModuleSourcesField
+from pants.backend.terraform.target_types import (
+    TerraformBackendTarget,
+    TerraformDependenciesField,
+    TerraformDeploymentFieldSet,
+    TerraformModuleSourcesField,
+    TerraformVarFileTarget,
+)
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.base.specs import DirGlobSpec, RawSpecs
+from pants.base.specs import DirGlobSpec, DirLiteralSpec, RawSpecs
+from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.native_engine import Address, AddressInput
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     FieldSet,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
+    Target,
     Targets,
 )
 from pants.engine.unions import UnionRule
@@ -139,9 +151,103 @@ async def infer_terraform_module_dependencies(
     return InferredDependencies(terraform_module_addresses)
 
 
+@dataclass(frozen=True)
+class TerraformDeploymentDependenciesInferenceFieldSet(TerraformDeploymentFieldSet):
+    pass
+
+
+class InferTerraformDeploymentDependenciesRequest(InferDependenciesRequest):
+    infer_from = TerraformDeploymentDependenciesInferenceFieldSet
+
+
+def find_targets_of_type(tgts, of_type) -> tuple:
+    if tgts:
+        return tuple(e for e in tgts if isinstance(e, of_type))
+    else:
+        return ()
+
+
+@dataclass(frozen=True)
+class TerraformDeploymentInvocationFilesRequest:
+    """TODO: is there a way to convert between FS? We could convert the inference FS to the deployment FS itself"""
+
+    address: Address
+    dependencies: TerraformDependenciesField
+
+
+@dataclass(frozen=True)
+class TerraformDeploymentInvocationFiles:
+    """The files passed in to the invocation of `terraform`"""
+
+    backend_configs: tuple[TerraformBackendTarget, ...]
+    vars_files: tuple[TerraformVarFileTarget, ...]
+
+
+@rule
+async def get_terraform_backend_and_vars(
+    field_set: TerraformDeploymentInvocationFilesRequest,
+) -> TerraformDeploymentInvocationFiles:
+    this_address = field_set.address
+
+    explicit_deps = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(field_set.dependencies)
+    )
+    tgts_in_dir, explicit_deps_tgt = await MultiGet(
+        Get(
+            Targets,
+            RawSpecs(
+                description_of_origin="terraform infer deployment dependencies",
+                dir_literals=(DirLiteralSpec(this_address.spec_path),),
+            ),
+        ),
+        Get(Targets, Addresses(explicit_deps.includes)),
+    )
+    return identify_terraform_backend_and_vars(explicit_deps_tgt, tgts_in_dir)
+
+
+def identify_terraform_backend_and_vars(
+    explicit_deps: Sequence[Target], tgts_in_dir: Sequence[Target]
+) -> TerraformDeploymentInvocationFiles:
+    has_explicit_backend = find_targets_of_type(explicit_deps, TerraformBackendTarget)
+    if not has_explicit_backend:
+        # Note: Terraform does not support multiple backends, but dep inference isn't the place to enforce that
+        backend_targets = find_targets_of_type(tgts_in_dir, TerraformBackendTarget)
+    else:
+        backend_targets = has_explicit_backend
+
+    has_explicit_var = find_targets_of_type(explicit_deps, TerraformVarFileTarget)
+    if not has_explicit_var:
+        vars_targets = find_targets_of_type(tgts_in_dir, TerraformVarFileTarget)
+    else:
+        vars_targets = has_explicit_var
+
+    return TerraformDeploymentInvocationFiles(backend_targets, vars_targets)
+
+
+@rule
+async def infer_terraform_deployment_dependencies(
+    request: InferTerraformDeploymentDependenciesRequest,
+) -> InferredDependencies:
+    root_module_address_input = request.field_set.root_module.to_address_input()
+    root_module = await Get(Address, AddressInput, root_module_address_input)
+    deps = [root_module]
+
+    invocation_files = await Get(
+        TerraformDeploymentInvocationFiles,
+        TerraformDeploymentInvocationFilesRequest(
+            request.field_set.address, request.field_set.dependencies
+        ),
+    )
+    deps.extend(e.address for e in invocation_files.backend_configs)
+    deps.extend(e.address for e in invocation_files.vars_files)
+
+    return InferredDependencies(deps)
+
+
 def rules():
     return [
         *collect_rules(),
         *pex_rules(),
         UnionRule(InferDependenciesRequest, InferTerraformModuleDependenciesRequest),
+        UnionRule(InferDependenciesRequest, InferTerraformDeploymentDependenciesRequest),
     ]

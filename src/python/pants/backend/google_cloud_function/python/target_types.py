@@ -47,6 +47,7 @@ class PythonGoogleCloudFunctionRuntimes(Enum):
     PYTHON_39 = "python39"
     PYTHON_310 = "python310"
     PYTHON_311 = "python311"
+    PYTHON_312 = "python312"
 
 
 class PythonGoogleCloudFunctionRuntime(PythonFaaSRuntimeField):
@@ -125,7 +126,7 @@ class PythonGoogleCloudFunction(Target):
         f"""
         A self-contained Python function suitable for uploading to Google Cloud Function.
 
-        See {doc_url('google-cloud-function-python')}.
+        See {doc_url('docs/python/integrations/google-cloud-functions')}.
         """
     )
 

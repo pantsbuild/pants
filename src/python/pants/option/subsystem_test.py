@@ -51,6 +51,7 @@ def test_is_valid_scope_name() -> None:
     check_true("foo-bar0-1ba22z")
     check_true("foo_bar")
 
+    check_false("pants")
     check_false("Foo")
     check_false("fOo")
     check_false("foo.bar")

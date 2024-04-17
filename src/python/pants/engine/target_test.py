@@ -31,6 +31,7 @@ from pants.engine.target import (
     InvalidFieldTypeException,
     InvalidGeneratedTargetException,
     InvalidTargetException,
+    ListOfDictStringToStringField,
     MultipleSourcesField,
     NestedDictStringToStringField,
     OptionalSingleSourceField,
@@ -326,7 +327,7 @@ def test_override_preexisting_field_via_new_target() -> None:
     # that still works where the original target was expected.
     #
     # However, this means that we must ensure `Target.get()` and `Target.has_fields()` will work
-    # with subclasses of the original `Field`s.
+    # with subclasses of the original `Field`.
 
     class CustomFortranExtensions(FortranExtensions):
         banned_extensions = ("FortranBannedExt",)
@@ -526,7 +527,7 @@ def test_coarsened_target_closure() -> None:
 
 
 def test_generated_targets_address_validation() -> None:
-    """Ensure that all addresses are well formed."""
+    """Ensure that all addresses are well-formed."""
 
     class MockTarget(Target):
         alias = "tgt"
@@ -868,6 +869,34 @@ def test_dict_string_to_string_field() -> None:
         default = FrozenDict({"default": "val"})
 
     assert ExampleDefault(None, addr).value == FrozenDict({"default": "val"})
+
+
+def test_list_of_dict_string_to_string_field() -> None:
+    class Example(ListOfDictStringToStringField):
+        alias = "example"
+
+    addr = Address("", target_name="example")
+
+    assert Example(None, addr).value is None
+    assert Example([{}], addr).value == (FrozenDict(),)
+    assert Example([{"hello": "world"}], addr).value == (FrozenDict({"hello": "world"}),)
+    # Test support for single dict not passed in a list
+    assert Example({"hello": "world"}, addr).value == (FrozenDict({"hello": "world"}),)
+
+    def assert_invalid_type(raw_value: Any) -> None:
+        with pytest.raises(InvalidFieldTypeException):
+            Example(raw_value, addr)
+
+    for v in [0, [0], [object()], ["hello"], [["hello"]], [{"hello": 0}], [{0: "world"}]]:
+        assert_invalid_type(v)
+
+    # Test that a default can be set.
+    class ExampleDefault(ListOfDictStringToStringField):
+        alias = "example"
+        # Note that we use `FrozenDict` so that the object can be hashable.
+        default = [FrozenDict({"default": "val"})]
+
+    assert ExampleDefault(None, addr).value == (FrozenDict({"default": "val"}),)
 
 
 def test_nested_dict_string_to_string_field() -> None:

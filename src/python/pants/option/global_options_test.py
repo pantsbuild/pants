@@ -4,27 +4,24 @@
 from __future__ import annotations
 
 import sys
-from collections import Counter
 from pathlib import Path
 from textwrap import dedent
+from typing import ContextManager
 
 import pytest
 
 from pants.base.build_environment import get_buildroot
 from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.internals.native_engine import PyRemotingOptions
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.errors import OptionsError
-from pants.option.global_options import (
-    _REMOTE_ADDRESS_SCHEMES,
-    DynamicRemoteOptions,
-    GlobalOptions,
-    _RemoteAddressScheme,
-)
+from pants.option.global_options import DynamicRemoteOptions, GlobalOptions, RemoteProvider
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil import rule_runner
 from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.pytest_util import no_exception
 from pants.util.dirutil import safe_mkdir_for
 
 
@@ -163,114 +160,129 @@ def test_invalidation_globs() -> None:
         assert suffix not in glob
 
 
-def _scheme(
-    schemes: tuple[str, ...] = ("foo",),
-    supports_execution: bool = False,
-    experimental: bool = False,
-) -> _RemoteAddressScheme:
-    return _RemoteAddressScheme(
-        schemes=schemes,
-        supports_execution=supports_execution,
-        experimental=experimental,
-        description="DESCRIPTION",
-    )
-
-
 @pytest.mark.parametrize(
-    "address",
+    ("provider", "address", "expect_raises"),
     [
-        "experimental:foo://",
-        "experimental:foo://host:123",
-        "experimental:foos://path/here",
-        "bar://",
-        "bar://user@host:123/path?query#fragment",
+        (RemoteProvider.reapi, "grpc://example", no_exception()),
+        (RemoteProvider.reapi, "grpcs://example", no_exception()),
+        (
+            RemoteProvider.reapi,
+            "http://example",
+            pytest.raises(
+                OptionsError,
+                match=r"(?is)Value `http://example` from ADDRESS is invalid: it doesn't have a scheme that is supported by provider `reapi` from PROVIDER.*Did you mean to use a provider that does support this scheme \(`experimental-github-actions-cache`\) or to use a scheme that is supported by this provider \(`grpc://`, `grpcs://`\)\?",
+            ),
+        ),
+        (
+            RemoteProvider.reapi,
+            "https://example",
+            pytest.raises(
+                OptionsError,
+                match=r"(?s)Value `https://example` from ADDRESS is invalid.*scheme.*supported",
+            ),
+        ),
+        (
+            RemoteProvider.reapi,
+            "file://example",
+            pytest.raises(
+                OptionsError,
+                match=r"(?s)Value .* from ADDRESS is invalid.*scheme.*supported.* provider `reapi` from PROVIDER.*Did you mean .* provider .* scheme \(`experimental-file`\) .* provider \(`grpc://`, `grpcs://`\)",
+            ),
+        ),
+        (
+            RemoteProvider.reapi,
+            "grpc-example",
+            pytest.raises(
+                OptionsError,
+                match=r"(?s)Value .* from ADDRESS is invalid.*scheme.*supported.* provider `reapi` from PROVIDER.*Did you mean to use a scheme that is supported by this provider \(`grpc://`, `grpcs://`\)",
+            ),
+        ),
+        (RemoteProvider.experimental_file, "file://example", no_exception()),
+        (
+            RemoteProvider.experimental_file,
+            "http://example",
+            pytest.raises(
+                OptionsError,
+                match="(?s)Value .* from ADDRESS is invalid.*scheme.*supported",
+            ),
+        ),
+        (RemoteProvider.experimental_github_actions_cache, "http://example", no_exception()),
+        (RemoteProvider.experimental_github_actions_cache, "https://example", no_exception()),
+        (
+            RemoteProvider.experimental_github_actions_cache,
+            "file://example",
+            pytest.raises(
+                OptionsError,
+                match="(?si)Value .* from ADDRESS is invalid.*scheme.*supported",
+            ),
+        ),
     ],
 )
-@pytest.mark.parametrize("execution", [False, True])
-def test_remote_schemes_validate_address_should_pass_for_various_good_addresses_without_execution(
-    address: str, execution: bool
+def test_remote_provider_validate_address_should_match_table(
+    provider: RemoteProvider, address: str, expect_raises: ContextManager
 ) -> None:
-    _RemoteAddressScheme._validate_address(
-        (
-            _scheme(schemes=("foo", "foos"), experimental=True, supports_execution=execution),
-            # (smoke test require_execution=False supports_execution=True)
-            _scheme(schemes=("bar",), supports_execution=True),
-        ),
-        address,
-        require_execution=execution,
-        context_for_diagnostics="CONTEXT",
-    )
+    with expect_raises:
+        provider.validate_address(address, address_source="ADDRESS", provider_source="PROVIDER")
 
 
 @pytest.mark.parametrize(
-    "address",
-    ["", "foo", "foo:", "foo:/", "FOO://", "foo:bar://", "fooextra://", "baz://", "bars://"],
+    ("provider", "expect_raises"),
+    [
+        (RemoteProvider.reapi, no_exception()),
+        (
+            RemoteProvider.experimental_file,
+            pytest.raises(
+                OptionsError,
+                match="(?s)Value `experimental-file` from PROVIDER is invalid: it does not support remote execution, but remote execution is required due to IMPLIED BY.*Either disable remote execution, or use a provider that does support remote execution: `reapi`",
+            ),
+        ),
+        (
+            RemoteProvider.experimental_github_actions_cache,
+            pytest.raises(
+                OptionsError,
+                match="(?si)Value `experimental-github-actions-cache` from PROVIDER is invalid.*remote execution.*IMPLIED BY",
+            ),
+        ),
+    ],
 )
-def test_remote_schemes_validate_address_should_error_when_bad_address(address: str) -> None:
-    with pytest.raises(
-        OptionsError,
-        match=f"(?s)CONTEXT has invalid value `{address}`: it does not have a supported scheme.*start with one of: `foo://`, `foos://`, `bar://`",
-    ):
-        _RemoteAddressScheme._validate_address(
-            (
-                _scheme(schemes=("foo", "foos")),
-                _scheme(schemes=("bar",)),
-            ),
-            address,
-            require_execution=False,
-            context_for_diagnostics="CONTEXT",
+def test_remote_provider_validate_execution_supported_should_match_table(
+    provider: RemoteProvider, expect_raises: ContextManager
+) -> None:
+    with expect_raises:
+        provider.validate_execution_supported(
+            provider_source="PROVIDER", execution_implied_by="IMPLIED BY"
         )
 
 
-def test_remote_schemes_validate_address_should_error_when_missing_experimental() -> None:
-    with pytest.raises(
-        OptionsError,
-        match="(?s)CONTEXT has invalid value `foo://bar`: the scheme `foo` is experimental.*Specify the value as `experimental:foo://bar`",
-    ):
-        _RemoteAddressScheme._validate_address(
-            (_scheme(experimental=True),),
-            "foo://bar",
-            require_execution=False,
-            context_for_diagnostics="CONTEXT",
-        )
-
-
-def test_remote_schemes_validate_address_should_warn_when_unnecessary_experimental(caplog) -> None:
-    with caplog.at_level("WARNING"):
-        _RemoteAddressScheme._validate_address(
-            (_scheme(experimental=False),),
-            "experimental:foo://bar",
-            require_execution=False,
-            context_for_diagnostics="CONTEXT",
-        )
-
-    assert "CONTEXT has value `experimental:foo://bar`" in caplog.text
-    assert "the scheme `foo` is not experimental" in caplog.text
-    assert "Specify the value as `foo://bar`" in caplog.text
-
-
-def test_remote_schemes_validate_address_should_error_when_execution_required_but_not_supported() -> (
-    None
-):
-    with pytest.raises(
-        OptionsError,
-        match="(?s)CONTEXT has invalid value `foo://bar`: the scheme `foo` does not support remote execution.*starting with one of: `bar://`",
-    ):
-        _RemoteAddressScheme._validate_address(
-            (
-                _scheme(supports_execution=False),
-                _scheme(schemes=("bar",), supports_execution=True),
-            ),
-            "foo://bar",
-            require_execution=True,
-            context_for_diagnostics="CONTEXT",
-        )
-
-
-def test_remote_schemes_should_have_unique_schemes():
-    # the raw schemes supported for remoting (not with experimental: prefix, etc.) should be unique,
-    # so there's no accidental ambiguity about, for instance, `http://` configured more than once
-    counts = Counter(
-        scheme_str for scheme in _REMOTE_ADDRESS_SCHEMES for scheme_str in scheme.schemes
+@pytest.mark.parametrize("provider", RemoteProvider)
+def test_remote_provider_matches_rust_enum(
+    provider: RemoteProvider,
+) -> None:
+    PyRemotingOptions(
+        # the string should be converted to the Rust-side enum successfully, i.e. Python matches
+        # Rust
+        provider=provider.value,
+        # all the other fields aren't relevant to this test
+        execution_enable=False,
+        store_headers={},
+        store_chunk_bytes=0,
+        store_rpc_retries=0,
+        store_rpc_concurrency=0,
+        store_rpc_timeout_millis=0,
+        store_batch_api_size_limit=0,
+        cache_warnings_behavior="ignore",
+        cache_content_behavior="validate",
+        cache_rpc_concurrency=0,
+        cache_rpc_timeout_millis=0,
+        execution_headers={},
+        execution_overall_deadline_secs=0,
+        execution_rpc_concurrency=0,
+        store_address=None,
+        execution_address=None,
+        execution_process_cache_namespace=None,
+        instance_name=None,
+        root_ca_certs_path=None,
+        client_certs_path=None,
+        client_key_path=None,
+        append_only_caches_base_path=None,
     )
-    assert [scheme for scheme, count in counts.items() if count > 1] == []

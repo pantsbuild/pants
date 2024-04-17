@@ -66,7 +66,7 @@ pub struct PyFailure(pub Failure);
 impl PyFailure {
     fn get_error(&self, py: Python) -> PyErr {
         match &self.0 {
-            Failure::Throw { val, .. } => val.into_py(py),
+            Failure::Throw { val, .. } => PyErr::from_value(val.as_ref().as_ref(py)),
             f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
                 EngineError::new_err(format!("{f}"))
             }
@@ -255,12 +255,6 @@ pub fn create_exception(py: Python, msg: String) -> Value {
     Value::new(IntrinsicError::new_err(msg).into_py(py))
 }
 
-pub fn call_function<'py>(func: &'py PyAny, args: &[Value]) -> PyResult<&'py PyAny> {
-    let args: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
-    let args_tuple = PyTuple::new(func.py(), &args);
-    func.call1(args_tuple)
-}
-
 pub(crate) enum GeneratorInput {
     Initial,
     Arg(Value),
@@ -375,15 +369,15 @@ pub(crate) fn generator_send(
 /// those configured in types::Types.
 pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
     let py_type = type_id.as_py_type(py);
-    call_function(py_type, args)
-        .map(|obj| Value::new(obj.into_py(py)))
-        .unwrap_or_else(|e| {
-            panic!(
-                "Core type constructor `{}` failed: {:?}",
-                py_type.name().unwrap(),
-                e
-            );
-        })
+    let args_tuple = PyTuple::new(py, args.iter().map(|v| v.to_object(py)));
+    let res = py_type.call1(args_tuple).unwrap_or_else(|e| {
+        panic!(
+            "Core type constructor `{}` failed: {:?}",
+            py_type.name().unwrap(),
+            e
+        );
+    });
+    Value::new(res.into_py(py))
 }
 
 lazy_static! {
@@ -478,15 +472,28 @@ impl PyGeneratorResponseCall {
         py: Python,
         rule_id: String,
         output_type: &PyType,
+        args: &PyTuple,
         input_arg0: Option<&PyAny>,
         input_arg1: Option<&PyAny>,
     ) -> PyResult<Self> {
         let output_type = TypeId::new(output_type);
+        let (args, args_arity) = if args.is_empty() {
+            (None, 0)
+        } else {
+            (
+                Some(args.extract::<Key>()?),
+                args.len().try_into().map_err(|e| {
+                    PyException::new_err(format!("Too many explicit arguments for {rule_id}: {e}"))
+                })?,
+            )
+        };
         let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
         Ok(Self(RefCell::new(Some(Call {
             rule_id: RuleId::from_string(rule_id),
             output_type,
+            args,
+            args_arity,
             input_types,
             inputs,
         }))))
@@ -610,6 +617,10 @@ impl PyGeneratorResponseGet {
 pub struct Call {
     pub rule_id: RuleId,
     pub output_type: TypeId,
+    // A tuple of positional arguments.
+    pub args: Option<Key>,
+    // The number of positional arguments which have been provided.
+    pub args_arity: u16,
     pub input_types: SmallVec<[TypeId; 2]>,
     pub inputs: SmallVec<[Key; 2]>,
 }

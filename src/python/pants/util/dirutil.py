@@ -14,9 +14,7 @@ import uuid
 from collections import defaultdict
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, DefaultDict, Iterable, Iterator, Sequence, overload
-
-from typing_extensions import Literal
+from typing import Any, Callable, DefaultDict, Iterable, Iterator, Literal, Sequence, overload
 
 from pants.util.strutil import ensure_text
 

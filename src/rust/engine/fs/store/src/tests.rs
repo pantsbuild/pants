@@ -22,8 +22,8 @@ use workunit_store::WorkunitStore;
 
 use crate::local::ByteStore;
 use crate::{
-    EntryType, FileContent, RemoteStoreOptions, Snapshot, Store, StoreError, StoreFileByDigest,
-    UploadSummary, MEGABYTES,
+    EntryType, FileContent, RemoteProvider, RemoteStoreOptions, Snapshot, Store, StoreError,
+    StoreFileByDigest, UploadSummary, MEGABYTES,
 };
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
@@ -64,6 +64,7 @@ fn remote_options(
     headers: BTreeMap<String, String>,
 ) -> RemoteStoreOptions {
     RemoteStoreOptions {
+        provider: RemoteProvider::Reapi,
         store_address,
         instance_name,
         tls_config: tls::Config::default(),
@@ -1529,7 +1530,7 @@ async fn returns_upload_summary_on_empty_cas() {
         .expect("Error uploading file");
 
     // We store all 3 files, and so we must sum their digests
-    let test_data = vec![
+    let test_data = [
         testdir.digest().size_bytes,
         testroland.digest().size_bytes,
         testcatnip.digest().size_bytes,

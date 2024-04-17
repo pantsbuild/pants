@@ -100,7 +100,7 @@ fs = { path = "./fs" }
 env_logger = { workspace = true }
 
 [build-dependencies]
-pyo3-build-config = "0.18"
+pyo3-build-config = { workspace = true }
 
 [lints]
 workspace = true
@@ -245,7 +245,7 @@ fuser = "0.11.1"
 futures = "0.3"
 futures-core = "^0.3.23"
 generic-array = "0.14"
-glob = "0.3.0"
+glob = "0.3.1"
 hdrhistogram = "7.5"
 hex = "0.4.3"
 http = "0.2"
@@ -289,7 +289,8 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messa
 prost = "0.12"
 prost-build = "0.12"
 prost-types = "0.12"
-pyo3 = "0.19"
+pyo3 = "0.20"
+pyo3-build-config = "0.20"
 rand = "0.8"
 regex = "1"
 rlimit = "0.8"
@@ -300,6 +301,7 @@ serde = "1.0.160"
 serde_derive = "1.0.98"
 serde_json = "1.0"
 serde_test = "1.0"
+serde_yaml = "0.9"
 sha2 = "0.10"
 shell-quote = "0.3.0"
 shellexpand = "2.1"

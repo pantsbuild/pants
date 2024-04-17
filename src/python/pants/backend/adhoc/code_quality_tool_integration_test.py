@@ -10,6 +10,8 @@ from pants.backend.adhoc.code_quality_tool import (
     CodeQualityToolUnsupportedGoalError,
     base_rules,
 )
+from pants.backend.adhoc.run_system_binary import rules as run_system_binary_rules
+from pants.backend.adhoc.target_types import SystemBinaryTarget
 from pants.backend.python import register as register_python
 from pants.backend.python.target_types import PythonSourceTarget
 from pants.core.goals.fix import Fix
@@ -35,6 +37,7 @@ def make_rule_runner(*cfgs: CodeQualityToolRuleBuilder):
         *core_rules(),
         *process.rules(),
         *register_python.rules(),
+        *run_system_binary_rules(),
         *base_rules(),
     ]
     for cfg in cfgs:
@@ -45,6 +48,7 @@ def make_rule_runner(*cfgs: CodeQualityToolRuleBuilder):
             CodeQualityToolTarget,
             FileTarget,
             PythonSourceTarget,
+            SystemBinaryTarget,
         ],
         rules=rules,
     )
@@ -276,3 +280,48 @@ def test_several_formatters():
     assert "badtogood made changes" in res.stderr
     assert "underscoreit" not in res.stderr
     assert "goodcode = 50\ngoodcode = 100\n" == rule_runner.read_file("do_not_underscore.py")
+
+
+def test_execution_dependencies_and_runnable_dependencies():
+    input_contents = "input contents\n"
+    output_contents = "original output contents"
+    # confirm that comparing these strings confirms that the test behaved as expected
+    assert input_contents != output_contents
+
+    cfg = CodeQualityToolRuleBuilder(
+        goal="fmt", target="b:overwriter", name="Overwriter", scope="overwriter"
+    )
+
+    # Formatter that copies the `b/input.txt` file over `b/output.txt` file via bash (relying on
+    # there being only one file, and a workaround for #19103 meaning we can't use `cp` as a system
+    # binary)
+    rule_runner = make_rule_runner(cfg)
+    rule_runner.write_files(
+        {
+            # put the runnable in its own directory, so we're sure that the dependencies are
+            # resolved relative to the code_quality_tool target
+            "a/BUILD": """system_binary(name="bash", binary_name="bash")""",
+            "b/BUILD": dedent(
+                """
+                system_binary(name="renamed_cat", binary_name="cat")
+                file(name="input", source="input.txt")
+                file(name="output", source="output.txt")
+
+                code_quality_tool(
+                    name="overwriter",
+                    runnable="a:bash",
+                    args=["-c", "renamed_cat b/input.txt > $1", "ignored"],
+                    execution_dependencies=[":input"],
+                    runnable_dependencies=[":renamed_cat"],
+                    file_glob_include=["**/*.txt"],
+                )
+                """
+            ),
+            "b/input.txt": input_contents,
+            "b/output.txt": output_contents,
+        }
+    )
+    res = rule_runner.run_goal_rule(Fmt, args=["b/output.txt"])
+    assert res.exit_code == 0
+    assert "overwriter made changes" in res.stderr
+    assert input_contents == rule_runner.read_file("b/output.txt")

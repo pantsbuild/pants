@@ -73,7 +73,7 @@ async def isolate_local_dist_wheels(
                 code will be used directly from sources, without a distribution being built,
                 and any native extensions in it will not be built.
 
-                See {doc_url('python-distributions')} for details on how to set up a
+                See {doc_url('docs/python/overview/building-distributions')} for details on how to set up a
                 {tgt.target.alias} target to produce a wheel.
                 """
             )
@@ -106,7 +106,6 @@ class LocalDistsPexRequest:
     """Request to build the local dists from the dependency closure of a set of addresses."""
 
     addresses: Addresses
-    internal_only: bool
     interpreter_constraints: InterpreterConstraints
     # The result will return these with the sources provided by the dists subtracted out.
     # This will help the caller prevent sources from appearing twice on sys.path.
@@ -116,12 +115,10 @@ class LocalDistsPexRequest:
         self,
         addresses: Iterable[Address],
         *,
-        internal_only: bool,
         interpreter_constraints: InterpreterConstraints,
         sources: PythonSourceFiles = PythonSourceFiles.empty(),
     ) -> None:
         object.__setattr__(self, "addresses", Addresses(addresses))
-        object.__setattr__(self, "internal_only", internal_only)
         object.__setattr__(self, "interpreter_constraints", interpreter_constraints)
         object.__setattr__(self, "sources", sources)
 
@@ -185,7 +182,9 @@ async def build_local_dists(
             requirements=PexRequirements(wheels),
             interpreter_constraints=request.interpreter_constraints,
             additional_inputs=wheels_digest,
-            internal_only=request.internal_only,
+            # a "local dists" PEX is always just for consumption by some downstream Pants process,
+            # i.e. internal
+            internal_only=True,
             additional_args=["--intransitive"],
         ),
     )

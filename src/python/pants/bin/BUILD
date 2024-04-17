@@ -9,7 +9,6 @@ python_sources(
     dependencies=[":plugins"],
 )
 
-# NOTE: When adding a new backend, add it to `generate_docs.py` too! (If stable enough for docs)
 target(
     name="plugins",
     dependencies=[
@@ -17,6 +16,7 @@ target(
         "src/python/pants/backend/build_files/fmt/buildifier",
         "src/python/pants/backend/awslambda/python",
         "src/python/pants/backend/build_files/fmt/black",
+        "src/python/pants/backend/build_files/fmt/ruff",
         "src/python/pants/backend/build_files/fmt/yapf",
         "src/python/pants/backend/codegen/protobuf/lint/buf",
         "src/python/pants/backend/codegen/protobuf/python",
@@ -35,6 +35,7 @@ target(
         "src/python/pants/backend/experimental/codegen/thrift/scrooge/scala",
         "src/python/pants/backend/experimental/cue",
         "src/python/pants/backend/experimental/debian",
+        "src/python/pants/backend/experimental/docker/podman",
         "src/python/pants/backend/experimental/go",
         "src/python/pants/backend/experimental/go/debug_goals",
         "src/python/pants/backend/experimental/go/lint/golangci_lint",
@@ -60,12 +61,15 @@ target(
         "src/python/pants/backend/experimental/python/lint/autoflake",
         "src/python/pants/backend/experimental/python/lint/pyupgrade",
         "src/python/pants/backend/experimental/python/lint/ruff",
+        "src/python/pants/backend/experimental/python/lint/ruff/check",
+        "src/python/pants/backend/experimental/python/lint/ruff/format",
         "src/python/pants/backend/experimental/python/packaging/pyoxidizer",
         "src/python/pants/backend/experimental/python/typecheck/pyright",
         "src/python/pants/backend/experimental/python/typecheck/pytype",
         "src/python/pants/backend/experimental/rust",
         "src/python/pants/backend/experimental/scala",
         "src/python/pants/backend/experimental/scala/debug_goals",
+        "src/python/pants/backend/experimental/scala/lint/scalafix",
         "src/python/pants/backend/experimental/scala/lint/scalafmt",
         "src/python/pants/backend/experimental/swift",
         "src/python/pants/backend/experimental/terraform",
@@ -73,6 +77,7 @@ target(
         "src/python/pants/backend/experimental/tools/semgrep",
         "src/python/pants/backend/experimental/tools/yamllint",
         "src/python/pants/backend/experimental/tools/workunit_logger",
+        "src/python/pants/backend/experimental/typescript",
         "src/python/pants/backend/experimental/visibility",
         "src/python/pants/backend/google_cloud_function/python",
         "src/python/pants/backend/plugin_development",

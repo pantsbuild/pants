@@ -240,7 +240,9 @@ class Options:
         section_to_valid_options = {}
         for scope in self.known_scope_to_info:
             section = GLOBAL_SCOPE_CONFIG_SECTION if scope == GLOBAL_SCOPE else scope
-            section_to_valid_options[section] = set(self.for_scope(scope, check_deprecations=False))
+            section_to_valid_options[section] = set(
+                self.for_scope(scope, check_deprecations=False, log_parser_warnings=True)
+            )
         global_config.verify(section_to_valid_options)
 
     def is_known_scope(self, scope: str) -> bool:
@@ -272,7 +274,12 @@ class Options:
         return register
 
     def get_parser(self, scope: str) -> Parser:
-        """Returns the parser for the given scope, so code can register on it directly."""
+        """Returns the parser for the given scope, so code can register on it directly.
+
+        :param scope: The scope to retrieve the parser for.
+        :return: The parser for the given scope.
+        :raises pants.option.errors.ConfigValidationError: if the scope is not known.
+        """
         try:
             return self._parser_by_scope[scope]
         except KeyError:
@@ -287,7 +294,7 @@ class Options:
           2) The entire ScopeInfo is deprecated (as in the case of deprecated SubsystemDependencies),
              meaning that the options live in one location.
 
-        In the first case, this method has the sideeffect of merging options values from deprecated
+        In the first case, this method has the side effect of merging options values from deprecated
         scopes into the given values.
         """
         si = self.known_scope_to_info[scope]
@@ -339,19 +346,27 @@ class Options:
 
     # TODO: Eagerly precompute backing data for this?
     @memoized_method
-    def for_scope(self, scope: str, check_deprecations: bool = True) -> OptionValueContainer:
+    def for_scope(
+        self, scope: str, check_deprecations: bool = True, log_parser_warnings: bool = False
+    ) -> OptionValueContainer:
         """Return the option values for the given scope.
 
         Values are attributes of the returned object, e.g., options.foo.
         Computed lazily per scope.
 
         :API: public
+        :param scope: The scope to get options for.
+        :param check_deprecations: Whether to check for any deprecations conditions.
+        :return: An OptionValueContainer representing the option values for the given scope.
+        :raises pants.option.errors.ConfigValidationError: if the scope is unknown.
         """
 
         values_builder = OptionValueContainerBuilder()
         flags_in_scope = self._scope_to_flags.get(scope, [])
         parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
-        values = self.get_parser(scope).parse_args(parse_args_request)
+        values = self.get_parser(scope).parse_args(
+            parse_args_request, log_warnings=log_parser_warnings
+        )
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:

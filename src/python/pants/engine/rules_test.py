@@ -473,8 +473,8 @@ class TestRuleGraph:
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
     @pytest.mark.no_error_if_skipped
     def test_not_fulfillable_duplicated_dependency(self) -> None:
-        # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable
-        # Only the unfulfillable one should be in the errors.
+        # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable,
+        # only the unfulfillable one should be in the errors.
 
         @rule
         def a_from_c(c: C) -> A:
@@ -1058,7 +1058,8 @@ def test_param_type_overrides() -> None:
     async def dont_injure_humans(param1: str, param2, param3: list) -> A:
         return A()
 
-    assert dont_injure_humans.rule.input_selectors == (int, dict, list)  # type: ignore[attr-defined]
+    dont_injure_humans_rule = dont_injure_humans.rule  # type: ignore[attr-defined]
+    assert tuple(dont_injure_humans_rule.parameters.values()) == (int, dict, list)
 
     with pytest.raises(ValueError, match="paramX"):
 

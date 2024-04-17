@@ -195,8 +195,7 @@ impl Function {
     /// The function represented as `path.to.module:lineno:func_name`.
     pub fn full_name(&self) -> String {
         let (module, name, line_no) = Python::with_gil(|py| {
-            let val = self.0.to_value();
-            let obj = (*val).as_ref(py);
+            let obj = (*self.0.value).as_ref(py);
             let module: String = externs::getattr(obj, "__module__").unwrap();
             let name: String = externs::getattr(obj, "__name__").unwrap();
             // NB: this is a custom dunder method that Python code should populate before sending the
@@ -244,13 +243,20 @@ impl hash::Hash for Key {
 
 impl fmt::Debug for Key {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self.to_value())
+        write!(f, "{:?}", self.value)
     }
 }
 
 impl fmt::Display for Key {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{self:?}")
+    }
+}
+
+impl<'source> FromPyObject<'source> for Key {
+    fn extract(obj: &'source PyAny) -> PyResult<Self> {
+        let py = obj.py();
+        externs::INTERNS.key_insert(py, obj.into_py(py))
     }
 }
 
@@ -372,15 +378,9 @@ impl From<PyObject> for Value {
     }
 }
 
-impl From<PyErr> for Value {
-    fn from(py_err: PyErr) -> Self {
-        Python::with_gil(|py| Value::new(py_err.into_py(py)))
-    }
-}
-
-impl IntoPy<PyErr> for &Value {
-    fn into_py(self, py: Python) -> PyErr {
-        PyErr::from_value((*self.0).as_ref(py))
+impl IntoPy<PyObject> for &Value {
+    fn into_py(self, py: Python) -> PyObject {
+        (*self.0).as_ref(py).into_py(py)
     }
 }
 

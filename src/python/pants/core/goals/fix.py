@@ -7,9 +7,19 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Iterator, NamedTuple, Sequence, Tuple, Type, TypeVar
-
-from typing_extensions import Protocol
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Iterable,
+    Iterator,
+    NamedTuple,
+    Protocol,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+)
 
 from pants.base.specs import Specs
 from pants.core.goals.lint import (
@@ -96,7 +106,7 @@ class FixResult(EngineAwareReturnType):
                     snapshot_diff.changed_files,
                     snapshot_diff.their_unique_files,  # added files
                     snapshot_diff.our_unique_files,  # removed files
-                    # NB: there is no rename detection, so a renames will list
+                    # NB: there is no rename detection, so a rename will list
                     # both the old filename (removed) and the new filename (added).
                 )
             )
@@ -117,6 +127,29 @@ Partitions = UntypedPartitions[str, PartitionMetadataT]
 class AbstractFixRequest(AbstractLintRequest):
     is_fixer = True
 
+    # Enable support for re-using this request's rule in `lint`, where the success/failure of the linter corresponds to
+    # whether the rule's output matches the input (i.e. whether the tool made changes or not).
+    #
+    # If you set this to `False`, you'll need to provide the following `UnionRule` with a custom class,
+    # as well as their corresponding implementation rules:
+    #   - `UnionRule(AbstractLintRequest, cls)`
+    #   - `UnionRule(AbstractLintRequest.Batch, cls)`
+    #
+    # !!! Setting this to `False` should be exceedingly rare, as the default implementation handles two important things:
+    #   - Re-use of the exact same process in `fix` as in `lint`, so runs like `pants fix lint` use
+    #     cached/memoized results in `lint`. This pattern is commonly used by developers locally.
+    #   - Ensuring that `pants lint` is checking that the file(s) are actually fixed. It's easy to forget to provide the
+    #     `lint` implementation (which is used usually in CI, as opposed to `fix`), which allows files to be merged
+    #     into the default branch un-fixed. (Fun fact, this happened in the Pants codebase before this inheritance existed
+    #     and was the catalysts for this design).
+    # The case for disabling this is when the `fix` implementation fixes a strict subset of some `lint` implementation, where
+    # the check for is-this-fixed in the `lint` implementation isn't possible.
+    # As an example, let's say tool `cruft` has `cruft lint` which lints for A, B and C. It also has `cruft lint --fix` which fixes A.
+    # Tthere's no way to not check for `A` in `cruft lint`. Since you're already going to provide a `lint` implementation
+    # which corresponds to `cruft lint`, there's no point in running `cruft check --fix` in `lint` as it's already covered by
+    # `cruft lint`.
+    enable_lint_rules: ClassVar[bool] = True
+
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     @dataclass(frozen=True)
     class Batch(AbstractLintRequest.Batch):
@@ -128,7 +161,8 @@ class AbstractFixRequest(AbstractLintRequest):
 
     @classmethod
     def _get_rules(cls) -> Iterable[UnionRule]:
-        yield from super()._get_rules()
+        if cls.enable_lint_rules:
+            yield from super()._get_rules()
         yield UnionRule(AbstractFixRequest, cls)
         yield UnionRule(AbstractFixRequest.Batch, cls.Batch)
 

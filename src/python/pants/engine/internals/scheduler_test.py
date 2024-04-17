@@ -143,7 +143,7 @@ async def a() -> A:
     _ = await b(**implicitly(int(1)))
     _ = await c()
     b1, c1, b2 = await MultiGet(
-        b(**implicitly(int(1))),
+        b(1),
         c(),
         Get(B, int(1)),
     )
@@ -436,7 +436,7 @@ def test_trace_includes_rule_exception_traceback() -> None:
          1 Exception encountered:
 
          Engine traceback:
-           in select
+           in root
              ..
            in {__name__}.{nested_raise.__name__}
              Nested raise
@@ -462,7 +462,7 @@ def test_trace_includes_nested_exception_traceback() -> None:
         1 Exception encountered:
 
         Engine traceback:
-          in select
+          in root
             ..
           in {__name__}.{catch_and_reraise.__name__}
             error chain
@@ -481,6 +481,8 @@ def test_trace_includes_nested_exception_traceback() -> None:
             return await Get(SomeOutput, SomeInput(outer_input.s))
           File LOCATION-INFO, in __await__
             result = yield self
+          File LOCATION-INFO, in raise_an_exception
+            raise Exception(some_input.s)
         Exception: asdf
 
         The above exception was the direct cause of the following exception:

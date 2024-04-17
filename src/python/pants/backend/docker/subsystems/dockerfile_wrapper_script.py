@@ -11,7 +11,7 @@ from itertools import chain
 from typing import Iterator
 
 #
-# Note: This file is used as an pex entry point in the execution sandbox.
+# Note: This file is used as a pex entry point in the execution sandbox.
 #
 
 
@@ -28,7 +28,22 @@ class ParsedDockerfileInfo:
 
 _address_regexp = re.compile(
     r"""
-    (?://)?[^:# ]*:[^:#!@?/\= ]+(?:\#[^:#!@?= ]+)?$
+    # Optionally root:ed.
+    (?://)?
+    # Optional path.
+    [^:# ]*
+    # Optional target name.
+    (?::[^:#!@?/\= ]+)?
+    # Optional generated name.
+    (?:\#[^:#!@?= ]+)?
+    # Optional parametrizations.
+    (?:@
+      # key=value
+      [^=: ]+=[^,: ]*
+      # Optional additional `,key=value`s
+      (?:,[^=: ]+=[^,: ]*)*
+    )?
+    $
     """,
     re.VERBOSE,
 )

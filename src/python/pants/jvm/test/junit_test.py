@@ -21,7 +21,7 @@ from pants.backend.scala.target_types import ScalaJunitTestsGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
 from pants.engine.target import CoarsenedTargets
@@ -34,7 +34,7 @@ from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.test.junit import JunitTestRequest
 from pants.jvm.test.junit import rules as junit_rules
-from pants.jvm.test.testutil import run_junit_test
+from pants.jvm.test.testutil import ATTEMPTS_DEFAULT_OPTION, run_junit_test
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -59,6 +59,7 @@ def rule_runner() -> RuleRunner:
             *scala_target_types_rules(),
             *scalac_rules(),
             *source_files.rules(),
+            *stripped_source_files.rules(),
             *target_types_rules(),
             *util_rules(),
             *non_jvm_dependencies_rules(),
@@ -188,6 +189,7 @@ def test_vintage_simple_failure(
     )
     assert re.search(r"1 tests failed", stdout_text) is not None
     assert re.search(r"1 tests found", stdout_text) is not None
+    assert len(test_result.process_results) == ATTEMPTS_DEFAULT_OPTION
 
 
 @maybe_skip_jdk_test
@@ -409,6 +411,7 @@ def test_jupiter_simple_failure(
     )
     assert re.search(r"1 tests failed", stdout_text) is not None
     assert re.search(r"1 tests found", stdout_text) is not None
+    assert len(test_result.process_results) == ATTEMPTS_DEFAULT_OPTION
 
 
 @maybe_skip_jdk_test

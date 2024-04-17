@@ -12,6 +12,8 @@ bytes = { workspace = true }
 grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
 protos = { path = "../../protos" }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 tokio = { workspace = true, features = ["fs"] }
 
 [lints]

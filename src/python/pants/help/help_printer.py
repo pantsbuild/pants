@@ -6,9 +6,7 @@ import json
 import re
 import textwrap
 from itertools import cycle
-from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
-
-from typing_extensions import Literal
+from typing import Callable, Dict, Iterable, List, Literal, Optional, Set, Tuple, cast
 
 from pants.base.build_environment import pants_version
 from pants.help.help_formatter import HelpFormatter
@@ -573,7 +571,7 @@ class HelpPrinter(MaybeColor):
                 "activated by": rule.provider,
                 "returns": rule.output_type,
                 f"takes {pluralize(len(rule.input_types), 'input')}": ", ".join(rule.input_types),
-                f"awaits {pluralize(len(rule.input_gets), 'get')}": "\n".join(rule.input_gets)
+                f"awaits {pluralize(len(rule.awaitables), 'get')}": "\n".join(rule.awaitables)
                 if show_advanced
                 else None,
             }

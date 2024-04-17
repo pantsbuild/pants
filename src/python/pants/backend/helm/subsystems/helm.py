@@ -25,7 +25,6 @@ _VALID_PASSTHROUGH_FLAGS = [
     "--cleanup-on-fail",
     "--create-namespace",
     "--debug",
-    "--dry-run",
     "--force",
     "--wait",
     "--wait-for-jobs",
@@ -81,7 +80,7 @@ registries_help = help_text(
     A configured registry is marked as default either by setting `default = true`
     or with an alias of `"default"`.
 
-    Registries also participate in resolving third party Helm charts uplodaded to those registries.
+    Registries also participate in resolving third party Helm charts uploaded to those registries.
     """
 )
 
@@ -90,8 +89,16 @@ class HelmSubsystem(TemplatedExternalTool):
     options_scope = "helm"
     help = "The Helm command line (https://helm.sh)"
 
-    default_version = "3.12.3"
+    default_version = "3.14.3"
     default_known_versions = [
+        "3.14.3|linux_arm64|85e1573e76fa60af14ba7e9ec75db2129b6884203be866893fa0b3f7e41ccd5e|14558415",
+        "3.14.3|linux_x86_64|3c90f24e180f8c207b8a18e5ec82cb0fa49858a7a0a86e4ed52a98398681e00b|16134525",
+        "3.14.3|macos_arm64|dff794152b62b7c1a9ff615d510f8657bcd7a3727c668e0d9d4955f70d5f7573|16104367",
+        "3.14.3|macos_x86_64|4d5d01a94c7d6b07e71690dc1988bf3229680284c87f4242d28c6f1cc99653be|16944220",
+        "3.13.3|linux_arm64|44aaa094ae24d01e8c36e327e1837fd3377a0f9152626da088384c5bc6d94562|14495979",
+        "3.13.3|linux_x86_64|bbb6e7c6201458b235f335280f35493950dcd856825ddcfd1d3b40ae757d5c7d|16188560",
+        "3.13.3|macos_arm64|61ba210cd65c53be5c0021c8fc8e0b94f4c122aff32f5ed0e4ea81728108ea20|16172665",
+        "3.13.3|macos_x86_64|da654c9e0fd4fcb50cc5dba051c1c9cf398e21ffa5064b47ac89a9697e139d39|16999788",
         "3.12.3|linux_arm64|79ef06935fb47e432c0c91bdefd140e5b543ec46376007ca14a52e5ed3023088|14355040",
         "3.12.3|linux_x86_64|1b2313cd198d45eab00cc37c38f6b1ca0a948ba279c29e322bdf426d406129b5|16028423",
         "3.12.3|macos_arm64|240b0a7da9cae208000eff3d3fb95e0fa1f4903d95be62c3f276f7630b12dae1|16019570",
@@ -165,7 +172,7 @@ class HelmSubsystem(TemplatedExternalTool):
     )
 
     args = ArgsListOption(
-        example="--dry-run",
+        example="--force",
         passthrough=True,
         extra_help=softwrap(
             f"""
@@ -180,6 +187,8 @@ class HelmSubsystem(TemplatedExternalTool):
 
             Before attempting to use passthrough arguments, check the reference of each of the available target types
             to see what fields are accepted in each of them.
+
+            To pass `--dry-run`, use the `--experimental-deploy-dry-run` flag.
             """
         ),
     )

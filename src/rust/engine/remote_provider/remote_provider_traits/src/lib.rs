@@ -12,9 +12,20 @@ use remexec::ActionResult;
 use tokio::fs::File;
 use tokio::io::{AsyncSeekExt, AsyncWrite};
 
+// TODO: this is duplicated with global_options.py, it'd be good to have this be the single source
+// of truth.
+#[derive(Clone, Copy, Debug, strum_macros::EnumString)]
+#[strum(serialize_all = "kebab-case")]
+pub enum RemoteProvider {
+    Reapi,
+    ExperimentalFile,
+    ExperimentalGithubActionsCache,
+}
+
 // TODO: Consider providing `impl Default`, similar to `remote::LocalOptions`.
 #[derive(Clone)]
 pub struct RemoteStoreOptions {
+    pub provider: RemoteProvider,
     // TODO: this is currently framed for the REAPI provider, with some options used by others, would
     // be good to generalise
     pub store_address: String,

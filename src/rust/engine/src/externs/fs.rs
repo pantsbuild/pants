@@ -257,8 +257,8 @@ pub struct PyMergeDigests(pub Vec<DirectoryDigest>);
 #[pymethods]
 impl PyMergeDigests {
     #[new]
-    fn __new__(digests: &PyAny, py: Python) -> PyResult<Self> {
-        let digests: PyResult<Vec<DirectoryDigest>> = PyIterator::from_object(py, digests)?
+    fn __new__(digests: &PyAny, _py: Python) -> PyResult<Self> {
+        let digests: PyResult<Vec<DirectoryDigest>> = PyIterator::from_object(digests)?
             .map(|v| {
                 let py_digest = v?.extract::<PyDigest>()?;
                 Ok(py_digest.0)
@@ -377,7 +377,7 @@ impl PyRemovePrefix {
 // PathGlobs
 // -----------------------------------------------------------------------------
 
-struct PyPathGlobs(PathGlobs);
+struct PyPathGlobs(#[allow(dead_code)] PathGlobs);
 
 impl<'source> FromPyObject<'source> for PyPathGlobs {
     fn extract(obj: &'source PyAny) -> PyResult<Self> {
