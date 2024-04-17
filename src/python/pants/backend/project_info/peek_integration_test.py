@@ -20,7 +20,6 @@ def test_requires_wheels() -> None:
             "--backend-packages=['pants.backend.python', 'pants.backend.experimental.python.packaging.pyoxidizer']",
             f"--source-root-patterns=['{tmpdir}']",
             "peek",
-            "--include-goals",
             f"{tmpdir}/src::",
         ]
         peek_result = run_pants(package_args)
