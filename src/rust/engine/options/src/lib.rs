@@ -46,6 +46,8 @@ use serde::Deserialize;
 pub use self::args::Args;
 use self::config::Config;
 pub use self::env::Env;
+use self::env::EnvReader;
+use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
@@ -270,7 +272,10 @@ impl OptionParser {
         );
 
         let mut sources: BTreeMap<Source, Rc<dyn OptionsSource>> = BTreeMap::new();
-        sources.insert(Source::Env, Rc::new(env));
+        sources.insert(
+            Source::Env,
+            Rc::new(EnvReader::new(env, FromfileExpander::new())),
+        );
         sources.insert(Source::Flag, Rc::new(args));
         let mut parser = OptionParser {
             sources: sources.clone(),
