@@ -52,10 +52,39 @@ function ensure_hook() {
   fi
 }
 
+function ensure_valid_symlink() {
+  HOOK=$1
+  HOOK_PATH="${HOOK_DIR}/${HOOK}"
+
+  if [[ -L "${HOOK_PATH}" ]]; then
+    if [[ -e "${HOOK_PATH}" ]]; then
+      return
+    fi
+
+    TARGET="$(readlink "${HOOK_PATH}")"
+
+    read -rp "A ${HOOK} symlink exists, but there is no associated target at ${TARGET}. Remove symlink? [Yn]" ok
+    if [[ "${ok:-Y}" =~ ^[yY]([eE][sS])?$ ]]; then
+      (
+        cd "${HOOK_DIR}" &&
+          rm -f "${HOOK}" &&
+          echo "${HOOK} symlink removed"
+      )
+    else
+      echo "${HOOK} symlink not removed"
+    fi
+  fi
+}
+
 # Make sure users of recent git don't have their history polluted
 # by formatting changes.
 git config --local blame.ignoreRevsFile .git-blame-ignore-revs
 
 for HOOK in ${HOOK_NAMES}; do
   ensure_hook "${HOOK}"
+done
+
+GITHOOK_NAMES="$(ls "${HOOK_DIR}")"
+for HOOK in ${GITHOOK_NAMES}; do
+  ensure_valid_symlink "${HOOK}"
 done
