@@ -16,42 +16,6 @@ use std::{fs, io};
 // Otherwise, the first component is None and the second is the original value.
 type ExpandedValue = (Option<PathBuf>, Option<String>);
 
-fn maybe_expand(value: String) -> Result<ExpandedValue, ParseError> {
-    if let Some(suffix) = value.strip_prefix('@') {
-        if suffix.starts_with('@') {
-            // @@ escapes the initial @.
-            Ok((None, Some(suffix.to_owned())))
-        } else {
-            match suffix.strip_prefix('?') {
-                Some(subsuffix) => {
-                    // @? means the path is allowed to not exist.
-                    let path = PathBuf::from(subsuffix);
-                    match fs::read_to_string(&path) {
-                        Ok(content) => Ok((Some(path), Some(content))),
-                        Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                            warn!("Optional file config '{}' does not exist.", path.display());
-                            Ok((Some(path), None))
-                        }
-                        Err(err) => Err(mk_parse_err(err, &path)),
-                    }
-                }
-                _ => {
-                    let path = PathBuf::from(suffix);
-                    let content = fs::read_to_string(&path).map_err(|e| mk_parse_err(e, &path))?;
-                    Ok((Some(path), Some(content)))
-                }
-            }
-        }
-    } else {
-        Ok((None, Some(value)))
-    }
-}
-
-pub(crate) fn expand(value: String) -> Result<Option<String>, ParseError> {
-    let (_, expanded_value) = maybe_expand(value)?;
-    Ok(expanded_value)
-}
-
 #[derive(Debug)]
 enum FromfileType {
     Json,
@@ -87,38 +51,101 @@ fn try_deserialize<'a, DE: Deserialize<'a>>(
     }
 }
 
-pub(crate) fn expand_to_list<T: Parseable>(
-    value: String,
-) -> Result<Option<Vec<ListEdit<T>>>, ParseError> {
-    let (path_opt, value_opt) = maybe_expand(value)?;
-    if let Some(value) = value_opt {
-        if let Some(items) = try_deserialize(&value, path_opt)? {
-            Ok(Some(vec![ListEdit {
-                action: ListEditAction::Replace,
-                items,
-            }]))
+pub struct FromfileExpander {}
+
+impl FromfileExpander {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    fn maybe_expand(&self, value: String) -> Result<ExpandedValue, ParseError> {
+        if let Some(suffix) = value.strip_prefix('@') {
+            if suffix.starts_with('@') {
+                // @@ escapes the initial @.
+                Ok((None, Some(suffix.to_owned())))
+            } else {
+                match suffix.strip_prefix('?') {
+                    Some(subsuffix) => {
+                        // @? means the path is allowed to not exist.
+                        let path = PathBuf::from(subsuffix);
+                        match fs::read_to_string(&path) {
+                            Ok(content) => Ok((Some(path), Some(content))),
+                            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                                warn!("Optional file config '{}' does not exist.", path.display());
+                                Ok((Some(path), None))
+                            }
+                            Err(err) => Err(mk_parse_err(err, &path)),
+                        }
+                    }
+                    _ => {
+                        let path = PathBuf::from(suffix);
+                        let content =
+                            fs::read_to_string(&path).map_err(|e| mk_parse_err(e, &path))?;
+                        Ok((Some(path), Some(content)))
+                    }
+                }
+            }
         } else {
-            T::parse_list(&value).map(Some)
+            Ok((None, Some(value)))
         }
-    } else {
-        Ok(None)
+    }
+
+    pub(crate) fn expand(&self, value: String) -> Result<Option<String>, ParseError> {
+        let (_, expanded_value) = self.maybe_expand(value)?;
+        Ok(expanded_value)
+    }
+
+    pub(crate) fn expand_to_list<T: Parseable>(
+        &self,
+        value: String,
+    ) -> Result<Option<Vec<ListEdit<T>>>, ParseError> {
+        let (path_opt, value_opt) = self.maybe_expand(value)?;
+        if let Some(value) = value_opt {
+            if let Some(items) = try_deserialize(&value, path_opt)? {
+                Ok(Some(vec![ListEdit {
+                    action: ListEditAction::Replace,
+                    items,
+                }]))
+            } else {
+                T::parse_list(&value).map(Some)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub(crate) fn expand_to_dict(
+        &self,
+        value: String,
+    ) -> Result<Option<Vec<DictEdit>>, ParseError> {
+        let (path_opt, value_opt) = self.maybe_expand(value)?;
+        if let Some(value) = value_opt {
+            if let Some(items) = try_deserialize(&value, path_opt)? {
+                Ok(Some(vec![DictEdit {
+                    action: DictEditAction::Replace,
+                    items,
+                }]))
+            } else {
+                parse_dict(&value).map(|x| Some(vec![x]))
+            }
+        } else {
+            Ok(None)
+        }
     }
 }
 
+pub(crate) fn expand(value: String) -> Result<Option<String>, ParseError> {
+    FromfileExpander::new().expand(value)
+}
+
+pub(crate) fn expand_to_list<T: Parseable>(
+    value: String,
+) -> Result<Option<Vec<ListEdit<T>>>, ParseError> {
+    FromfileExpander::new().expand_to_list(value)
+}
+
 pub(crate) fn expand_to_dict(value: String) -> Result<Option<Vec<DictEdit>>, ParseError> {
-    let (path_opt, value_opt) = maybe_expand(value)?;
-    if let Some(value) = value_opt {
-        if let Some(items) = try_deserialize(&value, path_opt)? {
-            Ok(Some(vec![DictEdit {
-                action: DictEditAction::Replace,
-                items,
-            }]))
-        } else {
-            parse_dict(&value).map(|x| Some(vec![x]))
-        }
-    } else {
-        Ok(None)
-    }
+    FromfileExpander::new().expand_to_dict(value)
 }
 
 #[cfg(test)]
