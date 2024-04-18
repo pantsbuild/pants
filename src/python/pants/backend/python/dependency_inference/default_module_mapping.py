@@ -210,7 +210,6 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
     "pyopenssl": ("OpenSSL",),
     "pypdf2": ("PyPDF2",),
     "pypi-kenlm": ("kenlm",),
-    "pyshp": ("shapefile",),
     "pysocks": ("socks",),
     "pytest": ("pytest", "_pytest"),
     "pytest-runner": ("ptr",),
