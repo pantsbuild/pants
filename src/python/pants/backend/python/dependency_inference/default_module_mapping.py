@@ -124,6 +124,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
     # opentelemetry
     "opentelemetry-api": (
         "opentelemetry._logs",
+        "opentelemetry.attributes",
         "opentelemetry.baggage",
         "opentelemetry.context",
         "opentelemetry.environment_variables",
@@ -131,6 +132,8 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
         "opentelemetry.propagate",
         "opentelemetry.propagators",
         "opentelemetry.trace",
+        "opentelemetry.util",
+        "opentelemetry.version",
     ),
     "opentelemetry-exporter-otlp": ("opentelemetry.exporter.otlp",),
     "opentelemetry-exporter-otlp-proto-grpc": ("opentelemetry.exporter.otlp.proto.grpc",),
