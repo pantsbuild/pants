@@ -810,20 +810,17 @@ class HelpInfoExtracter:
             ),
         )
 
-        def get_api_type_info_loader(api_type: type) -> Callable[[], PluginAPITypeInfo]:
-            def load() -> PluginAPITypeInfo:
-                return PluginAPITypeInfo.create(
-                    api_type,
-                    rules,
-                    provider=type_graph[api_type]["providers"],
-                    dependencies=type_graph[api_type]["dependencies"],
-                    dependents=type_graph[api_type].get("dependents", ()),
-                    union_members=tuple(
-                        sorted(member.__qualname__ for member in union_membership.get(api_type))
-                    ),
-                )
-
-            return load
+        def get_api_type_info(api_type: type) -> PluginAPITypeInfo:
+            return PluginAPITypeInfo.create(
+                api_type,
+                rules,
+                provider=type_graph[api_type]["providers"],
+                dependencies=type_graph[api_type]["dependencies"],
+                dependents=type_graph[api_type].get("dependents", ()),
+                union_members=tuple(
+                    sorted(member.__qualname__ for member in union_membership.get(api_type))
+                ),
+            )
 
         def merge_type_info(this: PluginAPITypeInfo, that: PluginAPITypeInfo) -> PluginAPITypeInfo:
             def merge_tuples(l, r):
@@ -847,7 +844,7 @@ class HelpInfoExtracter:
         infos: dict[str, PluginAPITypeInfo] = {}
         for api_type in sorted(all_types, key=attrgetter("__name__")):
             api_type_name = f"{api_type.__module__}.{api_type.__qualname__}"
-            api_type_info = get_api_type_info_loader(api_type)()
+            api_type_info = get_api_type_info(api_type)
             if api_type_name in infos:
                 infos[api_type_name] = merge_type_info(infos[api_type_name], api_type_info)
             else:

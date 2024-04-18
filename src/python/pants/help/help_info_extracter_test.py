@@ -531,7 +531,7 @@ def test_get_all_help_info():
             },
         },
         "name_to_api_type_info": {
-            "pants.help.help_info_extracter_test.Foo": {
+            "pants.help.help_info_extracter_test.test_get_all_help_info.<locals>.Foo": {
                 "consumed_by_rules": (
                     "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
                 ),
@@ -541,7 +541,7 @@ def test_get_all_help_info():
                 "is_union": False,
                 "module": "pants.help.help_info_extracter_test",
                 "name": "Foo",
-                "provider": "help_info_extracter_test",
+                "provider": ("help_info_extracter_test",),
                 "returned_by_rules": ("construct_scope_foo",),
                 "union_members": (),
                 "union_type": None,
@@ -561,7 +561,7 @@ def test_get_all_help_info():
                 "is_union": False,
                 "module": "pants.engine.target",
                 "name": "Target",
-                "provider": "help_info_extracter_test",
+                "provider": ("help_info_extracter_test",),
                 "returned_by_rules": (
                     "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
                 ),
@@ -577,7 +577,7 @@ def test_get_all_help_info():
                 "is_union": False,
                 "module": "pants.option.scope",
                 "name": "Scope",
-                "provider": "pants.option.scope",
+                "provider": ("pants.option.scope",),
                 "returned_by_rules": (),
                 "union_members": (),
                 "union_type": None,
