@@ -14,7 +14,7 @@ use crate::{
 };
 
 use crate::config::Config;
-use crate::parse::test_util::write_fromfile;
+use crate::fromfile::test_util::write_fromfile;
 use tempfile::TempDir;
 
 fn maybe_config(file_content: &str) -> Result<Config, String> {

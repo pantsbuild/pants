@@ -5,7 +5,7 @@ use core::fmt::Debug;
 use maplit::hashmap;
 
 use crate::args::Args;
-use crate::parse::test_util::write_fromfile;
+use crate::fromfile::test_util::write_fromfile;
 use crate::{option_id, DictEdit, DictEditAction, Val};
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource};
 

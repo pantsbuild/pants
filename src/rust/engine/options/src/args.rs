@@ -5,7 +5,8 @@ use std::env;
 
 use super::id::{is_valid_scope_name, NameTransform, OptionId, Scope};
 use super::{DictEdit, OptionsSource};
-use crate::parse::{expand, expand_to_dict, expand_to_list, ParseError, Parseable};
+use crate::fromfile::{expand, expand_to_dict, expand_to_list};
+use crate::parse::{ParseError, Parseable};
 use crate::ListEdit;
 use core::iter::once;
 use itertools::{chain, Itertools};

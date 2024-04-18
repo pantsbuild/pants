@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::env::Env;
-use crate::parse::test_util::write_fromfile;
+use crate::fromfile::test_util::write_fromfile;
 use crate::{option_id, DictEdit, DictEditAction};
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource, Val};
 use maplit::hashmap;
