@@ -280,8 +280,8 @@ def test_build_editable_local_dists_special_files(rule_runner: PythonRuleRunner)
 
                 pth_path = f"{pkg}__pants__.pth"
                 assert pth_path in whl_files
-                with whl.open(pth_path) as pth_contents:
-                    pth_lines = pth_contents.readlines()
+                pth_contents = zipfile.Path(whl, pth_path).read_text()
+                pth_lines = pth_contents.split("/n")
 
                 direct_url_path = f"{pkg}-9.8.7.dist-info/direct_url__pants__.json"
                 assert direct_url_path in whl_files
@@ -289,8 +289,8 @@ def test_build_editable_local_dists_special_files(rule_runner: PythonRuleRunner)
                     direct_url = json.loads(direct_url_contents.read())
 
         # make sure inferred dep on "a" is included as well
-        assert f"{rule_runner.build_root}/root_a\n" in pth_lines
-        assert f"{rule_runner.build_root}/root_{pkg}\n" in pth_lines
+        assert f"{rule_runner.build_root}/root_a" in pth_lines
+        assert f"{rule_runner.build_root}/root_{pkg}" in pth_lines
 
         assert len(direct_url) == 2
         assert "dir_info" in direct_url
