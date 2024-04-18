@@ -54,12 +54,16 @@ function ensure_hook() {
 
 function ensure_valid_symlink() {
   HOOK=$1
-  if [[ -L "${HOOK_DIR}/${HOOK}" ]]; then
-    if [[ -e "${HOOK_DIR}/${HOOK}" ]]; then
+  HOOK_PATH="${HOOK_DIR}/${HOOK}"
+
+  if [[ -L "${HOOK_PATH}" ]]; then
+    if [[ -e "${HOOK_PATH}" ]]; then
       return
     fi
 
-    read -rp "A ${HOOK} symlink exists, but there is no associated source file. Remove? [Yn]" ok
+    TARGET="$(readlink "${HOOK_PATH}")"
+
+    read -rp "A ${HOOK} symlink exists, but there is no associated target at ${TARGET}. Remove symlink? [Yn]" ok
     if [[ "${ok:-Y}" =~ ^[yY]([eE][sS])?$ ]]; then
       (
         cd "${HOOK_DIR}" &&
