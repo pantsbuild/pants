@@ -45,7 +45,7 @@ use serde::Deserialize;
 
 pub use self::args::Args;
 use self::args::ArgsReader;
-use self::config::Config;
+use self::config::{Config, ConfigReader};
 pub use self::env::Env;
 use self::env::EnvReader;
 use crate::fromfile::FromfileExpander;
@@ -342,7 +342,7 @@ impl OptionParser {
                     ordinal,
                     path: path_strip(&buildroot_string, path),
                 },
-                Rc::new(config),
+                Rc::new(ConfigReader::new(config, FromfileExpander::new())),
             );
             ordinal += 1;
         }
@@ -371,7 +371,7 @@ impl OptionParser {
                             ordinal,
                             path: rcfile,
                         },
-                        Rc::new(rc_config),
+                        Rc::new(ConfigReader::new(rc_config, FromfileExpander::new())),
                     );
                     ordinal += 1;
                 }
