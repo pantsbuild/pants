@@ -17,7 +17,11 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexRequest
-from pants.backend.python.util_rules.pex_environment import PexEnvironment, PythonExecutable
+from pants.backend.python.util_rules.pex_environment import (
+    PexEnvironment,
+    PexSubsystem,
+    PythonExecutable,
+)
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -41,6 +45,7 @@ async def _create_python_source_run_request(
     *,
     entry_point_field: PexEntryPointField,
     pex_env: PexEnvironment,
+    pex_subsystem: PexSubsystem,
     run_in_sandbox: bool,
     pex_path: Iterable[Pex] = (),
     console_script: Optional[ConsoleScript] = None,
@@ -66,6 +71,7 @@ async def _create_python_source_run_request(
                 addresses,
                 output_filename=f"{pex_filename}.pex",
                 internal_only=True,
+                include_requirements=pex_subsystem.include_requirements,
                 include_source_files=False,
                 include_local_dists=True,
                 # `PEX_EXTRA_SYS_PATH` should contain this entry_point's module.

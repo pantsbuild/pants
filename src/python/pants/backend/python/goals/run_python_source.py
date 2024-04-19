@@ -21,7 +21,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest
-from pants.backend.python.util_rules.pex_environment import PexEnvironment
+from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexSubsystem
 from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
 from pants.core.goals.run import (
     RunDebugAdapterRequest,
@@ -66,13 +66,17 @@ class PythonSourceFieldSet(RunFieldSet):
 
 @rule(level=LogLevel.DEBUG)
 async def create_python_source_run_request(
-    field_set: PythonSourceFieldSet, pex_env: PexEnvironment, python_setup: PythonSetup
+    field_set: PythonSourceFieldSet,
+    pex_env: PexEnvironment,
+    python_setup: PythonSetup,
+    pex_subsystem: PexSubsystem,
 ) -> RunRequest:
     return await _create_python_source_run_request(
         field_set.address,
         entry_point_field=PexEntryPointField(field_set.source.value, field_set.address),
         executable=field_set._executable_main(),
         pex_env=pex_env,
+        pex_subsystem=pex_subsystem,
         run_in_sandbox=field_set.should_use_sandbox(python_setup),
     )
 
