@@ -6,6 +6,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use log::debug;
+use std::os::unix::ffi::OsStrExt;
 
 #[derive(Debug)]
 pub struct BuildRoot(PathBuf);
@@ -58,6 +59,16 @@ impl BuildRoot {
                 sentinel_files = Self::SENTINEL_FILES.join(", ")
             ))?;
         }
+    }
+
+    pub fn convert_to_string(&self) -> Result<String, String> {
+        String::from_utf8(self.0.as_os_str().as_bytes().to_vec()).map_err(|e| {
+            format!(
+                "Failed to decode build root path {}: {}",
+                self.0.display(),
+                e
+            )
+        })
     }
 }
 

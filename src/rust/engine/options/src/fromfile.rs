@@ -51,11 +51,16 @@ fn try_deserialize<'a, DE: Deserialize<'a>>(
     }
 }
 
-pub struct FromfileExpander {}
+#[derive(Clone, Debug)]
+pub struct FromfileExpander {
+    build_root_str: String,
+}
 
 impl FromfileExpander {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(build_root_str: &str) -> Self {
+        Self {
+            build_root_str: build_root_str.to_string(),
+        }
     }
 
     fn maybe_expand(&self, value: String) -> Result<ExpandedValue, ParseError> {
@@ -67,7 +72,7 @@ impl FromfileExpander {
                 match suffix.strip_prefix('?') {
                     Some(subsuffix) => {
                         // @? means the path is allowed to not exist.
-                        let path = PathBuf::from(subsuffix);
+                        let path = Path::new(&self.build_root_str).join(subsuffix);
                         match fs::read_to_string(&path) {
                             Ok(content) => Ok((Some(path), Some(content))),
                             Err(err) if err.kind() == io::ErrorKind::NotFound => {
@@ -78,7 +83,7 @@ impl FromfileExpander {
                         }
                     }
                     _ => {
-                        let path = PathBuf::from(suffix);
+                        let path = Path::new(&self.build_root_str).join(suffix);
                         let content =
                             fs::read_to_string(&path).map_err(|e| mk_parse_err(e, &path))?;
                         Ok((Some(path), Some(content)))

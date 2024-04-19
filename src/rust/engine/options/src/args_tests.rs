@@ -17,7 +17,7 @@ where
 {
     ArgsReader::new(
         Args::new(args.into_iter().map(|x| x.to_string())),
-        FromfileExpander::new(),
+        FromfileExpander::new(""),
     )
 }
 
