@@ -44,6 +44,7 @@ use std::rc::Rc;
 use serde::Deserialize;
 
 pub use self::args::Args;
+use self::args::ArgsReader;
 use self::config::Config;
 pub use self::env::Env;
 use self::env::EnvReader;
@@ -276,7 +277,10 @@ impl OptionParser {
             Source::Env,
             Rc::new(EnvReader::new(env, FromfileExpander::new())),
         );
-        sources.insert(Source::Flag, Rc::new(args));
+        sources.insert(
+            Source::Flag,
+            Rc::new(ArgsReader::new(args, FromfileExpander::new())),
+        );
         let mut parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
