@@ -134,20 +134,6 @@ impl FromfileExpander {
     }
 }
 
-pub(crate) fn expand(value: String) -> Result<Option<String>, ParseError> {
-    FromfileExpander::new().expand(value)
-}
-
-pub(crate) fn expand_to_list<T: Parseable>(
-    value: String,
-) -> Result<Option<Vec<ListEdit<T>>>, ParseError> {
-    FromfileExpander::new().expand_to_list(value)
-}
-
-pub(crate) fn expand_to_dict(value: String) -> Result<Option<Vec<DictEdit>>, ParseError> {
-    FromfileExpander::new().expand_to_dict(value)
-}
-
 #[cfg(test)]
 pub(crate) mod test_util {
     use std::fs::File;

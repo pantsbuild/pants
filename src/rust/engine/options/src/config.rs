@@ -11,7 +11,7 @@ use toml::value::Table;
 use toml::Value;
 
 use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, OptionsSource, Val};
-use crate::fromfile::{expand, expand_to_dict, expand_to_list, FromfileExpander};
+use crate::fromfile::FromfileExpander;
 use crate::id::{NameTransform, OptionId};
 use crate::parse::Parseable;
 
@@ -104,7 +104,9 @@ trait FromValue: Parseable {
     fn from_config(config: &ConfigReader, id: &OptionId) -> Result<Option<Self>, String> {
         if let Some(value) = config.get_value(id) {
             if value.is_str() {
-                match expand(value.as_str().unwrap().to_owned())
+                match config
+                    .fromfile_expander
+                    .expand(value.as_str().unwrap().to_owned())
                     .map_err(|e| e.render(config.display(id)))?
                 {
                     Some(expanded_value) => Ok(Some(
@@ -319,7 +321,6 @@ impl Config {
 
 pub(crate) struct ConfigReader {
     config: Config,
-    #[allow(dead_code)]
     fromfile_expander: FromfileExpander,
 }
 
@@ -377,7 +378,9 @@ impl ConfigReader {
                         }
                     }
                     Value::String(v) => {
-                        if let Some(es) = expand_to_list::<T>(v.to_string())
+                        if let Some(es) = self
+                            .fromfile_expander
+                            .expand_to_list::<T>(v.to_string())
                             .map_err(|e| e.render(self.display(id)))?
                         {
                             list_edits.extend(es);
@@ -451,7 +454,9 @@ impl OptionsSource for ConfigReader {
                         }]));
                     }
                     Value::String(v) => {
-                        return expand_to_dict(v.to_owned())
+                        return self
+                            .fromfile_expander
+                            .expand_to_dict(v.to_owned())
                             .map_err(|e| e.render(self.display(id)));
                     }
                     _ => {
