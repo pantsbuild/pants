@@ -7,7 +7,7 @@ use std::ffi::OsString;
 
 use super::id::{NameTransform, OptionId, Scope};
 use super::{DictEdit, OptionsSource};
-use crate::fromfile::{expand, expand_to_dict, expand_to_list};
+use crate::fromfile::{expand, expand_to_dict, expand_to_list, FromfileExpander};
 use crate::parse::Parseable;
 use crate::ListEdit;
 
@@ -51,6 +51,21 @@ impl Env {
         }
         (Self::new(env), dropped)
     }
+}
+
+pub(crate) struct EnvReader {
+    env: Env,
+    #[allow(dead_code)]
+    fromfile_expander: FromfileExpander,
+}
+
+impl EnvReader {
+    pub(crate) fn new(env: Env, fromfile_expander: FromfileExpander) -> Self {
+        Self {
+            env,
+            fromfile_expander,
+        }
+    }
 
     fn env_var_names(id: &OptionId) -> Vec<String> {
         let name = id.name("_", NameTransform::ToUpper);
@@ -70,7 +85,7 @@ impl Env {
 
     fn get_list<T: Parseable>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
         for env_var_name in &Self::env_var_names(id) {
-            if let Some(value) = self.env.get(env_var_name) {
+            if let Some(value) = self.env.env.get(env_var_name) {
                 return expand_to_list::<T>(value.to_owned())
                     .map_err(|e| e.render(self.display(id)));
             }
@@ -88,14 +103,14 @@ impl From<&Env> for Vec<(String, String)> {
     }
 }
 
-impl OptionsSource for Env {
+impl OptionsSource for EnvReader {
     fn display(&self, id: &OptionId) -> String {
         Self::env_var_names(id).pop().unwrap()
     }
 
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
         for env_var_name in &Self::env_var_names(id) {
-            if let Some(value) = self.env.get(env_var_name) {
+            if let Some(value) = self.env.env.get(env_var_name) {
                 return expand(value.to_owned()).map_err(|e| e.render(self.display(id)));
             }
         }
@@ -130,7 +145,7 @@ impl OptionsSource for Env {
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
         for env_var_name in &Self::env_var_names(id) {
-            if let Some(value) = self.env.get(env_var_name) {
+            if let Some(value) = self.env.env.get(env_var_name) {
                 return expand_to_dict(value.to_owned()).map_err(|e| e.render(self.display(id)));
             }
         }
