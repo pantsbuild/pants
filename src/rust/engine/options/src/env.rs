@@ -7,7 +7,7 @@ use std::ffi::OsString;
 
 use super::id::{NameTransform, OptionId, Scope};
 use super::{DictEdit, OptionsSource};
-use crate::fromfile::{expand, expand_to_dict, expand_to_list, FromfileExpander};
+use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 use crate::ListEdit;
 
@@ -86,7 +86,9 @@ impl EnvReader {
     fn get_list<T: Parseable>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
         for env_var_name in &Self::env_var_names(id) {
             if let Some(value) = self.env.env.get(env_var_name) {
-                return expand_to_list::<T>(value.to_owned())
+                return self
+                    .fromfile_expander
+                    .expand_to_list::<T>(value.to_owned())
                     .map_err(|e| e.render(self.display(id)));
             }
         }
@@ -111,7 +113,10 @@ impl OptionsSource for EnvReader {
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
         for env_var_name in &Self::env_var_names(id) {
             if let Some(value) = self.env.env.get(env_var_name) {
-                return expand(value.to_owned()).map_err(|e| e.render(self.display(id)));
+                return self
+                    .fromfile_expander
+                    .expand(value.to_owned())
+                    .map_err(|e| e.render(self.display(id)));
             }
         }
         Ok(None)
@@ -146,7 +151,10 @@ impl OptionsSource for EnvReader {
     fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
         for env_var_name in &Self::env_var_names(id) {
             if let Some(value) = self.env.env.get(env_var_name) {
-                return expand_to_dict(value.to_owned()).map_err(|e| e.render(self.display(id)));
+                return self
+                    .fromfile_expander
+                    .expand_to_dict(value.to_owned())
+                    .map_err(|e| e.render(self.display(id)));
             }
         }
         Ok(None)
