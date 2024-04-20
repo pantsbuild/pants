@@ -79,7 +79,7 @@ class NodeJSProject:
     @property
     def immutable_install_args(self) -> tuple[str, ...]:
         if self.package_manager == "npm":
-            return ("clean-install", "--workspaces")
+            return ("clean-install",)
         if self.package_manager == "pnpm":
             return ("install", "--frozen-lockfile")
             # return ("install",)
