@@ -12,7 +12,6 @@ from pants.backend.google_cloud_function.python.target_types import (
     PythonGoogleCloudFunctionRuntime,
     PythonGoogleCloudFunctionType,
 )
-from pants.backend.python.target_types import PexLayout, PexLayoutField
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
     PythonFaaSCompletePlatforms,
@@ -39,7 +38,6 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
     type: PythonGoogleCloudFunctionType
     output_path: OutputPathField
     environment: EnvironmentField
-    layout: PexLayoutField
 
 
 @rule(desc="Create Python Google Cloud Function", level=LogLevel.DEBUG)
@@ -60,7 +58,6 @@ async def package_python_google_cloud_function(
             include_sources=True,
             reexported_handler_module=PythonGoogleCloudFunctionHandlerField.reexported_handler_module,
             log_only_reexported_handler_func=True,
-            layout=PexLayout(field_set.layout.value),
         ),
     )
 
