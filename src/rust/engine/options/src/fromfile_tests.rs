@@ -4,7 +4,7 @@
 use crate::fromfile::test_util::write_fromfile;
 use crate::fromfile::*;
 use crate::parse::{ParseError, Parseable};
-use crate::{DictEdit, DictEditAction, ListEdit, ListEditAction, Val};
+use crate::{BuildRoot, DictEdit, DictEditAction, ListEdit, ListEditAction, Val};
 use maplit::hashmap;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -22,15 +22,15 @@ macro_rules! check_err {
 }
 
 fn expand(value: String) -> Result<Option<String>, ParseError> {
-    FromfileExpander::new("").expand(value)
+    FromfileExpander::relative_to_cwd().expand(value)
 }
 
 fn expand_to_list<T: Parseable>(value: String) -> Result<Option<Vec<ListEdit<T>>>, ParseError> {
-    FromfileExpander::new("").expand_to_list(value)
+    FromfileExpander::relative_to_cwd().expand_to_list(value)
 }
 
 fn expand_to_dict(value: String) -> Result<Option<Vec<DictEdit>>, ParseError> {
-    FromfileExpander::new("").expand_to_dict(value)
+    FromfileExpander::relative_to_cwd().expand_to_dict(value)
 }
 
 #[test]
@@ -57,11 +57,11 @@ fn test_fromfile_relative_to_buildroot() {
     let (_tmpdir, fromfile_pathbuf) = write_fromfile("fromfile.txt", "FOO");
     let fromfile_relpath_pathbuf = fromfile_pathbuf.strip_prefix(&_tmpdir).unwrap();
     assert!(fromfile_relpath_pathbuf.is_relative());
-    let tmpdir_str = format!("{}", &_tmpdir.path().display());
     let fromfile_relpath_str = format!("{}", fromfile_relpath_pathbuf.display());
     assert_eq!(
         Ok(Some("FOO".to_string())),
-        FromfileExpander::new(&tmpdir_str).expand(format!("@{}", fromfile_relpath_str))
+        FromfileExpander::relative_to(BuildRoot::for_path(_tmpdir.into_path()))
+            .expand(format!("@{}", fromfile_relpath_str))
     );
 }
 

@@ -1,7 +1,7 @@
 // Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use super::{DictEdit, DictEditAction, ListEdit, ListEditAction};
+use super::{BuildRoot, DictEdit, DictEditAction, ListEdit, ListEditAction};
 
 use crate::parse::{mk_parse_err, parse_dict, ParseError, Parseable};
 use log::warn;
@@ -53,13 +53,23 @@ fn try_deserialize<'a, DE: Deserialize<'a>>(
 
 #[derive(Clone, Debug)]
 pub struct FromfileExpander {
-    build_root_str: String,
+    build_root: BuildRoot,
 }
 
 impl FromfileExpander {
-    pub fn new(build_root_str: &str) -> Self {
+    // Creates a FromfileExpander that treats relpaths as relative to the build root.
+    pub fn relative_to(build_root: BuildRoot) -> Self {
         Self {
-            build_root_str: build_root_str.to_string(),
+            build_root: build_root,
+        }
+    }
+
+    // Creates a FromfileExpander that treats relpaths as relative to the CWD.
+    // Useful in tests.
+    #[cfg(test)]
+    pub(crate) fn relative_to_cwd() -> Self {
+        Self {
+            build_root: BuildRoot::for_path(PathBuf::from("")),
         }
     }
 
@@ -72,7 +82,7 @@ impl FromfileExpander {
                 match suffix.strip_prefix('?') {
                     Some(subsuffix) => {
                         // @? means the path is allowed to not exist.
-                        let path = Path::new(&self.build_root_str).join(subsuffix);
+                        let path = self.build_root.join(subsuffix);
                         match fs::read_to_string(&path) {
                             Ok(content) => Ok((Some(path), Some(content))),
                             Err(err) if err.kind() == io::ErrorKind::NotFound => {
@@ -83,7 +93,7 @@ impl FromfileExpander {
                         }
                     }
                     _ => {
-                        let path = Path::new(&self.build_root_str).join(suffix);
+                        let path = self.build_root.join(suffix);
                         let content =
                             fs::read_to_string(&path).map_err(|e| mk_parse_err(e, &path))?;
                         Ok((Some(path), Some(content)))

@@ -8,11 +8,16 @@ use std::path::{Path, PathBuf};
 use log::debug;
 use std::os::unix::ffi::OsStrExt;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BuildRoot(PathBuf);
 
 impl BuildRoot {
     const SENTINEL_FILES: &'static [&'static str] = &["pants.toml", "BUILDROOT", "BUILD_ROOT"];
+
+    // Useful in tests.
+    pub fn for_path(path: PathBuf) -> Self {
+        Self(path)
+    }
 
     pub fn find() -> Result<BuildRoot, String> {
         match env::var_os("PANTS_BUILDROOT_OVERRIDE") {

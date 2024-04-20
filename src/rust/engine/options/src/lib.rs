@@ -257,7 +257,7 @@ impl OptionParser {
     ) -> Result<OptionParser, String> {
         let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
         let buildroot_string = buildroot.convert_to_string()?;
-        let fromfile_expander = FromfileExpander::new(&buildroot_string);
+        let fromfile_expander = FromfileExpander::relative_to(buildroot);
 
         let mut seed_values = HashMap::from_iter(
             env.env
