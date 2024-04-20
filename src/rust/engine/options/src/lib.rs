@@ -17,6 +17,10 @@ mod env;
 #[cfg(test)]
 mod env_tests;
 
+mod fromfile;
+#[cfg(test)]
+mod fromfile_tests;
+
 mod id;
 #[cfg(test)]
 mod id_tests;
@@ -40,8 +44,11 @@ use std::rc::Rc;
 use serde::Deserialize;
 
 pub use self::args::Args;
-use self::config::Config;
+use self::args::ArgsReader;
+use self::config::{Config, ConfigReader};
 pub use self::env::Env;
+use self::env::EnvReader;
+use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
@@ -266,8 +273,14 @@ impl OptionParser {
         );
 
         let mut sources: BTreeMap<Source, Rc<dyn OptionsSource>> = BTreeMap::new();
-        sources.insert(Source::Env, Rc::new(env));
-        sources.insert(Source::Flag, Rc::new(args));
+        sources.insert(
+            Source::Env,
+            Rc::new(EnvReader::new(env, FromfileExpander::new())),
+        );
+        sources.insert(
+            Source::Flag,
+            Rc::new(ArgsReader::new(args, FromfileExpander::new())),
+        );
         let mut parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
@@ -329,7 +342,7 @@ impl OptionParser {
                     ordinal,
                     path: path_strip(&buildroot_string, path),
                 },
-                Rc::new(config),
+                Rc::new(ConfigReader::new(config, FromfileExpander::new())),
             );
             ordinal += 1;
         }
@@ -358,7 +371,7 @@ impl OptionParser {
                             ordinal,
                             path: rcfile,
                         },
-                        Rc::new(rc_config),
+                        Rc::new(ConfigReader::new(rc_config, FromfileExpander::new())),
                     );
                     ordinal += 1;
                 }
@@ -489,18 +502,29 @@ impl OptionParser {
             }
             derivation = Some(derivations);
         }
+
+        // Removals from any source apply after adds from any source (but are themselves
+        // overridden by later replacements), so we collect them here and apply them later.
+        let mut removal_lists: Vec<Vec<T>> = vec![];
+
         let mut highest_priority_source = Source::Default;
         for (source_type, source) in self.sources.iter() {
             if let Some(list_edits) = getter(source, id)? {
                 highest_priority_source = source_type.clone();
                 for list_edit in list_edits {
                     match list_edit.action {
-                        ListEditAction::Replace => list = list_edit.items,
+                        ListEditAction::Replace => {
+                            list = list_edit.items;
+                            removal_lists.clear();
+                        }
                         ListEditAction::Add => list.extend(list_edit.items),
-                        ListEditAction::Remove => remover(&mut list, &list_edit.items),
+                        ListEditAction::Remove => removal_lists.push(list_edit.items),
                     }
                 }
             }
+        }
+        for removals in removal_lists {
+            remover(&mut list, &removals);
         }
         Ok(ListOptionValue {
             derivation,

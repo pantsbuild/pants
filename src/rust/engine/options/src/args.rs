@@ -5,7 +5,8 @@ use std::env;
 
 use super::id::{is_valid_scope_name, NameTransform, OptionId, Scope};
 use super::{DictEdit, OptionsSource};
-use crate::parse::{expand, expand_to_dict, expand_to_list, ParseError, Parseable};
+use crate::fromfile::FromfileExpander;
+use crate::parse::{ParseError, Parseable};
 use crate::ListEdit;
 use core::iter::once;
 use itertools::{chain, Itertools};
@@ -80,18 +81,6 @@ impl Arg {
     fn matches_negation(&self, id: &OptionId) -> bool {
         self._matches(id, true)
     }
-
-    fn to_bool(&self) -> Result<Option<bool>, ParseError> {
-        // An arg can represent a bool either by having an explicit value parseable as a bool,
-        // or by having no value (in which case it represents true).
-        match &self.value {
-            Some(value) => match expand(value.to_string())? {
-                Some(s) => bool::parse(&s).map(Some),
-                _ => Ok(None),
-            },
-            None => Ok(Some(true)),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -152,22 +141,53 @@ impl Args {
         args.next(); // Consume the process name (argv[0]).
         Self::new(env::args().collect::<Vec<_>>())
     }
+}
 
+pub(crate) struct ArgsReader {
+    args: Args,
+    #[allow(dead_code)]
+    fromfile_expander: FromfileExpander,
+}
+
+impl ArgsReader {
+    pub fn new(args: Args, fromfile_expander: FromfileExpander) -> Self {
+        Self {
+            args,
+            fromfile_expander,
+        }
+    }
+
+    #[allow(dead_code)]
     pub fn get_passthrough_args(&self) -> Option<Vec<&str>> {
-        self.passthrough_args
+        self.args
+            .passthrough_args
             .as_ref()
             .map(|v| Vec::from_iter(v.iter().map(String::as_str)))
     }
 
+    fn to_bool(&self, arg: &Arg) -> Result<Option<bool>, ParseError> {
+        // An arg can represent a bool either by having an explicit value parseable as a bool,
+        // or by having no value (in which case it represents true).
+        match &arg.value {
+            Some(value) => match self.fromfile_expander.expand(value.to_string())? {
+                Some(s) => bool::parse(&s).map(Some),
+                _ => Ok(None),
+            },
+            None => Ok(Some(true)),
+        }
+    }
+
     fn get_list<T: Parseable>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
         let mut edits = vec![];
-        for arg in &self.args {
+        for arg in &self.args.args {
             if arg.matches(id) {
                 let value = arg.value.as_ref().ok_or_else(|| {
                     format!("Expected list option {} to have a value.", self.display(id))
                 })?;
-                if let Some(es) =
-                    expand_to_list::<T>(value.to_string()).map_err(|e| e.render(&arg.flag))?
+                if let Some(es) = self
+                    .fromfile_expander
+                    .expand_to_list::<T>(value.to_string())
+                    .map_err(|e| e.render(&arg.flag))?
                 {
                     edits.extend(es);
                 }
@@ -181,7 +201,7 @@ impl Args {
     }
 }
 
-impl OptionsSource for Args {
+impl OptionsSource for ArgsReader {
     fn display(&self, id: &OptionId) -> String {
         format!(
             "--{}{}",
@@ -196,12 +216,14 @@ impl OptionsSource for Args {
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
         // We iterate in reverse so that the rightmost arg wins in case an option
         // is specified multiple times.
-        for arg in self.args.iter().rev() {
+        for arg in self.args.args.iter().rev() {
             if arg.matches(id) {
-                return expand(arg.value.clone().ok_or_else(|| {
-                    format!("Expected list option {} to have a value.", self.display(id))
-                })?)
-                .map_err(|e| e.render(&arg.flag));
+                return self
+                    .fromfile_expander
+                    .expand(arg.value.clone().ok_or_else(|| {
+                        format!("Expected list option {} to have a value.", self.display(id))
+                    })?)
+                    .map_err(|e| e.render(&arg.flag));
             };
         }
         Ok(None)
@@ -210,12 +232,12 @@ impl OptionsSource for Args {
     fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
         // We iterate in reverse so that the rightmost arg wins in case an option
         // is specified multiple times.
-        for arg in self.args.iter().rev() {
+        for arg in self.args.args.iter().rev() {
             if arg.matches(id) {
-                return arg.to_bool().map_err(|e| e.render(&arg.flag));
+                return self.to_bool(arg).map_err(|e| e.render(&arg.flag));
             } else if arg.matches_negation(id) {
-                return arg
-                    .to_bool()
+                return self
+                    .to_bool(arg)
                     .map(|ob| ob.map(|b| b ^ true))
                     .map_err(|e| e.render(&arg.flag));
             }
@@ -241,12 +263,16 @@ impl OptionsSource for Args {
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
         let mut edits = vec![];
-        for arg in self.args.iter() {
+        for arg in self.args.args.iter() {
             if arg.matches(id) {
                 let value = arg.value.clone().ok_or_else(|| {
                     format!("Expected dict option {} to have a value.", self.display(id))
                 })?;
-                if let Some(es) = expand_to_dict(value).map_err(|e| e.render(&arg.flag))? {
+                if let Some(es) = self
+                    .fromfile_expander
+                    .expand_to_dict(value)
+                    .map_err(|e| e.render(&arg.flag))?
+                {
                     edits.extend(es);
                 }
             }

@@ -13,11 +13,12 @@ use crate::{
     option_id, DictEdit, DictEditAction, ListEdit, ListEditAction, OptionId, OptionsSource, Val,
 };
 
-use crate::config::Config;
-use crate::parse::test_util::write_fromfile;
+use crate::config::{Config, ConfigReader};
+use crate::fromfile::test_util::write_fromfile;
+use crate::fromfile::FromfileExpander;
 use tempfile::TempDir;
 
-fn maybe_config(file_content: &str) -> Result<Config, String> {
+fn maybe_config(file_content: &str) -> Result<ConfigReader, String> {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("pants.toml");
     File::create(&path)
@@ -31,9 +32,10 @@ fn maybe_config(file_content: &str) -> Result<Config, String> {
             ("seed2".to_string(), "seed2val".to_string()),
         ]),
     )
+    .map(|config| ConfigReader::new(config, FromfileExpander::new()))
 }
 
-fn config(file_content: &str) -> Config {
+fn config(file_content: &str) -> ConfigReader {
     maybe_config(file_content).unwrap()
 }
 
@@ -178,7 +180,7 @@ fn test_scalar_fromfile() {
     fn do_test<T: PartialEq + Debug>(
         content: &str,
         expected: T,
-        getter: fn(&Config, &OptionId) -> Result<Option<T>, String>,
+        getter: fn(&ConfigReader, &OptionId) -> Result<Option<T>, String>,
     ) {
         let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", content);
         let conf = config(format!("[GLOBAL]\nfoo = '@{}'\n", fromfile_path.display()).as_str());
@@ -186,10 +188,10 @@ fn test_scalar_fromfile() {
         assert_eq!(expected, actual)
     }
 
-    do_test("true", true, Config::get_bool);
-    do_test("-42", -42, Config::get_int);
-    do_test("3.14", 3.14, Config::get_float);
-    do_test("EXPANDED", "EXPANDED".to_owned(), Config::get_string);
+    do_test("true", true, ConfigReader::get_bool);
+    do_test("-42", -42, ConfigReader::get_int);
+    do_test("3.14", 3.14, ConfigReader::get_float);
+    do_test("EXPANDED", "EXPANDED".to_owned(), ConfigReader::get_string);
 }
 
 #[test]

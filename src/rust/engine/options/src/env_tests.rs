@@ -1,8 +1,9 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::env::Env;
-use crate::parse::test_util::write_fromfile;
+use crate::env::{Env, EnvReader};
+use crate::fromfile::test_util::write_fromfile;
+use crate::fromfile::FromfileExpander;
 use crate::{option_id, DictEdit, DictEditAction};
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource, Val};
 use maplit::hashmap;
@@ -10,13 +11,15 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fmt::Debug;
 
-fn env<'a, I: IntoIterator<Item = (&'a str, &'a str)>>(vars: I) -> Env {
-    Env {
-        env: vars
-            .into_iter()
-            .map(|(k, v)| (k.to_owned(), v.to_owned()))
-            .collect::<HashMap<_, _>>(),
-    }
+fn env<'a, I: IntoIterator<Item = (&'a str, &'a str)>>(vars: I) -> EnvReader {
+    EnvReader::new(
+        Env::new(
+            vars.into_iter()
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                .collect::<HashMap<_, _>>(),
+        ),
+        FromfileExpander::new(),
+    )
 }
 
 #[test]
@@ -208,7 +211,7 @@ fn test_scalar_fromfile() {
     fn do_test<T: PartialEq + Debug>(
         content: &str,
         expected: T,
-        getter: fn(&Env, &OptionId) -> Result<Option<T>, String>,
+        getter: fn(&EnvReader, &OptionId) -> Result<Option<T>, String>,
     ) {
         let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", content);
         let env = env([(
@@ -219,10 +222,10 @@ fn test_scalar_fromfile() {
         assert_eq!(expected, actual)
     }
 
-    do_test("true", true, Env::get_bool);
-    do_test("-42", -42, Env::get_int);
-    do_test("3.14", 3.14, Env::get_float);
-    do_test("EXPANDED", "EXPANDED".to_owned(), Env::get_string);
+    do_test("true", true, EnvReader::get_bool);
+    do_test("-42", -42, EnvReader::get_int);
+    do_test("3.14", 3.14, EnvReader::get_float);
+    do_test("EXPANDED", "EXPANDED".to_owned(), EnvReader::get_string);
 }
 
 #[test]
