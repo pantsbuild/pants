@@ -23,9 +23,6 @@ from pants.backend.python.target_types import (
     MainSpecification,
     PexCompletePlatformsField,
     PexLayout,
-)
-from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
-from pants.backend.python.target_types import (
     PythonRequirementFindLinksField,
     PythonRequirementsField,
 )
@@ -97,10 +94,6 @@ class PythonProvider:
 
 class PexPlatforms(DeduplicatedCollection[str]):
     sort_input = True
-
-    @classmethod
-    def create_from_platforms_field(cls, field: PythonPlatformsField) -> PexPlatforms:
-        return cls(field.value or ())
 
     def generate_pex_arg_list(self) -> list[str]:
         args = []
