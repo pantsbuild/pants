@@ -18,7 +18,7 @@ fn env<'a, I: IntoIterator<Item = (&'a str, &'a str)>>(vars: I) -> EnvReader {
                 .map(|(k, v)| (k.to_owned(), v.to_owned()))
                 .collect::<HashMap<_, _>>(),
         ),
-        FromfileExpander::new(),
+        FromfileExpander::relative_to_cwd(),
     )
 }
 

@@ -37,7 +37,6 @@ mod types;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -257,14 +256,8 @@ impl OptionParser {
         buildroot: Option<BuildRoot>,
     ) -> Result<OptionParser, String> {
         let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
-        let buildroot_string = String::from_utf8(buildroot.as_os_str().as_bytes().to_vec())
-            .map_err(|e| {
-                format!(
-                    "Failed to decode build root path {}: {}",
-                    buildroot.display(),
-                    e
-                )
-            })?;
+        let buildroot_string = buildroot.convert_to_string()?;
+        let fromfile_expander = FromfileExpander::relative_to(buildroot);
 
         let mut seed_values = HashMap::from_iter(
             env.env
@@ -275,11 +268,11 @@ impl OptionParser {
         let mut sources: BTreeMap<Source, Rc<dyn OptionsSource>> = BTreeMap::new();
         sources.insert(
             Source::Env,
-            Rc::new(EnvReader::new(env, FromfileExpander::new())),
+            Rc::new(EnvReader::new(env, fromfile_expander.clone())),
         );
         sources.insert(
             Source::Flag,
-            Rc::new(ArgsReader::new(args, FromfileExpander::new())),
+            Rc::new(ArgsReader::new(args, fromfile_expander.clone())),
         );
         let mut parser = OptionParser {
             sources: sources.clone(),
@@ -342,7 +335,7 @@ impl OptionParser {
                     ordinal,
                     path: path_strip(&buildroot_string, path),
                 },
-                Rc::new(ConfigReader::new(config, FromfileExpander::new())),
+                Rc::new(ConfigReader::new(config, fromfile_expander.clone())),
             );
             ordinal += 1;
         }
@@ -371,7 +364,7 @@ impl OptionParser {
                             ordinal,
                             path: rcfile,
                         },
-                        Rc::new(ConfigReader::new(rc_config, FromfileExpander::new())),
+                        Rc::new(ConfigReader::new(rc_config, fromfile_expander.clone())),
                     );
                     ordinal += 1;
                 }

@@ -32,7 +32,7 @@ fn maybe_config(file_content: &str) -> Result<ConfigReader, String> {
             ("seed2".to_string(), "seed2val".to_string()),
         ]),
     )
-    .map(|config| ConfigReader::new(config, FromfileExpander::new()))
+    .map(|config| ConfigReader::new(config, FromfileExpander::relative_to_cwd()))
 }
 
 fn config(file_content: &str) -> ConfigReader {
