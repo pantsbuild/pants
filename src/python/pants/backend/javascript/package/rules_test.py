@@ -267,8 +267,6 @@ def test_extra_envs(rule_runner: RuleRunner) -> None:
                     "version": "0.0.1",
                     "browser": "lib/index.mjs",
                     "scripts": {"build": "mkdir dist && echo $FOO >> dist/index.cjs"},
-                    "workspaces": ["./"],
-                    "private": True,
                 }
             ),
             "src/js/package-lock.json": json.dumps({}),
