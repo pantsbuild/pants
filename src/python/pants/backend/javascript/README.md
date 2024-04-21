@@ -5,15 +5,15 @@ Plan to migrate much of this content to user docs.
 
 ## Definitions
 
-- Module: A single javascript source file. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules
-- Package: A javascript directory (or file) described by a `package.json` file. See https://docs.npmjs.com/about-packages-and-modules
-- Workspaces: Functionality of package managers for supporting development of multiple packages in a single repository
+- **Module**: A single javascript source file. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules
+- **Package**: A javascript directory (or file) described by a `package.json` file. See https://docs.npmjs.com/about-packages-and-modules
+- **Workspaces**: Functionality of package managers for supporting development of multiple packages in a single repository
   - In [npm](https://docs.npmjs.com/cli/v7/using-npm/workspaces) and [yarn](https://classic.yarnpkg.com/lang/en/docs/workspaces/), a "workspaces" key is added to a top level `package.json` file, which points to child packages. 
     - A single 'workspace' and 'package' have the same root directory, however, 'workspace' has an additional meaning in that package managers allow you to execute commands in the context of a workspace.
     - The term 'workspace' (as singular) is not frequently used though.
   - In [pnpm](https://pnpm.io/workspaces), a 'workspace' is defined by a `pnpm-workspace.yaml` file which points to child packages.
     - i.e., a single workspace is linked to multiple child packages, unlike in the definition from npm and yarn. This is only trivial for our purposes, but worth keeping in mind when talking about workspaces.
-- Project: Not formally defined. It is often used informally to refer to packages (e.g. where a single package might be a React project). 
+- **Project**: Not formally defined. It is often used informally to refer to packages (e.g. where a single package might be a React project). 
   - In this backend, `ProjectEnvironment` is used to indicate the context (package + configuration) in which a node process is run. This could be inside a singular package directory, or a root package.json defining workspaces, or a directory containing a `pnpm-workspace.yaml` file. 
 
 ## Example repository structure

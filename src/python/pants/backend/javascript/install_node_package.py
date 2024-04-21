@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import itertools
-import json
 import os.path
 from dataclasses import dataclass
 from typing import Iterable
@@ -22,18 +20,14 @@ from pants.backend.javascript.package_json import (
 )
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.target_types import JSSourceField
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import CreateDigest, DigestContents, FileContent, PathGlobs
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
-    HydrateSourcesRequest,
-    HydratedSources,
     SourcesField,
     Target,
     TransitiveTargets,
@@ -101,8 +95,6 @@ async def install_node_packages_for_address(
         (tgt[SourcesField] for tgt in transitive_tgts.closure if tgt.has_field(SourcesField)),
         with_js=False,
     )
-
-    # Run install
     package_digest = source_files.snapshot.digest
 
     install_result = await Get(
@@ -135,7 +127,6 @@ async def install_node_packages_for_address(
 async def add_sources_to_installed_node_package(
     req: InstalledNodePackageRequest,
 ) -> InstalledNodePackageWithSource:
-
     installation = await Get(InstalledNodePackage, InstalledNodePackageRequest, req)
     transitive_tgts = await Get(
         TransitiveTargets, TransitiveTargetsRequest([installation.target.address])

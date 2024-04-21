@@ -59,7 +59,6 @@ def test_creates_npm_run_requests_package_json_scripts(rule_runner: RuleRunner) 
                         "transpile": "babel ./lib -d dist",
                         "compile": "tsc ./lib --emit -d bin",
                     },
-                    "workspaces": ["./"],
                 }
             ),
             "src/js/package-lock.json": json.dumps({}),
