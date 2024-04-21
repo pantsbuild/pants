@@ -69,6 +69,13 @@ from pants.util.strutil import help_text, softwrap
 logger = logging.getLogger(__name__)
 
 
+class PythonFaaSLayoutField(StringField):
+    alias = "layout"
+    valid_choices = PexVenvLayout
+    expected_type = str
+    default = PexVenvLayout.FLAT_ZIPPED.value
+
+
 class PythonFaaSPex3VenvCreateExtraArgsField(StringSequenceField):
     alias = "pex3_venv_create_extra_args"
     default = ()
@@ -422,6 +429,7 @@ class BuildPythonFaaSRequest:
     output_path: OutputPathField
     runtime: PythonFaaSRuntimeField
     pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
+    layout: PythonFaaSLayoutField
 
     include_requirements: bool
     include_sources: bool
@@ -503,13 +511,17 @@ async def build_python_faas(
 
     pex_result = await Get(Pex, PexFromTargetsRequest, pex_request)
 
-    output_filename = request.output_path.value_or_default(file_ending="zip")
+    layout = PexVenvLayout(request.layout.value)
+
+    output_filename = request.output_path.value_or_default(
+        file_ending="zip" if layout is PexVenvLayout.FLAT_ZIPPED else None
+    )
 
     result = await Get(
         PexVenv,
         PexVenvRequest(
             pex=pex_result,
-            layout=PexVenvLayout.FLAT_ZIPPED,
+            layout=layout,
             platforms=platforms.pex_platforms,
             complete_platforms=platforms.complete_platforms,
             extra_args=request.pex3_venv_create_extra_args.value or (),
