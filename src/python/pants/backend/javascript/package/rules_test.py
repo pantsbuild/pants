@@ -129,8 +129,6 @@ def test_packages_files_as_resource(rule_runner: RuleRunner) -> None:
                     "version": "0.0.1",
                     "browser": "lib/index.mjs",
                     "scripts": {"build": "mkdir dist && echo 'blarb' >> dist/index.cjs"},
-                    "workspaces": ["./"],
-                    "private": True,
                 }
             ),
             "src/js/package-lock.json": json.dumps({}),
