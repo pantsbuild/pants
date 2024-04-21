@@ -15,7 +15,7 @@ use pyo3::{IntoPy, ToPyObject};
 use rule_graph::DependencyKey;
 use workunit_store::{in_workunit, Level, RunningWorkunit};
 
-use super::{maybe_side_effecting, select, NodeKey, NodeResult, Params};
+use super::{select, task_context, NodeKey, NodeResult, Params};
 use crate::context::Context;
 use crate::externs::engine_aware::EngineAwareReturnType;
 use crate::externs::{self, GeneratorInput, GeneratorResponse};
@@ -171,6 +171,19 @@ impl Task {
                 externs::generator_send(py, &context.core.types.coroutine, &generator, input)
             })?;
             match response {
+                GeneratorResponse::NativeCall(call) => {
+                    let _blocking_token = workunit.blocking();
+                    let result = (call.call).await;
+                    match result {
+                        Ok(value) => {
+                            input = GeneratorInput::Arg(value);
+                        }
+                        Err(throw @ Failure::Throw { .. }) => {
+                            input = GeneratorInput::Err(PyErr::from(throw));
+                        }
+                        Err(failure) => break Err(failure),
+                    }
+                }
                 GeneratorResponse::Call(call) => {
                     let _blocking_token = workunit.blocking();
                     let result = Self::gen_call(context, params.clone(), entry, call).await;
@@ -257,8 +270,11 @@ impl Task {
 
         let args = self.args;
 
-        let (mut result_val, mut result_type) =
-            maybe_side_effecting(self.task.side_effecting, &self.side_effected, async move {
+        let (mut result_val, mut result_type) = task_context(
+            context.clone(),
+            self.task.side_effecting,
+            &self.side_effected,
+            async move {
                 Python::with_gil(|py| {
                     let func = (*self.task.func.0.value).as_ref(py);
 
@@ -283,11 +299,13 @@ impl Task {
                     })
                     .map_err(Failure::from)
                 })
-            })
-            .await?;
+            },
+        )
+        .await?;
 
         if result_type == context.core.types.coroutine {
-            let (new_val, new_type) = maybe_side_effecting(
+            let (new_val, new_type) = task_context(
+                context.clone(),
                 self.task.side_effecting,
                 &self.side_effected,
                 Self::generate(&context, workunit, params, self.entry, result_val),
