@@ -4,18 +4,26 @@
 use core::fmt::Debug;
 use maplit::hashmap;
 
-use crate::args::Args;
-use crate::parse::test_util::write_fromfile;
+use crate::args::{Args, ArgsReader};
+use crate::fromfile::test_util::write_fromfile;
+use crate::fromfile::FromfileExpander;
 use crate::{option_id, DictEdit, DictEditAction, Val};
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource};
 
-fn mk_args<I: IntoIterator<Item = &'static str>>(args: I) -> Args {
-    Args::new(args.into_iter().map(str::to_owned))
+fn mk_args<I>(args: I) -> ArgsReader
+where
+    I: IntoIterator,
+    I::Item: ToString,
+{
+    ArgsReader::new(
+        Args::new(args.into_iter().map(|x| x.to_string())),
+        FromfileExpander::relative_to_cwd(),
+    )
 }
 
 #[test]
 fn test_display() {
-    let args = mk_args([]);
+    let args = mk_args::<Vec<&str>>(vec![]);
     assert_eq!("--global".to_owned(), args.display(&option_id!("global")));
     assert_eq!(
         "--scope-name".to_owned(),
@@ -194,29 +202,35 @@ fn test_scalar_fromfile() {
     fn do_test<T: PartialEq + Debug>(
         content: &str,
         expected: T,
-        getter: fn(&Args, &OptionId) -> Result<Option<T>, String>,
+        getter: fn(&ArgsReader, &OptionId) -> Result<Option<T>, String>,
         negate: bool,
     ) {
         let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", content);
-        let args = Args::new(vec![format!(
+        let args = mk_args(vec![format!(
             "--{}foo=@{}",
             if negate { "no-" } else { "" },
             fromfile_path.display()
-        )]);
+        )
+        .as_str()]);
         let actual = getter(&args, &option_id!("foo")).unwrap().unwrap();
         assert_eq!(expected, actual)
     }
 
-    do_test("true", true, Args::get_bool, false);
-    do_test("false", false, Args::get_bool, false);
-    do_test("true", false, Args::get_bool, true);
-    do_test("false", true, Args::get_bool, true);
-    do_test("-42", -42, Args::get_int, false);
-    do_test("3.14", 3.14, Args::get_float, false);
-    do_test("EXPANDED", "EXPANDED".to_owned(), Args::get_string, false);
+    do_test("true", true, ArgsReader::get_bool, false);
+    do_test("false", false, ArgsReader::get_bool, false);
+    do_test("true", false, ArgsReader::get_bool, true);
+    do_test("false", true, ArgsReader::get_bool, true);
+    do_test("-42", -42, ArgsReader::get_int, false);
+    do_test("3.14", 3.14, ArgsReader::get_float, false);
+    do_test(
+        "EXPANDED",
+        "EXPANDED".to_owned(),
+        ArgsReader::get_string,
+        false,
+    );
 
     let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", "BAD INT");
-    let args = Args::new(vec![format!("--foo=@{}", fromfile_path.display())]);
+    let args = mk_args(vec![format!("--foo=@{}", fromfile_path.display())]);
     assert_eq!(
         args.get_int(&option_id!("foo")).unwrap_err(),
         "Problem parsing --foo int value:\n1:BAD INT\n  ^\n\
@@ -228,7 +242,7 @@ fn test_scalar_fromfile() {
 fn test_list_fromfile() {
     fn do_test(content: &str, expected: &[ListEdit<i64>], filename: &str) {
         let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
-        let args = Args::new(vec![format!("--foo=@{}", &fromfile_path.display())]);
+        let args = mk_args(vec![format!("--foo=@{}", &fromfile_path.display()).as_str()]);
         let actual = args.get_int_list(&option_id!("foo")).unwrap().unwrap();
         assert_eq!(expected.to_vec(), actual)
     }
@@ -299,9 +313,9 @@ fn test_dict_fromfile() {
         ];
 
         let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
-        let args = Args::new(vec![
-            format!("--foo=@{}", &fromfile_path.display()),
-            "--foo=+{'KEY':'VALUE'}".to_string(),
+        let args = mk_args(vec![
+            &format!("--foo=@{}", &fromfile_path.display()),
+            "--foo=+{'KEY':'VALUE'}",
         ]);
         let actual = args.get_dict(&option_id!("foo")).unwrap().unwrap();
         assert_eq!(expected, actual)
@@ -335,7 +349,7 @@ fn test_dict_fromfile() {
     }];
 
     let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", "+{'FOO':42}");
-    let args = Args::new(vec![format!("--foo=@{}", &fromfile_path.display())]);
+    let args = mk_args(vec![format!("--foo=@{}", &fromfile_path.display()).as_str()]);
     assert_eq!(
         expected_add,
         args.get_dict(&option_id!("foo")).unwrap().unwrap()
@@ -344,14 +358,14 @@ fn test_dict_fromfile() {
 
 #[test]
 fn test_nonexistent_required_fromfile() {
-    let args = Args::new(vec!["--foo=@/does/not/exist".to_string()]);
+    let args = mk_args(vec!["--foo=@/does/not/exist"]);
     let err = args.get_string(&option_id!("foo")).unwrap_err();
     assert!(err.starts_with("Problem reading /does/not/exist for --foo: No such file or directory"));
 }
 
 #[test]
 fn test_nonexistent_optional_fromfile() {
-    let args = Args::new(vec!["--foo=@?/does/not/exist".to_string()]);
+    let args = mk_args(vec!["--foo=@?/does/not/exist"]);
     assert!(args.get_string(&option_id!("foo")).unwrap().is_none());
 }
 
@@ -374,7 +388,7 @@ fn test_passthrough_args() {
     assert_string("debug", option_id!(-'l', "level"));
 
     assert_eq!(
-        Some(vec![
+        Some(&vec![
             "--passthrough0".to_string(),
             "passthrough1".to_string(),
             "-p".to_string(),
@@ -387,5 +401,5 @@ fn test_passthrough_args() {
 fn test_empty_passthrough_args() {
     let args = mk_args(["-ldebug", "--foo=bar", "--"]);
 
-    assert_eq!(Some(vec![]), args.get_passthrough_args());
+    assert_eq!(Some(&vec![]), args.get_passthrough_args());
 }

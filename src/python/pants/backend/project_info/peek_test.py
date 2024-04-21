@@ -71,288 +71,263 @@ async def second_fake_additional_target_data(
     )
 
 
-@pytest.mark.parametrize(
-    "expanded_target_infos, exclude_defaults, include_dep_rules, expected_output",
-    [
-        pytest.param(
-            [],
-            False,
-            False,
-            "[]\n",
-            id="null-case",
+def test_render_json_null_case():
+    assert peek.render_json([]) == "[]\n"
+
+
+def test_render_json_with_single_target():
+    target_data = TargetData(
+        FilesGeneratorTarget(
+            {"sources": ["foo.txt"]}, Address("example", target_name="files_target")
         ),
-        pytest.param(
-            [
-                TargetData(
-                    FilesGeneratorTarget(
-                        {
-                            "sources": ["*.txt"],
-                            # Regression test that we can handle a dict with `tuple[str, ...]` as
-                            # key.
-                            "overrides": {("foo.txt",): {"tags": ["overridden"]}},
-                        },
-                        Address("example", target_name="files_target"),
-                    ),
-                    _snapshot(
-                        "2",
-                        ("foo.txt", "bar.txt"),
-                    ),
-                    tuple(),
-                )
+        _snapshot("1", ("foo.txt",)),
+        tuple(),
+    )
+    expected = dedent(
+        """\
+        [
+          {
+            "address": "example:files_target",
+            "target_type": "files",
+            "dependencies": [],
+            "description": null,
+            "overrides": null,
+            "sources": [
+              "foo.txt"
             ],
-            True,
-            False,
-            dedent(
-                """\
-                [
-                  {
-                    "address": "example:files_target",
-                    "target_type": "files",
-                    "dependencies": [],
-                    "overrides": {
-                      "('foo.txt',)": {
-                        "tags": [
-                          "overridden"
-                        ]
-                      }
-                    },
-                    "sources": [
-                      "bar.txt",
-                      "foo.txt"
-                    ],
-                    "sources_fingerprint": "d3dd0a1f72aaa1fb2623e7024d3ea460b798f6324805cfad5c2b751e2dfb756b",
-                    "sources_raw": [
-                      "*.txt"
-                    ]
-                  }
-                ]
-                """
+            "sources_fingerprint": "b5e73bb1d7a3f8c2e7f8c43f38ab4d198e3512f082c670706df89f5abe319edf",
+            "sources_raw": [
+              "foo.txt"
+            ],
+            "tags": null
+          }
+        ]
+        """
+    )
+    actual = peek.render_json([target_data])
+    assert actual == expected
+
+
+def test_render_json_with_multiple_targets_and_goals_excluding_defaults():
+    target_data = [
+        TargetData(
+            FilesGeneratorTarget(
+                {"sources": ["*.txt"], "tags": ["zippable"]},
+                Address("example", target_name="files_target"),
             ),
-            id="single-files-target/exclude-defaults-regression",
+            _snapshot("0", ()),
+            tuple(),
         ),
-        pytest.param(
-            [
-                TargetData(
-                    FilesGeneratorTarget(
-                        {"sources": ["foo.txt"]}, Address("example", target_name="files_target")
-                    ),
-                    _snapshot(
-                        "1",
-                        ("foo.txt",),
-                    ),
-                    tuple(),
-                )
-            ],
-            False,
-            False,
-            dedent(
-                """\
-                [
-                  {
-                    "address": "example:files_target",
-                    "target_type": "files",
-                    "dependencies": [],
-                    "description": null,
-                    "overrides": null,
-                    "sources": [
-                      "foo.txt"
-                    ],
-                    "sources_fingerprint": "b5e73bb1d7a3f8c2e7f8c43f38ab4d198e3512f082c670706df89f5abe319edf",
-                    "sources_raw": [
-                      "foo.txt"
-                    ],
-                    "tags": null
-                  }
-                ]
-                """
-            ),
-            id="single-files-target/include-defaults",
-        ),
-        pytest.param(
-            [
-                TargetData(
-                    FilesGeneratorTarget(
-                        {"sources": ["*.txt"], "tags": ["zippable"]},
-                        Address("example", target_name="files_target"),
-                    ),
-                    _snapshot(
-                        "0",
-                        (),
-                    ),
-                    tuple(),
-                ),
-                TargetData(
-                    ArchiveTarget(
-                        {
-                            "output_path": "my-archive.zip",
-                            "format": "zip",
-                            "files": ["example:files_target"],
-                        },
-                        Address("example", target_name="archive_target"),
-                    ),
-                    None,
-                    ("foo/bar:baz", "qux:quux"),
-                ),
-            ],
-            True,
-            False,
-            dedent(
-                """\
-                [
-                  {
-                    "address": "example:files_target",
-                    "target_type": "files",
-                    "dependencies": [],
-                    "sources": [],
-                    "sources_fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                    "sources_raw": [
-                      "*.txt"
-                    ],
-                    "tags": [
-                      "zippable"
-                    ]
-                  },
-                  {
-                    "address": "example:archive_target",
-                    "target_type": "archive",
-                    "dependencies": [
-                      "foo/bar:baz",
-                      "qux:quux"
-                    ],
-                    "files": [
-                      "example:files_target"
-                    ],
+        TargetData(
+            ArchiveTarget(
+                {
+                    "output_path": "my-archive.zip",
                     "format": "zip",
-                    "output_path": "my-archive.zip"
-                  }
-                ]
-                """
+                    "files": ["example:files_target"],
+                },
+                Address("example", target_name="archive_target"),
             ),
-            id="single-files-target/exclude-defaults",
+            None,
+            ("foo/bar:baz", "qux:quux"),
+            goals=("package",),
         ),
-        pytest.param(
-            [
-                TargetData(
-                    FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
-                    _snapshot("", ("foo/a.txt",)),
-                    ("foo/a.txt:baz",),
-                    dependencies_rules=("does", "apply", "*"),
-                    dependents_rules=("fall-through", "*"),
-                    applicable_dep_rules=(
-                        DependencyRuleApplication(
-                            action=DependencyRuleAction.ALLOW,
-                            rule_description="foo/BUILD[*] -> foo/BUILD[*]",
-                            origin_address=Address("foo", target_name="baz"),
-                            origin_type="files",
-                            dependency_address=Address(
-                                "foo", target_name="baz", relative_file_path="a.txt"
-                            ),
-                            dependency_type="files",
-                        ),
+    ]
+    expected = dedent(
+        """\
+        [
+          {
+            "address": "example:files_target",
+            "target_type": "files",
+            "dependencies": [],
+            "sources": [],
+            "sources_fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sources_raw": [
+              "*.txt"
+            ],
+            "tags": [
+              "zippable"
+            ]
+          },
+          {
+            "address": "example:archive_target",
+            "target_type": "archive",
+            "dependencies": [
+              "foo/bar:baz",
+              "qux:quux"
+            ],
+            "files": [
+              "example:files_target"
+            ],
+            "format": "zip",
+            "goals": [
+              "package"
+            ],
+            "output_path": "my-archive.zip"
+          }
+        ]
+        """
+    )
+
+    actual = peek.render_json(target_data, exclude_defaults=True)
+    assert actual == expected
+
+
+def test_render_json_with_single_target_excluding_defaults_regression():
+    target_data = TargetData(
+        FilesGeneratorTarget(
+            {
+                "sources": ["*.txt"],
+                # Regression test that we can handle a dict with `tuple[str, ...]` as
+                # key.
+                "overrides": {("foo.txt",): {"tags": ["overridden"]}},
+            },
+            Address("example", target_name="files_target"),
+        ),
+        _snapshot("2", ("foo.txt", "bar.txt")),
+        tuple(),
+    )
+    expected = dedent(
+        """\
+        [
+          {
+            "address": "example:files_target",
+            "target_type": "files",
+            "dependencies": [],
+            "overrides": {
+              "('foo.txt',)": {
+                "tags": [
+                  "overridden"
+                ]
+              }
+            },
+            "sources": [
+              "bar.txt",
+              "foo.txt"
+            ],
+            "sources_fingerprint": "d3dd0a1f72aaa1fb2623e7024d3ea460b798f6324805cfad5c2b751e2dfb756b",
+            "sources_raw": [
+              "*.txt"
+            ]
+          }
+        ]
+        """
+    )
+
+    actual = peek.render_json([target_data], exclude_defaults=True)
+    assert actual == expected
+
+
+def test_render_json_including_dep_rules():
+    target_data = [
+        TargetData(
+            FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
+            _snapshot("", ("foo/a.txt",)),
+            ("foo/a.txt:baz",),
+            dependencies_rules=("does", "apply", "*"),
+            dependents_rules=("fall-through", "*"),
+            applicable_dep_rules=(
+                DependencyRuleApplication(
+                    action=DependencyRuleAction.ALLOW,
+                    rule_description="foo/BUILD[*] -> foo/BUILD[*]",
+                    origin_address=Address("foo", target_name="baz"),
+                    origin_type="files",
+                    dependency_address=Address(
+                        "foo", target_name="baz", relative_file_path="a.txt"
                     ),
+                    dependency_type="files",
                 ),
-            ],
-            True,
-            True,
-            dedent(
-                """\
-                [
-                  {
-                    "address": "foo:baz",
-                    "target_type": "files",
-                    "_applicable_dep_rules": [
-                      {
-                        "action": "ALLOW",
-                        "rule_description": "foo/BUILD[*] -> foo/BUILD[*]",
-                        "origin_address": "foo:baz",
-                        "origin_type": "files",
-                        "dependency_address": "foo/a.txt:baz",
-                        "dependency_type": "files"
-                      }
-                    ],
-                    "_dependencies_rules": [
-                      "does",
-                      "apply",
-                      "*"
-                    ],
-                    "_dependents_rules": [
-                      "fall-through",
-                      "*"
-                    ],
-                    "dependencies": [
-                      "foo/a.txt:baz"
-                    ],
-                    "sources": [
-                      "foo/a.txt"
-                    ],
-                    "sources_fingerprint": "72ceef751c940b5797530e298f4d9f66daf3c51f7d075bfb802295ffb01d5de3",
-                    "sources_raw": [
-                      "*.txt"
-                    ]
-                  }
-                ]
-                """
             ),
-            id="include-dep-rules",
         ),
-        pytest.param(
-            [
-                TargetData(
-                    FilesGeneratorTarget(
-                        {"sources": ["foo.txt"]}, Address("example", target_name="files_target")
-                    ),
-                    _snapshot(
-                        "1",
-                        ("foo.txt",),
-                    ),
-                    tuple(),
-                    additional_info=(
-                        AdditionalTargetData("test_data1", {"hello": "world"}),
-                        AdditionalTargetData("test_data2", ["one", "two"]),
-                    ),
-                )
+    ]
+    expected = dedent(
+        """\
+        [
+          {
+            "address": "foo:baz",
+            "target_type": "files",
+            "_applicable_dep_rules": [
+              {
+                "action": "ALLOW",
+                "rule_description": "foo/BUILD[*] -> foo/BUILD[*]",
+                "origin_address": "foo:baz",
+                "origin_type": "files",
+                "dependency_address": "foo/a.txt:baz",
+                "dependency_type": "files"
+              }
             ],
-            False,
-            False,
-            dedent(
-                """\
-                [
-                  {
-                    "address": "example:files_target",
-                    "target_type": "files",
-                    "additional_info": {
-                      "test_data1": {
-                        "hello": "world"
-                      },
-                      "test_data2": [
-                        "one",
-                        "two"
-                      ]
-                    },
-                    "dependencies": [],
-                    "description": null,
-                    "overrides": null,
-                    "sources": [
-                      "foo.txt"
-                    ],
-                    "sources_fingerprint": "b5e73bb1d7a3f8c2e7f8c43f38ab4d198e3512f082c670706df89f5abe319edf",
-                    "sources_raw": [
-                      "foo.txt"
-                    ],
-                    "tags": null
-                  }
-                ]
-                """
-            ),
-            id="include-additional-info",
+            "_dependencies_rules": [
+              "does",
+              "apply",
+              "*"
+            ],
+            "_dependents_rules": [
+              "fall-through",
+              "*"
+            ],
+            "dependencies": [
+              "foo/a.txt:baz"
+            ],
+            "sources": [
+              "foo/a.txt"
+            ],
+            "sources_fingerprint": "72ceef751c940b5797530e298f4d9f66daf3c51f7d075bfb802295ffb01d5de3",
+            "sources_raw": [
+              "*.txt"
+            ]
+          }
+        ]
+        """
+    )
+
+    actual = peek.render_json(target_data, exclude_defaults=True, include_dep_rules=True)
+    assert actual == expected
+
+
+def test_render_json_including_additional_info():
+    target_data = TargetData(
+        FilesGeneratorTarget(
+            {"sources": ["foo.txt"]}, Address("example", target_name="files_target")
         ),
-    ],
-)
-def test_render_targets_as_json(
-    expanded_target_infos, exclude_defaults, include_dep_rules, expected_output
-):
-    actual_output = peek.render_json(expanded_target_infos, exclude_defaults, include_dep_rules)
-    assert actual_output == expected_output
+        _snapshot("1", ("foo.txt",)),
+        tuple(),
+        additional_info=(
+            AdditionalTargetData("test_data1", {"hello": "world"}),
+            AdditionalTargetData("test_data2", ["one", "two"]),
+        ),
+    )
+    expected = dedent(
+        """\
+        [
+          {
+            "address": "example:files_target",
+            "target_type": "files",
+            "additional_info": {
+              "test_data1": {
+                "hello": "world"
+              },
+              "test_data2": [
+                "one",
+                "two"
+              ]
+            },
+            "dependencies": [],
+            "description": null,
+            "overrides": null,
+            "sources": [
+              "foo.txt"
+            ],
+            "sources_fingerprint": "b5e73bb1d7a3f8c2e7f8c43f38ab4d198e3512f082c670706df89f5abe319edf",
+            "sources_raw": [
+              "foo.txt"
+            ],
+            "tags": null
+          }
+        ]
+        """
+    )
+
+    actual = peek.render_json([target_data])
+    assert actual == expected
 
 
 @pytest.fixture

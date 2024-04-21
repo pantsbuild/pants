@@ -134,6 +134,7 @@ Created as part of the release process.
 + Itay Donanhirsh
 + Ity Kaul
 + JC (Jonathan Chen)
++ Jack Zhao
 + Jackson Davis
 + Jacob Floyd
 + Jake Donham
@@ -199,6 +200,7 @@ Created as part of the release process.
 + Lei Wang
 + Leo Kim
 + Lex Spoon
++ Liam Deacon
 + Liam Wilson
 + Luc Cary
 + Luca Clementi
@@ -362,6 +364,7 @@ Created as part of the release process.
 + olivercoleman-switchdin
 + philipp-sontag-by
 + purajit
++ ravi2024sk
 + sww
 + twunderlich-grapl
 + wimax-grapl

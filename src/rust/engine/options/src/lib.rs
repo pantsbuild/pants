@@ -17,6 +17,10 @@ mod env;
 #[cfg(test)]
 mod env_tests;
 
+mod fromfile;
+#[cfg(test)]
+mod fromfile_tests;
+
 mod id;
 #[cfg(test)]
 mod id_tests;
@@ -33,15 +37,17 @@ mod types;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::sync::Arc;
 
 use serde::Deserialize;
 
 pub use self::args::Args;
-use self::config::Config;
+use self::args::ArgsReader;
+use self::config::{Config, ConfigReader};
 pub use self::env::Env;
+use self::env::EnvReader;
+use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
@@ -251,14 +257,8 @@ impl OptionParser {
         buildroot: Option<BuildRoot>,
     ) -> Result<OptionParser, String> {
         let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
-        let buildroot_string = String::from_utf8(buildroot.as_os_str().as_bytes().to_vec())
-            .map_err(|e| {
-                format!(
-                    "Failed to decode build root path {}: {}",
-                    buildroot.display(),
-                    e
-                )
-            })?;
+        let buildroot_string = buildroot.convert_to_string()?;
+        let fromfile_expander = FromfileExpander::relative_to(buildroot);
 
         let mut seed_values = HashMap::from_iter(
             env.env
@@ -266,11 +266,18 @@ impl OptionParser {
                 .map(|(k, v)| (format!("env.{k}", k = k), v.clone())),
         );
 
-        let passthrough_args = args.get_passthrough_args();
+        let args_reader = ArgsReader::new(args, fromfile_expander.clone());
+        let passthrough_args = args_reader.get_passthrough_args().cloned();
 
         let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
-        sources.insert(Source::Env, Arc::new(env));
-        sources.insert(Source::Flag, Arc::new(args));
+        sources.insert(
+            Source::Env,
+            Arc::new(EnvReader::new(env, fromfile_expander.clone())),
+        );
+        sources.insert(
+            Source::Flag,
+            Arc::new(args_reader),
+        );
         let mut parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
@@ -333,7 +340,7 @@ impl OptionParser {
                     ordinal,
                     path: path_strip(&buildroot_string, path),
                 },
-                Arc::new(config),
+                Arc::new(ConfigReader::new(config, fromfile_expander.clone())),
             );
             ordinal += 1;
         }
@@ -363,7 +370,7 @@ impl OptionParser {
                             ordinal,
                             path: rcfile,
                         },
-                        Arc::new(rc_config),
+                        Arc::new(ConfigReader::new(rc_config, fromfile_expander.clone())),
                     );
                     ordinal += 1;
                 }

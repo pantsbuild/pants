@@ -10,9 +10,10 @@ use regex::Regex;
 use toml::value::Table;
 use toml::Value;
 
-use super::id::{NameTransform, OptionId};
-use super::parse::{expand, expand_to_dict, expand_to_list, Parseable};
 use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, OptionsSource, Val};
+use crate::fromfile::FromfileExpander;
+use crate::id::{NameTransform, OptionId};
+use crate::parse::Parseable;
 
 type InterpolationMap = HashMap<String, String>;
 
@@ -102,10 +103,12 @@ struct ValueConversionError<'a> {
 trait FromValue: Parseable {
     fn from_value(value: &Value) -> Result<Self, ValueConversionError>;
 
-    fn from_config(config: &Config, id: &OptionId) -> Result<Option<Self>, String> {
+    fn from_config(config: &ConfigReader, id: &OptionId) -> Result<Option<Self>, String> {
         if let Some(value) = config.get_value(id) {
             if value.is_str() {
-                match expand(value.as_str().unwrap().to_owned())
+                match config
+                    .fromfile_expander
+                    .expand(value.as_str().unwrap().to_owned())
                     .map_err(|e| e.render(config.display(id)))?
                 {
                     Some(expanded_value) => Ok(Some(
@@ -316,13 +319,27 @@ impl Config {
             value: Value::Table(new_table),
         })
     }
+}
+
+pub(crate) struct ConfigReader {
+    config: Config,
+    fromfile_expander: FromfileExpander,
+}
+
+impl ConfigReader {
+    pub fn new(config: Config, fromfile_expander: FromfileExpander) -> Self {
+        Self {
+            config,
+            fromfile_expander,
+        }
+    }
 
     fn option_name(id: &OptionId) -> String {
         id.name("_", NameTransform::None)
     }
 
     fn get_from_section(&self, section_name: &str, option_name: &str) -> Option<&Value> {
-        self.value
+        self.config.value
             .get(section_name)
             .and_then(|table| table.get(option_name))
     }
@@ -357,7 +374,7 @@ impl Config {
         id: &OptionId,
     ) -> Result<Option<Vec<ListEdit<T>>>, String> {
         let mut list_edits = vec![];
-        if let Some(table) = self.value.get(section_name) {
+        if let Some(table) = self.config.value.get(section_name) {
             let option_name = &Self::option_name(id);
             if let Some(value) = table.get(option_name) {
                 match value {
@@ -387,7 +404,9 @@ impl Config {
                         }
                     }
                     Value::String(v) => {
-                        if let Some(es) = expand_to_list::<T>(v.to_string())
+                        if let Some(es) = self
+                            .fromfile_expander
+                            .expand_to_list::<T>(v.to_string())
                             .map_err(|e| e.render(self.display(id)))?
                         {
                             list_edits.extend(es);
@@ -409,7 +428,7 @@ impl Config {
     }
 }
 
-impl OptionsSource for Config {
+impl OptionsSource for ConfigReader {
     fn display(&self, id: &OptionId) -> String {
         format!("{id}")
     }
@@ -447,7 +466,7 @@ impl OptionsSource for Config {
     }
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
-        if let Some(table) = self.value.get(id.scope.name()) {
+        if let Some(table) = self.config.value.get(id.scope.name()) {
             let option_name = Self::option_name(id);
             if let Some(value) = table.get(&option_name) {
                 match value {
@@ -466,7 +485,9 @@ impl OptionsSource for Config {
                         }]));
                     }
                     Value::String(v) => {
-                        return expand_to_dict(v.to_owned())
+                        return self
+                            .fromfile_expander
+                            .expand_to_dict(v.to_owned())
                             .map_err(|e| e.render(self.display(id)));
                     }
                     _ => {
