@@ -18,6 +18,7 @@ from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
 from pants.util.frozendict import FrozenDict
+from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
 
 if TYPE_CHECKING:
@@ -66,6 +67,12 @@ class Subsystem(metaclass=_SubsystemMeta):
 
     options_scope: str
     help: ClassVar[str | Callable[[], str]]
+
+    @classproperty
+    def help_extended(cls) -> str:
+        if isinstance(cls.help, str):
+            return cls.help
+        return cls.help()
 
     # Subclasses may override these to specify a deprecated former name for this Subsystem's scope.
     # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
