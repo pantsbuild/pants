@@ -201,7 +201,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         name = f"construct_scope_{snake_scope}"
         partial_construct_subsystem.__name__ = name
         partial_construct_subsystem.__module__ = cls.__module__
-        partial_construct_subsystem.__doc__ = cls.help
+        partial_construct_subsystem.__doc__ = cls.help_extended
 
         _, class_definition_lineno = inspect.getsourcelines(cls)
         partial_construct_subsystem.__line_number__ = class_definition_lineno
