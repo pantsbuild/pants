@@ -398,7 +398,12 @@ class Options:
         for key, rv in values.as_dict().items():
             rv = listify_tuples(rv)
             if native_values[key] != rv:
-                raise Exception(f"scope={scope}, key={key}: {native_values[key]} of type {type(native_values[key])} !=\n{rv} of type {type(rv)}")
+                logger.warning(
+                    f"Value mismatch for option `{key}` in scope [{scope}]:\n"
+                    f"Rust   value: {native_values[key]} of type {type(native_values[key])}\n"
+                    f"Python value: {rv} of type {type(rv)}"
+                )
+                raise Exception("Option value mismatch")
         return values
 
     def get_fingerprintable_for_scope(
