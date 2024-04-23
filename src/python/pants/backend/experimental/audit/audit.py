@@ -10,13 +10,12 @@ from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.target import FieldSet
 from pants.engine.unions import union
-from pants.util.meta import frozen_after_init
 from pants.engine.console import Console
 from pants.engine.rules import collect_rules, goal_rule, rule, QueryRule
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership
-from pants.core.goals.multi_tool_goal_helper import determine_specified_tool_names
+from pants.core.goals.multi_tool_goal_helper import determine_specified_tool_ids
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
@@ -28,8 +27,6 @@ class AuditResult:
     lockfile: str
     report: str
 
-
-@frozen_after_init
 @dataclass(unsafe_hash=True)
 class AuditResults(EngineAwareReturnType):
     """Zero or more AuditResult objects for a single auditor."""  # Do I need this at all?
@@ -46,7 +43,6 @@ class AuditResults(EngineAwareReturnType):
         return False
 
 
-@frozen_after_init
 @union
 @dataclass(unsafe_hash=True)
 class AuditRequest(Generic[_FS], EngineAwareParameter):
@@ -56,7 +52,7 @@ class AuditRequest(Generic[_FS], EngineAwareParameter):
     """
 
     field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
-    tool_name: ClassVar[str]
+    tool_id: ClassVar[str]
 
     field_sets: Collection[_FS]
 
@@ -64,7 +60,7 @@ class AuditRequest(Generic[_FS], EngineAwareParameter):
         self.field_sets = Collection[_FS](field_sets)
 
     def debug_hint(self) -> str:
-        return self.tool_name
+        return self.tool_id
 
     def metadata(self) -> dict[str, Any]:
         return {"addresses": [fs.address.spec for fs in self.field_sets]}
@@ -92,13 +88,13 @@ async def audit(
     # audit_subsystem: AuditSubsystem,
 ) -> Audit:
     request_types = union_membership[AuditRequest]
-    specified_names = determine_specified_tool_names("audit", ["pypi-audit",], request_types)
+    specified_ids = determine_specified_tool_ids("audit", ["pypi-audit",], request_types)
     requests = tuple(
         request_type(
             request_type.field_set_type.create(target)
             for target in targets
             if (
-                request_type.tool_name in specified_names
+                request_type.tool_id in specified_ids
                 and request_type.field_set_type.is_applicable(target)
             )
         )

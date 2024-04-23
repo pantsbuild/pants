@@ -25,7 +25,7 @@ from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
-# TODO: Do I actually need my own? There must already be a fieldset for lockfiles, presumably I could use that.
+
 @dataclass(frozen=True)
 class PypiAuditFieldSet(FieldSet):
     required_fields = (PythonResolveField,)
@@ -33,7 +33,7 @@ class PypiAuditFieldSet(FieldSet):
 
 class PypiAuditRequest(AuditRequest):
     field_set_type = PypiAuditFieldSet
-    tool_name = "pypi-audit"
+    tool_id = "pypi-audit"
 
 class PypiAuditSubsystem(Subsystem):
     name = "pypi-audit"
