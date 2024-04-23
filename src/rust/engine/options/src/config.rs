@@ -339,7 +339,8 @@ impl ConfigReader {
     }
 
     fn get_from_section(&self, section_name: &str, option_name: &str) -> Option<&Value> {
-        self.config.value
+        self.config
+            .value
             .get(section_name)
             .and_then(|table| table.get(option_name))
     }

@@ -199,9 +199,23 @@ fn test_default_section_scalar() {
         assert_eq!(expected_bar, actual_bar);
     }
 
-    do_test("false", "false", "true", false, true, ConfigReader::get_bool);
+    do_test(
+        "false",
+        "false",
+        "true",
+        false,
+        true,
+        ConfigReader::get_bool,
+    );
     do_test("11", "22", "33", 11, 33, ConfigReader::get_int);
-    do_test("3.14", "1.23", "99.88", 3.14, 99.88, ConfigReader::get_float);
+    do_test(
+        "3.14",
+        "1.23",
+        "99.88",
+        3.14,
+        99.88,
+        ConfigReader::get_float,
+    );
     do_test(
         "\"xx\"",
         "\"yy\"",

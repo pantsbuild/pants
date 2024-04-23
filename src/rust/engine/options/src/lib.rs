@@ -274,10 +274,7 @@ impl OptionParser {
             Source::Env,
             Arc::new(EnvReader::new(env, fromfile_expander.clone())),
         );
-        sources.insert(
-            Source::Flag,
-            Arc::new(args_reader),
-        );
+        sources.insert(Source::Flag, Arc::new(args_reader));
         let mut parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
