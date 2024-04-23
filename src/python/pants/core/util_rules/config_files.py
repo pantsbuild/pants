@@ -146,7 +146,7 @@ async def gather_config_files_by_workspace_dir(
             if request.orphan_filepath_behavior == OrphanFilepathConfigBehavior.ERROR:
                 raise ValueError(msg)
             else:
-                logger.warn(msg)
+                logger.warning(msg)
 
     return GatheredConfigFilesByDirectories(
         request.config_filename, config_files_snapshot, FrozenDict(source_dir_to_config_file)
