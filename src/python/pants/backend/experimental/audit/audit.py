@@ -29,7 +29,7 @@ class AuditResult:
 
 @dataclass(unsafe_hash=True)
 class AuditResults(EngineAwareReturnType):
-    """Zero or more AuditResult objects for a single auditor."""  # Do I need this at all?
+    """Zero or more AuditResult objects for a single auditor."""
 
     results: tuple[AuditResult, ...]
     auditor_name: str

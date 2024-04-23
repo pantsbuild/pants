@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import pytest
-
+import textwrap
 from pants.backend.experimental.audit.audit import AuditResult, AuditResults
+from pants.backend.experimental.audit.format_results import format_results
+from pants.backend.experimental.audit.pip_audit import VulnerabilityData
 from pants.backend.experimental.audit.pip_audit_rule import PypiAuditRequest
 from pants.backend.experimental.audit.pip_audit_rule import rules as pip_audit_rules
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -51,7 +53,77 @@ setuptools==54.1.2; python_version >= "3.6" \
     --hash=sha256:dd20743f36b93cbb8724f4d2ccd970dce8b6e6e823a13aa7e5751bb4e674c20b \
     --hash=sha256:ebd0148faf627b569c8d2a1b20f5d3b09c873f12739d71c7ee88f037d5be82ff
 """
+report_a = format_results(
+    {
+        'setuptools==54.1.2; python_version >= "3.6"' : [
+            VulnerabilityData(
+                vuln_id='GHSA-r9hx-vwmv-q579',
+                details=textwrap.dedent("""
+                    Python Packaging Authority (PyPA)'s setuptools is a library designed to
+                    facilitate packaging Python projects. Setuptools version 65.5.0 and earlier
+                    could allow remote attackers to cause a denial of service by fetching
+                    malicious HTML from a PyPI package or custom PackageIndex page due to a
+                    vulnerable Regular Expression in `package_index`. This has been patched
+                    in version 65.5.1.
+                """),
+                fixed_in=['65.5.1'],
+                aliases=['CVE-2022-40897'],
+                link='https://osv.dev/vulnerability/GHSA-r9hx-vwmv-q579',
+                summary=None,
+                withdrawn=None,
+            ),
+            VulnerabilityData(
+                vuln_id='PYSEC-2022-43012',
+                details=textwrap.dedent("""
+                    Python Packaging Authority (PyPA) setuptools before 65.5.1 allows remote
+                    attackers to cause a denial of service via HTML in a crafted package or
+                    custom PackageIndex page. There is a Regular Expression Denial of Service
+                    (ReDoS) in package_index.py.
+                """),
+                fixed_in=['65.5.1'],
+                aliases=['CVE-2022-40897'],
+                link='https://osv.dev/vulnerability/PYSEC-2022-43012',
+                summary=None,
+                withdrawn=None,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        )
+        ]
+    }
+)
 
+report_b = format_results(
+    {
+        'setuptools==54.1.2; python_version >= "3.6"' : [
+            VulnerabilityData(
+                vuln_id='GHSA-r9hx-vwmv-q579',
+                details=textwrap.dedent("""
+                    Python Packaging Authority (PyPA)'s setuptools is a library designed to
+                    facilitate packaging Python projects. Setuptools version 65.5.0 and earlier
+                    could allow remote attackers to cause a denial of service by fetching
+                    malicious HTML from a PyPI package or custom PackageIndex page due to a
+                    vulnerable Regular Expression in `package_index`. This has been patched
+                    in version 65.5.1.
+                """),
+                fixed_in=['65.5.1'],
+                aliases=['CVE-2022-40897'],
+                link='https://osv.dev/vulnerability/GHSA-r9hx-vwmv-q579',
+                summary=None,
+                withdrawn=None,
+            ),
+            VulnerabilityData(
+                vuln_id='PYSEC-2022-43012',
+                details=textwrap.dedent("""
+                    Python Packaging Authority (PyPA) setuptools before 65.5.1 allows remote
+                    attackers to cause a denial of service via HTML in a crafted package or
+                    custom PackageIndex page. There is a Regular Expression Denial of Service
+                    (ReDoS) in package_index.py.
+                """),
+                fixed_in=['65.5.1'],
+                aliases=['CVE-2022-40897'],
+                link='https://osv.dev/vulnerability/PYSEC-2022-43012',
+                summary=None,
+                withdrawn=None,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        )
+        ]
+    }
+)
 
 def test_pip_audit(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -69,65 +141,8 @@ def test_pip_audit(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(AuditResults, [PypiAuditRequest(field_sets=())])
     assert result == AuditResults(
         results=(
-            AuditResult(lockfile="a.lock", report="a"),
-            AuditResult(lockfile="b.lock", report="b"),
+            AuditResult(resolve_name='a', lockfile="a.lock", report=report_a),
+            AuditResult(resolve_name='b',lockfile="b.lock", report=report_b),
         ),
         auditor_name="pypi_auditor",
     )
-
-
-# def test_multiple_resolves() -> None:
-#     rule_runner = RuleRunner(
-#         rules=[
-#             setup_user_lockfile_requests,
-#             SubsystemRule(PythonSetup),
-#             QueryRule(UserGenerateLockfiles, [RequestedPythonUserResolveNames]),
-#         ],
-#         target_types=[PythonRequirementTarget],
-#     )
-#     rule_runner.write_files(
-#         {
-#             "BUILD": dedent(
-#                 """\
-#                 python_requirement(
-#                     name='a',
-#                     requirements=['a'],
-#                     resolve='a',
-#                 )
-#                 python_requirement(
-#                     name='b',
-#                     requirements=['b'],
-#                     resolve='b',
-#                 )
-#                 """
-#             ),
-#         }
-#     )
-#     rule_runner.set_options(
-#         [
-#             "--python-resolves={'a': 'a.lock', 'b': 'b.lock'}",
-#             # Override interpreter constraints for 'b', but use default for 'a'.
-#             "--python-resolves-to-interpreter-constraints={'b': ['==3.7.*']}",
-#             "--python-enable-resolves",
-#         ],
-#         env_inherit=PYTHON_BOOTSTRAP_ENV,
-#     )
-#     result = rule_runner.request(
-#         UserGenerateLockfiles, [RequestedPythonUserResolveNames(["a", "b"])]
-#     )
-#     assert set(result) == {
-#         GeneratePythonLockfile(
-#             requirements=FrozenOrderedSet(["a"]),
-#             interpreter_constraints=InterpreterConstraints(
-#                 PythonSetup.default_interpreter_constraints
-#             ),
-#             resolve_name="a",
-#             lockfile_dest="a.lock",
-#         ),
-#         GeneratePythonLockfile(
-#             requirements=FrozenOrderedSet(["b"]),
-#             interpreter_constraints=InterpreterConstraints(["==3.7.*"]),
-#             resolve_name="b",
-#             lockfile_dest="b.lock",
-#         ),
-#     }
