@@ -20,6 +20,15 @@ def tabulate(rows: Iterable[Iterable[Any]]) -> tuple[list[str], list[int]]:
     return table, sizes
 
 
+def generate_header(sizes: Iterable[int]) -> str:
+    """Return a dashed header string."""
+    headers = []
+    for column_size in sizes:
+        column_header = "-" * column_size
+        headers.append(column_header)
+    return " ".join(headers)
+
+
 def format_results(
     result: dict[str, list[dict[str:Any]]],
 ) -> str:
@@ -39,7 +48,7 @@ def format_results(
 
         # Create and add a separator.
         if len(vuln_data) > 0:
-            vuln_strings.insert(1, " ".join(map(lambda x: "-" * x, sizes)))
+            vuln_strings.insert(1, generate_header(sizes))
 
         for row in vuln_strings:
             if columns_string:

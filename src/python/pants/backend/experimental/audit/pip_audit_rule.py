@@ -17,7 +17,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfileRequest,
     Lockfile,
 )
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.option.option_types import DictOption
@@ -63,22 +63,32 @@ async def pypi_audit(
         pass
     session = requests.Session()
     lockfile_paths = python_setup.resolves.items()
-    audit_results_by_lockfile = {}
-    for resolve_name, lockfile_path in lockfile_paths:
-        lockfile = Lockfile(
+    lockfiles = [
+        Lockfile(
             url=lockfile_path,
             url_description_of_origin=f"the resolve `{resolve_name}`",
             resolve_name=resolve_name,
         )
-        loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(lockfile))
+        for resolve_name, lockfile_path in lockfile_paths
+    ]
+    loaded_lockfiles = await MultiGet(
+        Get(LoadedLockfile, LoadedLockfileRequest, LoadedLockfileRequest(lockfile))
+        for lockfile in lockfiles
+    )
+    audit_results_by_lockfile = {}
+    for loaded_lockfile in loaded_lockfiles:
         lockfile_audit_result = audit_constraints_strings(
             constraints_strings=loaded_lockfile.as_constraints_strings,
             session=session,
             excludes_ids=frozenset(
-                pypi_audit_subsystem.lockfile_vulnerability_excludes.get(resolve_name, [])
+                pypi_audit_subsystem.lockfile_vulnerability_excludes.get(
+                    loaded_lockfile.original_lockfile.resolve_name, []
+                )
             ),
         )
-        audit_results_by_lockfile[lockfile_path] = format_results(lockfile_audit_result)
+        audit_results_by_lockfile[loaded_lockfile.lockfile_path] = format_results(
+            lockfile_audit_result
+        )
 
     return AuditResults(
         results=tuple(
