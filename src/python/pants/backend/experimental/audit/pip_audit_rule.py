@@ -1,27 +1,29 @@
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
 import requests
-from dataclasses import dataclass
+
 from pants.backend.experimental.audit.audit import AuditRequest, AuditResult, AuditResults
-from pants.backend.experimental.audit.pip_audit import audit_constraints_strings
 from pants.backend.experimental.audit.format_results import format_results
+from pants.backend.experimental.audit.pip_audit import audit_constraints_strings
 from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     LoadedLockfileRequest,
     Lockfile,
 )
-from pants.option.option_types import DictOption
-from pants.backend.python.target_types import PythonResolveField
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
-from pants.util.logging import LogLevel
+from pants.option.option_types import DictOption
 from pants.option.subsystem import Subsystem
+from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
-
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,7 @@ class PypiAuditRequest(AuditRequest):
     field_set_type = PypiAuditFieldSet
     tool_id = "pypi-audit"
 
+
 class PypiAuditSubsystem(Subsystem):
     name = "pypi-audit"
     options_scope = "pypi-audit"
@@ -42,7 +45,7 @@ class PypiAuditSubsystem(Subsystem):
 
     lockfile_vulnerability_excludes = DictOption(
         help=softwrap(
-            f"""
+            """
             A mapping of logical names of Python lockfiles to a list of excluded vulnerability IDs.
             """
         ),
@@ -71,7 +74,9 @@ async def pypi_audit(
         lockfile_audit_result = audit_constraints_strings(
             constraints_strings=loaded_lockfile.as_constraints_strings,
             session=session,
-            excludes_ids=frozenset(pypi_audit_subsystem.lockfile_vulnerability_excludes.get(resolve_name, [])),
+            excludes_ids=frozenset(
+                pypi_audit_subsystem.lockfile_vulnerability_excludes.get(resolve_name, [])
+            ),
         )
         audit_results_by_lockfile[lockfile_path] = format_results(lockfile_audit_result)
 

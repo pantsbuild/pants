@@ -1,31 +1,32 @@
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
 import logging
-from typing import cast
 from dataclasses import dataclass
 from typing import Any, ClassVar, Generic, Iterable, TypeVar
-from pants.engine.goal import Goal, GoalSubsystem, LineOriented
+
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
-from pants.engine.collection import Collection
-from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.target import FieldSet
-from pants.engine.unions import union
-from pants.engine.console import Console
-from pants.engine.rules import collect_rules, goal_rule, rule, QueryRule
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.target import FilteredTargets, Target
-from pants.engine.unions import UnionMembership
 from pants.core.goals.multi_tool_goal_helper import determine_specified_tool_ids
-from collections import defaultdict
+from pants.engine.collection import Collection
+from pants.engine.console import Console
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.rules import collect_rules, goal_rule
+from pants.engine.target import FieldSet, FilteredTargets
+from pants.engine.unions import UnionMembership, union
 
 logger = logging.getLogger(__name__)
 _FS = TypeVar("_FS", bound=FieldSet)
+
 
 @dataclass(frozen=True)
 class AuditResult:
     resolve_name: str
     lockfile: str
     report: str
+
 
 @dataclass(unsafe_hash=True)
 class AuditResults(EngineAwareReturnType):
@@ -88,7 +89,13 @@ async def audit(
     # audit_subsystem: AuditSubsystem,
 ) -> Audit:
     request_types = union_membership[AuditRequest]
-    specified_ids = determine_specified_tool_ids("audit", ["pypi-audit",], request_types)
+    specified_ids = determine_specified_tool_ids(
+        "audit",
+        [
+            "pypi-audit",
+        ],
+        request_types,
+    )
     requests = tuple(
         request_type(
             request_type.field_set_type.create(target)
@@ -102,20 +109,20 @@ async def audit(
     )
 
     # Run each audit request
-    all_results = await MultiGet(
-        Get(AuditResults, {request: AuditRequest}) for request in requests
-    )
+    all_results = await MultiGet(Get(AuditResults, {request: AuditRequest}) for request in requests)
     for results in all_results:
         for result in results.results:
             if result.report:
                 sigil = console.sigil_failed()
             else:
                 sigil = console.sigil_succeeded()
-            console.print_stdout(f"\n\n{sigil} Resolve: {result.resolve_name} (from {result.lockfile})")
+            console.print_stdout(
+                f"\n\n{sigil} Resolve: {result.resolve_name} (from {result.lockfile})"
+            )
             if result.report:
                 console.print_stdout(result.report)
             else:
-                console.print_stdout(f"No vulnerabilities reported.")
+                console.print_stdout("No vulnerabilities reported.")
     # results_by_tool: dict[str, list[AuditResult]] = defaultdict(list)
     # for results in all_results:
     #     results_by_tool[results.auditor_name].extend(results.results)

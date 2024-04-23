@@ -1,18 +1,16 @@
-"""
-Functionality for formatting vulnerability results as a set of human-readable columns.
-"""
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+"""Functionality for formatting vulnerability results as a set of human-readable columns."""
 
 from __future__ import annotations
 
 from itertools import zip_longest
-from typing import Any, Iterable, cast
-
-from packaging.version import Version
+from typing import Any, Iterable
 
 
 def tabulate(rows: Iterable[Iterable[Any]]) -> tuple[list[str], list[int]]:
-    """Return a list of formatted rows and a list of column sizes.
-    For example::
+    """Return a list of formatted rows and a list of column sizes. For example::
+
     >>> tabulate([['foobar', 2000], [0xdeadbeef]])
     (['foobar     2000', '3735928559'], [10, 4])
     """
@@ -21,21 +19,18 @@ def tabulate(rows: Iterable[Iterable[Any]]) -> tuple[list[str], list[int]]:
     table = [" ".join(map(str.ljust, row, sizes)).rstrip() for row in rows]
     return table, sizes
 
+
 def format_results(
     result: dict[str, list[dict[str:Any]]],
 ) -> str:
-    """
-    Returns a column formatted string for a given mapping of dependencies to vulnerability
-    results.
-    """
+    """Returns a column formatted string for a given mapping of dependencies to vulnerability
+    results."""
     vuln_data: list[list[Any]] = []
     header = ["Dependency", "ID", "Fix Versions", "Link"]
     vuln_data.append(header)
     for dep, vulns in result.items():
         for vuln in vulns:
-            vuln_data.append([
-                dep, vuln.vuln_id, vuln.fixed_in, vuln.link
-            ])
+            vuln_data.append([dep, vuln.vuln_id, vuln.fixed_in, vuln.link])
     columns_string = ""
 
     # If it's just a header, don't bother adding it to the output
