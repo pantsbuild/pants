@@ -86,7 +86,6 @@ async def audit(
     console: Console,
     targets: FilteredTargets,
     union_membership: UnionMembership,
-    # audit_subsystem: AuditSubsystem,
 ) -> Audit:
     request_types = union_membership[AuditRequest]
     specified_ids = determine_specified_tool_ids(
@@ -108,7 +107,6 @@ async def audit(
         for request_type in request_types
     )
 
-    # Run each audit request
     all_results = await MultiGet(Get(AuditResults, {request: AuditRequest}) for request in requests)
     for results in all_results:
         for result in results.results:
@@ -123,23 +121,6 @@ async def audit(
                 console.print_stdout(result.report)
             else:
                 console.print_stdout("No vulnerabilities reported.")
-    # results_by_tool: dict[str, list[AuditResult]] = defaultdict(list)
-    # for results in all_results:
-    #     results_by_tool[results.auditor_name].extend(results.results)
-
-    # if all_results:
-    #     console.print_stderr("")
-    # for results in sorted(all_results, key=lambda results: results.auditor_name):
-    #     if results.skipped:
-    #         continue
-    #     elif results.exit_code == 0:
-    #         sigil = console.sigil_succeeded()
-    #         status = "succeeded"
-    #     else:
-    #         sigil = console.sigil_failed()
-    #         status = "failed"
-    #         exit_code = results.exit_code
-    #     console.print_stderr(f"{sigil} {results.auditor_name} {status}.")
 
     return Audit(0)
 

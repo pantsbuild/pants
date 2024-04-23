@@ -28,6 +28,10 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
+class MissingLockfileException(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class PypiAuditFieldSet(FieldSet):
     required_fields = (PythonResolveField,)
@@ -59,8 +63,7 @@ async def pypi_audit(
     python_setup: PythonSetup,
 ) -> AuditResults:
     if not PythonSetup.enable_resolves:
-        # TODO: Fail, we need lockfiles.
-        pass
+        raise MissingLockfileException("This tool requires lockfiles be enabled.")
     session = requests.Session()
     lockfile_paths = python_setup.resolves.items()
     lockfiles = [

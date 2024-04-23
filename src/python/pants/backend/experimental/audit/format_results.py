@@ -46,7 +46,6 @@ def format_results(
     if len(vuln_data) > 1:
         vuln_strings, sizes = tabulate(vuln_data)
 
-        # Create and add a separator.
         if len(vuln_data) > 0:
             vuln_strings.insert(1, generate_header(sizes))
 

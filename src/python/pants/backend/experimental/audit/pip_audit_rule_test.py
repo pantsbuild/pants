@@ -26,8 +26,6 @@ def rule_runner() -> RuleRunner:
             *PythonSetup.rules(),
             *pip_audit_rules(),
             *pex_requirements_rules(),
-            # *config_files.rules(),
-            # *target_types_rules.rules(),
             QueryRule(AuditResults, (PypiAuditRequest,)),
         ],
         target_types=[PythonRequirementTarget],
