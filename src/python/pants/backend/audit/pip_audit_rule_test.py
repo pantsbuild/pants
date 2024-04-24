@@ -7,11 +7,11 @@ import textwrap
 
 import pytest
 
-from pants.backend.experimental.audit.audit import AuditResult, AuditResults
-from pants.backend.experimental.audit.format_results import format_results
-from pants.backend.experimental.audit.pip_audit import VulnerabilityData
-from pants.backend.experimental.audit.pip_audit_rule import PypiAuditRequest
-from pants.backend.experimental.audit.pip_audit_rule import rules as pip_audit_rules
+from pants.backend.audit.audit import AuditResult, AuditResults
+from pants.backend.audit.format_results import format_results
+from pants.backend.audit.pip_audit import VulnerabilityData
+from pants.backend.audit.pip_audit_rule import PypiAuditRequest
+from pants.backend.audit.pip_audit_rule import rules as pip_audit_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules.pex_requirements import rules as pex_requirements_rules

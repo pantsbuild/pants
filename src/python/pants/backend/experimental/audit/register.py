@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import logging
 
-from pants.backend.experimental.audit.audit import rules as audit_rules
-from pants.backend.experimental.audit.pip_audit_rule import rules as pip_audit_rules
+from pants.backend.audit.audit import rules as audit_rules
+from pants.backend.audit.pip_audit_rule import rules as pip_audit_rules
 
 logger = logging.getLogger(__name__)
 

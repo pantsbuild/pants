@@ -7,7 +7,7 @@ from __future__ import annotations
 from itertools import zip_longest
 from typing import Any, Iterable
 
-from pants.backend.experimental.audit.pip_audit import VulnerabilityData
+from pants.backend.audit.pip_audit import VulnerabilityData
 
 
 def tabulate(rows: Iterable[Iterable[Any]]) -> tuple[list[str], list[int]]:

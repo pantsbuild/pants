@@ -7,9 +7,9 @@ from dataclasses import dataclass
 
 import requests
 
-from pants.backend.experimental.audit.audit import AuditRequest, AuditResult, AuditResults
-from pants.backend.experimental.audit.format_results import format_results
-from pants.backend.experimental.audit.pip_audit import audit_constraints_strings
+from pants.backend.audit.audit import AuditRequest, AuditResult, AuditResults
+from pants.backend.audit.format_results import format_results
+from pants.backend.audit.pip_audit import audit_constraints_strings
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.pex_requirements import (
