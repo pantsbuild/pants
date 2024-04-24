@@ -63,9 +63,10 @@ fn test_parse_quoted_string() {
     check_str("some\tembedded\nescapes\\", r"'some\tembedded\nescapes\\'");
     check_str("non-escaping \\w backslash", r"'non-escaping \w backslash'");
     check_str(
-        "some \u{0} octal \u{3f} values \u{53}",
-        r"'some \0 octal \77 values \123'",
+        "some \u{0} octal \u{3f} values \u{53} \u{1ff}",
+        r"'some \0 octal \77 values \123 \777'",
     );
+    check_str("almost octal \\8 &8", r"'almost octal \8 \468'");
     check_str(
         "some \u{ab} hex \u{00} values \u{cd}",
         r"'some \xab hex \x00 values \xCD'",

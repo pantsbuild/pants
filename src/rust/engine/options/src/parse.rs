@@ -86,13 +86,14 @@ peg::parser! {
 
         // Python octal escapes take 1-3 digits.
         rule escaped_octal() -> char = "\\" s:$(['0'..='7']*<1,3>) {
-            char::from_u32(usize::from_str_radix(s, 8).unwrap().try_into().unwrap()).unwrap()
+            char::from_u32(u32::from_str_radix(s, 8).unwrap()).unwrap()
         }
 
         // Python hex escapes take exactly 2 digits. Note that we mirror the Python behavior of
         // always consuming the next two characters and failing if they aren't valid hex digits.
         rule escaped_hex() -> char = "\\x" s:$([_] [_]) {
-            char::from_u32(usize::from_str_radix(s, 16).unwrap_or_else(|_| panic!("expected two hex digits, found {}", s)).try_into().unwrap()).unwrap()
+            char::from_u32(u32::from_str_radix(s, 16).unwrap_or_else(
+                |_| panic!("expected two hex digits, found {}", s))).unwrap()
         }
 
         rule escaped_character() -> char = c:(
