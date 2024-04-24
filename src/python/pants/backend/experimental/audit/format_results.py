@@ -7,6 +7,8 @@ from __future__ import annotations
 from itertools import zip_longest
 from typing import Any, Iterable
 
+from pants.backend.experimental.audit.pip_audit import VulnerabilityData
+
 
 def tabulate(rows: Iterable[Iterable[Any]]) -> tuple[list[str], list[int]]:
     """Return a list of formatted rows and a list of column sizes. For example::
@@ -30,7 +32,7 @@ def generate_header(sizes: Iterable[int]) -> str:
 
 
 def format_results(
-    result: dict[str, list[dict[str:Any]]],
+    result: dict[str, list[VulnerabilityData]],
 ) -> str:
     """Returns a column formatted string for a given mapping of dependencies to vulnerability
     results."""

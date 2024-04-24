@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 import requests
 from packaging.requirements import Requirement
@@ -19,10 +19,10 @@ class VulnerabilityData:
     fixed_in: List[
         str
     ]  # A list of versions that can be upgraded to that resolve the vulnerability.
-    aliases: Set[str]  # A set of aliases (alternative identifiers) for this result.
+    aliases: List[str]  # A set of aliases (alternative identifiers) for this result.
     link: str  # A link to the vulnerability info.
-    summary: str  # An optional short form human readable description.
-    withdrawn: bool  # Represents whether the vulnerability has been withdrawn.
+    summary: Optional[str]  # An optional short form human readable description.
+    withdrawn: Optional[str]  # Represents whether the vulnerability has been withdrawn.
 
     @classmethod
     def from_raw_data(self, data):
@@ -37,7 +37,9 @@ class VulnerabilityData:
         )
 
 
-def audit_constraints_strings(constraints_strings, session, excludes_ids) -> Dict[str, str]:
+def audit_constraints_strings(
+    constraints_strings, session, excludes_ids
+) -> Dict[str, List[VulnerabilityData]]:
     """Retrieve security warnings for the given constraints from the Pypi json API."""
     vulnerabilities = {}
     for constraint_string in constraints_strings:
@@ -53,7 +55,7 @@ def audit_constraints_strings(constraints_strings, session, excludes_ids) -> Dic
             version=specifier.version,
             session=session,
         )
-        if results is None:
+        if not results:
             continue
         vulnerabilities[str(requirement)] = [
             result for result in results if result.vuln_id not in excludes_ids
@@ -63,7 +65,7 @@ def audit_constraints_strings(constraints_strings, session, excludes_ids) -> Dic
 
 def audit_constraints_string(
     package_name: str, version: str, session: requests.Session
-) -> Optional[str]:
+) -> List[VulnerabilityData]:
     url = f"https://pypi.org/pypi/{package_name}/{str(version)}/json"
     response = session.get(url=url)
     response.raise_for_status()
@@ -71,5 +73,5 @@ def audit_constraints_string(
     vulnerabilities = response_json.get("vulnerabilities")
     if vulnerabilities:
         vulns = [VulnerabilityData.from_raw_data(vuln_data) for vuln_data in vulnerabilities]
-        print(vulns)
         return vulns
+    return []

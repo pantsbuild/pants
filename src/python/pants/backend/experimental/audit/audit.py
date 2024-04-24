@@ -97,11 +97,11 @@ async def audit(
     )
     requests = tuple(
         request_type(
-            request_type.field_set_type.create(target)
+            request_type.field_set_type.create(target)  # type: ignore[misc]
             for target in targets
             if (
                 request_type.tool_id in specified_ids
-                and request_type.field_set_type.is_applicable(target)
+                and request_type.field_set_type.is_applicable(target)  # type: ignore[misc]
             )
         )
         for request_type in request_types

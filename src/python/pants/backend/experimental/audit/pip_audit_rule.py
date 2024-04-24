@@ -47,7 +47,7 @@ class PypiAuditSubsystem(Subsystem):
     options_scope = "pypi-audit"
     help = "Configuration for the pypi audit rule."
 
-    lockfile_vulnerability_excludes = DictOption(
+    lockfile_vulnerability_excludes = DictOption[str](
         help=softwrap(
             """
             A mapping of logical names of Python lockfiles to a list of excluded vulnerability IDs.
