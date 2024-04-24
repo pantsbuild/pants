@@ -43,10 +43,10 @@ peg::parser! {
         }
 
         rule unquoted_string() -> String
-            = s:(non_escaped_character() / escaped_character())+ { s.into_iter().collect() }
+            = s:(escaped_character() / non_escaped_character())+ { s.into_iter().collect() }
 
         rule non_escaped_character() -> char
-            = !"\\" c:$([_]) { c.chars().next().unwrap() }
+            = c:$([_]) { c.chars().next().unwrap() }
 
         pub(crate) rule quoted_string() -> String
             = string:(double_quoted_string() / single_quoted_string()) { string }
@@ -55,23 +55,51 @@ peg::parser! {
             = "\"" s:double_quoted_character()* "\"" { s.into_iter().collect() }
 
         rule double_quoted_character() -> char
-            = quoted_character("\"")
-            / escaped_character()
+            = escaped_character() / quoted_character("\"")
 
         rule single_quoted_string() -> String
             = "'" s:single_quoted_character()* "'" { s.into_iter().collect() }
 
         rule single_quoted_character() -> char
-            = quoted_character("'")
-            / escaped_character()
+            = escaped_character() / quoted_character("'")
 
         // NB: ##method(X) is an undocumented peg feature expression that calls input.method(pos, X)
         // (see https://github.com/kevinmehall/rust-peg/issues/283).
         rule quoted_character(quote_char: &'static str) -> char
-            = !(##parse_string_literal(quote_char) / "\\") c:$([_]) { c.chars().next().unwrap() }
+            = !(##parse_string_literal(quote_char)) c:$([_]) { c.chars().next().unwrap() }
 
-        rule escaped_character() -> char
-            = "\\" c:$([_]) { c.chars().next().unwrap() }
+        // Python string literal escape sequences.
+        // See https://docs.python.org/3/reference/lexical_analysis.html#escape-sequences.
+        // Note that only backslash, single-quote, linefeed, carriage return and horizontal tab
+        // are also Rust character escape sequences.
+
+        rule escaped_ba() -> char = "\\\\" { '\\' }
+        rule escaped_sq() -> char = "\\'" { '\'' }
+        rule escaped_dq() -> char = "\\\"" { '"' }
+        rule escaped_be() -> char = "\\a" { '\x07' }
+        rule escaped_bs() -> char = "\\b" { '\x08' }
+        rule escaped_ff() -> char = "\\f" { '\x0c' }
+        rule escaped_lf() -> char = "\\n" { '\n' }
+        rule escaped_cr() -> char = "\\r" { '\r' }
+        rule escaped_ht() -> char = "\\t" { '\t' }
+        rule escaped_vt() -> char = "\\v" { '\x0b' }
+
+        // Python octal escapes take 1-3 digits.
+        rule escaped_octal() -> char = "\\" s:$(['0'..='7']*<1,3>) {
+            char::from_u32(usize::from_str_radix(s, 8).unwrap().try_into().unwrap()).unwrap()
+        }
+
+        // Python hex escapes take exactly 2 digits. Note that we mirror the Python behavior of
+        // always consuming the next two characters and failing if they aren't valid hex digits.
+        rule escaped_hex() -> char = "\\x" s:$([_] [_]) {
+            char::from_u32(usize::from_str_radix(s, 16).unwrap_or_else(|_| panic!("expected two hex digits, found {}", s)).try_into().unwrap()).unwrap()
+        }
+
+        rule escaped_character() -> char = c:(
+             escaped_ba() / escaped_sq() / escaped_dq() / escaped_be() / escaped_bs() /
+             escaped_ff() / escaped_lf() / escaped_cr() / escaped_ht() / escaped_vt() /
+             escaped_octal() / escaped_hex()
+        ) { c }
 
         rule list_add() -> ListEditAction
             = "+" { ListEditAction::Add }

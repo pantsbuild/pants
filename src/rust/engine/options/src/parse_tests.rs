@@ -35,23 +35,23 @@ fn check_with_arg<T: PartialEq + Debug>(
     }
 }
 
+fn check_str(expected: &str, input: &str) {
+    // This is slightly convoluted: quoted strings appear as list items,
+    // so we generate a list, and then extract the parsed string out of
+    // the Result<Vec<ListEdit<String>>, ...> returned by parse_list().
+    let parsed = String::parse_list(format!("[{}]", input).as_str())
+        .unwrap()
+        .first()
+        .unwrap()
+        .items
+        .first()
+        .unwrap()
+        .to_string();
+    check!(expected.to_string(), Ok(parsed));
+}
+
 #[test]
 fn test_parse_quoted_string() {
-    fn check_str(expected: &str, input: &str) {
-        // This is slightly convoluted: quoted strings appear as list items,
-        // so we generate a list, and then extract the parsed string out of
-        // the Result<Vec<ListEdit<String>>, ...> returned by parse_list().
-        let parsed = String::parse_list(format!("[{}]", input).as_str())
-            .unwrap()
-            .first()
-            .unwrap()
-            .items
-            .first()
-            .unwrap()
-            .to_string();
-        check!(expected.to_string(), Ok(parsed));
-    }
-
     check_str("", "''");
     check_str("", r#""""#);
     check_str("foo", "'foo'");
@@ -60,6 +60,22 @@ fn test_parse_quoted_string() {
     check_str("hanakapi'ai", r#""hanakapi'ai""#);
     check_str("bs\"d", r#""bs\"d""#);
     check_str("1995", r#""1995""#);
+    check_str("some\tembedded\nescapes\\", r"'some\tembedded\nescapes\\'");
+    check_str("non-escaping \\w backslash", r"'non-escaping \w backslash'");
+    check_str(
+        "some \u{0} octal \u{3f} values \u{53}",
+        r"'some \0 octal \77 values \123'",
+    );
+    check_str(
+        "some \u{ab} hex \u{00} values \u{cd}",
+        r"'some \xab hex \x00 values \xCD'",
+    );
+}
+
+#[test]
+#[should_panic(expected = "expected two hex digits, found ZZ")]
+fn test_bad_hex_digits_in_quoted_string() {
+    check_str("", r"'\xZZ'");
 }
 
 #[test]
@@ -362,24 +378,9 @@ fn test_parse_scalar_list_implicit_add() {
 #[test]
 fn test_parse_string_list_quoted_chars() {
     check!(
-        vec![string_list_edit(ListEditAction::Add, vec!["[]"])],
-        String::parse_list(r"\[]"),
-        "Expected an implicit add of the literal string `[]` via an escaped opening `[`."
-    );
-    check!(
-        vec![string_list_edit(ListEditAction::Add, vec![" "])],
-        String::parse_list(r"\ "),
-        "Expected an implicit add of the literal string ` `."
-    );
-    check!(
-        vec![string_list_edit(ListEditAction::Add, vec!["+"])],
-        String::parse_list(r"\+"),
-        "Expected an implicit add of the literal string `+`."
-    );
-    check!(
-        vec![string_list_edit(ListEditAction::Add, vec!["-"])],
-        String::parse_list(r"\-"),
-        "Expected an implicit add of the literal string `-`."
+        vec![string_list_edit(ListEditAction::Add, vec!["\\"])],
+        String::parse_list(r"\\"),
+        "Expected an implicit add of a literal backslash."
     );
     check!(
         vec![string_list_edit(
