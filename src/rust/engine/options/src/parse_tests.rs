@@ -68,15 +68,28 @@ fn test_parse_quoted_string() {
     );
     check_str("almost octal \\8 &8", r"'almost octal \8 \468'");
     check_str(
-        "some \u{ab} hex \u{00} values \u{cd}",
-        r"'some \xab hex \x00 values \xCD'",
+        "some \u{ab} hex \u{00} values \u{cd}0",
+        r"'some \xab hex \x00 values \xCD0'",
     );
+    check_str("Escaped backslash-x \\x00", r"'Escaped backslash-x \\x00'");
 }
 
 #[test]
-#[should_panic(expected = "expected two hex digits, found ZZ")]
+#[should_panic(expected = "two hex digits at line 1 column 7")]
+fn test_no_hex_digits_in_quoted_string() {
+    check_str("", r"'\x'");
+}
+
+#[test]
+#[should_panic(expected = "two hex digits at line 1 column 7")]
+fn test_too_few_hex_digits_in_quoted_string() {
+    check_str("", r"'\xZ'");
+}
+
+#[test]
+#[should_panic(expected = "two hex digits at line 1 column 7")]
 fn test_bad_hex_digits_in_quoted_string() {
-    check_str("", r"'\xZZ'");
+    check_str("", r"'\x0Z'");
 }
 
 #[test]

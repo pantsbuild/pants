@@ -46,7 +46,7 @@ peg::parser! {
             = s:(escaped_character() / non_escaped_character())+ { s.into_iter().collect() }
 
         rule non_escaped_character() -> char
-            = c:$([_]) { c.chars().next().unwrap() }
+            = !"\\x" c:$([_]) { c.chars().next().unwrap() }
 
         pub(crate) rule quoted_string() -> String
             = string:(double_quoted_string() / single_quoted_string()) { string }
@@ -66,12 +66,16 @@ peg::parser! {
         // NB: ##method(X) is an undocumented peg feature expression that calls input.method(pos, X)
         // (see https://github.com/kevinmehall/rust-peg/issues/283).
         rule quoted_character(quote_char: &'static str) -> char
-            = !(##parse_string_literal(quote_char)) c:$([_]) { c.chars().next().unwrap() }
+            = !(##parse_string_literal(quote_char) / "\\x") c:$([_]) { c.chars().next().unwrap() }
 
         // Python string literal escape sequences.
         // See https://docs.python.org/3/reference/lexical_analysis.html#escape-sequences.
         // Note that only backslash, single-quote, linefeed, carriage return and horizontal tab
         // are also Rust character escape sequences.
+        //
+        // TODO: Support \uXXXX and \UXXXXXXXX escapes? What about \N{name}?
+        //  The unicode_names crate would be helpful for the latter, but it seems like
+        //  overkill, and would add 500KB to the size of the Pants binary.
 
         rule escaped_ba() -> char = "\\\\" { '\\' }
         rule escaped_sq() -> char = "\\'" { '\'' }
@@ -91,9 +95,14 @@ peg::parser! {
 
         // Python hex escapes take exactly 2 digits. Note that we mirror the Python behavior of
         // always consuming the next two characters and failing if they aren't valid hex digits.
-        rule escaped_hex() -> char = "\\x" s:$([_] [_]) {
-            char::from_u32(u32::from_str_radix(s, 16).unwrap_or_else(
-                |_| panic!("expected two hex digits, found {}", s))).unwrap()
+        rule escaped_hex() -> char = "\\x" s:$([_] [_]) {?
+            if let Ok(n) = u32::from_str_radix(s, 16) {
+                // In practice all possible two-digit numbers are are valid character codes,
+                // so this error should never trigger.
+                char::from_u32(n).ok_or("valid character code")
+            } else {
+                Err("two hex digits")
+            }
         }
 
         rule escaped_character() -> char = c:(
