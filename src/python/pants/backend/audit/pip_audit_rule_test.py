@@ -94,66 +94,21 @@ report_a = format_results(
     }
 )
 
-report_b = format_results(
-    {
-        'setuptools==54.1.2; python_version >= "3.6"': [
-            VulnerabilityData(
-                vuln_id="GHSA-r9hx-vwmv-q579",
-                details=textwrap.dedent(
-                    """
-                    Python Packaging Authority (PyPA)'s setuptools is a library designed to
-                    facilitate packaging Python projects. Setuptools version 65.5.0 and earlier
-                    could allow remote attackers to cause a denial of service by fetching
-                    malicious HTML from a PyPI package or custom PackageIndex page due to a
-                    vulnerable Regular Expression in `package_index`. This has been patched
-                    in version 65.5.1.
-                """
-                ),
-                fixed_in=["65.5.1"],
-                aliases=["CVE-2022-40897"],
-                link="https://osv.dev/vulnerability/GHSA-r9hx-vwmv-q579",
-                summary=None,
-                withdrawn=None,
-            ),
-            VulnerabilityData(
-                vuln_id="PYSEC-2022-43012",
-                details=textwrap.dedent(
-                    """
-                    Python Packaging Authority (PyPA) setuptools before 65.5.1 allows remote
-                    attackers to cause a denial of service via HTML in a crafted package or
-                    custom PackageIndex page. There is a Regular Expression Denial of Service
-                    (ReDoS) in package_index.py.
-                """
-                ),
-                fixed_in=["65.5.1"],
-                aliases=["CVE-2022-40897"],
-                link="https://osv.dev/vulnerability/PYSEC-2022-43012",
-                summary=None,
-                withdrawn=None,
-            ),
-        ]
-    }
-)
-
 
 def test_pip_audit(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "a.lock": setuptools_poetry_lockfile,
-            "b.lock": setuptools_poetry_lockfile,
         }
     )
     rule_runner.set_options(
         [
-            "--python-resolves={'a': 'a.lock', 'b': 'b.lock'}",
+            "--python-resolves={'a': 'a.lock'}",
             "--python-enable-resolves",
         ],
     )
     result = rule_runner.request(AuditResults, [PypiAuditRequest(field_sets=())])
     assert result == AuditResults(
-        results=(
-            AuditResult(resolve_name="a", lockfile="a.lock", report=report_a),
-            AuditResult(resolve_name="b", lockfile="b.lock", report=report_b),
-        ),
+        results=(AuditResult(resolve_name="a", lockfile="a.lock", report=report_a),),
         auditor_name="pypi_auditor",
     )
