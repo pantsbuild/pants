@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import json
 from functools import partial
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 import pytest
 
@@ -44,20 +44,32 @@ def assert_dependents(
     targets: List[str],
     expected: Union[List[str], Dict[str, List[str]]],
     transitive: bool = False,
+    output_file: Optional[str] = None,
     closed: bool = False,
     output_format: DependentsOutputFormat = DependentsOutputFormat.text,
 ) -> None:
     args = []
     if transitive:
         args.append("--transitive")
+    if output_file:
+        args.extend([f"--output-file={output_file}"])
     if closed:
         args.append("--closed")
     args.append(f"--format={output_format.value}")
     result = rule_runner.run_goal_rule(DependentsGoal, args=[*args, *targets])
-    if output_format == DependentsOutputFormat.text:
-        assert result.stdout.splitlines() == expected
-    elif output_format == DependentsOutputFormat.json:
-        assert json.loads(result.stdout) == expected
+
+    if output_file is None:
+        if output_format == DependentsOutputFormat.text:
+            assert result.stdout.splitlines() == expected
+        elif output_format == DependentsOutputFormat.json:
+            assert json.loads(result.stdout) == expected
+    else:
+        assert not result.stdout
+        with open(output_file) as f:
+            if output_format == DependentsOutputFormat.text:
+                assert f.read().splitlines() == expected
+            elif output_format == DependentsOutputFormat.json:
+                assert json.load(f) == expected
 
 
 def test_no_targets(rule_runner: RuleRunner) -> None:
@@ -162,6 +174,16 @@ def test_dependents_as_json_direct_deps(rule_runner: RuleRunner) -> None:
             ],
             "leaf:leaf": ["leaf:leaf"],
             "special:special": ["special:special"],
+        },
+    )
+
+    # input: single target with output file
+    assert_deps(
+        targets=["base"],
+        transitive=False,
+        output_file="output.json",
+        expected={
+            "base:base": ["intermediate:intermediate"],
         },
     )
 
