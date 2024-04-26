@@ -41,7 +41,7 @@ class NativeOptionParser:
             # TODO: When we switch to Python 3.11, use: return isinstance(typ, EnumType)
             return inspect.isclass(typ) and issubclass(typ, Enum)
 
-        name_parts = flags[-1][2:].split("-")  # '--foo-bar' -> ['foo', 'bar']
+        name_parts = flags[-1][2:].replace(".", "-").split("-")  # '--foo.bar-baz' -> ['foo', 'bar', 'baz']
         switch = flags[0][1:] if len(flags) > 1 else None  # '-d' -> 'd'
         option_id = native_engine.PyOptionId(*name_parts, scope=scope or "GLOBAL", switch=switch)
 
