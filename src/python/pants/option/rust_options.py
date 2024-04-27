@@ -6,14 +6,24 @@ from __future__ import annotations
 import inspect
 import shlex
 from enum import Enum
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence, Tuple
 
 from pants.engine.internals import native_engine
 from pants.option.custom_types import _flatten_shlexed_list, shell_str
 from pants.option.errors import OptionsError
+from pants.option.ranked_value import Rank
 
 
 class NativeOptionParser:
+    int_to_rank = [
+        Rank.NONE,
+        Rank.HARDCODED,
+        Rank.CONFIG_DEFAULT,
+        Rank.CONFIG,
+        Rank.ENVIRONMENT,
+        Rank.FLAG,
+    ]
+
     def __init__(
         self,
         args: Optional[Sequence[str]],
@@ -22,16 +32,17 @@ class NativeOptionParser:
         allow_pantsrc: bool,
     ):
         self._native_parser = native_engine.PyOptionParser(
-            args, dict(env), configs, allow_pantsrc,
+            args,
+            dict(env),
+            configs,
+            allow_pantsrc,
         )
-        def temp_silliness(x, y):
-            return self._native_parser.get_string(x, y)[0]
 
         self._getter_by_type = {
             (bool, None): self._native_parser.get_bool,
             (int, None): self._native_parser.get_int,
             (float, None): self._native_parser.get_float,
-            (str, None): temp_silliness,
+            (str, None): self._native_parser.get_string,
             (list, bool): self._native_parser.get_bool_list,
             (list, int): self._native_parser.get_int_list,
             (list, float): self._native_parser.get_float_list,
@@ -39,12 +50,16 @@ class NativeOptionParser:
             (dict, None): self._native_parser.get_dict,
         }
 
-    def get(self, *, scope, flags, default, option_type, member_type=None, passthrough=False) -> Any:
+    def get(
+        self, *, scope, flags, default, option_type, member_type=None, passthrough=False
+    ) -> Tuple[Any, Rank]:
         def is_enum(typ):
             # TODO: When we switch to Python 3.11, use: return isinstance(typ, EnumType)
             return inspect.isclass(typ) and issubclass(typ, Enum)
 
-        name_parts = flags[-1][2:].replace(".", "-").split("-")  # '--foo.bar-baz' -> ['foo', 'bar', 'baz']
+        name_parts = (
+            flags[-1][2:].replace(".", "-").split("-")
+        )  # '--foo.bar-baz' -> ['foo', 'bar', 'baz']
         switch = flags[0][1:] if len(flags) > 1 else None  # '-d' -> 'd'
         option_id = native_engine.PyOptionId(*name_parts, scope=scope or "GLOBAL", switch=switch)
 
@@ -93,7 +108,8 @@ class NativeOptionParser:
             suffix = f" with member type {rust_member_type}" if rust_option_type is list else ""
             raise OptionsError(f"Unsupported type: {rust_option_type}{suffix}")
 
-        val = getter(option_id, default)
+        val, rank_int = getter(option_id, default)
+        rank = self.int_to_rank[rank_int]
 
         if val is not None:
             if option_type is list:
@@ -107,15 +123,5 @@ class NativeOptionParser:
                 val = option_type(val)
             elif callable(option_type):
                 val = option_type(val)
-        return val
 
-
-
-def foo() -> None:
-    native_parser = native_engine.PyOptionParser([], {}, None, True)
-    option_id = native_engine.PyOptionId("version_for_resolve", scope="scala")
-    val = native_parser.get_dict(
-        option_id,
-        {"FOO": "BAR", "BAZ": 55, "QUX": True, "QUUX": 5.4, "FIZZ": [1, 2], "BUZZ": {"X": "Y"}},
-    )
-    print(f"XXXXXX {val}")
+        return (val, rank)

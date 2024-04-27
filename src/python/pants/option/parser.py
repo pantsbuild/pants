@@ -199,7 +199,7 @@ class Parser:
         for args, kwargs in self._option_registrations:
             self._validate(args, kwargs)
             dest = self.parse_dest(*args, **kwargs)
-            val = native_parser.get(
+            val, rank = native_parser.get(
                 scope=self.scope,
                 flags=args,
                 default=kwargs.get("default"),
@@ -207,8 +207,7 @@ class Parser:
                 member_type=kwargs.get("member_type"),
                 passthrough=kwargs.get("passthrough"),
             )
-            # TODO: If the option is explicitly given, check deprecation and mutual exclusion.
-            setattr(namespace, dest, RankedValue(Rank.HARDCODED, val))
+            setattr(namespace, dest, RankedValue(rank, val))
         return namespace.build()
 
     def parse_args(

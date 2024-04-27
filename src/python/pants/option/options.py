@@ -391,7 +391,7 @@ class Options:
             if isinstance(x, (tuple, list)):
                 return [listify_tuples(y) for y in x]
             elif isinstance(x, dict):
-                return {k: listify_tuples(v) for k, v in x.items() }
+                return {k: listify_tuples(v) for k, v in x.items()}
             else:
                 return x
 

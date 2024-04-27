@@ -12,12 +12,13 @@ from typing import (
     Generic,
     Iterable,
     Mapping,
+    Optional,
     Protocol,
     Sequence,
     TextIO,
     Tuple,
     TypeVar,
-    overload, Optional,
+    overload,
 )
 
 from typing_extensions import Self
@@ -539,35 +540,39 @@ class PantsdClientException(Exception):
 
 class PyOptionId:
     def __init__(
-            self, *components: str, scope: str | None = None, switch: str | None = None
+        self, *components: str, scope: str | None = None, switch: str | None = None
     ) -> None: ...
 
-
 # A pair of (option value, rank). See src/python/pants/option/ranked_value.py.
-type OptionValue[T] = Tuple[Optional[T], int]
-type OptionListValue[T] = Tuple[list[T], int]
-type OptionDictValue = Tuple[dict[str, Any], int]
-
+T = TypeVar("T")
+OptionValue = Tuple[Optional[T], int]
+OptionListValue = Tuple[list[T], int]
+OptionDictValue = Tuple[dict[str, Any], int]
 
 class PyOptionParser:
-    def __init__(self,
-                 args: Optional[Sequence[str]],
-                 env: dict[str, str],
-                 configs: Optional[Sequence[str]],
-                 allow_pantsrc: bool) -> None: ...
-
+    def __init__(
+        self,
+        args: Optional[Sequence[str]],
+        env: dict[str, str],
+        configs: Optional[Sequence[str]],
+        allow_pantsrc: bool,
+    ) -> None: ...
     def get_bool(self, option_id: PyOptionId, default: Optional[bool]) -> OptionValue[bool]: ...
     def get_int(self, option_id: PyOptionId, default: Optional[int]) -> OptionValue[int]: ...
     def get_float(self, option_id: PyOptionId, default: Optional[float]) -> OptionValue[float]: ...
     def get_string(self, option_id: PyOptionId, default: Optional[str]) -> OptionValue[str]: ...
-    def get_bool_list(self, option_id: PyOptionId, default: list[bool]) -> OptionListValue[bool]: ...
+    def get_bool_list(
+        self, option_id: PyOptionId, default: list[bool]
+    ) -> OptionListValue[bool]: ...
     def get_int_list(self, option_id: PyOptionId, default: list[int]) -> OptionListValue[int]: ...
-    def get_float_list(self, option_id: PyOptionId, default: list[float]) -> OptionListValue[float]: ...
-    def get_string_list(self, option_id: PyOptionId, default: list[str]) -> OptionListValue[str]: ...
+    def get_float_list(
+        self, option_id: PyOptionId, default: list[float]
+    ) -> OptionListValue[float]: ...
+    def get_string_list(
+        self, option_id: PyOptionId, default: list[str]
+    ) -> OptionListValue[str]: ...
     def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionDictValue: ...
-
     def get_passthrough_args(self) -> Optional[list[str]]: ...
-
 
 # ------------------------------------------------------------------------------
 # Testutil

@@ -113,9 +113,7 @@ def test_bool_explicit_values() -> None:
         opt.register(GLOBAL_SCOPE, "--opt", type=bool)
 
     def assert_val(arg: str, expected: bool) -> None:
-        with create_options(
-            [GLOBAL_SCOPE], register, [f"--opt={arg}"]
-        ) as opts:
+        with create_options([GLOBAL_SCOPE], register, [f"--opt={arg}"]) as opts:
             assert opts.for_global_scope().opt is expected
 
     assert_val("false", False)
@@ -323,7 +321,9 @@ def test_deprecated_options(caplog) -> None:
     ) -> None:
         caplog.clear()
         warn_or_error.clear()  # type: ignore[attr-defined]
-        with create_options([GLOBAL_SCOPE, "scope"], register, args, env=env, config=config) as opts:
+        with create_options(
+            [GLOBAL_SCOPE, "scope"], register, args, env=env, config=config
+        ) as opts:
             assert opts.for_scope(scope)[opt] == expected
             assert len(caplog.records) == 1
             assert "is scheduled to be removed in version" in caplog.text
@@ -349,12 +349,7 @@ def test_deprecated_options(caplog) -> None:
     caplog.clear()
     warn_or_error.clear()  # type: ignore[attr-defined]
     with create_options([GLOBAL_SCOPE, "scope"], register, ["--scope-valid=x"]) as opts:
-        assert (
-            opts
-            .for_scope("scope")
-            .valid
-            == "x"
-        )
+        assert opts.for_scope("scope").valid == "x"
         assert not caplog.records
 
 
