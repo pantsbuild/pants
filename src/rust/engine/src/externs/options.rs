@@ -5,7 +5,9 @@ use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 
-use options::{Args, Env, ListOptionValue, OptionId, OptionParser, Scope, Val};
+use options::{
+    Args, Env, ListOptionValue, OptionId, OptionParser, OptionalOptionValue, Scope, Val,
+};
 
 use std::collections::HashMap;
 
@@ -123,6 +125,13 @@ impl PyOptionId {
 #[pyclass]
 struct PyOptionParser(OptionParser);
 
+type RankedVal<T> = (T, isize);
+
+fn to_py<T>(res: Result<OptionalOptionValue<T>, String>) -> PyResult<RankedVal<Option<T>>> {
+    let val = res.map_err(PyException::new_err)?;
+    Ok((val.value, val.source.rank() as isize))
+}
+
 #[allow(clippy::type_complexity)]
 impl PyOptionParser {
     fn get_list<T: ToOwned + ?Sized>(
@@ -134,9 +143,9 @@ impl PyOptionParser {
             &OptionId,
             Vec<T::Owned>,
         ) -> Result<ListOptionValue<T::Owned>, String>,
-    ) -> PyResult<Vec<T::Owned>> {
-        let opt_val = getter(&self.0, &option_id.0, default).map_err(PyException::new_err)?.value;
-        Ok(opt_val)
+    ) -> PyResult<(Vec<T::Owned>, isize)> {
+        let opt_val = getter(&self.0, &option_id.0, default).map_err(PyException::new_err)?;
+        Ok((opt_val.value, opt_val.source.rank() as isize))
     }
 }
 
@@ -168,35 +177,63 @@ impl PyOptionParser {
         Ok(Self(option_parser))
     }
 
-    fn get_bool(&self, option_id: &PyOptionId, default: Option<bool>) -> PyResult<Option<bool>> {
-        Ok(self.0.parse_bool_optional(&option_id.0, default).map_err(PyException::new_err)?.value)
+    fn get_bool(
+        &self,
+        option_id: &PyOptionId,
+        default: Option<bool>,
+    ) -> PyResult<RankedVal<Option<bool>>> {
+        to_py(self.0.parse_bool_optional(&option_id.0, default))
     }
 
-    fn get_int(&self, option_id: &PyOptionId, default: Option<i64>) -> PyResult<Option<i64>> {
-        Ok(self.0.parse_int_optional(&option_id.0, default).map_err(PyException::new_err)?.value)
+    fn get_int(
+        &self,
+        option_id: &PyOptionId,
+        default: Option<i64>,
+    ) -> PyResult<RankedVal<Option<i64>>> {
+        to_py(self.0.parse_int_optional(&option_id.0, default))
     }
 
-    fn get_float(&self, option_id: &PyOptionId, default: Option<f64>) -> PyResult<Option<f64>> {
-        Ok(self.0.parse_float_optional(&option_id.0, default).map_err(PyException::new_err)?.value)
+    fn get_float(
+        &self,
+        option_id: &PyOptionId,
+        default: Option<f64>,
+    ) -> PyResult<RankedVal<Option<f64>>> {
+        to_py(self.0.parse_float_optional(&option_id.0, default))
     }
 
-    fn get_string(&self, option_id: &PyOptionId, default: Option<&str>) -> PyResult<Option<String>> {
-        Ok(self.0.parse_string_optional(&option_id.0, default).map_err(PyException::new_err)?.value)
+    fn get_string(
+        &self,
+        option_id: &PyOptionId,
+        default: Option<&str>,
+    ) -> PyResult<RankedVal<Option<String>>> {
+        to_py(self.0.parse_string_optional(&option_id.0, default))
     }
 
-    fn get_bool_list(&self, option_id: &PyOptionId, default: Vec<bool>) -> PyResult<Vec<bool>> {
+    fn get_bool_list(
+        &self,
+        option_id: &PyOptionId,
+        default: Vec<bool>,
+    ) -> PyResult<RankedVal<Vec<bool>>> {
         self.get_list::<bool>(option_id, default, |op, oid, def| {
             op.parse_bool_list(oid, def)
         })
     }
 
-    fn get_int_list(&self, option_id: &PyOptionId, default: Vec<i64>) -> PyResult<Vec<i64>> {
+    fn get_int_list(
+        &self,
+        option_id: &PyOptionId,
+        default: Vec<i64>,
+    ) -> PyResult<RankedVal<Vec<i64>>> {
         self.get_list::<i64>(option_id, default, |op, oid, def| {
             op.parse_int_list(oid, def)
         })
     }
 
-    fn get_float_list(&self, option_id: &PyOptionId, default: Vec<f64>) -> PyResult<Vec<f64>> {
+    fn get_float_list(
+        &self,
+        option_id: &PyOptionId,
+        default: Vec<f64>,
+    ) -> PyResult<RankedVal<Vec<f64>>> {
         self.get_list::<f64>(option_id, default, |op, oid, def| {
             op.parse_float_list(oid, def)
         })
@@ -206,7 +243,7 @@ impl PyOptionParser {
         &self,
         option_id: &PyOptionId,
         default: Vec<String>,
-    ) -> PyResult<Vec<String>> {
+    ) -> PyResult<RankedVal<Vec<String>>> {
         self.get_list::<String>(option_id, default, |op, oid, def| {
             op.parse_string_list(oid, def)
         })
@@ -217,7 +254,7 @@ impl PyOptionParser {
         py: Python,
         option_id: &PyOptionId,
         default: &PyDict,
-    ) -> PyResult<HashMap<String, PyObject>> {
+    ) -> PyResult<RankedVal<HashMap<String, PyObject>>> {
         let default = default
             .items()
             .into_iter()
@@ -229,15 +266,16 @@ impl PyOptionParser {
         let opt_val = self
             .0
             .parse_dict(&option_id.0, default)
-            .map_err(PyException::new_err)?
-            .value;
-        opt_val
+            .map_err(PyException::new_err)?;
+        let opt_val_py = opt_val
+            .value
             .into_iter()
             .map(|(k, v)| match val_to_py_object(py, &v) {
                 Ok(pyobj) => Ok((k, pyobj)),
                 Err(err) => Err(err),
             })
-            .collect()
+            .collect::<PyResult<HashMap<String, PyObject>>>()?;
+        Ok((opt_val_py, opt_val.source.rank() as isize))
     }
 
     fn get_passthrough_args(&self) -> PyResult<Option<Vec<String>>> {

@@ -199,6 +199,30 @@ pub enum Source {
     Flag,
 }
 
+// NB: Must mirror the Rank enum in src/python/pants/option/ranked_value.py.
+pub enum Rank {
+    _NONE = 0,          // Unused, exists for historical Python compatibility reasons.
+    HARDCODED = 1,      // The default provided at option registration.
+    _CONFIGDEFAULT = 2, // Unused, exists for historical Python compatibility reasons.
+    CONFIG = 3,         // The value from the relevant section of the config file.
+    ENVIRONMENT = 4,    // The value from the appropriately-named environment variable.
+    FLAG = 5,           // The value from the appropriately-named command-line flag.
+}
+
+impl Source {
+    pub fn rank(&self) -> Rank {
+        match *self {
+            Source::Default => Rank::HARDCODED,
+            Source::Config {
+                ordinal: _,
+                path: _,
+            } => Rank::CONFIG,
+            Source::Env => Rank::ENVIRONMENT,
+            Source::Flag => Rank::FLAG,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct OptionValue<T> {
     pub derivation: Option<Vec<(Source, T)>>,

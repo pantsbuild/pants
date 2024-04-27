@@ -24,11 +24,14 @@ class NativeOptionParser:
         self._native_parser = native_engine.PyOptionParser(
             args, dict(env), configs, allow_pantsrc,
         )
+        def temp_silliness(x, y):
+            return self._native_parser.get_string(x, y)[0]
+
         self._getter_by_type = {
             (bool, None): self._native_parser.get_bool,
             (int, None): self._native_parser.get_int,
             (float, None): self._native_parser.get_float,
-            (str, None): self._native_parser.get_string,
+            (str, None): temp_silliness,
             (list, bool): self._native_parser.get_bool_list,
             (list, int): self._native_parser.get_int_list,
             (list, float): self._native_parser.get_float_list,

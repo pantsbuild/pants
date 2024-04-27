@@ -73,8 +73,7 @@ impl EnvReader {
             "PANTS_{}_{}",
             id.scope
                 .name()
-                .replace('-', "_")
-                .replace('.', "_")
+                .replace(['-', '.'], "_")
                 .to_ascii_uppercase(),
             name
         )];
