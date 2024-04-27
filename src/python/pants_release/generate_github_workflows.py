@@ -182,7 +182,7 @@ def ensure_release_notes() -> Sequence[Step]:
                 # - category:internal label (similar to the previous label)
                 """
                 github.event_name == 'pull_request' &&
-                !needs.classify_changes.output.notes &&
+                !needs.classify_changes.outputs.notes &&
                 !contains(github.event.issue.labels.*.name, 'release-notes-not-required') &&
                 !contains(github.event.issue.labels.*.name, 'category:internal')
                 """
