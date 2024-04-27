@@ -60,6 +60,7 @@ class PythonSetup(Subsystem):
         "3.10",
         "3.11",
         "3.12",
+        "3.13",
     ]
 
     _interpreter_constraints = StrListOption(
