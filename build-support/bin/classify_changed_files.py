@@ -17,6 +17,7 @@ class Affected(enum.Enum):
     rust = "rust"
     release = "release"
     ci_config = "ci_config"
+    notes = "notes"
     other = "other"
 
 
@@ -40,6 +41,9 @@ _ci_config_globs = [
     "build-support/bin/classify_changed_files.py",
     "src/python/pants_release/generate_github_workflows.py",
 ]
+_notes_globs = [
+    "docs/notes/*",
+]
 
 
 _affected_to_globs = {
@@ -47,6 +51,7 @@ _affected_to_globs = {
     Affected.rust: _rust_globs,
     Affected.release: _release_globs,
     Affected.ci_config: _ci_config_globs,
+    Affected.notes: _notes_globs,
 }
 
 
