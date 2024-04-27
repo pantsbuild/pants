@@ -74,6 +74,13 @@ class PythonFaaSLayoutField(StringField):
     valid_choices = PexVenvLayout
     expected_type = str
     default = PexVenvLayout.FLAT_ZIPPED.value
+    help = help_text(
+        """
+        Control the layout of the final artifact: `flat` creates a directory with the
+        source and requirements at the top level, as recommended by cloud vendors,
+        while `flat-zipped` (the default) wraps this up into a single zip file.
+        """
+    )
 
 
 class PythonFaaSPex3VenvCreateExtraArgsField(StringSequenceField):
@@ -82,7 +89,7 @@ class PythonFaaSPex3VenvCreateExtraArgsField(StringSequenceField):
     help = help_text(
         """
         Any extra arguments to pass to the `pex3 venv create` invocation that is used to create the
-        final zip file.
+        final zip file or directory.
 
         For example, `pex3_venv_create_extra_args=["--collisions-ok"]`, if using packages that have
         colliding files that aren't required at runtime (errors like "Encountered collisions
