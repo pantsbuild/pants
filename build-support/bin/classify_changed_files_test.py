@@ -14,7 +14,7 @@ from classify_changed_files import Affected, classify
             {Affected.docs},
         ],
         [
-            ["src/python/pants/notes/2.16.x.md"],
+            ["docs/notes/2.16.x.md"],
             {Affected.docs},
         ],
         [["src/rust/engine/path/to/file.rs"], {Affected.rust}],
