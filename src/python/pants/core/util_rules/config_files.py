@@ -145,7 +145,7 @@ async def gather_config_files_by_workspace_dir(
             )
             if request.orphan_filepath_behavior == OrphanFilepathConfigBehavior.ERROR:
                 raise ValueError(msg)
-            else:
+            elif request.orphan_filepath_behavior == OrphanFilepathConfigBehavior.WARN:
                 logger.warning(msg)
 
     return GatheredConfigFilesByDirectories(
