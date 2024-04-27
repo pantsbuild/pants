@@ -34,7 +34,7 @@ from pants.backend.python.util_rules.faas import (
 )
 from pants.backend.python.util_rules.pex import CompletePlatforms, Pex, PexPlatforms
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
-from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvRequest
+from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
 from pants.build_graph.address import Address
 from pants.core.goals.package import OutputPathField
 from pants.core.target_types import FileTarget
@@ -414,6 +414,7 @@ def test_venv_create_extra_args_are_passed_through() -> None:
         output_path=OutputPathField(None, addr),
         runtime=Mock(),
         pex3_venv_create_extra_args=extra_args_field,
+        layout=PexVenvLayout.FLAT_ZIPPED,
         include_requirements=False,
         include_sources=False,
         reexported_handler_module=None,
