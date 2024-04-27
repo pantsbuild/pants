@@ -109,6 +109,7 @@ def classify_changes() -> Jobs:
                 "rust": gha_expr("steps.classify.outputs.rust"),
                 "release": gha_expr("steps.classify.outputs.release"),
                 "ci_config": gha_expr("steps.classify.outputs.ci_config"),
+                "notes": gha_expr("steps.classify.outputs.notes"),
                 "other": gha_expr("steps.classify.outputs.other"),
             },
             "steps": [

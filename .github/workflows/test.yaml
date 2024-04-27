@@ -569,6 +569,7 @@ jobs:
       ci_config: ${{ steps.classify.outputs.ci_config }}
       docs: ${{ steps.classify.outputs.docs }}
       docs_only: ${{ steps.classify.outputs.docs_only }}
+      notes: ${{ steps.classify.outputs.notes }}
       other: ${{ steps.classify.outputs.other }}
       release: ${{ steps.classify.outputs.release }}
       rust: ${{ steps.classify.outputs.rust }}
