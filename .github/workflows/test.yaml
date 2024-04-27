@@ -587,8 +587,8 @@ jobs:
         \  # pull request: compare to the base branch, ensuring that commit exists\n  git fetch --depth=1 \"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\
         \n  comparison_sha=\"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\nfi\necho \"comparison_sha=$comparison_sha\"\n\naffected=$(git\
         \ diff --name-only \"$comparison_sha\" HEAD | python build-support/bin/classify_changed_files.py)\necho \"Affected:\"\
-        \nif [[ \"${affected}\" == \"docs\" ]]; then\n  echo \"docs_only=true\" | tee -a $GITHUB_OUTPUT\nfi\nfor i in ${affected};\
-        \ do\n  echo \"${i}=true\" | tee -a $GITHUB_OUTPUT\ndone\n"
+        \nif [[ \"${affected}\" == \"docs\" || \"${affected}\" == \"docs notes\" ]]; then\n  echo \"docs_only=true\" | tee\
+        \ -a $GITHUB_OUTPUT\nfi\nfor i in ${affected}; do\n  echo \"${i}=true\" | tee -a $GITHUB_OUTPUT\ndone\n"
   lint_python:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Lint Python and Shell

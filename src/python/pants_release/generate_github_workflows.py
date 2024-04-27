@@ -132,7 +132,7 @@ def classify_changes() -> Jobs:
 
                         affected=$(git diff --name-only "$comparison_sha" HEAD | python build-support/bin/classify_changed_files.py)
                         echo "Affected:"
-                        if [[ "${affected}" == "docs" ]]; then
+                        if [[ "${affected}" == "docs" || "${affected}" == "docs notes" ]]; then
                           echo "docs_only=true" | tee -a $GITHUB_OUTPUT
                         fi
                         for i in ${affected}; do
