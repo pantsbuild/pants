@@ -689,6 +689,7 @@ jobs:
     needs:
     - classify_changes
     - check_labels
+    - check_release_notes
     - bootstrap_pants_linux_arm64
     - bootstrap_pants_linux_x86_64
     - bootstrap_pants_macos11_x86_64

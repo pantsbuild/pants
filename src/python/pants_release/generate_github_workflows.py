@@ -1680,7 +1680,7 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
             # NB: This always() condition is critical, as it ensures that this job is run even if
             #   jobs it depends on are skipped.
             "if": "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
-            "needs": ["classify_changes", "check_labels"] + sorted(pr_jobs),
+            "needs": ["classify_changes", "check_labels", "check_release_notes"] + sorted(pr_jobs),
             "outputs": {"merge_ok": f"{gha_expr('steps.set_merge_ok.outputs.merge_ok')}"},
             "steps": [
                 {
