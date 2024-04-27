@@ -109,7 +109,9 @@ async def list_dependencies_as_json(
     # for them, the lists of dependencies are returned in the very same order.
     mapping = dict(zip([str(tgt.address) for tgt in target_roots], iterated_targets))
     output = json.dumps(mapping, indent=4)
-    console.print_stdout(output)
+
+    with dependencies_subsystem.line_oriented(console) as print_stdout:
+        print_stdout(output)
 
 
 async def list_dependencies_as_plain_text(
