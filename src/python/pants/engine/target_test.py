@@ -1332,6 +1332,16 @@ def test_explicitly_provided_dependencies_disambiguated() -> None:
         == addr_a
     )
 
+    # Verify that ignores works for parametrized targets
+    assert get_disambiguated(
+        ambiguous=[
+            Address(spec_path="", target_name="src", parameters={"tag": "a"}),
+            Address(spec_path="", target_name="src", parameters={"tag": "b"}),
+        ],
+        includes=[Address(spec_path="", target_name="src", parameters={"tag": "a"})],
+        ignores=[Address(spec_path="", target_name="src", parameters={"tag": "b"})],
+    )
+
 
 def test_explicitly_provided_dependencies_maybe_warn_of_ambiguous_dependency_inference(
     caplog,
