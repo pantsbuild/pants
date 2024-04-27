@@ -562,6 +562,36 @@ jobs:
         labels: category:new feature, category:user api change, category:plugin api change, category:performance, category:bugfix,
           category:documentation, category:internal
         mode: exactly
+  check_release_notes:
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Ensure PR has release notes
+    needs:
+    - classify_changes
+    - check_labels
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - if: '
+
+        github.event_name == ''pull_request'' &&
+
+        !needs.classify_changes.output.notes &&
+
+        !contains(github.event.issue.labels.*.name, ''release-notes-not-required'') &&
+
+        !contains(github.event.issue.labels.*.name, ''category:internal'')
+
+        '
+      name: Release notes required
+      run: '
+
+        echo ''This PR should either: add release notes to the appropriate file in `docs/notes`, or, be labelled with `release-notes-not-required`
+        if it does not need them.''
+
+        exit 1
+
+        '
   classify_changes:
     if: github.repository_owner == 'pantsbuild'
     name: Classify changes
@@ -667,6 +697,7 @@ jobs:
     - build_wheels_macos10_15_x86_64
     - build_wheels_macos11_arm64
     - check_labels
+    - check_release_notes
     - classify_changes
     - lint_python
     - test_python_linux_arm64
