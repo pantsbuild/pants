@@ -455,3 +455,58 @@ def test_venv_create_extra_args_are_passed_through() -> None:
     # Verify
     assert len(observed_extra_args) == 1
     assert observed_extra_args[0] == extra_args
+
+
+@pytest.mark.parametrize(
+    "input_layout,expected_output",
+    [
+        (PexVenvLayout.FLAT_ZIPPED, "x.zip"),
+        (PexVenvLayout.FLAT, "x"),
+        # PexVenvLayout.VENV is semi-supported: if a user can get it to work, that's fine, but we don't explicitly support it.
+    ],
+)
+def test_layout_should_be_passed_through_and_adjust_filename(input_layout, expected_output) -> None:
+    # Setup
+    addr = Address("x")
+    request = BuildPythonFaaSRequest(
+        address=addr,
+        target_name="x",
+        complete_platforms=Mock(),
+        handler=None,
+        output_path=OutputPathField(None, addr),
+        runtime=Mock(),
+        pex3_venv_create_extra_args=Mock(),
+        layout=input_layout,
+        include_requirements=False,
+        include_sources=False,
+        reexported_handler_module=None,
+    )
+
+    mock_build = Mock()
+
+    # Exercise
+    run_rule_with_mocks(
+        build_python_faas,
+        rule_args=[request],
+        mock_gets=[
+            MockGet(
+                output_type=RuntimePlatforms,
+                input_types=(RuntimePlatformsRequest,),
+                mock=lambda _: RuntimePlatforms(interpreter_version=None),
+            ),
+            MockGet(
+                output_type=ResolvedPythonFaaSHandler,
+                input_types=(ResolvePythonFaaSHandlerRequest,),
+                mock=lambda _: Mock(),
+            ),
+            MockGet(output_type=Digest, input_types=(CreateDigest,), mock=lambda _: EMPTY_DIGEST),
+            MockGet(
+                output_type=Pex,
+                input_types=(PexFromTargetsRequest,),
+                mock=lambda _: Pex(digest=EMPTY_DIGEST, name="pex", python=None),
+            ),
+            MockGet(output_type=PexVenv, input_types=(PexVenvRequest,), mock=mock_build),
+        ],
+    )
+
+    assert str(mock_build.mock_calls[0].args[0].output_path.name) == expected_output
