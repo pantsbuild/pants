@@ -68,8 +68,7 @@ def classify(changed_files: list[str]) -> set[Affected]:
 
 def main() -> None:
     affecteds = classify(sys.stdin.read().splitlines())
-    for affected in sorted([a.name for a in affecteds]):
-        print(affected)
+    print(" ".join(sorted(a.name for a in affecteds)))
 
 
 if __name__ == "__main__":
