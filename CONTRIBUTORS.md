@@ -138,6 +138,7 @@ Created as part of the release process.
 + Jackson Davis
 + Jacob Floyd
 + Jake Donham
++ Jake Zerrer
 + Jakub Bujny
 + James Bench
 + James Koch
@@ -368,4 +369,5 @@ Created as part of the release process.
 + sww
 + twunderlich-grapl
 + wimax-grapl
++ yjabri
 + Ólafur Páll Geirsson
