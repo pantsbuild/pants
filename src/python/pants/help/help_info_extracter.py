@@ -393,6 +393,25 @@ class PluginAPITypeInfo:
 
         return satisfies
 
+    def merged_with(self, that: PluginAPITypeInfo) -> PluginAPITypeInfo:
+        def merge_tuples(l, r):
+            return tuple(sorted({*l, *r}))
+
+        return PluginAPITypeInfo(
+            self.name,
+            self.module,
+            self.documentation,
+            merge_tuples(self.provider, that.provider),
+            self.is_union,
+            self.union_type,
+            merge_tuples(self.union_members, that.union_members),
+            merge_tuples(self.dependencies, that.dependencies),
+            merge_tuples(self.dependents, that.dependents),
+            merge_tuples(self.returned_by_rules, that.returned_by_rules),
+            merge_tuples(self.consumed_by_rules, that.consumed_by_rules),
+            merge_tuples(self.used_in_rules, that.used_in_rules),
+        )
+
 
 @dataclass(frozen=True)
 class BackendHelpInfo:
@@ -822,31 +841,12 @@ class HelpInfoExtracter:
                 ),
             )
 
-        def merge_type_info(this: PluginAPITypeInfo, that: PluginAPITypeInfo) -> PluginAPITypeInfo:
-            def merge_tuples(l, r):
-                return tuple(sorted({*l, *r}))
-
-            return PluginAPITypeInfo(
-                this.name,
-                this.module,
-                this.documentation,
-                merge_tuples(this.provider, that.provider),
-                this.is_union,
-                this.union_type,
-                merge_tuples(this.union_members, that.union_members),
-                merge_tuples(this.dependencies, that.dependencies),
-                merge_tuples(this.dependents, that.dependents),
-                merge_tuples(this.returned_by_rules, that.returned_by_rules),
-                merge_tuples(this.consumed_by_rules, that.consumed_by_rules),
-                merge_tuples(this.used_in_rules, that.used_in_rules),
-            )
-
         infos: dict[str, PluginAPITypeInfo] = {}
         for api_type in sorted(all_types, key=attrgetter("__name__")):
             api_type_name = f"{api_type.__module__}.{api_type.__qualname__}"
             api_type_info = get_api_type_info(api_type)
             if api_type_name in infos:
-                infos[api_type_name] = merge_type_info(infos[api_type_name], api_type_info)
+                infos[api_type_name] = infos[api_type_name].merged_with(api_type_info)
             else:
                 infos[api_type_name] = api_type_info
 
