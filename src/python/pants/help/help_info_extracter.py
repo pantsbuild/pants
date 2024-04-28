@@ -332,6 +332,10 @@ class PluginAPITypeInfo:
     consumed_by_rules: tuple[str, ...]
     used_in_rules: tuple[str, ...]
 
+    @property
+    def fully_qualified_name(self) -> str:
+        return f"{self.module}.{self.name}"
+
     @classmethod
     def create(
         cls, api_type: type, rules: Sequence[Rule | UnionRule], **kwargs
@@ -345,7 +349,7 @@ class PluginAPITypeInfo:
         task_rules = [rule for rule in rules if isinstance(rule, TaskRule)]
 
         return cls(
-            name=api_type.__name__,
+            name=api_type.__qualname__,
             module=api_type.__module__,
             documentation=maybe_cleandoc(api_type.__doc__),
             is_union=is_union(api_type),
@@ -842,13 +846,12 @@ class HelpInfoExtracter:
             )
 
         infos: dict[str, PluginAPITypeInfo] = {}
-        for api_type in sorted(all_types, key=attrgetter("__name__")):
-            api_type_name = f"{api_type.__module__}.{api_type.__qualname__}"
+        for api_type in sorted(all_types, key=attrgetter("__qualname__")):
             api_type_info = get_api_type_info(api_type)
-            if api_type_name in infos:
-                infos[api_type_name] = infos[api_type_name].merged_with(api_type_info)
+            if api_type_info.fully_qualified_name in infos:
+                infos[api_type_info.fully_qualified_name] = infos[api_type_info.fully_qualified_name].merged_with(api_type_info)
             else:
-                infos[api_type_name] = api_type_info
+                infos[api_type_info.fully_qualified_name] = api_type_info
 
         return FrozenDict(infos)
 
