@@ -509,4 +509,6 @@ def test_layout_should_be_passed_through_and_adjust_filename(input_layout, expec
         ],
     )
 
-    assert str(mock_build.mock_calls[0].args[0].output_path.name) == expected_output
+    args = mock_build.mock_calls[0].args[0]
+    assert args.layout == input_layout
+    assert args.output_path.name == expected_output
