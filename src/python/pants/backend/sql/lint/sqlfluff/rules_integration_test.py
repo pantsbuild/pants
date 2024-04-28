@@ -26,9 +26,34 @@ from pants.engine.addresses import Address
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
-GOOD_FILE = "select\n    e.id,\n    e.name\nfrom employees as e\n"
-BAD_FILE = "select\n    e.id,\n    name\nfrom employees as e\n"
-UNFORMATTED_FILE = "select e.id, e.name\nfrom employees as e\n"
+GOOD_FILE = dedent(
+    """\
+    select
+        e.id,
+        e.name
+    from employees as e
+    """
+)
+BAD_FILE = dedent(
+    """\
+    select
+        e.id,
+        name
+    from employees as e
+    """
+)
+UNFORMATTED_FILE = dedent(
+    """\
+    select e.id, e.name
+    from employees as e
+    """
+)
+CONFIG_POSTGRES = dedent(
+    """\
+    [sqlfluff]
+    dialect = postgres
+    """
+)
 
 
 @pytest.fixture
@@ -105,12 +130,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
         {
             "query.sql": GOOD_FILE,
             "BUILD": "sql_sources(name='t')",
-            ".sqlfluff": dedent(
-                """\
-                [sqlfluff]
-                dialect = postgres
-                """
-            ),
+            ".sqlfluff": CONFIG_POSTGRES,
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="query.sql"))
@@ -135,12 +155,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
         {
             "query.sql": BAD_FILE,
             "BUILD": "sql_sources(name='t')",
-            ".sqlfluff": dedent(
-                """\
-                [sqlfluff]
-                dialect = postgres
-                """
-            ),
+            ".sqlfluff": CONFIG_POSTGRES,
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="query.sql"))
@@ -167,25 +182,26 @@ def test_failing(rule_runner: RuleRunner) -> None:
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "good.py": GOOD_FILE,
-            "bad.py": BAD_FILE,
-            "unformatted.py": UNFORMATTED_FILE,
+            "good.sql": GOOD_FILE,
+            "bad.sql": BAD_FILE,
+            "unformatted.sql": UNFORMATTED_FILE,
             "BUILD": "sql_sources(name='t')",
+            ".sqlfluff": CONFIG_POSTGRES,
         }
     )
     tgts = [
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.py")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.sql")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.sql")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.sql")),
     ]
     fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, tgts)
     assert lint_result.exit_code == 1
     assert fix_result.output == rule_runner.make_snapshot(
-        {"good.py": GOOD_FILE, "bad.py": GOOD_FILE, "unformatted.py": UNFORMATTED_FILE}
+        {"good.sql": GOOD_FILE, "bad.sql": GOOD_FILE, "unformatted.sql": GOOD_FILE}
     )
     assert fix_result.did_change is True
     assert fmt_result.output == rule_runner.make_snapshot(
-        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "unformatted.py": GOOD_FILE}
+        {"good.sql": GOOD_FILE, "bad.sql": BAD_FILE, "unformatted.sql": GOOD_FILE}
     )
     assert fmt_result.did_change is True
 
@@ -193,81 +209,25 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 def test_skip_field(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "good.py": GOOD_FILE,
-            "bad.py": BAD_FILE,
-            "unformatted.py": UNFORMATTED_FILE,
+            "good.sql": GOOD_FILE,
+            "bad.sql": BAD_FILE,
+            "unformatted.sql": UNFORMATTED_FILE,
             "BUILD": "sql_sources(name='t', skip_sqlfluff=True)",
         }
     )
     tgts = [
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.py")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.sql")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.sql")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.sql")),
     ]
     for tgt in tgts:
         assert tgt.get(SkipSqlfluffField).value is True
 
     fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, tgts)
 
-    assert lint_result.exit_code == 1
+    assert lint_result.exit_code == 0
     assert fix_result.output == rule_runner.make_snapshot({})
     assert fix_result.did_change is False
-    assert fmt_result.output == rule_runner.make_snapshot({})
-    assert fmt_result.did_change is False
-
-
-def test_skip_check_field(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "good.py": GOOD_FILE,
-            "bad.py": BAD_FILE,
-            "unformatted.py": UNFORMATTED_FILE,
-            "BUILD": "sql_sources(name='t', skip_sqlfluff=True)",
-        }
-    )
-    tgts = [
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.py")),
-    ]
-    for tgt in tgts:
-        assert tgt.get(SkipSqlfluffField).value is True
-
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, tgts)
-
-    assert lint_result.exit_code == 1
-    assert fix_result.output == rule_runner.make_snapshot({})
-    assert fix_result.did_change is False
-    assert fmt_result.output == rule_runner.make_snapshot(
-        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "unformatted.py": GOOD_FILE}
-    )
-    assert fmt_result.did_change is True
-
-
-def test_skip_format_field(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "good.py": GOOD_FILE,
-            "bad.py": BAD_FILE,
-            "unformatted.py": UNFORMATTED_FILE,
-            "BUILD": "sql_sources(name='t', skip_sqlfluff_format=True)",
-        }
-    )
-    tgts = [
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.py")),
-    ]
-    for tgt in tgts:
-        assert tgt.get(SkipSqlfluffField).value is True
-
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, tgts)
-
-    assert lint_result.exit_code == 1
-    assert fix_result.output == rule_runner.make_snapshot(
-        {"good.py": GOOD_FILE, "bad.py": GOOD_FILE, "unformatted.py": UNFORMATTED_FILE}
-    )
-    assert fix_result.did_change is True
     assert fmt_result.output == rule_runner.make_snapshot({})
     assert fmt_result.did_change is False
 
@@ -276,16 +236,21 @@ def test_skip_format_field(rule_runner: RuleRunner) -> None:
     "file_path,config_path,extra_args,should_change",
     (
         [Path("query.sql"), Path("pyproject.toml"), [], False],
-        [Path("query.sql"), Path("sqlfluff.toml"), [], False],
-        [Path("custom/query.sql"), Path("custom/sqlfluff.toml"), [], False],
+        [Path("query.sql"), Path(".sqlfluff"), [], False],
         [Path("custom/query.sql"), Path("custom/pyproject.toml"), [], False],
+        [Path("custom/query.sql"), Path("custom/.sqlfluff"), [], False],
         [
             Path("query.sql"),
-            Path("custom/sqlfluff.toml"),
-            ["--sqlfluff-config=custom/sqlfluff.toml"],
+            Path("custom/config.sqlfluff"),
+            ["--sqlfluff-config=custom/config.sqlfluff"],
             False,
         ],
-        [Path("query.sql"), Path("custom/sqlfluff.toml"), [], True],
+        [
+            Path("query.sql"),
+            Path("custom/.sqlfluff"),
+            ['--sqlfluff-args="--dialect=postgres"'],
+            True,
+        ],
     ),
 )
 def test_config_file(
@@ -295,18 +260,35 @@ def test_config_file(
     extra_args: list[str],
     should_change: bool,
 ) -> None:
-    hierarchy = "[tool.sqlfluff]\n" if config_path.stem == "pyproject" else ""
+    if config_path.stem == "pyproject":
+        config = dedent(
+            """\
+            [tool.sqlfluff.core]
+            dialect = "postgres"
+            exclude_rules = ["RF03"]
+            """
+        )
+    else:
+        config = dedent(
+            """\
+            [sqlfluff]
+            dialect = postgres
+            exclude_rules = RF03
+            """
+        )
+
     rule_runner.write_files(
         {
             file_path: BAD_FILE,
             file_path.parent / "BUILD": "sql_sources()",
-            config_path: f'{hierarchy}ignore = ["F541"]',
+            config_path: config,
         }
     )
+
     spec_path = str(file_path.parent).replace(".", "")
     rel_file_path = file_path.relative_to(*file_path.parts[:1]) if spec_path else file_path
     addr = Address(spec_path, relative_file_path=str(rel_file_path))
     tgt = rule_runner.get_target(addr)
     fix_result, lint_result, _ = run_sqlfluff(rule_runner, [tgt], extra_args=extra_args)
-    assert lint_result.exit_code == bool(should_change)
+    assert lint_result.exit_code == (1 if should_change else 0)
     assert fix_result.did_change is should_change

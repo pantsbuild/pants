@@ -52,7 +52,7 @@ class Sqlfluff(PythonToolBase):
     default_lockfile_resource = ("pants.backend.sql.lint.sqlfluff", "sqlfluff.lock")
 
     skip = SkipOption("fmt", "fix", "lint")
-    args = ArgsListOption(example="--exclude=foo --ignore=E501")
+    args = ArgsListOption(example="--dialect=postgres --exclude-rules LT08,RF02")
     config = FileOption(
         default=None,
         advanced=True,
@@ -81,14 +81,18 @@ class Sqlfluff(PythonToolBase):
     )
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
-        # See https://docs.sqlfluff.com/en/stable/configuration.html for how sqlfluff discovers
-        # config files.
+        # See https://docs.sqlfluff.com/en/stable/configuration.html for how
+        # sqlfluff discovers config files.
         all_dirs = ("", *dirs)
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
             discovery=self.config_discovery,
-            check_existence=[os.path.join(d, ".sqlfluff") for d in all_dirs],
+            check_existence=[
+                os.path.join(d, filename)
+                for d in all_dirs
+                for filename in ["setup.cfg", "tox.ini", "pep8.ini", ".sqlfluff"]
+            ],
             check_content={os.path.join(d, "pyproject.toml"): b"[tool.sqlfluff" for d in all_dirs},
         )
 
