@@ -619,7 +619,9 @@ def test_pex_binary_targets() -> None:
     }
 
 
-def assert_inferred(rule_runner: RuleRunner, address: Address, expected: list[Address]) -> None:
+def assert_inferred(
+    rule_runner: RuleRunner, address: Address, expected: list[Address], comment=""
+) -> None:
     tgt = rule_runner.get_target(address)
     inferred = rule_runner.request(
         InferredDependencies,
@@ -629,7 +631,7 @@ def assert_inferred(rule_runner: RuleRunner, address: Address, expected: list[Ad
             )
         ],
     )
-    assert inferred == InferredDependencies(expected)
+    assert InferredDependencies(expected) == inferred, comment
 
 
 def test_20806() -> None:
@@ -661,6 +663,8 @@ def test_20806() -> None:
 
             pex_binary(name="with-deps", entry_point="./example.py", dependencies=[":src@tags=a"])
 
+            pex_binary(name="with-deps-and-ignore", entry_point="./example.py", dependencies=[":src@tags=a", "!:src@tags=b"])
+
             pex_binary(name="with-ignore-only", entry_point="./example.py", dependencies=[ "!:src@tags=b"])
             """
             ),
@@ -668,29 +672,37 @@ def test_20806() -> None:
         }
     )
 
-    # The ambiguous should not be disambiguated
     assert_inferred(
         rule_runner,
         Address(spec_path="", target_name="ambiguous"),
         [],
+        comment="The ambiguous should not be disambiguated",
     )
 
-    # Using an explicit target is not standard (the entry is actually a Python entrypoint, not a Pants target)
-    assert_inferred(
-        rule_runner,
-        Address(spec_path="", target_name="with-target"),
-        [Address(spec_path="", target_name="src", parameters={"tags": "a"})],
-    )
+    # assert_inferred(
+    #     rule_runner,
+    #     Address(spec_path="", target_name="with-target"),
+    #     [Address(spec_path="", target_name="src", parameters={"tags": "a"})],
+    #     comment="Using an explicit target is not standard (the entry is actually a Python entrypoint, not a Pants target)",
+    # )
 
-    # Explicitly providing the dep should resolve the ambiguity
     assert_inferred(
         rule_runner,
         Address(spec_path="", target_name="with-deps"),
         [Address(spec_path="", target_name="src", parameters={"tags": "a"})],
+        comment="Explicitly providing the dep should resolve the ambiguity",
     )
 
     assert_inferred(
         rule_runner,
         Address(spec_path="", target_name="with-ignore-only"),
         [Address(spec_path="", target_name="src", parameters={"tags": "a"})],
+        comment="Ignoring the other ambiguous cases should disambiguate",
+    )
+
+    assert_inferred(
+        rule_runner,
+        Address(spec_path="", target_name="with-deps-and-ignore"),
+        [Address(spec_path="", target_name="src", parameters={"tags": "a"})],
+        comment="Ignoring the other ambiguous cases should disambiguate, even if one of the ambiguous ones is provided as a dep",
     )

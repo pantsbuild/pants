@@ -2626,7 +2626,7 @@ class ExplicitlyProvidedDependencies:
 
     @memoized_method
     def any_are_covered_by_includes(self, addresses: Iterable[Address]) -> bool:
-        """Return True if every address is in the explicitly provided includes.
+        """Return True if any address is in the explicitly provided includes.
 
         Note that if the input addresses are generated targets, they will still be marked as covered
         if their original target generator is in the explicitly provided includes.
@@ -2635,6 +2635,20 @@ class ExplicitlyProvidedDependencies:
             addr in self.includes or addr.maybe_convert_to_target_generator() in self.includes
             for addr in addresses
         )
+
+    @memoized_method
+    def covered_by_includes(self, addresses: frozenset[Address]) -> frozenset[Address]:
+        """Return only the addresses which are in the explicitly provided includes."""
+        out = set()
+        for addr in addresses:
+            if addr in self.includes:
+                out.add(addr)
+            maybe_tgt_generator = addr.maybe_convert_to_target_generator()
+            if maybe_tgt_generator in self.includes:
+                # TODO: do we include the maybe_tgt_generator or the addr?
+                out.add(maybe_tgt_generator)
+
+        return frozenset(out)
 
     @memoized_method
     def remaining_after_disambiguation(
@@ -2682,21 +2696,43 @@ class ExplicitlyProvidedDependencies:
         `!!`. If `owners_must_be_ancestors` is True, any addresses which are not ancestors of the
         target in question will also be ignored.
         """
-        if not ambiguous_addresses or self.any_are_covered_by_includes(ambiguous_addresses):
-            return
-        remaining = self.remaining_after_disambiguation(
+        if not ambiguous_addresses:
+            return None
+        remaining_after_ignores = self.remaining_after_disambiguation(
             ambiguous_addresses, owners_must_be_ancestors=owners_must_be_ancestors
         )
+        if len(remaining_after_ignores) == 1:
+            return
+
+        remaining_after_includes = self.covered_by_includes(remaining_after_ignores)
+        if len(remaining_after_includes) == 1:
+            return
+        elif len(remaining_after_includes) > 1:
+            # if multiple includes still own this target, we warn only about them, and not all targets
+            remaining = remaining_after_includes
+            suggestion = (
+                f"\n\nMultiple dependencies specified in the `dependencies` field of {original_address} "
+                f"own this {import_reference}. Try removing all of them except for one, "
+                "or ignore the ones you do not want by prefixing "
+                f"with `!` or `!!` so that one or no targets are left."
+            )
+        else:
+            # if none of the includes helped, we warn about all owners
+            remaining = remaining_after_ignores
+            suggestion = (
+                f"\n\nPlease explicitly include the dependency you want in the `dependencies` "
+                f"field of {original_address}, or ignore the ones you do not want by prefixing "
+                f"with `!` or `!!` so that one or no targets are left."
+            )
+
         if len(remaining) <= 1:
             return
         logger.warning(
             f"{context}, but Pants cannot safely infer a dependency because more than one target "
             f"owns this {import_reference}, so it is ambiguous which to use: "
             f"{sorted(addr.spec for addr in remaining)}."
-            f"\n\nPlease explicitly include the dependency you want in the `dependencies` "
-            f"field of {original_address}, or ignore the ones you do not want by prefixing "
-            f"with `!` or `!!` so that one or no targets are left."
-            f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
+            + suggestion
+            + f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
             f"targets so that only 1 target owns this {import_reference}. Refer to "
             f"{doc_url('docs/using-pants/troubleshooting-common-issues#import-errors-and-missing-dependencies')}."
         )
@@ -2710,12 +2746,17 @@ class ExplicitlyProvidedDependencies:
         `!!`. If `owners_must_be_ancestors` is True, any addresses which are not ancestors of the
         target in question will also be ignored.
         """
-        if not ambiguous_addresses or self.any_are_covered_by_includes(ambiguous_addresses):
+        if not ambiguous_addresses:
             return None
         remaining_after_ignores = self.remaining_after_disambiguation(
             ambiguous_addresses, owners_must_be_ancestors=owners_must_be_ancestors
         )
-        return list(remaining_after_ignores)[0] if len(remaining_after_ignores) == 1 else None
+        if len(remaining_after_ignores) == 1:
+            return list(remaining_after_ignores)[0]
+        only_explicitly_included = self.covered_by_includes(remaining_after_ignores)
+        if len(only_explicitly_included) == 1:
+            return list(only_explicitly_included)[0]
+        return None
 
 
 FS = TypeVar("FS", bound="FieldSet")
