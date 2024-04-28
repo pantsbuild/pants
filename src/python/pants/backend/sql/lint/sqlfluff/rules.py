@@ -29,30 +29,14 @@ class SqlfluffFixRequest(FixTargetsRequest):
     tool_subsystem = Sqlfluff
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
-    @classproperty
-    def tool_name(cls) -> str:
-        return "sqlfluff fix"
-
-    @classproperty
-    def tool_id(cls) -> str:
-        return "sqlfluff-fix"
-
 
 class SqlfluffLintRequest(LintTargetsRequest):
     field_set_type = SqlfluffFieldSet
     tool_subsystem = Sqlfluff
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
-    @classproperty
-    def tool_name(cls) -> str:
-        return "sqlfluff lint"
 
-    @classproperty
-    def tool_id(cls) -> str:
-        return "sqlfluff-lint"
-
-
-class SqlfluffFmtRequest(FmtTargetsRequest):
+class SqlfluffFormatRequest(FmtTargetsRequest):
     field_set_type = SqlfluffFieldSet
     tool_subsystem = Sqlfluff
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
@@ -137,7 +121,7 @@ async def sqlfluff_lint(request: SqlfluffLintRequest.Batch[SqlfluffFieldSet, Any
 
 
 @rule(desc="Format with sqlfluff format", level=LogLevel.DEBUG)
-async def sqlfluff_fmt(request: SqlfluffFmtRequest.Batch, sqlfluff: Sqlfluff) -> FmtResult:
+async def sqlfluff_fmt(request: SqlfluffFormatRequest.Batch, sqlfluff: Sqlfluff) -> FmtResult:
     result = await Get(
         FallibleProcessResult,
         _RunSqlfluffRequest(snapshot=request.snapshot, mode=SqlfluffMode.FMT),
@@ -162,6 +146,6 @@ def rules():
         *collect_rules(),
         *SqlfluffLintRequest.rules(),
         *without_lint(SqlfluffFixRequest.rules()),
-        *without_lint(SqlfluffFmtRequest.rules()),
+        *without_lint(SqlfluffFormatRequest.rules()),
         *pex.rules(),
     ]

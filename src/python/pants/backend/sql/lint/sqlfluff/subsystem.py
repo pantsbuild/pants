@@ -1,6 +1,3 @@
-# Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
-# Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 from __future__ import annotations
 
 import os.path
@@ -8,8 +5,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable
 
-from pants.backend.sql.lint.sqlfluff.skip_field import SkipSqlfluffField
-from pants.backend.sql.target_types import SqlDialectField, SqlSourceField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -17,6 +12,8 @@ from pants.backend.python.target_types import (
     PythonResolveField,
     PythonSourceField,
 )
+from pants.backend.sql.lint.sqlfluff.skip_field import SkipSqlfluffField
+from pants.backend.sql.target_types import SqlDialectField, SqlSourceField
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules
 from pants.engine.target import FieldSet, Target
