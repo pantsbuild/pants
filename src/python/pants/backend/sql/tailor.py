@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from typing import Iterable
 
-from experimental.sql.target_types import SqlSourcesGeneratorTarget
+from pants.backend.sql.target_types import SqlSourcesGeneratorTarget
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets, PutativeTargetsRequest
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.internals.selectors import Get

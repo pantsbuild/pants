@@ -1,5 +1,5 @@
-from experimental.sql.lint.sqlfluff import rules as sqlfluff_rules
-from experimental.sql.lint.sqlfluff import skip_field, subsystem
+from pants.backend.sql.lint.sqlfluff import rules as sqlfluff_rules
+from pants.backend.sql.lint.sqlfluff import skip_field, subsystem
 
 
 def rules():

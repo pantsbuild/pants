@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable
 
-from experimental.sql.lint.sqlfluff.skip_field import SkipSqlfluffField
-from experimental.sql.target_types import SqlDialectField, SqlSourceField
+from pants.backend.sql.lint.sqlfluff.skip_field import SkipSqlfluffField
+from pants.backend.sql.target_types import SqlDialectField, SqlSourceField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -57,7 +57,7 @@ class Sqlfluff(PythonToolBase):
 
     register_interpreter_constraints = True
 
-    default_lockfile_resource = ("experimental.sql.lint.sqlfluff", "sqlfluff.lock")
+    default_lockfile_resource = ("pants.backend.sql.lint.sqlfluff", "sqlfluff.lock")
 
     skip = SkipOption("fmt", "fix", "lint")
     args = ArgsListOption(example="--exclude=foo --ignore=E501")
