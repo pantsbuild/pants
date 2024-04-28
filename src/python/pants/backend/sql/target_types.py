@@ -17,8 +17,12 @@ from pants.engine.target import (
 from pants.util.strutil import help_text
 
 
-# subclassing ResourceSourceField will tell pex to treat sql_source as a resource
 class SqlSourceField(ResourceSourceField):
+    """
+    Subclassing ResourceSourceField will make sure the sql is included in
+    distributions as a resource.
+    """
+
     expected_file_extensions: ClassVar[tuple[str, ...]] = (".sql",)
 
 
@@ -34,18 +38,12 @@ class SqlSourcesGeneratingSourcesField(MultipleSourcesField):
     )
 
 
-class SqlDialectField(StringField):
-    alias = "dialect"
-    help = "SQL dialect."
-
-
 class SqlSourceTarget(Target):
     alias = "sql_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         SqlSourceField,
         SqlDependenciesField,
-        SqlDialectField,
     )
     help = "A single SQL source file."
 
@@ -71,10 +69,7 @@ class SqlSourcesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = SqlSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (
-        SqlDependenciesField,
-        SqlDialectField,
-    )
+    moved_fields = (SqlDependenciesField,)
     help = help_text(
         """
         Generate a `sql_source` target for each file in the `sources` field.

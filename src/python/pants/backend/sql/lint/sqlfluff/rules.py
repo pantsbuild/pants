@@ -3,9 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Tuple
 
-from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff, SqlfluffFieldSet, SqlfluffMode
+from typing_extensions import assert_never
+
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff, SqlfluffFieldSet, SqlfluffMode
 from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.lint import AbstractLintRequest, LintResult, LintTargetsRequest
@@ -20,7 +22,6 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
-from typing_extensions import assert_never
 
 
 class SqlfluffFixRequest(FixTargetsRequest):
@@ -32,6 +33,10 @@ class SqlfluffFixRequest(FixTargetsRequest):
     def tool_name(cls) -> str:
         return "sqlfluff fix"
 
+    @classproperty
+    def tool_id(cls) -> str:
+        return "sqlfluff-fix"
+
 
 class SqlfluffLintRequest(LintTargetsRequest):
     field_set_type = SqlfluffFieldSet
@@ -42,6 +47,10 @@ class SqlfluffLintRequest(LintTargetsRequest):
     def tool_name(cls) -> str:
         return "sqlfluff lint"
 
+    @classproperty
+    def tool_id(cls) -> str:
+        return "sqlfluff-lint"
+
 
 class SqlfluffFmtRequest(FmtTargetsRequest):
     field_set_type = SqlfluffFieldSet
@@ -51,6 +60,10 @@ class SqlfluffFmtRequest(FmtTargetsRequest):
     @classproperty
     def tool_name(cls) -> str:
         return "sqlfluff format"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "sqlfluff-format"
 
 
 @dataclass(frozen=True)
@@ -66,7 +79,9 @@ async def run_sqlfluff(
 ) -> FallibleProcessResult:
     sqlfluff_pex_get = Get(VenvPex, PexRequest, sqlfluff.to_pex_request())
 
-    config_files_get = Get(ConfigFiles, ConfigFilesRequest, sqlfluff.config_request(request.snapshot.dirs))
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, sqlfluff.config_request(request.snapshot.dirs)
+    )
 
     sqlfluff_pex, config_files = await MultiGet(sqlfluff_pex_get, config_files_get)
 
@@ -103,13 +118,17 @@ async def run_sqlfluff(
 
 @rule(desc="Fix with sqlfluff fix", level=LogLevel.DEBUG)
 async def sqlfluff_fix(request: SqlfluffFixRequest.Batch, sqlfluff: Sqlfluff) -> FixResult:
-    result = await Get(FallibleProcessResult, _RunSqlfluffRequest(snapshot=request.snapshot, mode=SqlfluffMode.FIX))
+    result = await Get(
+        FallibleProcessResult, _RunSqlfluffRequest(snapshot=request.snapshot, mode=SqlfluffMode.FIX)
+    )
     return await FixResult.create(request, result)
 
 
 @rule(desc="Lint with sqlfluff lint", level=LogLevel.DEBUG)
 async def sqlfluff_lint(request: SqlfluffLintRequest.Batch[SqlfluffFieldSet, Any]) -> LintResult:
-    source_files = await Get(SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements))
+    source_files = await Get(
+        SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
+    )
     result = await Get(
         FallibleProcessResult,
         _RunSqlfluffRequest(snapshot=source_files.snapshot, mode=SqlfluffMode.LINT),
@@ -131,7 +150,10 @@ def without_lint(rules):
         rule
         for rule in rules
         if not isinstance(rule, UnionRule)
-        or (rule.union_base is not AbstractLintRequest and rule.union_base is not AbstractLintRequest.Batch)
+        or (
+            rule.union_base is not AbstractLintRequest
+            and rule.union_base is not AbstractLintRequest.Batch
+        )
     ]
 
 
