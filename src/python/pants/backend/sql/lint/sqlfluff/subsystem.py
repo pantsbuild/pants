@@ -6,14 +6,9 @@ from enum import Enum
 from typing import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.target_types import (
-    ConsoleScript,
-    InterpreterConstraintsField,
-    PythonResolveField,
-    PythonSourceField,
-)
+from pants.backend.python.target_types import ConsoleScript
 from pants.backend.sql.lint.sqlfluff.skip_field import SkipSqlfluffField
-from pants.backend.sql.target_types import SqlDialectField, SqlSourceField
+from pants.backend.sql.target_types import SqlSourceField
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules
 from pants.engine.target import FieldSet, Target
@@ -26,7 +21,6 @@ class SqlfluffFieldSet(FieldSet):
     required_fields = (SqlSourceField,)
 
     source: SqlSourceField
-    dialect: SqlDialectField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -50,9 +44,10 @@ class Sqlfluff(PythonToolBase):
     help = "The Sqlfluff SQL linter (https://github.com/sqlfluff/sqlfluff)."
 
     default_main = ConsoleScript("sqlfluff")
-    default_requirements = ["sqlfluff>=2.3.5,<3"]
+    default_requirements = ["sqlfluff>=3.0.5,<4"]
 
     register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.8,<4"]
 
     default_lockfile_resource = ("pants.backend.sql.lint.sqlfluff", "sqlfluff.lock")
 
@@ -99,4 +94,4 @@ class Sqlfluff(PythonToolBase):
 
 
 def rules():
-    return (*collect_rules(),)
+    return collect_rules()
