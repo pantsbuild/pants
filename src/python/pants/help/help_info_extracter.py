@@ -10,6 +10,7 @@ import json
 from collections import defaultdict, namedtuple
 from dataclasses import dataclass
 from enum import Enum
+from functools import reduce
 from itertools import chain
 from operator import attrgetter
 from pathlib import Path
@@ -43,7 +44,7 @@ from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
 from pants.option.scope import ScopeInfo
-from pants.util.frozendict import FrozenDict, LazyFrozenDict
+from pants.util.frozendict import LazyFrozenDict
 from pants.util.strutil import first_paragraph, strval
 
 T = TypeVar("T")
@@ -336,6 +337,10 @@ class PluginAPITypeInfo:
     def fully_qualified_name(self) -> str:
         return f"{self.module}.{self.name}"
 
+    @staticmethod
+    def fully_qualified_name_from_type(t: type):
+        return f"{t.__module__}.{t.__qualname__}"
+
     @classmethod
     def create(
         cls, api_type: type, rules: Sequence[Rule | UnionRule], **kwargs
@@ -441,7 +446,7 @@ class AllHelpInfo:
     name_to_goal_info: LazyFrozenDict[str, GoalHelpInfo]
     name_to_target_type_info: LazyFrozenDict[str, TargetTypeHelpInfo]
     name_to_rule_info: LazyFrozenDict[str, RuleInfo]
-    name_to_api_type_info: FrozenDict[str, PluginAPITypeInfo]
+    name_to_api_type_info: LazyFrozenDict[str, PluginAPITypeInfo]
     name_to_backend_help_info: LazyFrozenDict[str, BackendHelpInfo]
     name_to_build_file_info: LazyFrozenDict[str, BuildFileSymbolHelpInfo]
     env_var_to_help_info: LazyFrozenDict[str, OptionHelpInfo]
@@ -706,7 +711,7 @@ class HelpInfoExtracter:
     @classmethod
     def get_api_type_infos(
         cls, build_configuration: BuildConfiguration | None, union_membership: UnionMembership
-    ) -> FrozenDict[str, PluginAPITypeInfo]:
+    ) -> LazyFrozenDict[str, PluginAPITypeInfo]:
         if build_configuration is None:
             return LazyFrozenDict({})
 
@@ -833,27 +838,39 @@ class HelpInfoExtracter:
             ),
         )
 
-        def get_api_type_info(api_type: type) -> PluginAPITypeInfo:
-            return PluginAPITypeInfo.create(
-                api_type,
-                rules,
-                provider=type_graph[api_type]["providers"],
-                dependencies=type_graph[api_type]["dependencies"],
-                dependents=type_graph[api_type].get("dependents", ()),
-                union_members=tuple(
-                    sorted(member.__qualname__ for member in union_membership.get(api_type))
-                ),
+        def get_api_type_info(api_types: list[type]) -> PluginAPITypeInfo:
+            """
+            Gather the info from each of the types and aggregate it.
+            The gathering is the expensive operation, and we can only aggregate once we've gathered.
+            """
+            infos = [
+                PluginAPITypeInfo.create(
+                    api_type,
+                    rules,
+                    provider=type_graph[api_type]["providers"],
+                    dependencies=type_graph[api_type]["dependencies"],
+                    dependents=type_graph[api_type].get("dependents", ()),
+                    union_members=tuple(
+                        sorted(member.__qualname__ for member in union_membership.get(api_type))
+                    ),
+                )
+                for api_type in api_types
+            ]
+            return reduce(lambda x, y: x.merged_with(y), infos)
+
+        # We want to provide a lazy dict so we don't spend so long doing the info gathering.
+        # We provide a list of the types here, and the lookup function performs the gather and the aggregation
+        names_to_types: dict[str, list[type]] = defaultdict(list)
+        for api_type in sorted(all_types, key=attrgetter("__qualname__")):
+            names_to_types[PluginAPITypeInfo.fully_qualified_name_from_type(api_type)].append(
+                api_type
             )
 
-        infos: dict[str, PluginAPITypeInfo] = {}
-        for api_type in sorted(all_types, key=attrgetter("__qualname__")):
-            api_type_info = get_api_type_info(api_type)
-            if api_type_info.fully_qualified_name in infos:
-                infos[api_type_info.fully_qualified_name] = infos[api_type_info.fully_qualified_name].merged_with(api_type_info)
-            else:
-                infos[api_type_info.fully_qualified_name] = api_type_info
+        infos: dict[str, Callable[[], PluginAPITypeInfo]] = {
+            k: lambda: get_api_type_info(v) for k, v in names_to_types.items()
+        }
 
-        return FrozenDict(infos)
+        return LazyFrozenDict(infos)
 
     @classmethod
     def get_backend_help_info(cls, options: Options) -> LazyFrozenDict[str, BackendHelpInfo]:
