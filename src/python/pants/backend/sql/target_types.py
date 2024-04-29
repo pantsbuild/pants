@@ -1,16 +1,15 @@
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 from typing import ClassVar
 
-from pants.core.target_types import FileSourceField, ResourceSourceField
+from pants.core.target_types import ResourceSourceField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
     MultipleSourcesField,
     OverridesField,
-    SingleSourceField,
-    StringField,
     Target,
     TargetFilesGenerator,
-    TargetFilesGeneratorSettingsRequest,
     generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
@@ -18,10 +17,8 @@ from pants.util.strutil import help_text
 
 
 class SqlSourceField(ResourceSourceField):
-    """
-    Subclassing ResourceSourceField will make sure the sql is included in
-    distributions as a resource.
-    """
+    """Subclassing ResourceSourceField will make sure the sql is included in distributions as a
+    resource."""
 
     expected_file_extensions: ClassVar[tuple[str, ...]] = (".sql",)
 
