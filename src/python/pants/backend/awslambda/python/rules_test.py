@@ -384,6 +384,7 @@ def test_pex3_venv_create_extra_args_are_passed_through(
         complete_platforms=Mock(),
         output_path=Mock(),
         environment=Mock(),
+        layout=Mock(),
         **{arg: Mock() for arg in extra_field_set_args},
         pex3_venv_create_extra_args=extra_args_field,
     )
