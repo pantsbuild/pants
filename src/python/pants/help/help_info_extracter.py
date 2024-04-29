@@ -838,25 +838,29 @@ class HelpInfoExtracter:
             ),
         )
 
-        def get_api_type_info(api_types: list[type]) -> PluginAPITypeInfo:
-            """
-            Gather the info from each of the types and aggregate it.
+        def get_api_type_info(api_types: list[type]):
+            """Gather the info from each of the types and aggregate it.
+
             The gathering is the expensive operation, and we can only aggregate once we've gathered.
             """
-            infos = [
-                PluginAPITypeInfo.create(
-                    api_type,
-                    rules,
-                    provider=type_graph[api_type]["providers"],
-                    dependencies=type_graph[api_type]["dependencies"],
-                    dependents=type_graph[api_type].get("dependents", ()),
-                    union_members=tuple(
-                        sorted(member.__qualname__ for member in union_membership.get(api_type))
-                    ),
-                )
-                for api_type in api_types
-            ]
-            return reduce(lambda x, y: x.merged_with(y), infos)
+
+            def load() -> PluginAPITypeInfo:
+                gatherered_infos = [
+                    PluginAPITypeInfo.create(
+                        api_type,
+                        rules,
+                        provider=type_graph[api_type]["providers"],
+                        dependencies=type_graph[api_type]["dependencies"],
+                        dependents=type_graph[api_type].get("dependents", ()),
+                        union_members=tuple(
+                            sorted(member.__qualname__ for member in union_membership.get(api_type))
+                        ),
+                    )
+                    for api_type in api_types
+                ]
+                return reduce(lambda x, y: x.merged_with(y), gatherered_infos)
+
+            return load
 
         # We want to provide a lazy dict so we don't spend so long doing the info gathering.
         # We provide a list of the types here, and the lookup function performs the gather and the aggregation
@@ -867,7 +871,7 @@ class HelpInfoExtracter:
             )
 
         infos: dict[str, Callable[[], PluginAPITypeInfo]] = {
-            k: lambda: get_api_type_info(v) for k, v in names_to_types.items()
+            k: get_api_type_info(v) for k, v in names_to_types.items()
         }
 
         return LazyFrozenDict(infos)
