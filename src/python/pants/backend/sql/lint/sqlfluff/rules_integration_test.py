@@ -26,6 +26,7 @@ from pants.core.util_rules.partitions import _EmptyMetadata
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.target import Target
+from pants.testutil.python_interpreter_selection import skip_unless_python38_and_python39_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 GOOD_FILE = dedent(
@@ -126,7 +127,7 @@ def run_sqlfluff(
     return fix_result, lint_result, fmt_result
 
 
-@pytest.mark.platform_specific_behavior
+@skip_unless_python38_and_python39_present
 def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -152,6 +153,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert fmt_result.output == rule_runner.make_snapshot({"query.sql": GOOD_FILE})
 
 
+@skip_unless_python38_and_python39_present
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -181,6 +183,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert fmt_result.output == rule_runner.make_snapshot({"query.sql": BAD_FILE})
 
 
+@skip_unless_python38_and_python39_present
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -208,6 +211,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is True
 
 
+@skip_unless_python38_and_python39_present
 def test_skip_field(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -255,6 +259,7 @@ def test_skip_field(rule_runner: RuleRunner) -> None:
         ],
     ),
 )
+@skip_unless_python38_and_python39_present
 def test_config_file(
     rule_runner: RuleRunner,
     file_path: Path,
