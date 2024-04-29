@@ -134,6 +134,7 @@ Created as part of the release process.
 + Itay Donanhirsh
 + Ity Kaul
 + JC (Jonathan Chen)
++ Jack Evans
 + Jack Zhao
 + Jackson Davis
 + Jacob Floyd
