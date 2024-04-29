@@ -42,7 +42,6 @@ async def find_putative_targets(
             for dirname, filenames in group_by_dir(unowned_sql_files).items()
         ]
     )
-    # raise RuntimeError(targets)
     return targets
 
 
