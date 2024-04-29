@@ -28,7 +28,6 @@ class SqlDependenciesField(Dependencies):
 
 
 class SqlSourcesGeneratingSourcesField(MultipleSourcesField):
-    expected_file_extensions: ClassVar[tuple[str, ...]] = (".sql",)
     default = ("*.sql",)
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['example.sql', 'new_*.sql', '!old_ignore.sql']`"
