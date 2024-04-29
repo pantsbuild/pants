@@ -20,7 +20,7 @@ from pants.util.strutil import help_text
 # Subclassing ResourceSourceField will make sure the sql is included in
 # distributions as a resource.
 class SqlSourceField(ResourceSourceField):
-    expected_file_extensions: ClassVar[tuple[str, ...]] = (".sql",)
+    pass
 
 
 class SqlDependenciesField(Dependencies):
