@@ -24,7 +24,6 @@ from pants.backend.python.target_types import (
     PexInheritPathField,
     PexLayout,
     PexLayoutField,
-    PexPlatformsField,
     PexResolveLocalPlatformsField,
     PexScriptField,
     PexShBootField,
@@ -35,7 +34,7 @@ from pants.backend.python.target_types import (
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.backend.python.util_rules.pex import CompletePlatforms, Pex, PexPlatforms
+from pants.backend.python.util_rules.pex import CompletePlatforms, Pex
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.core.goals.package import (
     BuiltPackage,
@@ -72,7 +71,6 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     sh_boot: PexShBootField
     shebang: PexShebangField
     strip_env: PexStripEnvField
-    platforms: PexPlatformsField
     complete_platforms: PexCompletePlatformsField
     resolve_local_platforms: PexResolveLocalPlatformsField
     layout: PexLayoutField
@@ -156,7 +154,6 @@ async def package_pex_binary(
         main=resolved_entry_point.val or field_set.script.value or field_set.executable.value,
         inject_args=field_set.args.value or [],
         inject_env=field_set.env.value or FrozenDict[str, str](),
-        platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
         complete_platforms=complete_platforms,
         output_filename=output_filename,
         layout=PexLayout(field_set.layout.value),
