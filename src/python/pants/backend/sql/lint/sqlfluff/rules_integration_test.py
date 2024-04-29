@@ -11,12 +11,12 @@ from pants.backend.sql.lint.sqlfluff import rules as sqlfluff_rules
 from pants.backend.sql.lint.sqlfluff import skip_field
 from pants.backend.sql.lint.sqlfluff import subsystem as sqlfluff_subsystem
 from pants.backend.sql.lint.sqlfluff.rules import (
-    SqlfluffFieldSet,
     SqlfluffFixRequest,
     SqlfluffFormatRequest,
     SqlfluffLintRequest,
 )
 from pants.backend.sql.lint.sqlfluff.skip_field import SkipSqlfluffField
+from pants.backend.sql.lint.sqlfluff.subsystem import SqlfluffFieldSet
 from pants.backend.sql.target_types import SqlSourcesGeneratorTarget
 from pants.core.goals.fix import FixResult
 from pants.core.goals.fmt import FmtResult
