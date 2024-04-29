@@ -32,7 +32,6 @@ from pants.backend.python.lint.add_trailing_comma.subsystem import AddTrailingCo
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
 from pants.backend.python.lint.bandit.subsystem import Bandit
 from pants.backend.python.lint.black.subsystem import Black
-from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.lint.isort.subsystem import Isort
@@ -119,19 +118,18 @@ all_python_tools = tuple(
             PythonTool(IPython, "pants.backend.python"),
             PythonTool(Isort, "pants.backend.python.lint.isort"),
             PythonTool(MyPy, "pants.backend.python.typecheck.mypy"),
-            PythonTool(PyOxidizer, "pants.backend.experimental.python.packaging.pyoxidizer"),
+            PythonTool(Pydocstyle, "pants.backend.python.lint.pydocstyle"),
             PythonTool(PyTest, "pants.backend.python"),
             PythonTool(PyUpgrade, "pants.backend.python.lint.pyupgrade"),
-            PythonTool(Pydocstyle, "pants.backend.python.lint.pydocstyle"),
             PythonTool(Pylint, "pants.backend.python.lint.pylint"),
-            PythonTool(PythonProtobufGrpclibPlugin, "pants.backend.codegen.protobuf.python"),
             PythonTool(PythonProtobufMypyPlugin, "pants.backend.codegen.protobuf.python"),
+            PythonTool(PythonProtobufGrpclibPlugin, "pants.backend.codegen.protobuf.python"),
             PythonTool(Pytype, "pants.backend.experimental.python.typecheck.pytype"),
+            PythonTool(PyOxidizer, "pants.backend.experimental.python.packaging.pyoxidizer"),
             PythonTool(Ruff, "pants.backend.experimental.python.lint.ruff"),
             PythonTool(SemgrepSubsystem, "pants.backend.experimental.tools.semgrep"),
             PythonTool(Setuptools, "pants.backend.python"),
             PythonTool(SetuptoolsSCM, "pants.backend.python"),
-            PythonTool(Sqlfluff, "pants.backend.experimental.sql.lint.sqlfluff"),
             PythonTool(TerraformHcl2Parser, "pants.backend.experimental.terraform"),
             PythonTool(TwineSubsystem, "pants.backend.python"),
             PythonTool(Yamllint, "pants.backend.experimental.tools.yamllint"),
