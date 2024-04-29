@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from typing import ClassVar
 
-from pants.core.target_types import ResourceSourceField
+from pants.backend.python.target_types import PexBinary
+from pants.core.target_types import ResourcesGeneratorTarget, ResourceSourceField, ResourceTarget
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -16,10 +17,9 @@ from pants.engine.target import (
 from pants.util.strutil import help_text
 
 
+# Subclassing ResourceSourceField will make sure the sql is included in
+# distributions as a resource.
 class SqlSourceField(ResourceSourceField):
-    """Subclassing ResourceSourceField will make sure the sql is included in distributions as a
-    resource."""
-
     expected_file_extensions: ClassVar[tuple[str, ...]] = (".sql",)
 
 
@@ -42,7 +42,14 @@ class SqlSourceTarget(Target):
         SqlSourceField,
         SqlDependenciesField,
     )
-    help = "A single SQL source file."
+    help = help_text(
+        f"""
+        A single SQL source file.
+
+        `{alias}` is treated like `{ResourceTarget.alias}` by other targets like
+        `{PexBinary.alias}`.
+        """
+    )
 
 
 class SqlSourcesOverridesField(OverridesField):
@@ -68,7 +75,11 @@ class SqlSourcesGeneratorTarget(TargetFilesGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (SqlDependenciesField,)
     help = help_text(
-        """
-        Generate a `sql_source` target for each file in the `sources` field.
+        f"""
+        Generate a `{SqlSourceTarget.alias}` target for each file in the
+        `sources` field.
+
+        `{alias}` are treated like `{ResourcesGeneratorTarget.alias}` by other
+        targets like `{PexBinary.alias}`.
         """
     )
