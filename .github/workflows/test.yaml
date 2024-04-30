@@ -584,14 +584,9 @@ jobs:
 
         '
       name: Release notes required
-      run: '
-
-        echo ''This PR should either: add release notes to the appropriate file in `docs/notes`, or, be labelled with `release-notes-not-required`
-        if it does not need them.''
-
-        exit 1
-
-        '
+      run: "\necho 'Please either:\n\n- add release notes to the appropriate file in `docs/notes`\n\n- label this PR with\
+        \ `release-notes:not-required` if it does not need them (for\n  instance, if this is fixing a minor typo in documentation)\n\
+        \nFeel free to ask a maintainer for help if you are not sure what is appropriate!'\n\nexit 1\n"
   classify_changes:
     if: github.repository_owner == 'pantsbuild'
     name: Classify changes

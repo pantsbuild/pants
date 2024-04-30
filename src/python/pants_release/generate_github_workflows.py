@@ -190,7 +190,15 @@ def ensure_release_notes() -> Sequence[Step]:
             "name": "Release notes required",
             "run": dedent(
                 """
-                echo 'This PR should either: add release notes to the appropriate file in `docs/notes`, or, be labelled with `release-notes-not-required` if it does not need them.'
+                echo 'Please either:
+
+                - add release notes to the appropriate file in `docs/notes`
+
+                - label this PR with `release-notes:not-required` if it does not need them (for
+                  instance, if this is fixing a minor typo in documentation)
+
+                Feel free to ask a maintainer for help if you are not sure what is appropriate!'
+
                 exit 1
                 """
             ),
