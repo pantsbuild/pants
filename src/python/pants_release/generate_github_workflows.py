@@ -170,20 +170,20 @@ def ensure_category_label() -> Sequence[Step]:
 
 
 def ensure_release_notes() -> Sequence[Step]:
-    """Check that a PR either has release notes, or a category:internal or no-release-notes
-    label."""
+    """Check that a PR either has release notes, or a category:internal or release-notes:not-
+    required label."""
     return [
         {
             "if": dedent(
                 # For PRs, only run this step (and thus fail the build) if we don't have any of these:
                 #
                 # - changes to the release notes
-                # - release-notes-not-required label (i.e. a human has explicitly indicated that we can skip the release notes)
+                # - release-notes:not-required label (i.e. a human has explicitly indicated that we can skip the release notes)
                 # - category:internal label (similar to the previous label)
                 """
                 github.event_name == 'pull_request' &&
                 !needs.classify_changes.outputs.notes &&
-                !contains(github.event.issue.labels.*.name, 'release-notes-not-required') &&
+                !contains(github.event.issue.labels.*.name, 'release-notes:not-required') &&
                 !contains(github.event.issue.labels.*.name, 'category:internal')
                 """
             ),
