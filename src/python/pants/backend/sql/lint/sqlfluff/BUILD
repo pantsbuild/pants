@@ -8,4 +8,5 @@ python_sources(
 
 python_tests(
     name="tests",
+    interpreter_constraints=["CPython>=3.8,<4"],
 )
