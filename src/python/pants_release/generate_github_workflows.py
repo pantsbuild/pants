@@ -998,7 +998,7 @@ def test_workflow_jobs() -> Jobs:
         "check_release_notes": {
             "name": "Ensure PR has release notes",
             "runs-on": linux_x86_64_helper.runs_on(),
-            "needs": ["classify_changes", "check_labels"],
+            "needs": ["classify_changes"],
             "if": IS_PANTS_OWNER,
             "steps": ensure_release_notes(),
         },
@@ -1730,7 +1730,7 @@ def generate() -> dict[Path, str]:
     pr_jobs = test_workflow_jobs()
     pr_jobs.update(**classify_changes())
     for key, val in pr_jobs.items():
-        if key in {"check_labels", "classify_changes"}:
+        if key in {"check_labels", "classify_changes", "check_release_notes"}:
             continue
         needs = val.get("needs", [])
         if isinstance(needs, str):

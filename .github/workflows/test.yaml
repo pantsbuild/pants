@@ -563,11 +563,9 @@ jobs:
           category:documentation, category:internal
         mode: exactly
   check_release_notes:
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has release notes
     needs:
-    - classify_changes
-    - check_labels
     - classify_changes
     runs-on:
     - ubuntu-20.04
