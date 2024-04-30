@@ -6,7 +6,6 @@ from __future__ import annotations
 import os
 import platform
 import shutil
-from dataclasses import dataclass
 from textwrap import dedent
 from typing import Mapping, MutableMapping
 
@@ -21,6 +20,7 @@ SOURCES = {
         """\
         python_requirement(name='req1', requirements=['ansicolors==1.1.8'], resolve='a', modules=['colors'])
         python_requirement(name='req2', requirements=['ansicolors==1.0.2'], resolve='b', modules=['colors'])
+        python_requirement(name='req3', requirements=['wheel'], resolve=parametrize('a', 'b'))
         """
     ),
     "src/python/foo.py": "from colors import *",
@@ -37,20 +37,9 @@ SOURCES = {
 }
 
 
-@dataclass
-class _ToolConfig:
-    name: str
-    version: str
-    experimental: bool = False
-    backend_prefix: str | None = "lint"
-    takes_ics: bool = True
-
-    @property
-    def package(self) -> str:
-        return self.name.replace("-", "_")
-
-
-def build_config(tmpdir: str, py_resolve_format: PythonResolveExportFormat) -> Mapping:
+def build_config(
+    tmpdir: str, py_resolve_format: PythonResolveExportFormat, py_hermetic_scripts: bool = True
+) -> Mapping:
     cfg: MutableMapping = {
         "GLOBAL": {
             "backend_packages": ["pants.backend.python"],
@@ -63,20 +52,24 @@ def build_config(tmpdir: str, py_resolve_format: PythonResolveExportFormat) -> M
                 "b": f"{tmpdir}/3rdparty/b.lock",
             },
         },
-        "export": {"py_resolve_format": py_resolve_format.value},
+        "export": {
+            "py_resolve_format": py_resolve_format.value,
+            "py_hermetic_scripts": py_hermetic_scripts,
+        },
     }
 
     return cfg
 
 
 @pytest.mark.parametrize(
-    "py_resolve_format",
+    "py_resolve_format,py_hermetic_scripts",
     [
-        PythonResolveExportFormat.mutable_virtualenv,
-        PythonResolveExportFormat.symlinked_immutable_virtualenv,
+        (PythonResolveExportFormat.mutable_virtualenv, True),
+        (PythonResolveExportFormat.mutable_virtualenv, False),
+        (PythonResolveExportFormat.symlinked_immutable_virtualenv, True),
     ],
 )
-def test_export(py_resolve_format: PythonResolveExportFormat) -> None:
+def test_export(py_resolve_format: PythonResolveExportFormat, py_hermetic_scripts: bool) -> None:
     with setup_tmpdir(SOURCES) as tmpdir:
         resolve_names = ["a", "b"]
         run_pants(
@@ -86,7 +79,7 @@ def test_export(py_resolve_format: PythonResolveExportFormat) -> None:
                 *(f"--resolve={name}" for name in resolve_names),
                 "--export-py-editable-in-resolve=['a']",
             ],
-            config=build_config(tmpdir, py_resolve_format),
+            config=build_config(tmpdir, py_resolve_format, py_hermetic_scripts),
         ).assert_success()
 
     export_prefix = os.path.join("dist", "export", "python", "virtualenvs")
@@ -117,6 +110,23 @@ def test_export(py_resolve_format: PythonResolveExportFormat) -> None:
         ), f"expected dist-info for ansicolors '{expected_ansicolors_dir}' does not exist"
 
         if py_resolve_format == PythonResolveExportFormat.mutable_virtualenv:
+            activate_path = os.path.join(export_dir, "bin", "activate")
+            assert os.path.isfile(activate_path), "virtualenv's bin/activate is missing"
+            with open(activate_path) as activate_file:
+                prompt = f'PS1="({resolve}/{platform.python_version()}) '
+                assert prompt in activate_file.read()
+
+            script_path = os.path.join(export_dir, "bin", "wheel")
+            assert os.path.isfile(
+                script_path
+            ), "expected wheel to be installed, but bin/wheel is missing"
+            with open(script_path) as script_file:
+                shebang = script_file.readline().strip()
+            if py_hermetic_scripts:
+                assert shebang.endswith(" -sE")
+            else:
+                assert not shebang.endswith(" -sE")
+
             expected_foo_dir = os.path.join(lib_dir, "foo_dist-1.2.3.dist-info")
             if resolve == "b":
                 assert not os.path.isdir(

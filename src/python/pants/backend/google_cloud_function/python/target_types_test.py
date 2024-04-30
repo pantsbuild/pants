@@ -42,6 +42,7 @@ def rule_runner() -> RuleRunner:
         ["python39", 3, 9],
         ["python310", 3, 10],
         ["python311", 3, 11],
+        ["python312", 3, 12],
     ),
 )
 def test_to_interpreter_version(runtime: str, expected_major: int, expected_minor: int) -> None:

@@ -81,7 +81,12 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, union
-from pants.source.source_root import SourceRootsRequest, SourceRootsResult
+from pants.source.source_root import (
+    OptionalSourceRoot,
+    SourceRootRequest,
+    SourceRootsRequest,
+    SourceRootsResult,
+)
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -94,7 +99,7 @@ logger = logging.getLogger(__name__)
 
 class SetupPyError(Exception):
     def __init__(self, msg: str):
-        super().__init__(f"{msg} See {doc_url('python-distributions')}.")
+        super().__init__(f"{msg} See {doc_url('docs/python/overview/building-distributions')}.")
 
 
 class InvalidSetupPyArgs(SetupPyError):
@@ -116,7 +121,7 @@ class OwnershipError(SetupPyError):
         super().__init__(
             softwrap(
                 f"""
-                {msg} See {doc_url('python-distributions')} for
+                {msg} See {doc_url('docs/python/overview/building-distributions')} for
                 how python_sources targets are mapped to distributions.
                 """
             )
@@ -406,20 +411,27 @@ async def create_dist_build_request(
     )
 
     # Find the source roots for the build-time 1stparty deps (e.g., deps of setup.py).
-    source_roots_result = await Get(
-        SourceRootsResult,
-        SourceRootsRequest(
-            files=[],
-            dirs={
-                PurePath(tgt.address.spec_path)
-                for tgt in transitive_targets.closure
-                if tgt.has_field(PythonSourceField) or tgt.has_field(ResourceSourceField)
-            },
+    optional_dist_source_root, source_roots_result = await MultiGet(
+        Get(OptionalSourceRoot, SourceRootRequest.for_target(dist_tgt)),
+        Get(
+            SourceRootsResult,
+            SourceRootsRequest(
+                files=[],
+                dirs={
+                    PurePath(tgt.address.spec_path)
+                    for tgt in transitive_targets.closure
+                    if tgt.has_field(PythonSourceField) or tgt.has_field(ResourceSourceField)
+                },
+            ),
         ),
     )
-    path_to_root = source_roots_result.path_to_root
-    dist_source_root = next(iter(path_to_root.values())).path if path_to_root else "."
-    source_roots = tuple(sorted({sr.path for sr in path_to_root.values()}))
+
+    # We have to get `dist_source_root` independently from the other source roots because it is
+    # not a `python_source` target, and because `source_roots_result.path_to_root` is already sorted.
+    dist_source_root = (
+        optional_dist_source_root.source_root.path if optional_dist_source_root.source_root else "."
+    )
+    source_roots = tuple(sorted({sr.path for sr in source_roots_result.path_to_root.values()}))
 
     # Get any extra build-time environment (e.g., native extension requirements).
     build_env_requests = []

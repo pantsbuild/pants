@@ -377,7 +377,7 @@ impl PyRemovePrefix {
 // PathGlobs
 // -----------------------------------------------------------------------------
 
-struct PyPathGlobs(PathGlobs);
+struct PyPathGlobs(#[allow(dead_code)] PathGlobs);
 
 impl<'source> FromPyObject<'source> for PyPathGlobs {
     fn extract(obj: &'source PyAny) -> PyResult<Self> {

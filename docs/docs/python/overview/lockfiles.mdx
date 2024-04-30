@@ -184,6 +184,9 @@ It is strongly recommended that these tools be installed from a hermetic lockfil
 
 The only time you need to think about this is if you want to customize the tool requirements that Pants uses. This might be the case if you want to modify the version of a tool or add extra requirements (for example, tool plugins).
 
+:::caution Exporting tools requires a custom lockfile
+:::
+
 If you want a tool to be installed from some resolve, instead of from the built-in lockfile, you set `install_from_resolve` and `requirements` on the tool's config section:
 
 ```toml title="pants.toml"
@@ -192,7 +195,7 @@ pytest = "3rdparty/python/pytest.lock"
 
 [pytest]
 install_from_resolve = "pytest"  # Use this resolve's lockfiles.
-requirements =["//3rdparty/python:pytest"]  # Use these requirements from the lockfile.
+requirements = ["//3rdparty/python:pytest"]  # Use these requirements from the lockfile.
 ```
 
 Then set up the resolve's inputs:
@@ -239,7 +242,7 @@ Rather than repeat the same requirement in two different resolves, you can point
 
 ```toml title="pants.toml"
 [pytest]
-install_from_resolve = python-default
+install_from_resolve = "python-default"
 ```
 
 Of course, you have to ensure that this resolve does in fact provide appropriate versions of the tool.
@@ -248,7 +251,7 @@ As above, you will want to point `requirements` to the subset of targets represe
 
 ```toml title="pants.toml"
 [pytest]
-install_from_resolve = python-default
+install_from_resolve = "python-default"
 
 requirements = [
   "//3rdparty/python#pytest",

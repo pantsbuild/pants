@@ -19,6 +19,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
     Resolve,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
 from pants.option.errors import OptionsError
@@ -31,7 +32,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-class PythonToolRequirementsBase(Subsystem):
+class PythonToolRequirementsBase(Subsystem, ExportableTool):
     """Base class for subsystems that configure a set of requirements for a python tool."""
 
     # Subclasses must set.
@@ -58,7 +59,7 @@ class PythonToolRequirementsBase(Subsystem):
             If specified, install the tool using the lockfile for this named resolve.
 
             This resolve must be defined in `[python].resolves`, as described in
-            {doc_url("python-third-party-dependencies#user-lockfiles")}.
+            {doc_url("docs/python/overview/third-party-dependencies#user-lockfiles")}.
 
             The resolve's entire lockfile will be installed, unless specific requirements are
             listed via the `requirements` option, in which case only those requirements
@@ -141,6 +142,33 @@ class PythonToolRequirementsBase(Subsystem):
             )
         )
 
+    @classmethod
+    def help_for_generate_lockfile_with_default_location(cls, resolve_name):
+        return softwrap(
+            f"""
+            You requested to generate a lockfile for {resolve_name} because
+            you included it in `--generate-lockfiles-resolve`, but
+            {resolve_name} is a tool using its default lockfile.
+
+            If you would like to generate a lockfile for {resolve_name},
+            follow the instructions for setting up lockfiles for tools
+            {doc_url('docs/python/overview/lockfiles#lockfiles-for-tools')}
+        """
+        )
+
+    @classmethod
+    def pex_requirements_for_default_lockfile(cls):
+        """Generate the pex requirements using this subsystem's default lockfile resource."""
+        assert cls.default_lockfile_resource is not None
+        pkg, path = cls.default_lockfile_resource
+        url = f"resource://{pkg}/{path}"
+        origin = f"The built-in default lockfile for {cls.options_scope}"
+        return Lockfile(
+            url=url,
+            url_description_of_origin=origin,
+            resolve_name=cls.options_scope,
+        )
+
     def pex_requirements(
         self,
         *,
@@ -155,17 +183,8 @@ class PythonToolRequirementsBase(Subsystem):
                 from_superset=Resolve(self.install_from_resolve, use_entire_lockfile),
                 description_of_origin=description_of_origin,
             )
-
-        assert self.default_lockfile_resource is not None
-        pkg, path = self.default_lockfile_resource
-        url = f"resource://{pkg}/{path}"
-        origin = f"The built-in default lockfile for {self.options_scope}"
-        lockfile = Lockfile(
-            url=url,
-            url_description_of_origin=origin,
-            resolve_name=self.options_scope,
-        )
-        return EntireLockfile(lockfile)
+        else:
+            return EntireLockfile(self.pex_requirements_for_default_lockfile())
 
     @property
     def interpreter_constraints(self) -> InterpreterConstraints:

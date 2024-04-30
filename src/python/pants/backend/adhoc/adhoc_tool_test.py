@@ -268,3 +268,37 @@ def test_env_vars(rule_runner: PythonRuleRunner) -> None:
         Address("src", target_name="envvars"),
         expected_contents={"out.log": f"{envvar_value}\n"},
     )
+
+
+def test_execution_dependencies_and_runnable_dependencies(rule_runner: PythonRuleRunner) -> None:
+    file_contents = "example contents"
+
+    rule_runner.write_files(
+        {
+            # put the runnable in its own directory, so we're sure that the dependencies are
+            # resolved relative to the adhoc_tool target
+            "a/BUILD": """system_binary(name="bash", binary_name="bash")""",
+            "b/BUILD": dedent(
+                """
+                system_binary(name="renamed_cat", binary_name="cat")
+                files(name="f", sources=["f.txt"])
+
+                adhoc_tool(
+                  name="deps",
+                  runnable="a:bash",
+                  args=["-c", "renamed_cat f.txt"],
+                  execution_dependencies=[":f"],
+                  runnable_dependencies=[":renamed_cat"],
+                  stdout="stdout",
+                )
+                """
+            ),
+            "b/f.txt": file_contents,
+        }
+    )
+
+    assert_adhoc_tool_result(
+        rule_runner,
+        Address("b", target_name="deps"),
+        expected_contents={"b/stdout": file_contents},
+    )

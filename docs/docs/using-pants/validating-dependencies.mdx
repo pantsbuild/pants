@@ -9,6 +9,8 @@ Validating your code's dependencies.
 
 Visibility rules are the mechanism by which to control who may depend on whom. It is an implementation of Pants's dependency rules API. With these rules a dependency between two files (or targets) may be set for entire directory trees down to single files. A target may be selected not only by its file path but also by target type, name, and tags.
 
+NB: Visibility rules are applied on a low level, so they can inspect metadata provided directly on a target and via `__defaults__`, but anything applied via `overrides` is opaque to the visibility rules. For example, a rule that selects tagged targets can find tags provided directly on the target using the `tags` field (like `target(tags=[...])`) or via `__defaults__` (like `__defaults__({target:dict(tags=[...])})`) but any tags in `overrides` (like `target(overrides={"foo": dict(tags=[...])})`) cannot be inspected by the visibility rules.
+
 To jump right in, start with [enabling the backend](./validating-dependencies.mdx#enable-visibility-backend) and add some rules to your BUILD files.
 
 ## Example visibility rules
@@ -203,13 +205,13 @@ __dependencies_rules__(
 
 The selector and rule share a common syntax (refered to as a **target rule spec**), that is a dictionary value with properties describing what targets it applies to. Together, this pair of selector(s) and rules is called a **rule set**. A rule set may have multiple selectors wrapped in a list/tuple and the rules may be spread out or grouped in any fashion. Grouping rules like this makes it easier to re-use/insert rules from macros or similar.
 
-:::note An empty selector (`{}` or `""`) will never match anything and is as such pointless and will result in an error.
+:::note An empty selector (`{}` or `""`) will never match anything and is as such pointless and is ignored.
 For every dependency link, only a single set of rules will ever be applied. The first rule set
 with a matching selector will be the only one used and any remaining rule sets are never
 consulted.
 :::
 
-The **target rule spec** has four properties: `type`, `name`, `tags`, and `path`. From the above example, when determining which rule set to apply for the dependencies of `src/a/main.py` Pants will look for the first selector for `src/a/BUILD` that satisifies the properties `type=python_sources`, `tags=["apps"]`, and `path=src/a/main.py`. The selection is based on exclusion so only when there is a property value and it doesn't match the target's property it will move on to the next selector; the lack of a property will be considered to match anything. Consequently an empty target spec would match all targets, but this is disallowed and will raise an error if used because it is conceptually not very clear when reading the rules.
+The **target rule spec** has four (five for rules) properties: `type`, `name`, `tags`, `path`, and `action` (only rules consult `action`). The `action` is one of `allow` (default if not specified), `warn`, or `deny`. From the above example, when determining which rule set to apply for the dependencies of `src/a/main.py` Pants will look for the first selector for `src/a/BUILD` that satisifies the properties `type=python_sources`, `tags=["apps"]`, and `path=src/a/main.py`. The selection is based on exclusion so only when there is a property value and it doesn't match the target's property it will move on to the next selector; the lack of a property will be considered to match anything. Consequently an empty target spec would match all targets, but this is disallowed and will raise an error if used because it is conceptually not very clear when reading the rules.
 
 The values of a **target rule spec** supports wildcard patterns (or globs) in order to have a single selector match multiple different targets, as described in [glob syntax](./key-concepts/targets-and-build-files.mdx#glob-syntax). When listing multiple values for the `tags` property, the target must have all of them in order to match. Spread the tags over multiple selectors in order to switch from _AND_ to _OR_ as required. The target `type` to match against will be that of the type used in the BUILD file, as the path (and target address) may refer to a generated target it is the target generators type that will be used during the selector matching process.
 
@@ -286,6 +288,25 @@ The previous example, using this alternative syntax for the selectors, would loo
       "//src/**:named-*",
     ),
     ...
+  )
+```
+
+Similarily, the rules may also be expressed using the dict syntax:
+
+```python
+  (
+    ( # Selectors block
+      ...
+    ),
+    (  # Grouping rules for readability
+      (  # Deny rules
+        {"path": "tests/**", "action": "deny"},  # No tests
+        {"path": "src/*/*/**", "action": "deny"}, # Nothing deeply nested
+      ),
+      (  # Allow rules
+        {"path": "*"},  # Allow everything else (allow is default action)
+      ),
+    )
   )
 ```
 

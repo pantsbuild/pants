@@ -35,7 +35,7 @@ class PythonProtobufSubsystem(Subsystem):
         f"""
         Options related to the Protobuf Python backend.
 
-        See {doc_url('protobuf-python')}.
+        See {doc_url('docs/python/integrations/protobuf-and-grpc')}.
         """
     )
 

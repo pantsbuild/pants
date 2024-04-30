@@ -43,7 +43,7 @@ function git_merge_base() {
   # This prints the tracking branch if set and otherwise falls back to the commit before HEAD.
   # We fall back to the commit before HEAD to attempt to account for situations without a tracking
   # branch, which might include `main` builds, but can also include branch-PR builds, where
-  # Travis checks out a specially crafted Github `+refs/pull/11516/merge` branch.
+  # Travis checks out a specially crafted GitHub `+refs/pull/11516/merge` branch.
   git rev-parse --symbolic-full-name --abbrev-ref HEAD@\{upstream\} 2> /dev/null || git rev-parse HEAD^
 }
 

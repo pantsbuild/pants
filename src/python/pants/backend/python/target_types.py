@@ -113,7 +113,7 @@ class InterpreterConstraintsField(StringSequenceField):
 
         If the field is not set, it will default to the option `[python].interpreter_constraints`.
 
-        See {doc_url('python-interpreter-compatibility')} for how these interpreter
+        See {doc_url('docs/python/overview/interpreter-compatibility')} for how these interpreter
         constraints are merged with the constraints of dependencies.
         """
     )
@@ -157,7 +157,8 @@ class PythonRunGoalUseSandboxField(TriBoolField):
     alias = "run_goal_use_sandbox"
     help = help_text(
         """
-        Whether to use a sandbox when `run`ning this target. Defaults to `[python].run_goal_use_sandbox`.
+        Whether to use a sandbox when `run`ning this target. Defaults to
+        `[python].default_run_goal_use_sandbox`.
 
         If true, runs of this target with the `run` goal will copy the needed first-party sources
         into a temporary sandbox and run from there.
@@ -414,11 +415,32 @@ class PexExecutableField(Field):
 
 
 class PexArgsField(StringSequenceField):
-    alias = "args"
+    alias: ClassVar[str] = "args"
     help = help_text(
-        """
+        lambda: f"""
         Freeze these command-line args into the PEX. Allows you to run generic entry points
         on specific arguments without creating a shim file.
+
+        This is different to `{PexExtraBuildArgsField.alias}`: `{PexArgsField.alias}`
+        records arguments used by the packaged PEX when executed,
+        `{PexExtraBuildArgsField.alias}` passes arguments to the process that does the
+        packaging.
+        """
+    )
+
+
+class PexExtraBuildArgsField(StringSequenceField):
+    alias: ClassVar[str] = "extra_build_args"
+    default = ()
+    help = help_text(
+        lambda: f"""
+        Extra arguments to pass to the `pex` invocation used to build this PEX. These are
+        passed after all other arguments. This can be used to pass extra options that
+        Pants doesn't have built-in support for.
+
+        This is different to `{PexArgsField.alias}`: `{PexArgsField.alias}` records
+        arguments used by the packaged PEX when executed, `{PexExtraBuildArgsField.alias}`
+        passes arguments to the process that does the packaging.
         """
     )
 
@@ -451,47 +473,6 @@ class PexEnvField(DictStringToStringField):
     )
 
 
-class PexPlatformsField(StringSequenceField):
-    alias = "platforms"
-    removal_version = "2.22.0.dev0"
-    removal_hint = softwrap(
-        f"""\
-    The platforms field is a hack. The abbreviated information it provides is sometimes insufficient,
-    leading to hard-to-debug build issues. Use complete_platforms instead.
-    See {doc_url('pex')} for details.
-    """
-    )
-    help = help_text(
-        """
-        The abbreviated platforms the built PEX should be compatible with.
-
-        There must be built wheels available for all of the foreign platforms, rather than sdists.
-
-        You can give a list of multiple platforms to create a multiplatform PEX,
-        meaning that the PEX will be executable in all of the supported environments.
-
-        Platforms should be in the format defined by Pex
-        (https://pex.readthedocs.io/en/latest/buildingpex.html#platform), i.e.
-        PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-37-cp37m",
-        "macosx_10.12_x86_64-cp-310-cp310"):
-
-          - PLATFORM: the host platform, e.g. "linux-x86_64", "macosx-10.12-x86_64".
-          - IMPL: the Python implementation abbreviation, e.g. "cp" or "pp".
-          - PYVER: a two or more digit string representing the python major/minor version\
-            (e.g., "37" or "310") or else a component dotted version string (e.g., "3.7" or "3.10.1").
-          - ABI: the ABI tag, e.g. "cp37m", "cp310", "abi3", "none".
-
-        Note that using an abbreviated platform means that certain resolves will fail when they
-        encounter environment markers that cannot be deduced from the abbreviated platform
-        string. A common example of this is 'python_full_version' which requires knowing the
-        patch level version of the foreign Python interpreter. To remedy this you should use a
-        3-component dotted version for PYVER. If your resolves fail due to more esoteric
-        undefined environment markers, you should switch to specifying `complete_platforms`
-        instead.
-        """
-    )
-
-
 class PexCompletePlatformsField(SpecialCasedDependencies):
     alias = "complete_platforms"
     help = help_text(
@@ -507,7 +488,7 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
         complete platform JSON as described by Pex
         (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
 
-        See {doc_url('pex')} for details.
+        See {doc_url('docs/python/overview/pex')} for details.
         """
     )
 
@@ -605,20 +586,21 @@ class PexEmitWarningsField(TriBoolField):
     def value_or_global_default(self, pex_binary_defaults: PexBinaryDefaults) -> bool:
         if self.value is None:
             return pex_binary_defaults.emit_warnings
+
         return self.value
 
 
 class PexResolveLocalPlatformsField(TriBoolField):
     alias = "resolve_local_platforms"
+    removal_version = "2.24.0.dev0"
+    removal_hint = softwrap(
+        f"""\
+        This {alias} field is no longer used now that the `platforms` field has been removed. Remove it.
+        """
+    )
     help = help_text(
-        f"""
-        For each of the `{PexPlatformsField.alias}` specified, attempt to find a local
-        interpreter that matches.
-
-        If a matching interpreter is found, use the interpreter to resolve distributions and build
-        any that are only available in source distribution form.
-        If no matching interpreter is found (or if this option is `False`), resolve for the
-        platform by accepting only pre-built binary distributions (wheels).
+        """
+        Now unused.
         """
     )
 
@@ -758,7 +740,6 @@ _PEX_BINARY_COMMON_FIELDS = (
     PythonResolveField,
     PexBinaryDependenciesField,
     PexCheckField,
-    PexPlatformsField,
     PexCompletePlatformsField,
     PexResolveLocalPlatformsField,
     PexInheritPathField,
@@ -787,6 +768,7 @@ class PexBinary(Target):
         PexScriptField,
         PexExecutableField,
         PexArgsField,
+        PexExtraBuildArgsField,
         PexEnvField,
         OutputPathField,
     )
@@ -795,7 +777,7 @@ class PexBinary(Target):
         A Python target that can be converted into an executable PEX file.
 
         PEX files are self-contained executable files that contain a complete Python environment
-        capable of running the target. For more information, see {doc_url('pex')}.
+        capable of running the target. For more information, see {doc_url('docs/python/overview/pex')}.
         """
     )
 
@@ -909,14 +891,14 @@ class PexBinaryDefaults(Subsystem):
     resolve_local_platforms = BoolOption(
         default=False,
         help=softwrap(
-            f"""
-            For each of the `{PexPlatformsField.alias}` specified for a `{PexBinary.alias}`
-            target, attempt to find a local interpreter that matches.
-
-            If a matching interpreter is found, use the interpreter to resolve distributions and
-            build any that are only available in source distribution form. If no matching interpreter
-            is found (or if this option is `False`), resolve for the platform by accepting
-            only pre-built binary distributions (wheels).
+            """
+            Now unused.
+            """
+        ),
+        removal_version="2.24.0.dev0",
+        removal_hint=softwrap(
+            """\
+            This `resolve_local_platforms` option is no longer used now that the `platforms` field has been removed. You can safely delete this setting.
             """
         ),
         advanced=True,
@@ -1057,7 +1039,7 @@ class PythonTestTarget(Target):
         target and then be included in the `dependencies` field. (You can use the
         `python_test_utils` target to generate these `python_source` targets.)
 
-        See {doc_url('python-test-goal')}
+        See {doc_url('docs/python/goals/test')}
         """
     )
 
@@ -1396,7 +1378,7 @@ class PythonRequirementTarget(Target):
         requirement into a `python_requirement` target automatically. For Poetry, use
         `poetry_requirements`.
 
-        See {doc_url('python-third-party-dependencies')}.
+        See {doc_url('docs/python/overview/third-party-dependencies')}.
         """
     )
 
@@ -1441,7 +1423,7 @@ class PythonProvidesField(ScalarField, AsyncFieldMixin):
         in the `setup()` function:
         (https://packaging.python.org/guides/distributing-packages-using-setuptools/#setup-args).
 
-        See {doc_url('plugins-setup-py')} for how to write a plugin to dynamically generate kwargs.
+        See {doc_url('docs/writing-plugins/common-plugin-tasks/custom-python-artifact-kwargs')} for how to write a plugin to dynamically generate kwargs.
         """
     )
 
@@ -1675,7 +1657,7 @@ class PythonDistribution(Target):
         f"""
         A publishable Python setuptools distribution (e.g. an sdist or wheel).
 
-        See {doc_url('python-distributions')}.
+        See {doc_url('docs/python/overview/building-distributions')}.
         """
     )
 
@@ -1784,6 +1766,6 @@ class VCSVersion(Target):
         a subset of that config in this target's fields.
 
         If you need functionality that is not currently exposed here, please reach out to us at
-        {doc_url("getting-help")}.
+        {doc_url("community/getting-help")}.
         """
     )

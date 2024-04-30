@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{HashMap, HashSet};
-use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
 
@@ -11,11 +10,10 @@ use regex::Regex;
 use toml::value::Table;
 use toml::Value;
 
-use super::id::{NameTransform, OptionId};
-use super::parse::{
-    parse_bool_list, parse_dict, parse_float_list, parse_int_list, parse_string_list, ParseError,
-};
 use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, OptionsSource, Val};
+use crate::fromfile::FromfileExpander;
+use crate::id::{NameTransform, OptionId};
+use crate::parse::Parseable;
 
 type InterpolationMap = HashMap<String, String>;
 
@@ -100,17 +98,30 @@ struct ValueConversionError<'a> {
     given_value: &'a Value,
 }
 
-trait FromValue: Sized {
+trait FromValue: Parseable {
     fn from_value(value: &Value) -> Result<Self, ValueConversionError>;
 
-    fn from_config(config: &Config, id: &OptionId) -> Result<Option<Self>, String> {
+    fn from_config(config: &ConfigReader, id: &OptionId) -> Result<Option<Self>, String> {
         if let Some(value) = config.get_value(id) {
-            match Self::from_value(value) {
-                Ok(x) => Ok(Some(x)),
-                Err(verr) => Err(format!(
-                    "Expected {id} to be a {} but given {}",
-                    verr.expected_type, verr.given_value
-                )),
+            if value.is_str() {
+                match config
+                    .fromfile_expander
+                    .expand(value.as_str().unwrap().to_owned())
+                    .map_err(|e| e.render(config.display(id)))?
+                {
+                    Some(expanded_value) => Ok(Some(
+                        Self::parse(&expanded_value).map_err(|e| e.render(config.display(id)))?,
+                    )),
+                    _ => Ok(None),
+                }
+            } else {
+                match Self::from_value(value) {
+                    Ok(x) => Ok(Some(x)),
+                    Err(verr) => Err(format!(
+                        "Expected {id} to be a {} but given {}",
+                        verr.expected_type, verr.given_value
+                    )),
+                }
             }
         } else {
             Ok(None)
@@ -217,132 +228,15 @@ fn toml_table_to_dict(table: &Value) -> HashMap<String, Val> {
 }
 
 #[derive(Clone)]
-struct ConfigSource {
-    #[allow(dead_code)]
-    path: Option<OsString>,
-    config: Value,
-}
-
-impl ConfigSource {
-    fn option_name(id: &OptionId) -> String {
-        id.name("_", NameTransform::None)
-    }
-
-    fn get_value(&self, id: &OptionId) -> Option<&Value> {
-        self.config
-            .get(id.scope())
-            .and_then(|table| table.get(Self::option_name(id)))
-    }
-
-    fn get_list<T: FromValue>(
-        &self,
-        id: &OptionId,
-        parse_list: fn(&str) -> Result<Vec<ListEdit<T>>, ParseError>,
-    ) -> Result<Vec<ListEdit<T>>, String> {
-        let mut list_edits = vec![];
-        if let Some(table) = self.config.get(id.scope()) {
-            let option_name = Self::option_name(id);
-            if let Some(value) = table.get(&option_name) {
-                match value {
-                    Value::Table(sub_table) => {
-                        if sub_table.is_empty()
-                            || !sub_table.keys().collect::<HashSet<_>>().is_subset(
-                                &["add".to_owned(), "remove".to_owned()]
-                                    .iter()
-                                    .collect::<HashSet<_>>(),
-                            )
-                        {
-                            return Err(format!(
-                                "Expected {option_name} to contain an 'add' element, a 'remove' element or both but found: {sub_table:?}"
-                            ));
-                        }
-                        if let Some(add) = sub_table.get("add") {
-                            list_edits.push(ListEdit {
-                                action: ListEditAction::Add,
-                                items: T::extract_list(&format!("{option_name}.add"), add)?,
-                            })
-                        }
-                        if let Some(remove) = sub_table.get("remove") {
-                            list_edits.push(ListEdit {
-                                action: ListEditAction::Remove,
-                                items: T::extract_list(&format!("{option_name}.remove"), remove)?,
-                            })
-                        }
-                    }
-                    Value::String(v) => {
-                        list_edits.extend(parse_list(v).map_err(|e| e.render(option_name))?);
-                    }
-                    value => list_edits.push(ListEdit {
-                        action: ListEditAction::Replace,
-                        items: T::extract_list(&option_name, value)?,
-                    }),
-                }
-            }
-        }
-        Ok(list_edits)
-    }
-
-    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
-        if let Some(table) = self.config.get(id.scope()) {
-            let option_name = Self::option_name(id);
-            if let Some(value) = table.get(&option_name) {
-                match value {
-                    Value::Table(sub_table) => {
-                        if let Some(add) = sub_table.get("add") {
-                            if sub_table.len() == 1 && add.is_table() {
-                                return Ok(Some(DictEdit {
-                                    action: DictEditAction::Add,
-                                    items: toml_table_to_dict(add),
-                                }));
-                            }
-                        }
-                        return Ok(Some(DictEdit {
-                            action: DictEditAction::Replace,
-                            items: toml_table_to_dict(value),
-                        }));
-                    }
-                    Value::String(v) => {
-                        return Ok(Some(parse_dict(v).map_err(|e| e.render(option_name))?));
-                    }
-                    _ => {
-                        return Err(format!(
-                            "Expected {option_name} to be a toml table or Python dict, but given {value}."
-                        ));
-                    }
-                }
-            }
-        }
-        Ok(None)
-    }
-}
-
-#[derive(Clone)]
 pub(crate) struct Config {
-    sources: Vec<ConfigSource>,
+    value: Value,
 }
 
 impl Config {
     pub(crate) fn parse<P: AsRef<Path>>(
-        files: &[P],
-        seed_values: &InterpolationMap,
-    ) -> Result<Config, String> {
-        let mut sources = vec![];
-        for file in files {
-            sources.push(Self::parse_source(file, seed_values)?);
-        }
-        Ok(Config { sources })
-    }
-
-    pub(crate) fn merge(self, other: Config) -> Config {
-        Config {
-            sources: self.sources.into_iter().chain(other.sources).collect(),
-        }
-    }
-
-    fn parse_source<P: AsRef<Path>>(
         file: P,
         seed_values: &InterpolationMap,
-    ) -> Result<ConfigSource, String> {
+    ) -> Result<Config, String> {
         let config_contents = fs::read_to_string(&file).map_err(|e| {
             format!(
                 "Failed to read config file {}: {}",
@@ -419,33 +313,91 @@ impl Config {
         };
 
         let new_table = Table::from_iter(new_sections?);
-        Ok(ConfigSource {
-            path: Some(file.as_ref().as_os_str().into()),
-            config: Value::Table(new_table),
+        Ok(Self {
+            value: Value::Table(new_table),
         })
-    }
-
-    fn get_value(&self, id: &OptionId) -> Option<&Value> {
-        self.sources
-            .iter()
-            .rev()
-            .find_map(|source| source.get_value(id))
-    }
-
-    fn get_list<T: FromValue>(
-        &self,
-        id: &OptionId,
-        parse_list: fn(&str) -> Result<Vec<ListEdit<T>>, ParseError>,
-    ) -> Result<Option<Vec<ListEdit<T>>>, String> {
-        let mut edits: Vec<ListEdit<T>> = vec![];
-        for source in self.sources.iter() {
-            edits.append(&mut source.get_list(id, parse_list)?);
-        }
-        Ok(Some(edits))
     }
 }
 
-impl OptionsSource for Config {
+pub(crate) struct ConfigReader {
+    config: Config,
+    fromfile_expander: FromfileExpander,
+}
+
+impl ConfigReader {
+    pub fn new(config: Config, fromfile_expander: FromfileExpander) -> Self {
+        Self {
+            config,
+            fromfile_expander,
+        }
+    }
+
+    fn option_name(id: &OptionId) -> String {
+        id.name("_", NameTransform::None)
+    }
+
+    fn get_value(&self, id: &OptionId) -> Option<&Value> {
+        self.config
+            .value
+            .get(id.scope.name())
+            .and_then(|table| table.get(Self::option_name(id)))
+    }
+
+    fn get_list<T: FromValue + Parseable>(
+        &self,
+        id: &OptionId,
+    ) -> Result<Option<Vec<ListEdit<T>>>, String> {
+        let mut list_edits = vec![];
+        if let Some(table) = self.config.value.get(id.scope.name()) {
+            let option_name = Self::option_name(id);
+            if let Some(value) = table.get(&option_name) {
+                match value {
+                    Value::Table(sub_table) => {
+                        if sub_table.is_empty()
+                            || !sub_table.keys().collect::<HashSet<_>>().is_subset(
+                                &["add".to_owned(), "remove".to_owned()]
+                                    .iter()
+                                    .collect::<HashSet<_>>(),
+                            )
+                        {
+                            return Err(format!(
+                                "Expected {option_name} to contain an 'add' element, a 'remove' element or both but found: {sub_table:?}"
+                            ));
+                        }
+                        if let Some(add) = sub_table.get("add") {
+                            list_edits.push(ListEdit {
+                                action: ListEditAction::Add,
+                                items: T::extract_list(&format!("{option_name}.add"), add)?,
+                            })
+                        }
+                        if let Some(remove) = sub_table.get("remove") {
+                            list_edits.push(ListEdit {
+                                action: ListEditAction::Remove,
+                                items: T::extract_list(&format!("{option_name}.remove"), remove)?,
+                            })
+                        }
+                    }
+                    Value::String(v) => {
+                        if let Some(es) = self
+                            .fromfile_expander
+                            .expand_to_list::<T>(v.to_string())
+                            .map_err(|e| e.render(self.display(id)))?
+                        {
+                            list_edits.extend(es);
+                        }
+                    }
+                    value => list_edits.push(ListEdit {
+                        action: ListEditAction::Replace,
+                        items: T::extract_list(&option_name, value)?,
+                    }),
+                }
+            }
+        }
+        Ok(Some(list_edits))
+    }
+}
+
+impl OptionsSource for ConfigReader {
     fn display(&self, id: &OptionId) -> String {
         format!("{id}")
     }
@@ -467,28 +419,54 @@ impl OptionsSource for Config {
     }
 
     fn get_bool_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<bool>>>, String> {
-        self.get_list(id, parse_bool_list)
+        self.get_list::<bool>(id)
     }
 
     fn get_int_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<i64>>>, String> {
-        self.get_list(id, parse_int_list)
+        self.get_list::<i64>(id)
     }
 
     fn get_float_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<f64>>>, String> {
-        self.get_list(id, parse_float_list)
+        self.get_list::<f64>(id)
     }
 
     fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
-        self.get_list(id, parse_string_list)
+        self.get_list::<String>(id)
     }
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
-        let mut edits = vec![];
-        for source in self.sources.iter() {
-            if let Some(edit) = source.get_dict(id)? {
-                edits.push(edit);
+        if let Some(table) = self.config.value.get(id.scope.name()) {
+            let option_name = Self::option_name(id);
+            if let Some(value) = table.get(&option_name) {
+                match value {
+                    Value::Table(sub_table) => {
+                        if let Some(add) = sub_table.get("add") {
+                            if sub_table.len() == 1 && add.is_table() {
+                                return Ok(Some(vec![DictEdit {
+                                    action: DictEditAction::Add,
+                                    items: toml_table_to_dict(add),
+                                }]));
+                            }
+                        }
+                        return Ok(Some(vec![DictEdit {
+                            action: DictEditAction::Replace,
+                            items: toml_table_to_dict(value),
+                        }]));
+                    }
+                    Value::String(v) => {
+                        return self
+                            .fromfile_expander
+                            .expand_to_dict(v.to_owned())
+                            .map_err(|e| e.render(self.display(id)));
+                    }
+                    _ => {
+                        return Err(format!(
+                            "Expected {option_name} to be a toml table or Python dict, but given {value}."
+                        ));
+                    }
+                }
             }
         }
-        Ok(if edits.is_empty() { None } else { Some(edits) })
+        Ok(None)
     }
 }

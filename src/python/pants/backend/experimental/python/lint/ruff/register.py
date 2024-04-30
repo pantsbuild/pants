@@ -6,9 +6,15 @@
 See https://www.pantsbuild.org/docs/python-linters-and-formatters and https://docs.astral.sh/ruff/
 """
 
-from pants.backend.python.lint.ruff import rules as ruff_rules
-from pants.backend.python.lint.ruff import skip_field, subsystem
+from pants.backend.experimental.python.lint.ruff.check import register as ruff_check
+from pants.base.deprecated import warn_or_error
 
 
 def rules():
-    return (*ruff_rules.rules(), *skip_field.rules(), *subsystem.rules())
+    warn_or_error(
+        "2.23.0.dev0",
+        "The `pants.backend.experimental.python.lint.ruff` backend",
+        hint="Use `pants.backend.experimental.python.lint.ruff.check` instead.",
+        start_version="2.20.0.dev7",
+    )
+    return ruff_check.rules()

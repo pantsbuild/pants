@@ -4,7 +4,10 @@
 use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, Val};
 use crate::render_choice;
 
+use serde::de::DeserializeOwned;
 use std::collections::HashMap;
+use std::fmt::Display;
+use std::path::Path;
 
 peg::parser! {
     grammar option_value_parser() for str {
@@ -40,10 +43,10 @@ peg::parser! {
         }
 
         rule unquoted_string() -> String
-            = s:(non_escaped_character() / escaped_character())+ { s.into_iter().collect() }
+            = s:(escaped_character() / non_escaped_character())+ { s.into_iter().collect() }
 
         rule non_escaped_character() -> char
-            = !"\\" c:$([_]) { c.chars().next().unwrap() }
+            = !"\\x" c:$([_]) { c.chars().next().unwrap() }
 
         pub(crate) rule quoted_string() -> String
             = string:(double_quoted_string() / single_quoted_string()) { string }
@@ -52,23 +55,61 @@ peg::parser! {
             = "\"" s:double_quoted_character()* "\"" { s.into_iter().collect() }
 
         rule double_quoted_character() -> char
-            = quoted_character("\"")
-            / escaped_character()
+            = escaped_character() / quoted_character("\"")
 
         rule single_quoted_string() -> String
             = "'" s:single_quoted_character()* "'" { s.into_iter().collect() }
 
         rule single_quoted_character() -> char
-            = quoted_character("'")
-            / escaped_character()
+            = escaped_character() / quoted_character("'")
 
         // NB: ##method(X) is an undocumented peg feature expression that calls input.method(pos, X)
         // (see https://github.com/kevinmehall/rust-peg/issues/283).
         rule quoted_character(quote_char: &'static str) -> char
-            = !(##parse_string_literal(quote_char) / "\\") c:$([_]) { c.chars().next().unwrap() }
+            = !(##parse_string_literal(quote_char) / "\\x") c:$([_]) { c.chars().next().unwrap() }
 
-        rule escaped_character() -> char
-            = "\\" c:$([_]) { c.chars().next().unwrap() }
+        // Python string literal escape sequences.
+        // See https://docs.python.org/3/reference/lexical_analysis.html#escape-sequences.
+        // Note that only backslash, single-quote, linefeed, carriage return and horizontal tab
+        // are also Rust character escape sequences.
+        //
+        // TODO: Support \uXXXX and \UXXXXXXXX escapes? What about \N{name}?
+        //  The unicode_names crate would be helpful for the latter, but it seems like
+        //  overkill, and would add 500KB to the size of the Pants binary.
+
+        rule escaped_ba() -> char = "\\\\" { '\\' }
+        rule escaped_sq() -> char = "\\'" { '\'' }
+        rule escaped_dq() -> char = "\\\"" { '"' }
+        rule escaped_be() -> char = "\\a" { '\x07' }
+        rule escaped_bs() -> char = "\\b" { '\x08' }
+        rule escaped_ff() -> char = "\\f" { '\x0c' }
+        rule escaped_lf() -> char = "\\n" { '\n' }
+        rule escaped_cr() -> char = "\\r" { '\r' }
+        rule escaped_ht() -> char = "\\t" { '\t' }
+        rule escaped_vt() -> char = "\\v" { '\x0b' }
+
+        // Python octal escapes take 1-3 digits.
+        rule escaped_octal() -> char = "\\" s:$(['0'..='7']*<1,3>) {
+            char::from_u32(u32::from_str_radix(s, 8).unwrap()).unwrap()
+        }
+
+        // Python hex escapes take exactly 2 digits. Note that we mirror the Python behavior of
+        // always consuming the next two characters and failing if they aren't valid hex digits.
+        rule escaped_hex() -> char = "\\x" s:$([_] [_]) {?
+            if let Ok(n) = u32::from_str_radix(s, 16) {
+                // In practice all possible two-digit numbers are are valid character codes,
+                // so this error should never trigger.
+                char::from_u32(n).ok_or("valid character code")
+            } else {
+                Err("two hex digits")
+            }
+        }
+
+        rule escaped_character() -> char = c:(
+             escaped_ba() / escaped_sq() / escaped_dq() / escaped_be() / escaped_bs() /
+             escaped_ff() / escaped_lf() / escaped_cr() / escaped_ht() / escaped_vt() /
+             escaped_octal() / escaped_hex()
+        ) { c }
 
         rule list_add() -> ListEditAction
             = "+" { ListEditAction::Add }
@@ -231,6 +272,13 @@ mod err {
 
 pub(crate) use err::ParseError;
 
+pub(crate) fn mk_parse_err(err: impl Display, path: &Path) -> ParseError {
+    ParseError::new(format!(
+        "Problem reading {path} for {{name}}: {err}",
+        path = path.display()
+    ))
+}
+
 fn format_parse_error(
     type_id: &str,
     value: &str,
@@ -274,49 +322,55 @@ fn format_parse_error(
     ))
 }
 
-#[allow(dead_code)]
-pub(crate) fn parse_bool(value: &str) -> Result<bool, ParseError> {
-    option_value_parser::bool(value).map_err(|e| format_parse_error("bool", value, e))
-}
-
-#[allow(dead_code)]
-pub(crate) fn parse_int(value: &str) -> Result<i64, ParseError> {
-    option_value_parser::int(value).map_err(|e| format_parse_error("int", value, e))
-}
-
-#[allow(dead_code)]
-pub(crate) fn parse_float(value: &str) -> Result<f64, ParseError> {
-    option_value_parser::float(value).map_err(|e| format_parse_error("float", value, e))
-}
-
-#[allow(dead_code)]
-pub(crate) fn parse_quoted_string(value: &str) -> Result<String, ParseError> {
-    option_value_parser::quoted_string(value).map_err(|e| format_parse_error("string", value, e))
-}
-
-#[allow(dead_code)]
-pub(crate) fn parse_bool_list(value: &str) -> Result<Vec<ListEdit<bool>>, ParseError> {
-    option_value_parser::bool_list_edits(value)
-        .map_err(|e| format_parse_error("bool list", value, e))
-}
-
-#[allow(dead_code)]
-pub(crate) fn parse_int_list(value: &str) -> Result<Vec<ListEdit<i64>>, ParseError> {
-    option_value_parser::int_list_edits(value).map_err(|e| format_parse_error("int list", value, e))
-}
-
-#[allow(dead_code)]
-pub(crate) fn parse_float_list(value: &str) -> Result<Vec<ListEdit<f64>>, ParseError> {
-    option_value_parser::float_list_edits(value)
-        .map_err(|e| format_parse_error("float list", value, e))
-}
-
-pub(crate) fn parse_string_list(value: &str) -> Result<Vec<ListEdit<String>>, ParseError> {
-    option_value_parser::string_list_edits(value)
-        .map_err(|e| format_parse_error("string list", value, e))
-}
-
-#[allow(dead_code)]
 pub(crate) fn parse_dict(value: &str) -> Result<DictEdit, ParseError> {
     option_value_parser::dict_edit(value).map_err(|e| format_parse_error("dict", value, e))
+}
+
+pub(crate) trait Parseable: Sized + DeserializeOwned {
+    fn parse(value: &str) -> Result<Self, ParseError>;
+    fn parse_list(value: &str) -> Result<Vec<ListEdit<Self>>, ParseError>;
+}
+
+impl Parseable for bool {
+    fn parse(value: &str) -> Result<bool, ParseError> {
+        option_value_parser::bool(value).map_err(|e| format_parse_error("bool", value, e))
+    }
+
+    fn parse_list(value: &str) -> Result<Vec<ListEdit<bool>>, ParseError> {
+        option_value_parser::bool_list_edits(value)
+            .map_err(|e| format_parse_error("bool list", value, e))
+    }
+}
+
+impl Parseable for i64 {
+    fn parse(value: &str) -> Result<i64, ParseError> {
+        option_value_parser::int(value).map_err(|e| format_parse_error("int", value, e))
+    }
+
+    fn parse_list(value: &str) -> Result<Vec<ListEdit<i64>>, ParseError> {
+        option_value_parser::int_list_edits(value)
+            .map_err(|e| format_parse_error("int list", value, e))
+    }
+}
+
+impl Parseable for f64 {
+    fn parse(value: &str) -> Result<f64, ParseError> {
+        option_value_parser::float(value).map_err(|e| format_parse_error("float", value, e))
+    }
+
+    fn parse_list(value: &str) -> Result<Vec<ListEdit<f64>>, ParseError> {
+        option_value_parser::float_list_edits(value)
+            .map_err(|e| format_parse_error("float list", value, e))
+    }
+}
+
+impl Parseable for String {
+    fn parse(value: &str) -> Result<String, ParseError> {
+        Ok(value.to_owned())
+    }
+
+    fn parse_list(value: &str) -> Result<Vec<ListEdit<String>>, ParseError> {
+        option_value_parser::string_list_edits(value)
+            .map_err(|e| format_parse_error("string list", value, e))
+    }
 }

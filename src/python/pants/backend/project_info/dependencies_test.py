@@ -85,12 +85,15 @@ def assert_dependencies(
     specs: List[str],
     expected: List[str],
     transitive: bool = False,
+    output_file: Optional[str] = None,
     closed: bool = False,
     output_format: DependenciesOutputFormat = DependenciesOutputFormat.text,
 ) -> None:
     args = []
     if transitive:
         args.append("--transitive")
+    if output_file:
+        args.extend([f"--output-file={output_file}"])
     if closed:
         args.append("--closed")
     args.append(f"--format={output_format.value}")
@@ -98,10 +101,19 @@ def assert_dependencies(
     result = rule_runner.run_goal_rule(
         Dependencies, args=[*args, *specs], env_inherit={"PATH", "PYENV_ROOT", "HOME"}
     )
-    if output_format == DependenciesOutputFormat.text:
-        assert result.stdout.splitlines() == expected
-    elif output_format == DependenciesOutputFormat.json:
-        assert json.loads(result.stdout) == expected
+
+    if output_file is None:
+        if output_format == DependenciesOutputFormat.text:
+            assert result.stdout.splitlines() == expected
+        elif output_format == DependenciesOutputFormat.json:
+            assert json.loads(result.stdout) == expected
+    else:
+        assert not result.stdout
+        with open(output_file) as f:
+            if output_format == DependenciesOutputFormat.text:
+                assert f.read().splitlines() == expected
+            elif output_format == DependenciesOutputFormat.json:
+                assert json.load(f) == expected
 
 
 def test_no_target(rule_runner: PythonRuleRunner) -> None:
@@ -223,6 +235,12 @@ def test_python_dependencies(rule_runner: PythonRuleRunner) -> None:
         ],
         closed=True,
     )
+    assert_deps(
+        specs=["some/other/target:target"],
+        transitive=False,
+        output_file="dependencies.txt",
+        expected=["some/other/target/a.py"],
+    )
 
 
 def test_python_dependencies_output_format_json_direct_deps(rule_runner: PythonRuleRunner) -> None:
@@ -282,6 +300,32 @@ def test_python_dependencies_output_format_json_direct_deps(rule_runner: PythonR
             ],
         },
     )
+    # input: directory, recursively, closed
+    assert_deps(
+        specs=["some::"],
+        transitive=False,
+        closed=True,
+        expected={
+            "some/target:target": [
+                "some/target/a.py",
+                "some/target:target",
+            ],
+            "some/target/a.py": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+                "some/target/a.py",
+            ],
+            "some/other/target:target": [
+                "some/other/target/a.py",
+                "some/other/target:target",
+            ],
+            "some/other/target/a.py": [
+                "3rdparty/python:req2",
+                "some/other/target/a.py",
+                "some/target/a.py",
+            ],
+        },
+    )
     assert_deps(
         specs=["some/other/target:target"],
         transitive=True,
@@ -292,6 +336,32 @@ def test_python_dependencies_output_format_json_direct_deps(rule_runner: PythonR
                 "dep/target/a.py",
                 "some/other/target/a.py",
                 "some/target/a.py",
+            ]
+        },
+    )
+    assert_deps(
+        specs=["some/other/target:target"],
+        transitive=True,
+        closed=True,
+        expected={
+            "some/other/target:target": [
+                "3rdparty/python:req1",
+                "3rdparty/python:req2",
+                "dep/target/a.py",
+                "some/other/target/a.py",
+                "some/other/target:target",
+                "some/target/a.py",
+            ]
+        },
+    )
+    assert_deps(
+        specs=["some/target/a.py"],
+        transitive=False,
+        output_file="dependencies.json",
+        expected={
+            "some/target/a.py": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
             ]
         },
     )
@@ -362,6 +432,41 @@ def test_python_dependencies_output_format_json_transitive_deps(
                 "3rdparty/python:req1",
                 "3rdparty/python:req2",
                 "dep/target/a.py",
+                "some/target/a.py",
+            ],
+        },
+    )
+
+    # input: directory, recursively, closed
+    assert_deps(
+        specs=["some::"],
+        transitive=True,
+        closed=True,
+        expected={
+            "some/target:target": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+                "some/target/a.py",
+                "some/target:target",
+            ],
+            "some/target/a.py": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+                "some/target/a.py",
+            ],
+            "some/other/target:target": [
+                "3rdparty/python:req1",
+                "3rdparty/python:req2",
+                "dep/target/a.py",
+                "some/other/target/a.py",
+                "some/other/target:target",
+                "some/target/a.py",
+            ],
+            "some/other/target/a.py": [
+                "3rdparty/python:req1",
+                "3rdparty/python:req2",
+                "dep/target/a.py",
+                "some/other/target/a.py",
                 "some/target/a.py",
             ],
         },

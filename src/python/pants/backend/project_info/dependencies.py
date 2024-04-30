@@ -41,8 +41,7 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
     )
     closed = BoolOption(
         default=False,
-        help="Include the input targets in the output, along with the dependencies. This option "
-        "only applies when using the `text` format.",
+        help="Include the input targets in the output, along with the dependencies.",
     )
     format = EnumOption(
         default=DependenciesOutputFormat.text,
@@ -58,11 +57,7 @@ class Dependencies(Goal):
 async def list_dependencies_as_json(
     addresses: Addresses, dependencies_subsystem: DependenciesSubsystem, console: Console
 ) -> None:
-    """Get dependencies for given addresses and list them in the console in JSON.
-
-    Note that `--closed` option is ignored as it doesn't make sense to duplicate source address in
-    the list of its dependencies.
-    """
+    """Get dependencies for given addresses and list them in the console in JSON."""
     # NB: We must preserve target generators for the roots, i.e. not replace with their
     # generated targets.
     target_roots = await Get(UnexpandedTargets, Addresses, addresses)
@@ -80,10 +75,16 @@ async def list_dependencies_as_json(
         )
 
         iterated_targets = []
-        for transitive_targets in transitive_targets_group:
-            iterated_targets.append(
-                sorted([str(tgt.address) for tgt in transitive_targets.dependencies])
-            )
+        for idx, transitive_targets in enumerate(transitive_targets_group):
+            targets_collection = {
+                str(tgt.address)
+                for tgt in (
+                    transitive_targets.closure
+                    if dependencies_subsystem.closed
+                    else transitive_targets.dependencies
+                )
+            }
+            iterated_targets.append(sorted(targets_collection))
 
     else:
         dependencies_per_target_root = await MultiGet(
@@ -98,14 +99,19 @@ async def list_dependencies_as_json(
         )
 
         iterated_targets = []
-        for targets in dependencies_per_target_root:
-            iterated_targets.append(sorted([str(tgt.address) for tgt in targets]))
+        for idx, targets in enumerate(dependencies_per_target_root):
+            targets_collection = {str(tgt.address) for tgt in targets}
+            if dependencies_subsystem.closed:
+                targets_collection.add(str(target_roots[idx].address))
+            iterated_targets.append(sorted(targets_collection))
 
     # The assumption is that when iterating the targets and sending dependency requests
     # for them, the lists of dependencies are returned in the very same order.
     mapping = dict(zip([str(tgt.address) for tgt in target_roots], iterated_targets))
     output = json.dumps(mapping, indent=4)
-    console.print_stdout(output)
+
+    with dependencies_subsystem.line_oriented(console) as print_stdout:
+        print_stdout(output)
 
 
 async def list_dependencies_as_plain_text(

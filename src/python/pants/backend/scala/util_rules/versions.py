@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 from pants.engine.rules import collect_rules, rule
 from pants.jvm.resolve.coordinate import Coordinate
@@ -60,6 +61,26 @@ class ScalaVersion:
     @property
     def binary(self) -> str:
         return self.crossversion(ScalaCrossVersionMode.BINARY)
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ScalaVersion)
+            and other.major == self.major
+            and other.minor == self.minor
+            and other.patch == self.patch
+            and other.suffix == self.suffix
+        )
+
+    def __gt__(self, other: Any) -> bool:
+        if isinstance(other, ScalaVersion):
+            if self.major > other.major:
+                return True
+            elif (self.major == other.major) and (self.minor > other.minor):
+                return True
+            elif (self.major == other.major) and (self.minor == other.minor):
+                return self.patch > other.patch
+            return False
+        return False
 
     def __str__(self) -> str:
         version_str = f"{self.major}.{self.minor}.{self.patch}"
