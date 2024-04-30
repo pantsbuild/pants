@@ -12,7 +12,7 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff, SqlfluffFieldSet, SqlfluffMode
 from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
-from pants.core.goals.lint import AbstractLintRequest, LintResult, LintTargetsRequest
+from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -20,7 +20,6 @@ from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
@@ -30,6 +29,10 @@ class SqlfluffFixRequest(FixTargetsRequest):
     field_set_type = SqlfluffFieldSet
     tool_subsystem = Sqlfluff
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
+
+    # We don't need to include automatically added lint rules for this SqlfluffFixRequest,
+    # because these lint rules are already checked by SqlfluffLintRequest.
+    enable_lint_rules = False
 
 
 class SqlfluffLintRequest(LintTargetsRequest):
@@ -131,23 +134,11 @@ async def sqlfluff_fmt(request: SqlfluffFormatRequest.Batch, sqlfluff: Sqlfluff)
     return await FmtResult.create(request, result)
 
 
-def without_lint(rules):
-    return [
-        rule
-        for rule in rules
-        if not isinstance(rule, UnionRule)
-        or (
-            rule.union_base is not AbstractLintRequest
-            and rule.union_base is not AbstractLintRequest.Batch
-        )
-    ]
-
-
 def rules():
     return [
         *collect_rules(),
         *SqlfluffLintRequest.rules(),
-        *without_lint(SqlfluffFixRequest.rules()),
-        *without_lint(SqlfluffFormatRequest.rules()),
+        *SqlfluffFixRequest.rules(),
+        *SqlfluffFormatRequest.rules(),
         *pex.rules(),
     ]
