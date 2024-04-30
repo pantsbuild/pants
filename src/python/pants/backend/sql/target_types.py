@@ -1,5 +1,6 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from typing import ClassVar
 
 from pants.backend.python.target_types import PexBinary
 from pants.core.target_types import ResourcesGeneratorTarget, ResourceSourceField, ResourceTarget
