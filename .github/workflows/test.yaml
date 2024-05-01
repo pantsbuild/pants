@@ -570,21 +570,19 @@ jobs:
     runs-on:
     - ubuntu-20.04
     steps:
-    - if: '
-
-        github.event_name == ''pull_request'' &&
-
-        !needs.classify_changes.outputs.notes &&
-
-        !contains(github.event.issue.labels.*.name, ''release-notes:not-required'') &&
-
-        !contains(github.event.issue.labels.*.name, ''category:internal'')
-
-        '
-      name: Release notes required
-      run: "\necho 'Please either:\n\n- add release notes to the appropriate file in `docs/notes`\n\n- label this PR with\
-        \ `release-notes:not-required` if it does not need them (for\n  instance, if this is fixing a minor typo in documentation)\n\
-        \nFeel free to ask a maintainer for help if you are not sure what is appropriate!'\n\nexit 1\n"
+    - env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: github.event_name == 'pull_request' && !needs.classify_changes.outputs.notes
+      name: Ensure appropriate label
+      uses: mheap/github-action-required-labels@v4.0.0
+      with:
+        count: 1
+        labels: release-notes:not-required, category:internal
+        message: "\nPlease do one of:\n\n- add release notes to the appropriate file in `docs/notes`\n\n- label this PR with\
+          \ `release-notes:not-required` if it does not need them (for\n  instance, if this is fixing a minor typo in documentation)\n\
+          \n- label this PR with `category:internal` if it's an internal change\n\nFeel free to ask a maintainer for help\
+          \ if you are not sure what is appropriate!\n"
+        mode: minimum
   classify_changes:
     if: github.repository_owner == 'pantsbuild'
     name: Classify changes

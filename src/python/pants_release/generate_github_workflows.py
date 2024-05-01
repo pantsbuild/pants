@@ -174,34 +174,32 @@ def ensure_release_notes() -> Sequence[Step]:
     required label."""
     return [
         {
-            "if": dedent(
-                # For PRs, only run this step (and thus fail the build) if we don't have any of these:
-                #
-                # - changes to the release notes
-                # - release-notes:not-required label (i.e. a human has explicitly indicated that we can skip the release notes)
-                # - category:internal label (similar to the previous label)
-                """
-                github.event_name == 'pull_request' &&
-                !needs.classify_changes.outputs.notes &&
-                !contains(github.event.issue.labels.*.name, 'release-notes:not-required') &&
-                !contains(github.event.issue.labels.*.name, 'category:internal')
-                """
-            ),
-            "name": "Release notes required",
-            "run": dedent(
-                """
-                echo 'Please either:
+            # If there's release note changes, then we're good to go and no need to check for one of
+            # the opt-out labels. If there's not, then we should check to see if a human has opted
+            # out via a label.
+            "if": "github.event_name == 'pull_request' && !needs.classify_changes.outputs.notes",
+            "name": "Ensure appropriate label",
+            "uses": "mheap/github-action-required-labels@v4.0.0",
+            "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
+            "with": {
+                "mode": "minimum",
+                "count": 1,
+                "labels": "release-notes:not-required, category:internal",
+                "message": dedent(
+                    """
+                    Please do one of:
 
-                - add release notes to the appropriate file in `docs/notes`
+                    - add release notes to the appropriate file in `docs/notes`
 
-                - label this PR with `release-notes:not-required` if it does not need them (for
-                  instance, if this is fixing a minor typo in documentation)
+                    - label this PR with `release-notes:not-required` if it does not need them (for
+                      instance, if this is fixing a minor typo in documentation)
 
-                Feel free to ask a maintainer for help if you are not sure what is appropriate!'
+                    - label this PR with `category:internal` if it's an internal change
 
-                exit 1
-                """
-            ),
+                    Feel free to ask a maintainer for help if you are not sure what is appropriate!
+                    """
+                ),
+            },
         },
     ]
 
