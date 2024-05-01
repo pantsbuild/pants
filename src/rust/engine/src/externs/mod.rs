@@ -32,7 +32,6 @@ mod interface;
 mod interface_tests;
 pub mod nailgun;
 mod options;
-mod options_test;
 mod pantsd;
 pub mod process;
 pub mod scheduler;
