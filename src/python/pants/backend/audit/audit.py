@@ -99,12 +99,10 @@ async def audit(
         request_type(
             request_type.field_set_type.create(target)  # type: ignore[misc]
             for target in targets
-            if (
-                request_type.tool_id in specified_ids
-                and request_type.field_set_type.is_applicable(target)  # type: ignore[misc]
-            )
+            if request_type.field_set_type.is_applicable(target)  # type: ignore[misc]
         )
         for request_type in request_types
+        if request_type.tool_id in specified_ids
     )
 
     all_results = await MultiGet(Get(AuditResults, {request: AuditRequest}) for request in requests)
