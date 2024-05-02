@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import shlex
 from enum import Enum
 from typing import Any, Mapping, Optional, Sequence, Tuple
@@ -12,6 +13,9 @@ from pants.engine.internals import native_engine
 from pants.option.custom_types import _flatten_shlexed_list, shell_str
 from pants.option.errors import OptionsError
 from pants.option.ranked_value import Rank
+from pants.util.strutil import get_strict_env
+
+logger = logging.getLogger()
 
 
 class NativeOptionParser:
@@ -33,7 +37,7 @@ class NativeOptionParser:
     ):
         self._native_parser = native_engine.PyOptionParser(
             args,
-            dict(env),
+            dict(get_strict_env(env, logger)),
             configs,
             allow_pantsrc,
         )

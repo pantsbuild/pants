@@ -400,8 +400,8 @@ class Options:
             if native_values[key] != rv:
                 logger.warning(
                     f"Value mismatch for option `{key}` in scope [{scope}]:\n"
-                    f"Rust   value: {native_values[key]} of type {type(native_values[key])}\n"
-                    f"Python value: {rv} of type {type(rv)}"
+                    f"Rust   value: {native_values[key]} of type {type(native_values[key])} provided by {native_values.get_rank(key)}\n"
+                    f"Python value: {rv} of type {type(rv)} provided by {values.get_rank(key)}"
                 )
                 raise Exception("Option value mismatch")
         return values
