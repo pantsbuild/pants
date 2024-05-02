@@ -6,7 +6,7 @@ from __future__ import annotations
 import inspect
 import shlex
 from enum import Enum
-from typing import Any, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Mapping, Optional, Sequence, Tuple
 
 from pants.engine.internals import native_engine
 from pants.option.custom_types import _flatten_shlexed_list, shell_str

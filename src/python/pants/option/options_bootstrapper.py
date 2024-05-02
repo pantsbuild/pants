@@ -249,7 +249,7 @@ class OptionsBootstrapper:
             self.env,
             self.config,
             known_scope_infos,
-            args=("pants",) + self.args,
+            args=self.args,
             bootstrap_option_values=bootstrap_option_values,
             allow_unknown_options=allow_unknown_options,
         )

@@ -78,7 +78,7 @@ def create_options(
     env: dict[str, str] | None = None,
     config: dict[str, dict[str, Any]] | None = None,
     extra_scope_infos: list[ScopeInfo] | None = None,
-) -> Options:
+) -> Generator[Options, None, None]:
     config_content = toml.dumps(config or {}).encode()
     with temporary_dir() as tmpdir:
         # Write to a real path, so the Rust config reader can access it.
