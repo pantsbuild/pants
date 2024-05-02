@@ -6,7 +6,7 @@ from __future__ import annotations
 import inspect
 import shlex
 from enum import Enum
-from typing import Any, Callable, Mapping, Optional, Sequence, Tuple
+from typing import Any, Mapping, Optional, Sequence, Tuple
 
 from pants.engine.internals import native_engine
 from pants.option.custom_types import _flatten_shlexed_list, shell_str
@@ -108,7 +108,7 @@ class NativeOptionParser:
             suffix = f" with member type {rust_member_type}" if rust_option_type is list else ""
             raise OptionsError(f"Unsupported type: {rust_option_type}{suffix}")
 
-        val, rank_int = getter(option_id, default)
+        val, rank_int = getter(option_id, default)  # type:ignore
         rank = self.int_to_rank[rank_int]
 
         if val is not None:

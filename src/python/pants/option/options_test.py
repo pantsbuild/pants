@@ -12,7 +12,7 @@ from enum import Enum
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, Dict, cast
+from typing import Any, Callable, Dict, Generator, cast
 
 import pytest
 import toml
