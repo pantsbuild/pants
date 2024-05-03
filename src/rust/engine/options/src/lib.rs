@@ -52,6 +52,7 @@ use crate::parse::Parseable;
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
 pub use types::OptionType;
+use crate::config::ConfigSource;
 
 // NB: The legacy Python options parser supported dicts with member_type "Any", which means
 // the values can be arbitrarily-nested lists, tuples and dicts, including heterogeneous
@@ -355,7 +356,8 @@ impl OptionParser {
 
         let mut ordinal: usize = 0;
         for path in repo_config_files.iter() {
-            let config = Config::parse(path, &seed_values)?;
+            let config_source = ConfigSource::from_file(path)?;
+            let config = Config::parse(&config_source, &seed_values)?;
             sources.insert(
                 Source::Config {
                     ordinal,
@@ -385,7 +387,7 @@ impl OptionParser {
             {
                 let rcfile_path = Path::new(&rcfile);
                 if rcfile_path.exists() {
-                    let rc_config = Config::parse(rcfile_path, &seed_values)?;
+                    let rc_config = Config::parse(&ConfigSource::from_file(rcfile_path)?, &seed_values)?;
                     sources.insert(
                         Source::Config {
                             ordinal,
