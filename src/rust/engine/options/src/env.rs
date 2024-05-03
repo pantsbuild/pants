@@ -71,7 +71,10 @@ impl EnvReader {
         let name = id.name("_", NameTransform::ToUpper);
         let mut names = vec![format!(
             "PANTS_{}_{}",
-            id.scope.name().replace('-', "_").to_ascii_uppercase(),
+            id.scope
+                .name()
+                .replace(['-', '.'], "_")
+                .to_ascii_uppercase(),
             name
         )];
         if id.scope == Scope::Global {
