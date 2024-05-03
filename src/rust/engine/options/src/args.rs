@@ -158,11 +158,8 @@ impl ArgsReader {
     }
 
     #[allow(dead_code)]
-    pub fn get_passthrough_args(&self) -> Option<Vec<&str>> {
-        self.args
-            .passthrough_args
-            .as_ref()
-            .map(|v| Vec::from_iter(v.iter().map(String::as_str)))
+    pub fn get_passthrough_args(&self) -> Option<&Vec<String>> {
+        self.args.passthrough_args.as_ref()
     }
 
     fn to_bool(&self, arg: &Arg) -> Result<Option<bool>, ParseError> {

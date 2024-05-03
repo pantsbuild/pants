@@ -71,9 +71,9 @@ fn test_display() {
 
 #[test]
 fn test_scope() {
-    let env = env([("PANTS_PYTHON_EXAMPLE", "true")]);
+    let env = env([("PANTS_FOO_BAR_EXAMPLE", "true")]);
     assert!(env
-        .get_bool(&option_id!(["python"], "example"))
+        .get_bool(&option_id!(["foo.bar"], "example"))
         .unwrap()
         .unwrap());
 }
