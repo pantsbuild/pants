@@ -427,6 +427,46 @@ impl ConfigReader {
             Some(list_edits)
         })
     }
+
+    fn get_dict_from_section(
+        &self,
+        section_name: &str,
+        id: &OptionId,
+    ) -> Result<Option<Vec<DictEdit>>, String> {
+        if let Some(table) = self.config.value.get(section_name) {
+            let option_name = Self::option_name(id);
+            if let Some(value) = table.get(&option_name) {
+                match value {
+                    Value::Table(sub_table) => {
+                        if let Some(add) = sub_table.get("add") {
+                            if sub_table.len() == 1 && add.is_table() {
+                                return Ok(Some(vec![DictEdit {
+                                    action: DictEditAction::Add,
+                                    items: toml_table_to_dict(add),
+                                }]));
+                            }
+                        }
+                        return Ok(Some(vec![DictEdit {
+                            action: DictEditAction::Replace,
+                            items: toml_table_to_dict(value),
+                        }]));
+                    }
+                    Value::String(v) => {
+                        return self
+                            .fromfile_expander
+                            .expand_to_dict(v.to_owned())
+                            .map_err(|e| e.render(self.display(id)));
+                    }
+                    _ => {
+                        return Err(format!(
+                            "Expected {option_name} to be a toml table or Python dict, but given {value}."
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
 }
 
 impl OptionsSource for ConfigReader {
@@ -467,38 +507,17 @@ impl OptionsSource for ConfigReader {
     }
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
-        if let Some(table) = self.config.value.get(id.scope.name()) {
-            let option_name = Self::option_name(id);
-            if let Some(value) = table.get(&option_name) {
-                match value {
-                    Value::Table(sub_table) => {
-                        if let Some(add) = sub_table.get("add") {
-                            if sub_table.len() == 1 && add.is_table() {
-                                return Ok(Some(vec![DictEdit {
-                                    action: DictEditAction::Add,
-                                    items: toml_table_to_dict(add),
-                                }]));
-                            }
-                        }
-                        return Ok(Some(vec![DictEdit {
-                            action: DictEditAction::Replace,
-                            items: toml_table_to_dict(value),
-                        }]));
-                    }
-                    Value::String(v) => {
-                        return self
-                            .fromfile_expander
-                            .expand_to_dict(v.to_owned())
-                            .map_err(|e| e.render(self.display(id)));
-                    }
-                    _ => {
-                        return Err(format!(
-                            "Expected {option_name} to be a toml table or Python dict, but given {value}."
-                        ));
-                    }
-                }
-            }
-        }
-        Ok(None)
+        let from_scoped_section_opt = self.get_dict_from_section(id.scope.name(), id)?;
+
+        Ok(
+            if let Some(from_default_section) = self.get_dict_from_section(DEFAULT_SECTION, id)? {
+                Some(itertools::concat([
+                    from_default_section,
+                    from_scoped_section_opt.unwrap_or(vec![]),
+                ]))
+            } else {
+                from_scoped_section_opt
+            },
+        )
     }
 }

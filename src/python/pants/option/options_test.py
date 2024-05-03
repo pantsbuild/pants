@@ -732,11 +732,14 @@ def test_list_option() -> None:
         expected: list[int],
         flags: str = "",
         env_val: str | None = None,
+        config_default: str | None = None,
         config_val: str | None = None,
         config2_val: str | None = None,
     ) -> None:
         env = {"PANTS_GLOBAL_LISTY": env_val} if env_val else None
         config = {"GLOBAL": {"listy": config_val}} if config_val else None
+        if config_default:
+            config["DEFAULT"] = {"listy": config_default}
         config2 = {"GLOBAL": {"listy": config2_val}} if config2_val else None
         global_options = _parse(
             flags=flags, env=env, config=config, config2=config2
@@ -761,12 +764,23 @@ def test_list_option() -> None:
     check(
         flags="--listy=+[8,9]",
         env_val="+[6,7]",
+        config_default="+[100]",
         config_val="+[4,5],+[45]",
-        expected=[*default, 4, 5, 45, 6, 7, 8, 9],
+        expected=[*default, 100, 4, 5, 45, 6, 7, 8, 9],
     )
     check(
         config_val="+[4,5],-[4]",
         expected=[*default, 5],
+    )
+    check(
+        config_default="[100, 101]",
+        config_val="+[4,5],-[4,101]",
+        expected=[100, 5],
+    )
+    check(
+        config_default="[100, 101]",
+        config_val="[4,5]",
+        expected=[4, 5],
     )
 
     # Appending and filtering across env, config and flags (in the right order).
@@ -915,10 +929,13 @@ def test_dict_option() -> None:
         *,
         expected: dict[str, str],
         flags: str = "",
+        config_default: str | None = None,
         config_val: str | None = None,
         config2_val: str | None = None,
     ) -> None:
         config = {"GLOBAL": {"dicty": config_val}} if config_val else None
+        if config_default:
+            config["DEFAULT"] = {"dicty": config_default}
         config2 = {"GLOBAL": {"dicty": config2_val}} if config2_val else None
         global_options = _parse(flags=flags, config=config, config2=config2).for_global_scope()
         assert global_options.dicty == expected
@@ -944,6 +961,12 @@ def test_dict_option() -> None:
         config_val='+{"c": "d"}',
         flags='--dicty=\'+{"e": "f"}\'',
         expected={**all_args, "e": "f"},
+    )
+    check(
+        config_default='+{"x": "y"}',
+        config_val='+{"c": "d"}',
+        flags='--dicty=\'+{"e": "f"}\'',
+        expected={**all_args, "x": "y", "e": "f"},
     )
 
     # Check that highest rank wins if we have multiple values for the same key.
