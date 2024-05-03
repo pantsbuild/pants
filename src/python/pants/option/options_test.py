@@ -737,9 +737,11 @@ def test_list_option() -> None:
         config2_val: str | None = None,
     ) -> None:
         env = {"PANTS_GLOBAL_LISTY": env_val} if env_val else None
-        config = {"GLOBAL": {"listy": config_val}} if config_val else None
+        config = {}
         if config_default:
             config["DEFAULT"] = {"listy": config_default}
+        if config_val:
+            config["GLOBAL"] = {"listy": config_val}
         config2 = {"GLOBAL": {"listy": config2_val}} if config2_val else None
         global_options = _parse(
             flags=flags, env=env, config=config, config2=config2
@@ -933,9 +935,11 @@ def test_dict_option() -> None:
         config_val: str | None = None,
         config2_val: str | None = None,
     ) -> None:
-        config = {"GLOBAL": {"dicty": config_val}} if config_val else None
+        config = {}
         if config_default:
             config["DEFAULT"] = {"dicty": config_default}
+        if config_val:
+            config["GLOBAL"] = {"dicty": config_val}
         config2 = {"GLOBAL": {"dicty": config2_val}} if config2_val else None
         global_options = _parse(flags=flags, config=config, config2=config2).for_global_scope()
         assert global_options.dicty == expected
