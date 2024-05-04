@@ -229,14 +229,10 @@ fn toml_table_to_dict(table: &Value) -> HashMap<String, Val> {
     }
 }
 
-#[derive(Clone)]
-pub(crate) struct Config {
-    value: Value,
-}
-
+#[derive(Clone, Debug)]
 pub struct ConfigSource {
-    pub(crate) path: PathBuf,
-    pub(crate) content: String,
+    pub path: PathBuf,
+    pub content: String,
 }
 
 impl ConfigSource {
@@ -255,6 +251,11 @@ impl ConfigSource {
             content,
         })
     }
+}
+
+#[derive(Clone)]
+pub(crate) struct Config {
+    value: Value,
 }
 
 impl Config {

@@ -45,6 +45,7 @@ use serde::Deserialize;
 pub use self::args::Args;
 use self::args::ArgsReader;
 use self::config::{Config, ConfigReader};
+pub use self::config::ConfigSource;
 pub use self::env::Env;
 use self::env::EnvReader;
 use crate::fromfile::FromfileExpander;
@@ -52,7 +53,6 @@ use crate::parse::Parseable;
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
 pub use types::OptionType;
-use crate::config::ConfigSource;
 
 // NB: The legacy Python options parser supported dicts with member_type "Any", which means
 // the values can be arbitrarily-nested lists, tuples and dicts, including heterogeneous

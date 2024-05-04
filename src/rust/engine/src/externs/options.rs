@@ -6,13 +6,14 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 
 use options::{
-    Args, Env, ListOptionValue, OptionId, OptionParser, OptionalOptionValue, Scope, Val,
+    Args, ConfigSource, Env, ListOptionValue, OptionId, OptionParser, OptionalOptionValue, Scope, Val,
 };
 
 use std::collections::HashMap;
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
     m.add_class::<PyOptionId>()?;
+    m.add_class::<PyConfigSource>()?;
     m.add_class::<PyOptionParser>()?;
     Ok(())
 }
@@ -123,6 +124,17 @@ impl PyOptionId {
 }
 
 #[pyclass]
+struct PyConfigSource(ConfigSource);
+
+#[pymethods]
+impl PyConfigSource {
+    #[new]
+    fn __new__(path: &str, content: &str) -> PyResult<Self> {
+        Ok(Self(ConfigSource { path: path.into(), content: content.to_string() }))
+    }
+}
+
+#[pyclass]
 struct PyOptionParser(OptionParser);
 
 type RankedVal<T> = (T, isize);
@@ -156,7 +168,7 @@ impl PyOptionParser {
     fn __new__(
         args: Vec<String>,
         env: &PyDict,
-        configs: Option<Vec<&str>>,
+        configs: Option<Vec<PyRef<PyConfigSource>>>,
         allow_pantsrc: bool,
     ) -> PyResult<Self> {
         let env = env
@@ -168,7 +180,7 @@ impl PyOptionParser {
         let option_parser = OptionParser::new(
             Args::new(args),
             Env::new(env),
-            configs,
+            configs.map(|cs| cs.iter().map(|c| c.0.clone()).collect()),
             allow_pantsrc,
             false,
             None,
