@@ -55,6 +55,7 @@ class Sqlfluff(PythonToolBase):
 
     skip = SkipOption("fmt", "fix", "lint")
     args = ArgsListOption(example="--dialect=postgres --exclude-rules LT08,RF02")
+    fix_args = ArgsListOption(example="--force")
     config = FileOption(
         default=None,
         advanced=True,

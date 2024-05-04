@@ -81,7 +81,11 @@ def run_sqlfluff(
     *,
     extra_args: list[str] | None = None,
 ) -> tuple[FixResult, LintResult, FmtResult]:
-    args = ["--backend-packages=pants.backend.sql.lint.sqlfluff", *(extra_args or ())]
+    args = [
+        "--backend-packages=pants.backend.sql.lint.sqlfluff",
+        '--sqlfluff-fix-args="--force"',
+        *(extra_args or ()),
+    ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
     field_sets = [
@@ -140,6 +144,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert fix_result.stdout == dedent(
         """\
         ==== finding fixable violations ====
+        FORCE MODE: Attempting fixes...
         ==== no fixable linting violations found ====
         All Finished!
         """
@@ -165,6 +170,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert fix_result.stdout == dedent(
         """\
         ==== finding fixable violations ====
+        FORCE MODE: Attempting fixes...
         == [query.sql] FAIL
         L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
                                | select. [references.consistent]
@@ -174,6 +180,18 @@ def test_failing(rule_runner: RuleRunner) -> None:
         """
     )
     assert fix_result.stderr == ""
+    assert lint_result.stdout == dedent(
+        """\
+         == [query.sql] FAIL
+         L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
+                                | select. [references.consistent]
+         L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
+                                | select which is inconsistent with previous references.
+                                | [references.consistent]
+         All Finished!
+         """
+    )
+    assert lint_result.stderr == ""
     assert lint_result.exit_code == 1
     assert fix_result.did_change
     assert fix_result.output == rule_runner.make_snapshot({"query.sql": GOOD_FILE})

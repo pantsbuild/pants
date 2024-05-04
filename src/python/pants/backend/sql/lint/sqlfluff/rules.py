@@ -83,7 +83,7 @@ async def run_sqlfluff(
     if request.mode is SqlfluffMode.FMT:
         initial_args = ("format",)
     elif request.mode is SqlfluffMode.FIX:
-        initial_args = ("fix",)
+        initial_args = ("fix", *sqlfluff.fix_args)
     elif request.mode is SqlfluffMode.LINT:
         initial_args = ("lint",)
     else:
