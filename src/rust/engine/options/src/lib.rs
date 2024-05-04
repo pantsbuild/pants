@@ -276,7 +276,7 @@ impl OptionParser {
     pub fn new(
         args: Args,
         env: Env,
-        config_paths: Option<Vec<&str>>,
+        config_sources: Option<Vec<ConfigSource>>,
         allow_pantsrc: bool,
         include_derivation: bool,
         buildroot: Option<BuildRoot>,
@@ -323,16 +323,17 @@ impl OptionParser {
                 .to_string()
         }
 
-        let repo_config_files = match config_paths {
-            Some(paths) => paths.iter().map(|s| s.to_string()).collect(),
+        let config_sources = match config_sources {
+            Some(cs) => cs,
             None => {
                 let default_config_path = path_join(&buildroot_string, "pants.toml");
-                parser
+                let config_paths = parser
                     .parse_string_list(
                         &option_id!("pants", "config", "files"),
                         vec![default_config_path],
                     )?
-                    .value
+                    .value;
+                config_paths.iter().map(|cp| ConfigSource::from_file(Path::new(&cp))).collect::<Result<Vec<_>, _>>()?
             }
         };
 
@@ -355,13 +356,12 @@ impl OptionParser {
         ]);
 
         let mut ordinal: usize = 0;
-        for path in repo_config_files.iter() {
-            let config_source = ConfigSource::from_file(path)?;
+        for config_source in config_sources {
             let config = Config::parse(&config_source, &seed_values)?;
             sources.insert(
                 Source::Config {
                     ordinal,
-                    path: path_strip(&buildroot_string, path),
+                    path: path_strip(&buildroot_string, config_source.path.to_string_lossy().as_ref()),
                 },
                 Arc::new(ConfigReader::new(config, fromfile_expander.clone())),
             );

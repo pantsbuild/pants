@@ -235,8 +235,8 @@ pub(crate) struct Config {
 }
 
 pub struct ConfigSource {
-    path: PathBuf,
-    content: String,
+    pub(crate) path: PathBuf,
+    pub(crate) content: String,
 }
 
 impl ConfigSource {

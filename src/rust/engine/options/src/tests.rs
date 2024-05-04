@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use tempfile::TempDir;
+use crate::config::ConfigSource;
 
 fn config_source() -> Source {
     Source::Config {
@@ -60,10 +61,7 @@ fn with_setup(
                 .map(|(k, v)| (k.to_owned(), v.to_owned()))
                 .collect::<HashMap<_, _>>(),
         },
-        Some(vec![
-            config_path.to_str().unwrap(),
-            extra_config_path.to_str().unwrap(),
-        ]),
+        Some(vec![config_path, extra_config_path].iter().map(|cp| ConfigSource::from_file(cp).unwrap()).collect()),
         false,
         true,
         Some(BuildRoot::find_from(buildroot.path()).unwrap()),
