@@ -228,7 +228,7 @@ fn test_default_section_scalar() {
 
 #[test]
 fn test_default_section_list() {
-    let conf = config("[DEFAULT]\nfoo = [11]\nbar=[22]\n[scope]\nbar=[33]\n");
+    let conf = config("[DEFAULT]\nfoo = [11]\nbar=[22]\n[scope]\nbar=\"+[33]\"\n");
     assert_eq!(
         conf.get_int_list(&option_id!(["scope"], "foo"))
             .unwrap()
@@ -249,10 +249,53 @@ fn test_default_section_list() {
                 items: vec![22]
             },
             ListEdit::<i64> {
-                action: ListEditAction::Replace,
+                action: ListEditAction::Add,
                 items: vec![33]
             }
         ]
+    );
+}
+
+#[test]
+fn test_default_section_dict() {
+    let mut conf = config(
+        "[DEFAULT]\n\
+     bar = '{ \"x\": 2 }'\n\
+     [foo]\n\
+     baz = '{ \"a\": 3 }'",
+    );
+
+    let mut expected = vec![DictEdit {
+        action: DictEditAction::Replace,
+        items: hashmap! { "x".to_string() => Val::Int(2) },
+    }];
+
+    assert_eq!(
+        conf.get_dict(&option_id!(["foo"], "bar")).unwrap().unwrap(),
+        expected
+    );
+
+    conf = config(
+        "[DEFAULT]\n\
+     bar = '{ \"x\": 2 }'\n\
+     [foo]\n\
+     bar = '+{ \"a\": 3 }'",
+    );
+
+    expected = vec![
+        DictEdit {
+            action: DictEditAction::Replace,
+            items: hashmap! { "x".to_string() => Val::Int(2) },
+        },
+        DictEdit {
+            action: DictEditAction::Add,
+            items: hashmap! { "a".to_string() => Val::Int(3) },
+        },
+    ];
+
+    assert_eq!(
+        conf.get_dict(&option_id!(["foo"], "bar")).unwrap().unwrap(),
+        expected
     );
 }
 
