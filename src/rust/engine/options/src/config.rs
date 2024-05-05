@@ -17,6 +17,8 @@ use crate::parse::Parseable;
 
 type InterpolationMap = HashMap<String, String>;
 
+static DEFAULT_SECTION: &str = "DEFAULT";
+
 lazy_static! {
     static ref PLACEHOLDER_RE: Regex = Regex::new(r"%\(([a-zA-Z0-9_.]+)\)s").unwrap();
 }
@@ -269,7 +271,7 @@ impl Config {
         }
 
         let default_imap =
-            add_section_to_interpolation_map(seed_values.clone(), config.get("DEFAULT"))?;
+            add_section_to_interpolation_map(seed_values.clone(), config.get(DEFAULT_SECTION))?;
 
         let new_sections: Result<Vec<(String, Value)>, String> = match config {
             Value::Table(t) => t
@@ -285,7 +287,7 @@ impl Config {
                             section
                         ));
                     }
-                    let section_imap = if section_name == "DEFAULT" {
+                    let section_imap = if section_name == *DEFAULT_SECTION {
                         default_imap.clone()
                     } else {
                         add_section_to_interpolation_map(default_imap.clone(), Some(&section))?
@@ -336,21 +338,46 @@ impl ConfigReader {
         id.name("_", NameTransform::None)
     }
 
-    fn get_value(&self, id: &OptionId) -> Option<&Value> {
+    fn get_from_section(&self, section_name: &str, option_name: &str) -> Option<&Value> {
         self.config
             .value
-            .get(id.scope.name())
-            .and_then(|table| table.get(Self::option_name(id)))
+            .get(section_name)
+            .and_then(|table| table.get(option_name))
+    }
+
+    fn get_value(&self, id: &OptionId) -> Option<&Value> {
+        let option_name = Self::option_name(id);
+        self.get_from_section(id.scope.name(), &option_name)
+            .or(self.get_from_section(DEFAULT_SECTION, &option_name))
     }
 
     fn get_list<T: FromValue + Parseable>(
         &self,
         id: &OptionId,
     ) -> Result<Option<Vec<ListEdit<T>>>, String> {
+        let from_scoped_section_opt = self.get_list_from_section(id.scope.name(), id)?;
+
+        Ok(
+            if let Some(from_default_section) = self.get_list_from_section(DEFAULT_SECTION, id)? {
+                Some(itertools::concat([
+                    from_default_section,
+                    from_scoped_section_opt.unwrap_or(vec![]),
+                ]))
+            } else {
+                from_scoped_section_opt
+            },
+        )
+    }
+
+    fn get_list_from_section<T: FromValue + Parseable>(
+        &self,
+        section_name: &str,
+        id: &OptionId,
+    ) -> Result<Option<Vec<ListEdit<T>>>, String> {
         let mut list_edits = vec![];
-        if let Some(table) = self.config.value.get(id.scope.name()) {
-            let option_name = Self::option_name(id);
-            if let Some(value) = table.get(&option_name) {
+        if let Some(table) = self.config.value.get(section_name) {
+            let option_name = &Self::option_name(id);
+            if let Some(value) = table.get(option_name) {
                 match value {
                     Value::Table(sub_table) => {
                         if sub_table.is_empty()
@@ -368,13 +395,13 @@ impl ConfigReader {
                             list_edits.push(ListEdit {
                                 action: ListEditAction::Add,
                                 items: T::extract_list(&format!("{option_name}.add"), add)?,
-                            })
+                            });
                         }
                         if let Some(remove) = sub_table.get("remove") {
                             list_edits.push(ListEdit {
                                 action: ListEditAction::Remove,
                                 items: T::extract_list(&format!("{option_name}.remove"), remove)?,
-                            })
+                            });
                         }
                     }
                     Value::String(v) => {
@@ -388,12 +415,57 @@ impl ConfigReader {
                     }
                     value => list_edits.push(ListEdit {
                         action: ListEditAction::Replace,
-                        items: T::extract_list(&option_name, value)?,
+                        items: T::extract_list(option_name, value)?,
                     }),
                 }
             }
         }
-        Ok(Some(list_edits))
+
+        Ok(if list_edits.is_empty() {
+            None
+        } else {
+            Some(list_edits)
+        })
+    }
+
+    fn get_dict_from_section(
+        &self,
+        section_name: &str,
+        id: &OptionId,
+    ) -> Result<Option<Vec<DictEdit>>, String> {
+        if let Some(table) = self.config.value.get(section_name) {
+            let option_name = Self::option_name(id);
+            if let Some(value) = table.get(&option_name) {
+                match value {
+                    Value::Table(sub_table) => {
+                        if let Some(add) = sub_table.get("add") {
+                            if sub_table.len() == 1 && add.is_table() {
+                                return Ok(Some(vec![DictEdit {
+                                    action: DictEditAction::Add,
+                                    items: toml_table_to_dict(add),
+                                }]));
+                            }
+                        }
+                        return Ok(Some(vec![DictEdit {
+                            action: DictEditAction::Replace,
+                            items: toml_table_to_dict(value),
+                        }]));
+                    }
+                    Value::String(v) => {
+                        return self
+                            .fromfile_expander
+                            .expand_to_dict(v.to_owned())
+                            .map_err(|e| e.render(self.display(id)));
+                    }
+                    _ => {
+                        return Err(format!(
+                            "Expected {option_name} to be a toml table or Python dict, but given {value}."
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -435,38 +507,17 @@ impl OptionsSource for ConfigReader {
     }
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
-        if let Some(table) = self.config.value.get(id.scope.name()) {
-            let option_name = Self::option_name(id);
-            if let Some(value) = table.get(&option_name) {
-                match value {
-                    Value::Table(sub_table) => {
-                        if let Some(add) = sub_table.get("add") {
-                            if sub_table.len() == 1 && add.is_table() {
-                                return Ok(Some(vec![DictEdit {
-                                    action: DictEditAction::Add,
-                                    items: toml_table_to_dict(add),
-                                }]));
-                            }
-                        }
-                        return Ok(Some(vec![DictEdit {
-                            action: DictEditAction::Replace,
-                            items: toml_table_to_dict(value),
-                        }]));
-                    }
-                    Value::String(v) => {
-                        return self
-                            .fromfile_expander
-                            .expand_to_dict(v.to_owned())
-                            .map_err(|e| e.render(self.display(id)));
-                    }
-                    _ => {
-                        return Err(format!(
-                            "Expected {option_name} to be a toml table or Python dict, but given {value}."
-                        ));
-                    }
-                }
-            }
-        }
-        Ok(None)
+        let from_scoped_section_opt = self.get_dict_from_section(id.scope.name(), id)?;
+
+        Ok(
+            if let Some(from_default_section) = self.get_dict_from_section(DEFAULT_SECTION, id)? {
+                Some(itertools::concat([
+                    from_default_section,
+                    from_scoped_section_opt.unwrap_or(vec![]),
+                ]))
+            } else {
+                from_scoped_section_opt
+            },
+        )
     }
 }
