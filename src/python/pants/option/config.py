@@ -52,6 +52,7 @@ class Config:
     Supports variable substitution using old-style Python format strings. E.g., %(var_name)s will be
     replaced with the value of var_name.
     """
+
     values: tuple[_ConfigValues, ...]
 
     @classmethod

@@ -543,7 +543,6 @@ class PyOptionId:
         self, *components: str, scope: str | None = None, switch: str | None = None
     ) -> None: ...
 
-
 class PyConfigSource:
     def __init__(self, path: str, content: bytes) -> None: ...
 

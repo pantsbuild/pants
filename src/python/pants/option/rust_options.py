@@ -37,7 +37,11 @@ class NativeOptionParser:
         config_sources: Optional[Sequence[ConfigSource]],
         allow_pantsrc: bool,
     ):
-        py_config_sources = [PyConfigSource(cs.path, cs.content) for cs in config_sources]
+        py_config_sources = (
+            None
+            if config_sources is None
+            else [PyConfigSource(cs.path, cs.content) for cs in config_sources]
+        )
         self._native_parser = native_engine.PyOptionParser(
             args,
             dict(get_strict_env(env, logger)),
