@@ -44,8 +44,8 @@ use serde::Deserialize;
 
 pub use self::args::Args;
 use self::args::ArgsReader;
-use self::config::{Config, ConfigReader};
 pub use self::config::ConfigSource;
+use self::config::{Config, ConfigReader};
 pub use self::env::Env;
 use self::env::EnvReader;
 use crate::fromfile::FromfileExpander;
@@ -333,7 +333,10 @@ impl OptionParser {
                         vec![default_config_path],
                     )?
                     .value;
-                config_paths.iter().map(|cp| ConfigSource::from_file(Path::new(&cp))).collect::<Result<Vec<_>, _>>()?
+                config_paths
+                    .iter()
+                    .map(|cp| ConfigSource::from_file(Path::new(&cp)))
+                    .collect::<Result<Vec<_>, _>>()?
             }
         };
 
@@ -361,7 +364,10 @@ impl OptionParser {
             sources.insert(
                 Source::Config {
                     ordinal,
-                    path: path_strip(&buildroot_string, config_source.path.to_string_lossy().as_ref()),
+                    path: path_strip(
+                        &buildroot_string,
+                        config_source.path.to_string_lossy().as_ref(),
+                    ),
                 },
                 Arc::new(ConfigReader::new(config, fromfile_expander.clone())),
             );
@@ -387,7 +393,8 @@ impl OptionParser {
             {
                 let rcfile_path = Path::new(&rcfile);
                 if rcfile_path.exists() {
-                    let rc_config = Config::parse(&ConfigSource::from_file(rcfile_path)?, &seed_values)?;
+                    let rc_config =
+                        Config::parse(&ConfigSource::from_file(rcfile_path)?, &seed_values)?;
                     sources.insert(
                         Source::Config {
                             ordinal,

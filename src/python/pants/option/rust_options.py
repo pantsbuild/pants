@@ -10,6 +10,8 @@ from enum import Enum
 from typing import Any, Mapping, Optional, Sequence, Tuple
 
 from pants.engine.internals import native_engine
+from pants.engine.internals.native_engine import PyConfigSource
+from pants.option.config import ConfigSource
 from pants.option.custom_types import _flatten_shlexed_list, shell_str
 from pants.option.errors import OptionsError
 from pants.option.ranked_value import Rank
@@ -32,13 +34,14 @@ class NativeOptionParser:
         self,
         args: Optional[Sequence[str]],
         env: Mapping[str, str],
-        configs: Optional[Sequence[str]],
+        config_sources: Optional[Sequence[ConfigSource]],
         allow_pantsrc: bool,
     ):
+        py_config_sources = [PyConfigSource(cs.path, cs.content) for cs in config_sources]
         self._native_parser = native_engine.PyOptionParser(
             args,
             dict(get_strict_env(env, logger)),
-            configs,
+            py_config_sources,
             allow_pantsrc,
         )
 

@@ -1,6 +1,7 @@
 // Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use crate::config::ConfigSource;
 use crate::{
     option_id, Args, BuildRoot, DictEdit, DictEditAction, Env, ListEdit, ListEditAction,
     OptionParser, Source, Val,
@@ -10,7 +11,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use tempfile::TempDir;
-use crate::config::ConfigSource;
 
 fn config_source() -> Source {
     Source::Config {
@@ -61,7 +61,12 @@ fn with_setup(
                 .map(|(k, v)| (k.to_owned(), v.to_owned()))
                 .collect::<HashMap<_, _>>(),
         },
-        Some(vec![config_path, extra_config_path].iter().map(|cp| ConfigSource::from_file(cp).unwrap()).collect()),
+        Some(
+            vec![config_path, extra_config_path]
+                .iter()
+                .map(|cp| ConfigSource::from_file(cp).unwrap())
+                .collect(),
+        ),
         false,
         true,
         Some(BuildRoot::find_from(buildroot.path()).unwrap()),

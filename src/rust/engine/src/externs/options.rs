@@ -6,7 +6,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 
 use options::{
-    Args, ConfigSource, Env, ListOptionValue, OptionId, OptionParser, OptionalOptionValue, Scope, Val,
+    Args, ConfigSource, Env, ListOptionValue, OptionId, OptionParser, OptionalOptionValue, Scope,
+    Val,
 };
 
 use std::collections::HashMap;
@@ -129,8 +130,11 @@ struct PyConfigSource(ConfigSource);
 #[pymethods]
 impl PyConfigSource {
     #[new]
-    fn __new__(path: &str, content: &str) -> PyResult<Self> {
-        Ok(Self(ConfigSource { path: path.into(), content: content.to_string() }))
+    fn __new__(path: &str, content: &[u8]) -> PyResult<Self> {
+        Ok(Self(ConfigSource {
+            path: path.into(),
+            content: std::str::from_utf8(content).map(str::to_string)?,
+        }))
     }
 }
 

@@ -543,6 +543,10 @@ class PyOptionId:
         self, *components: str, scope: str | None = None, switch: str | None = None
     ) -> None: ...
 
+
+class PyConfigSource:
+    def __init__(self, path: str, content: bytes) -> None: ...
+
 # A pair of (option value, rank). See src/python/pants/option/ranked_value.py.
 T = TypeVar("T")
 OptionValue = Tuple[Optional[T], int]
@@ -554,7 +558,7 @@ class PyOptionParser:
         self,
         args: Optional[Sequence[str]],
         env: dict[str, str],
-        configs: Optional[Sequence[str]],
+        configs: Optional[Sequence[PyConfigSource]],
         allow_pantsrc: bool,
     ) -> None: ...
     def get_bool(self, option_id: PyOptionId, default: Optional[bool]) -> OptionValue[bool]: ...

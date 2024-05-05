@@ -8,7 +8,7 @@ use std::fmt::Debug;
 use std::fs::File;
 use std::io::Write;
 
-use crate::config::{ConfigSource, interpolate_string};
+use crate::config::{interpolate_string, ConfigSource};
 use crate::{
     option_id, DictEdit, DictEditAction, ListEdit, ListEditAction, OptionId, OptionsSource, Val,
 };

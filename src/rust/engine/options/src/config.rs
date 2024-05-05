@@ -236,9 +236,7 @@ pub struct ConfigSource {
 }
 
 impl ConfigSource {
-    pub fn from_file<P: AsRef<Path>>(
-        path: P,
-    ) -> Result<ConfigSource, String> {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<ConfigSource, String> {
         let content = fs::read_to_string(&path).map_err(|e| {
             format!(
                 "Failed to read config file {}: {}",
