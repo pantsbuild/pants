@@ -648,7 +648,7 @@ def test_env_var_of_type_int() -> None:
     options.register(GLOBAL_SCOPE, "--foo-bar", type=int)
     assert 123 == options.for_global_scope().foo_bar
 
-    options = create_options_object(env={"PANTS_FOO_BAR": "['123','456']"})
+    options = create_options_object(env={"PANTS_FOO_BAR": "[123,456]"})
     options.register(GLOBAL_SCOPE, "--foo-bar", type=list, member_type=int)
     assert [123, 456] == options.for_global_scope().foo_bar
 
@@ -676,11 +676,11 @@ def test_arg_scoping() -> None:
     assert 22 == options.for_scope("anotherscope").num
 
     # Test list-typed option.
-    global_options = _parse(config={"DEFAULT": {"y": ["88", "-99"]}}).for_global_scope()
+    global_options = _parse(config={"DEFAULT": {"y": [88, -99]}}).for_global_scope()
     assert [88, -99] == global_options.y
 
     global_options = _parse(
-        flags="--y=5 --y=-6 --y=77", config={"DEFAULT": {"y": ["88", "-99"]}}
+        flags="--y=5 --y=-6 --y=77", config={"DEFAULT": {"y": [88, -99]}}
     ).for_global_scope()
     assert [88, -99, 5, -6, 77] == global_options.y
 
@@ -989,7 +989,7 @@ def test_defaults() -> None:
     assert 99 == options.for_scope("anotherscope").num
 
     # Get defaults from config and environment.
-    config = {"DEFAULT": {"num": "88"}, "anotherscope": {"num": "77"}}
+    config = {"DEFAULT": {"num": 88}, "anotherscope": {"num": 77}}
     options = _parse(flags="anotherscope", config=config)
     assert 88 == options.for_global_scope().num
     assert 77 == options.for_scope("anotherscope").num
