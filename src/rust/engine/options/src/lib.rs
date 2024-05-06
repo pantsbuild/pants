@@ -271,8 +271,8 @@ pub struct OptionParser {
 }
 
 impl OptionParser {
-    // If config_paths is None, we'll do config file discovery. Otherwise we'll use the provided paths.
-    // The latter case is useful for tests.
+    // If config_sources is None, we'll do config file discovery. Otherwise we'll use the
+    // provided sources. The latter case is useful for tests.
     pub fn new(
         args: Args,
         env: Env,
