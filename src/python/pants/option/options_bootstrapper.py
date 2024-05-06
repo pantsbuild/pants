@@ -146,18 +146,17 @@ class OptionsBootstrapper:
 
             # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
             # from (typically pants.toml), then config override, then rcfiles.
-            full_config_paths = pre_bootstrap_config.sources()
+            full_config_sources = pre_bootstrap_config.sources()
             if allow_pantsrc and bootstrap_option_values.pantsrc:
                 rcfiles = [
                     os.path.expanduser(str(rcfile))
                     for rcfile in bootstrap_option_values.pantsrc_files
                 ]
-                existing_rcfiles = list(filter(os.path.exists, rcfiles))
-                full_config_paths.extend(existing_rcfiles)
+                existing_rcfiles = [filecontent_for(p) for p in filter(os.path.exists, rcfiles)]
+                full_config_sources.extend(existing_rcfiles)
 
-            full_config_files_products = [filecontent_for(p) for p in full_config_paths]
             post_bootstrap_config = Config.load(
-                full_config_files_products,
+                full_config_sources,
                 seed_values=bootstrap_option_values.as_dict(),
                 env=env,
             )

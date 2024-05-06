@@ -254,14 +254,13 @@ def _compare(config: Config, expected: dict[str, dict[str, list[str]]]) -> None:
 
 @pytest.mark.parametrize("filedata", [FILE_0, FILE_1])
 def test_individual_file_parsing(filedata: ConfigFile) -> None:
+    file_contents = [FileContent("file.toml", filedata.content.encode())]
     config = Config.load(
-        file_contents=[
-            FileContent("file.toml", filedata.content.encode()),
-        ],
+        file_contents=file_contents,
         seed_values=_seed_values,
         env=_env,
     )
-    assert ["file.toml"] == config.sources()
+    assert file_contents == config.sources()
 
     _compare(config, filedata.expected_options)
 
@@ -273,15 +272,16 @@ def test_individual_file_parsing(filedata: ConfigFile) -> None:
 
 
 def test_merged_config() -> None:
+    file_contents = [
+        FileContent("file0.toml", FILE_0.content.encode()),
+        FileContent("file1.toml", FILE_1.content.encode()),
+    ]
     config = Config.load(
-        file_contents=[
-            FileContent("file0.toml", FILE_0.content.encode()),
-            FileContent("file1.toml", FILE_1.content.encode()),
-        ],
+        file_contents=file_contents,
         seed_values=_seed_values,
         env=_env,
     )
-    assert ["file0.toml", "file1.toml"] == config.sources()
+    assert file_contents == config.sources()
 
     _compare(config, _expected_combined_values)
 
