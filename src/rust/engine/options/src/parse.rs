@@ -168,7 +168,7 @@ peg::parser! {
             }
 
         rule list_edits<T>(parse_value: rule<T>) -> Vec<ListEdit<T>>
-            = e:list_edit(&parse_value) ** "," ","? { e }
+            = e:list_edit(&parse_value) ++ "," { e }
 
         rule list_replace<T>(parse_value: rule<T>) -> Vec<ListEdit<T>>
             = items:items(&parse_value) {
@@ -193,8 +193,13 @@ peg::parser! {
 
         pub(crate) rule float_list_edits() -> Vec<ListEdit<f64>> = scalar_list_edits(<float()>)
 
+        // Make `--foo=` yield an implicit add of an empty string.
+        rule empty_string_string_list() -> Vec<ListEdit<String>>
+            = ![_] { vec![ListEdit { action: ListEditAction::Add, items: vec!["".to_string()] }] }
+
         pub(crate) rule string_list_edits() -> Vec<ListEdit<String>>
-            = implicit_add(<unquoted_string()>) / list_replace(<quoted_string()>) / list_edits(<quoted_string()>)
+            = empty_string_string_list() / implicit_add(<unquoted_string()>) /
+              list_replace(<quoted_string()>) / list_edits(<quoted_string()>)
 
         // Heterogeneous values embedded in dicts. Note that float_val() must precede int_val() so that
         // the integer prefix of a float is not interpreted as an int.
@@ -327,13 +332,19 @@ pub(crate) fn parse_dict(value: &str) -> Result<DictEdit, ParseError> {
 }
 
 pub(crate) trait Parseable: Sized + DeserializeOwned {
+    fn option_type() -> &'static str;
     fn parse(value: &str) -> Result<Self, ParseError>;
     fn parse_list(value: &str) -> Result<Vec<ListEdit<Self>>, ParseError>;
 }
 
 impl Parseable for bool {
+    fn option_type() -> &'static str {
+        "bool"
+    }
+
     fn parse(value: &str) -> Result<bool, ParseError> {
-        option_value_parser::bool(value).map_err(|e| format_parse_error("bool", value, e))
+        option_value_parser::bool(value)
+            .map_err(|e| format_parse_error(Self::option_type(), value, e))
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<bool>>, ParseError> {
@@ -343,8 +354,13 @@ impl Parseable for bool {
 }
 
 impl Parseable for i64 {
+    fn option_type() -> &'static str {
+        "int"
+    }
+
     fn parse(value: &str) -> Result<i64, ParseError> {
-        option_value_parser::int(value).map_err(|e| format_parse_error("int", value, e))
+        option_value_parser::int(value)
+            .map_err(|e| format_parse_error(Self::option_type(), value, e))
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<i64>>, ParseError> {
@@ -354,8 +370,13 @@ impl Parseable for i64 {
 }
 
 impl Parseable for f64 {
+    fn option_type() -> &'static str {
+        "float"
+    }
+
     fn parse(value: &str) -> Result<f64, ParseError> {
-        option_value_parser::float(value).map_err(|e| format_parse_error("float", value, e))
+        option_value_parser::float(value)
+            .map_err(|e| format_parse_error(Self::option_type(), value, e))
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<f64>>, ParseError> {
@@ -365,6 +386,10 @@ impl Parseable for f64 {
 }
 
 impl Parseable for String {
+    fn option_type() -> &'static str {
+        "string"
+    }
+
     fn parse(value: &str) -> Result<String, ParseError> {
         Ok(value.to_owned())
     }

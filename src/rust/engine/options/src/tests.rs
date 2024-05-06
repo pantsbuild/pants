@@ -185,7 +185,7 @@ fn test_parse_list_options() {
     ) {
         with_setup(args, env, config, extra_config, |option_parser| {
             let id = option_id!(["scope"], "foo");
-            let option_value = option_parser.parse_int_list(&id, &[0]).unwrap();
+            let option_value = option_parser.parse_int_list(&id, vec![0]).unwrap();
             assert_eq!(expected, option_value.value);
             assert_eq!(expected_derivation, option_value.derivation.unwrap());
         });
