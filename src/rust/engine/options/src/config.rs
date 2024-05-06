@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -229,27 +229,42 @@ fn toml_table_to_dict(table: &Value) -> HashMap<String, Val> {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ConfigSource {
+    pub path: PathBuf,
+    pub content: String,
+}
+
+impl ConfigSource {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<ConfigSource, String> {
+        let content = fs::read_to_string(&path).map_err(|e| {
+            format!(
+                "Failed to read config file {}: {}",
+                path.as_ref().display(),
+                e
+            )
+        })?;
+        Ok(ConfigSource {
+            path: path.as_ref().to_path_buf(),
+            content,
+        })
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct Config {
     value: Value,
 }
 
 impl Config {
-    pub(crate) fn parse<P: AsRef<Path>>(
-        file: P,
+    pub(crate) fn parse(
+        config_source: &ConfigSource,
         seed_values: &InterpolationMap,
     ) -> Result<Config, String> {
-        let config_contents = fs::read_to_string(&file).map_err(|e| {
-            format!(
-                "Failed to read config file {}: {}",
-                file.as_ref().display(),
-                e
-            )
-        })?;
-        let config = config_contents.parse::<Value>().map_err(|e| {
+        let config = config_source.content.parse::<Value>().map_err(|e| {
             format!(
                 "Failed to parse config file {}: {}",
-                file.as_ref().display(),
+                config_source.path.display(),
                 e
             )
         })?;
@@ -281,7 +296,7 @@ impl Config {
                         return Err(format!(
                             "Expected the config file {} to contain tables per section, \
                             but section {} contained a {}: {}",
-                            file.as_ref().display(),
+                            config_source.path.display(),
                             section_name,
                             section.type_str(),
                             section
@@ -297,7 +312,7 @@ impl Config {
                             format!(
                                 "{} in config file {}, section {}, key {}",
                                 e.msg,
-                                file.as_ref().display(),
+                                config_source.path.display(),
                                 section_name,
                                 e.key
                             )
@@ -308,7 +323,7 @@ impl Config {
 
             _ => Err(format!(
                 "Expected the config file {} to contain a table but contained a {}: {}",
-                file.as_ref().display(),
+                config_source.path.display(),
                 config.type_str(),
                 config
             )),

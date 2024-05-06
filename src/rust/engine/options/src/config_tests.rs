@@ -8,7 +8,7 @@ use std::fmt::Debug;
 use std::fs::File;
 use std::io::Write;
 
-use crate::config::interpolate_string;
+use crate::config::{interpolate_string, ConfigSource};
 use crate::{
     option_id, DictEdit, DictEditAction, ListEdit, ListEditAction, OptionId, OptionsSource, Val,
 };
@@ -26,7 +26,7 @@ fn maybe_config(file_content: &str) -> Result<ConfigReader, String> {
         .write_all(file_content.as_bytes())
         .unwrap();
     Config::parse(
-        &path,
+        &ConfigSource::from_file(&path)?,
         &HashMap::from([
             ("seed1".to_string(), "seed1val".to_string()),
             ("seed2".to_string(), "seed2val".to_string()),
