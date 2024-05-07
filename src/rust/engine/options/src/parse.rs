@@ -332,63 +332,63 @@ pub(crate) fn parse_dict(value: &str) -> Result<DictEdit, ParseError> {
 }
 
 pub(crate) trait Parseable: Sized + DeserializeOwned {
-    fn option_type() -> &'static str;
+    const OPTION_TYPE: &'static str;
     fn parse(value: &str) -> Result<Self, ParseError>;
     fn parse_list(value: &str) -> Result<Vec<ListEdit<Self>>, ParseError>;
+
+    fn format_parse_error(value: &str, e: peg::error::ParseError<peg::str::LineCol>) -> ParseError {
+        format_parse_error(Self::OPTION_TYPE, value, e)
+    }
+
+    fn format_list_parse_error(
+        value: &str,
+        e: peg::error::ParseError<peg::str::LineCol>,
+    ) -> ParseError {
+        format_parse_error(&format!("{} list", Self::OPTION_TYPE), value, e)
+    }
 }
 
 impl Parseable for bool {
-    fn option_type() -> &'static str {
-        "bool"
-    }
+    const OPTION_TYPE: &'static str = "bool";
 
     fn parse(value: &str) -> Result<bool, ParseError> {
-        option_value_parser::bool(value)
-            .map_err(|e| format_parse_error(Self::option_type(), value, e))
+        option_value_parser::bool(value).map_err(|e| Self::format_parse_error(value, e))
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<bool>>, ParseError> {
         option_value_parser::bool_list_edits(value)
-            .map_err(|e| format_parse_error("bool list", value, e))
+            .map_err(|e| Self::format_list_parse_error(value, e))
     }
 }
 
 impl Parseable for i64 {
-    fn option_type() -> &'static str {
-        "int"
-    }
+    const OPTION_TYPE: &'static str = "int";
 
     fn parse(value: &str) -> Result<i64, ParseError> {
-        option_value_parser::int(value)
-            .map_err(|e| format_parse_error(Self::option_type(), value, e))
+        option_value_parser::int(value).map_err(|e| Self::format_parse_error(value, e))
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<i64>>, ParseError> {
         option_value_parser::int_list_edits(value)
-            .map_err(|e| format_parse_error("int list", value, e))
+            .map_err(|e| Self::format_list_parse_error(value, e))
     }
 }
 
 impl Parseable for f64 {
-    fn option_type() -> &'static str {
-        "float"
-    }
+    const OPTION_TYPE: &'static str = "float";
 
     fn parse(value: &str) -> Result<f64, ParseError> {
-        option_value_parser::float(value)
-            .map_err(|e| format_parse_error(Self::option_type(), value, e))
+        option_value_parser::float(value).map_err(|e| Self::format_parse_error(value, e))
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<f64>>, ParseError> {
         option_value_parser::float_list_edits(value)
-            .map_err(|e| format_parse_error("float list", value, e))
+            .map_err(|e| Self::format_list_parse_error(value, e))
     }
 }
 
 impl Parseable for String {
-    fn option_type() -> &'static str {
-        "string"
-    }
+    const OPTION_TYPE: &'static str = "string";
 
     fn parse(value: &str) -> Result<String, ParseError> {
         Ok(value.to_owned())
@@ -396,6 +396,6 @@ impl Parseable for String {
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<String>>, ParseError> {
         option_value_parser::string_list_edits(value)
-            .map_err(|e| format_parse_error("string list", value, e))
+            .map_err(|e| Self::format_list_parse_error(value, e))
     }
 }

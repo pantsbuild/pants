@@ -169,7 +169,7 @@ fn test_parse_list_from_empty_string() {
     );
 
     fn check_err<T: Parseable + Debug>() {
-        let expected = format!("Problem parsing foo {} list value", T::option_type());
+        let expected = format!("Problem parsing foo {} list value", T::OPTION_TYPE);
         let actual = T::parse_list("").unwrap_err().render("foo");
         assert!(
             actual.contains(&expected),
