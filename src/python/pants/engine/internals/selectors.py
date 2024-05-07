@@ -595,6 +595,10 @@ async def MultiGet(
     )
 
 
+# Alias for `MultiGet` to new syntax name `concurrently`, while remaining backwards compatible.
+concurrently = MultiGet
+
+
 @dataclass(frozen=True)
 class Params:
     """A set of values with distinct types.

@@ -9,8 +9,9 @@ import os
 import uuid
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexLayout
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -31,13 +32,14 @@ from pants.core.goals.export import (
     ExportSubsystem,
     PostProcessingCommand,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.unions import UnionRule
-from pants.option.option_types import EnumOption, StrListOption
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.option.option_types import BoolOption, EnumOption, StrListOption
 from pants.util.strutil import path_safe, softwrap
 
 logger = logging.getLogger(__name__)
@@ -92,9 +94,32 @@ class ExportPluginOptions:
             This only applies when '[python].enable_resolves' is true and when exporting a
             'mutable_virtualenv' ('symlinked_immutable_virtualenv' exports are not "full"
             virtualenvs because they must not be edited, and do not include 'pip').
+            """
+        ),
+        advanced=True,
+    )
 
-            NOTE: If you are using legacy exports (not using the '--resolve' option), then
-            this option has no effect. Legacy exports will not include any editable installs.
+    py_hermetic_scripts = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            When exporting a mutable virtualenv for a resolve, by default
+            modify console script shebang lines to make them "hermetic".
+            The shebang of hermetic console scripts uses the python args: `-sE`:
+
+            - `-s` skips inclusion of the user site-packages directoy,
+            - `-E` ignores all `PYTHON*` env vars like `PYTHONPATH`.
+
+            Set this to false if you need non-hermetic scripts with
+            simple python shebangs that respect vars like `PYTHONPATH`,
+            to, for example, allow IDEs like PyCharm to inject its debugger,
+            coverage, or other IDE-specific libs when running a script.
+
+            This only applies when when exporting a 'mutable_virtualenv'
+            ('symlinked_immutable_virtualenv' exports are not "full"
+            virtualenvs because they are used internally by pants itself.
+            Pants requires hermetic scripts to provide its reproduciblity
+            guarantee, fine-grained caching, and other features).
             """
         ),
         advanced=True,
@@ -205,17 +230,24 @@ async def do_export(
         tmpdir_under_digest_root = os.path.join("{digest_root}", tmpdir_prefix)
         merged_digest_under_tmpdir = await Get(Digest, AddPrefix(merged_digest, tmpdir_prefix))
 
+        venv_prompt = f"{req.resolve_name}/{py_version}" if req.resolve_name else py_version
+
+        pex_args = [
+            os.path.join(tmpdir_under_digest_root, requirements_pex.name),
+            "venv",
+            "--pip",
+            "--collisions-ok",
+            f"--prompt={venv_prompt}",
+            output_path,
+        ]
+        if not export_subsys.options.py_hermetic_scripts:
+            pex_args.insert(-1, "--non-hermetic-scripts")
+
         post_processing_cmds = [
             PostProcessingCommand(
                 complete_pex_env.create_argv(
                     os.path.join(tmpdir_under_digest_root, pex_pex.exe),
-                    *(
-                        os.path.join(tmpdir_under_digest_root, requirements_pex.name),
-                        "venv",
-                        "--pip",
-                        "--collisions-ok",
-                        output_path,
-                    ),
+                    *pex_args,
                 ),
                 {
                     **complete_pex_env.environment_dict(python=requirements_pex.python),
@@ -307,18 +339,31 @@ async def export_virtualenv_for_resolve(
     request: _ExportVenvForResolveRequest,
     python_setup: PythonSetup,
     export_subsys: ExportSubsystem,
+    union_membership: UnionMembership,
 ) -> MaybeExportResult:
     resolve = request.resolve
     lockfile_path = python_setup.resolves.get(resolve)
-    if not lockfile_path:
+    if lockfile_path:
+        lockfile = Lockfile(
+            url=lockfile_path,
+            url_description_of_origin=f"the resolve `{resolve}`",
+            resolve_name=resolve,
+        )
+    else:
+        maybe_exportable = ExportableTool.filter_for_subclasses(
+            union_membership, PythonToolBase
+        ).get(resolve)
+        if maybe_exportable:
+            lockfile = cast(
+                PythonToolBase, maybe_exportable
+            ).pex_requirements_for_default_lockfile()
+        else:
+            lockfile = None
+
+    if not lockfile:
         raise ExportError(
             f"No resolve named {resolve} found in [{python_setup.options_scope}].resolves."
         )
-    lockfile = Lockfile(
-        url=lockfile_path,
-        url_description_of_origin=f"the resolve `{resolve}`",
-        resolve_name=resolve,
-    )
 
     interpreter_constraints = InterpreterConstraints(
         python_setup.resolves_to_interpreter_constraints.get(

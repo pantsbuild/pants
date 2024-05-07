@@ -114,12 +114,12 @@ class DebianPackage(Target):
         DebianPackageDependencies,
     )
     help = help_text(
-        f""""
+        f"""
         A Debian package containing an artifact.
 
-        This will not install the package, only create a .deb file
-        that you can then distribute and install, e.g. via dpkg.
+        This will not install the package, only create a `.deb` file
+        that you can then distribute and install, e.g. via `dpkg`.
 
-        "See {doc_url('debian-package')}.
+        See {doc_url('reference/targets/debian_package')}.
         """
     )

@@ -91,4 +91,6 @@ class Isort(PythonToolBase):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+    ]

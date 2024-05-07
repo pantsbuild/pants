@@ -23,7 +23,7 @@ from pants.backend.build_files.fmt.yapf.register import YapfRequest
 from pants.backend.python.goals import lockfile
 from pants.backend.python.lint.black.rules import _run_black
 from pants.backend.python.lint.black.subsystem import Black
-from pants.backend.python.lint.ruff.fmt_rules import _run_ruff_fmt
+from pants.backend.python.lint.ruff.format.rules import _run_ruff_fmt
 from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.lint.yapf.rules import _run_yapf
 from pants.backend.python.lint.yapf.subsystem import Yapf
@@ -277,14 +277,18 @@ async def update_build_files(
         if change_descriptions
     )
     if not changed_build_files:
-        msg = "No required changes to BUILD files found."
+        parts = ["No required changes to BUILD files found."]
         if not update_build_files_subsystem.check:
-            msg += softwrap(
-                f"""
-                However, there may still be deprecations that `update-build-files` doesn't know
-                how to fix. See {doc_url('docs/releases/upgrade-tips')} for upgrade tips.
-                """
+            parts.append(
+                softwrap(
+                    f"""
+                    However, there may still be deprecations that `update-build-files` doesn't know
+                    how to fix. See {doc_url('docs/releases/upgrade-tips')} for upgrade tips.
+                    """
+                )
             )
+
+        msg = " ".join(parts)
         logger.info(msg)
         return UpdateBuildFilesGoal(exit_code=0)
 

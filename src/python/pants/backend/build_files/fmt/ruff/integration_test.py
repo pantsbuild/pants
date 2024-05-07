@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.build_files.fmt.ruff.register import RuffRequest
 from pants.backend.build_files.fmt.ruff.register import rules as ruff_build_rules
-from pants.backend.python.lint.ruff.check_rules import rules as ruff_fmt_rules
+from pants.backend.python.lint.ruff.check.rules import rules as ruff_fmt_rules
 from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget

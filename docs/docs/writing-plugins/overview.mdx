@@ -148,7 +148,11 @@ This will generate [`python_requirement` targets](../python/overview/third-party
 
 The target generator dynamically sets the version downloaded to match your current `pants_version` set in `pants.toml`. Pants's [dependency inference](../using-pants/key-concepts/targets-and-build-files.mdx) understands imports of the `pants` module and will automatically add dependencies on the generated `python_requirement` targets where relevant.
 
-If you do not want your plugin requirements to mix with your normal requirements, it's often a good idea to set up a dedicated "resolve" (lockfile) for your plugins. See [Third-party dependencies](../python/overview/third-party-dependencies.mdx) for more information. For example:
+:::caution Plugins resolve
+We strongly recommend to set up a dedicated "resolve" (lockfile) for your plugins. Pants ships as a monolithic application with a pinned set of dependencies, which can make it hard to combine with your project's dependencies.
+:::
+
+To set up a dedicated resolve for your plugins, update your `pants.toml` as follows:
 
 ```python title="pants.toml"
 [python]
@@ -172,6 +176,7 @@ pants-plugins = ["==3.9.*"]
 ```
 
 Then, update your `pants_requirements` target generator with `resolve="pants-plugins"`, and run `pants generate-lockfiles`. You will also need to update the relevant `python_source` / `python_sources` and `python_test` / `python_tests` targets to set `resolve="pants-plugins"` (along with possibly the `interpreter_constraints` field).
+See [Third-party dependencies](../python/overview/third-party-dependencies.mdx) for more information.
 
 ## Publishing a plugin
 

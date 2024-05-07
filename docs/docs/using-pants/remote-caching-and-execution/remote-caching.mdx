@@ -42,7 +42,9 @@ If the endpoint is using TLS, then the `remote_store_address` option would be sp
 GitHub Actions provides a built-in caching service which Pants supports using for sharing caches across GitHub Actions runs (not with machines outside of GitHub Actions). It is typically used via the `actions/cache` action to cache whole directories and files, but Pants can use the same functionality for fine-grained caching.
 
 :::caution GitHub Actions Cache support is still experimental
-Support for this cache provider is still under development, with more refinement required. Please [let us know](/community/getting-help) if you use it and encounter errors or warnings.
+Support for this cache provider is still under development, with more refinement required. Pants' fine-grained caching makes for many requests, and thus [often hits rate limit errors](https://github.com/pantsbuild/pants/issues/20133).
+
+Please [let us know](/community/getting-help) if you use it and encounter errors or warnings.
 :::
 
 ### Workflow
@@ -86,7 +88,7 @@ To read and write the cache to `/path/to/cache`, you will need to configure `pan
 
 ```toml
 [GLOBAL]
-remote_store_provider = "experimental-file"
+remote_provider = "experimental-file"
 remote_store_address = "file:///path/to/cache"
 remote_cache_read = true
 remote_cache_write = true

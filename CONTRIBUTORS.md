@@ -1,6 +1,7 @@
 Created as part of the release process.
 
 + A. Alonso Dominguez
++ APL
 + Aaron Mitchell
 + Adam Chainz
 + Adam Retter
@@ -133,15 +134,19 @@ Created as part of the release process.
 + Itay Donanhirsh
 + Ity Kaul
 + JC (Jonathan Chen)
++ Jack Evans
++ Jack Zhao
 + Jackson Davis
 + Jacob Floyd
 + Jake Donham
++ Jake Zerrer
 + Jakub Bujny
 + James Bench
 + James Koch
 + James Mouradian
 + Jan Berkel
 + Jan Paul Erkelens
++ Jason Barnett
 + Jason Jackson
 + Jason Song
 + Jay Crumb
@@ -153,6 +158,7 @@ Created as part of the release process.
 + Joe Ennever
 + Joe Smith
 + Johan Oskarsson
++ Johan Sim Jian An
 + John Barry
 + John Basila
 + John Chee
@@ -196,6 +202,7 @@ Created as part of the release process.
 + Lei Wang
 + Leo Kim
 + Lex Spoon
++ Liam Deacon
 + Liam Wilson
 + Luc Cary
 + Luca Clementi
@@ -244,6 +251,7 @@ Created as part of the release process.
 + Neil Sanchala
 + Nicholas Gustafson
 + Nicholas Santos
++ Nick Dellosa
 + Nik Shkrob
 + Nimrod Shlagman
 + Nitay Joffe
@@ -295,6 +303,7 @@ Created as part of the release process.
 + Shuo Li
 + Simeon Franklin
 + Simon Biggs
++ Sion Kang
 + Srikanth Kotagiri
 + Stefan Sauer
 + Stephan Erb
@@ -347,15 +356,19 @@ Created as part of the release process.
 + bianca rosa
 + billybecker
 + csqzhang
++ csteiner
 + eugene yokota
 + gyudoza
 + hephex
 + jgartdele/del
 + offsetcyan
++ okcleary
 + olivercoleman-switchdin
 + philipp-sontag-by
 + purajit
++ ravi2024sk
 + sww
 + twunderlich-grapl
 + wimax-grapl
++ yjabri
 + Ólafur Páll Geirsson

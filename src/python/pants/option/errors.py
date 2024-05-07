@@ -53,10 +53,6 @@ class HelpType(RegistrationError):
     """The `help=` argument must be a string, but was of type `{help_type}`."""
 
 
-class ImplicitValIsNone(RegistrationError):
-    """Implicit value cannot be None."""
-
-
 class InvalidKwarg(RegistrationError):
     """Invalid registration kwarg {kwarg}."""
 

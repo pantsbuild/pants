@@ -18,6 +18,7 @@ from pants.backend.docker.registries import DockerRegistries, DockerRegistryOpti
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerBuildKitOptionField,
+    DockerBuildOptionFieldListOfMultiValueDictMixin,
     DockerBuildOptionFieldMixin,
     DockerBuildOptionFieldMultiValueDictMixin,
     DockerBuildOptionFieldMultiValueMixin,
@@ -336,6 +337,7 @@ def get_build_options(
             (
                 DockerBuildOptionFieldMixin,
                 DockerBuildOptionFieldMultiValueDictMixin,
+                DockerBuildOptionFieldListOfMultiValueDictMixin,
                 DockerBuildOptionFieldValueMixin,
                 DockerBuildOptionFieldMultiValueMixin,
                 DockerBuildOptionFlagFieldMixin,
@@ -523,7 +525,7 @@ def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: byte
                     # BuildKit output.
                     r"(writing image (?P<digest>sha256:\S+) done)",
                     # BuildKit with containerd-snapshotter output.
-                    r"(exporting manifest list (?P<manifest_list>sha256:\S+) done)",
+                    r"(exporting manifest list (?P<manifest_list>sha256:\S+))",
                     # Docker output.
                     r"(Successfully built (?P<short_id>\S+))",
                 ),
