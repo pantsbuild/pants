@@ -99,7 +99,7 @@ class OptionsBootstrapper:
             args=args,
             # We ignore validation to ensure bootstrapping succeeds.
             # The bootstrap options will be validated anyway when we parse the full options.
-            native_options_validation=NativeOptionsValidation.IGNORE,
+            native_options_validation=NativeOptionsValidation.ignore,
         )
 
         for options_info in collect_options_info(BootstrapOptions):

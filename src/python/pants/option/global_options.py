@@ -994,7 +994,7 @@ class BootstrapOptions:
         ),
     )
     native_options_validation = EnumOption(
-        default=NativeOptionsValidation.WARNING,
+        default=NativeOptionsValidation.warning,
         help=softwrap(
             """
             Pants is switching its option parsing system from a legacy parser written in Python
@@ -1004,12 +1004,12 @@ class BootstrapOptions:
             during a transition period we will run both parsers and compare their results.
             This option controls how to report discrepancies that arise.
 
-            ERROR: Discrepancies will cause Pants to exit.
-            WARNING: Discrepancies will be logged but Pants will continue.
-            IGNORE: A last resort to turn off this check entirely.
+            - `error`: Discrepancies will cause Pants to exit.
+            - `warning`: Discrepancies will be logged but Pants will continue.
+            - `ignore`: A last resort to turn off this check entirely.
 
             If you encounter discrepancies that are not easily resolvable, please reach out to
-            us on Slack: https://www.pantsbuild.org/community/getting-help.
+            us on Slack or file an issue: https://www.pantsbuild.org/community/getting-help.
 
             A future version of Pants will remove the legacy parser, so it is imperative that
             we find out about any discrepancies during the transition period.

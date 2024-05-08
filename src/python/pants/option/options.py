@@ -26,9 +26,9 @@ logger = logging.getLogger(__name__)
 
 
 class NativeOptionsValidation(Enum):
-    IGNORE = "IGNORE"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
+    ignore = "ignore"
+    warning = "warning"
+    error = "error"
 
 
 class Options:
@@ -116,9 +116,9 @@ class Options:
         args: Sequence[str],
         bootstrap_option_values: OptionValueContainer | None = None,
         allow_unknown_options: bool = False,
-        # We default to ERROR to be strict in tests, but set explicitly in OptionsBootstrapper
+        # We default to error to be strict in tests, but set explicitly in OptionsBootstrapper
         # for user-facing behavior.
-        native_options_validation: NativeOptionsValidation = NativeOptionsValidation.ERROR,
+        native_options_validation: NativeOptionsValidation = NativeOptionsValidation.error,
     ) -> Options:
         """Create an Options instance.
 
@@ -390,7 +390,7 @@ class Options:
             parse_args_request, log_warnings=log_parser_warnings
         )
 
-        if self._native_options_validation == NativeOptionsValidation.IGNORE:
+        if self._native_options_validation == NativeOptionsValidation.ignore:
             native_values = None
         else:
             native_values = self.get_parser(scope).parse_args_native(self._native_parser)
@@ -454,13 +454,13 @@ class Options:
                         log_func(msg)
                     log_func(
                         "If you can't resolve this discrepancy, please reach out to the Pants "
-                        "development team. You can use the global native_options_validation option "
-                        "to configure this check."
+                        "development team: https://www.pantsbuild.org/community/getting-help. "
+                        "You can use the global native_options_validation option to configure this check."
                     )
 
-                if self._native_options_validation == NativeOptionsValidation.WARNING:
+                if self._native_options_validation == NativeOptionsValidation.warning:
                     log(logger.warning)
-                elif self._native_options_validation == NativeOptionsValidation.ERROR:
+                elif self._native_options_validation == NativeOptionsValidation.error:
                     log(logger.error)
                     raise Exception("Option value mismatches detected, aborting.")
         # TODO: In a future release, switch to the native_values as authoritative.
