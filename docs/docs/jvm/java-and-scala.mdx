@@ -117,6 +117,55 @@ To efficiently determine which symbols are provided by thirdparty code (i.e., wi
 The `packages` argument allows you to override which symbols a `jvm_artifact` provides. See the [`jvm_artifact` docs](../../reference/targets/jvm_artifact.mdx#packages) for more information.
 :::
 
+To enable better IDE integration, Pants has `jvm_artifacts` target generator to generate `jvm_artifact` targets for you.
+
+### `pom.xml`
+
+The `jvm_artifacts()` target generator parses a [`pom.xml`](https://maven.apache.org/guides/introduction/introduction-to-the-pom.html) to produce a `jvm_artifact` target for each `dependency` in `project.dependencies`.
+
+For example:
+
+```xml tab={"label":"pom.xml"}
+<project>
+  <dependencies>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>33.2.0-jre</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.14.0</version>
+    </dependency>
+  </dependencies>
+</project>
+```
+
+```python tab={"label":"BUILD"}
+
+# This will generate two targets:
+#
+#  - //:reqs#guava
+#  - //:reqs#commons-lang3
+jvm_artifacts(name="reqs")
+```
+
+The above target generator is spiritually equivalent to this:
+
+```python title="BUILD"
+jvm_artifact(
+    group="com.google.guava",
+    artifact="guava",
+    version="33.2.0-jre",
+)
+jvm_artifact(
+    group="org.apache.commons",
+    artifact="commons-lang3",
+    version="3.14.0",
+)
+```
+
 ### `resource` targets
 
 To have your code [load files as "resources"](https://docs.oracle.com/javase/8/docs/technotes/guides/lang/resources.html):
