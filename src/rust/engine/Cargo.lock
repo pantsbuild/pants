@@ -2471,9 +2471,9 @@ dependencies = [
 
 [[package]]
 name = "peg"
-version = "0.8.1"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a07f2cafdc3babeebc087e499118343442b742cc7c31b4d054682cc598508554"
+checksum = "8a625d12ad770914cbf7eff6f9314c3ef803bfe364a1b20bc36ddf56673e71e5"
 dependencies = [
  "peg-macros",
  "peg-runtime",
@@ -2481,9 +2481,9 @@ dependencies = [
 
 [[package]]
 name = "peg-macros"
-version = "0.8.1"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a90084dc05cf0428428e3d12399f39faad19b0909f64fb9170c9fdd6d9cd49b"
+checksum = "f241d42067ed3ab6a4fece1db720838e1418f36d868585a27931f95d6bc03582"
 dependencies = [
  "peg-runtime",
  "proc-macro2",
@@ -2492,9 +2492,9 @@ dependencies = [
 
 [[package]]
 name = "peg-runtime"
-version = "0.8.1"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fa00462b37ead6d11a82c9d568b26682d78e0477dc02d1966c013af80969739"
+checksum = "e3aeb8f54c078314c2065ee649a7241f46b9d8e418e1a9581ba0546657d7aa3a"
 
 [[package]]
 name = "percent-encoding"
