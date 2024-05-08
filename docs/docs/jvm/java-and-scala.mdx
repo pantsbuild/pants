@@ -169,6 +169,39 @@ jvm_artifact(
 )
 ```
 
+To define `jvm_artifact` packages use `package_mapping` field:
+
+```python tab={"label":"BUILD"}
+jvm_artifacts(
+    name="reqs",
+    package_mapping={
+        "com.google.guava:guava": [
+            "com.google.common.**",
+        ],
+        "org.apache.commons:commons-lang3": [
+            "org.apache.commons.lang3.**",
+        ],
+    },
+)
+```
+
+```xml tab={"label":"pom.xml"}
+<project>
+  <dependencies>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>33.2.0-jre</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.14.0</version>
+    </dependency>
+  </dependencies>
+</project>
+```
+
 ### `resource` targets
 
 To have your code [load files as "resources"](https://docs.oracle.com/javase/8/docs/technotes/guides/lang/resources.html):
