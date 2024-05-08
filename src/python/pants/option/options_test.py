@@ -648,7 +648,7 @@ def test_env_var_of_type_int() -> None:
     options.register(GLOBAL_SCOPE, "--foo-bar", type=int)
     assert 123 == options.for_global_scope().foo_bar
 
-    options = create_options_object(env={"PANTS_FOO_BAR": "['123','456']"})
+    options = create_options_object(env={"PANTS_FOO_BAR": "[123,456]"})
     options.register(GLOBAL_SCOPE, "--foo-bar", type=list, member_type=int)
     assert [123, 456] == options.for_global_scope().foo_bar
 
@@ -676,11 +676,11 @@ def test_arg_scoping() -> None:
     assert 22 == options.for_scope("anotherscope").num
 
     # Test list-typed option.
-    global_options = _parse(config={"DEFAULT": {"y": ["88", "-99"]}}).for_global_scope()
+    global_options = _parse(config={"DEFAULT": {"y": [88, -99]}}).for_global_scope()
     assert [88, -99] == global_options.y
 
     global_options = _parse(
-        flags="--y=5 --y=-6 --y=77", config={"DEFAULT": {"y": ["88", "-99"]}}
+        flags="--y=5 --y=-6 --y=77", config={"DEFAULT": {"y": [88, -99]}}
     ).for_global_scope()
     assert [88, -99, 5, -6, 77] == global_options.y
 
@@ -732,11 +732,16 @@ def test_list_option() -> None:
         expected: list[int],
         flags: str = "",
         env_val: str | None = None,
+        config_default: str | None = None,
         config_val: str | None = None,
         config2_val: str | None = None,
     ) -> None:
         env = {"PANTS_GLOBAL_LISTY": env_val} if env_val else None
-        config = {"GLOBAL": {"listy": config_val}} if config_val else None
+        config = {}
+        if config_default:
+            config["DEFAULT"] = {"listy": config_default}
+        if config_val:
+            config["GLOBAL"] = {"listy": config_val}
         config2 = {"GLOBAL": {"listy": config2_val}} if config2_val else None
         global_options = _parse(
             flags=flags, env=env, config=config, config2=config2
@@ -761,12 +766,23 @@ def test_list_option() -> None:
     check(
         flags="--listy=+[8,9]",
         env_val="+[6,7]",
+        config_default="+[100]",
         config_val="+[4,5],+[45]",
-        expected=[*default, 4, 5, 45, 6, 7, 8, 9],
+        expected=[*default, 100, 4, 5, 45, 6, 7, 8, 9],
     )
     check(
         config_val="+[4,5],-[4]",
         expected=[*default, 5],
+    )
+    check(
+        config_default="[100, 101]",
+        config_val="+[4,5],-[4,101]",
+        expected=[100, 5],
+    )
+    check(
+        config_default="[100, 101]",
+        config_val="[4,5]",
+        expected=[4, 5],
     )
 
     # Appending and filtering across env, config and flags (in the right order).
@@ -915,10 +931,15 @@ def test_dict_option() -> None:
         *,
         expected: dict[str, str],
         flags: str = "",
+        config_default: str | None = None,
         config_val: str | None = None,
         config2_val: str | None = None,
     ) -> None:
-        config = {"GLOBAL": {"dicty": config_val}} if config_val else None
+        config = {}
+        if config_default:
+            config["DEFAULT"] = {"dicty": config_default}
+        if config_val:
+            config["GLOBAL"] = {"dicty": config_val}
         config2 = {"GLOBAL": {"dicty": config2_val}} if config2_val else None
         global_options = _parse(flags=flags, config=config, config2=config2).for_global_scope()
         assert global_options.dicty == expected
@@ -945,6 +966,12 @@ def test_dict_option() -> None:
         flags='--dicty=\'+{"e": "f"}\'',
         expected={**all_args, "e": "f"},
     )
+    check(
+        config_default='+{"x": "y"}',
+        config_val='+{"c": "d"}',
+        flags='--dicty=\'+{"e": "f"}\'',
+        expected={**all_args, "x": "y", "e": "f"},
+    )
 
     # Check that highest rank wins if we have multiple values for the same key.
     check(config_val='+{"a": "b+", "c": "d"}', expected={"a": "b+", "c": "d"})
@@ -962,7 +989,7 @@ def test_defaults() -> None:
     assert 99 == options.for_scope("anotherscope").num
 
     # Get defaults from config and environment.
-    config = {"DEFAULT": {"num": "88"}, "anotherscope": {"num": "77"}}
+    config = {"DEFAULT": {"num": 88}, "anotherscope": {"num": 77}}
     options = _parse(flags="anotherscope", config=config)
     assert 88 == options.for_global_scope().num
     assert 77 == options.for_scope("anotherscope").num

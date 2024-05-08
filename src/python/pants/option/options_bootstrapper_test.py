@@ -193,7 +193,7 @@ class TestOptionsBootstrapper:
                 dedent(
                     """\
                     [compile_apt]
-                    worker_count = 1
+                    worker_count = "1"
 
                     [fruit]
                     apple = "red"
@@ -204,7 +204,7 @@ class TestOptionsBootstrapper:
                 dedent(
                     """\
                     [compile_apt]
-                    worker_count = 2
+                    worker_count = "2"
                     """
                 )
             )

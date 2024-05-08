@@ -1,6 +1,7 @@
 // Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use crate::config::ConfigSource;
 use crate::{
     option_id, Args, BuildRoot, DictEdit, DictEditAction, Env, ListEdit, ListEditAction,
     OptionParser, Source, Val,
@@ -60,10 +61,12 @@ fn with_setup(
                 .map(|(k, v)| (k.to_owned(), v.to_owned()))
                 .collect::<HashMap<_, _>>(),
         },
-        Some(vec![
-            config_path.to_str().unwrap(),
-            extra_config_path.to_str().unwrap(),
-        ]),
+        Some(
+            vec![config_path, extra_config_path]
+                .iter()
+                .map(|cp| ConfigSource::from_file(cp).unwrap())
+                .collect(),
+        ),
         false,
         true,
         Some(BuildRoot::find_from(buildroot.path()).unwrap()),
@@ -182,7 +185,7 @@ fn test_parse_list_options() {
     ) {
         with_setup(args, env, config, extra_config, |option_parser| {
             let id = option_id!(["scope"], "foo");
-            let option_value = option_parser.parse_int_list(&id, &[0]).unwrap();
+            let option_value = option_parser.parse_int_list(&id, vec![0]).unwrap();
             assert_eq!(expected, option_value.value);
             assert_eq!(expected_derivation, option_value.derivation.unwrap());
         });

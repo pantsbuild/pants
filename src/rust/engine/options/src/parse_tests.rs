@@ -163,10 +163,24 @@ fn test_parse_float() {
 
 #[test]
 fn test_parse_list_from_empty_string() {
-    assert!(String::parse_list("").unwrap().is_empty());
-    assert!(bool::parse_list("").unwrap().is_empty());
-    assert!(i64::parse_list("").unwrap().is_empty());
-    assert!(f64::parse_list("").unwrap().is_empty());
+    assert_eq!(
+        String::parse_list(""),
+        Ok(vec![string_list_edit(ListEditAction::Add, [""])])
+    );
+
+    fn check_err<T: Parseable + Debug>() {
+        let expected = format!("Problem parsing foo {} list value", T::OPTION_TYPE);
+        let actual = T::parse_list("").unwrap_err().render("foo");
+        assert!(
+            actual.contains(&expected),
+            "Error message `{}` did not contain `{}`",
+            actual,
+            expected
+        );
+    }
+    check_err::<bool>();
+    check_err::<i64>();
+    check_err::<f64>();
 }
 
 fn string_list_edit<I: IntoIterator<Item = &'static str>>(

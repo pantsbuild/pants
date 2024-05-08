@@ -168,7 +168,7 @@ peg::parser! {
             }
 
         rule list_edits<T>(parse_value: rule<T>) -> Vec<ListEdit<T>>
-            = e:list_edit(&parse_value) ** "," ","? { e }
+            = e:list_edit(&parse_value) ++ "," { e }
 
         rule list_replace<T>(parse_value: rule<T>) -> Vec<ListEdit<T>>
             = items:items(&parse_value) {
@@ -193,8 +193,13 @@ peg::parser! {
 
         pub(crate) rule float_list_edits() -> Vec<ListEdit<f64>> = scalar_list_edits(<float()>)
 
+        // Make `--foo=` yield an implicit add of an empty string.
+        rule empty_string_string_list() -> Vec<ListEdit<String>>
+            = ![_] { vec![ListEdit { action: ListEditAction::Add, items: vec!["".to_string()] }] }
+
         pub(crate) rule string_list_edits() -> Vec<ListEdit<String>>
-            = implicit_add(<unquoted_string()>) / list_replace(<quoted_string()>) / list_edits(<quoted_string()>)
+            = empty_string_string_list() / implicit_add(<unquoted_string()>) /
+              list_replace(<quoted_string()>) / list_edits(<quoted_string()>)
 
         // Heterogeneous values embedded in dicts. Note that float_val() must precede int_val() so that
         // the integer prefix of a float is not interpreted as an int.
@@ -327,50 +332,70 @@ pub(crate) fn parse_dict(value: &str) -> Result<DictEdit, ParseError> {
 }
 
 pub(crate) trait Parseable: Sized + DeserializeOwned {
+    const OPTION_TYPE: &'static str;
     fn parse(value: &str) -> Result<Self, ParseError>;
     fn parse_list(value: &str) -> Result<Vec<ListEdit<Self>>, ParseError>;
+
+    fn format_parse_error(value: &str, e: peg::error::ParseError<peg::str::LineCol>) -> ParseError {
+        format_parse_error(Self::OPTION_TYPE, value, e)
+    }
+
+    fn format_list_parse_error(
+        value: &str,
+        e: peg::error::ParseError<peg::str::LineCol>,
+    ) -> ParseError {
+        format_parse_error(&format!("{} list", Self::OPTION_TYPE), value, e)
+    }
 }
 
 impl Parseable for bool {
+    const OPTION_TYPE: &'static str = "bool";
+
     fn parse(value: &str) -> Result<bool, ParseError> {
-        option_value_parser::bool(value).map_err(|e| format_parse_error("bool", value, e))
+        option_value_parser::bool(value).map_err(|e| Self::format_parse_error(value, e))
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<bool>>, ParseError> {
         option_value_parser::bool_list_edits(value)
-            .map_err(|e| format_parse_error("bool list", value, e))
+            .map_err(|e| Self::format_list_parse_error(value, e))
     }
 }
 
 impl Parseable for i64 {
+    const OPTION_TYPE: &'static str = "int";
+
     fn parse(value: &str) -> Result<i64, ParseError> {
-        option_value_parser::int(value).map_err(|e| format_parse_error("int", value, e))
+        option_value_parser::int(value).map_err(|e| Self::format_parse_error(value, e))
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<i64>>, ParseError> {
         option_value_parser::int_list_edits(value)
-            .map_err(|e| format_parse_error("int list", value, e))
+            .map_err(|e| Self::format_list_parse_error(value, e))
     }
 }
 
 impl Parseable for f64 {
+    const OPTION_TYPE: &'static str = "float";
+
     fn parse(value: &str) -> Result<f64, ParseError> {
-        option_value_parser::float(value).map_err(|e| format_parse_error("float", value, e))
+        option_value_parser::float(value).map_err(|e| Self::format_parse_error(value, e))
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<f64>>, ParseError> {
         option_value_parser::float_list_edits(value)
-            .map_err(|e| format_parse_error("float list", value, e))
+            .map_err(|e| Self::format_list_parse_error(value, e))
     }
 }
 
 impl Parseable for String {
+    const OPTION_TYPE: &'static str = "string";
+
     fn parse(value: &str) -> Result<String, ParseError> {
         Ok(value.to_owned())
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<String>>, ParseError> {
         option_value_parser::string_list_edits(value)
-            .map_err(|e| format_parse_error("string list", value, e))
+            .map_err(|e| Self::format_list_parse_error(value, e))
     }
 }
