@@ -117,11 +117,15 @@ To efficiently determine which symbols are provided by thirdparty code (i.e., wi
 The `packages` argument allows you to override which symbols a `jvm_artifact` provides. See the [`jvm_artifact` docs](../../reference/targets/jvm_artifact.mdx#packages) for more information.
 :::
 
-To enable better IDE integration, Pants has `jvm_artifacts` target generator to generate `jvm_artifact` targets for you.
+To enable better IDE integration, Pants has `jvm_artifacts` target generator to
+generate `jvm_artifact` targets for you.
 
 ### `pom.xml`
 
-The `jvm_artifacts()` target generator parses a [`pom.xml`](https://maven.apache.org/guides/introduction/introduction-to-the-pom.html) to produce a `jvm_artifact` target for each `dependency` in `project.dependencies`.
+The `jvm_artifacts()` target generator parses a
+[`pom.xml`](https://maven.apache.org/guides/introduction/introduction-to-the-pom.html)
+to produce a `jvm_artifact` target for each `dependency` in
+`project.dependencies`.
 
 For example:
 
