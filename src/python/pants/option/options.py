@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from enum import Enum
 from typing import Any, Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_buildroot
@@ -12,6 +13,7 @@ from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter
 from pants.option.config import Config
 from pants.option.errors import ConfigValidationError
+from pants.option.native_options import NativeOptionParser
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.parser import Parser
@@ -21,6 +23,12 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class NativeOptionsValidation(Enum):
+    IGNORE = "IGNORE"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
 
 
 class Options:
@@ -108,6 +116,9 @@ class Options:
         args: Sequence[str],
         bootstrap_option_values: OptionValueContainer | None = None,
         allow_unknown_options: bool = False,
+        # We default to ERROR to be strict in tests, but set explicitly in OptionsBootstrapper
+        # for user-facing behavior.
+        native_options_validation: NativeOptionsValidation = NativeOptionsValidation.ERROR,
     ) -> Options:
         """Create an Options instance.
 
@@ -118,6 +129,8 @@ class Options:
         :param bootstrap_option_values: An optional namespace containing the values of bootstrap
                options. We can use these values when registering other options.
         :param allow_unknown_options: Whether to ignore or error on unknown cmd-line flags.
+        :param native_options_validation: How to validate the native options parser against the
+               legacy Python parser.
         """
         # We need parsers for all the intermediate scopes, so inherited option values
         # can propagate through them.
@@ -149,6 +162,9 @@ class Options:
 
         parser_by_scope = {si.scope: Parser(env, config, si) for si in complete_known_scope_infos}
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
+
+        native_parser = NativeOptionParser(args, env, config.sources(), allow_pantsrc=True)
+
         return cls(
             builtin_goal=split_args.builtin_goal,
             goals=split_args.goals,
@@ -157,6 +173,8 @@ class Options:
             specs=split_args.specs,
             passthru=split_args.passthru,
             parser_by_scope=parser_by_scope,
+            native_parser=native_parser,
+            native_options_validation=native_options_validation,
             bootstrap_option_values=bootstrap_option_values,
             known_scope_to_info=known_scope_to_info,
             allow_unknown_options=allow_unknown_options,
@@ -171,6 +189,8 @@ class Options:
         specs: list[str],
         passthru: list[str],
         parser_by_scope: dict[str, Parser],
+        native_parser: NativeOptionParser,
+        native_options_validation: NativeOptionsValidation,
         bootstrap_option_values: OptionValueContainer | None,
         known_scope_to_info: dict[str, ScopeInfo],
         allow_unknown_options: bool = False,
@@ -186,6 +206,8 @@ class Options:
         self._specs = specs
         self._passthru = passthru
         self._parser_by_scope = parser_by_scope
+        self._native_parser = native_parser
+        self._native_options_validation = native_options_validation
         self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
         self._allow_unknown_options = allow_unknown_options
@@ -364,17 +386,85 @@ class Options:
         values_builder = OptionValueContainerBuilder()
         flags_in_scope = self._scope_to_flags.get(scope, [])
         parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
-        values = self.get_parser(scope).parse_args(
+        legacy_values = self.get_parser(scope).parse_args(
             parse_args_request, log_warnings=log_parser_warnings
         )
 
+        if self._native_options_validation == NativeOptionsValidation.IGNORE:
+            native_values = None
+        else:
+            native_values = self.get_parser(scope).parse_args_native(self._native_parser)
+
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
-            values_builder = values.to_builder()
+            values_builder = legacy_values.to_builder()
             self._check_and_apply_deprecations(scope, values_builder)
-            values = values_builder.build()
+            legacy_values = values_builder.build()
 
-        return values
+            if native_values:
+                native_values_builder = native_values.to_builder()
+                self._check_and_apply_deprecations(scope, native_values_builder)
+                native_values = native_values_builder.build()
+
+        def listify_tuples(x):
+            # Sequence values from the legacy parser can be tuple or list, but those coming from
+            # the native parser are always list. We convert to list here for comparison purposes.
+            if isinstance(x, (tuple, list)):
+                return [listify_tuples(y) for y in x]
+            elif isinstance(x, dict):
+                return {k: listify_tuples(v) for k, v in x.items()}
+            else:
+                return x
+
+        if native_values:
+            msgs = []
+
+            def legacy_val_info(k):
+                if k in legacy_values:
+                    val = legacy_values[k]
+                    descr = (
+                        f"{val} of type {type(val)}, from source {legacy_values.get_rank(k).name}"
+                    )
+                else:
+                    descr = "not provided"
+                return f"Legacy value: {descr}"
+
+            def native_val_info(k):
+                if k in native_values:
+                    val = native_values[k]
+                    descr = (
+                        f"{val} of type {type(val)}, from source {native_values.get_rank(k).name}"
+                    )
+                else:
+                    descr = "not provided"
+                return f"Native value: {descr}"
+
+            for key in sorted(legacy_values.get_keys() | native_values.get_keys()):
+                if listify_tuples(legacy_values.get(key)) != native_values.get(key):
+                    msgs.append(
+                        f"Value mismatch for the option `{key}` in scope [{scope}]:\n"
+                        f"{legacy_val_info(key)}\n"
+                        f"{native_val_info(key)}"
+                    )
+
+            if msgs:
+
+                def log(log_func):
+                    for msg in msgs:
+                        log_func(msg)
+                    log_func(
+                        "If you can't resolve this discrepancy, please reach out to the Pants "
+                        "development team. You can use the global native_options_validation option "
+                        "to configure this check."
+                    )
+
+                if self._native_options_validation == NativeOptionsValidation.WARNING:
+                    log(logger.warning)
+                elif self._native_options_validation == NativeOptionsValidation.ERROR:
+                    log(logger.error)
+                    raise Exception("Option value mismatches detected, aborting.")
+        # TODO: In a future release, switch to the native_values as authoritative.
+        return legacy_values
 
     def get_fingerprintable_for_scope(
         self,

@@ -18,7 +18,7 @@ from pants.option.config import Config
 from pants.option.custom_types import DictValueComponent, ListValueComponent
 from pants.option.global_options import BootstrapOptions, GlobalOptions
 from pants.option.option_types import collect_options_info
-from pants.option.options import Options
+from pants.option.options import NativeOptionsValidation, Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import read_file
@@ -97,6 +97,9 @@ class OptionsBootstrapper:
             config=config,
             known_scope_infos=[GlobalOptions.get_scope_info()],
             args=args,
+            # We ignore validation to ensure bootstrapping succeeds.
+            # The bootstrap options will be validated anyway when we parse the full options.
+            native_options_validation=NativeOptionsValidation.IGNORE,
         )
 
         for options_info in collect_options_info(BootstrapOptions):
@@ -251,6 +254,7 @@ class OptionsBootstrapper:
             args=self.args,
             bootstrap_option_values=bootstrap_option_values,
             allow_unknown_options=allow_unknown_options,
+            native_options_validation=bootstrap_option_values.native_options_validation,
         )
 
         distinct_subsystem_classes: set[type[Subsystem]] = set()

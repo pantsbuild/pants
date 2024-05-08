@@ -44,7 +44,7 @@ from pants.option.option_types import (
     collect_options_info,
 )
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.options import Options
+from pants.option.options import NativeOptionsValidation, Options
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
@@ -990,6 +990,29 @@ class BootstrapOptions:
             Paths to Pants config files. This may only be set through the environment variable
             `PANTS_CONFIG_FILES` and the command line argument `--pants-config-files`; it will
             be ignored if in a config file like `pants.toml`.
+            """
+        ),
+    )
+    native_options_validation = EnumOption(
+        default=NativeOptionsValidation.WARNING,
+        help=softwrap(
+            """
+            Pants is switching its option parsing system from a legacy parser written in Python
+            to a new one written in Rust.
+
+            The results of parsing a given option by each system should be identical. However
+            during a transition period we will run both parsers and compare their results.
+            This option controls how to report discrepancies that arise.
+
+            ERROR: Discrepancies will cause Pants to exit.
+            WARNING: Discrepancies will be logged but Pants will continue.
+            IGNORE: A last resort to turn off this check entirely.
+
+            If you encounter discrepancies that are not easily resolvable, please reach out to
+            us on Slack: https://www.pantsbuild.org/community/getting-help.
+
+            A future version of Pants will remove the legacy parser, so it is imperative that
+            we find out about any discrepancies during the transition period.
             """
         ),
     )
