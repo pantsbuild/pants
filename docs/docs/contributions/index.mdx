@@ -158,3 +158,20 @@ Your change will be included in the next weekly dev release, which usually happe
 
 See [Release strategy](./releases/release-strategy.mdx).
 :::
+
+## Release notes
+
+We maintain release notes as we go: every pull request should add or adjust the release notes if required. These release notes are files in `docs/notes/`, grouped by release series; for example, `docs/notes/2.22.x.md` includes the release notes for 2.22 releases.
+
+The release note file is generally grouped by "backend". If you're not sure whether to add release notes, or where to put them, or how to phrase them, feel free to:
+
+- look in other release notes files in `docs/notes` for inspiration
+- ask in `#development` on Slack
+- open a pull request and ask the reviewers
+
+New features and major bug fixes should definitely have release notes, but other changes can opt out. For example, fixes to features that aren't released or minor documentation fixes.
+
+We have guidance to walk us through this, so it's not a problem to forget. Pull request CI enforces that either:
+
+- the PR release notes, by having changes in `docs/notes/`
+- someone has opted out, by labelling the PR with `release-notes:not-required` or `category:internal` (the latter means that release notes are optional for all `category:internal` PRs).
