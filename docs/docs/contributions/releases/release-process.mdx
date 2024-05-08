@@ -53,6 +53,15 @@ If there is deprecated code that must be removed, you can either:
 2. Remove it yourself, in a precursor PR.
 3. Bump the deprecation removal target back by one dev release.
 
+### `a0` - Release notes for next version
+
+When releasing an `a0` version, we need to prepare the release notes for the _next_ version:
+
+1. Create pull request adding the release notes file for the next version in `docs/notes/`, e.g. if you're releasing 2.8.0a0, create `docs/notes/2.9.x.md`.
+   1. Copy the title and template over from the prior release, e.g. `2.8.x.md`.
+   2. Delete the content, leaving just the headings, so the file is mostly empty.
+2. NB. this can merge after the release pull request, but should be available soon so that pull requests tht land in `main` can update it
+
 ### `rc` - Check for cherry-picks
 
 If this is a release candidate, ensure that pending cherry-picks have been applied in the release branch. Cherry-picks are usually applied automatically, but this may not always succeed, so [check for any pending cherry-picks](https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-cherrypick+is%3Aclosed), and find the relevant ones by looking at the milestone: for instance, if doing a release for 2.16, the relevant cherry-picks are those for milestone `2.16.x` or earlier.
@@ -65,13 +74,6 @@ The process may fail in one of two ways:
 ## Step 1: Create the release commit
 
 The release commit is the commit that bumps the VERSION string. For `dev`/`a0` releases this happens in the `main` branch, in the same commit that updates the release notes and the `CONTRIBUTORS.md` file. For `rc` and stable releases, this happens in the relevant stable branch.
-
-### `dev0` - set up the new release series
-
-If this is the first dev release in a new series:
-
-1. Create a new file in `docs/notes`, e.g. create `docs/notes/2.9.x.md`.
-   1. Copy the title and template over from the prior release, e.g. `2.8.x.md`.
 
 ### Bump the VERSION
 
@@ -86,9 +88,14 @@ This will create a pull request that:
 
 Post the PR to the `#development` channel in Slack. Merge once approved and green.
 
-### `a0` - create a new Git branch
+### `a0` - new release cycle
 
-If you're releasing an `a0` release, you must create the stable branch for that version.
+If you're releasing an `a0` release, you must:
+
+1. create the stable branch for that version,
+2. identify pull requests that need changes to their release notes.
+
+#### Create new branch
 
 For example, if you're releasing `2.9.0a0`, create the branch `2.9.x` by running the command below. Make sure you are on your release commit before doing this.
 
@@ -96,6 +103,22 @@ For example, if you're releasing `2.9.0a0`, create the branch `2.9.x` by running
 $ git checkout -b 2.9.x
 $ git push upstream 2.9.x
 ```
+
+#### Identify pull requests needing changes
+
+Find unmerged pull requests with release notes changes that will now be targetting the new release, and so should be updated:
+
+1. Use this `gh` CLI command to find pull requests targetting `main` that touch any release notes file:
+
+   ```shell
+   gh pr list --limit 1000 --json url,files --base main | jq 'map(select(.files | map(.path | startswith("docs/notes/")) | any) | .url)'
+   ```
+
+2. For each of them, add a "Request changes" review that asks for an update. Suggested review text (replace `$OLD_VERSION` and `$NEW_VERSION` as appropriate, e.g. if you're releasing 2.8.0a0, `OLD_VERSION = 2.8`, `NEW_VERSION = 2.9`):
+
+   > Thanks for the contribution. We've just branched for $OLD_VERSION, so merging this pull request now will come out in $NEW_VERSION, please move the release notes updates to `docs/notes/$NEW_VERSION.x.md` if that's appropriate.
+
+3. In some cases, the release note changes can remain in the old version (for example, if the pull request is a bug fix that needs to be cherry-picked).
 
 ## Step 2: Tag the release to trigger publishing
 
