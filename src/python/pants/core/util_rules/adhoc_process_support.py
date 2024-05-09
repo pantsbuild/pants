@@ -30,7 +30,13 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.native_engine import AddressInput, RemovePrefix
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult, ProductDescription
+from pants.engine.process import (
+    FallibleProcessResult,
+    Process,
+    ProcessCacheScope,
+    ProcessResult,
+    ProductDescription,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     FieldSetsPerTarget,
@@ -581,6 +587,10 @@ async def prepare_adhoc_process(
         working_directory=working_directory,
         append_only_caches=append_only_caches,
         immutable_input_digests=immutable_input_digests,
+        # TODO: This is necessary for tests of `adhoc_tool` and `shell_command` with
+        # workspace execution to pass repeatedly in local Pants development.
+        # We need a viable solution instead of this hack.
+        cache_scope=ProcessCacheScope.PER_SESSION,
     )
 
     return _output_at_build_root(proc, bash)

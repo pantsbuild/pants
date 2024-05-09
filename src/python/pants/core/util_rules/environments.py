@@ -12,8 +12,11 @@ from typing import Any, Callable, ClassVar, Iterable, Optional, Sequence, Tuple,
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.environment import __LOCAL_WORKSPACE_ENV_NAME, LOCAL_ENVIRONMENT_MATCHER
+from pants.engine.environment import LOCAL_ENVIRONMENT_MATCHER, LOCAL_WORKSPACE_ENVIRONMENT_MATCHER
 from pants.engine.environment import ChosenLocalEnvironmentName as ChosenLocalEnvironmentName
+from pants.engine.environment import (
+    ChosenLocalWorkspaceEnvironmentName as ChosenLocalWorkspaceEnvironmentName,
+)
 from pants.engine.environment import EnvironmentName as EnvironmentName
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.graph import WrappedTargetForBootstrap
@@ -172,6 +175,62 @@ class LocalEnvironmentTarget(Target):
         `local_environment` that matches the current platform (if defined) will be selected.
         """
         # TODO(#17096) Add a link to the environments docs once they land.
+    )
+
+
+class LocalWorkspaceFallbackEnvironmentField(FallbackEnvironmentField):
+    help = help_text(
+        f"""
+        The environment to fallback to when this local workspace environment cannot be used because the
+        field `{CompatiblePlatformsField.alias}` is not compatible with the local host.
+
+        Must be an environment name from the option `[environments-preview].names`, the
+        special string `{LOCAL_WORKSPACE_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
+        Python value `None` to error when this specific local environment cannot be used.
+
+        Tip: when targeting Linux, it can be particularly helpful to fallback to a
+        `docker_environment` or `remote_environment` target. That allows you to prefer using the
+        local host when possible, which often has less overhead (particularly compared to Docker).
+        If the local host is not compatible, then Pants will use Docker or remote execution to
+        still run in a similar environment.
+        """
+    )
+
+
+class LocalWorkspaceEnvironmentTarget(Target):
+    alias = "workspace_environment"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        CompatiblePlatformsField,
+        LocalWorkspaceFallbackEnvironmentField,
+    )
+    help = help_text(
+        """
+        Configuration of a "workspace" execution environment for specific platforms.
+
+        A "workspace" environment is a local environment which executes build processes within
+        the repository and not in the usual execution sandbox. This is useful when interacting with
+        third-party build orchestration tools which may not run correctly when run from within the Pants
+        execution sandbox.
+
+        SAFETY: Workspace environments are inherently UNSAFE since Pants cannot guarantee that any process invoked
+        as a workspace environment is in fact reproducible. By using this environment, you forgo the
+        "hermetic" nature of the Pants execution model and must guarantee to Pants that the invoked process
+        is repeatable and does not have side effects.
+
+        Environment configuration includes the platforms the environment is compatible with, and
+        optionally a fallback environment, along with environment-aware options (such as
+        environment variables and search paths) used by Pants to execute processes in this
+        environment.
+
+        To use this environment, map this target's address with a memorable name in
+        `[environments-preview].names`. You can then consume this environment by specifying the name in
+        the `environment` field defined on other targets.
+
+        Only one `workspace_environment` may be defined in `[environments-preview].names` per platform, and
+        when `{LOCAL_WORKSPACE_ENVIRONMENT_MATCHER}` is specified as the environment, the
+        `workspace_environment` that matches the current platform (if defined) will be selected.
+        """
     )
 
 
@@ -514,6 +573,9 @@ class EnvironmentTarget:
             else ProcessCacheScope.PER_RESTART_SUCCESSFUL
         )
 
+    def is_workspace_environment(self):
+        return self.val and self.val.has_field(LocalWorkspaceFallbackEnvironmentField)
+
 
 def _compute_env_field(field_set: FieldSet) -> EnvironmentField:
     for attr in dir(field_set):
@@ -665,6 +727,75 @@ async def determine_local_environment(
     )
 
 
+# TODO: Consider refactoring with determine_local_workspace above.
+@rule
+async def determine_local_workspace_environment(
+    all_environment_targets: AllEnvironmentTargets,
+) -> ChosenLocalWorkspaceEnvironmentName:
+    platform = Platform.create_for_localhost()
+    compatible_name_and_targets = [
+        (name, tgt)
+        for name, tgt in all_environment_targets.items()
+        if tgt.has_field(CompatiblePlatformsField)
+        and tgt.has_field(LocalWorkspaceFallbackEnvironmentField)
+        and platform.value in tgt[CompatiblePlatformsField].value
+    ]
+
+    if not compatible_name_and_targets:
+        # Raise an exception since, unlike with `local_environment`, a `workspace_environment`
+        # cannot be configured via global options.
+        raise AmbiguousEnvironmentError(
+            softwrap(
+                f"""
+                A target requested a compatible workspace environment via the
+                `{LOCAL_WORKSPACE_ENVIRONMENT_MATCHER}` special environment name. No `workspace_environment`
+                target exists, however, to satisfy that request.
+
+                Unlike local environmnts, with workspace environments, at least one `workspace_environment`
+                target must exist and be named in the `[environments-preview.names]` option.
+                """
+            )
+        )
+
+    if len(compatible_name_and_targets) == 1:
+        result_name, _tgt = compatible_name_and_targets[0]
+        return ChosenLocalWorkspaceEnvironmentName(EnvironmentName(result_name))
+
+    raise AmbiguousEnvironmentError(
+        softwrap(
+            f"""
+            Multiple `workspace_environment` targets from `[environments-preview].names`
+            are compatible with the current platform `{platform.value}`, so it is ambiguous
+            which to use:
+            {sorted(tgt.address.spec for _name, tgt in compatible_name_and_targets)}
+
+            To fix, either adjust the `{CompatiblePlatformsField.alias}` field from those
+            targets so that only one includes the value `{platform.value}`, or change
+            `[environments-preview].names` so that it does not define some of those targets.
+
+            It is often useful to still keep the same `workspace_environment` target definitions in
+            BUILD files; instead, do not give a name to each of them in
+            `[environments-preview].names` to avoid ambiguity. Then, you can override which target
+            a particular name points to by overriding `[environments-preview].names`. For example,
+            you could set this in `pants.toml`:
+
+                [environments-preview.names]
+                linux = "//:linux_env"
+                macos = "//:macos_local_env"
+
+            Then, for CI, override what the name `macos` points to by setting this in
+            `pants.ci.toml`:
+
+                [environments-preview.names.add]
+                macos = "//:macos_ci_env"
+
+            Locally, you can override `[environments-preview].names` like this by using a
+            `.pants.rc` file, for example.
+            """
+        )
+    )
+
+
 @rule
 async def resolve_single_environment_name(
     request: SingleEnvironmentNameRequest,
@@ -708,8 +839,9 @@ async def resolve_environment_name(
     if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
         local_env_name = await Get(ChosenLocalEnvironmentName)
         return local_env_name.val
-    if request.raw_value == __LOCAL_WORKSPACE_ENV_NAME:
-        return EnvironmentName(__LOCAL_WORKSPACE_ENV_NAME)
+    if request.raw_value == LOCAL_WORKSPACE_ENVIRONMENT_MATCHER:
+        local_workspace_env_name = await Get(ChosenLocalWorkspaceEnvironmentName)
+        return local_workspace_env_name.val
     if request.raw_value not in environments_subsystem.names:
         raise UnrecognizedEnvironmentError(
             softwrap(
@@ -816,8 +948,6 @@ async def get_target_for_environment_name(
 ) -> EnvironmentTarget:
     if env_name.val is None:
         return EnvironmentTarget(None, None)
-    if env_name.val == __LOCAL_WORKSPACE_ENV_NAME:
-        return EnvironmentTarget(__LOCAL_WORKSPACE_ENV_NAME, None)
     if env_name.val not in environments_subsystem.names:
         raise AssertionError(
             softwrap(
@@ -899,19 +1029,10 @@ async def extract_process_config_from_environment(
     global_options: GlobalOptions,
     environments_subsystem: EnvironmentsSubsystem,
 ) -> ProcessExecutionEnvironment:
-    if tgt.name == __LOCAL_WORKSPACE_ENV_NAME:
-        return ProcessExecutionEnvironment(
-            environment_name=__LOCAL_WORKSPACE_ENV_NAME,
-            platform=platform.value,
-            remote_execution=False,
-            remote_execution_extra_platform_properties=[],
-            docker_image=None,
-            execute_in_workspace=True,
-        )
-
     docker_image = None
     remote_execution = False
     raw_remote_execution_extra_platform_properties: tuple[str, ...] = ()
+    execute_in_workspace = False
 
     if environments_subsystem.remote_execution_used_globally(global_options):
         remote_execution = True
@@ -947,6 +1068,8 @@ async def extract_process_config_from_environment(
                     )
                 )
 
+        execute_in_workspace = tgt.val.has_field(LocalWorkspaceFallbackEnvironmentField)
+
     return ProcessExecutionEnvironment(
         environment_name=tgt.name,
         platform=platform.value,
@@ -956,7 +1079,7 @@ async def extract_process_config_from_environment(
             tuple(pair.split("=", maxsplit=1))  # type: ignore[misc]
             for pair in raw_remote_execution_extra_platform_properties
         ],
-        execute_in_workspace=False,
+        execute_in_workspace=execute_in_workspace,
     )
 
 
@@ -1063,6 +1186,7 @@ def _add_option_field_for(
 
     return [
         LocalEnvironmentTarget.register_plugin_field(OptionField),
+        LocalWorkspaceEnvironmentTarget.register_plugin_field(OptionField),
         DockerEnvironmentTarget.register_plugin_field(OptionField),
         RemoteEnvironmentTarget.register_plugin_field(OptionField),
     ]
