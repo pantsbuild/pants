@@ -455,6 +455,13 @@ class Options:
                     log_func(
                         "If you can't resolve this discrepancy, please reach out to the Pants "
                         "development team: https://www.pantsbuild.org/community/getting-help. "
+                    )
+                    log_func(
+                        "The native parser will become the default in 2.23.x, and the legacy parser "
+                        "will be removed in 2.24.x. So it is imperative that we find out about any "
+                        "discrepancies during this transition period."
+                    )
+                    log_func(
                         "You can use the global native_options_validation option to configure this check."
                     )
 

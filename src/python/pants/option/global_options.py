@@ -1011,8 +1011,8 @@ class BootstrapOptions:
             If you encounter discrepancies that are not easily resolvable, please reach out to
             us on Slack or file an issue: https://www.pantsbuild.org/community/getting-help.
 
-            A future version of Pants will remove the legacy parser, so it is imperative that
-            we find out about any discrepancies during the transition period.
+            The native parser will become the default in 2.23.x, and the legacy parser will be removed in 2.24.x.
+            So it is imperative that we find out about any discrepancies during this transition period.
             """
         ),
     )
