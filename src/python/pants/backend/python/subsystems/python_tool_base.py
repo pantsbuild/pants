@@ -201,23 +201,20 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
         stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
         lockfile_contents = json.loads(stripped_lock_bytes)
-        first_default_requirement = cls.default_requirements[0]
-        if first_default_requirement:
-            parsed_requirement = PipRequirement.parse(first_default_requirement)
-            project_name = parsed_requirement.project_name
-        else:
-            project_name = cls.options_scope
+        # The first requirement must contain the primary package for this tool, otherwise
+        # this will pick up the wrong requirement.
+        first_default_requirement = PipRequirement.parse(cls.default_requirements[0])
         package_version = next(
             (
                 requirement["version"]
                 for resolve in lockfile_contents["locked_resolves"]
                 for requirement in resolve["locked_requirements"]
-                if requirement["project_name"] == cls.options_scope
+                if requirement["project_name"] == first_default_requirement.project_name
             ),
             None,
         )
         all_paragraphs.append(
-            f"This version of Pants uses {project_name} {package_version} by default. "
+            f"This version of Pants uses {first_default_requirement.project_name} {package_version} by default. "
             + "Use a dedicated lockfile and the `install_from_resolve` option to control this."
         )
 
