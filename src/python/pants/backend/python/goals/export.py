@@ -107,8 +107,8 @@ class ExportPluginOptions:
             modify console script shebang lines to make them "hermetic".
             The shebang of hermetic console scripts uses the python args: `-sE`:
 
-            - `-s` skips inclusion of the user site-packages directoy,
-            - `-E` ignores all `PYTHON*` env vars like `PYTHONPATH`.
+              - `-s` skips inclusion of the user site-packages directoy,
+              - `-E` ignores all `PYTHON*` env vars like `PYTHONPATH`.
 
             Set this to false if you need non-hermetic scripts with
             simple python shebangs that respect vars like `PYTHONPATH`,
