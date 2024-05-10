@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from pants.backend.adhoc.target_types import (
     AdhocToolArgumentsField,
     AdhocToolExecutionDependenciesField,
     AdhocToolExtraEnvVarsField,
+    AdhocToolInvalidationGlobsField,
     AdhocToolLogOutputField,
     AdhocToolNamedCachesField,
     AdhocToolOutputDirectoriesField,
@@ -20,6 +22,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolStdoutFilenameField,
     AdhocToolWorkdirField,
 )
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
@@ -30,7 +33,7 @@ from pants.core.util_rules.adhoc_process_support import (
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, Snapshot
+from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest
 from pants.engine.unions import UnionRule
@@ -81,6 +84,16 @@ async def run_in_sandbox_request(
 
     cache_scope = env_target.default_cache_scope
 
+    invalidation_path_globs = None
+    globs = request.protocol_target.get(AdhocToolInvalidationGlobsField).value or ()
+    if globs:
+        spec_path = request.protocol_target.address.spec_path
+        invalidation_path_globs = PathGlobs(
+            globs=(os.path.join(spec_path, glob) for glob in globs),
+            glob_match_error_behavior=GlobMatchErrorBehavior.warn,
+            description_of_origin=f"`invalidation_globs` for `adhoc_tools` target at `{request.protocol_target.address}`",
+        )
+
     process_request = AdhocProcessRequest(
         description=description,
         address=target.address,
@@ -100,6 +113,7 @@ async def run_in_sandbox_request(
         capture_stderr_file=target[AdhocToolStderrFilenameField].value,
         capture_stdout_file=target[AdhocToolStdoutFilenameField].value,
         cache_scope=cache_scope,
+        invalidation_globs=invalidation_path_globs,
     )
 
     adhoc_result = await Get(
