@@ -84,16 +84,16 @@ class ExportPluginOptions:
         help=softwrap(
             """
             When exporting a mutable virtualenv for a resolve, do PEP-660 editable installs
-            of all 'python_distribution' targets that own code in the exported resolve.
+            of all `python_distribution` targets that own code in the exported resolve.
 
-            If a resolve name is not in this list, 'python_distribution' targets will not
+            If a resolve name is not in this list, `python_distribution` targets will not
             be installed in the virtualenv. This defaults to an empty list for backwards
             compatibility and to prevent unnecessary work to generate and install the
             PEP-660 editable wheels.
 
-            This only applies when '[python].enable_resolves' is true and when exporting a
-            'mutable_virtualenv' ('symlinked_immutable_virtualenv' exports are not "full"
-            virtualenvs because they must not be edited, and do not include 'pip').
+            This only applies when `[python].enable_resolves` is true and when exporting a
+            `mutable_virtualenv` (`symlinked_immutable_virtualenv` exports are not "full"
+            virtualenvs because they must not be edited, and do not include `pip`).
             """
         ),
         advanced=True,
@@ -115,8 +115,8 @@ class ExportPluginOptions:
             to, for example, allow IDEs like PyCharm to inject its debugger,
             coverage, or other IDE-specific libs when running a script.
 
-            This only applies when when exporting a 'mutable_virtualenv'
-            ('symlinked_immutable_virtualenv' exports are not "full"
+            This only applies when when exporting a `mutable_virtualenv`
+            (`symlinked_immutable_virtualenv` exports are not "full"
             virtualenvs because they are used internally by pants itself.
             Pants requires hermetic scripts to provide its reproduciblity
             guarantee, fine-grained caching, and other features).
