@@ -72,6 +72,7 @@ class Subsystem(metaclass=_SubsystemMeta):
     def help_extended(cls) -> str:
         if isinstance(cls.help, str):
             return cls.help
+
         return cls.help()
 
     # Subclasses may override these to specify a deprecated former name for this Subsystem's scope.
