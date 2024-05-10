@@ -10,42 +10,37 @@ from pants.backend.makeself.target_types import (
     MakeselfArchiveOutputPathField,
     MakeselfArchivePackagesField,
     MakeselfArchiveStartupScriptField,
+    MakeselfArchiveToolsField,
     MakeselfArthiveLabelField,
 )
+from pants.backend.shell.subsystems.shell_setup import ShellSetup
+from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.system_binaries import (
-    AwkBinary,
-    Base64Binary,
     BasenameBinary,
     BashBinary,
+    BinaryPathRequest,
     BinaryShims,
     BinaryShimsRequest,
-    Bzip2Binary,
     CatBinary,
     CutBinary,
     DateBinary,
     DdBinary,
-    DfBinary,
     DirnameBinary,
     ExprBinary,
     FindBinary,
-    GpgBinary,
     GzipBinary,
     HeadBinary,
     IdBinary,
-    Md5sumBinary,
     MkdirBinary,
     PwdBinary,
     RmBinary,
     SedBinary,
-    ShasumBinary,
     TailBinary,
     TarBinary,
     TestBinary,
     WcBinary,
-    XzBinary,
-    ZstdBinary,
 )
 from pants.engine.fs import Digest
 from pants.engine.process import Process
@@ -61,74 +56,65 @@ class RunMakeselfArchive:
     level: LogLevel = LogLevel.INFO
     output_directory: Optional[str] = None
     extra_args: Optional[Tuple[str, ...]] = None
+    extra_tools: Tuple[str, ...] = ()
 
 
 @rule(desc="Run makeself archive", level=LogLevel.DEBUG)
 async def run_makeself_archive(
     request: RunMakeselfArchive,
-    awk: AwkBinary,
-    base64: Base64Binary,
+    shell_setup: ShellSetup.EnvironmentAware,
     basename: BasenameBinary,
     bash: BashBinary,
-    bzip2: Bzip2Binary,
     cat: CatBinary,
     cut: CutBinary,
     date: DateBinary,
     dd: DdBinary,
-    df: DfBinary,
     dirname: DirnameBinary,
     expr: ExprBinary,
     find: FindBinary,
-    gpg: GpgBinary,
     gzip: GzipBinary,
     head: HeadBinary,
     id: IdBinary,
-    md5sum: Md5sumBinary,
     mkdir: MkdirBinary,
     pwd: PwdBinary,
     rm: RmBinary,
     sed: SedBinary,
-    shasum: ShasumBinary,
     tail: TailBinary,
     tar: TarBinary,
     test: TestBinary,
     wc: WcBinary,
-    xz: XzBinary,
-    zstd: ZstdBinary,
 ) -> Process:
     shims = await Get(
         BinaryShims,
         BinaryShimsRequest(
             paths=(
-                awk,
-                base64,
                 basename,
                 bash,
-                bzip2,
                 cat,
                 cut,
                 date,
                 dd,
-                df,
                 dirname,
                 expr,
                 find,
-                gpg,
                 gzip,
                 head,
                 id,
-                md5sum,
                 mkdir,
                 pwd,
                 rm,
                 sed,
-                shasum,
                 tail,
                 tar,
                 test,
                 wc,
-                xz,
-                zstd,
+            ),
+            requests=tuple(
+                BinaryPathRequest(
+                    binary_name=binary_name,
+                    search_path=shell_setup.executable_search_path,
+                )
+                for binary_name in request.extra_tools
             ),
             rationale="run makeself archive",
         ),
@@ -162,6 +148,7 @@ class MakeselfArchiveFieldSet(PackageFieldSet, RunFieldSet):
     packages: MakeselfArchivePackagesField
     output_path: MakeselfArchiveOutputPathField
     args: MakeselfArchiveArgsField
+    tools: MakeselfArchiveToolsField
 
 
 @rule
@@ -169,13 +156,19 @@ async def create_makeself_archive_run_request(field_set: MakeselfArchiveFieldSet
     package = await Get(BuiltPackage, PackageFieldSet, field_set)
 
     exe = package.artifacts[0].relpath
-    assert exe is not None, package
+    if exe is None:
+        raise RuntimeError(f"Invalid package artifact: {package}")
+
+    tools = field_set.tools.value or ()
+    tools = tuple(tool for tool in tools if tool not in BASH_BUILTIN_COMMANDS)
+
     process = await Get(
         Process,
         RunMakeselfArchive(
             exe=exe,
             input_digest=package.digest,
             description="Run makeself archive",
+            extra_tools=tools,
         ),
     )
 

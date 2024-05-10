@@ -89,6 +89,20 @@ class MakeselfArchiveArgsField(StringSequenceField):
     )
 
 
+class MakeselfArchiveToolsField(StringSequenceField):
+    alias = "tools"
+    default = ()
+    help = help_text(
+        """
+        Specify required executable tools that might be used.
+
+        Only the tools explicitly provided will be available on the search PATH,
+        and these tools must be found on the paths provided by
+        `[shell-setup].executable_search_paths` (which defaults to the system PATH).
+        """
+    )
+
+
 class MakeselfArchiveTarget(Target):
     alias = "makeself_archive"
     core_fields = (
@@ -98,6 +112,7 @@ class MakeselfArchiveTarget(Target):
         MakeselfArchivePackagesField,
         MakeselfArchiveOutputPathField,
         MakeselfArchiveArgsField,
+        MakeselfArchiveToolsField,
         *COMMON_TARGET_FIELDS,
     )
     help = help_text(
