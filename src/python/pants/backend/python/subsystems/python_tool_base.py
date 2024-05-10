@@ -31,6 +31,7 @@ from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url, git_url
 from pants.util.meta import classproperty
+from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
     # Subclasses may set to override the value computed from default_version and
     # default_extra_requirements.
+    # The primary package used in the subsystem must always be the first requirement.
     # TODO: Once we get rid of those options, subclasses must set this to loose
     #  requirements that reflect any minimum capabilities Pants assumes about the tool.
     default_requirements: Sequence[str] = []
@@ -199,6 +201,12 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
         stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
         lockfile_contents = json.loads(stripped_lock_bytes)
+        first_default_requirement = cls.default_requirements[0]
+        if first_default_requirement:
+            parsed_requirement = PipRequirement.parse(first_default_requirement)
+            project_name = parsed_requirement.project_name
+        else:
+            project_name = cls.options_scope
         package_version = next(
             (
                 requirement["version"]
@@ -210,8 +218,8 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
         )
         if package_version:
             all_paragraphs.append(
-                f"This version of Pants uses {cls.options_scope} {package_version} by default. " +
-                "Use a dedicated lockfile and the `install_from_resolve` option to control this."
+                f"This version of Pants uses {project_name} {package_version} by default. "
+                + "Use a dedicated lockfile and the `install_from_resolve` option to control this."
             )
 
         return "\n\n".join(all_paragraphs)
