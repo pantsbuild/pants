@@ -54,11 +54,13 @@ class FortranLintFieldSet(FieldSet):
 
 :::note Support depends on language backend of the subsystem
 Only some language backends support `pants export`. These include the Python and JVM backends. Only tools which are themselves written to use a backend with this feature can be exported. For example, a Python-based tool which operates on a different language is exportable.
-
+:::
 
 1. Make the subsystem a subclass of `ExportableTool`
 
-:::note Language backends may have done this in their Tool base class. For example, the Python backend with `PythonToolRequirementsBase` and JVM with `JvmToolBase` are already subclasses.
+:::note Language backends may have done this in their Tool base class.
+For example, the Python backend with `PythonToolRequirementsBase` and JVM with `JvmToolBase` are already subclasses.
+:::
 
 ```python
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
