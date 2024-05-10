@@ -748,6 +748,8 @@ impl<R: Rule> Builder<R> {
                 minimal_in_set.insert(node_id);
 
                 // But we ensure that its out_set is accurate before continuing.
+                // Note: Clippy wants us to use `clone_from`, but doing so fails because `graph` is borrowed as mutable already.
+                #[allow(clippy::assigning_clones)]
                 if node.out_set != node.in_set {
                     graph.node_weight_mut(node_id).unwrap().0.out_set =
                         graph[node_id].0.in_set.clone();

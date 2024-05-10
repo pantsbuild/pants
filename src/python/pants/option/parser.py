@@ -49,6 +49,7 @@ from pants.option.errors import (
     RegistrationError,
     UnknownFlagsError,
 )
+from pants.option.native_options import NativeOptionParser
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.ranked_value import Rank, RankedValue
@@ -192,6 +193,22 @@ class Parser:
                         flag_val = None
                 flag_value_map[key].append(flag_val)
             return flag_value_map
+
+    def parse_args_native(self, native_parser: NativeOptionParser) -> OptionValueContainer:
+        namespace = OptionValueContainerBuilder()
+        for args, kwargs in self._option_registrations:
+            self._validate(args, kwargs)
+            dest = self.parse_dest(*args, **kwargs)
+            val, rank = native_parser.get(
+                scope=self.scope,
+                flags=args,
+                default=kwargs.get("default"),
+                option_type=kwargs.get("type"),
+                member_type=kwargs.get("member_type"),
+                passthrough=kwargs.get("passthrough"),
+            )
+            setattr(namespace, dest, RankedValue(rank, val))
+        return namespace.build()
 
     def parse_args(
         self, parse_args_request: ParseArgsRequest, log_warnings: bool = False
