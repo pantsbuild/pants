@@ -214,7 +214,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
             base_help += softwrap(
                 f"""
 
-                This version of Pants uses {cls.options_scope} {package_version} by default. Use a dedicated lockfile and the install_from_resolve option to control this.
+                This version of Pants uses {cls.options_scope} {package_version} by default. Use a dedicated lockfile and the `install_from_resolve` option to control this.
                 """
             )
 
