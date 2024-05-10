@@ -57,15 +57,15 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
 
-    install_from_resolve = StrOption(
-        advanced=True,
-        default=None,
-        help=lambda cls: softwrap(
+    @classmethod
+    def install_from_resolve_help(cls) -> str:
+        _PACKAGE_VERSION_CLAUSE = ""
+        return softwrap(
             f"""\
             If specified, install the tool using the lockfile for this named resolve.
 
             This resolve must be defined in `[python].resolves`, as described in
-            {doc_url("docs/python/overview/third-party-dependencies#user-lockfiles")}.
+            {doc_url("docs/python/overview/lockfiles#lockfiles-for-tools")}.
 
             The resolve's entire lockfile will be installed, unless specific requirements are
             listed via the `requirements` option, in which case only those requirements
@@ -79,7 +79,12 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
             `{cls.options_scope}` "tool lockfile" generated from the `version` and
             `extra_requirements` options. But note that this mechanism is deprecated.
             """
-        ),
+        )
+
+    install_from_resolve = StrOption(
+        advanced=True,
+        default=None,
+        help=install_from_resolve_help,
     )
 
     requirements = StrListOption(
