@@ -216,11 +216,10 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
             ),
             None,
         )
-        if package_version:
-            all_paragraphs.append(
-                f"This version of Pants uses {project_name} {package_version} by default. "
-                + "Use a dedicated lockfile and the `install_from_resolve` option to control this."
-            )
+        all_paragraphs.append(
+            f"This version of Pants uses {project_name} {package_version} by default. "
+            + "Use a dedicated lockfile and the `install_from_resolve` option to control this."
+        )
 
         return "\n\n".join(all_paragraphs)
 
