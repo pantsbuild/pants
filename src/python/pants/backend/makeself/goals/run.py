@@ -18,6 +18,7 @@ from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.system_binaries import (
+    AwkBinary,
     BasenameBinary,
     BashBinary,
     BinaryPathRequest,
@@ -27,6 +28,7 @@ from pants.core.util_rules.system_binaries import (
     CutBinary,
     DateBinary,
     DdBinary,
+    DfBinary,
     DirnameBinary,
     ExprBinary,
     FindBinary,
@@ -63,12 +65,14 @@ class RunMakeselfArchive:
 async def run_makeself_archive(
     request: RunMakeselfArchive,
     shell_setup: ShellSetup.EnvironmentAware,
+    awk: AwkBinary,
     basename: BasenameBinary,
     bash: BashBinary,
     cat: CatBinary,
     cut: CutBinary,
     date: DateBinary,
     dd: DdBinary,
+    df: DfBinary,
     dirname: DirnameBinary,
     expr: ExprBinary,
     find: FindBinary,
@@ -88,12 +92,14 @@ async def run_makeself_archive(
         BinaryShims,
         BinaryShimsRequest(
             paths=(
+                awk,
                 basename,
                 bash,
                 cat,
                 cut,
                 date,
                 dd,
+                df,
                 dirname,
                 expr,
                 find,
