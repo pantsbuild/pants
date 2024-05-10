@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import importlib.resources
 import logging
 import os
 from typing import ClassVar, Iterable, Sequence
+from urllib.parse import urlparse
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -18,15 +20,19 @@ from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
     PexRequirements,
     Resolve,
+    is_probably_pex_json_lockfile,
+    strip_comments_from_pex_json_lockfile,
 )
 from pants.core.goals.resolves import ExportableTool
-from pants.engine.fs import Digest
+from pants.engine.fs import Digest, FileContent
 from pants.engine.internals.selectors import Get
 from pants.option.errors import OptionsError
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url, git_url
 from pants.util.meta import classproperty
+from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.requirements import parse_requirements_file
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -168,6 +174,38 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
             url_description_of_origin=origin,
             resolve_name=cls.options_scope,
         )
+
+    @classproperty
+    def help_extended(cls) -> str:
+        if cls.install_from_resolve:
+            # TODO: How to get the lockfile for the resolve without a `PythonSetup`?
+            # `get_lockfile_for_resolve` does this but is implemented as a rule
+            return ""
+        else:
+            lockfile = cls.pex_requirements_for_default_lockfile()
+            parts = urlparse(lockfile.url)
+            # urlparse retains the leading / in URLs with a netloc.
+            lockfile_path = parts.path[1:] if parts.path.startswith("/") else parts.path
+            if parts.scheme in {"", "file"}:
+                with open(lockfile_path, "rb") as fp:
+                    lock_bytes = fp.read()
+            elif parts.scheme == "resource":
+                _fc = FileContent(
+                    lockfile_path,
+                    # The "netloc" in our made-up "resource://" scheme is the package.
+                    importlib.resources.read_binary(parts.netloc, lockfile_path),
+                )
+                lockfile_path, lock_bytes = (_fc.path, _fc.content)
+            else:
+                raise ValueError(
+                    f"Unsupported scheme {parts.scheme} for lockfile URL: {lockfile.url} "
+                    f"(origin: {lockfile.url_description_of_origin})"
+                )
+
+            stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
+
+
+
 
     def pex_requirements(
         self,
