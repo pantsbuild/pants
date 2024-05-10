@@ -24,10 +24,11 @@ from pants.engine.addresses import Addresses
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import (
-    FallibleProcessResult,
     InteractiveProcess,
     Process,
     ProcessCacheScope,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField, TransitiveTargets, TransitiveTargetsRequest
@@ -175,16 +176,20 @@ async def run_junit_test(
     field_set = batch.single_element
 
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
-    process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
+    process = await Get(Process, JvmProcess, test_setup.process)
+    process_results = await Get(
+        ProcessResultWithRetries, ProcessWithRetries(process, test_subsystem.attempts_default)
+    )
     reports_dir_prefix = test_setup.reports_dir_prefix
 
     xml_result_subset = await Get(
-        Digest, DigestSubset(process_result.output_digest, PathGlobs([f"{reports_dir_prefix}/**"]))
+        Digest,
+        DigestSubset(process_results.last.output_digest, PathGlobs([f"{reports_dir_prefix}/**"])),
     )
     xml_results = await Get(Snapshot, RemovePrefix(xml_result_subset, reports_dir_prefix))
 
     return TestResult.from_fallible_process_result(
-        process_results=(process_result,),
+        process_results=process_results.results,
         address=field_set.address,
         output_setting=test_subsystem.output,
         xml_results=xml_results,

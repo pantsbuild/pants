@@ -18,7 +18,7 @@ from pants.option.config import Config
 from pants.option.custom_types import DictValueComponent, ListValueComponent
 from pants.option.global_options import BootstrapOptions, GlobalOptions
 from pants.option.option_types import collect_options_info
-from pants.option.options import Options
+from pants.option.options import NativeOptionsValidation, Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import read_file
@@ -97,6 +97,9 @@ class OptionsBootstrapper:
             config=config,
             known_scope_infos=[GlobalOptions.get_scope_info()],
             args=args,
+            # We ignore validation to ensure bootstrapping succeeds.
+            # The bootstrap options will be validated anyway when we parse the full options.
+            native_options_validation=NativeOptionsValidation.ignore,
         )
 
         for options_info in collect_options_info(BootstrapOptions):
@@ -146,18 +149,17 @@ class OptionsBootstrapper:
 
             # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
             # from (typically pants.toml), then config override, then rcfiles.
-            full_config_paths = pre_bootstrap_config.sources()
+            full_config_sources = pre_bootstrap_config.sources()
             if allow_pantsrc and bootstrap_option_values.pantsrc:
                 rcfiles = [
                     os.path.expanduser(str(rcfile))
                     for rcfile in bootstrap_option_values.pantsrc_files
                 ]
-                existing_rcfiles = list(filter(os.path.exists, rcfiles))
-                full_config_paths.extend(existing_rcfiles)
+                existing_rcfiles = [filecontent_for(p) for p in filter(os.path.exists, rcfiles)]
+                full_config_sources.extend(existing_rcfiles)
 
-            full_config_files_products = [filecontent_for(p) for p in full_config_paths]
             post_bootstrap_config = Config.load(
-                full_config_files_products,
+                full_config_sources,
                 seed_values=bootstrap_option_values.as_dict(),
                 env=env,
             )
@@ -252,6 +254,7 @@ class OptionsBootstrapper:
             args=self.args,
             bootstrap_option_values=bootstrap_option_values,
             allow_unknown_options=allow_unknown_options,
+            native_options_validation=bootstrap_option_values.native_options_validation,
         )
 
         distinct_subsystem_classes: set[type[Subsystem]] = set()

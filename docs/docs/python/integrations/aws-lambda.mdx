@@ -7,10 +7,10 @@ Create a Lambda with Python code.
 
 ---
 
-Pants can create a Lambda-compatible zip file from your Python code, allowing you to develop your Lambda functions and layers in your repository instead of using the online Cloud9 editor.
+Pants can create a Lambda-compatible zip file or directory from your Python code, allowing you to develop your Lambda functions and layers in your repository instead of using the online Cloud9 editor.
 
 :::note FYI: how Pants does this
-Under-the-hood, Pants uses the [PEX](https://github.com/pex-tool/pex) project, to select the appropriate third-party requirements and first-party sources and lay them out in a zip file, in the format recommended by AWS.
+Under-the-hood, Pants uses the [PEX](https://github.com/pex-tool/pex) project, to select the appropriate third-party requirements and first-party sources and lay them out in a zip file or directory, in the format recommended by AWS.
 :::
 
 ## Step 1: Activate the Python AWS Lambda backend
@@ -57,6 +57,10 @@ def example_handler(event, context):
 Pants will use [dependency inference](../../using-pants/key-concepts/targets-and-build-files.mdx) based on the `handler` field, which you can confirm by running `pants dependencies path/to:lambda`. You can also manually add to the `dependencies` field.
 
 You can optionally set the `output_path` field to change the generated zip file's path.
+
+:::tip Using layout
+Use [layout](../../../reference/targets/python_aws_lambda_function.mdx#layout) to determine whether to build a `.zip` file or a directory
+:::
 
 :::caution Use `resource` instead of `file`
 `file` / `files` targets will not be included in the built AWS Lambda artifacts because filesystem APIs like `open()` would not load them as expected. Instead, use the `resource` and `resources` target. See [Assets and archives](../../using-pants/assets-and-archives.mdx) for further explanation.

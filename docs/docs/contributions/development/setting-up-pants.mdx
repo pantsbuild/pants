@@ -61,9 +61,9 @@ To free up space, run `rm -rf src/rust/engine/target`.
 Warning: this will cause Rust to recompile everything.
 :::
 
-## Step 3: (Optional) Set up a Git hook
+## Step 3: Set up a pre-push Git Hook
 
-We have a [Git hook](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks) that runs some useful checks and lints when you `git commit`.
+We have a [Git Hook](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks) that runs some useful checks and lints when you `git push`. Running this locally can prevent easily avoidable CI failures such as whitespace or linting issues.
 
 To install this, run:
 
@@ -71,22 +71,20 @@ To install this, run:
 $ build-support/bin/setup.sh
 ```
 
-If you commit frequently as part of your workflow you may find it annoying to have these run every time, so installing this hook is not required.
-
-You can manually run the pre-commit check with:
+You can manually run the pre-push check with:
 
 ```bash
-$ build-support/githooks/pre-commit
+$ build-support/githooks/pre-push
 ```
 
-The [Rust-compilation](./developing-rust.mdx) affecting `MODE` flag is passed through to the hooks, so to run the commit hooks in "debug" mode, you can do something like:
+The [Rust-compilation](./developing-rust.mdx) affecting `MODE` flag is passed through to the hooks, so to run the githooks in "debug" mode, you can do something like:
 
 ```bash
-$ MODE=debug git commit ...
+$ MODE=debug git push ...
 ```
 
-:::note How to temporarily skip the pre-commit checks
-Use `git commit --no-verify` or `git commit -n` to skip the checks.
+:::note How to temporarily skip the pre-push checks
+Use `git push --no-verify` or `git push -n` to skip the checks.
 :::
 
 ## Configure your IDE (optional)

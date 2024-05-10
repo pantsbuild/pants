@@ -147,7 +147,7 @@ class CoverageSubsystem(PythonToolBase):
         help=lambda cls: softwrap(
             f"""
             Path to an INI or TOML config file understood by coverage.py
-            (https://coverage.readthedocs.io/en/stable/config.html).
+            (https://coverage.readthedocs.io/en/latest/config.html).
 
             Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
             this option if the config is located in a non-standard location.
