@@ -26,6 +26,7 @@ from pants.core.util_rules.environments import (
     EnvironmentTarget,
     FallbackEnvironmentField,
     LocalEnvironmentTarget,
+    LocalWorkspaceEnvironmentTarget,
     NoFallbackEnvironmentError,
     RemoteEnvironmentCacheBinaryDiscovery,
     RemoteEnvironmentTarget,
@@ -35,7 +36,7 @@ from pants.core.util_rules.environments import (
     extract_process_config_from_environment,
     resolve_environment_name,
 )
-from pants.engine.environment import LOCAL_ENVIRONMENT_MATCHER
+from pants.engine.environment import LOCAL_ENVIRONMENT_MATCHER, ChosenLocalWorkspaceEnvironmentName
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessCacheScope
@@ -61,7 +62,12 @@ def rule_runner() -> RuleRunner:
             QueryRule(EnvironmentName, [EnvironmentNameRequest]),
             QueryRule(EnvironmentName, [SingleEnvironmentNameRequest]),
         ],
-        target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget, RemoteEnvironmentTarget],
+        target_types=[
+            LocalEnvironmentTarget,
+            LocalWorkspaceEnvironmentTarget,
+            DockerEnvironmentTarget,
+            RemoteEnvironmentTarget,
+        ],
         inherent_environment=None,
     )
 
@@ -70,7 +76,11 @@ def test_extract_process_config_from_environment() -> None:
     def assert_config(
         *,
         envs_enabled: bool = True,
-        env_tgt: LocalEnvironmentTarget | RemoteEnvironmentTarget | DockerEnvironmentTarget | None,
+        env_tgt: LocalEnvironmentTarget
+        | LocalWorkspaceEnvironmentTarget
+        | RemoteEnvironmentTarget
+        | DockerEnvironmentTarget
+        | None,
         enable_remote_execution: bool,
         expected_remote_execution: bool,
         expected_docker_image: str | None,
@@ -338,6 +348,11 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
             mock_gets=[
                 MockGet(
                     output_type=ChosenLocalEnvironmentName,
+                    input_types=(),
+                    mock=lambda: ChosenLocalEnvironmentName(EnvironmentName(None)),
+                ),
+                MockGet(
+                    output_type=ChosenLocalWorkspaceEnvironmentName,
                     input_types=(),
                     mock=lambda: ChosenLocalEnvironmentName(EnvironmentName(None)),
                 ),
