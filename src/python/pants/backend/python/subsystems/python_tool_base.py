@@ -7,7 +7,8 @@ import importlib.resources
 import json
 import logging
 import os
-from typing import ClassVar, Iterable, Sequence
+from dataclasses import dataclass
+from typing import ClassVar, Iterable, Optional, Sequence
 from urllib.parse import urlparse
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
@@ -37,6 +38,12 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class PackageNameAndVersion:
+    name: str
+    version: str
+
+
 class PythonToolRequirementsBase(Subsystem, ExportableTool):
     """Base class for subsystems that configure a set of requirements for a python tool."""
 
@@ -59,7 +66,12 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
     @classmethod
     def install_from_resolve_help(cls) -> str:
-        _PACKAGE_VERSION_CLAUSE = ""
+        package_and_version = cls.default_package_name_and_version
+        version_clause = (
+            f", which uses {package_and_version.name} version {package_and_version.version}"
+            if package_and_version is not None
+            else ""
+        )
         return softwrap(
             f"""\
             If specified, install the tool using the lockfile for this named resolve.
@@ -73,7 +85,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
             outputs when the resolve incurs changes to unrelated requirements.
 
             If unspecified, and the `lockfile` option is unset, the tool will be installed
-            using the default lockfile shipped with Pants.
+            using the default lockfile shipped with Pants{version_clause}.
 
             If unspecified, and the `lockfile` option is set, the tool will use the custom
             `{cls.options_scope}` "tool lockfile" generated from the `version` and
@@ -84,7 +96,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
     install_from_resolve = StrOption(
         advanced=True,
         default=None,
-        help=install_from_resolve_help,
+        help=lambda cls: cls.install_from_resolve_help(),
     )
 
     requirements = StrListOption(
@@ -181,13 +193,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
         )
 
     @classproperty
-    def help_extended(cls) -> str:
-        base_help = cls.help if isinstance(cls.help, str) else cls.help()
-        if cls.default_lockfile_resource is None:
-            return base_help
-
-        all_paragraphs = [base_help]
-
+    def default_package_name_and_version(cls) -> Optional[PackageNameAndVersion]:
         lockfile = cls.pex_requirements_for_default_lockfile()
         parts = urlparse(lockfile.url)
         # urlparse retains the leading / in URLs with a netloc.
@@ -209,17 +215,30 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
         # The first requirement must contain the primary package for this tool, otherwise
         # this will pick up the wrong requirement.
         first_default_requirement = PipRequirement.parse(cls.default_requirements[0])
-        package_version = next(
+        return next(
             (
-                requirement["version"]
+                PackageNameAndVersion(
+                    name=first_default_requirement.project_name, version=requirement["version"]
+                )
                 for resolve in lockfile_contents["locked_resolves"]
                 for requirement in resolve["locked_requirements"]
                 if requirement["project_name"] == first_default_requirement.project_name
             ),
             None,
         )
+
+    @classproperty
+    def help_extended(cls) -> str:
+        base_help = cls.help if isinstance(cls.help, str) else cls.help()
+        if cls.default_lockfile_resource is None:
+            return base_help
+
+        all_paragraphs = [base_help]
+
+        package_name_and_version = cls.default_package_name_and_version
+        assert package_name_and_version is not None
         all_paragraphs.append(
-            f"This version of Pants uses {first_default_requirement.project_name} {package_version} by default. "
+            f"This version of Pants uses {package_name_and_version.name} {package_name_and_version.version} by default. "
             + "Use a dedicated lockfile and the `install_from_resolve` option to control this."
         )
 
