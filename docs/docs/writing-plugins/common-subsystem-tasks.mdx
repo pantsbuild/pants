@@ -58,23 +58,23 @@ Only some language backends support `pants export`. These include the Python and
 
 1. Make the subsystem a subclass of `ExportableTool`
 
-:::note Language backends may have done this in their Tool base class.
-For example, the Python backend with `PythonToolRequirementsBase` and JVM with `JvmToolBase` are already subclasses.
-:::
+    :::note Language backends may have done this in their Tool base class.
+    For example, the Python backend with `PythonToolRequirementsBase` and JVM with `JvmToolBase` are already subclasses.
+    :::
 
-```python
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.core.goals.resolves import ExportableTool
+    ```python
+    from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+    from pants.core.goals.resolves import ExportableTool
 
-class FortranLint(PythonToolBase, ExportableTool):
-    ...
-```
+    class FortranLint(PythonToolBase, ExportableTool):
+        ...
+    ```
 
 2. Register your class with a `UnionRule` with `ExportableTool`
 
-```python
-def rules():
-	return [
-		UnionRule(ExportableTool, FortranLint)
-	]
-```
+    ```python
+    def rules():
+        return [
+            UnionRule(ExportableTool, FortranLint)
+        ]
+    ```
