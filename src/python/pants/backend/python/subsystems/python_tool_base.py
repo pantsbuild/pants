@@ -24,7 +24,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     strip_comments_from_pex_json_lockfile,
 )
 from pants.core.goals.resolves import ExportableTool
-from pants.engine.fs import Digest, FileContent
+from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
 from pants.option.errors import OptionsError
 from pants.option.option_types import StrListOption, StrOption
@@ -179,6 +179,8 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
         if cls.default_lockfile_resource is None:
             return base_help
 
+        all_paragraphs = [base_help]
+
         lockfile = cls.pex_requirements_for_default_lockfile()
         parts = urlparse(lockfile.url)
         # urlparse retains the leading / in URLs with a netloc.
@@ -207,14 +209,11 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
             None,
         )
         if package_version:
-            base_help += softwrap(
-                f"""
-
-                This version of Pants uses {cls.options_scope} {package_version} by default. Use a dedicated lockfile and the `install_from_resolve` option to control this.
-                """
+            all_paragraphs.append(
+                "This version of Pants uses {cls.options_scope} {package_version} by default. Use a dedicated lockfile and the `install_from_resolve` option to control this."
             )
 
-        return base_help
+        return "\n\n".join(all_paragraphs)
 
     def pex_requirements(
         self,
