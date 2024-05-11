@@ -9,9 +9,8 @@ from typing import Optional, Tuple
 
 from pants.backend.makeself.goals.run import MakeselfArchiveFieldSet
 from pants.backend.makeself.subsystem import MakeselfTool
-from pants.backend.shell.subsystems.shell_setup import ShellSetup
+from pants.backend.makeself.system_binaries import MakeselfBinaryShimsRequest
 from pants.backend.shell.target_types import ShellSourceField
-from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.core.goals import package
 from pants.core.goals.package import (
     BuiltPackage,
@@ -21,31 +20,7 @@ from pants.core.goals.package import (
 )
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules import source_files
-from pants.core.util_rules.system_binaries import (
-    AwkBinary,
-    BasenameBinary,
-    BinaryPathRequest,
-    BinaryShims,
-    BinaryShimsRequest,
-    CatBinary,
-    ChmodBinary,
-    CksumBinary,
-    CutBinary,
-    DateBinary,
-    DirnameBinary,
-    DuBinary,
-    ExprBinary,
-    FindBinary,
-    GzipBinary,
-    RmBinary,
-    SedBinary,
-    ShBinary,
-    SortBinary,
-    TarBinary,
-    TrBinary,
-    WcBinary,
-    XargsBinary,
-)
+from pants.core.util_rules.system_binaries import BinaryShims
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import AddPrefix, Snapshot
@@ -80,7 +55,7 @@ class CreateMakeselfArchive:
     input_digest: Digest
     description: str = dataclasses.field(compare=False)
     output_filename: str
-    extra_tools: Tuple[str, ...] = ()
+    extra_tools: Optional[Tuple[str, ...]] = None
     level: LogLevel = LogLevel.INFO
     cache_scope: Optional[ProcessCacheScope] = None
     timeout_seconds: Optional[int] = None
@@ -90,61 +65,11 @@ class CreateMakeselfArchive:
 async def create_makeself_archive(
     request: CreateMakeselfArchive,
     makeself: MakeselfTool,
-    shell_setup: ShellSetup.EnvironmentAware,
-    awk: AwkBinary,
-    basename: BasenameBinary,
-    cat: CatBinary,
-    chmod: ChmodBinary,
-    cksum: CksumBinary,
-    cut: CutBinary,
-    date: DateBinary,
-    dirname: DirnameBinary,
-    du: DuBinary,
-    expr: ExprBinary,
-    find: FindBinary,
-    gzip: GzipBinary,
-    rm: RmBinary,
-    sed: SedBinary,
-    sh: ShBinary,
-    sort: SortBinary,
-    tar: TarBinary,
-    tr: TrBinary,
-    wc: WcBinary,
-    xargs: XargsBinary,
 ) -> Process:
     shims = await Get(
         BinaryShims,
-        BinaryShimsRequest(
-            paths=(
-                awk,
-                basename,
-                cat,
-                chmod,
-                cksum,
-                cut,
-                date,
-                dirname,
-                du,
-                expr,
-                find,
-                gzip,
-                rm,
-                sed,
-                sh,
-                sort,
-                tar,
-                tr,
-                wc,
-                xargs,
-            ),
-            requests=tuple(
-                BinaryPathRequest(
-                    binary_name=binary_name,
-                    search_path=shell_setup.executable_search_path,
-                )
-                for binary_name in request.extra_tools
-                if binary_name not in BASH_BUILTIN_COMMANDS
-            ),
+        MakeselfBinaryShimsRequest(
+            extra_tools=request.extra_tools or (),
             rationale="create makeself archive",
         ),
     )

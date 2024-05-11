@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from pants.backend.makeself.system_binaries import MakeselfBinaryShimsRequest
 from pants.backend.makeself.target_types import (
     MakeselfArchiveArgsField,
     MakeselfArchiveFilesField,
@@ -13,38 +14,9 @@ from pants.backend.makeself.target_types import (
     MakeselfArchiveToolsField,
     MakeselfArthiveLabelField,
 )
-from pants.backend.shell.subsystems.shell_setup import ShellSetup
-from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
-from pants.core.util_rules.system_binaries import (
-    AwkBinary,
-    BasenameBinary,
-    BashBinary,
-    BinaryPathRequest,
-    BinaryShims,
-    BinaryShimsRequest,
-    CatBinary,
-    CksumBinary,
-    CutBinary,
-    DateBinary,
-    DdBinary,
-    DfBinary,
-    DirnameBinary,
-    ExprBinary,
-    FindBinary,
-    GzipBinary,
-    HeadBinary,
-    IdBinary,
-    MkdirBinary,
-    PwdBinary,
-    RmBinary,
-    SedBinary,
-    TailBinary,
-    TarBinary,
-    TestBinary,
-    WcBinary,
-)
+from pants.core.util_rules.system_binaries import BinaryShims
 from pants.engine.fs import Digest
 from pants.engine.process import Process
 from pants.engine.rules import Get, collect_rules, rule
@@ -63,69 +35,11 @@ class RunMakeselfArchive:
 
 
 @rule(desc="Run makeself archive", level=LogLevel.DEBUG)
-async def run_makeself_archive(
-    request: RunMakeselfArchive,
-    shell_setup: ShellSetup.EnvironmentAware,
-    awk: AwkBinary,
-    basename: BasenameBinary,
-    bash: BashBinary,
-    cat: CatBinary,
-    cksum: CksumBinary,
-    cut: CutBinary,
-    date: DateBinary,
-    dd: DdBinary,
-    df: DfBinary,
-    dirname: DirnameBinary,
-    expr: ExprBinary,
-    find: FindBinary,
-    gzip: GzipBinary,
-    head: HeadBinary,
-    id: IdBinary,
-    mkdir: MkdirBinary,
-    pwd: PwdBinary,
-    rm: RmBinary,
-    sed: SedBinary,
-    tail: TailBinary,
-    tar: TarBinary,
-    test: TestBinary,
-    wc: WcBinary,
-) -> Process:
+async def run_makeself_archive(request: RunMakeselfArchive) -> Process:
     shims = await Get(
         BinaryShims,
-        BinaryShimsRequest(
-            paths=(
-                awk,
-                basename,
-                bash,
-                cat,
-                cksum,
-                cut,
-                date,
-                dd,
-                df,
-                dirname,
-                expr,
-                find,
-                gzip,
-                head,
-                id,
-                mkdir,
-                pwd,
-                rm,
-                sed,
-                tail,
-                tar,
-                test,
-                wc,
-            ),
-            requests=tuple(
-                BinaryPathRequest(
-                    binary_name=binary_name,
-                    search_path=shell_setup.executable_search_path,
-                )
-                for binary_name in request.extra_tools
-                if binary_name not in BASH_BUILTIN_COMMANDS
-            ),
+        MakeselfBinaryShimsRequest(
+            extra_tools=request.extra_tools or (),
             rationale="run makeself archive",
         ),
     )

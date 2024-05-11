@@ -5,6 +5,7 @@
 See https://github.com/megastep/makeself.
 """
 from pants.backend.makeself import subsystem
+from pants.backend.makeself import system_binaries as makeself_system_binaries
 from pants.backend.makeself.goals import package, run
 from pants.backend.makeself.target_types import MakeselfArchiveTarget
 from pants.core.util_rules import system_binaries
@@ -20,4 +21,5 @@ def rules():
         *package.rules(),
         *run.rules(),
         *system_binaries.rules(),
+        *makeself_system_binaries.rules(),
     ]

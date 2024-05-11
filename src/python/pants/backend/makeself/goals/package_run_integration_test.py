@@ -5,6 +5,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.makeself import subsystem
+from pants.backend.makeself import system_binaries as makeself_system_binaries
 from pants.backend.makeself.goals import package, run
 from pants.backend.makeself.goals.package import BuiltMakeselfArchiveArtifact
 from pants.backend.makeself.goals.run import MakeselfArchiveFieldSet, RunMakeselfArchive
@@ -35,6 +36,7 @@ def rule_runner() -> RuleRunner:
             *run.rules(),
             *system_binaries.rules(),
             *register.rules(),
+            *makeself_system_binaries.rules(),
             *core_target_types_rules(),
             QueryRule(BuiltPackage, [MakeselfArchiveFieldSet]),
             QueryRule(ProcessResult, [RunMakeselfArchive]),
