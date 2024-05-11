@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
+from functools import cache
 
 import importlib.resources
 import json
@@ -39,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PackageNameAndVersion:
+class _PackageNameAndVersion:
     name: str
     version: str
 
@@ -65,8 +66,8 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
 
     @classmethod
-    def install_from_resolve_help(cls) -> str:
-        package_and_version = cls.default_package_name_and_version
+    def _install_from_resolve_help(cls) -> str:
+        package_and_version = cls._default_package_name_and_version()
         version_clause = (
             f", which uses {package_and_version.name} version {package_and_version.version}"
             if package_and_version is not None
@@ -96,7 +97,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
     install_from_resolve = StrOption(
         advanced=True,
         default=None,
-        help=lambda cls: cls.install_from_resolve_help(),
+        help=lambda cls: cls._install_from_resolve_help(),
     )
 
     requirements = StrListOption(
@@ -192,8 +193,9 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
             resolve_name=cls.options_scope,
         )
 
-    @classproperty
-    def default_package_name_and_version(cls) -> Optional[PackageNameAndVersion]:
+    @classmethod
+    @cache
+    def _default_package_name_and_version(cls) -> _PackageNameAndVersion:
         lockfile = cls.pex_requirements_for_default_lockfile()
         parts = urlparse(lockfile.url)
         # urlparse retains the leading / in URLs with a netloc.
@@ -217,7 +219,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
         first_default_requirement = PipRequirement.parse(cls.default_requirements[0])
         return next(
             (
-                PackageNameAndVersion(
+                _PackageNameAndVersion(
                     name=first_default_requirement.project_name, version=requirement["version"]
                 )
                 for resolve in lockfile_contents["locked_resolves"]
@@ -235,7 +237,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
         all_paragraphs = [base_help]
 
-        package_name_and_version = cls.default_package_name_and_version
+        package_name_and_version = cls._default_package_name_and_version()
         assert package_name_and_version is not None
         all_paragraphs.append(
             f"This version of Pants uses {package_name_and_version.name} {package_name_and_version.version} by default. "
