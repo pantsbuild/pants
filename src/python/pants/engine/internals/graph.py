@@ -1206,7 +1206,6 @@ def find_source_blocks_owners(
             owners.add(target_blocks.address)
             break  # continue outer loop
 
-    # raise RuntimeError(f"{request.text_blocks=} {file_blocks=} {owners=}")
     return Owners(owners)
 
 
