@@ -5,11 +5,13 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional
+from typing import Optional, Tuple
 
 from pants.backend.makeself.goals.run import MakeselfArchiveFieldSet
 from pants.backend.makeself.subsystem import MakeselfTool
+from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import ShellSourceField
+from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.core.goals import package
 from pants.core.goals.package import (
     BuiltPackage,
@@ -22,6 +24,7 @@ from pants.core.util_rules import source_files
 from pants.core.util_rules.system_binaries import (
     AwkBinary,
     BasenameBinary,
+    BinaryPathRequest,
     BinaryShims,
     BinaryShimsRequest,
     CatBinary,
@@ -77,6 +80,7 @@ class CreateMakeselfArchive:
     input_digest: Digest
     description: str = dataclasses.field(compare=False)
     output_filename: str
+    extra_tools: Tuple[str, ...] = ()
     level: LogLevel = LogLevel.INFO
     cache_scope: Optional[ProcessCacheScope] = None
     timeout_seconds: Optional[int] = None
@@ -86,9 +90,13 @@ class CreateMakeselfArchive:
 async def create_makeself_archive(
     request: CreateMakeselfArchive,
     makeself: MakeselfTool,
+    shell_setup: ShellSetup.EnvironmentAware,
     awk: AwkBinary,
     basename: BasenameBinary,
     cat: CatBinary,
+    chmod: ChmodBinary,
+    cksum: CksumBinary,
+    cut: CutBinary,
     date: DateBinary,
     dirname: DirnameBinary,
     du: DuBinary,
@@ -100,12 +108,9 @@ async def create_makeself_archive(
     sh: ShBinary,
     sort: SortBinary,
     tar: TarBinary,
+    tr: TrBinary,
     wc: WcBinary,
     xargs: XargsBinary,
-    tr: TrBinary,
-    cksum: CksumBinary,
-    cut: CutBinary,
-    chmod: ChmodBinary,
 ) -> Process:
     shims = await Get(
         BinaryShims,
@@ -114,6 +119,9 @@ async def create_makeself_archive(
                 awk,
                 basename,
                 cat,
+                chmod,
+                cksum,
+                cut,
                 date,
                 dirname,
                 du,
@@ -125,12 +133,17 @@ async def create_makeself_archive(
                 sh,
                 sort,
                 tar,
-                wc,
                 tr,
-                cksum,
-                cut,
-                chmod,
+                wc,
                 xargs,
+            ),
+            requests=tuple(
+                BinaryPathRequest(
+                    binary_name=binary_name,
+                    search_path=shell_setup.executable_search_path,
+                )
+                for binary_name in request.extra_tools
+                if binary_name not in BASH_BUILTIN_COMMANDS
             ),
             rationale="create makeself archive",
         ),
@@ -226,6 +239,7 @@ async def package_makeself_binary(field_set: MakeselfArchiveFieldSet) -> BuiltPa
             args=field_set.args.value or (),
             input_digest=input_digest,
             output_filename=output_filename,
+            extra_tools=field_set.tools.value or (),
             description=f"Packaging makeself archive: {field_set.address}",
             level=LogLevel.DEBUG,
         ),
