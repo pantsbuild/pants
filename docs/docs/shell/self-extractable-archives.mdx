@@ -1,0 +1,265 @@
+---
+    title: Run shell commands
+    sidebar_position: 2
+---
+
+Self-extractable archives with [`makeself`](https://github.com/megastep/makeself)
+
+---
+
+Pants integrates with [`makeself`](https://github.com/megastep/makeself) tool
+to allow you to easily build self-extractable archives. To enable the
+integration activate the `makeself` backend in `pants.toml`:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages = [
+    ...
+    "pants.backend.experimental.makeself",
+]
+```
+
+## Minimal example
+
+The [`makeself_archive`](../../reference/targets/makeself_archive.mdx) target
+allows you to bundle files and packages into a single executable archive.
+
+Here is a minimal example:
+
+```python title="BUILD"
+makeself_archive(
+    name="arc",
+    startup_script=["echo", "hello pants"],
+)
+```
+
+To build the archive use the `package` goal:
+
+```bash
+pants package :arc
+```
+```
+[INFO] Wrote dist/arc.run
+Built Makeself binary: arc.run
+```
+
+Now run the archive just like a regular executable:
+
+```bash
+dist/arc.run
+```
+```
+Verifying archive integrity...  100%   MD5 checksums are OK. All good.
+Uncompressing arc.run  100%  
+hello pants
+```
+
+The built archive supports a bunch of parameters, you can inspect them manually:
+
+```bash
+dist/arc.run --help
+```
+
+Or refer to the [`makeself`](https://github.com/megastep/makeself) documentation.
+
+## Bundling multiple files
+
+You can bundle multiple shell scripts using
+[`files`](../../reference/targets/makeself_archive.mdx#files) field:
+
+```python tab={"label":"BUILD"}
+shell_sources(name="src")
+
+makeself_archive(
+    name="arc",
+    files=["lib.sh:src", "entrypoint.sh:src"],
+    startup_script=["./entrypoint.sh"],
+)
+```
+
+```bash tab={"label":"entrypoint.sh"} 
+#!/bin/bash
+
+. lib.sh
+echo $@ "one two three" | first_column
+```
+
+```bash tab={"label":"lib.sh"} 
+#!/bin/bash
+
+function first_column {
+    awk '{print $1}'
+}
+```
+
+Notice that we need to use a relative path to the `./entrypoint.sh`.
+
+```bash
+pants package :arc && dist/arc.run
+```
+```
+[INFO] Wrote dist/arc.run
+Built Makeself binary: arc.run
+Verifying archive integrity...  100%   MD5 checksums are OK. All good.
+Uncompressing arc.run  100%  
+one
+```
+
+To pass the arguments to the startup_script use `--`:
+
+```bash
+pants package :arc && dist/arc.run -- zero
+```
+```
+[INFO] Wrote dist/arc.run
+Built Makeself binary: arc.run
+Verifying archive integrity...  100%   MD5 checksums are OK. All good.
+Uncompressing arc.run  100%  
+zero
+```
+
+## `pants run`
+
+Instead of packaging and running `makeself_archive` manually, you can use `run` goal instead:
+
+```bash
+pants run :arc
+```
+```
+Verifying archive integrity...  100%   MD5 checksums are OK. All good.
+Uncompressing arc.run  100%  
+one
+```
+
+To pass the arguments through the `pants run` goal you need `--`, then you need
+another `--` to pass arguments to archive `startup_script`, so you end up with
+two `--`:
+
+```bash
+pants run :arc -- -- zero
+```
+```
+Verifying archive integrity...  100%   MD5 checksums are OK. All good.
+Uncompressing arc.run  100%  
+zero
+```
+
+Similarly you can pass flags to the archive, for example, `quiet` flag to suppress progress messages:
+```bash
+pants run :arc -- -q -- zero
+```
+```
+zero
+```
+
+## Bundling packages like `pex_binary`
+
+You can put other packages like `pex_binary` into a makeself archive. 
+
+To configure `pex_binary`, first, update your `pants.toml`:
+
+```toml title="pants.toml"
+backend_packages = [
+    ...
+    "pants.backend.shell",
+    "pants.backend.experimental.makeself",
+    "pants.backend.python",
+]
+
+[python]
+interpreter_constraints = ["CPython==3.12.*"]
+```
+
+Now define the `pex_binary` and add it to the makeself archive via the
+`packages` field:
+
+```python tab={"label":"BUILD"}
+python_sources(name="py")
+pex_binary(
+    name="upper",
+    entry_point="upper.py",
+)
+shell_sources(name="sh")
+makeself_archive(
+    name="arc",
+    files=["lib.sh:sh", "entrypoint.sh:sh"],
+    packages=[":upper"],
+    startup_script=["./entrypoint.sh"],
+)
+```
+
+```python tab={"label":"upper.py"}
+print(input().upper())
+```
+
+```bash tab={"label":"entrypoint.sh"} 
+#!/bin/bash
+
+. lib.sh
+echo $@ "one two three" | first_column | ./upper.pex
+```
+
+```bash tab={"label":"lib.sh"} 
+#!/bin/bash
+
+function first_column {
+    awk '{print $1}'
+}
+```
+
+```bash
+pants run :arc -- -q -- zero
+```
+```
+/usr/bin/env: ‘python3.12’: No such file or directory
+```
+
+Oops! This happened because `pants run` is running in isolated environment, so
+we have to explicitly tell pants that we want to access the python interpreter
+and a couple of binaries used by pex:
+
+```python title="BUILD"
+...
+makeself_archive(
+    name="arc",
+    files=["lib.sh:sh", "entrypoint.sh:sh"],
+    packages=[":upper"],
+    startup_script=["./entrypoint.sh"],
+    tools=["python3.12", "grep", "sort"],
+)
+```
+
+Now it should work:
+
+```bash
+pants run :arc -- -q -- zero
+```
+```
+ZERO
+```
+
+Yay!
+
+## Using `makeself` build args
+
+To control the `makeself` archive creation you can provide `args` field:
+
+```python title="BUILD"
+makeself_archive(
+    name="arc",
+    startup_script=["echo", "Done"],
+    args=["--xz", "--nomd5"],
+    tools=["xz"],
+) 
+```
+```bash
+pants run :arc
+```
+```
+Verifying archive integrity...  100%   CRC checksums are OK. All good.
+Uncompressing arc.run  100%  
+Done
+```
+
+See full list of available options in the
+[docs](https://github.com/megastep/makeself#usage).
