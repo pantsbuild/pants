@@ -230,15 +230,19 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
         if cls.default_lockfile_resource is None:
             return base_help
 
-        all_paragraphs = [base_help]
+        help_paragraphs = [base_help]
 
         package_name_and_version = cls._default_package_name_and_version()
-        all_paragraphs.append(
-            f"This version of Pants uses {package_name_and_version.name} {package_name_and_version.version} by default. "
-            + "Use a dedicated lockfile and the `install_from_resolve` option to control this."
+        help_paragraphs.append(
+            softwrap(
+                f"""
+                This version of Pants uses {package_name_and_version.name} {package_name_and_version.version} by default.
+                Use a dedicated lockfile and the `install_from_resolve` option to control this.
+                """
+            )
         )
 
-        return "\n\n".join(all_paragraphs)
+        return "\n\n".join(help_paragraphs)
 
     def pex_requirements(
         self,
