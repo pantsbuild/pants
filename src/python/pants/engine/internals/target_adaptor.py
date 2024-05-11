@@ -36,8 +36,8 @@ class SourceBlock:
         self.__post_init__()
 
     def __post_init__(self):
-        if self.start > self.end:
-            raise ValueError(f"{self.start=} must be <= {self.end=}")
+        if self.start >= self.end:
+            raise ValueError(f"{self.start=} must be less than {self.end=}")
 
     def __len__(self) -> int:
         return self.end - self.start
