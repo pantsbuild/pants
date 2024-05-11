@@ -25,6 +25,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryShims,
     BinaryShimsRequest,
     CatBinary,
+    CksumBinary,
     CutBinary,
     DateBinary,
     DdBinary,
@@ -69,6 +70,7 @@ async def run_makeself_archive(
     basename: BasenameBinary,
     bash: BashBinary,
     cat: CatBinary,
+    cksum: CksumBinary,
     cut: CutBinary,
     date: DateBinary,
     dd: DdBinary,
@@ -96,6 +98,7 @@ async def run_makeself_archive(
                 basename,
                 bash,
                 cat,
+                cksum,
                 cut,
                 date,
                 dd,
@@ -121,6 +124,7 @@ async def run_makeself_archive(
                     search_path=shell_setup.executable_search_path,
                 )
                 for binary_name in request.extra_tools
+                if binary_name not in BASH_BUILTIN_COMMANDS
             ),
             rationale="run makeself archive",
         ),
@@ -165,16 +169,13 @@ async def create_makeself_archive_run_request(field_set: MakeselfArchiveFieldSet
     if exe is None:
         raise RuntimeError(f"Invalid package artifact: {package}")
 
-    tools = field_set.tools.value or ()
-    tools = tuple(tool for tool in tools if tool not in BASH_BUILTIN_COMMANDS)
-
     process = await Get(
         Process,
         RunMakeselfArchive(
             exe=exe,
             input_digest=package.digest,
             description="Run makeself archive",
-            extra_tools=tools,
+            extra_tools=field_set.tools.value or (),
         ),
     )
 
