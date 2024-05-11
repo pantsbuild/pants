@@ -100,7 +100,7 @@ fs = { path = "./fs" }
 env_logger = { workspace = true }
 
 [build-dependencies]
-pyo3-build-config = "0.18"
+pyo3-build-config = { workspace = true }
 
 [lints]
 workspace = true
@@ -290,6 +290,7 @@ prost = "0.12"
 prost-build = "0.12"
 prost-types = "0.12"
 pyo3 = "0.20"
+pyo3-build-config = "0.20"
 rand = "0.8"
 regex = "1"
 rlimit = "0.8"
@@ -323,8 +324,8 @@ tower = "0.4"
 tower-layer = "0.3"
 tower-service = "0.3"
 uname = "0.1.1"
-url = "2.4"
-uuid = "1.6.1"
+url = "2.5"
+uuid = "1.8.0"
 walkdir = "2"
 webpki = "0.22"
 whoami = "1.4.1"

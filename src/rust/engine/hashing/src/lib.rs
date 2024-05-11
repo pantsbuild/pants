@@ -351,13 +351,10 @@ impl<AW: ?Sized + AsyncWrite + Unpin> AsyncWrite for WriterHasher<&mut AW> {
 /// Copy the data from reader and hash the bytes in one pass.
 /// Use hash() to just hash without copying the data anywhere.
 ///
-pub fn sync_copy_and_hash<R: ?Sized, W: ?Sized>(
-    reader: &mut R,
-    writer: &mut W,
-) -> io::Result<Digest>
+pub fn sync_copy_and_hash<R, W>(reader: &mut R, writer: &mut W) -> io::Result<Digest>
 where
-    R: io::Read,
-    W: io::Write,
+    R: io::Read + ?Sized,
+    W: io::Write + ?Sized,
 {
     let mut hasher = WriterHasher::new(writer);
     let _ = io::copy(reader, &mut hasher)?;
@@ -367,15 +364,15 @@ where
 ///
 /// Copy from reader to writer and return whether the copied data matches expected_digest.
 ///
-pub fn sync_verified_copy<R: ?Sized, W: ?Sized>(
+pub fn sync_verified_copy<R, W>(
     expected_digest: Digest,
     data_is_immutable: bool,
     reader: &mut R,
     writer: &mut W,
 ) -> io::Result<bool>
 where
-    R: io::Read,
-    W: io::Write,
+    R: io::Read + ?Sized,
+    W: io::Write + ?Sized,
 {
     if data_is_immutable {
         // Trust that the data hasn't changed, and only validate its length.

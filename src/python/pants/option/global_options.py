@@ -44,7 +44,7 @@ from pants.option.option_types import (
     collect_options_info,
 )
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.options import Options
+from pants.option.options import NativeOptionsValidation, Options
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
@@ -990,6 +990,29 @@ class BootstrapOptions:
             Paths to Pants config files. This may only be set through the environment variable
             `PANTS_CONFIG_FILES` and the command line argument `--pants-config-files`; it will
             be ignored if in a config file like `pants.toml`.
+            """
+        ),
+    )
+    native_options_validation = EnumOption(
+        default=NativeOptionsValidation.warning,
+        help=softwrap(
+            """
+            Pants is switching its option parsing system from a legacy parser written in Python
+            to a new one written in Rust.
+
+            The results of parsing a given option by each system should be identical. However
+            during a transition period we will run both parsers and compare their results.
+            This option controls how to report discrepancies that arise.
+
+            - `error`: Discrepancies will cause Pants to exit.
+            - `warning`: Discrepancies will be logged but Pants will continue.
+            - `ignore`: A last resort to turn off this check entirely.
+
+            If you encounter discrepancies that are not easily resolvable, please reach out to
+            us on Slack or file an issue: https://www.pantsbuild.org/community/getting-help.
+
+            The native parser will become the default in 2.23.x, and the legacy parser will be removed in 2.24.x.
+            So it is imperative that we find out about any discrepancies during this transition period.
             """
         ),
     )

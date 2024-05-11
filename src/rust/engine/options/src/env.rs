@@ -7,7 +7,8 @@ use std::ffi::OsString;
 
 use super::id::{NameTransform, OptionId, Scope};
 use super::{DictEdit, OptionsSource};
-use crate::parse::{expand, expand_to_dict, expand_to_list, Parseable};
+use crate::fromfile::FromfileExpander;
+use crate::parse::Parseable;
 use crate::ListEdit;
 
 #[derive(Debug)]
@@ -50,15 +51,33 @@ impl Env {
         }
         (Self::new(env), dropped)
     }
+}
+
+pub(crate) struct EnvReader {
+    env: Env,
+    #[allow(dead_code)]
+    fromfile_expander: FromfileExpander,
+}
+
+impl EnvReader {
+    pub(crate) fn new(env: Env, fromfile_expander: FromfileExpander) -> Self {
+        Self {
+            env,
+            fromfile_expander,
+        }
+    }
 
     fn env_var_names(id: &OptionId) -> Vec<String> {
         let name = id.name("_", NameTransform::ToUpper);
         let mut names = vec![format!(
             "PANTS_{}_{}",
-            id.0.name().replace('-', "_").to_ascii_uppercase(),
+            id.scope
+                .name()
+                .replace(['-', '.'], "_")
+                .to_ascii_uppercase(),
             name
         )];
-        if id.0 == Scope::Global {
+        if id.scope == Scope::Global {
             names.push(format!("PANTS_{name}"));
         }
         if name.starts_with("PANTS_") {
@@ -69,8 +88,10 @@ impl Env {
 
     fn get_list<T: Parseable>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
         for env_var_name in &Self::env_var_names(id) {
-            if let Some(value) = self.env.get(env_var_name) {
-                return expand_to_list::<T>(value.to_owned())
+            if let Some(value) = self.env.env.get(env_var_name) {
+                return self
+                    .fromfile_expander
+                    .expand_to_list::<T>(value.to_owned())
                     .map_err(|e| e.render(self.display(id)));
             }
         }
@@ -87,15 +108,18 @@ impl From<&Env> for Vec<(String, String)> {
     }
 }
 
-impl OptionsSource for Env {
+impl OptionsSource for EnvReader {
     fn display(&self, id: &OptionId) -> String {
         Self::env_var_names(id).pop().unwrap()
     }
 
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
         for env_var_name in &Self::env_var_names(id) {
-            if let Some(value) = self.env.get(env_var_name) {
-                return expand(value.to_owned()).map_err(|e| e.render(self.display(id)));
+            if let Some(value) = self.env.env.get(env_var_name) {
+                return self
+                    .fromfile_expander
+                    .expand(value.to_owned())
+                    .map_err(|e| e.render(self.display(id)));
             }
         }
         Ok(None)
@@ -127,10 +151,13 @@ impl OptionsSource for Env {
         self.get_list::<String>(id)
     }
 
-    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
+    fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
         for env_var_name in &Self::env_var_names(id) {
-            if let Some(value) = self.env.get(env_var_name) {
-                return expand_to_dict(value.to_owned()).map_err(|e| e.render(self.display(id)));
+            if let Some(value) = self.env.env.get(env_var_name) {
+                return self
+                    .fromfile_expander
+                    .expand_to_dict(value.to_owned())
+                    .map_err(|e| e.render(self.display(id)));
             }
         }
         Ok(None)

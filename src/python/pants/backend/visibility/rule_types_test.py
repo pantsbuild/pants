@@ -45,7 +45,7 @@ def parse_address(raw: str, description_of_origin: str = repr("test"), **kwargs)
     return parsed.dir_to_address() if "." not in raw else parsed.file_to_address()
 
 
-def parse_rule(rule: str, relpath: str = "test/path") -> VisibilityRule:
+def parse_rule(rule: str | dict, relpath: str = "test/path") -> VisibilityRule:
     return VisibilityRule.parse(rule, relpath)
 
 
@@ -158,6 +158,7 @@ def test_flatten(expected, xs) -> None:
         (True, "<target>", "src/a", ""),
         (False, "<target>[src/b]", "src/a", ""),
         (False, "<file>", "src/a", ""),
+        (True, {"path": "src/a"}, "src/a", ""),
     ],
 )
 def test_visibility_rule(expected: bool, spec: str, path: str, relpath: str) -> None:
@@ -205,6 +206,23 @@ def test_visibility_rule(expected: bool, spec: str, path: str, relpath: str) -> 
                 ),
             ),
             ("<target>", "src/*", "src/a:lib"),
+        ),
+        (
+            VisibilityRuleSet(
+                build_file="test/path/BUILD",
+                selectors=(TargetGlob.parse("<target>", ""),),
+                rules=(
+                    parse_rule("!src/*"),
+                    parse_rule("?src/a:lib"),
+                    parse_rule("(this, is, ok)"),
+                ),
+            ),
+            (
+                "<target>",
+                {"action": "deny", "path": "src/*"},
+                {"action": "warn", "path": "src/a", "name": "lib"},
+                {"tags": ["this", "is", "ok"]},
+            ),
         ),
     ],
 )

@@ -101,7 +101,7 @@ url_template = "https://my.custom.host/bin/protoc/{version}/{platform}/protoc.zi
 
 For simplicity, we used the original value for `url_platform_mapping`, meaning that we set up our hosted URL to store the macOS x86 binary at `.../osx-x86_64/protoc.zip`, for example. You can override the option `url_platform_mapping` if you want to use different values.
 
-Occasionally, new Pants releases will upgrade to new versions of these binaries, which will be mentioned in the "User API Changes" part of the changelog [https://github.com/pantsbuild/pants/tree/master/src/python/pants/notes](https://github.com/pantsbuild/pants/tree/master/src/python/pants/notes). When upgrading to these new Pants releases, you should download the new artifact and upload a copy to your host.
+Occasionally, new Pants releases will upgrade to new versions of these binaries, which will be mentioned in the "User API Changes" part of the changelog [https://github.com/pantsbuild/pants/tree/main/docs/notes](https://github.com/pantsbuild/pants/tree/main/docs/notes). When upgrading to these new Pants releases, you should download the new artifact and upload a copy to your host.
 
 :::note Asking for help
 It's possible that Pants does not yet have all the mechanisms it'll need to work with your organization's specific networking setup, which we'd love to fix.

@@ -12,6 +12,7 @@ from typing import (
     Generic,
     Iterable,
     Mapping,
+    Optional,
     Protocol,
     Sequence,
     TextIO,
@@ -532,6 +533,49 @@ class PantsdConnectionException(Exception):
 
 class PantsdClientException(Exception):
     pass
+
+# ------------------------------------------------------------------------------
+# Options
+# ------------------------------------------------------------------------------
+
+class PyOptionId:
+    def __init__(
+        self, *components: str, scope: str | None = None, switch: str | None = None
+    ) -> None: ...
+
+class PyConfigSource:
+    def __init__(self, path: str, content: bytes) -> None: ...
+
+T = TypeVar("T")
+# A pair of (option value, rank). See src/python/pants/option/ranked_value.py.
+OptionValue = Tuple[Optional[T], int]
+OptionListValue = Tuple[list[T], int]
+OptionDictValue = Tuple[dict[str, Any], int]
+
+class PyOptionParser:
+    def __init__(
+        self,
+        args: Optional[Sequence[str]],
+        env: dict[str, str],
+        configs: Optional[Sequence[PyConfigSource]],
+        allow_pantsrc: bool,
+    ) -> None: ...
+    def get_bool(self, option_id: PyOptionId, default: Optional[bool]) -> OptionValue[bool]: ...
+    def get_int(self, option_id: PyOptionId, default: Optional[int]) -> OptionValue[int]: ...
+    def get_float(self, option_id: PyOptionId, default: Optional[float]) -> OptionValue[float]: ...
+    def get_string(self, option_id: PyOptionId, default: Optional[str]) -> OptionValue[str]: ...
+    def get_bool_list(
+        self, option_id: PyOptionId, default: list[bool]
+    ) -> OptionListValue[bool]: ...
+    def get_int_list(self, option_id: PyOptionId, default: list[int]) -> OptionListValue[int]: ...
+    def get_float_list(
+        self, option_id: PyOptionId, default: list[float]
+    ) -> OptionListValue[float]: ...
+    def get_string_list(
+        self, option_id: PyOptionId, default: list[str]
+    ) -> OptionListValue[str]: ...
+    def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionDictValue: ...
+    def get_passthrough_args(self) -> Optional[list[str]]: ...
 
 # ------------------------------------------------------------------------------
 # Testutil

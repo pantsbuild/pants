@@ -52,6 +52,7 @@ from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.python.typecheck.pytype.subsystem import Pytype
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
+from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
 from pants.backend.tools.semgrep.subsystem import SemgrepSubsystem
 from pants.backend.tools.yamllint.subsystem import Yamllint
@@ -132,6 +133,7 @@ all_python_tools = tuple(
             PythonTool(SemgrepSubsystem, "pants.backend.experimental.tools.semgrep"),
             PythonTool(Setuptools, "pants.backend.python"),
             PythonTool(SetuptoolsSCM, "pants.backend.python"),
+            PythonTool(Sqlfluff, "pants.backend.experimental.sql.lint.sqlfluff"),
             PythonTool(TerraformHcl2Parser, "pants.backend.experimental.terraform"),
             PythonTool(TwineSubsystem, "pants.backend.python"),
             PythonTool(Yamllint, "pants.backend.experimental.tools.yamllint"),

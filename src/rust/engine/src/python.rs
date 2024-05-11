@@ -98,7 +98,6 @@ impl<'x> Params {
     }
 }
 
-///
 pub fn display_sorted_in_parens<T>(items: T) -> String
 where
     T: Iterator,

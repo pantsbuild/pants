@@ -133,7 +133,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     )
     assert lint_result.exit_code == 0
     assert fix_result.stderr == ""
-    assert fix_result.stdout == ""
+    assert fix_result.stdout == "All checks passed!\n"
     assert not fix_result.did_change
     assert fix_result.output == rule_runner.make_snapshot({"f.py": GOOD_FILE})
     assert not fmt_result.did_change
