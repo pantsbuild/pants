@@ -2,14 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
-from functools import cache
 
 import importlib.resources
 import json
 import logging
 import os
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Optional, Sequence
+from functools import cache
+from typing import ClassVar, Iterable, Sequence
 from urllib.parse import urlparse
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
@@ -70,8 +70,6 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
         package_and_version = cls._default_package_name_and_version()
         version_clause = (
             f", which uses {package_and_version.name} version {package_and_version.version}"
-            if package_and_version is not None
-            else ""
         )
         return softwrap(
             f"""\
@@ -218,15 +216,12 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
         # this will pick up the wrong requirement.
         first_default_requirement = PipRequirement.parse(cls.default_requirements[0])
         return next(
-            (
-                _PackageNameAndVersion(
-                    name=first_default_requirement.project_name, version=requirement["version"]
-                )
-                for resolve in lockfile_contents["locked_resolves"]
-                for requirement in resolve["locked_requirements"]
-                if requirement["project_name"] == first_default_requirement.project_name
-            ),
-            None,
+            _PackageNameAndVersion(
+                name=first_default_requirement.project_name, version=requirement["version"]
+            )
+            for resolve in lockfile_contents["locked_resolves"]
+            for requirement in resolve["locked_requirements"]
+            if requirement["project_name"] == first_default_requirement.project_name
         )
 
     @classproperty
@@ -238,7 +233,6 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
         all_paragraphs = [base_help]
 
         package_name_and_version = cls._default_package_name_and_version()
-        assert package_name_and_version is not None
         all_paragraphs.append(
             f"This version of Pants uses {package_name_and_version.name} {package_name_and_version.version} by default. "
             + "Use a dedicated lockfile and the `install_from_resolve` option to control this."
