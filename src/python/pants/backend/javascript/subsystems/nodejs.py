@@ -563,6 +563,7 @@ async def prepare_corepack_tool(
             level=LogLevel.DEBUG,
             env=environment.to_env_dict(),
             append_only_caches={**environment.append_only_caches},
+            # Note this is a static value - '_.corepack_home'
             output_directories=[environment.corepack_home],
         ),
     )
