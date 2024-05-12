@@ -27,13 +27,7 @@ from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
-from pants.engine.target import (
-    SourcesField,
-    Target,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-    targets_with_sources_types,
-)
+from pants.engine.target import SourcesField, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionMembership, UnionRule
 
 
@@ -85,11 +79,6 @@ async def install_node_packages_for_address(
     project_env = await Get(NodeJsProjectEnvironment, NodeJSProjectEnvironmentRequest(req.address))
     target = project_env.ensure_target()
     transitive_tgts = await Get(TransitiveTargets, TransitiveTargetsRequest([target.address]))
-
-    pkg_tgts = targets_with_sources_types(
-        [PackageJsonSourceField], transitive_tgts.dependencies, union_membership
-    )
-    assert target not in pkg_tgts
 
     source_files = await _get_relevant_source_files(
         (tgt[SourcesField] for tgt in transitive_tgts.closure if tgt.has_field(SourcesField)),
