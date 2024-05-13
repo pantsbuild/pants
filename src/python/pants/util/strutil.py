@@ -142,7 +142,7 @@ def anonymize_v2_chroot_path(v: bytes | str) -> str:
         v = v.decode()
 
     found_sandbox_paths = re.findall(r"(/.*?/pants-sandbox-[a-zA-Z0-9]+)/", v)
-    sandbox_path_to_replacement = {}
+    sandbox_path_to_replacement: dict[str, str] = {}
     for sandbox_path in found_sandbox_paths:
         if sandbox_path not in sandbox_path_to_replacement:
             sandbox_path_to_replacement[
