@@ -9,7 +9,7 @@ import logging
 import os
 from dataclasses import dataclass
 from functools import cache
-from typing import ClassVar, Iterable, Optional, Sequence
+from typing import Callable, ClassVar, Iterable, Optional, Sequence
 from urllib.parse import urlparse
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
@@ -50,6 +50,8 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
     # Subclasses must set.
     default_version: ClassVar[str]
+    # Must be set by subclasses - will be used to set the help text in this class.
+    help_short: ClassVar[str | Callable[[], str]]
     # Subclasses do not need to override.
     default_extra_requirements: ClassVar[Sequence[str]] = []
 
