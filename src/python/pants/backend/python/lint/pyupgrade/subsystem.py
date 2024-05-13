@@ -12,7 +12,7 @@ from pants.option.option_types import ArgsListOption, SkipOption
 class PyUpgrade(PythonToolBase):
     options_scope = "pyupgrade"
     name = "pyupgrade"
-    help = (
+    help_short = (
         "Upgrade syntax for newer versions of the language (https://github.com/asottile/pyupgrade)."
     )
 

@@ -12,7 +12,7 @@ from pants.option.option_types import ArgsListOption, SkipOption
 class AddTrailingComma(PythonToolBase):
     options_scope = "add-trailing-comma"
     name = "add-trailing-comma"
-    help = "The add-trailing-comma Python code formatter (https://github.com/asottile/add-trailing-comma)."
+    help_short = "The add-trailing-comma Python code formatter (https://github.com/asottile/add-trailing-comma)."
 
     default_main = ConsoleScript("add-trailing-comma")
     default_requirements = ["add-trailing-comma>=2.2.3,<3"]

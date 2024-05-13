@@ -34,7 +34,9 @@ class BanditFieldSet(FieldSet):
 class Bandit(PythonToolBase):
     options_scope = "bandit"
     name = "Bandit"
-    help = "A tool for finding security issues in Python code (https://bandit.readthedocs.io)."
+    help_short = (
+        "A tool for finding security issues in Python code (https://bandit.readthedocs.io)."
+    )
 
     default_main = ConsoleScript("bandit")
     default_requirements = [

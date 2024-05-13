@@ -66,7 +66,7 @@ class MyPyFieldSet(FieldSet):
 class MyPy(PythonToolBase):
     options_scope = "mypy"
     name = "MyPy"
-    help = "The MyPy Python type checker (http://mypy-lang.org/)."
+    help_short = "The MyPy Python type checker (http://mypy-lang.org/)."
 
     default_main = ConsoleScript("mypy")
     default_requirements = ["mypy>=0.961,<2"]

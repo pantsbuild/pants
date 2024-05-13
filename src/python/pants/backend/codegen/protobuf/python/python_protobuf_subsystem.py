@@ -104,7 +104,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
 
 class PythonProtobufGrpclibPlugin(PythonToolRequirementsBase):
     options_scope = "python-grpclib-protobuf"
-    help = "Configuration of the grpclib plugin."
+    help_short = "Configuration of the grpclib plugin."
 
     default_requirements = ["grpclib[protobuf]>=0.4,<1"]
 
