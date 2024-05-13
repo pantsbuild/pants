@@ -12,8 +12,7 @@ from pants.goal.migrate_call_by_name import MigrateCallByNameBuiltinGoal
 
 
 def register_builtin_goals(build_configuration: BuildConfiguration.Builder) -> None:
-    # build_configuration.register_subsystems("pants.goal", builtin_goals())
-    build_configuration.register_builtin_goals("builtin", builtin_goals())
+    build_configuration.register_subsystems("pants.goal", builtin_goals())
 
 
 def builtin_goals() -> tuple[type[BuiltinGoal], ...]:
