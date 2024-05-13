@@ -421,15 +421,14 @@ impl ByteStoreProvider for Provider {
         let futures = requests
             .map(|request| {
                 let client = client.clone();
-                let result = retry_call(
+                retry_call(
                     client,
                     move |mut client, _| {
                         let request = request.clone();
                         async move { client.find_missing_blobs(request).await }
                     },
                     status_is_retryable,
-                );
-                result
+                )
             })
             .collect::<Vec<_>>();
 
