@@ -6,12 +6,18 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use log::debug;
+use std::os::unix::ffi::OsStrExt;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BuildRoot(PathBuf);
 
 impl BuildRoot {
     const SENTINEL_FILES: &'static [&'static str] = &["pants.toml", "BUILDROOT", "BUILD_ROOT"];
+
+    // Useful in tests.
+    pub fn for_path(path: PathBuf) -> Self {
+        Self(path)
+    }
 
     pub fn find() -> Result<BuildRoot, String> {
         match env::var_os("PANTS_BUILDROOT_OVERRIDE") {
@@ -58,6 +64,16 @@ impl BuildRoot {
                 sentinel_files = Self::SENTINEL_FILES.join(", ")
             ))?;
         }
+    }
+
+    pub fn convert_to_string(&self) -> Result<String, String> {
+        String::from_utf8(self.0.as_os_str().as_bytes().to_vec()).map_err(|e| {
+            format!(
+                "Failed to decode build root path {}: {}",
+                self.0.display(),
+                e
+            )
+        })
     }
 }
 

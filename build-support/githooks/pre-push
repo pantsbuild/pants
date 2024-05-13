@@ -2,14 +2,14 @@
 
 set -e
 
-# If you use the `pants` scie, you may "export _PANTS_PRE_COMMIT_BINARY=pants" in order to use the same bootstrapped
-# pants setup for this pre-commit hook as you get from the command line for any other pants command.
-: "${_PANTS_PRE_COMMIT_BINARY:=./pants}"
+# If you use the `pants` scie, you may "export _PANTS_PRE_PUSH_BINARY=pants" in order to use the same bootstrapped
+# pants setup for this pre-push hook as you get from the command line for any other pants command.
+: "${_PANTS_PRE_PUSH_BINARY:=./pants}"
 
-# NB: pre-commit runs in the context of GIT_WORK_TREE, ie: pwd == REPO_ROOT
+# NB: githooks runs in the context of GIT_WORK_TREE, ie: pwd == REPO_ROOT
 source build-support/common.sh
 
-# Commit hooks set $GIT_DIR by default to .git
+# Githooks set $GIT_DIR by default to .git
 # This causes git commands (notably, git rev-parse --show-toplevel) to fail if the script isn't
 # running in the git root, as it looks for a .git directory relative to the working directory.
 # Explicitly absolute-ify the $GIT_DIR variable so that this doesn't happen.
@@ -25,13 +25,13 @@ if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
 fi
 
 echo "* Typechecking"
-$_PANTS_PRE_COMMIT_BINARY --changed-since="${MERGE_BASE}" --changed-dependents=transitive check
+$_PANTS_PRE_PUSH_BINARY --changed-since="${MERGE_BASE}" --changed-dependents=transitive check
 
 echo "* Checking linters, formatters, and headers"
-$_PANTS_PRE_COMMIT_BINARY --changed-since="${MERGE_BASE}" lint ||
-  die "If there were formatting errors, run \`$_PANTS_PRE_COMMIT_BINARY --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
+$_PANTS_PRE_PUSH_BINARY --changed-since="${MERGE_BASE}" lint ||
+  die "If there were formatting errors, run \`$_PANTS_PRE_PUSH_BINARY --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
 
 if git diff "${MERGE_BASE}" --name-only | grep src/python/pants_release/generate_github_workflows.py > /dev/null; then
   echo "* Checking GitHub workflows generation"
-  $_PANTS_PRE_COMMIT_BINARY run src/python/pants_release/generate_github_workflows.py -- --check
+  $_PANTS_PRE_PUSH_BINARY run src/python/pants_release/generate_github_workflows.py -- --check
 fi

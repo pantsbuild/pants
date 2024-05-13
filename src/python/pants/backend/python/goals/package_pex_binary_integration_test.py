@@ -14,7 +14,10 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_dists, package_pex_binary
-from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
+from pants.backend.python.goals.package_pex_binary import (
+    PexBinaryFieldSet,
+    PexFromTargetsRequestForBuiltPackage,
+)
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
@@ -49,6 +52,7 @@ def rule_runner() -> PythonRuleRunner:
             *core_target_types_rules(),
             *package_dists.rules(),
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
+            QueryRule(PexFromTargetsRequestForBuiltPackage, [PexBinaryFieldSet]),
             QueryRule(BuiltPackage, [PythonDistributionFieldSet]),
         ],
         target_types=[
@@ -455,3 +459,33 @@ def test_sh_boot_plumb(rule_runner: PythonRuleRunner) -> None:
     with open(executable, "rb") as f:
         shebang = f.readline().decode()
         assert "#!/bin/sh" in shebang
+
+
+def test_extra_build_args(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    extra_build_args=["--example-extra-arg", "value-goes-here"]
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(PexFromTargetsRequestForBuiltPackage, [field_set])
+
+    additional_args = result.request.additional_args
+
+    assert additional_args[-2] == "--example-extra-arg"
+    assert additional_args[-1] == "value-goes-here"

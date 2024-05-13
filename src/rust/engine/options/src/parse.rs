@@ -4,12 +4,10 @@
 use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, Val};
 use crate::render_choice;
 
-use log::warn;
-use serde::de::{Deserialize, DeserializeOwned};
+use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::path::{Path, PathBuf};
-use std::{fs, io};
+use std::path::Path;
 
 peg::parser! {
     grammar option_value_parser() for str {
@@ -45,10 +43,10 @@ peg::parser! {
         }
 
         rule unquoted_string() -> String
-            = s:(non_escaped_character() / escaped_character())+ { s.into_iter().collect() }
+            = s:(escaped_character() / non_escaped_character())+ { s.into_iter().collect() }
 
         rule non_escaped_character() -> char
-            = !"\\" c:$([_]) { c.chars().next().unwrap() }
+            = !"\\x" c:$([_]) { c.chars().next().unwrap() }
 
         pub(crate) rule quoted_string() -> String
             = string:(double_quoted_string() / single_quoted_string()) { string }
@@ -57,23 +55,61 @@ peg::parser! {
             = "\"" s:double_quoted_character()* "\"" { s.into_iter().collect() }
 
         rule double_quoted_character() -> char
-            = quoted_character("\"")
-            / escaped_character()
+            = escaped_character() / quoted_character("\"")
 
         rule single_quoted_string() -> String
             = "'" s:single_quoted_character()* "'" { s.into_iter().collect() }
 
         rule single_quoted_character() -> char
-            = quoted_character("'")
-            / escaped_character()
+            = escaped_character() / quoted_character("'")
 
         // NB: ##method(X) is an undocumented peg feature expression that calls input.method(pos, X)
         // (see https://github.com/kevinmehall/rust-peg/issues/283).
         rule quoted_character(quote_char: &'static str) -> char
-            = !(##parse_string_literal(quote_char) / "\\") c:$([_]) { c.chars().next().unwrap() }
+            = !(##parse_string_literal(quote_char) / "\\x") c:$([_]) { c.chars().next().unwrap() }
 
-        rule escaped_character() -> char
-            = "\\" c:$([_]) { c.chars().next().unwrap() }
+        // Python string literal escape sequences.
+        // See https://docs.python.org/3/reference/lexical_analysis.html#escape-sequences.
+        // Note that only backslash, single-quote, linefeed, carriage return and horizontal tab
+        // are also Rust character escape sequences.
+        //
+        // TODO: Support \uXXXX and \UXXXXXXXX escapes? What about \N{name}?
+        //  The unicode_names crate would be helpful for the latter, but it seems like
+        //  overkill, and would add 500KB to the size of the Pants binary.
+
+        rule escaped_ba() -> char = "\\\\" { '\\' }
+        rule escaped_sq() -> char = "\\'" { '\'' }
+        rule escaped_dq() -> char = "\\\"" { '"' }
+        rule escaped_be() -> char = "\\a" { '\x07' }
+        rule escaped_bs() -> char = "\\b" { '\x08' }
+        rule escaped_ff() -> char = "\\f" { '\x0c' }
+        rule escaped_lf() -> char = "\\n" { '\n' }
+        rule escaped_cr() -> char = "\\r" { '\r' }
+        rule escaped_ht() -> char = "\\t" { '\t' }
+        rule escaped_vt() -> char = "\\v" { '\x0b' }
+
+        // Python octal escapes take 1-3 digits.
+        rule escaped_octal() -> char = "\\" s:$(['0'..='7']*<1,3>) {
+            char::from_u32(u32::from_str_radix(s, 8).unwrap()).unwrap()
+        }
+
+        // Python hex escapes take exactly 2 digits. Note that we mirror the Python behavior of
+        // always consuming the next two characters and failing if they aren't valid hex digits.
+        rule escaped_hex() -> char = "\\x" s:$([_] [_]) {?
+            if let Ok(n) = u32::from_str_radix(s, 16) {
+                // In practice all possible two-digit numbers are are valid character codes,
+                // so this error should never trigger.
+                char::from_u32(n).ok_or("valid character code")
+            } else {
+                Err("two hex digits")
+            }
+        }
+
+        rule escaped_character() -> char = c:(
+             escaped_ba() / escaped_sq() / escaped_dq() / escaped_be() / escaped_bs() /
+             escaped_ff() / escaped_lf() / escaped_cr() / escaped_ht() / escaped_vt() /
+             escaped_octal() / escaped_hex()
+        ) { c }
 
         rule list_add() -> ListEditAction
             = "+" { ListEditAction::Add }
@@ -132,7 +168,7 @@ peg::parser! {
             }
 
         rule list_edits<T>(parse_value: rule<T>) -> Vec<ListEdit<T>>
-            = e:list_edit(&parse_value) ** "," ","? { e }
+            = e:list_edit(&parse_value) ++ "," { e }
 
         rule list_replace<T>(parse_value: rule<T>) -> Vec<ListEdit<T>>
             = items:items(&parse_value) {
@@ -157,8 +193,13 @@ peg::parser! {
 
         pub(crate) rule float_list_edits() -> Vec<ListEdit<f64>> = scalar_list_edits(<float()>)
 
+        // Make `--foo=` yield an implicit add of an empty string.
+        rule empty_string_string_list() -> Vec<ListEdit<String>>
+            = ![_] { vec![ListEdit { action: ListEditAction::Add, items: vec!["".to_string()] }] }
+
         pub(crate) rule string_list_edits() -> Vec<ListEdit<String>>
-            = implicit_add(<unquoted_string()>) / list_replace(<quoted_string()>) / list_edits(<quoted_string()>)
+            = empty_string_string_list() / implicit_add(<unquoted_string()>) /
+              list_replace(<quoted_string()>) / list_edits(<quoted_string()>)
 
         // Heterogeneous values embedded in dicts. Note that float_val() must precede int_val() so that
         // the integer prefix of a float is not interpreted as an int.
@@ -236,6 +277,13 @@ mod err {
 
 pub(crate) use err::ParseError;
 
+pub(crate) fn mk_parse_err(err: impl Display, path: &Path) -> ParseError {
+    ParseError::new(format!(
+        "Problem reading {path} for {{name}}: {err}",
+        path = path.display()
+    ))
+}
+
 fn format_parse_error(
     type_id: &str,
     value: &str,
@@ -284,186 +332,70 @@ pub(crate) fn parse_dict(value: &str) -> Result<DictEdit, ParseError> {
 }
 
 pub(crate) trait Parseable: Sized + DeserializeOwned {
+    const OPTION_TYPE: &'static str;
     fn parse(value: &str) -> Result<Self, ParseError>;
     fn parse_list(value: &str) -> Result<Vec<ListEdit<Self>>, ParseError>;
+
+    fn format_parse_error(value: &str, e: peg::error::ParseError<peg::str::LineCol>) -> ParseError {
+        format_parse_error(Self::OPTION_TYPE, value, e)
+    }
+
+    fn format_list_parse_error(
+        value: &str,
+        e: peg::error::ParseError<peg::str::LineCol>,
+    ) -> ParseError {
+        format_parse_error(&format!("{} list", Self::OPTION_TYPE), value, e)
+    }
 }
 
 impl Parseable for bool {
+    const OPTION_TYPE: &'static str = "bool";
+
     fn parse(value: &str) -> Result<bool, ParseError> {
-        option_value_parser::bool(value).map_err(|e| format_parse_error("bool", value, e))
+        option_value_parser::bool(value).map_err(|e| Self::format_parse_error(value, e))
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<bool>>, ParseError> {
         option_value_parser::bool_list_edits(value)
-            .map_err(|e| format_parse_error("bool list", value, e))
+            .map_err(|e| Self::format_list_parse_error(value, e))
     }
 }
 
 impl Parseable for i64 {
+    const OPTION_TYPE: &'static str = "int";
+
     fn parse(value: &str) -> Result<i64, ParseError> {
-        option_value_parser::int(value).map_err(|e| format_parse_error("int", value, e))
+        option_value_parser::int(value).map_err(|e| Self::format_parse_error(value, e))
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<i64>>, ParseError> {
         option_value_parser::int_list_edits(value)
-            .map_err(|e| format_parse_error("int list", value, e))
+            .map_err(|e| Self::format_list_parse_error(value, e))
     }
 }
 
 impl Parseable for f64 {
+    const OPTION_TYPE: &'static str = "float";
+
     fn parse(value: &str) -> Result<f64, ParseError> {
-        option_value_parser::float(value).map_err(|e| format_parse_error("float", value, e))
+        option_value_parser::float(value).map_err(|e| Self::format_parse_error(value, e))
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<f64>>, ParseError> {
         option_value_parser::float_list_edits(value)
-            .map_err(|e| format_parse_error("float list", value, e))
+            .map_err(|e| Self::format_list_parse_error(value, e))
     }
 }
 
 impl Parseable for String {
+    const OPTION_TYPE: &'static str = "string";
+
     fn parse(value: &str) -> Result<String, ParseError> {
         Ok(value.to_owned())
     }
 
     fn parse_list(value: &str) -> Result<Vec<ListEdit<String>>, ParseError> {
         option_value_parser::string_list_edits(value)
-            .map_err(|e| format_parse_error("string list", value, e))
-    }
-}
-
-// If the corresponding unexpanded value points to a @fromfile, then the
-// first component is the path to that file, and the second is the value from the file,
-// or None if the file doesn't exist and the @?fromfile syntax was used.
-//
-// Otherwise, the first component is None and the second is the original value.
-type ExpandedValue = (Option<PathBuf>, Option<String>);
-
-fn mk_parse_err(err: impl Display, path: &Path) -> ParseError {
-    ParseError::new(format!(
-        "Problem reading {path} for {{name}}: {err}",
-        path = path.display()
-    ))
-}
-
-fn maybe_expand(value: String) -> Result<ExpandedValue, ParseError> {
-    if let Some(suffix) = value.strip_prefix('@') {
-        if suffix.starts_with('@') {
-            // @@ escapes the initial @.
-            Ok((None, Some(suffix.to_owned())))
-        } else {
-            match suffix.strip_prefix('?') {
-                Some(subsuffix) => {
-                    // @? means the path is allowed to not exist.
-                    let path = PathBuf::from(subsuffix);
-                    match fs::read_to_string(&path) {
-                        Ok(content) => Ok((Some(path), Some(content))),
-                        Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                            warn!("Optional file config '{}' does not exist.", path.display());
-                            Ok((Some(path), None))
-                        }
-                        Err(err) => Err(mk_parse_err(err, &path)),
-                    }
-                }
-                _ => {
-                    let path = PathBuf::from(suffix);
-                    let content = fs::read_to_string(&path).map_err(|e| mk_parse_err(e, &path))?;
-                    Ok((Some(path), Some(content)))
-                }
-            }
-        }
-    } else {
-        Ok((None, Some(value)))
-    }
-}
-
-pub(crate) fn expand(value: String) -> Result<Option<String>, ParseError> {
-    let (_, expanded_value) = maybe_expand(value)?;
-    Ok(expanded_value)
-}
-
-#[derive(Debug)]
-enum FromfileType {
-    Json,
-    Yaml,
-    Unknown,
-}
-
-impl FromfileType {
-    fn detect(path: &Path) -> FromfileType {
-        if let Some(ext) = path.extension() {
-            if ext == "json" {
-                return FromfileType::Json;
-            } else if ext == "yml" || ext == "yaml" {
-                return FromfileType::Yaml;
-            };
-        }
-        FromfileType::Unknown
-    }
-}
-
-fn try_deserialize<'a, DE: Deserialize<'a>>(
-    value: &'a str,
-    path_opt: Option<PathBuf>,
-) -> Result<Option<DE>, ParseError> {
-    if let Some(path) = path_opt {
-        match FromfileType::detect(&path) {
-            FromfileType::Json => serde_json::from_str(value).map_err(|e| mk_parse_err(e, &path)),
-            FromfileType::Yaml => serde_yaml::from_str(value).map_err(|e| mk_parse_err(e, &path)),
-            _ => Ok(None),
-        }
-    } else {
-        Ok(None)
-    }
-}
-
-pub(crate) fn expand_to_list<T: Parseable>(
-    value: String,
-) -> Result<Option<Vec<ListEdit<T>>>, ParseError> {
-    let (path_opt, value_opt) = maybe_expand(value)?;
-    if let Some(value) = value_opt {
-        if let Some(items) = try_deserialize(&value, path_opt)? {
-            Ok(Some(vec![ListEdit {
-                action: ListEditAction::Replace,
-                items,
-            }]))
-        } else {
-            T::parse_list(&value).map(Some)
-        }
-    } else {
-        Ok(None)
-    }
-}
-
-pub(crate) fn expand_to_dict(value: String) -> Result<Option<DictEdit>, ParseError> {
-    let (path_opt, value_opt) = maybe_expand(value)?;
-    if let Some(value) = value_opt {
-        if let Some(items) = try_deserialize(&value, path_opt)? {
-            Ok(Some(DictEdit {
-                action: DictEditAction::Replace,
-                items,
-            }))
-        } else {
-            parse_dict(&value).map(Some)
-        }
-    } else {
-        Ok(None)
-    }
-}
-
-#[cfg(test)]
-pub(crate) mod test_util {
-    use std::fs::File;
-    use std::io::Write;
-    use std::path::PathBuf;
-    use tempfile::{tempdir, TempDir};
-
-    pub(crate) fn write_fromfile(filename: &str, content: &str) -> (TempDir, PathBuf) {
-        let tmpdir = tempdir().unwrap();
-        let fromfile_path = tmpdir.path().join(filename);
-        let mut fromfile = File::create(&fromfile_path).unwrap();
-        fromfile.write_all(content.as_bytes()).unwrap();
-        fromfile.flush().unwrap();
-        (tmpdir, fromfile_path)
+            .map_err(|e| Self::format_list_parse_error(value, e))
     }
 }

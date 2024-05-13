@@ -29,7 +29,6 @@ from pants.option.errors import (
     DefaultValueType,
     FromfileError,
     HelpType,
-    ImplicitValIsNone,
     InvalidKwarg,
     InvalidMemberType,
     MemberTypeNotAllowed,
@@ -98,18 +97,6 @@ def register_bool_opts(opts: Options) -> None:
     opts.register(GLOBAL_SCOPE, "--default-true", type=bool, default=True)
     opts.register(GLOBAL_SCOPE, "--default-false", type=bool, default=False)
     opts.register(GLOBAL_SCOPE, "--unset", type=bool, default=UnsetBool)
-    opts.register(GLOBAL_SCOPE, "--implicit-true", type=bool, implicit_value=True)
-    opts.register(GLOBAL_SCOPE, "--implicit-false", type=bool, implicit_value=False)
-    opts.register(
-        GLOBAL_SCOPE,
-        "--implicit-false-default-false",
-        type=bool,
-        implicit_value=False,
-        default=False,
-    )
-    opts.register(
-        GLOBAL_SCOPE, "--implicit-false-default-true", type=bool, implicit_value=False, default=True
-    )
 
 
 def test_bool_explicit_values() -> None:
@@ -136,11 +123,6 @@ def test_bool_defaults() -> None:
 
     assert opts.unset is None
 
-    assert opts.implicit_true is False
-    assert opts.implicit_false is True
-    assert opts.implicit_false_default_false is False
-    assert opts.implicit_false_default_true is True
-
 
 def test_bool_args() -> None:
     opts = create_options(
@@ -151,10 +133,6 @@ def test_bool_args() -> None:
             "--default-true",
             "--default-false",
             "--unset",
-            "--implicit-true",
-            "--implicit-false",
-            "--implicit-false-default-false",
-            "--implicit-false-default-true",
         ],
     ).for_global_scope()
     assert opts.default_missing is True
@@ -162,11 +140,6 @@ def test_bool_args() -> None:
     assert opts.default_false is True
 
     assert opts.unset is True
-
-    assert opts.implicit_true is True
-    assert opts.implicit_false is False
-    assert opts.implicit_false_default_false is False
-    assert opts.implicit_false_default_true is False
 
 
 def test_bool_negate() -> None:
@@ -178,10 +151,6 @@ def test_bool_negate() -> None:
             "--no-default-true",
             "--no-default-false",
             "--no-unset",
-            "--no-implicit-true",
-            "--no-implicit-false",
-            "--no-implicit-false-default-false",
-            "--no-implicit-false-default-true",
         ],
     ).for_global_scope()
     assert opts.default_missing is False
@@ -190,11 +159,6 @@ def test_bool_negate() -> None:
 
     assert opts.unset is False
 
-    assert opts.implicit_true is False
-    assert opts.implicit_false is True
-    assert opts.implicit_false_default_false is True
-    assert opts.implicit_false_default_true is True
-
 
 @pytest.mark.parametrize("val", [False, True])
 def test_bool_config(val: bool) -> None:
@@ -202,10 +166,6 @@ def test_bool_config(val: bool) -> None:
         "default_missing",
         "default_true",
         "default_false",
-        "implicit_true",
-        "implicit_false",
-        "implicit_false_default_false",
-        "implicit_false_default_true",
     )
     opts = create_options(
         [GLOBAL_SCOPE], register_bool_opts, config={"GLOBAL": {opt: val for opt in opt_names}}
@@ -610,9 +570,6 @@ def _register(options):
         default="--default1 --default2=test",
     )
 
-    # Implicit value.
-    register_global("--implicit-valuey", default="default", implicit_value="implicit")
-
     # Mutual Exclusive options
     register_global("--mutex-foo", mutually_exclusive_group="mutex")
     register_global("--mutex-bar", mutually_exclusive_group="mutex")
@@ -691,7 +648,7 @@ def test_env_var_of_type_int() -> None:
     options.register(GLOBAL_SCOPE, "--foo-bar", type=int)
     assert 123 == options.for_global_scope().foo_bar
 
-    options = create_options_object(env={"PANTS_FOO_BAR": "['123','456']"})
+    options = create_options_object(env={"PANTS_FOO_BAR": "[123,456]"})
     options.register(GLOBAL_SCOPE, "--foo-bar", type=list, member_type=int)
     assert [123, 456] == options.for_global_scope().foo_bar
 
@@ -719,11 +676,11 @@ def test_arg_scoping() -> None:
     assert 22 == options.for_scope("anotherscope").num
 
     # Test list-typed option.
-    global_options = _parse(config={"DEFAULT": {"y": ["88", "-99"]}}).for_global_scope()
+    global_options = _parse(config={"DEFAULT": {"y": [88, -99]}}).for_global_scope()
     assert [88, -99] == global_options.y
 
     global_options = _parse(
-        flags="--y=5 --y=-6 --y=77", config={"DEFAULT": {"y": ["88", "-99"]}}
+        flags="--y=5 --y=-6 --y=77", config={"DEFAULT": {"y": [88, -99]}}
     ).for_global_scope()
     assert [88, -99, 5, -6, 77] == global_options.y
 
@@ -775,11 +732,16 @@ def test_list_option() -> None:
         expected: list[int],
         flags: str = "",
         env_val: str | None = None,
+        config_default: str | None = None,
         config_val: str | None = None,
         config2_val: str | None = None,
     ) -> None:
         env = {"PANTS_GLOBAL_LISTY": env_val} if env_val else None
-        config = {"GLOBAL": {"listy": config_val}} if config_val else None
+        config = {}
+        if config_default:
+            config["DEFAULT"] = {"listy": config_default}
+        if config_val:
+            config["GLOBAL"] = {"listy": config_val}
         config2 = {"GLOBAL": {"listy": config2_val}} if config2_val else None
         global_options = _parse(
             flags=flags, env=env, config=config, config2=config2
@@ -804,12 +766,23 @@ def test_list_option() -> None:
     check(
         flags="--listy=+[8,9]",
         env_val="+[6,7]",
+        config_default="+[100]",
         config_val="+[4,5],+[45]",
-        expected=[*default, 4, 5, 45, 6, 7, 8, 9],
+        expected=[*default, 100, 4, 5, 45, 6, 7, 8, 9],
     )
     check(
         config_val="+[4,5],-[4]",
         expected=[*default, 5],
+    )
+    check(
+        config_default="[100, 101]",
+        config_val="+[4,5],-[4,101]",
+        expected=[100, 5],
+    )
+    check(
+        config_default="[100, 101]",
+        config_val="[4,5]",
+        expected=[4, 5],
     )
 
     # Appending and filtering across env, config and flags (in the right order).
@@ -958,10 +931,15 @@ def test_dict_option() -> None:
         *,
         expected: dict[str, str],
         flags: str = "",
+        config_default: str | None = None,
         config_val: str | None = None,
         config2_val: str | None = None,
     ) -> None:
-        config = {"GLOBAL": {"dicty": config_val}} if config_val else None
+        config = {}
+        if config_default:
+            config["DEFAULT"] = {"dicty": config_default}
+        if config_val:
+            config["GLOBAL"] = {"dicty": config_val}
         config2 = {"GLOBAL": {"dicty": config2_val}} if config2_val else None
         global_options = _parse(flags=flags, config=config, config2=config2).for_global_scope()
         assert global_options.dicty == expected
@@ -988,6 +966,12 @@ def test_dict_option() -> None:
         flags='--dicty=\'+{"e": "f"}\'',
         expected={**all_args, "e": "f"},
     )
+    check(
+        config_default='+{"x": "y"}',
+        config_val='+{"c": "d"}',
+        flags='--dicty=\'+{"e": "f"}\'',
+        expected={**all_args, "x": "y", "e": "f"},
+    )
 
     # Check that highest rank wins if we have multiple values for the same key.
     check(config_val='+{"a": "b+", "c": "d"}', expected={"a": "b+", "c": "d"})
@@ -1005,7 +989,7 @@ def test_defaults() -> None:
     assert 99 == options.for_scope("anotherscope").num
 
     # Get defaults from config and environment.
-    config = {"DEFAULT": {"num": "88"}, "anotherscope": {"num": "77"}}
+    config = {"DEFAULT": {"num": 88}, "anotherscope": {"num": 77}}
     options = _parse(flags="anotherscope", config=config)
     assert 88 == options.for_global_scope().num
     assert 77 == options.for_scope("anotherscope").num
@@ -1053,7 +1037,6 @@ def test_validation() -> None:
     assertError(OptionNameDoubleDash, "badname")
     assertError(OptionNameDoubleDash, "-badname")
     assertError(InvalidKwarg, "--foo", badkwarg=42)
-    assertError(ImplicitValIsNone, "--foo", implicit_value=None)
     assertError(BooleanOptionNameWithNo, "--no-foo", type=bool)
     assertError(MemberTypeNotAllowed, "--foo", member_type=int)
     assertError(MemberTypeNotAllowed, "--foo", type=dict, member_type=int)
@@ -1061,16 +1044,6 @@ def test_validation() -> None:
     assertError(InvalidMemberType, "--foo", type=list, member_type=list)
     assertError(HelpType, "--foo", help=())
     assertError(HelpType, "--foo", help=("Help!",))
-
-
-def test_implicit_value() -> None:
-    def check(*, flag: str = "", expected: str) -> None:
-        options = _parse(flags=flag)
-        assert options.for_global_scope().implicit_valuey == expected
-
-    check(expected="default")
-    check(flag="--implicit-valuey", expected="implicit")
-    check(flag="--implicit-valuey=explicit", expected="explicit")
 
 
 def test_shadowing() -> None:

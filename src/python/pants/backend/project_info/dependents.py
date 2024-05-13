@@ -167,7 +167,8 @@ async def list_dependents_as_json(
         iterated_addresses.append(sorted([str(address) for address in dependents]))
     mapping = dict(zip([str(address) for address in addresses], iterated_addresses))
     output = json.dumps(mapping, indent=4)
-    console.print_stdout(output)
+    with dependents_subsystem.line_oriented(console) as print_stdout:
+        print_stdout(output)
 
 
 @goal_rule

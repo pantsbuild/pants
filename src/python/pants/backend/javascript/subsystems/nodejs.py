@@ -89,7 +89,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             and replacing '{os.path.sep}' with '.' in that path.
 
             Example:
-            An npm lockfile located at `src/js/package/package-lock.json'
+            An npm lockfile located at `src/js/package/package-lock.json`
             will result in a resolve named `js.package`, assuming src/
             is a source root.
 
