@@ -9,7 +9,7 @@ import logging
 import os
 from dataclasses import dataclass
 from functools import cache
-from typing import ClassVar, Iterable, Sequence
+from typing import ClassVar, Iterable, Optional, Sequence
 from urllib.parse import urlparse
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
@@ -70,6 +70,8 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
         package_and_version = cls._default_package_name_and_version()
         version_clause = (
             f", which uses {package_and_version.name} version {package_and_version.version}"
+            if package_and_version
+            else ""
         )
         return softwrap(
             f"""\
@@ -193,7 +195,10 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
     @classmethod
     @cache
-    def _default_package_name_and_version(cls) -> _PackageNameAndVersion:
+    def _default_package_name_and_version(cls) -> Optional[_PackageNameAndVersion]:
+        if cls.default_lockfile_resource is None:
+            return None
+
         lockfile = cls.pex_requirements_for_default_lockfile()
         parts = urlparse(lockfile.url)
         # urlparse retains the leading / in URLs with a netloc.
@@ -223,26 +228,6 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
             for requirement in resolve["locked_requirements"]
             if requirement["project_name"] == first_default_requirement.project_name
         )
-
-    @classproperty
-    def help_extended(cls) -> str:
-        base_help = cls.help if isinstance(cls.help, str) else cls.help()
-        if cls.default_lockfile_resource is None:
-            return base_help
-
-        help_paragraphs = [base_help]
-
-        package_name_and_version = cls._default_package_name_and_version()
-        help_paragraphs.append(
-            softwrap(
-                f"""
-                This version of Pants uses {package_name_and_version.name} {package_name_and_version.version} by default.
-                Use a dedicated lockfile and the `install_from_resolve` option to control this.
-                """
-            )
-        )
-
-        return "\n\n".join(help_paragraphs)
 
     def pex_requirements(
         self,

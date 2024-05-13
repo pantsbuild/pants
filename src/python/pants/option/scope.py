@@ -41,7 +41,7 @@ class ScopeInfo:
 
     @property
     def description(self) -> str:
-        return cast(str, self._subsystem_cls_attr("help_extended"))
+        return cast(str, self._subsystem_cls_attr("help"))
 
     @property
     def deprecated_scope(self) -> Optional[str]:
