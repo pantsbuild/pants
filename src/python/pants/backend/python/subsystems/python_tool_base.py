@@ -69,7 +69,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
     def _install_from_resolve_help(cls) -> str:
         package_and_version = cls._default_package_name_and_version()
         version_clause = (
-            f", which uses {package_and_version.name} version {package_and_version.version}"
+            f", which uses `{package_and_version.name}` version {package_and_version.version}"
             if package_and_version
             else ""
         )
