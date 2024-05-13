@@ -33,7 +33,7 @@ _DOCKERFILE_PACKAGE = "pants.backend.docker.subsystems"
 
 class DockerfileParser(PythonToolRequirementsBase):
     options_scope = "dockerfile-parser"
-    help = "Used to parse Dockerfile build specs to infer their dependencies."
+    help_short = "Used to parse Dockerfile build specs to infer their dependencies."
 
     default_requirements = ["dockerfile>=3.2.0,<4"]
 
