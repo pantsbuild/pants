@@ -21,8 +21,8 @@ class GoToolchain(Subsystem):
             If true, Pants will provide a Go distribution instead of requiring one to be installed on the host system.
             """
         ),
-        deprecation_start_version="2.21.0.dev0",
-        removal_version="2.22.0dev0",
+        deprecation_start_version="2.22.0.dev2",
+        removal_version="2.24.0dev0",
         removal_hint="Pants will stop supporting a host-provided go toolchain in the future.",
     )
 
