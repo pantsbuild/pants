@@ -102,7 +102,7 @@ def test_failing_source(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     fmt_result = run_isort(rule_runner, [tgt])
-    assert fmt_result.stdout == "Fixing f.py\n"
+    assert fmt_result.stdout == "Fixing /<pants-sandbox-1>/f.py\n"
     assert fmt_result.output == rule_runner.make_snapshot({"f.py": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
@@ -116,7 +116,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
     ]
     fmt_result = run_isort(rule_runner, tgts)
-    assert "Fixing bad.py\n" == fmt_result.stdout
+    assert "Fixing /<pants-sandbox-1>/bad.py\n" == fmt_result.stdout
     assert fmt_result.output == rule_runner.make_snapshot(
         {"good.py": GOOD_FILE, "bad.py": FIXED_BAD_FILE}
     )
@@ -136,7 +136,7 @@ def test_config_file(rule_runner: RuleRunner, path: str, extra_args: list[str]) 
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     fmt_result = run_isort(rule_runner, [tgt], extra_args=extra_args)
-    assert fmt_result.stdout == "Fixing f.py\n"
+    assert fmt_result.stdout == "Fixing /<pants-sandbox-1>/f.py\n"
     assert fmt_result.output == rule_runner.make_snapshot({"f.py": FIXED_NEEDS_CONFIG_FILE})
     assert fmt_result.did_change is True
 
@@ -171,7 +171,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": NEEDS_CONFIG_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     fmt_result = run_isort(rule_runner, [tgt], extra_args=["--isort-args='--combine-as'"])
-    assert fmt_result.stdout == "Fixing f.py\n"
+    assert fmt_result.stdout == "Fixing /<pants-sandbox-1>/f.py\n"
     assert fmt_result.output == rule_runner.make_snapshot({"f.py": FIXED_NEEDS_CONFIG_FILE})
     assert fmt_result.did_change is True
 
@@ -202,7 +202,9 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
     ]
     fmt_result = run_isort(rule_runner, bad_tgts)
-    assert fmt_result.stdout == "Fixing bad.py\nFixing bad.pyi\n"
+    assert (
+        fmt_result.stdout == "Fixing /<pants-sandbox-1>/bad.py\nFixing /<pants-sandbox-1>/bad.pyi\n"
+    )
     assert fmt_result.output == rule_runner.make_snapshot(
         {"bad.py": FIXED_BAD_FILE, "bad.pyi": FIXED_BAD_FILE}
     )
