@@ -135,10 +135,10 @@ async def run_golangci_lint(
         textwrap.dedent(
             f"""\
             sandbox_root="$(/bin/pwd)"
-            export GOROOT=${{sandbox_root}}/{goroot.path}
-            export PATH="{tool_search_path}"
             export GOPATH="${{sandbox_root}}/gopath"
-            export GOCACHE="${{sandbox_root}}/gocache"
+            export GOCACHE="${{sandbox_root}}/cache"
+            export GOROOT="${{sandbox_root}}/{goroot.path}"
+            export PATH="{tool_search_path}"
             export GOLANGCI_LINT_CACHE="$GOCACHE"
             export CGO_ENABLED={1 if cgo_enabled else 0}
             /bin/mkdir -p "$GOPATH" "$GOCACHE"
