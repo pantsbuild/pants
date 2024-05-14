@@ -73,7 +73,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
         help_paragraphs = [base_help]
         package_and_version = cls._default_package_name_and_version()
         if package_and_version:
-            new_paragraph = f"This version of Pants uses `{package_and_version.name}` version {package_and_version.version} by default. Use a dedicated lockfile and the install_from_resolve option to control this."
+            new_paragraph = f"This version of Pants uses `{package_and_version.name}` version {package_and_version.version} by default. Use a dedicated lockfile and the `install_from_resolve` option to control this."
             help_paragraphs.append(new_paragraph)
 
         return "\n\n".join(help_paragraphs)
