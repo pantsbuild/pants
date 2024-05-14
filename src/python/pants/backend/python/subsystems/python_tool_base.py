@@ -3,9 +3,14 @@
 
 from __future__ import annotations
 
+import importlib.resources
+import json
 import logging
 import os
-from typing import ClassVar, Iterable, Sequence
+from dataclasses import dataclass
+from functools import cache
+from typing import ClassVar, Iterable, Optional, Sequence
+from urllib.parse import urlparse
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -18,6 +23,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
     PexRequirements,
     Resolve,
+    strip_comments_from_pex_json_lockfile,
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.engine.fs import Digest
@@ -27,9 +33,16 @@ from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url, git_url
 from pants.util.meta import classproperty
+from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _PackageNameAndVersion:
+    name: str
+    version: str
 
 
 class PythonToolRequirementsBase(Subsystem, ExportableTool):
@@ -42,6 +55,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
     # Subclasses may set to override the value computed from default_version and
     # default_extra_requirements.
+    # The primary package used in the subsystem must always be the first requirement.
     # TODO: Once we get rid of those options, subclasses must set this to loose
     #  requirements that reflect any minimum capabilities Pants assumes about the tool.
     default_requirements: Sequence[str] = []
@@ -51,15 +65,20 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
 
-    install_from_resolve = StrOption(
-        advanced=True,
-        default=None,
-        help=lambda cls: softwrap(
+    @classmethod
+    def _install_from_resolve_help(cls) -> str:
+        package_and_version = cls._default_package_name_and_version()
+        version_clause = (
+            f", which uses `{package_and_version.name}` version {package_and_version.version}"
+            if package_and_version
+            else ""
+        )
+        return softwrap(
             f"""\
             If specified, install the tool using the lockfile for this named resolve.
 
             This resolve must be defined in `[python].resolves`, as described in
-            {doc_url("docs/python/overview/third-party-dependencies#user-lockfiles")}.
+            {doc_url("docs/python/overview/lockfiles#lockfiles-for-tools")}.
 
             The resolve's entire lockfile will be installed, unless specific requirements are
             listed via the `requirements` option, in which case only those requirements
@@ -67,13 +86,18 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
             outputs when the resolve incurs changes to unrelated requirements.
 
             If unspecified, and the `lockfile` option is unset, the tool will be installed
-            using the default lockfile shipped with Pants.
+            using the default lockfile shipped with Pants{version_clause}.
 
             If unspecified, and the `lockfile` option is set, the tool will use the custom
             `{cls.options_scope}` "tool lockfile" generated from the `version` and
             `extra_requirements` options. But note that this mechanism is deprecated.
             """
-        ),
+        )
+
+    install_from_resolve = StrOption(
+        advanced=True,
+        default=None,
+        help=lambda cls: cls._install_from_resolve_help(),
     )
 
     requirements = StrListOption(
@@ -167,6 +191,42 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
             url=url,
             url_description_of_origin=origin,
             resolve_name=cls.options_scope,
+        )
+
+    @classmethod
+    @cache
+    def _default_package_name_and_version(cls) -> Optional[_PackageNameAndVersion]:
+        if cls.default_lockfile_resource is None:
+            return None
+
+        lockfile = cls.pex_requirements_for_default_lockfile()
+        parts = urlparse(lockfile.url)
+        # urlparse retains the leading / in URLs with a netloc.
+        lockfile_path = parts.path[1:] if parts.path.startswith("/") else parts.path
+        if parts.scheme in {"", "file"}:
+            with open(lockfile_path, "rb") as fp:
+                lock_bytes = fp.read()
+        elif parts.scheme == "resource":
+            # The "netloc" in our made-up "resource://" scheme is the package.
+            lock_bytes = importlib.resources.read_binary(parts.netloc, lockfile_path)
+        else:
+            raise ValueError(
+                f"Unsupported scheme {parts.scheme} for lockfile URL: {lockfile.url} "
+                f"(origin: {lockfile.url_description_of_origin})"
+            )
+
+        stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
+        lockfile_contents = json.loads(stripped_lock_bytes)
+        # The first requirement must contain the primary package for this tool, otherwise
+        # this will pick up the wrong requirement.
+        first_default_requirement = PipRequirement.parse(cls.default_requirements[0])
+        return next(
+            _PackageNameAndVersion(
+                name=first_default_requirement.project_name, version=requirement["version"]
+            )
+            for resolve in lockfile_contents["locked_resolves"]
+            for requirement in resolve["locked_requirements"]
+            if requirement["project_name"] == first_default_requirement.project_name
         )
 
     def pex_requirements(
