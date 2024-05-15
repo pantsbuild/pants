@@ -114,6 +114,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
     "beautifulsoup4": ("bs4",),
     "biopython": ("Bio", "BioSQL"),
     "bitvector": ("BitVector",),
+    "boto3": ("botocore",),
     "cattrs": ("cattr", "cattrs"),
     "cloud-sql-python-connector": ("google.cloud.sql.connector",),
     "coolprop": ("CoolProp",),
