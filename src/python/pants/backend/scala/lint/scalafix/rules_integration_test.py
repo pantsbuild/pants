@@ -234,7 +234,7 @@ object Foo {
 """
 
 BAD_FILE_STDOUT = """\
-Foo.scala:2:24: error: [DisableSyntax.throw] exceptions should be avoided, consider encoding the error in the return type instead
+/<pants-sandbox-1>/Foo.scala:2:24: error: [DisableSyntax.throw] exceptions should be avoided, consider encoding the error in the return type instead
   def throwException = throw new IllegalArgumentException
                        ^^^^^
 """
