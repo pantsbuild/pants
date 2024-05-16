@@ -8,7 +8,7 @@ from pants.engine.rules import collect_rules
 
 class SetuptoolsSCM(PythonToolBase):
     options_scope = "setuptools-scm"
-    help = (
+    help_short = (
         "A tool for generating versions from VCS metadata (https://github.com/pypa/setuptools_scm)."
     )
 

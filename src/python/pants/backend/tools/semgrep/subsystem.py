@@ -30,7 +30,7 @@ class SemgrepFieldSet(FieldSet):
 class SemgrepSubsystem(PythonToolBase):
     name = "Semgrep"
     options_scope = "semgrep"
-    help = softwrap(
+    help_short = softwrap(
         """
         Lightweight static analysis for many languages. Find bug variants with patterns that look
         like source code. (https://semgrep.dev/)

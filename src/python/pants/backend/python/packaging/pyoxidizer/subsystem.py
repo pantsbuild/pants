@@ -11,7 +11,7 @@ from pants.util.strutil import help_text
 class PyOxidizer(PythonToolBase):
     options_scope = "pyoxidizer"
     name = "PyOxidizer"
-    help = help_text(
+    help_short = help_text(
         """
         The PyOxidizer utility for packaging Python code in a Rust binary
         (https://pyoxidizer.readthedocs.io/en/stable/pyoxidizer.html).

@@ -17,7 +17,9 @@ from pants.util.strutil import softwrap
 class TwineSubsystem(PythonToolBase):
     options_scope = "twine"
     name = "Twine"
-    help = "The utility for publishing Python distributions to PyPI and other Python repositories."
+    help_short = (
+        "The utility for publishing Python distributions to PyPI and other Python repositories."
+    )
 
     default_version = "twine>=4,<5"
     default_main = ConsoleScript("twine")

@@ -12,7 +12,7 @@ from pants.option.option_types import ArgsListOption, SkipOption
 class Autoflake(PythonToolBase):
     options_scope = "autoflake"
     name = "Autoflake"
-    help = "The Autoflake Python code formatter (https://github.com/myint/autoflake)."
+    help_short = "The Autoflake Python code formatter (https://github.com/myint/autoflake)."
 
     default_main = ConsoleScript("autoflake")
     default_requirements = ["autoflake>=1.4,<3"]

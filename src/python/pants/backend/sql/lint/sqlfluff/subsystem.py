@@ -43,7 +43,7 @@ class SqlfluffMode(str, Enum):
 class Sqlfluff(PythonToolBase):
     options_scope = "sqlfluff"
     name = "Sqlfluff"
-    help = "The Sqlfluff SQL linter (https://github.com/sqlfluff/sqlfluff)."
+    help_short = "The Sqlfluff SQL linter (https://github.com/sqlfluff/sqlfluff)."
 
     default_main = ConsoleScript("sqlfluff")
     default_requirements = ["sqlfluff>=2.3.5,<3"]
