@@ -481,7 +481,7 @@ async def merge_coverage_data(
     )
     return MergedCoverageData(
         await Get(Digest, MergeDigests((result.output_digest, extra_sources_digest))),
-        tuple(addresses),
+        tuple(sorted(addresses)),
     )
 
 
