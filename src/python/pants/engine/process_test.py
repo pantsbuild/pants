@@ -324,7 +324,7 @@ def test_workspace_process_basic(rule_runner) -> None:
     assert result.metadata.execution_environment.environment_type == "workspace"
 
     # Test whether there is a distinction between the workspace and chroot when a workspace
-    # process executes. Do this by puttng a file in the build root which is not covered by a
+    # process executes. Do this by putting a file in the build root which is not covered by a
     # target, a depenency created via a digest, and have the invoked process create a file
     # in the build root.
     rule_runner.write_files(

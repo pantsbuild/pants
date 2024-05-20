@@ -226,7 +226,8 @@ impl Core {
             spawn_lock.clone(),
         );
 
-        // TODO: Wrap this in a BoundedCommandRunner so only run process can execute in the workspace at once.
+        // TODO: Consider whether this should be wrapped in a `BoundedCommandRunner` to limit the number of concurrent
+        // workspace executions.
         let local_workspace_command_runner = process_execution::workspace::CommandRunner::new(
             local_runner_store.clone(),
             executor.clone(),

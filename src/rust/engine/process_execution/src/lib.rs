@@ -441,7 +441,7 @@ pub enum ProcessExecutionStrategy {
     Local,
     /// Run the Process locally in the workspace without an execution sandbox.
     LocalInWorkspace,
-    /// Run the Process remotelyt using the Remote Execution API. The vector stores the platform_properties to pass
+    /// Run the Process remotely using the Remote Execution API. The vector stores the platform_properties to pass
     /// for that execution.
     RemoteExecution(Vec<(String, String)>),
     /// Run the Process in a Docker container. The string stores the image name.

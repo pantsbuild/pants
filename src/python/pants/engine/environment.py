@@ -6,10 +6,10 @@ from dataclasses import dataclass
 
 from pants.engine.engine_aware import EngineAwareParameter
 
-# Reserved sentinnel value directing Pants to find applicable local environment.
+# Reserved sentinel value directing Pants to find applicable local environment.
 LOCAL_ENVIRONMENT_MATCHER = "__local__"
 
-# Reserved sentinnel value representing execution within the workspace and not local sandbox.
+# Reserved sentinel value representing execution within the workspace and not local sandbox.
 LOCAL_WORKSPACE_ENV_NAME = "__local_workspace__"
 
 
