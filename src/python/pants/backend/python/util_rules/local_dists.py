@@ -98,7 +98,9 @@ async def isolate_local_dist_wheels(
     )
     provided_files = set(wheels_listing_result.stdout.decode().splitlines())
 
-    return LocalDistWheels(tuple(wheels), wheels_snapshot.digest, frozenset(provided_files))
+    return LocalDistWheels(
+        tuple(sorted(wheels)), wheels_snapshot.digest, frozenset(sorted(provided_files))
+    )
 
 
 @dataclass(frozen=True)

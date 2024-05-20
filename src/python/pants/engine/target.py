@@ -438,6 +438,16 @@ class Target:
             other.field_values,
         )
 
+    def __lt__(self, other: Any) -> bool:
+        if not isinstance(other, Target):
+            return NotImplemented
+        return self.address < other.address
+
+    def __gt__(self, other: Any) -> bool:
+        if not isinstance(other, Target):
+            return NotImplemented
+        return self.address > other.address
+
     @classmethod
     @memoized_method
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
