@@ -1,0 +1,4 @@
+1.29.x Stable releases
+=====================
+
+These notes have moved to `docs/notes/1.29.x.rst <../../../../docs/notes/1.29.x.rst>`_
