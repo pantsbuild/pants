@@ -106,7 +106,7 @@ class CoverageReportType(Enum):
 
 class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
-    help = "Configuration for Python test coverage measurement."
+    help_short = "Configuration for Python test coverage measurement."
 
     default_main = ConsoleScript("coverage")
     default_requirements = ["coverage[toml]>=6.5,<8"]
@@ -147,7 +147,7 @@ class CoverageSubsystem(PythonToolBase):
         help=lambda cls: softwrap(
             f"""
             Path to an INI or TOML config file understood by coverage.py
-            (https://coverage.readthedocs.io/en/stable/config.html).
+            (https://coverage.readthedocs.io/en/latest/config.html).
 
             Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
             this option if the config is located in a non-standard location.

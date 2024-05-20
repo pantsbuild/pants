@@ -61,7 +61,7 @@ class PylintFieldSet(FieldSet):
 class Pylint(PythonToolBase):
     options_scope = "pylint"
     name = "Pylint"
-    help = "The Pylint linter for Python code (https://www.pylint.org/)."
+    help_short = "The Pylint linter for Python code (https://www.pylint.org/)."
 
     default_main = ConsoleScript("pylint")
     default_requirements = ["pylint>=2.13.0,<3"]

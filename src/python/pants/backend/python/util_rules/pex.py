@@ -23,9 +23,6 @@ from pants.backend.python.target_types import (
     MainSpecification,
     PexCompletePlatformsField,
     PexLayout,
-)
-from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
-from pants.backend.python.target_types import (
     PythonRequirementFindLinksField,
     PythonRequirementsField,
 )
@@ -97,10 +94,6 @@ class PythonProvider:
 
 class PexPlatforms(DeduplicatedCollection[str]):
     sort_input = True
-
-    @classmethod
-    def create_from_platforms_field(cls, field: PythonPlatformsField) -> PexPlatforms:
-        return cls(field.value or ())
 
     def generate_pex_arg_list(self) -> list[str]:
         args = []
@@ -705,6 +698,12 @@ async def build_pex(
     if request.pex_path:
         argv.extend(["--pex-path", ":".join(pex.name for pex in request.pex_path)])
 
+    if request.internal_only:
+        # An internal-only runs on a single machine, and pre-installing wheels is wasted work in
+        # that case (see https://github.com/pex-tool/pex/issues/2292#issuecomment-1854582647 for
+        # analysis).
+        argv.append("--no-pre-install-wheels")
+
     argv.append(f"--sources-directory={source_dir_name}")
     sources_digest_as_subdir = await Get(
         Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
@@ -1196,7 +1195,7 @@ class VenvPexProcess:
     level: LogLevel
     input_digest: Digest | None
     working_directory: str | None
-    extra_env: FrozenDict[str, str] | None
+    extra_env: FrozenDict[str, str]
     output_files: tuple[str, ...] | None
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
@@ -1229,7 +1228,7 @@ class VenvPexProcess:
         object.__setattr__(self, "level", level)
         object.__setattr__(self, "input_digest", input_digest)
         object.__setattr__(self, "working_directory", working_directory)
-        object.__setattr__(self, "extra_env", FrozenDict(extra_env) if extra_env else None)
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
         object.__setattr__(self, "output_files", tuple(output_files) if output_files else None)
         object.__setattr__(
             self, "output_directories", tuple(output_directories) if output_directories else None

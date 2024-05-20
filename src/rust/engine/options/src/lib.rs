@@ -17,6 +17,10 @@ mod env;
 #[cfg(test)]
 mod env_tests;
 
+mod fromfile;
+#[cfg(test)]
+mod fromfile_tests;
+
 mod id;
 #[cfg(test)]
 mod id_tests;
@@ -33,15 +37,18 @@ mod types;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use serde::Deserialize;
 
 pub use self::args::Args;
-use self::config::Config;
+use self::args::ArgsReader;
+pub use self::config::ConfigSource;
+use self::config::{Config, ConfigReader};
 pub use self::env::Env;
+use self::env::EnvReader;
+use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
@@ -92,7 +99,7 @@ pub struct DictEdit {
     pub items: HashMap<String, Val>,
 }
 
-pub(crate) trait OptionsSource {
+pub(crate) trait OptionsSource: Send + Sync {
     ///
     /// Get a display version of the option `id` that most closely matches the syntax used to supply
     /// the id at runtime. For example, an global option of "bob" would display as "--bob" for use in
@@ -193,6 +200,30 @@ pub enum Source {
     Flag,
 }
 
+// NB: Must mirror the Rank enum in src/python/pants/option/ranked_value.py.
+pub enum Rank {
+    _NONE = 0,          // Unused, exists for historical Python compatibility reasons.
+    HARDCODED = 1,      // The default provided at option registration.
+    _CONFIGDEFAULT = 2, // Unused, exists for historical Python compatibility reasons.
+    CONFIG = 3,         // The value from the relevant section of the config file.
+    ENVIRONMENT = 4,    // The value from the appropriately-named environment variable.
+    FLAG = 5,           // The value from the appropriately-named command-line flag.
+}
+
+impl Source {
+    pub fn rank(&self) -> Rank {
+        match *self {
+            Source::Default => Rank::HARDCODED,
+            Source::Config {
+                ordinal: _,
+                path: _,
+            } => Rank::CONFIG,
+            Source::Env => Rank::ENVIRONMENT,
+            Source::Flag => Rank::FLAG,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct OptionValue<T> {
     pub derivation: Option<Vec<(Source, T)>>,
@@ -234,30 +265,25 @@ pub struct DictOptionValue {
 }
 
 pub struct OptionParser {
-    sources: BTreeMap<Source, Rc<dyn OptionsSource>>,
+    sources: BTreeMap<Source, Arc<dyn OptionsSource>>,
     include_derivation: bool,
+    passthrough_args: Option<Vec<String>>,
 }
 
 impl OptionParser {
-    // If config_paths is None, we'll do config file discovery. Otherwise we'll use the provided paths.
-    // The latter case is useful for tests.
+    // If config_sources is None, we'll do config file discovery. Otherwise we'll use the
+    // provided sources. The latter case is useful for tests.
     pub fn new(
         args: Args,
         env: Env,
-        config_paths: Option<Vec<&str>>,
+        config_sources: Option<Vec<ConfigSource>>,
         allow_pantsrc: bool,
         include_derivation: bool,
         buildroot: Option<BuildRoot>,
     ) -> Result<OptionParser, String> {
         let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
-        let buildroot_string = String::from_utf8(buildroot.as_os_str().as_bytes().to_vec())
-            .map_err(|e| {
-                format!(
-                    "Failed to decode build root path {}: {}",
-                    buildroot.display(),
-                    e
-                )
-            })?;
+        let buildroot_string = buildroot.convert_to_string()?;
+        let fromfile_expander = FromfileExpander::relative_to(buildroot);
 
         let mut seed_values = HashMap::from_iter(
             env.env
@@ -265,12 +291,19 @@ impl OptionParser {
                 .map(|(k, v)| (format!("env.{k}", k = k), v.clone())),
         );
 
-        let mut sources: BTreeMap<Source, Rc<dyn OptionsSource>> = BTreeMap::new();
-        sources.insert(Source::Env, Rc::new(env));
-        sources.insert(Source::Flag, Rc::new(args));
+        let args_reader = ArgsReader::new(args, fromfile_expander.clone());
+        let passthrough_args = args_reader.get_passthrough_args().cloned();
+
+        let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
+        sources.insert(
+            Source::Env,
+            Arc::new(EnvReader::new(env, fromfile_expander.clone())),
+        );
+        sources.insert(Source::Flag, Arc::new(args_reader));
         let mut parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
+            passthrough_args: None,
         };
 
         fn path_join(prefix: &str, suffix: &str) -> String {
@@ -290,16 +323,20 @@ impl OptionParser {
                 .to_string()
         }
 
-        let repo_config_files = match config_paths {
-            Some(paths) => paths.iter().map(|s| s.to_string()).collect(),
+        let config_sources = match config_sources {
+            Some(cs) => cs,
             None => {
                 let default_config_path = path_join(&buildroot_string, "pants.toml");
-                parser
+                let config_paths = parser
                     .parse_string_list(
                         &option_id!("pants", "config", "files"),
-                        &[&default_config_path],
+                        vec![default_config_path],
                     )?
-                    .value
+                    .value;
+                config_paths
+                    .iter()
+                    .map(|cp| ConfigSource::from_file(Path::new(&cp)))
+                    .collect::<Result<Vec<_>, _>>()?
             }
         };
 
@@ -322,43 +359,48 @@ impl OptionParser {
         ]);
 
         let mut ordinal: usize = 0;
-        for path in repo_config_files.iter() {
-            let config = Config::parse(path, &seed_values)?;
+        for config_source in config_sources {
+            let config = Config::parse(&config_source, &seed_values)?;
             sources.insert(
                 Source::Config {
                     ordinal,
-                    path: path_strip(&buildroot_string, path),
+                    path: path_strip(
+                        &buildroot_string,
+                        config_source.path.to_string_lossy().as_ref(),
+                    ),
                 },
-                Rc::new(config),
+                Arc::new(ConfigReader::new(config, fromfile_expander.clone())),
             );
             ordinal += 1;
         }
         parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
+            passthrough_args: None,
         };
 
         if allow_pantsrc && parser.parse_bool(&option_id!("pantsrc"), true)?.value {
             for rcfile in parser
                 .parse_string_list(
                     &option_id!("pantsrc", "files"),
-                    &[
-                        "/etc/pantsrc",
-                        shellexpand::tilde("~/.pants.rc").as_ref(),
-                        ".pants.rc",
+                    vec![
+                        "/etc/pantsrc".to_string(),
+                        shellexpand::tilde("~/.pants.rc").to_string(),
+                        ".pants.rc".to_string(),
                     ],
                 )?
                 .value
             {
                 let rcfile_path = Path::new(&rcfile);
                 if rcfile_path.exists() {
-                    let rc_config = Config::parse(rcfile_path, &seed_values)?;
+                    let rc_config =
+                        Config::parse(&ConfigSource::from_file(rcfile_path)?, &seed_values)?;
                     sources.insert(
                         Source::Config {
                             ordinal,
                             path: rcfile,
                         },
-                        Rc::new(rc_config),
+                        Arc::new(ConfigReader::new(rc_config, fromfile_expander.clone())),
                     );
                     ordinal += 1;
                 }
@@ -367,6 +409,7 @@ impl OptionParser {
         Ok(OptionParser {
             sources,
             include_derivation,
+            passthrough_args,
         })
     }
 
@@ -375,7 +418,7 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: Option<&T>,
-        getter: fn(&Rc<dyn OptionsSource>, &OptionId) -> Result<Option<T::Owned>, String>,
+        getter: fn(&Arc<dyn OptionsSource>, &OptionId) -> Result<Option<T::Owned>, String>,
     ) -> Result<OptionalOptionValue<T::Owned>, String> {
         let mut derivation = None;
         if self.include_derivation {
@@ -463,11 +506,11 @@ impl OptionParser {
     }
 
     #[allow(clippy::type_complexity)]
-    fn parse_list<T: Clone>(
+    fn parse_list<T: Clone + Debug>(
         &self,
         id: &OptionId,
         default: Vec<T>,
-        getter: fn(&Rc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
+        getter: fn(&Arc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
         remover: fn(&mut Vec<T>, &Vec<T>),
     ) -> Result<ListOptionValue<T>, String> {
         let mut list = default;
@@ -489,18 +532,29 @@ impl OptionParser {
             }
             derivation = Some(derivations);
         }
+
+        // Removals from any source apply after adds from any source (but are themselves
+        // overridden by later replacements), so we collect them here and apply them later.
+        let mut removal_lists: Vec<Vec<T>> = vec![];
+
         let mut highest_priority_source = Source::Default;
         for (source_type, source) in self.sources.iter() {
             if let Some(list_edits) = getter(source, id)? {
                 highest_priority_source = source_type.clone();
                 for list_edit in list_edits {
                     match list_edit.action {
-                        ListEditAction::Replace => list = list_edit.items,
+                        ListEditAction::Replace => {
+                            list = list_edit.items;
+                            removal_lists.clear();
+                        }
                         ListEditAction::Add => list.extend(list_edit.items),
-                        ListEditAction::Remove => remover(&mut list, &list_edit.items),
+                        ListEditAction::Remove => removal_lists.push(list_edit.items),
                     }
                 }
             }
+        }
+        for removals in removal_lists {
+            remover(&mut list, &removals);
         }
         Ok(ListOptionValue {
             derivation,
@@ -516,11 +570,11 @@ impl OptionParser {
     // However this is still more than fast enough, and inoculates us against a very unlikely
     // pathological case of a very large removal set.
     #[allow(clippy::type_complexity)]
-    fn parse_list_hashable<T: Clone + Eq + Hash>(
+    fn parse_list_hashable<T: Clone + Debug + Eq + Hash>(
         &self,
         id: &OptionId,
         default: Vec<T>,
-        getter: fn(&Rc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
+        getter: fn(&Arc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
     ) -> Result<ListOptionValue<T>, String> {
         self.parse_list(id, default, getter, |list, remove| {
             let to_remove = remove.iter().collect::<HashSet<_>>();
@@ -531,28 +585,28 @@ impl OptionParser {
     pub fn parse_bool_list(
         &self,
         id: &OptionId,
-        default: &[bool],
+        default: Vec<bool>,
     ) -> Result<ListOptionValue<bool>, String> {
-        self.parse_list_hashable(id, default.to_vec(), |source, id| source.get_bool_list(id))
+        self.parse_list_hashable(id, default, |source, id| source.get_bool_list(id))
     }
 
     pub fn parse_int_list(
         &self,
         id: &OptionId,
-        default: &[i64],
+        default: Vec<i64>,
     ) -> Result<ListOptionValue<i64>, String> {
-        self.parse_list_hashable(id, default.to_vec(), |source, id| source.get_int_list(id))
+        self.parse_list_hashable(id, default, |source, id| source.get_int_list(id))
     }
 
     // Floats are not Eq or Hash, so we fall back to the brute-force O(N*M) lookups.
     pub fn parse_float_list(
         &self,
         id: &OptionId,
-        default: &[f64],
+        default: Vec<f64>,
     ) -> Result<ListOptionValue<f64>, String> {
         self.parse_list(
             id,
-            default.to_vec(),
+            default,
             |source, id| source.get_float_list(id),
             |list, to_remove| {
                 list.retain(|item| !to_remove.contains(item));
@@ -563,13 +617,9 @@ impl OptionParser {
     pub fn parse_string_list(
         &self,
         id: &OptionId,
-        default: &[&str],
+        default: Vec<String>,
     ) -> Result<ListOptionValue<String>, String> {
-        self.parse_list_hashable::<String>(
-            id,
-            default.iter().map(|s| s.to_string()).collect(),
-            |source, id| source.get_string_list(id),
-        )
+        self.parse_list_hashable::<String>(id, default, |source, id| source.get_string_list(id))
     }
 
     pub fn parse_dict(
@@ -611,6 +661,10 @@ impl OptionParser {
             source: highest_priority_source,
             value: dict,
         })
+    }
+
+    pub fn get_passthrough_args(&self) -> Option<&Vec<String>> {
+        self.passthrough_args.as_ref()
     }
 }
 

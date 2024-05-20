@@ -17,7 +17,7 @@ from pants.util.strutil import softwrap
 class Isort(PythonToolBase):
     options_scope = "isort"
     name = "isort"
-    help = "The Python import sorter tool (https://pycqa.github.io/isort/)."
+    help_short = "The Python import sorter tool (https://pycqa.github.io/isort/)."
 
     default_main = ConsoleScript("isort")
     default_requirements = ["isort[pyproject,colors]>=5.9.3,<6.0"]
@@ -91,4 +91,6 @@ class Isort(PythonToolBase):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+    ]

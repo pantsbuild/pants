@@ -473,47 +473,6 @@ class PexEnvField(DictStringToStringField):
     )
 
 
-class PexPlatformsField(StringSequenceField):
-    alias = "platforms"
-    removal_version = "2.22.0.dev0"
-    removal_hint = softwrap(
-        f"""\
-    The platforms field is a hack. The abbreviated information it provides is sometimes insufficient,
-    leading to hard-to-debug build issues. Use complete_platforms instead.
-    See {doc_url('docs/python/overview/pex')} for details.
-    """
-    )
-    help = help_text(
-        """
-        The abbreviated platforms the built PEX should be compatible with.
-
-        There must be built wheels available for all of the foreign platforms, rather than sdists.
-
-        You can give a list of multiple platforms to create a multiplatform PEX,
-        meaning that the PEX will be executable in all of the supported environments.
-
-        Platforms should be in the format defined by Pex
-        (https://pex.readthedocs.io/en/latest/buildingpex.html#platform), i.e.
-        PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-37-cp37m",
-        "macosx_10.12_x86_64-cp-310-cp310"):
-
-          - PLATFORM: the host platform, e.g. "linux-x86_64", "macosx-10.12-x86_64".
-          - IMPL: the Python implementation abbreviation, e.g. "cp" or "pp".
-          - PYVER: a two or more digit string representing the python major/minor version\
-            (e.g., "37" or "310") or else a component dotted version string (e.g., "3.7" or "3.10.1").
-          - ABI: the ABI tag, e.g. "cp37m", "cp310", "abi3", "none".
-
-        Note that using an abbreviated platform means that certain resolves will fail when they
-        encounter environment markers that cannot be deduced from the abbreviated platform
-        string. A common example of this is 'python_full_version' which requires knowing the
-        patch level version of the foreign Python interpreter. To remedy this you should use a
-        3-component dotted version for PYVER. If your resolves fail due to more esoteric
-        undefined environment markers, you should switch to specifying `complete_platforms`
-        instead.
-        """
-    )
-
-
 class PexCompletePlatformsField(SpecialCasedDependencies):
     alias = "complete_platforms"
     help = help_text(
@@ -633,15 +592,15 @@ class PexEmitWarningsField(TriBoolField):
 
 class PexResolveLocalPlatformsField(TriBoolField):
     alias = "resolve_local_platforms"
+    removal_version = "2.24.0.dev0"
+    removal_hint = softwrap(
+        f"""\
+        This {alias} field is no longer used now that the `platforms` field has been removed. Remove it.
+        """
+    )
     help = help_text(
-        f"""
-        For each of the `{PexPlatformsField.alias}` specified, attempt to find a local
-        interpreter that matches.
-
-        If a matching interpreter is found, use the interpreter to resolve distributions and build
-        any that are only available in source distribution form.
-        If no matching interpreter is found (or if this option is `False`), resolve for the
-        platform by accepting only pre-built binary distributions (wheels).
+        """
+        Now unused.
         """
     )
 
@@ -781,7 +740,6 @@ _PEX_BINARY_COMMON_FIELDS = (
     PythonResolveField,
     PexBinaryDependenciesField,
     PexCheckField,
-    PexPlatformsField,
     PexCompletePlatformsField,
     PexResolveLocalPlatformsField,
     PexInheritPathField,
@@ -797,6 +755,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexIncludeToolsField,
     PexVenvSitePackagesCopies,
     PexVenvHermeticScripts,
+    PexExtraBuildArgsField,
     RestartableField,
 )
 
@@ -810,7 +769,6 @@ class PexBinary(Target):
         PexScriptField,
         PexExecutableField,
         PexArgsField,
-        PexExtraBuildArgsField,
         PexEnvField,
         OutputPathField,
     )
@@ -933,14 +891,14 @@ class PexBinaryDefaults(Subsystem):
     resolve_local_platforms = BoolOption(
         default=False,
         help=softwrap(
-            f"""
-            For each of the `{PexPlatformsField.alias}` specified for a `{PexBinary.alias}`
-            target, attempt to find a local interpreter that matches.
-
-            If a matching interpreter is found, use the interpreter to resolve distributions and
-            build any that are only available in source distribution form. If no matching interpreter
-            is found (or if this option is `False`), resolve for the platform by accepting
-            only pre-built binary distributions (wheels).
+            """
+            Now unused.
+            """
+        ),
+        removal_version="2.24.0.dev0",
+        removal_hint=softwrap(
+            """\
+            This `resolve_local_platforms` option is no longer used now that the `platforms` field has been removed. You can safely delete this setting.
             """
         ),
         advanced=True,

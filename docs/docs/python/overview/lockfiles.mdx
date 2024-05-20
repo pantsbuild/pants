@@ -195,7 +195,7 @@ pytest = "3rdparty/python/pytest.lock"
 
 [pytest]
 install_from_resolve = "pytest"  # Use this resolve's lockfiles.
-requirements =["//3rdparty/python:pytest"]  # Use these requirements from the lockfile.
+requirements = ["//3rdparty/python:pytest"]  # Use these requirements from the lockfile.
 ```
 
 Then set up the resolve's inputs:
@@ -242,7 +242,7 @@ Rather than repeat the same requirement in two different resolves, you can point
 
 ```toml title="pants.toml"
 [pytest]
-install_from_resolve = python-default
+install_from_resolve = "python-default"
 ```
 
 Of course, you have to ensure that this resolve does in fact provide appropriate versions of the tool.
@@ -251,7 +251,7 @@ As above, you will want to point `requirements` to the subset of targets represe
 
 ```toml title="pants.toml"
 [pytest]
-install_from_resolve = python-default
+install_from_resolve = "python-default"
 
 requirements = [
   "//3rdparty/python#pytest",

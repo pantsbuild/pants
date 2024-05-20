@@ -31,7 +31,7 @@ class RuffMode(str, Enum):
 class Ruff(PythonToolBase):
     options_scope = "ruff"
     name = "Ruff"
-    help = "The Ruff Python formatter (https://github.com/astral-sh/ruff)."
+    help_short = "The Ruff Python formatter (https://github.com/astral-sh/ruff)."
 
     default_main = ConsoleScript("ruff")
     default_requirements = ["ruff>=0.1.2,<1"]

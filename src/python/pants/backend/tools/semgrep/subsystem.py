@@ -30,7 +30,7 @@ class SemgrepFieldSet(FieldSet):
 class SemgrepSubsystem(PythonToolBase):
     name = "Semgrep"
     options_scope = "semgrep"
-    help = softwrap(
+    help_short = softwrap(
         """
         Lightweight static analysis for many languages. Find bug variants with patterns that look
         like source code. (https://semgrep.dev/)
@@ -45,6 +45,7 @@ class SemgrepSubsystem(PythonToolBase):
     default_requirements = ["semgrep>=1.20.0,<2"]
 
     register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.8,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.tools.semgrep", "semgrep.lock")

@@ -8,16 +8,17 @@ use std::fmt::Debug;
 use std::fs::File;
 use std::io::Write;
 
-use crate::config::interpolate_string;
+use crate::config::{interpolate_string, ConfigSource};
 use crate::{
     option_id, DictEdit, DictEditAction, ListEdit, ListEditAction, OptionId, OptionsSource, Val,
 };
 
-use crate::config::Config;
-use crate::parse::test_util::write_fromfile;
+use crate::config::{Config, ConfigReader};
+use crate::fromfile::test_util::write_fromfile;
+use crate::fromfile::FromfileExpander;
 use tempfile::TempDir;
 
-fn maybe_config(file_content: &str) -> Result<Config, String> {
+fn maybe_config(file_content: &str) -> Result<ConfigReader, String> {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("pants.toml");
     File::create(&path)
@@ -25,15 +26,16 @@ fn maybe_config(file_content: &str) -> Result<Config, String> {
         .write_all(file_content.as_bytes())
         .unwrap();
     Config::parse(
-        &path,
+        &ConfigSource::from_file(&path)?,
         &HashMap::from([
             ("seed1".to_string(), "seed1val".to_string()),
             ("seed2".to_string(), "seed2val".to_string()),
         ]),
     )
+    .map(|config| ConfigReader::new(config, FromfileExpander::relative_to_cwd()))
 }
 
-fn config(file_content: &str) -> Config {
+fn config(file_content: &str) -> ConfigReader {
     maybe_config(file_content).unwrap()
 }
 
@@ -174,11 +176,135 @@ fn test_interpolate_config() {
 }
 
 #[test]
+fn test_default_section_scalar() {
+    fn do_test<T: PartialEq + Debug>(
+        default_foo: &str,
+        default_bar: &str,
+        overridden_bar: &str,
+        expected_foo: T,
+        expected_bar: T,
+        getter: fn(&ConfigReader, &OptionId) -> Result<Option<T>, String>,
+    ) {
+        let conf = config(&format!(
+            "[DEFAULT]\nfoo = {default_foo}\nbar={default_bar}\n[scope]\nbar={overridden_bar}\n"
+        ));
+        let actual_foo = getter(&conf, &option_id!(["scope"], "foo"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(expected_foo, actual_foo);
+
+        let actual_bar = getter(&conf, &option_id!(["scope"], "bar"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(expected_bar, actual_bar);
+    }
+
+    do_test(
+        "false",
+        "false",
+        "true",
+        false,
+        true,
+        ConfigReader::get_bool,
+    );
+    do_test("11", "22", "33", 11, 33, ConfigReader::get_int);
+    do_test(
+        "3.14",
+        "1.23",
+        "99.88",
+        3.14,
+        99.88,
+        ConfigReader::get_float,
+    );
+    do_test(
+        "\"xx\"",
+        "\"yy\"",
+        "\"zz\"",
+        "xx".to_string(),
+        "zz".to_string(),
+        ConfigReader::get_string,
+    );
+}
+
+#[test]
+fn test_default_section_list() {
+    let conf = config("[DEFAULT]\nfoo = [11]\nbar=[22]\n[scope]\nbar=\"+[33]\"\n");
+    assert_eq!(
+        conf.get_int_list(&option_id!(["scope"], "foo"))
+            .unwrap()
+            .unwrap(),
+        vec![ListEdit::<i64> {
+            action: ListEditAction::Replace,
+            items: vec![11]
+        }]
+    );
+
+    assert_eq!(
+        conf.get_int_list(&option_id!(["scope"], "bar"))
+            .unwrap()
+            .unwrap(),
+        vec![
+            ListEdit::<i64> {
+                action: ListEditAction::Replace,
+                items: vec![22]
+            },
+            ListEdit::<i64> {
+                action: ListEditAction::Add,
+                items: vec![33]
+            }
+        ]
+    );
+}
+
+#[test]
+fn test_default_section_dict() {
+    let mut conf = config(
+        "[DEFAULT]\n\
+     bar = '{ \"x\": 2 }'\n\
+     [foo]\n\
+     baz = '{ \"a\": 3 }'",
+    );
+
+    let mut expected = vec![DictEdit {
+        action: DictEditAction::Replace,
+        items: hashmap! { "x".to_string() => Val::Int(2) },
+    }];
+
+    assert_eq!(
+        conf.get_dict(&option_id!(["foo"], "bar")).unwrap().unwrap(),
+        expected
+    );
+
+    conf = config(
+        "[DEFAULT]\n\
+     bar = '{ \"x\": 2 }'\n\
+     [foo]\n\
+     bar = '+{ \"a\": 3 }'",
+    );
+
+    expected = vec![
+        DictEdit {
+            action: DictEditAction::Replace,
+            items: hashmap! { "x".to_string() => Val::Int(2) },
+        },
+        DictEdit {
+            action: DictEditAction::Add,
+            items: hashmap! { "a".to_string() => Val::Int(3) },
+        },
+    ];
+
+    assert_eq!(
+        conf.get_dict(&option_id!(["foo"], "bar")).unwrap().unwrap(),
+        expected
+    );
+}
+
+#[test]
 fn test_scalar_fromfile() {
     fn do_test<T: PartialEq + Debug>(
         content: &str,
         expected: T,
-        getter: fn(&Config, &OptionId) -> Result<Option<T>, String>,
+        getter: fn(&ConfigReader, &OptionId) -> Result<Option<T>, String>,
     ) {
         let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", content);
         let conf = config(format!("[GLOBAL]\nfoo = '@{}'\n", fromfile_path.display()).as_str());
@@ -186,10 +312,10 @@ fn test_scalar_fromfile() {
         assert_eq!(expected, actual)
     }
 
-    do_test("true", true, Config::get_bool);
-    do_test("-42", -42, Config::get_int);
-    do_test("3.14", 3.14, Config::get_float);
-    do_test("EXPANDED", "EXPANDED".to_owned(), Config::get_string);
+    do_test("true", true, ConfigReader::get_bool);
+    do_test("-42", -42, ConfigReader::get_int);
+    do_test("3.14", 3.14, ConfigReader::get_float);
+    do_test("EXPANDED", "EXPANDED".to_owned(), ConfigReader::get_string);
 }
 
 #[test]

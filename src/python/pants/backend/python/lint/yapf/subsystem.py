@@ -17,7 +17,7 @@ from pants.util.strutil import softwrap
 class Yapf(PythonToolBase):
     options_scope = "yapf"
     name = "yapf"
-    help = "A formatter for Python files (https://github.com/google/yapf)."
+    help_short = "A formatter for Python files (https://github.com/google/yapf)."
 
     default_main = ConsoleScript("yapf")
     default_requirements = ["yapf>=0.32.0,<1", "toml"]

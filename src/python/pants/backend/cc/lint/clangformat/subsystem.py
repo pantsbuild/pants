@@ -18,7 +18,7 @@ from pants.util.strutil import help_text
 class ClangFormat(PythonToolBase):
     options_scope = "clang-format"
     name = "ClangFormat"
-    help = help_text(
+    help_short = help_text(
         """
         The clang-format utility for formatting C/C++ (and others) code
         (https://clang.llvm.org/docs/ClangFormat.html). The clang-format binaries

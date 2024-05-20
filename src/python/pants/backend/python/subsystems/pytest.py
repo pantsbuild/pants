@@ -51,7 +51,7 @@ class PythonTestFieldSet(TestFieldSet):
 class PyTest(PythonToolBase):
     options_scope = "pytest"
     name = "Pytest"
-    help = "The pytest Python test framework (https://docs.pytest.org/)."
+    help_short = "The pytest Python test framework (https://docs.pytest.org/)."
 
     # Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most
     # recent release at the time of writing). see https://github.com/pantsbuild/pants/issues/14990.

@@ -92,7 +92,7 @@ class Config:
             **normalized_seed_values,
             **toml_values.get(DEFAULT_SECTION, {}),
         }
-        return _ConfigValues(config_source.path, toml_values, seed_values)
+        return _ConfigValues(config_source, toml_values, seed_values)
 
     def verify(self, section_to_valid_options: dict[str, set[str]]):
         error_log = []
@@ -155,9 +155,9 @@ class Config:
                 available_vals.append(val)
         return available_vals
 
-    def sources(self) -> list[str]:
-        """Returns the sources of this config as a list of filenames."""
-        return [vals.path for vals in self.values]
+    def sources(self) -> list[ConfigSource]:
+        """Returns the sources of this config."""
+        return [vals.source for vals in self.values]
 
     def get_sources_for_option(self, section: str, option: str) -> list[str]:
         """Returns the path(s) to the source file(s) the given option was defined in."""
@@ -176,9 +176,13 @@ _TomlValue = Union[_TomlPrimitive, List[_TomlPrimitive], Dict[str, _TomlPrimitiv
 class _ConfigValues:
     """The parsed contents of a TOML config file."""
 
-    path: str
+    source: ConfigSource
     section_to_values: dict[str, dict[str, Any]]
     seed_values: dict[str, Any]
+
+    @property
+    def path(self) -> str:
+        return self.source.path
 
     def _possibly_interpolate_value(
         self,

@@ -16,6 +16,7 @@ from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException,
 from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
+from pants.util.dirutil import touch
 from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, get_git_worktree
 
 
@@ -353,6 +354,7 @@ def test_worktree_invalidation(origin: Path) -> None:
     # and that the consuming `@rule` also reruns.
     with pushd(origin.as_posix()):
         init_repo("origin", origin)
+        touch("BUILDROOT")
 
         @rule
         async def worktree_id_string() -> str:
