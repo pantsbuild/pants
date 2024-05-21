@@ -62,9 +62,9 @@ def test_parse_python_constants():
     content = _CONSTANTS_MODULE
     constants = PythonConstantVisitor.parse_constants(content.encode("utf-8"))
     assert constants == [
-        PythonConstant(python_contant="int_constant", lineno=1, end_lineno=1),
-        PythonConstant(python_contant="array_constant", lineno=2, end_lineno=6),
-        PythonConstant(python_contant="dict_constant", lineno=8, end_lineno=12),
+        PythonConstant(name="int_constant", lineno=1, end_lineno=1),
+        PythonConstant(name="array_constant", lineno=2, end_lineno=6),
+        PythonConstant(name="dict_constant", lineno=8, end_lineno=12),
     ]
 
 
