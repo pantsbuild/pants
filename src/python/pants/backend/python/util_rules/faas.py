@@ -105,7 +105,7 @@ class PythonFaaSPexBuildExtraArgs(StringSequenceField):
         """
         Additional arguments to pass to the `pex` invocation that is used to collect the requirements
         and sources for packaging.
-        
+
         For example, `pex_build_extra_args=["--exclude=pypi-package-name"]` to force a package called
         `pypi-package-name` isn't included in the artifact.
 

@@ -11,7 +11,6 @@ import pytest
 
 from pants.backend.awslambda.python.target_types import rules as target_type_rules
 from pants.backend.python.target_types import (
-    PexExtraBuildArgsField,
     PythonRequirementTarget,
     PythonResolveField,
     PythonSourcesGeneratorTarget,
