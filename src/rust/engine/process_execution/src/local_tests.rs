@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::PathBuf;
 use std::str;
+use std::sync::Arc;
 use std::time::Duration;
 
 use maplit::hashset;
@@ -14,6 +15,7 @@ use store::{ImmutableInputs, Store};
 use testutil::data::{TestData, TestDirectory};
 use testutil::path::{find_bash, which};
 use testutil::{owned_string_vec, relative_paths};
+use tokio::sync::RwLock;
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
@@ -794,6 +796,7 @@ async fn run_command_locally_in_dir(
         named_caches,
         immutable_inputs,
         cleanup,
+        Arc::new(RwLock::new(())),
     );
     let original = runner.run(Context::default(), workunit, req).await?;
     let stdout_bytes = store
