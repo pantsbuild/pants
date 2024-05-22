@@ -224,8 +224,9 @@ class Address:
         ...
     @property
     def path_safe_spec(self) -> str: ...
-    def parametrize(self, parameters: Mapping[str, str]) -> Address:
-        """Creates a new Address with the given `parameters` merged over self.parameters."""
+    def parametrize(self, parameters: Mapping[str, str], replace: bool = False) -> Address:
+        """Creates a new Address with the given `parameters` merged or replaced over
+        self.parameters."""
         ...
     def maybe_convert_to_target_generator(self) -> Address:
         """If this address is generated or parametrized, convert it to its generator target.
