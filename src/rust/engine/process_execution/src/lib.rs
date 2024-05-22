@@ -65,8 +65,6 @@ pub mod workspace;
 #[cfg(test)]
 pub mod workspace_tests;
 
-pub(crate) mod fork_exec;
-
 extern crate uname;
 
 pub use crate::children::ManagedChild;
