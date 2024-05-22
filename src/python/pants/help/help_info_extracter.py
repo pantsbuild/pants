@@ -6,13 +6,13 @@ from __future__ import annotations
 import ast
 import dataclasses
 import inspect
+import itertools
 import json
 from collections import defaultdict, namedtuple
 from dataclasses import dataclass
 from enum import Enum
 from functools import reduce
 from itertools import chain
-from operator import attrgetter
 from pathlib import Path
 from typing import (
     Any,
@@ -838,7 +838,7 @@ class HelpInfoExtracter:
             ),
         )
 
-        def get_api_type_info(api_types: list[type]):
+        def get_api_type_info(api_types: tuple[type, ...]):
             """Gather the info from each of the types and aggregate it.
 
             The gathering is the expensive operation, and we can only aggregate once we've gathered.
@@ -864,14 +864,11 @@ class HelpInfoExtracter:
 
         # We want to provide a lazy dict so we don't spend so long doing the info gathering.
         # We provide a list of the types here, and the lookup function performs the gather and the aggregation
-        names_to_types: dict[str, list[type]] = defaultdict(list)
-        for api_type in sorted(all_types, key=attrgetter("__qualname__")):
-            names_to_types[PluginAPITypeInfo.fully_qualified_name_from_type(api_type)].append(
-                api_type
-            )
-
+        api_type_name = PluginAPITypeInfo.fully_qualified_name_from_type
+        all_types_sorted = sorted(all_types, key=api_type_name)
         infos: dict[str, Callable[[], PluginAPITypeInfo]] = {
-            k: get_api_type_info(v) for k, v in names_to_types.items()
+            k: get_api_type_info(tuple(v))
+            for k, v in itertools.groupby(all_types_sorted, key=api_type_name)
         }
 
         return LazyFrozenDict(infos)
