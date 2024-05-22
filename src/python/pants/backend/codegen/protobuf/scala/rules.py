@@ -19,7 +19,7 @@ from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionResult,
     ScalaVersion,
 )
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import distdir
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -53,7 +53,7 @@ from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, GatherJvmCoordinatesRequest
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
@@ -64,10 +64,6 @@ from pants.util.resources import read_resource
 class GenerateScalaFromProtobufRequest(GenerateSourcesRequest):
     input = ProtobufSourceField
     output = ScalaSourceField
-
-
-class ScalapbcToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = ScalaPBSubsystem.options_scope
 
 
 class ScalaPBShimCompiledClassfiles(ClasspathEntry):
@@ -118,7 +114,7 @@ async def generate_scala_from_protobuf(
     plugins_relpath = "__plugins"
     protoc_relpath = "__protoc"
 
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalapbcToolLockfileSentinel())
+    lockfile_request = GenerateJvmLockfileFromTool.create(scalapb)
     (
         downloaded_protoc_binary,
         tool_classpath,
@@ -258,9 +254,9 @@ async def setup_scalapb_shim_classfiles(
 
     scalapb_shim_source = FileContent("ScalaPBShim.scala", scalapb_shim_content)
 
-    lockfile_request, scala_artifacts = await MultiGet(
-        Get(GenerateJvmLockfileFromTool, ScalapbcToolLockfileSentinel()),
-        Get(ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(SHIM_SCALA_VERSION)),
+    lockfile_request = GenerateJvmLockfileFromTool.create(scalapb)
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(SHIM_SCALA_VERSION)
     )
     tool_classpath, shim_classpath, source_digest = await MultiGet(
         Get(
@@ -310,13 +306,6 @@ async def setup_scalapb_shim_classfiles(
     return ScalaPBShimCompiledClassfiles(digest=stripped_classfiles_digest)
 
 
-@rule
-def generate_scalapbc_lockfile_request(
-    _: ScalapbcToolLockfileSentinel, tool: ScalaPBSubsystem
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(tool)
-
-
 def rules():
     return [
         *collect_rules(),
@@ -324,7 +313,7 @@ def rules():
         *dependency_inference.rules(),
         *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromProtobufRequest),
-        UnionRule(GenerateToolLockfileSentinel, ScalapbcToolLockfileSentinel),
+        UnionRule(ExportableTool, ScalaPBSubsystem),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),

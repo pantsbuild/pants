@@ -16,6 +16,7 @@ from abc import ABC, ABCMeta, abstractmethod
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
+from operator import attrgetter
 from pathlib import PurePath
 from typing import (
     AbstractSet,
@@ -459,7 +460,7 @@ class Target:
             if issubclass(cls, Target):
                 result.update(cast("set[type[Field]]", union_membership.get(cls.PluginField)))
 
-        return tuple(result)
+        return tuple(sorted(result, key=attrgetter("alias")))
 
     @final
     @classmethod
