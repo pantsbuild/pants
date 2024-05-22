@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 use async_lock::{Mutex, MutexGuardArc};
 use futures::future;
 use lazy_static::lazy_static;
-use log::debug;
+use log::{debug, info};
 use regex::Regex;
 use tempfile::TempDir;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -67,6 +67,7 @@ pub struct NailgunPool {
 
 impl NailgunPool {
     pub fn new(workdir_base: PathBuf, size: usize, store: Store, executor: Executor) -> Self {
+        info!("Initializing Nailgun pool for {} processes...", size);
         NailgunPool {
             workdir_base,
             size,
