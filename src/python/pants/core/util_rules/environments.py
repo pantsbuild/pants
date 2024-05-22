@@ -1044,6 +1044,8 @@ def _add_option_field_for(
         subsystem = env_aware_t
         option_name = option.flag_names[0]
 
+    setattr(OptionField, "__qualname__", f"{option_type.__qualname__}.{OptionField.__name__}")
+
     return [
         LocalEnvironmentTarget.register_plugin_field(OptionField),
         DockerEnvironmentTarget.register_plugin_field(OptionField),
