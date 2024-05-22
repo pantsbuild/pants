@@ -5,9 +5,11 @@ from __future__ import annotations
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.fs import CreateDigest
 from pants.engine.rules import collect_rules
+from pants.engine.unions import UnionRule
 from pants.option.global_options import ca_certs_path_to_file_content
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption, StrOption
 from pants.util.docutil import doc_url
@@ -103,4 +105,7 @@ class TwineSubsystem(PythonToolBase):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(ExportableTool, TwineSubsystem),
+    ]
