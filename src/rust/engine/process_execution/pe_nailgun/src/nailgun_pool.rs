@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 use async_lock::{Mutex, MutexGuardArc};
 use futures::future;
 use lazy_static::lazy_static;
-use log::{debug, info};
+use log::debug;
 use regex::Regex;
 use tempfile::TempDir;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -285,9 +285,7 @@ fn spawn_and_read_port(
     workdir: PathBuf,
 ) -> Result<(std::process::Child, Port), String> {
     let cmd = process.argv[0].clone();
-    // TODO: This is an expensive operation, and thus we info! it.
-    //       If it becomes annoying, we can downgrade the logging to just debug!
-    info!(
+    debug!(
         "Starting new nailgun server with cmd: {:?}, args {:?}, in cwd {}",
         cmd,
         &process.argv[1..],
