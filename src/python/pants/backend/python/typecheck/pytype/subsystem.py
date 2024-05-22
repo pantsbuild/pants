@@ -13,7 +13,7 @@ from pants.util.strutil import help_text, softwrap
 class Pytype(PythonToolBase):
     options_scope = "pytype"
     name = "Pytype"
-    help = help_text(
+    help_short = help_text(
         """
         The Pytype utility for typechecking Python code
         (https://github.com/google/pytype).

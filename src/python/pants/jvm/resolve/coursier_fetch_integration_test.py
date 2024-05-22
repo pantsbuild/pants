@@ -18,7 +18,11 @@ from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coordinate import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.target_types import JvmArtifactJarSourceField, JvmArtifactTarget
+from pants.jvm.target_types import (
+    JvmArtifactExclusion,
+    JvmArtifactJarSourceField,
+    JvmArtifactTarget,
+)
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.jvm.util_rules import rules as util_rules
@@ -660,6 +664,25 @@ def test_transitive_excludes(rule_runner: RuleRunner) -> None:
     entries = resolve.entries
     assert any(i for i in entries if i.coord.artifact == "jackson-databind")
     assert not any(i for i in entries if i.coord.artifact == "jackson-core")
+
+
+@maybe_skip_jdk_test
+def test_transitive_group_only_excludes(rule_runner: RuleRunner) -> None:
+    group_only_excludes = JvmArtifactExclusion(group="com.fasterxml.jackson.core", artifact=None)
+
+    requirement = ArtifactRequirement(
+        coordinate=Coordinate(
+            group="com.fasterxml.jackson.module",
+            artifact="jackson-module-jaxb-annotations",
+            version="2.17.1",
+        ),
+        excludes=frozenset([group_only_excludes.to_coord_str()]),
+    )
+
+    resolve = rule_runner.request(CoursierResolvedLockfile, [ArtifactRequirements([requirement])])
+
+    entries = resolve.entries
+    assert not any(i for i in entries if i.coord.group == "com.fasterxml.jackson.core")
 
 
 @maybe_skip_jdk_test

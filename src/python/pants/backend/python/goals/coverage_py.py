@@ -106,7 +106,7 @@ class CoverageReportType(Enum):
 
 class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
-    help = "Configuration for Python test coverage measurement."
+    help_short = "Configuration for Python test coverage measurement."
 
     default_main = ConsoleScript("coverage")
     default_requirements = ["coverage[toml]>=6.5,<8"]
@@ -481,7 +481,7 @@ async def merge_coverage_data(
     )
     return MergedCoverageData(
         await Get(Digest, MergeDigests((result.output_digest, extra_sources_digest))),
-        tuple(addresses),
+        tuple(sorted(addresses)),
     )
 
 

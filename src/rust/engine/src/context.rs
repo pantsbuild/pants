@@ -37,6 +37,7 @@ use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
 use store::{self, ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store};
 use task_executor::Executor;
+use tokio::sync::RwLock;
 use watch::{Invalidatable, InvalidateCaller, InvalidationWatcher};
 use workunit_store::{Metric, RunningWorkunit};
 
@@ -210,6 +211,10 @@ impl Core {
         exec_strategy_opts: &ExecutionStrategyOptions,
         remoting_opts: &RemotingOptions,
     ) -> Result<Arc<dyn CommandRunner>, String> {
+        // Lock shared between local command runner (and in future work) other "local" command runners
+        // for spawning processes.
+        let spawn_lock = Arc::new(RwLock::new(()));
+
         let local_command_runner = local::CommandRunner::new(
             local_runner_store.clone(),
             executor.clone(),
@@ -217,6 +222,7 @@ impl Core {
             named_caches.clone(),
             immutable_inputs.clone(),
             exec_strategy_opts.local_keep_sandboxes,
+            spawn_lock.clone(),
         );
 
         let runner: Box<dyn CommandRunner> = if exec_strategy_opts.local_enable_nailgun {

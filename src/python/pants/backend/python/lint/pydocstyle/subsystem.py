@@ -31,7 +31,7 @@ class PydocstyleFieldSet(FieldSet):
 class Pydocstyle(PythonToolBase):
     options_scope = "pydocstyle"
     name = "Pydocstyle"
-    help = "A tool for checking compliance with Python docstring conventions (http://www.pydocstyle.org/en/stable/)."
+    help_short = "A tool for checking compliance with Python docstring conventions (http://www.pydocstyle.org/en/stable/)."
 
     default_main = ConsoleScript("pydocstyle")
     default_requirements = ["pydocstyle[toml]>=6.1.1,<7.0"]

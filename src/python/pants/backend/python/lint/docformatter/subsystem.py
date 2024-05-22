@@ -11,7 +11,7 @@ from pants.option.option_types import ArgsListOption, SkipOption
 class Docformatter(PythonToolBase):
     options_scope = "docformatter"
     name = "docformatter"
-    help = "The Python docformatter tool (https://github.com/myint/docformatter)."
+    help_short = "The Python docformatter tool (https://github.com/myint/docformatter)."
 
     default_main = ConsoleScript("docformatter")
     default_requirements = ["docformatter>=1.4,<1.5"]

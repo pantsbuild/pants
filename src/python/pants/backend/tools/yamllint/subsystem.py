@@ -23,7 +23,7 @@ from pants.util.strutil import softwrap
 class Yamllint(PythonToolBase):
     name = "Yamllint"
     options_scope = "yamllint"
-    help = "A linter for YAML files (https://yamllint.readthedocs.io)"
+    help_short = "A linter for YAML files (https://yamllint.readthedocs.io)"
 
     default_main = ConsoleScript("yamllint")
     default_requirements = ["yamllint>=1.28.0,<2"]

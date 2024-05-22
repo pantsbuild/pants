@@ -36,7 +36,7 @@ class BlackFieldSet(FieldSet):
 class Black(PythonToolBase):
     options_scope = "black"
     name = "Black"
-    help = "The Black Python code formatter (https://black.readthedocs.io/)."
+    help_short = "The Black Python code formatter (https://black.readthedocs.io/)."
 
     default_main = ConsoleScript("black")
     default_requirements = [
