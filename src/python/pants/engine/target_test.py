@@ -474,14 +474,13 @@ def test_target_residence_dir() -> None:
 
 def test_field_dynamic_default() -> None:
     class SomeField(Field):
-        alias: str = "some"
-        default: str = "some-default"
+        alias: ClassVar[str] = "some"
+        default: ClassVar[str] = "some-default"
 
         @classmethod
         def compute_value(cls, raw_value: Optional[str], address: Address) -> str:
             value_or_default = super().compute_value(raw_value, address)
-            print(f"compute {raw_value=}, {value_or_default=}")
-            assert not isinstance(value_or_default, FieldDefaultValue)
+            assert isinstance(value_or_default, str)
             return value_or_default
 
     def check_field(fld: SomeField, value: str, default: str) -> None:
