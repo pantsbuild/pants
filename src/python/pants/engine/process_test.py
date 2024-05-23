@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from pants.engine.environment import LOCAL_WORKSPACE_ENV_NAME, EnvironmentName
+from pants.engine.environment import __LOCAL_WORKSPACE_ENV_NAME, EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -310,7 +310,7 @@ def test_interactive_process_inputs(rule_runner: RuleRunner, run_in_workspace: b
 
 
 def test_workspace_process_basic(rule_runner) -> None:
-    rule_runner = new_rule_runner(inherent_environment=EnvironmentName(LOCAL_WORKSPACE_ENV_NAME))
+    rule_runner = new_rule_runner(inherent_environment=EnvironmentName(__LOCAL_WORKSPACE_ENV_NAME))
     build_root = Path(rule_runner.build_root)
 
     # Check that a custom exit code is returned as expected.
