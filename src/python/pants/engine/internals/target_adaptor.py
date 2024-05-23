@@ -72,7 +72,7 @@ class SourceBlock:
         return cls(start=text_block.start, end=text_block.start + text_block.count)
 
 
-class SourceBlocks(Collection[SourceBlock]):
+class SourceBlocks(FrozenOrderedSet[SourceBlock]):
     pass
 
 
