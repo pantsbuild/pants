@@ -15,6 +15,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSKnownRuntime,
     PythonFaaSLayoutField,
     PythonFaaSPex3VenvCreateExtraArgsField,
+    PythonFaaSPexBuildExtraArgs,
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
@@ -153,6 +154,7 @@ class _AWSLambdaBaseTarget(Target):
         PythonAwsLambdaRuntime,
         PythonFaaSCompletePlatforms,
         PythonFaaSPex3VenvCreateExtraArgsField,
+        PythonFaaSPexBuildExtraArgs,
         PythonFaaSLayoutField,
         PythonResolveField,
         EnvironmentField,

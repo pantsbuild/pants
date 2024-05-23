@@ -6,12 +6,13 @@ from __future__ import annotations
 import ast
 import dataclasses
 import inspect
+import itertools
 import json
 from collections import defaultdict, namedtuple
 from dataclasses import dataclass
 from enum import Enum
+from functools import reduce
 from itertools import chain
-from operator import attrgetter
 from pathlib import Path
 from typing import (
     Any,
@@ -322,7 +323,7 @@ class PluginAPITypeInfo:
     name: str
     module: str
     documentation: str | None
-    provider: str
+    provider: tuple[str, ...]
     is_union: bool
     union_type: str | None
     union_members: tuple[str, ...]
@@ -331,6 +332,14 @@ class PluginAPITypeInfo:
     returned_by_rules: tuple[str, ...]
     consumed_by_rules: tuple[str, ...]
     used_in_rules: tuple[str, ...]
+
+    @property
+    def fully_qualified_name(self) -> str:
+        return f"{self.module}.{self.name}"
+
+    @staticmethod
+    def fully_qualified_name_from_type(t: type):
+        return f"{t.__module__}.{t.__qualname__}"
 
     @classmethod
     def create(
@@ -345,7 +354,7 @@ class PluginAPITypeInfo:
         task_rules = [rule for rule in rules if isinstance(rule, TaskRule)]
 
         return cls(
-            name=api_type.__name__,
+            name=api_type.__qualname__,
             module=api_type.__module__,
             documentation=maybe_cleandoc(api_type.__doc__),
             is_union=is_union(api_type),
@@ -392,6 +401,25 @@ class PluginAPITypeInfo:
             return isinstance(rule, UnionRule) and rule.union_member is api_type
 
         return satisfies
+
+    def merged_with(self, that: PluginAPITypeInfo) -> PluginAPITypeInfo:
+        def merge_tuples(l, r):
+            return tuple(sorted({*l, *r}))
+
+        return PluginAPITypeInfo(
+            self.name,
+            self.module,
+            self.documentation,
+            merge_tuples(self.provider, that.provider),
+            self.is_union,
+            self.union_type,
+            merge_tuples(self.union_members, that.union_members),
+            merge_tuples(self.dependencies, that.dependencies),
+            merge_tuples(self.dependents, that.dependents),
+            merge_tuples(self.returned_by_rules, that.returned_by_rules),
+            merge_tuples(self.consumed_by_rules, that.consumed_by_rules),
+            merge_tuples(self.used_in_rules, that.used_in_rules),
+        )
 
 
 @dataclass(frozen=True)
@@ -810,27 +838,40 @@ class HelpInfoExtracter:
             ),
         )
 
-        def get_api_type_info_loader(api_type: type) -> Callable[[], PluginAPITypeInfo]:
+        def get_api_type_info(api_types: tuple[type, ...]):
+            """Gather the info from each of the types and aggregate it.
+
+            The gathering is the expensive operation, and we can only aggregate once we've gathered.
+            """
+
             def load() -> PluginAPITypeInfo:
-                return PluginAPITypeInfo.create(
-                    api_type,
-                    rules,
-                    provider=", ".join(type_graph[api_type]["providers"]),
-                    dependencies=type_graph[api_type]["dependencies"],
-                    dependents=type_graph[api_type].get("dependents", ()),
-                    union_members=tuple(
-                        sorted(member.__name__ for member in union_membership.get(api_type))
-                    ),
-                )
+                gatherered_infos = [
+                    PluginAPITypeInfo.create(
+                        api_type,
+                        rules,
+                        provider=type_graph[api_type]["providers"],
+                        dependencies=type_graph[api_type]["dependencies"],
+                        dependents=type_graph[api_type].get("dependents", ()),
+                        union_members=tuple(
+                            sorted(member.__qualname__ for member in union_membership.get(api_type))
+                        ),
+                    )
+                    for api_type in api_types
+                ]
+                return reduce(lambda x, y: x.merged_with(y), gatherered_infos)
 
             return load
 
-        return LazyFrozenDict(
-            {
-                f"{api_type.__module__}.{api_type.__name__}": get_api_type_info_loader(api_type)
-                for api_type in sorted(all_types, key=attrgetter("__name__"))
-            }
-        )
+        # We want to provide a lazy dict so we don't spend so long doing the info gathering.
+        # We provide a list of the types here, and the lookup function performs the gather and the aggregation
+        api_type_name = PluginAPITypeInfo.fully_qualified_name_from_type
+        all_types_sorted = sorted(all_types, key=api_type_name)
+        infos: dict[str, Callable[[], PluginAPITypeInfo]] = {
+            k: get_api_type_info(tuple(v))
+            for k, v in itertools.groupby(all_types_sorted, key=api_type_name)
+        }
+
+        return LazyFrozenDict(infos)
 
     @classmethod
     def get_backend_help_info(cls, options: Options) -> LazyFrozenDict[str, BackendHelpInfo]:

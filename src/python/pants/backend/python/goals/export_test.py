@@ -20,12 +20,10 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import local_dists_pep660, pex_from_targets
 from pants.base.specs import RawSpecs
 from pants.core.goals.export import ExportResults
-from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import distdir
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.rules import QueryRule
 from pants.engine.target import Targets
-from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.frozendict import FrozenDict
 
@@ -48,9 +46,6 @@ def rule_runner() -> RuleRunner:
             *distdir.rules(),
             *local_dists_pep660.rules(),
             *isort_subsystem.rules(),  # add a tool that we can try exporting
-            UnionRule(
-                ExportableTool, isort_subsystem.Isort
-            ),  # TODO: remove this manual export when we add ExportableTool to tools
             QueryRule(Targets, [RawSpecs]),
             QueryRule(ExportResults, [ExportVenvsRequest]),
         ],
