@@ -98,6 +98,23 @@ class PythonFaaSPex3VenvCreateExtraArgsField(StringSequenceField):
     )
 
 
+class PythonFaaSPexBuildExtraArgs(StringSequenceField):
+    alias = "pex_build_extra_args"
+    default = ()
+    help = help_text(
+        """
+        Additional arguments to pass to the `pex` invocation that is used to collect the requirements
+        and sources for packaging.
+
+        For example, `pex_build_extra_args=["--exclude=pypi-package-name"]` to force a package called
+        `pypi-package-name` isn't included in the artifact.
+
+        Note: Excluding dependencies currently causes Pex to throw an error. You can additionally pass
+        the `--ignore-errors` flag.
+        """
+    )
+
+
 class PythonFaaSHandlerField(StringField, AsyncFieldMixin):
     alias = "handler"
     required = True
@@ -436,6 +453,7 @@ class BuildPythonFaaSRequest:
     output_path: OutputPathField
     runtime: PythonFaaSRuntimeField
     pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
+    pex_build_extra_args: PythonFaaSPexBuildExtraArgs
     layout: PythonFaaSLayoutField
 
     include_requirements: bool
@@ -457,6 +475,8 @@ async def build_python_faas(
         # When we're executing Pex on Linux, allow a local interpreter to be resolved if
         # available and matching the AMI platform.
         "--resolve-local-platforms",
+        # Additional args from request
+        *(request.pex_build_extra_args.value or ()),
     )
 
     platforms_get = Get(

@@ -34,6 +34,7 @@ from pants.backend.python.target_types_rules import rules as python_target_types
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
     PythonFaaSPex3VenvCreateExtraArgsField,
+    PythonFaaSPexBuildExtraArgs,
 )
 from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
@@ -387,6 +388,7 @@ def test_pex3_venv_create_extra_args_are_passed_through(
         layout=Mock(),
         **{arg: Mock() for arg in extra_field_set_args},
         pex3_venv_create_extra_args=extra_args_field,
+        pex_build_extra_args=PythonFaaSPexBuildExtraArgs(None, addr),
     )
 
     observed_calls = []
