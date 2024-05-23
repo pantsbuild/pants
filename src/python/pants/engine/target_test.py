@@ -14,6 +14,7 @@ from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, Pa
 from pants.engine.target import (
     NO_VALUE,
     AsyncFieldMixin,
+    FieldDefaultValue,
     BoolField,
     CoarsenedTarget,
     CoarsenedTargets,
@@ -469,6 +470,31 @@ def test_target_residence_dir() -> None:
         FortranTarget({}, Address("some_dir/subdir"), residence_dir="another_dir").residence_dir
         == "another_dir"
     )
+
+
+def test_field_dynamic_default() -> None:
+    class SomeField(Field):
+        alias: str = "some"
+        default: str = "some-default"
+
+        @classmethod
+        def compute_value(
+            cls, raw_value: Optional[str], address: Address
+        ) -> str:
+            value_or_default = super().compute_value(raw_value, address)
+            print(f"compute {raw_value=}, {value_or_default=}")
+            assert not isinstance(value_or_default, FieldDefaultValue)
+            return value_or_default
+
+    def check_field(fld: SomeField, value: str, default: str) -> None:
+        # The class var should never change.
+        assert SomeField.default == "some-default"
+        assert fld.value == value
+        assert fld.default == default
+
+    addr = Address("a")
+    check_field(SomeField("regular", addr), "regular", SomeField.default)
+    check_field(SomeField(FieldDefaultValue("other-default"), addr), "other-default", "other-default")
 
 
 # -----------------------------------------------------------------------------------------------
