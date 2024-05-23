@@ -7,7 +7,7 @@ from pants.backend.kotlin.lint.ktlint.skip_field import SkipKtlintField
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.kotlin.target_types import KotlinSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
@@ -17,7 +17,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -41,15 +41,11 @@ class KtlintRequest(FmtTargetsRequest):
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
-class KtlintToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = KtlintSubsystem.options_scope
-
-
 @rule(desc="Format with Ktlint", level=LogLevel.DEBUG)
 async def ktlint_fmt(
     request: KtlintRequest.Batch, tool: KtlintSubsystem, jdk: InternalJdk
 ) -> FmtResult:
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, KtlintToolLockfileSentinel())
+    lockfile_request = GenerateJvmLockfileFromTool.create(tool)
     tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
 
     toolcp_relpath = "__toolcp"
@@ -82,17 +78,10 @@ async def ktlint_fmt(
     return await FmtResult.create(request, result)
 
 
-@rule
-def generate_ktlint_lockfile_request(
-    _: KtlintToolLockfileSentinel, tool: KtlintSubsystem
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(tool)
-
-
 def rules():
     return [
         *collect_rules(),
         *jvm_tool.rules(),
         *KtlintRequest.rules(),
-        UnionRule(GenerateToolLockfileSentinel, KtlintToolLockfileSentinel),
+        UnionRule(ExportableTool, KtlintSubsystem),
     ]

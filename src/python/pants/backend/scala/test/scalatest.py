@@ -12,7 +12,7 @@ from pants.backend.scala.target_types import (
     ScalatestTestSourceField,
     ScalatestTestTimeoutField,
 )
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
@@ -40,7 +40,7 @@ from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmDependenciesField, JvmJdkField
 from pants.util.logging import LogLevel
@@ -68,10 +68,6 @@ class ScalatestTestRequest(TestRequest):
     supports_debug = True
 
 
-class ScalatestToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = Scalatest.options_scope
-
-
 @dataclass(frozen=True)
 class TestSetupRequest:
     field_set: ScalatestTestFieldSet
@@ -97,7 +93,7 @@ async def setup_scalatest_for_target(
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
     )
 
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalatestToolLockfileSentinel())
+    lockfile_request = GenerateJvmLockfileFromTool.create(scalatest)
     classpath, scalatest_classpath, files = await MultiGet(
         Get(Classpath, Addresses([request.field_set.address])),
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
@@ -208,17 +204,10 @@ async def setup_scalatest_debug_request(
     )
 
 
-@rule
-def generate_scalatest_lockfile_request(
-    _: ScalatestToolLockfileSentinel, scalatest: Scalatest
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(scalatest)
-
-
 def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, ScalatestToolLockfileSentinel),
+        UnionRule(ExportableTool, Scalatest),
         *ScalatestTestRequest.rules(),
     ]

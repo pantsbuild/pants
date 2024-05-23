@@ -19,6 +19,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -621,4 +622,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
+        UnionRule(ExportableTool, CoverageSubsystem),
     ]
