@@ -19,6 +19,7 @@ from pants.engine.addresses import Address
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.target import (
     Field,
+    FieldDefaultValue,
     ImmutableValue,
     InvalidFieldException,
     RegisteredTargetTypes,
@@ -230,4 +231,9 @@ class BuildFileDefaultsParserState:
                         _check_field_alias(field_alias)
 
                 # Merge all provided defaults for this call.
-                defaults.setdefault(target_type.alias, {}).update(raw_values)
+                defaults.setdefault(target_type.alias, {}).update(
+                    {
+                        field_alias: FieldDefaultValue(field_value)
+                        for field_alias, field_value in raw_values.items()
+                    }
+                )

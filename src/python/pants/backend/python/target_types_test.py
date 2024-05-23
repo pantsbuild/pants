@@ -49,7 +49,7 @@ from pants.engine.target import (
     InvalidTargetException,
     Tags,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.frozendict import FrozenDict
 from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
@@ -557,11 +557,6 @@ def test_normalize_module_mapping(
     assert normalize_module_mapping(raw_value) == FrozenDict(expected)
 
 
-# -----------------------------------------------------------------------------------------------
-# Generate targets
-# -----------------------------------------------------------------------------------------------
-
-
 def test_pex_binary_targets() -> None:
     rule_runner = RuleRunner(
         rules=[
@@ -615,3 +610,33 @@ def test_pex_binary_targets() -> None:
         gen_pex_binary_tgt("subdir.f.py", tags=["overridden"]),
         gen_pex_binary_tgt("subdir.f:main"),
     }
+
+
+def test_any_match_globs_from_custom_defaults() -> None:
+    rule_runner = RuleRunner(
+        rules=target_types_rules.rules(),
+        target_types=[PythonSourcesGeneratorTarget],
+    )
+    rule_runner.write_files(
+        {
+            "project/BUILD": dedent(
+                """\
+                __defaults__({python_sources: dict(sources=["foo_*.py", "bar_*.py"])})
+                python_sources(name="implicit")
+                python_sources(name="explicit", sources=["foo_*.py", "bar_*.py"])
+                """
+            ),
+            "project/foo_here.py": "",
+        }
+    )
+    rule_runner.set_options(["--unmatched-build-file-globs=error"])
+
+    tgt = rule_runner.get_target(
+        Address("project", target_name="implicit", relative_file_path="foo_here.py")
+    )
+    assert str(tgt.address) == "project/foo_here.py:implicit"
+
+    with engine_error(InvalidFieldException, contains="Unmatched glob"):
+        rule_runner.get_target(
+            Address("project", target_name="explicit", relative_file_path="foo_here.py")
+        )
