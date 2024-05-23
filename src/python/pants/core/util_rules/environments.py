@@ -186,13 +186,7 @@ class LocalWorkspaceFallbackEnvironmentField(FallbackEnvironmentField):
 
         Must be an environment name from the option `[environments-preview].names`, the
         special string `{LOCAL_WORKSPACE_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
-        Python value `None` to error when this specific local environment cannot be used.
-
-        Tip: when targeting Linux, it can be particularly helpful to fallback to a
-        `docker_environment` or `remote_environment` target. That allows you to prefer using the
-        local host when possible, which often has less overhead (particularly compared to Docker).
-        If the local host is not compatible, then Pants will use Docker or remote execution to
-        still run in a similar environment.
+        Python value `None` to error when this specific local workspace environment cannot be used.
         """
     )
 
