@@ -269,7 +269,6 @@ class _NoValue:
 # Marker for unspecified field values that should use the default value if applicable.
 NO_VALUE: _NoValue
 
-
 class FieldDefaultValue:
     """Field value wrapper to indicate this should be treated as the default value for this instance
     of the field.
@@ -285,13 +284,12 @@ class FieldDefaultValue:
     The value is unwrapped and assigned to the `default` property on the field instance. During
     `compute_value`, the wrapped value is passed as `raw_value`, while the unwrapped value is
     returned from `super().compute_value(...)`.
-
     """
+
     value: ImmutableValue
 
     def __repr__(self) -> str: ...
     def __str__(self) -> str: ...
-
 
 class Field:
     """A Field.

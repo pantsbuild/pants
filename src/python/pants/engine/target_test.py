@@ -14,7 +14,6 @@ from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, Pa
 from pants.engine.target import (
     NO_VALUE,
     AsyncFieldMixin,
-    FieldDefaultValue,
     BoolField,
     CoarsenedTarget,
     CoarsenedTargets,
@@ -22,6 +21,7 @@ from pants.engine.target import (
     DictStringToStringSequenceField,
     ExplicitlyProvidedDependencies,
     Field,
+    FieldDefaultValue,
     FieldSet,
     FloatField,
     GeneratedTargets,
@@ -478,9 +478,7 @@ def test_field_dynamic_default() -> None:
         default: str = "some-default"
 
         @classmethod
-        def compute_value(
-            cls, raw_value: Optional[str], address: Address
-        ) -> str:
+        def compute_value(cls, raw_value: Optional[str], address: Address) -> str:
             value_or_default = super().compute_value(raw_value, address)
             print(f"compute {raw_value=}, {value_or_default=}")
             assert not isinstance(value_or_default, FieldDefaultValue)
@@ -494,7 +492,9 @@ def test_field_dynamic_default() -> None:
 
     addr = Address("a")
     check_field(SomeField("regular", addr), "regular", SomeField.default)
-    check_field(SomeField(FieldDefaultValue("other-default"), addr), "other-default", "other-default")
+    check_field(
+        SomeField(FieldDefaultValue("other-default"), addr), "other-default", "other-default"
+    )
 
 
 # -----------------------------------------------------------------------------------------------
