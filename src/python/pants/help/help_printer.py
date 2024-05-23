@@ -527,7 +527,7 @@ class HelpPrinter(MaybeColor):
         print()
         self._print_table(
             {
-                "activated by": type_info.provider,
+                "activated by": "\n".join(type_info.provider),
                 "union type": type_info.union_type,
                 "union members": "\n".join(type_info.union_members) if type_info.is_union else None,
                 "dependencies": "\n".join(type_info.dependencies) if show_advanced else None,

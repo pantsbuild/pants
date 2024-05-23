@@ -45,7 +45,7 @@ from pants.util.resources import read_resource
 
 class TerraformHcl2Parser(PythonToolRequirementsBase):
     options_scope = "terraform-hcl2-parser"
-    help = "Used to parse Terraform modules to infer their dependencies."
+    help_short = "Used to parse Terraform modules to infer their dependencies."
 
     default_requirements = ["python-hcl2>=3.0.5,<5"]
 

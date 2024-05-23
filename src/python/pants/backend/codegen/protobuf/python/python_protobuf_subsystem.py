@@ -93,7 +93,7 @@ class PythonProtobufSubsystem(Subsystem):
 
 class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     options_scope = "mypy-protobuf"
-    help = "Configuration of the mypy-protobuf type stub generation plugin."
+    help_short = "Configuration of the mypy-protobuf type stub generation plugin."
 
     default_requirements = ["mypy-protobuf>=3.4.0,<4"]
 
@@ -104,7 +104,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
 
 class PythonProtobufGrpclibPlugin(PythonToolRequirementsBase):
     options_scope = "python-grpclib-protobuf"
-    help = "Configuration of the grpclib plugin."
+    help_short = "Configuration of the grpclib plugin."
 
     default_requirements = ["grpclib[protobuf]>=0.4,<1"]
 

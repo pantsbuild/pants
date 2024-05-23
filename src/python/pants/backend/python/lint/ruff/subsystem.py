@@ -10,8 +10,10 @@ from typing import Iterable
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules import python_sources
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
 
@@ -31,7 +33,7 @@ class RuffMode(str, Enum):
 class Ruff(PythonToolBase):
     options_scope = "ruff"
     name = "Ruff"
-    help = "The Ruff Python formatter (https://github.com/astral-sh/ruff)."
+    help_short = "The Ruff Python formatter (https://github.com/astral-sh/ruff)."
 
     default_main = ConsoleScript("ruff")
     default_requirements = ["ruff>=0.1.2,<1"]
@@ -86,4 +88,5 @@ def rules():
     return (
         *collect_rules(),
         *python_sources.rules(),
+        UnionRule(ExportableTool, Ruff),
     )

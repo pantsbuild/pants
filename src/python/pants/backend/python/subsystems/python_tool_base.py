@@ -9,7 +9,7 @@ import logging
 import os
 from dataclasses import dataclass
 from functools import cache
-from typing import ClassVar, Iterable, Optional, Sequence
+from typing import Callable, ClassVar, Iterable, Optional, Sequence
 from urllib.parse import urlparse
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
@@ -34,7 +34,7 @@ from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url, git_url
 from pants.util.meta import classproperty
 from pants.util.pip_requirement import PipRequirement
-from pants.util.strutil import softwrap
+from pants.util.strutil import softwrap, strval
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,8 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
     # Subclasses must set.
     default_version: ClassVar[str]
+    # Must be set by subclasses - will be used to set the help text in this class.
+    help_short: ClassVar[str | Callable[[], str]]
     # Subclasses do not need to override.
     default_extra_requirements: ClassVar[Sequence[str]] = []
 
@@ -64,6 +66,19 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
     register_interpreter_constraints: ClassVar[bool] = False
 
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
+
+    @classmethod
+    def _help_extended(cls) -> str:
+        base_help = strval(cls.help_short)
+        help_paragraphs = [base_help]
+        package_and_version = cls._default_package_name_and_version()
+        if package_and_version:
+            new_paragraph = f"This version of Pants uses `{package_and_version.name}` version {package_and_version.version} by default. Use a dedicated lockfile and the `install_from_resolve` option to control this."
+            help_paragraphs.append(new_paragraph)
+
+        return "\n\n".join(help_paragraphs)
+
+    help = classproperty(_help_extended)
 
     @classmethod
     def _install_from_resolve_help(cls) -> str:

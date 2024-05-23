@@ -9,9 +9,11 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.lint.pydocstyle.skip_field import SkipPydocstyleField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript, PythonSourceField
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules
 from pants.engine.target import FieldSet, Target
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
@@ -31,7 +33,7 @@ class PydocstyleFieldSet(FieldSet):
 class Pydocstyle(PythonToolBase):
     options_scope = "pydocstyle"
     name = "Pydocstyle"
-    help = "A tool for checking compliance with Python docstring conventions (http://www.pydocstyle.org/en/stable/)."
+    help_short = "A tool for checking compliance with Python docstring conventions (http://www.pydocstyle.org/en/stable/)."
 
     default_main = ConsoleScript("pydocstyle")
     default_requirements = ["pydocstyle[toml]>=6.1.1,<7.0"]
@@ -91,4 +93,5 @@ def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
+        UnionRule(ExportableTool, Pydocstyle),
     )

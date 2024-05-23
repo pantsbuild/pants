@@ -23,6 +23,7 @@ use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
 use remote::remote_cache::RemoteCacheRunnerOptions;
 use store::{ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store};
+use tokio::sync::RwLock;
 use workunit_store::{in_workunit, Level, WorkunitStore};
 
 #[derive(Clone, Debug, Default)]
@@ -393,6 +394,7 @@ async fn main() {
             ),
             ImmutableInputs::new(store.clone(), &workdir).unwrap(),
             KeepSandboxes::Never,
+            Arc::new(RwLock::new(())),
         )) as Box<dyn process_execution::CommandRunner>,
     };
 

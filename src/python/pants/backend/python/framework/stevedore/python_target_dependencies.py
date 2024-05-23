@@ -96,7 +96,9 @@ async def map_stevedore_extensions(
         for namespace in (tgt[PythonDistributionEntryPointsField].value or {}).keys():
             if isinstance(namespace, StevedoreNamespace):
                 mapping[namespace].append(tgt)
-    return StevedoreExtensions(FrozenDict((k, tuple(v)) for k, v in sorted(mapping.items())))
+    return StevedoreExtensions(
+        FrozenDict((k, tuple(sorted(v))) for k, v in sorted(mapping.items()))
+    )
 
 
 @rule(

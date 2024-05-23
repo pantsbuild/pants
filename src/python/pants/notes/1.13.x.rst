@@ -1,0 +1,4 @@
+1.13.x Stable releases
+=====================
+
+These notes have moved to `docs/notes/1.13.x.rst <../../../../docs/notes/1.13.x.rst>`_

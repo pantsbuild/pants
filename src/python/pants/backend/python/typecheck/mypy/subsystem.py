@@ -7,7 +7,6 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -25,11 +24,13 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.unions import UnionRule
 from pants.option.option_types import (
     ArgsListOption,
     BoolOption,
@@ -66,7 +67,7 @@ class MyPyFieldSet(FieldSet):
 class MyPy(PythonToolBase):
     options_scope = "mypy"
     name = "MyPy"
-    help = "The MyPy Python type checker (http://mypy-lang.org/)."
+    help_short = "The MyPy Python type checker (http://mypy-lang.org/)."
 
     default_main = ConsoleScript("mypy")
     default_requirements = ["mypy>=0.961,<2"]
@@ -266,5 +267,5 @@ async def _mypy_interpreter_constraints(
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
+        UnionRule(ExportableTool, MyPy),
     )
