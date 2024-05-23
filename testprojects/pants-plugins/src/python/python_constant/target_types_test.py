@@ -29,13 +29,11 @@ def rule_runner():
             *module_mapper.rules(),
             *stripped_source_files.rules(),
             *target_types_rules.rules(),
-            # python_register.rules(),
             QueryRule(Addresses, (DependenciesRequest,)),
         ],
         target_types=[
             PythonSourceTarget,
             PythonSourcesGeneratorTarget,
-            # *python_register.target_types(),
             PythonConstantTarget,
             PythonConstantTargetGenerator,
         ],
