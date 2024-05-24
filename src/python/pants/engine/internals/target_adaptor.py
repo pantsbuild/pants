@@ -10,9 +10,9 @@ from typing import Any
 from typing_extensions import final
 
 from pants.build_graph.address import Address
-from pants.engine.collection import FrozenOrderedSet
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.util.frozendict import FrozenDict
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.hunk import TextBlock
 
 
