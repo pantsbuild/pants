@@ -312,6 +312,7 @@ def test_from_fallible_process_result_output_prepping() -> None:
                         docker_image=None,
                         remote_execution=False,
                         remote_execution_extra_platform_properties=[],
+                        execute_in_workspace=False,
                     ),
                     "ran_locally",
                     0,
