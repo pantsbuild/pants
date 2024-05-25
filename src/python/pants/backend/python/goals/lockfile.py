@@ -20,7 +20,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, maybe_log_pex_stderr
-from pants.backend.python.util_rules.pex_environment import PexSubsystem
+from pants.backend.python.util_rules.pex_environment import PexSubsystem, PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
     ResolvePexConfig,
@@ -101,6 +101,9 @@ async def generate_lockfile(
     pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
 
     header_delimiter = "//"
+
+    python = await Get(PythonExecutable, InterpreterConstraints, req.interpreter_constraints)
+
     result = await Get(
         ProcessResult,
         PexCliProcess(
@@ -129,6 +132,7 @@ async def generate_lockfile(
                 "mac",
                 # This makes diffs more readable when lockfiles change.
                 "--indent=2",
+                f"--python-path={python.path}",
                 *(f"--find-links={link}" for link in req.find_links),
                 *pip_args_setup.args,
                 *req.interpreter_constraints.generate_pex_arg_list(),
