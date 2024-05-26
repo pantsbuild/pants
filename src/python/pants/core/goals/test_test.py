@@ -107,6 +107,7 @@ def make_process_result_metadata(
             docker_image=docker_image,
             remote_execution=remote_execution,
             remote_execution_extra_platform_properties=[],
+            execute_in_workspace=False,
         ),
         source,
         source_run_id,

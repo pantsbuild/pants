@@ -331,6 +331,7 @@ Created as part of the release process.
 + Tom Solberg
 + Tomasz Godzik
 + Tomasz Pasternak
++ Tony Sherman
 + Travis Crawford
 + Troy Howard
 + Tushar Singh
