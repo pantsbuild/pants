@@ -149,6 +149,7 @@ class TestOptionsBootstrapper:
         assert "/pear/banana" == opts.for_scope("fruit").apple
 
     @pytest.mark.skip("See https://github.com/pantsbuild/pants/pull/20956 for when we can revisit")
+    @pytest.mark.no_error_if_skipped
     def test_bootstrapped_options_ignore_irrelevant_env(self) -> None:
         included = "PANTS_DISTDIR"
         excluded = "NON_PANTS_ENV"
