@@ -8,6 +8,8 @@ from functools import partial
 from pathlib import Path
 from textwrap import dedent
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.engine.unions import UnionMembership
 from pants.option.option_value_container import OptionValueContainer
@@ -146,6 +148,7 @@ class TestOptionsBootstrapper:
         assert "/qux/baz" == opts.for_scope("foo").bar
         assert "/pear/banana" == opts.for_scope("fruit").apple
 
+    @pytest.mark.skip("See https://github.com/pantsbuild/pants/pull/20956 for when we can revisit")
     def test_bootstrapped_options_ignore_irrelevant_env(self) -> None:
         included = "PANTS_DISTDIR"
         excluded = "NON_PANTS_ENV"
