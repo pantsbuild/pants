@@ -67,7 +67,7 @@ pub struct NailgunPool {
 
 impl NailgunPool {
     pub fn new(workdir_base: PathBuf, size: usize, store: Store, executor: Executor) -> Self {
-        info!("Initialising Nailgun pool for {} processes...", size);
+        info!("Initializing Nailgun pool for {} processes...", size);
         NailgunPool {
             workdir_base,
             size,
