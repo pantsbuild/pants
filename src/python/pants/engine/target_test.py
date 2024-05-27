@@ -1061,7 +1061,7 @@ expected_path_globs = namedtuple(
                     "test/b",
                 ),
                 glob_match_error_behavior=GlobMatchErrorBehavior.warn,
-                conjunction=GlobExpansionConjunction.all_match,
+                conjunction=GlobExpansionConjunction.any_match,
                 description_of_origin="test:test's `sources` field",
             ),
             id="provided value warns on glob match error",
@@ -1108,7 +1108,7 @@ def test_multiple_sources_path_globs(
             expected_path_globs(
                 globs=("test/other_file",),
                 glob_match_error_behavior=GlobMatchErrorBehavior.warn,
-                conjunction=GlobExpansionConjunction.all_match,
+                conjunction=GlobExpansionConjunction.any_match,
                 description_of_origin="test:test's `source` field",
             ),
             id="provided value warns on glob match error",
@@ -1119,7 +1119,7 @@ def test_multiple_sources_path_globs(
             expected_path_globs(
                 globs=("test/life",),
                 glob_match_error_behavior=GlobMatchErrorBehavior.warn,
-                conjunction=GlobExpansionConjunction.all_match,
+                conjunction=GlobExpansionConjunction.any_match,
                 description_of_origin="test:test's `source` field",
             ),
             id="default glob conjunction",
