@@ -735,3 +735,21 @@ def test_type_context_bounds(rule_runner: RuleRunner) -> None:
         "foo.Applicative",
         "foo.Functor",
     ]
+
+
+def test_self_types_on_same_package(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """\
+            package foo
+
+            trait Bar { self: Foo =>
+            }
+            """
+        ),
+    )
+
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.Foo",
+    ]
