@@ -157,7 +157,7 @@ def run_typecheck_rule(
 ) -> Tuple[int, str]:
     union_membership = UnionMembership({CheckRequest: request_types})
     check_subsystem = create_subsystem(CheckSubsystem, only=only or [])
-    with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
+    with mock_console(create_options_bootstrapper(["-lwarn"])) as (console, stdio_reader):
         rule_runner = RuleRunner()
         result: Check = run_rule_with_mocks(
             check,
