@@ -31,14 +31,7 @@ def rule_runner() -> RuleRunner:
 
 PANTS_TOML = """[GLOBAL]\nbackend_packages = ["pants.backend.tools.trufflehog"]\n"""
 
-PANTS_TOML_WITH_EXCLUSIONS = """
-    [GLOBAL]
-    backend_packages = ["pants.backend.tools.trufflehog"]
-
-    [trufflehog]
-    exclude_options = ["secret.json"]
-"""
-
+# This configuration file specifies a detector that looks for custom regex patterns
 TRUFFLEHOG_CONFIG = r"""
 # config.yaml
 detectors:
@@ -56,6 +49,7 @@ detectors:
           - "Authorization: super secret authorization header"
 """
 
+# Example file contents with mock secrets in place for detection. These are not real secrets.
 TRUFFLEHOG_PAYLOAD_WITH_SECRETS = """
 {
     "HogTokenDetector": {
@@ -64,6 +58,10 @@ TRUFFLEHOG_PAYLOAD_WITH_SECRETS = """
     }
 }
 """
+
+# The count of detectors loaded by the current version of Trufflehog.
+# This may change in future versions, depending on whether or not new detectors are added.
+TOTAL_DETECTORS = 738
 
 
 def run_trufflehog(
@@ -87,7 +85,11 @@ def run_trufflehog(
     return fmt_result
 
 
-def extract_total_detector_count(input_string):
+def extract_total_detector_count(input_string: str) -> int | None:
+    """This function extracts the total number of detectors loaded by Trufflehog.
+
+    Trufflehog prints to stderr in a format that can't be parsed as json.
+    """
     # Find the index of the substring "total"
     total_index = input_string.find('"total":')
     if total_index == -1:
@@ -111,7 +113,7 @@ def test_detectors_loaded(rule_runner: RuleRunner) -> None:
     # Trufflehog prints details on how many active detectors are running to stderr
     assert "loaded detectors" in fmt_result.stderr
     # This number is expected to change with upgrades to trufflehog
-    assert 738 == extract_total_detector_count(fmt_result.stderr)
+    assert TOTAL_DETECTORS == extract_total_detector_count(fmt_result.stderr)
     rule_runner.write_files(
         {
             "pants-enable-trufflehog.toml.toml": PANTS_TOML,
@@ -121,7 +123,7 @@ def test_detectors_loaded(rule_runner: RuleRunner) -> None:
     fmt_result = run_trufflehog(rule_runner)
     assert not fmt_result.stdout
     # Adding the config file has added one additional detector
-    assert 739 == extract_total_detector_count(fmt_result.stderr)
+    assert TOTAL_DETECTORS + 1 == extract_total_detector_count(fmt_result.stderr)
 
 
 def test_secret_detected(rule_runner: RuleRunner) -> None:
