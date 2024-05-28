@@ -166,24 +166,45 @@ class Parametrize:
         except Exception as e:
             raise Exception(f"Failed to parametrize `{address}`:\n  {e}") from e
 
-        if parametrized_groups:
-            # Add the groups as one vector for the cross-product.
-            parametrized.append(parametrized_groups)
-
-        if not parametrized:
-            yield (address, fields)
-            return
-
+        parameters = address.parameters
         non_parametrized = tuple(
             (field_name, field_value)
             for field_name, field_value in fields.items()
             if not isinstance(field_value, Parametrize)
         )
+        if parametrized_groups:
+            # Add the groups as one vector for the cross-product.
+            parametrized.append(parametrized_groups)
+
+        unparametrize_keys = {k for k, _ in non_parametrized if k in parameters}
+
+        # Remove non-parametrized fields from the address parameters.
+        for k in unparametrize_keys:
+            parameters.pop(k, None)
+
+        if not parametrized:
+            if unparametrize_keys:
+                address = address.parametrize(parameters, replace=True)
+            yield (address, fields)
+            return
 
         for parametrized_args in itertools.product(*parametrized):
-            expanded_address = address.parametrize(
-                {field_name: alias for field_name, alias, _ in parametrized_args}
+            expanded_parameters = parameters | {
+                field_name: alias for field_name, alias, _ in parametrized_args
+            }
+            # There will be at most one group per cross product.
+            group_kwargs: Mapping[str, Any] = next(
+                (
+                    field_value.kwargs
+                    for _, _, field_value in parametrized_args
+                    if isinstance(field_value, Parametrize) and field_value.is_group
+                ),
+                {},
             )
+            # Exclude fields from parametrize group from address parameters.
+            for k in group_kwargs.keys() & parameters.keys():
+                expanded_parameters.pop(k, None)
+
             parametrized_args_fields = tuple(
                 (field_name, field_value)
                 for field_name, _, field_value in parametrized_args
@@ -191,17 +212,9 @@ class Parametrize:
                 if not (isinstance(field_value, Parametrize) and field_value.is_group)
             )
             expanded_fields: dict[str, Any] = dict(non_parametrized + parametrized_args_fields)
-            expanded_fields.update(
-                # There will be at most one group per cross product.
-                next(
-                    (
-                        field_value.kwargs
-                        for _, _, field_value in parametrized_args
-                        if isinstance(field_value, Parametrize) and field_value.is_group
-                    ),
-                    {},
-                )
-            )
+            expanded_fields.update(group_kwargs)
+
+            expanded_address = address.parametrize(expanded_parameters, replace=True)
             yield expanded_address, expanded_fields
 
     @staticmethod
