@@ -646,10 +646,9 @@ async def find_binary(
     # which is not the current directory (since the process will execute in the workspace). Thus,
     # adjust the path used as argv[0] to find the script.
     script_name = "find_binary.sh"
+    sandbox_base_path = env_target.sandbox_base_path()
     script_exec_path = (
-        f"./{script_name}"
-        if not env_target.is_workspace_environment()
-        else f"{{chroot}}/{script_name}"
+        f"./{script_name}" if not sandbox_base_path else f"{sandbox_base_path}/{script_name}"
     )
 
     script_header = dedent(

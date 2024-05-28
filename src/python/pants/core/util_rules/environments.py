@@ -178,25 +178,15 @@ class LocalEnvironmentTarget(Target):
     )
 
 
-class LocalWorkspaceFallbackEnvironmentField(FallbackEnvironmentField):
-    help = help_text(
-        f"""
-        The environment to fallback to when this local workspace environment cannot be used because the
-        field `{CompatiblePlatformsField.alias}` is not compatible with the local host.
-
-        Must be an environment name from the option `[environments-preview].names`, the
-        special string `{LOCAL_WORKSPACE_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
-        Python value `None` to error when this specific local workspace environment cannot be used.
-        """
-    )
+class LocalWorkspaceCompatiblePlatformsField(CompatiblePlatformsField):
+    pass
 
 
 class LocalWorkspaceEnvironmentTarget(Target):
     alias = "workspace_environment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        CompatiblePlatformsField,
-        LocalWorkspaceFallbackEnvironmentField,
+        LocalWorkspaceCompatiblePlatformsField,
     )
     help = help_text(
         """
@@ -567,8 +557,11 @@ class EnvironmentTarget:
             else ProcessCacheScope.PER_RESTART_SUCCESSFUL
         )
 
-    def is_workspace_environment(self):
-        return self.val and self.val.has_field(LocalWorkspaceFallbackEnvironmentField)
+    def sandbox_base_path(self) -> str:
+        if self.val and self.val.has_field(LocalWorkspaceCompatiblePlatformsField):
+            return "{chroot}"
+        else:
+            return ""
 
 
 def _compute_env_field(field_set: FieldSet) -> EnvironmentField:
@@ -721,7 +714,6 @@ async def determine_local_environment(
     )
 
 
-# TODO: Consider refactoring with determine_local_workspace above.
 @rule
 async def determine_local_workspace_environment(
     all_environment_targets: AllEnvironmentTargets,
@@ -730,8 +722,7 @@ async def determine_local_workspace_environment(
     compatible_name_and_targets = [
         (name, tgt)
         for name, tgt in all_environment_targets.items()
-        if tgt.has_field(CompatiblePlatformsField)
-        and tgt.has_field(LocalWorkspaceFallbackEnvironmentField)
+        if tgt.has_field(LocalWorkspaceCompatiblePlatformsField)
         and platform.value in tgt[CompatiblePlatformsField].value
     ]
 
@@ -1062,7 +1053,7 @@ async def extract_process_config_from_environment(
                     )
                 )
 
-        execute_in_workspace = tgt.val.has_field(LocalWorkspaceFallbackEnvironmentField)
+        execute_in_workspace = tgt.val.has_field(LocalWorkspaceCompatiblePlatformsField)
 
     return ProcessExecutionEnvironment(
         environment_name=tgt.name,
