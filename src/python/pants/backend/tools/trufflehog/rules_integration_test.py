@@ -8,8 +8,8 @@ import pytest
 
 from pants.backend.tools.trufflehog.rules import TrufflehogRequest
 from pants.backend.tools.trufflehog.rules import rules as trufflehog_rules
-from pants.core.goals.lint import LintResult
 from pants.core.goals.fmt import Partitions
+from pants.core.goals.lint import LintResult
 from pants.core.util_rules import config_files, external_tool
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.native_engine import Snapshot
@@ -31,7 +31,7 @@ def rule_runner() -> RuleRunner:
 
 PANTS_TOML = """[GLOBAL]\nbackend_packages = ["pants.backend.tools.trufflehog"]\n"""
 
-TRUFFLEHOG_CONFIG = r'''
+TRUFFLEHOG_CONFIG = r"""
 # config.yaml
 detectors:
   - name: HogTokenDetector
@@ -46,7 +46,7 @@ detectors:
         unsafe: true
         headers:
           - "Authorization: super secret authorization header"
-'''
+"""
 
 
 def run_trufflehog(
@@ -64,9 +64,7 @@ def run_trufflehog(
     fmt_result = rule_runner.request(
         LintResult,
         [
-            TrufflehogRequest.Batch(
-                "", partition.elements, partition_metadata=partition.metadata
-            ),
+            TrufflehogRequest.Batch("", partition.elements, partition_metadata=partition.metadata),
         ],
     )
     return fmt_result
@@ -80,7 +78,7 @@ def extract_total_detector_count(input_string):
 
     # Extract the value after "total"
     total_value = ""
-    for char in input_string[total_index + len('"total":'):]:
+    for char in input_string[total_index + len('"total":') :]:
         if char.isdigit():
             total_value += char
         else:

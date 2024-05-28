@@ -1,3 +1,5 @@
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 """"Generates trufflehog rules."""
 
 from __future__ import annotations
@@ -26,8 +28,8 @@ from .subsystem import Trufflehog
 
 
 class TrufflehogRequest(LintFilesRequest):
-    """Defines the request for linting, in support of batching files in chunks,
-    in case many files need to be scanned)"""
+    """Defines the request for linting, in support of batching files in chunks, in case many files
+    need to be scanned)"""
 
     tool_subsystem = Trufflehog
 
@@ -103,7 +105,7 @@ async def run_trufflehog(
             input_digest=input_digest,
             description=f"Run Trufflehog on {pluralize(len(snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
-        )
+        ),
     )
     return LintResult.create(request, process_result)
 

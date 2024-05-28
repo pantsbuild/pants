@@ -1,3 +1,5 @@
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 """Downloads the trufflehog binary."""
 
 from __future__ import annotations
@@ -48,8 +50,8 @@ class Trufflehog(ExternalTool):
     )
 
     def generate_url(self, plat: Platform) -> str:
-        """Returns the download URL for the trufflehog binary, depending on the
-        current environment."""
+        """Returns the download URL for the trufflehog binary, depending on the current
+        environment."""
         plat_str = {
             "macos_arm64": "darwin_arm64",
             "macos_x86_64": "darwin_amd64",
