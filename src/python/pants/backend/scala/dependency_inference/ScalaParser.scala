@@ -185,6 +185,7 @@ class SourceAnalysisTraverser extends Traverser {
     withNamePart(
       name,
       () => {
+        apply(templ.self)
         apply(templ.early)
         apply(templ.stats)
       }
@@ -382,6 +383,9 @@ class SourceAnalysisTraverser extends Traverser {
       })
       init.argss.foreach(arg => apply(arg))
     }
+
+    case Self(_name, Some(decltpe)) =>
+      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
 
     case node @ Term.Select(_, _) => {
       val name = extractName(node)
