@@ -859,11 +859,10 @@ def test_shell_command_with_workspace_execution(rule_runner: RuleRunner) -> None
         }
     )
     rule_runner.set_options(
-        ["--environments-preview-names={'workspace': '//:workspace'}", "--no-local-cache"],
+        ["--environments-preview-names={'workspace': '//:workspace'}"],
         env_inherit={"PATH"},
     )
 
-    print(f"build root = {rule_runner.build_root}")
     assert_shell_command_result(
         rule_runner,
         Address("", target_name="make-file"),

@@ -71,6 +71,7 @@ class AdhocProcessRequest:
     log_output: bool
     capture_stdout_file: str | None
     capture_stderr_file: str | None
+    cache_scope: ProcessCacheScope | None = None
 
 
 @dataclass(frozen=True)
@@ -587,10 +588,7 @@ async def prepare_adhoc_process(
         working_directory=working_directory,
         append_only_caches=append_only_caches,
         immutable_input_digests=immutable_input_digests,
-        # TODO: This is necessary for tests of `adhoc_tool` and `shell_command` with
-        # workspace execution to pass repeatedly in local Pants development.
-        # We need a viable solution instead of this hack.
-        cache_scope=ProcessCacheScope.PER_SESSION,
+        cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
 
     return _output_at_build_root(proc, bash)

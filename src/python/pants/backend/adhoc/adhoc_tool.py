@@ -28,7 +28,7 @@ from pants.core.util_rules.adhoc_process_support import (
     ToolRunnerRequest,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
-from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
@@ -48,6 +48,7 @@ class GenerateFilesFromAdhocToolRequest(GenerateSourcesRequest):
 @rule(desc="Running run_in_sandbox target", level=LogLevel.DEBUG)
 async def run_in_sandbox_request(
     request: GenerateFilesFromAdhocToolRequest,
+    env_target: EnvironmentTarget,
 ) -> GeneratedSources:
     target = request.protocol_target
     description = f"the `{target.alias}` at {target.address}"
@@ -78,6 +79,8 @@ async def run_in_sandbox_request(
     output_files = target.get(AdhocToolOutputFilesField).value or ()
     output_directories = target.get(AdhocToolOutputDirectoriesField).value or ()
 
+    cache_scope = env_target.default_cache_scope
+
     process_request = AdhocProcessRequest(
         description=description,
         address=target.address,
@@ -96,6 +99,7 @@ async def run_in_sandbox_request(
         log_output=target[AdhocToolLogOutputField].value,
         capture_stderr_file=target[AdhocToolStderrFilenameField].value,
         capture_stdout_file=target[AdhocToolStdoutFilenameField].value,
+        cache_scope=cache_scope,
     )
 
     adhoc_result = await Get(

@@ -563,6 +563,13 @@ class EnvironmentTarget:
         else:
             return ""
 
+    @property
+    def default_cache_scope(self) -> ProcessCacheScope:
+        if self.val and self.val.has_field(LocalWorkspaceCompatiblePlatformsField):
+            return ProcessCacheScope.PER_SESSION
+        else:
+            return ProcessCacheScope.SUCCESSFUL
+
 
 def _compute_env_field(field_set: FieldSet) -> EnvironmentField:
     for attr in dir(field_set):
