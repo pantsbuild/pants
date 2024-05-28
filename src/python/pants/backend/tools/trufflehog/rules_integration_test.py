@@ -31,6 +31,14 @@ def rule_runner() -> RuleRunner:
 
 PANTS_TOML = """[GLOBAL]\nbackend_packages = ["pants.backend.tools.trufflehog"]\n"""
 
+PANTS_TOML_WITH_EXCLUSIONS = """
+    [GLOBAL]
+    backend_packages = ["pants.backend.tools.trufflehog"]
+
+    [trufflehog]
+    exclude_options = ["secret.json"]
+"""
+
 TRUFFLEHOG_CONFIG = r"""
 # config.yaml
 detectors:
@@ -38,7 +46,7 @@ detectors:
     keywords:
       - hog
     regex:
-      hogID: '(HOG[0-9A-Z]{17})'
+      hogID: '\b(HOG[0-9A-Z]{17})\b'
       hogToken: '[^A-Za-z0-9+\/]{0,1}([A-Za-z0-9+\/]{40})[^A-Za-z0-9+\/]{0,1}'
     verify:
       - endpoint: http://localhost:8000/
@@ -46,6 +54,15 @@ detectors:
         unsafe: true
         headers:
           - "Authorization: super secret authorization header"
+"""
+
+TRUFFLEHOG_PAYLOAD_WITH_SECRETS = """
+{
+    "HogTokenDetector": {
+        "HogID": ["HOGAAIUNNWHAHJJWUQYR"],
+        "HogSecret": ["sD9vzqdSsAOxntjAJ/qZ9sw+8PvEYg0r7D1Hhh0C"],
+    }
+}
 """
 
 
@@ -105,3 +122,18 @@ def test_detectors_loaded(rule_runner: RuleRunner) -> None:
     assert not fmt_result.stdout
     # Adding the config file has added one additional detector
     assert 739 == extract_total_detector_count(fmt_result.stderr)
+
+
+def test_secret_detected(rule_runner: RuleRunner) -> None:
+    # Write the configuration file
+    rule_runner.write_files(
+        {
+            "pants-enable-trufflehog.toml.toml": PANTS_TOML,
+            "trufflehog-config.yaml": TRUFFLEHOG_CONFIG,
+            "secret.json": TRUFFLEHOG_PAYLOAD_WITH_SECRETS,
+        }
+    )
+    fmt_result = run_trufflehog(rule_runner)
+
+    # Trufflehog returns exit code 183 upon finding secrets
+    assert fmt_result.exit_code == 183
