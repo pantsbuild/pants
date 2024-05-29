@@ -18,7 +18,6 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSour
 from pants.backend.openapi.codegen.java.rules import GenerateJavaFromOpenAPIRequest
 from pants.backend.openapi.codegen.java.rules import rules as java_codegen_rules
 from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
-from pants.backend.openapi.util_rules import openapi_document
 from pants.backend.openapi.target_types import (
     OpenApiDocumentDependenciesField,
     OpenApiDocumentField,
@@ -28,6 +27,7 @@ from pants.backend.openapi.target_types import (
     OpenApiSourceTarget,
 )
 from pants.backend.openapi.target_types import rules as target_types_rules
+from pants.backend.openapi.util_rules import openapi_bundle
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     Dependencies,
@@ -62,7 +62,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *java_backend_rules(),
             *java_codegen_rules(),
-            *openapi_document.rules(),
+            *openapi_bundle.rules(),
             *target_types_rules(),
             *testutil.rules(),
             QueryRule(HydratedSources, (HydrateSourcesRequest,)),
