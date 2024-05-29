@@ -1,69 +1,86 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
+from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.backend.javascript.subsystems import nodejs_tool
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
 from pants.backend.openapi.subsystems.redocly import Redocly
 from pants.backend.openapi.target_types import (
+    OpenApiBundleDummySourceField,
+    OpenApiBundleSourceRootField,
     OpenApiDocumentField,
-    OpenApiDocumentGeneratorTarget,
-    OpenApiDocumentTarget,
     OpenApiSourceField,
 )
 from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.internals.native_engine import AddPrefix, Digest, Snapshot
+from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
     GeneratedSources,
     GenerateSourcesRequest,
-    StringField,
+    Target,
+    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
-from pants.util.strutil import help_text, pluralize
+from pants.util.strutil import pluralize
 
 
-class BundleOpenApiDocumentRequest(GenerateSourcesRequest):
-    input = OpenApiDocumentField
+class GenerateOpenApiBundleRequest(GenerateSourcesRequest):
+    input = OpenApiBundleDummySourceField
     output = ResourceSourceField
 
 
-class BundleSourceRootField(StringField):
-    alias = "bundle_source_root"
-    help = help_text(
-        """
-        The source root to bundle OpenAPI documents under.
-
-        If unspecified, the source root the `openapi_documents` is under will be used.
-        """
-    )
+@dataclass(frozen=True)
+class _BundleOpenApiDocument:
+    target: Target
+    bundle_source_root: str | None
 
 
 @rule
-async def bundle_openapi_document(
-    request: BundleOpenApiDocumentRequest, redocly: Redocly
+async def generate_openapi_bundle_sources(
+    request: GenerateOpenApiBundleRequest,
 ) -> GeneratedSources:
-    target = request.protocol_target
-    bundle_source_root = request.protocol_target.get(BundleSourceRootField).value
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([target.address]))
+    bundle_source_root = request.protocol_target[OpenApiBundleSourceRootField].value
+    openapi_document_targets = await Get(
+        Targets, DependenciesRequest(request.protocol_target[Dependencies])
+    )
+    bundled_documents_digests = await MultiGet(
+        Get(Digest, _BundleOpenApiDocument(tgt, bundle_source_root))
+        for tgt in openapi_document_targets
+        if tgt.has_field(OpenApiDocumentField)
+    )
+    snapshot = await Get(Snapshot, MergeDigests(bundled_documents_digests))
+    return GeneratedSources(snapshot)
+
+
+@rule
+async def bundle_openapi_document(request: _BundleOpenApiDocument, redocly: Redocly) -> Digest:
+    transitive_targets = await Get(
+        TransitiveTargets, TransitiveTargetsRequest([request.target.address])
+    )
+
     source_root_request = Get(
         SourceRoot,
         SourceRootRequest,
-        SourceRootRequest(PurePath(bundle_source_root))
-        if bundle_source_root
-        else SourceRootRequest.for_target(request.protocol_target),
+        SourceRootRequest(PurePath(request.bundle_source_root))
+        if request.bundle_source_root
+        else SourceRootRequest.for_target(request.target),
     )
 
     target_stripped_sources_request = Get(
-        StrippedSourceFiles, SourceFilesRequest([target[OpenApiDocumentField]])
+        StrippedSourceFiles, SourceFilesRequest([request.target[OpenApiDocumentField]])
     )
     all_stripped_sources_request = Get(
         StrippedSourceFiles,
@@ -98,19 +115,16 @@ async def bundle_openapi_document(
     )
 
     source_root_restored = (
-        await Get(Snapshot, AddPrefix(result.output_digest, source_root.path))
+        await Get(Digest, AddPrefix(result.output_digest, source_root.path))
         if source_root.path != "."
-        else await Get(Snapshot, Digest, result.output_digest)
+        else result.output_digest
     )
-
-    return GeneratedSources(source_root_restored)
+    return source_root_restored
 
 
 def rules():
     return (
         *collect_rules(),
         *nodejs_tool.rules(),
-        UnionRule(GenerateSourcesRequest, BundleOpenApiDocumentRequest),
-        OpenApiDocumentTarget.register_plugin_field(BundleSourceRootField),
-        OpenApiDocumentGeneratorTarget.register_plugin_field(BundleSourceRootField),
+        UnionRule(GenerateSourcesRequest, GenerateOpenApiBundleRequest),
     )
