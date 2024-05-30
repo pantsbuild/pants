@@ -61,7 +61,24 @@ async def infer_docker_dependencies(
             ),
         )
     )
-    maybe_output_paths = set(dockerfile_info.copy_source_paths)
+    putative_copy_addresses = await Get(
+        Addresses,
+        UnparsedAddressInputs(
+            dockerfile_info.copy_build_args.to_dict().values(),
+            owning_address=dockerfile_info.address,
+            description_of_origin=softwrap(
+                f"""
+                the COPY arguments from the file {dockerfile_info.source}
+                from the target {dockerfile_info.address}
+                """
+            ),
+            skip_invalid_addresses=True,
+        ),
+    )
+    # maybe_output_paths = set(dockerfile_info.copy_source_paths) | set(dockerfile_info.copy_build_args.to_dict().values())
+    maybe_output_paths = set(dockerfile_info.copy_source_paths) | set(
+        dockerfile_info.copy_build_args.to_dict().values()
+    )
 
     # NB: There's no easy way of knowing the output path's default file ending as there could
     # be none or it could be dynamic. Instead of forcing clients to tell us, we just use all the
@@ -71,10 +88,12 @@ async def infer_docker_dependencies(
     possible_file_endings = {PurePath(path).suffix[1:] or None for path in maybe_output_paths}
     inferred_addresses = []
     for target in all_packageable_targets:
+        # If the target is an image we depend on, add it
         if target.address in putative_image_addresses:
             inferred_addresses.append(target.address)
             continue
 
+        # If the target looks like it could generate the file we're trying to COPY
         output_path_field = target.get(OutputPathField)
         possible_output_paths = {
             output_path_field.value_or_default(file_ending=file_ending)
@@ -84,6 +103,11 @@ async def infer_docker_dependencies(
             if output_path in maybe_output_paths:
                 inferred_addresses.append(target.address)
                 break
+
+        # If the target has the same address as an ARG that will eventually be copied
+        for input_address in putative_copy_addresses:
+            if target.address == input_address:
+                inferred_addresses.append(target.address)
 
     return InferredDependencies(Addresses(inferred_addresses))
 
