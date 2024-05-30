@@ -39,11 +39,9 @@ async def infer_docker_dependencies(
     dockerfile_info = await Get(DockerfileInfo, DockerfileInfoRequest(request.field_set.address))
     targets = await Get(Targets, Addresses([request.field_set.address]))
     build_args = await Get(DockerBuildArgs, DockerBuildArgsRequest(targets.expect_single()))
-    merged_from_build_args = {
-        k: build_args.to_dict().get(k, v)
-        for k, v in dockerfile_info.from_image_build_args.to_dict().items()
-    }
-    dockerfile_build_args = {k: v for k, v in merged_from_build_args.items() if v}
+    dockerfile_build_args = dockerfile_info.from_image_build_args.with_overrides(
+        build_args, only_with_value=True
+    )
 
     putative_image_addresses = set(
         await Get(

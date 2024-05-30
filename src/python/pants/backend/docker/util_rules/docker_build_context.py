@@ -24,7 +24,12 @@ from pants.backend.docker.util_rules.docker_build_env import (
 from pants.backend.docker.utils import suggest_renames
 from pants.backend.docker.value_interpolation import DockerBuildArgsInterpolationValue
 from pants.backend.shell.target_types import ShellSourceField
-from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
+from pants.core.goals.package import (
+    BuiltPackage,
+    EnvironmentAwarePackageRequest,
+    OutputPathField,
+    PackageFieldSet,
+)
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
@@ -332,11 +337,9 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
         # Update build arg values for FROM image build args.
 
         # Get the FROM image build args with defined values in the Dockerfile & build args.
-        merged_from_build_args = {
-            k: build_args.to_dict().get(k, v)
-            for k, v in dockerfile_info.from_image_build_args.to_dict().items()
-        }
-        dockerfile_build_args = {k: v for k, v in merged_from_build_args.items() if v}
+        dockerfile_build_args = dockerfile_info.from_image_build_args.with_overrides(
+            build_args, only_with_value=True
+        )
         # Parse the build args values into Address instances.
         from_image_addresses = await Get(
             Addresses,
@@ -370,8 +373,32 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
             f"{arg_name}={address_to_built_image_tag[addr]}"
             for arg_name, addr in zip(dockerfile_build_args.keys(), from_image_addresses)
         ]
-        # Merge all build args.
-        build_args = DockerBuildArgs.from_strings(*build_args, *from_image_build_args)
+        build_args = build_args.extended(from_image_build_args)
+
+    # Render build args for turning COPY values in ARGS which are targets into their output
+    copy_arg_addresses = await Get(
+        Addresses,
+        UnparsedAddressInputs(
+            dockerfile_info.copy_build_args.to_dict().values(),
+            owning_address=dockerfile_info.address,
+            description_of_origin=softwrap(
+                f"""
+                the COPY arguments from the file {dockerfile_info.source}
+                from the target {dockerfile_info.address}
+                """
+            ),
+            skip_invalid_addresses=True,
+        ),
+    )
+    copy_arg_targets = await Get(Targets, Addresses, copy_arg_addresses)
+    arg_name_to_target = zip(dockerfile_info.copy_build_args.to_dict().keys(), copy_arg_targets)
+    # TODO: real file ending?
+    copy_arg_as_build_args = [
+        f"{arg_name}={tgt.get(OutputPathField).value_or_default(file_ending='*')}"
+        for arg_name, tgt in arg_name_to_target
+    ]
+
+    build_args = build_args.extended(copy_arg_as_build_args)
 
     return DockerBuildContext.create(
         build_args=build_args,
