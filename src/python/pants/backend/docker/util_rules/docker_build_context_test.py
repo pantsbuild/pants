@@ -726,6 +726,7 @@ def test_create_docker_build_context() -> None:
             source="test/Dockerfile",
             build_args=DockerBuildArgs.from_strings(),
             copy_source_paths=(),
+            copy_build_args=DockerBuildArgs.from_strings(),
             from_image_build_args=DockerBuildArgs.from_strings(),
             version_tags=("base latest", "stage1 1.2", "dev 2.0", "prod 2.0"),
         ),

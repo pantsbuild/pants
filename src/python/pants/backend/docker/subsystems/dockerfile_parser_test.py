@@ -59,10 +59,13 @@ def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunne
     dockerfile_content = dedent(
         """\
         ARG BASE_IMAGE=:base
+        ARG PEX_BIN=:hello
+        ARG PEX_BIN_DOTTED_PATH=dotted.path.as.arg/dpaa.pex
         FROM $BASE_IMAGE
         COPY some.target/binary.pex some.target/tool.pex /bin
         COPY --from=scratch this.is/ignored.pex /opt
         COPY binary another/cli.pex tool /bin
+        COPY ${PEX_BIN} ${PEX_BIN_DOTTED_PATH} :technically_a_file /app/hello.pex
         """
     )
 
@@ -73,12 +76,19 @@ def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunne
     addr = Address("test")
     info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
     assert info.from_image_build_args.to_dict() == {"BASE_IMAGE": ":base"}
+    assert info.copy_build_args.to_dict() == {
+        "PEX_BIN": ":hello",
+        "PEX_BIN_DOTTED_PATH": "dotted.path.as.arg/dpaa.pex",
+    }
     assert info.copy_source_paths == (
         "some.target/binary.pex",
         "some.target/tool.pex",
         "binary",
         "another/cli.pex",
         "tool",
+        "${PEX_BIN}",  # TODO: Should this be here?
+        "${PEX_BIN_DOTTED_PATH}",  # TODO: Should this be here?
+        ":technically_a_file",  # we don't resolve inline targets, since we'd need to rewrite the Dockerfile
     )
 
 
