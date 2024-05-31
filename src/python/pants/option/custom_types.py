@@ -79,17 +79,6 @@ def file_option(s: str) -> str:
     return _normalize_directory_separators(s)
 
 
-def dict_with_files_option(s):
-    """Same as 'dict', but fingerprints the file contents of any values which are file paths.
-
-    For any value which matches the path of a file on disk, the file path is not fingerprinted -- only
-    its contents.
-
-    :API: public
-    """
-    return DictValueComponent.create(s)
-
-
 def shell_str(s: str) -> str:
     """A member_type for strings that should be split upon parsing through `shlex.split()`.
 

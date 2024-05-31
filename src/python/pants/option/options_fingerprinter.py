@@ -8,7 +8,7 @@ from enum import Enum
 from hashlib import sha1
 
 from pants.base.build_environment import get_buildroot
-from pants.option.custom_types import UnsetBool, dict_with_files_option, dir_option, file_option
+from pants.option.custom_types import UnsetBool, dir_option, file_option
 from pants.util.strutil import softwrap
 
 
@@ -83,8 +83,6 @@ class OptionsFingerprinter:
             return self._fingerprint_dirs(option_val)
         elif option_type == file_option:
             return self._fingerprint_files(option_val)
-        elif option_type == dict_with_files_option:
-            return self._fingerprint_dict_with_files(option_val)
         else:
             return self._fingerprint_primitives(option_val)
 

@@ -9,7 +9,6 @@ from pants.option.custom_types import (
     DictValueComponent,
     ListValueComponent,
     UnsetBool,
-    dict_with_files_option,
     dir_option,
     file_option,
 )
@@ -112,33 +111,3 @@ def test_fingerprint_dir(rule_runner: RuleRunner) -> None:
     assert dp1 != dp3
     assert dp1 != dp4
     assert dp2 != dp3
-
-
-def test_fingerprint_dict_with_files_order(rule_runner: RuleRunner) -> None:
-    f1, f2 = (
-        rule_runner.write_files({f: c})[0]
-        for (f, c) in (
-            ("foo/bar.config", "blah blah blah"),
-            ("foo/bar.config", "meow meow meow"),
-        )
-    )
-    fp1 = OptionsFingerprinter().fingerprint(dict_with_files_option, {"properties": f"{f1},{f2}"})
-    fp2 = OptionsFingerprinter().fingerprint(dict_with_files_option, {"properties": f"{f2},{f1}"})
-    assert fp1 == fp2
-
-
-def test_fingerprint_dict_with_file_content_change(rule_runner: RuleRunner) -> None:
-    f1, f2 = (
-        rule_runner.write_files({f: c})[0]
-        for (f, c) in (
-            ("foo/bar.config", "blah blah blah"),
-            ("foo/bar.config", "meow meow meow"),
-        )
-    )
-
-    fp1 = OptionsFingerprinter().fingerprint(dict_with_files_option, {"properties": f"{f1},{f2}"})
-    with open(f1, "w") as f:
-        f.write("123")
-
-    fp2 = OptionsFingerprinter().fingerprint(dict_with_files_option, {"properties": f"{f1},{f2}"})
-    assert fp1 != fp2
