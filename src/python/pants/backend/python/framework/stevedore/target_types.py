@@ -11,13 +11,13 @@ from pants.util.strutil import help_text
 
 
 class StevedoreNamespace(str):
-    f"""Tag a namespace in entry_points as a stevedore namespace.
+    """Tag a namespace in entry_points as a stevedore namespace.
 
     This is required for the entry_point to be visible to dep inference
     based on the `stevedore_namespaces` field.
 
     For example:
-        {PythonDistribution.alias}(
+        python_distribution(
             ...
             entry_points={{
                 stevedore_namespace("a.b.c"): {{
