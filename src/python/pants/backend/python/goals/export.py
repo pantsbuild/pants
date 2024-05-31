@@ -414,13 +414,6 @@ async def python_codegen_export_setup() -> _ExportPythonCodegenSetup:
 async def export_python_codegen(
     request: _ExportPythonCodegenRequest, python_setup: PythonSetup, all_targets: AllTargets
 ) -> _ExportPythonCodegenResult:
-    print(f"all_targets={all_targets}")
-    print(
-        f"has_field(PythonResolveField)={[tgt.has_field(PythonResolveField) for tgt in all_targets]}"
-    )
-    print(
-        f"resolve={[tgt[PythonResolveField].normalized_value(python_setup) for tgt in all_targets]}"
-    )
     non_python_sources_in_python_resolve = [
         tgt.get(SourcesField)
         for tgt in all_targets
@@ -429,7 +422,6 @@ async def export_python_codegen(
         and tgt.has_field(SourcesField)
         and not tgt.has_field(PythonSourceField)
     ]
-    print(f"non_python_sources_in_python_resolve={non_python_sources_in_python_resolve}")
 
     if not non_python_sources_in_python_resolve:
         return _ExportPythonCodegenResult(EMPTY_DIGEST)
