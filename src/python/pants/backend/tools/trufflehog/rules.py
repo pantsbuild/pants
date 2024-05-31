@@ -28,9 +28,6 @@ from .subsystem import Trufflehog
 
 
 class TrufflehogRequest(LintFilesRequest):
-    """Defines the request for linting, in support of batching files in chunks, in case many files
-    need to be scanned)"""
-
     tool_subsystem = Trufflehog
 
 
@@ -69,7 +66,7 @@ async def run_trufflehog(
     entry = next(
         e
         for e in await Get(DigestEntries, Digest, downloaded_trufflehog.digest)
-        if isinstance(e, FileEntry) and e.path.endswith("trufflehog")
+        if isinstance(e, FileEntry) and e.path == "trufflehog" and e.is_executable
     )
     trufflehog_digest = await Get(Digest, CreateDigest([entry]))
 
