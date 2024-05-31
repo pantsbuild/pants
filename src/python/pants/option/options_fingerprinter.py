@@ -3,7 +3,6 @@
 import hashlib
 import json
 import os
-from collections import defaultdict
 from enum import Enum
 from hashlib import sha1
 
@@ -148,27 +147,3 @@ class OptionsFingerprinter:
 
     def _fingerprint_primitives(self, val):
         return stable_option_fingerprint(val)
-
-    @staticmethod
-    def _fingerprint_dict_with_files(option_val):
-        """Returns a fingerprint of the given dictionary containing file paths.
-
-        Any value which is a file path which exists on disk will be fingerprinted by that file's
-        contents rather than by its path.
-
-        This assumes the files are small enough to be read into memory.
-
-        NB: The keys of the dict are assumed to be strings -- if they are not, the dict should be
-        converted to encode its keys with `stable_option_fingerprint()`, as is done in the `fingerprint()`
-        method.
-        """
-        final = defaultdict(list)
-        for k, v in option_val.items():
-            for sub_value in sorted(v.split(",")):
-                if os.path.isfile(sub_value):
-                    with open(sub_value) as f:
-                        final[k].append(f.read())
-                else:
-                    final[k].append(sub_value)
-        fingerprint = stable_option_fingerprint(final)
-        return fingerprint
