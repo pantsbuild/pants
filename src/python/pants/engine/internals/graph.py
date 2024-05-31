@@ -635,8 +635,9 @@ async def find_all_targets() -> AllTargets:
     tgts = await Get(
         Targets,
         RawSpecsWithoutFileOwners(
-            recursive_globs=(RecursiveGlobSpec(""),), description_of_origin="the `AllTargets` rule",
-            unmatched_glob_behavior=GlobMatchErrorBehavior.warn,
+            recursive_globs=(RecursiveGlobSpec(""),),
+            description_of_origin="the `AllTargets` rule",
+            unmatched_glob_behavior=GlobMatchErrorBehavior.error,
         ),
     )
     return AllTargets(tgts)
