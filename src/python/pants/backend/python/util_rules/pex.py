@@ -63,6 +63,7 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
+from pants.engine.intrinsics import add_prefix_request_to_digest
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
@@ -671,12 +672,12 @@ async def build_pex(
 
     requirements_setup = await _setup_pex_requirements(request, python_setup)
 
-    sources_digest_as_subdir = await Get(
-        Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
+    sources_digest_as_subdir = await add_prefix_request_to_digest(
+        AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
     )
 
     req_strings = (
-        (await Get(PexRequirementsInfo, PexRequirements, request.requirements)).req_strings
+        (await get_req_strings(request.requirements)).req_strings
         if isinstance(request.requirements, PexRequirements)
         else []
     )
