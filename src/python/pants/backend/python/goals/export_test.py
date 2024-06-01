@@ -241,7 +241,7 @@ def test_export_codegen_outputs():
             "--python-resolves={'test-resolve': 'test-resolve.lock'}",
             "--source-root-patterns=src/python",
             "--export-resolve=test-resolve",
-            "--export-py-include-codegen",
+            "--export-py-generated-sources",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
