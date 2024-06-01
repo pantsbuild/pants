@@ -665,16 +665,29 @@ async def build_pex(
                 ),
             )
 
+    source_dir_name = "source_files"
+
+    pex_python_setup = await _determine_pex_python_and_platforms(request)
+
+    requirements_setup = await _setup_pex_requirements(request, python_setup)
+
+    sources_digest_as_subdir = await Get(
+        Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
+    )
+
+    req_strings = (
+        (await Get(PexRequirementsInfo, PexRequirements, request.requirements)).req_strings
+        if isinstance(request.requirements, PexRequirements)
+        else []
+    )
+
     argv = [
         "--output-file",
         request.output_filename,
         *request.additional_args,
     ]
 
-    pex_python_setup = await _determine_pex_python_and_platforms(request)
     argv.extend(pex_python_setup.argv)
-
-    source_dir_name = "source_files"
 
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())
@@ -705,12 +718,8 @@ async def build_pex(
         argv.append("--no-pre-install-wheels")
 
     argv.append(f"--sources-directory={source_dir_name}")
-    sources_digest_as_subdir = await Get(
-        Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
-    )
 
     # Include any additional arguments and input digests required by the requirements.
-    requirements_setup = await _setup_pex_requirements(request, python_setup)
     argv.extend(requirements_setup.argv)
 
     merged_digest = await Get(
@@ -734,11 +743,6 @@ async def build_pex(
     else:
         output_directories = [request.output_filename]
 
-    req_strings = (
-        (await Get(PexRequirementsInfo, PexRequirements, request.requirements)).req_strings
-        if isinstance(request.requirements, PexRequirements)
-        else []
-    )
     result = await Get(
         ProcessResult,
         PexCliProcess(
