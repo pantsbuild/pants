@@ -12,6 +12,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSHandlerField,
     PythonFaaSLayoutField,
     PythonFaaSPex3VenvCreateExtraArgsField,
+    PythonFaaSPexBuildExtraArgs,
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
@@ -120,6 +121,7 @@ class PythonGoogleCloudFunction(Target):
         PythonFaaSCompletePlatforms,
         PythonGoogleCloudFunctionType,
         PythonFaaSPex3VenvCreateExtraArgsField,
+        PythonFaaSPexBuildExtraArgs,
         PythonFaaSLayoutField,
         PythonResolveField,
         EnvironmentField,

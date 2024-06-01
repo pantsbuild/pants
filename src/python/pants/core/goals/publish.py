@@ -279,7 +279,7 @@ async def run_publish(
 
     # We collect all results to the end, so all output from the interactive processes are done,
     # before printing the results.
-    for line in results:
+    for line in sorted(results):
         console.print_stderr(line)
 
     # Log structured output

@@ -1,0 +1,4 @@
+1.5.x Stable releases
+=====================
+
+These notes have moved to `docs/notes/1.5.x.rst <../../../../docs/notes/1.5.x.rst>`_

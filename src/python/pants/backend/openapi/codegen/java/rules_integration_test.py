@@ -27,6 +27,7 @@ from pants.backend.openapi.target_types import (
     OpenApiSourceTarget,
 )
 from pants.backend.openapi.target_types import rules as target_types_rules
+from pants.backend.openapi.util_rules import openapi_bundle
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     Dependencies,
@@ -61,6 +62,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *java_backend_rules(),
             *java_codegen_rules(),
+            *openapi_bundle.rules(),
             *target_types_rules(),
             *testutil.rules(),
             QueryRule(HydratedSources, (HydrateSourcesRequest,)),

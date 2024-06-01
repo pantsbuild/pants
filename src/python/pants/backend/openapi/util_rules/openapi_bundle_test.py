@@ -10,17 +10,17 @@ import pytest
 from pants.backend.openapi import dependency_inference
 from pants.backend.openapi.subsystems.redocly import Redocly
 from pants.backend.openapi.target_types import (
-    OpenApiDocumentField,
+    OpenApiBundleTarget,
     OpenApiDocumentGeneratorTarget,
     OpenApiSourceGeneratorTarget,
 )
 from pants.backend.openapi.target_types import rules as target_types_rules
-from pants.backend.openapi.util_rules.openapi_document import BundleOpenApiDocumentRequest
-from pants.backend.openapi.util_rules.openapi_document import rules as openapi_document_rules
+from pants.backend.openapi.util_rules.openapi_bundle import GenerateOpenApiBundleRequest
+from pants.backend.openapi.util_rules.openapi_bundle import rules as openapi_bundle_rules
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
-from pants.engine.fs import DigestContents
-from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
+from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
+from pants.engine.target import GeneratedSources
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -29,13 +29,16 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *target_types_rules(),
-            *openapi_document_rules(),
+            *openapi_bundle_rules(),
             *dependency_inference.rules(),
             *stripped_source_files.rules(),
-            QueryRule(HydratedSources, [HydrateSourcesRequest]),
-            QueryRule(GeneratedSources, [BundleOpenApiDocumentRequest, Redocly]),
+            QueryRule(GeneratedSources, [GenerateOpenApiBundleRequest, Redocly]),
         ],
-        target_types=[OpenApiSourceGeneratorTarget, OpenApiDocumentGeneratorTarget],
+        target_types=[
+            OpenApiSourceGeneratorTarget,
+            OpenApiDocumentGeneratorTarget,
+            OpenApiBundleTarget,
+        ],
     )
 
 
@@ -53,12 +56,10 @@ def assert_files_generated(
     ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     tgt = rule_runner.get_target(address)
-    protocol_sources = rule_runner.request(
-        HydratedSources, [HydrateSourcesRequest(tgt[OpenApiDocumentField])]
-    )
+
     generated_sources = rule_runner.request(
         GeneratedSources,
-        [BundleOpenApiDocumentRequest(protocol_sources.snapshot, tgt)],
+        [GenerateOpenApiBundleRequest(EMPTY_SNAPSHOT, tgt)],
     )
 
     assert set(generated_sources.snapshot.files) == set(expected_files.keys())
@@ -74,7 +75,15 @@ def assert_files_generated(
 def test_bundle(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/openapi/foo/BUILD": 'openapi_sources()\nopenapi_documents(name="openapi")\n',
+            "src/openapi/foo/BUILD": textwrap.dedent(
+                """\
+                openapi_sources()
+
+                openapi_documents(name="openapi")
+
+                openapi_bundle(name="bundle", dependencies=[":openapi"])
+                """
+            ),
             "src/openapi/foo/openapi.json": textwrap.dedent(
                 """\
             {
@@ -93,7 +102,7 @@ def test_bundle(rule_runner: RuleRunner) -> None:
 
     assert_files_generated(
         rule_runner,
-        Address("src/openapi/foo", target_name="openapi", relative_file_path="openapi.json"),
+        Address("src/openapi/foo", target_name="bundle"),
         source_roots=["src/openapi"],
         expected_files={
             "src/openapi/foo/openapi.json": textwrap.dedent(
@@ -114,7 +123,18 @@ def test_bundle(rule_runner: RuleRunner) -> None:
 def test_bundle_with_source_root(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/openapi/foo/BUILD": 'openapi_sources()\nopenapi_documents(name="openapi", bundle_source_root="src/python")\n',
+            "src/openapi/foo/BUILD": textwrap.dedent(
+                """\
+                openapi_sources()
+                openapi_documents(name="openapi")
+
+                openapi_bundle(
+                  name="bundle",
+                  bundle_source_root="src/python",
+                  dependencies=[":openapi"],
+                )
+                """
+            ),
             "src/openapi/foo/openapi.json": textwrap.dedent(
                 """\
             {
@@ -133,7 +153,7 @@ def test_bundle_with_source_root(rule_runner: RuleRunner) -> None:
 
     assert_files_generated(
         rule_runner,
-        Address("src/openapi/foo", target_name="openapi", relative_file_path="openapi.json"),
+        Address("src/openapi/foo", target_name="bundle"),
         source_roots=["src/openapi", "src/python"],
         expected_files={
             "src/python/foo/openapi.json": textwrap.dedent(

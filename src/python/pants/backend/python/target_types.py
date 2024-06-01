@@ -755,6 +755,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexIncludeToolsField,
     PexVenvSitePackagesCopies,
     PexVenvHermeticScripts,
+    PexExtraBuildArgsField,
     RestartableField,
 )
 
@@ -768,7 +769,6 @@ class PexBinary(Target):
         PexScriptField,
         PexExecutableField,
         PexArgsField,
-        PexExtraBuildArgsField,
         PexEnvField,
         OutputPathField,
     )

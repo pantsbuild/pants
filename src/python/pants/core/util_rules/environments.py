@@ -12,7 +12,7 @@ from typing import Any, Callable, ClassVar, Iterable, Optional, Sequence, Tuple,
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.environment import LOCAL_ENVIRONMENT_MATCHER as LOCAL_ENVIRONMENT_MATCHER
+from pants.engine.environment import __LOCAL_WORKSPACE_ENV_NAME, LOCAL_ENVIRONMENT_MATCHER
 from pants.engine.environment import ChosenLocalEnvironmentName as ChosenLocalEnvironmentName
 from pants.engine.environment import EnvironmentName as EnvironmentName
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
@@ -708,6 +708,8 @@ async def resolve_environment_name(
     if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
         local_env_name = await Get(ChosenLocalEnvironmentName)
         return local_env_name.val
+    if request.raw_value == __LOCAL_WORKSPACE_ENV_NAME:
+        return EnvironmentName(__LOCAL_WORKSPACE_ENV_NAME)
     if request.raw_value not in environments_subsystem.names:
         raise UnrecognizedEnvironmentError(
             softwrap(
@@ -814,6 +816,8 @@ async def get_target_for_environment_name(
 ) -> EnvironmentTarget:
     if env_name.val is None:
         return EnvironmentTarget(None, None)
+    if env_name.val == __LOCAL_WORKSPACE_ENV_NAME:
+        return EnvironmentTarget(__LOCAL_WORKSPACE_ENV_NAME, None)
     if env_name.val not in environments_subsystem.names:
         raise AssertionError(
             softwrap(
@@ -895,6 +899,16 @@ async def extract_process_config_from_environment(
     global_options: GlobalOptions,
     environments_subsystem: EnvironmentsSubsystem,
 ) -> ProcessExecutionEnvironment:
+    if tgt.name == __LOCAL_WORKSPACE_ENV_NAME:
+        return ProcessExecutionEnvironment(
+            environment_name=__LOCAL_WORKSPACE_ENV_NAME,
+            platform=platform.value,
+            remote_execution=False,
+            remote_execution_extra_platform_properties=[],
+            docker_image=None,
+            execute_in_workspace=True,
+        )
+
     docker_image = None
     remote_execution = False
     raw_remote_execution_extra_platform_properties: tuple[str, ...] = ()
@@ -942,6 +956,7 @@ async def extract_process_config_from_environment(
             tuple(pair.split("=", maxsplit=1))  # type: ignore[misc]
             for pair in raw_remote_execution_extra_platform_properties
         ],
+        execute_in_workspace=False,
     )
 
 
@@ -1043,6 +1058,8 @@ def _add_option_field_for(
         )
         subsystem = env_aware_t
         option_name = option.flag_names[0]
+
+    setattr(OptionField, "__qualname__", f"{option_type.__qualname__}.{OptionField.__name__}")
 
     return [
         LocalEnvironmentTarget.register_plugin_field(OptionField),

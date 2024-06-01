@@ -149,6 +149,7 @@ def assert_build(
                     docker_image=None,
                     remote_execution=False,
                     remote_execution_extra_platform_properties=[],
+                    execute_in_workspace=False,
                 ),
                 "ran_locally",
                 0,

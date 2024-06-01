@@ -16,6 +16,7 @@ from abc import ABC, ABCMeta, abstractmethod
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
+from operator import attrgetter
 from pathlib import PurePath
 from typing import (
     AbstractSet,
@@ -438,6 +439,16 @@ class Target:
             other.field_values,
         )
 
+    def __lt__(self, other: Any) -> bool:
+        if not isinstance(other, Target):
+            return NotImplemented
+        return self.address < other.address
+
+    def __gt__(self, other: Any) -> bool:
+        if not isinstance(other, Target):
+            return NotImplemented
+        return self.address > other.address
+
     @classmethod
     @memoized_method
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
@@ -449,7 +460,7 @@ class Target:
             if issubclass(cls, Target):
                 result.update(cast("set[type[Field]]", union_membership.get(cls.PluginField)))
 
-        return tuple(result)
+        return tuple(sorted(result, key=attrgetter("alias")))
 
     @final
     @classmethod
@@ -2179,23 +2190,19 @@ class SourcesField(AsyncFieldMixin, Field):
             [self.default] if self.default and isinstance(self.default, str) else self.default
         )
 
-        # Match any if we use default globs, else match all.
-        conjunction = (
-            GlobExpansionConjunction.all_match
-            if not default_globs or (set(self.globs) != set(default_globs))
-            else GlobExpansionConjunction.any_match
-        )
+        using_default_globs = default_globs and (set(self.globs) == set(default_globs)) or False
+
         # Use fields default error behavior if defined, if we use default globs else the provided
         # error behavior.
         error_behavior = (
             unmatched_build_file_globs.error_behavior
-            if conjunction == GlobExpansionConjunction.all_match
-            or self.default_glob_match_error_behavior is None
+            if not using_default_globs or self.default_glob_match_error_behavior is None
             else self.default_glob_match_error_behavior
         )
+
         return PathGlobs(
             (self._prefix_glob_with_address(glob) for glob in self.globs),
-            conjunction=conjunction,
+            conjunction=GlobExpansionConjunction.any_match,
             glob_match_error_behavior=error_behavior,
             description_of_origin=(
                 f"{self.address}'s `{self.alias}` field"

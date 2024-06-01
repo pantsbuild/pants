@@ -110,7 +110,11 @@ def run_semgrep(
         extra_args = ("--semgrep-args=[]", *extra_args)
 
     rule_runner.set_options(
-        ["--backend-packages=pants.backend.tools.semgrep", *extra_args],
+        [
+            "--backend-packages=pants.backend.tools.semgrep",
+            f"--python-interpreter-constraints={SemgrepSubsystem.default_interpreter_constraints!r}",
+            *extra_args,
+        ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partitions = rule_runner.request(

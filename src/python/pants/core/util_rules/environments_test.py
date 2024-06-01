@@ -12,7 +12,6 @@ import pytest
 from pants.build_graph.address import Address, ResolveError
 from pants.core.util_rules import environments
 from pants.core.util_rules.environments import (
-    LOCAL_ENVIRONMENT_MATCHER,
     AllEnvironmentTargets,
     AmbiguousEnvironmentError,
     ChosenLocalEnvironmentName,
@@ -36,6 +35,7 @@ from pants.core.util_rules.environments import (
     extract_process_config_from_environment,
     resolve_environment_name,
 )
+from pants.engine.environment import LOCAL_ENVIRONMENT_MATCHER
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessCacheScope

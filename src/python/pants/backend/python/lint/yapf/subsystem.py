@@ -8,8 +8,10 @@ from typing import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
 
@@ -17,7 +19,7 @@ from pants.util.strutil import softwrap
 class Yapf(PythonToolBase):
     options_scope = "yapf"
     name = "yapf"
-    help = "A formatter for Python files (https://github.com/google/yapf)."
+    help_short = "A formatter for Python files (https://github.com/google/yapf)."
 
     default_main = ConsoleScript("yapf")
     default_requirements = ["yapf>=0.32.0,<1", "toml"]
@@ -88,4 +90,7 @@ class Yapf(PythonToolBase):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(ExportableTool, Yapf),
+    ]
