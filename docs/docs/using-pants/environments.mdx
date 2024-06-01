@@ -16,6 +16,7 @@ By default, Pants will execute all sandboxed build work directly on localhost. B
 1. locally in Docker containers
 2. remotely via [remote execution](./remote-caching-and-execution/remote-execution.mdx)
 3. locally, but with a non-default set of environment variables and settings (such as when different platforms need different values, or when cross-building)
+4. locally, with execution performed in the workspace / repository and not an execution sandbox (with the trade-off that this is inherently UNSAFE)
 
 ### Defining environments
 
@@ -70,7 +71,8 @@ To declare which environment they should build with, many target types (but part
 The `environment=` field may either:
 
 1. refer to an environment by name
-2. use a special `__local__` environment name, which resolves to any matching `local_environment` (see "Environment matching" below)
+2. use a special `__local__` environment name, which resolves to any matching `local_environment` 
+3. use a special `__local_workspace__` environment environment name, which resolves to any matching `workspace_environment` (see "Environment matching" below)
 
 :::caution Environment compatibility
 Currently, there is no static validation that a target's environment is compatible with its dependencies' environments -- only the implicit validation of the goals that you run successfully against those targets (`check`, `lint`, `test`, `package`, etc).
@@ -107,8 +109,9 @@ A single environment name may end up referring to different environment targets 
 - `local_environment` targets will match if their `compatible_platforms=` field matches localhost's platform.
 - `docker_environment` targets will match [if Docker is enabled](../../reference/global-options.mdx#docker_execution), and if their `platform=` field is compatible with localhost's platform.
 - `remote_environment` targets will match [if Remote execution is enabled](../../reference/global-options.mdx#remote_execution).
+- `workspace_environment` targets will match if their `compatible_platforms=` field matches localhost's platform.
 
-If a particular environment target _doesn't_ match, it can configure a `fallback_environment=` which will be attempted next. This allows for forming preference chains which are referred to by whichever environment name is at the head of the chain.
+If a particular environment target _doesn't_ match (other than for `workspace_enviroment` targets), it can configure a `fallback_environment=` which will be attempted next. This allows for forming preference chains which are referred to by whichever environment name is at the head of the chain. This does not apply to `workspace_enviroment` targets because in-workspace execution differs significantly from the execution in the other environments due to the lack of an execution sandbox.
 
 For example: a chain like "prefer remote execution if enabled, but fall back to local execution if the platform matches, otherwise use docker" might be configured via the targets:
 
@@ -238,3 +241,15 @@ You could then _override_ that name definition in `pants.ci.toml` (note the use 
 [environments-preview.names.add]
 macos = "//:macos_ci"
 ```
+
+### In-Workspace Execution (`workspace_environment`)
+
+The `workspace_enviroment` target type configures a special "workspace" environment in which build actions are invoked in the repository / workspace instead of an execution sandbox as would be done with `local_environment` executions.
+
+The primary motivation for this feature is to better support integration with third-party build orchestration tools (for example, Bazel) which may not operate properly when not invoked in the repository (including in some cases incurring signifcant performance penalties).
+
+There is a significant trade-off though which makes this feature inherently **UNSAFE**: Pants cannot reasonbly guarantee that build processes are reproducible if they run in the workspace environment. Thus, Pants puts that burden on you, the Pants user, to guarantee that any process executed in the workspace environment is reproducible based solely on inputs in the repository. If a process is not reproducible, then unknown side effects may occur.
+
+The special environment name `__local_workspace__` can be used to select a matching `workspace_environment` based on its `compatible_platforms` attribute.
+
+There is no `fallback_environment=` atribute on `workspace_enviroment` targets because in-workspace execution differs significantly from the other environemnts due to the lack of an execution sandbox.
