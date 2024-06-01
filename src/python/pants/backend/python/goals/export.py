@@ -568,13 +568,15 @@ async def export_virtualenv_for_resolve(
     )
 
     # Add generated Python sources from codegen targets to the virtualenv.
-    if (
-        export_subsys.options.py_resolve_format == PythonResolveExportFormat.mutable_virtualenv
-        and export_subsys.options.py_generated_sources
-    ):
-        export_result = await add_codegen_to_export_result(
-            request.resolve, export_result, codegen_setup
-        )
+    if export_subsys.options.py_generated_sources:
+        if export_subsys.options.py_resolve_format == PythonResolveExportFormat.mutable_virtualenv:
+            export_result = await add_codegen_to_export_result(
+                request.resolve, export_result, codegen_setup
+            )
+        else:
+            logger.warning(
+                "Ignoring `--export-py-generated-sources` option because export is not to a mutable virtualenv."
+            )
 
     return MaybeExportResult(export_result)
 
