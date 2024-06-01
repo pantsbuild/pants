@@ -65,7 +65,7 @@ from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.intrinsics import add_prefix_request_to_digest
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, collect_rules, implicitly, rule
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
@@ -670,19 +670,31 @@ async def build_pex(
 
     source_dir_name = "source_files"
 
-    pex_python_setup = await _determine_pex_python_and_platforms(request)
-
-    requirements_setup = await _setup_pex_requirements(**implicitly({request: PexRequest}))
-
-    sources_digest_as_subdir = await add_prefix_request_to_digest(
+    pex_python_setup_req = _determine_pex_python_and_platforms(request)
+    requirements_setup_req = _setup_pex_requirements(**implicitly({request: PexRequest}))
+    sources_digest_as_subdir_req = add_prefix_request_to_digest(
         AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
     )
-
-    req_strings = (
-        (await get_req_strings(request.requirements)).req_strings
-        if isinstance(request.requirements, PexRequirements)
-        else []
-    )
+    if isinstance(request.requirements, PexRequirements):
+        (
+            pex_python_setup,
+            requirements_setup,
+            sources_digest_as_subdir,
+            req_info,
+        ) = await concurrently(
+            pex_python_setup_req,
+            requirements_setup_req,
+            sources_digest_as_subdir_req,
+            get_req_strings(request.requirements),
+        )
+        req_strings = req_info.req_strings
+    else:
+        pex_python_setup, requirements_setup, sources_digest_as_subdir = await concurrently(
+            pex_python_setup_req,
+            requirements_setup_req,
+            sources_digest_as_subdir_req,
+        )
+        req_strings = ()
 
     argv = [
         "--output-file",
