@@ -153,8 +153,21 @@ class MockTargetGenerator(TargetFilesGenerator):
     moved_fields = (MockDependencies, Tags, ResolveField)
 
 
+class MockAlsoGeneratedTarget(Target):
+    alias = "also_generated"
+    core_fields = (MockDependencies, Tags, MockSingleSourceField, ResolveField)
+
+
+class MockMultiTypeTargetGenerator(TargetFilesGenerator):
+    alias = "generator"
+    core_fields = (MockMultipleSourcesField, OverridesField)
+    generated_target_cls = (MockGeneratedTarget, MockAlsoGeneratedTarget)
+    copied_fields = ()
+    moved_fields = (MockDependencies, Tags, ResolveField)
+
+
 @pytest.fixture
-def transitive_targets_rule_runner() -> RuleRunner:
+def transitive_targets_rule_runner() -> RuleRunner:  # TODO: maybe update tests that use this rule runner
     return RuleRunner(
         rules=[
             QueryRule(AllTargets, []),
@@ -163,7 +176,7 @@ def transitive_targets_rule_runner() -> RuleRunner:
             QueryRule(Targets, [DependenciesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
         ],
-        target_types=[MockTarget, MockTargetGenerator, MockGeneratedTarget],
+        target_types=[MockTarget, MockTargetGenerator, MockGeneratedTarget, MockMultiTypeTargetGenerator, MockAlsoGeneratedTarget],
         objects={"parametrize": Parametrize},
         # NB: The `graph` module masks the environment is most/all positions. We disable the
         # inherent environment so that the positions which do require the environment are
@@ -824,7 +837,7 @@ def test_invalid_target(transitive_targets_rule_runner: RuleRunner) -> None:
 
 
 @pytest.fixture
-def owners_rule_runner() -> RuleRunner:
+def owners_rule_runner() -> RuleRunner:  # TODO: maybe update tests that use this rule runner
     return RuleRunner(
         rules=[
             QueryRule(Owners, [OwnersRequest]),
@@ -833,6 +846,7 @@ def owners_rule_runner() -> RuleRunner:
             MockTarget,
             MockTargetGenerator,
             MockGeneratedTarget,
+            MockMultiTypeTargetGenerator, MockAlsoGeneratedTarget
         ],
         # NB: The `graph` module masks the environment is most/all positions. We disable the
         # inherent environment so that the positions which do require the environment are
@@ -986,7 +1000,7 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
 
 
 @pytest.fixture
-def generated_targets_rule_runner() -> RuleRunner:
+def generated_targets_rule_runner() -> RuleRunner:  # TODO: update tests that use this rule runner
     return RuleRunner(
         rules=[
             QueryRule(Addresses, [Specs]),
@@ -996,8 +1010,10 @@ def generated_targets_rule_runner() -> RuleRunner:
             resolve_field_default_factory,
             MockGeneratedTarget.register_plugin_field(MockPluginField),
             MockTargetGenerator.register_plugin_field(MockPluginField, as_moved_field=True),
+            MockAlsoGeneratedTarget.register_plugin_field(MockPluginField),
+            MockMultiTypeTargetGenerator.register_plugin_field(MockPluginField, as_moved_field=True),
         ],
-        target_types=[MockTargetGenerator, MockGeneratedTarget],
+        target_types=[MockTargetGenerator, MockGeneratedTarget, MockMultiTypeTargetGenerator, MockAlsoGeneratedTarget],
         objects={"parametrize": Parametrize},
         # NB: The `graph` module masks the environment is most/all positions. We disable the
         # inherent environment so that the positions which do require the environment are
@@ -1207,7 +1223,7 @@ def test_parametrize_moved_plugin_field(generated_targets_rule_runner: RuleRunne
     )
 
 
-def test_cannot_parametrize_copied_plugin_field() -> None:
+def test_cannot_parametrize_copied_plugin_field() -> None:  # TODO: update test
     rule_runner = RuleRunner(
         rules=[
             QueryRule(Addresses, [Specs]),
@@ -1217,6 +1233,8 @@ def test_cannot_parametrize_copied_plugin_field() -> None:
             resolve_field_default_factory,
             MockGeneratedTarget.register_plugin_field(MockPluginField),
             MockTargetGenerator.register_plugin_field(MockPluginField),  # not moved
+            MockAlsoGeneratedTarget.register_plugin_field(MockPluginField),
+            MockMultiTypeTargetGenerator.register_plugin_field(MockPluginField),  # also not moved
         ],
         target_types=[MockTargetGenerator, MockGeneratedTarget],
         objects={"parametrize": Parametrize},

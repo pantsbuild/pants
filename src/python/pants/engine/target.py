@@ -1025,7 +1025,7 @@ class TargetGenerator(Target):
     GeneratedTargets.
     """
 
-    # The generated Target class.
+    # The generated Target class or classes.
     #
     # If this is not provided, consider checking for the default values that applies to the target
     # types being generated manually. The applicable defaults are available on the `AddressFamily`
@@ -1033,7 +1033,7 @@ class TargetGenerator(Target):
     #
     #    family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
     #    target_defaults = family.defaults.get(MyTarget.alias, {})
-    generated_target_cls: ClassVar[type[Target]]
+    generated_target_cls: ClassVar[type[Target] | tuple[type[Target], ...]]
 
     # Fields which have their values copied from the generator Target to the generated Target.
     #

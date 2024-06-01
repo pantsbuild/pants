@@ -263,68 +263,72 @@ async def _parametrized_target_generators_with_templates(
     generator_fields: dict[str, Any],
     union_membership: UnionMembership,
 ) -> list[tuple[TargetGenerator, dict[str, Any]]]:
+    def populate_template_fields_for_generated_target_type(template_fields: dict[str, Any]) -> dict[str, Any]:
+        # Split out the `propagated_fields` before construction.
+        copied_fields = (
+            *target_type.copied_fields,
+            *target_type._find_copied_plugin_fields(union_membership),
+        )
+        moved_fields = (
+            *target_type.moved_fields,
+            *target_type._find_moved_plugin_fields(union_membership),
+        )
+        for field_type in copied_fields:
+            for alias in (field_type.deprecated_alias, field_type.alias):
+                if alias is None:
+                    continue
+                # Any deprecated field use will be checked on the generator target.
+                field_value = generator_fields.get(alias, None)
+                if field_value is not None:
+                    template_fields[alias] = field_value
+        for field_type in moved_fields:
+            # We must check for deprecated field usage here before passing the value to the generator.
+            if field_type.deprecated_alias is not None:
+                field_value = generator_fields.pop(field_type.deprecated_alias, None)
+                if field_value is not None:
+                    warn_deprecated_field_type(field_type)
+                    template_fields[field_type.deprecated_alias] = field_value
+            field_value = generator_fields.pop(field_type.alias, None)
+            if field_value is not None:
+                template_fields[field_type.alias] = field_value
+
+        # Move parametrize groups over to `template_fields` in order to expand them.
+        parametrize_group_field_names = [
+            name
+            for name, field in generator_fields.items()
+            if isinstance(field, Parametrize) and field.is_group
+        ]
+        for field_name in parametrize_group_field_names:
+            template_fields[field_name] = generator_fields.pop(field_name)
+
+        field_type_aliases = target_type._get_field_aliases_to_field_types(
+            target_type.class_field_types(union_membership)
+        ).keys()
+        generator_fields_parametrized = {
+            name
+            for name, field in generator_fields.items()
+            if isinstance(field, Parametrize) and name in field_type_aliases
+        }
+        if generator_fields_parametrized:
+            noun = pluralize(len(generator_fields_parametrized), "field", include_count=False)
+            generator_fields_parametrized_text = ", ".join(
+                repr(f) for f in generator_fields_parametrized
+            )
+            raise InvalidFieldException(
+                f"Only fields which will be moved to generated targets may be parametrized, "
+                f"so target generator {address} (with type {target_type.alias}) cannot "
+                f"parametrize the {generator_fields_parametrized_text} {noun}."
+            )
+        return template_fields
+    
     # Pre-load field values from defaults for the target type being generated.
     if hasattr(target_type, "generated_target_cls"):
         family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
-        template_fields = dict(family.defaults.get(target_type.generated_target_cls.alias, {}))
+        generated_target_classes = target_type.generated_target_cls if isinstance(target_type.generated_target_cls, tuple) else (target_type.generated_target_cls,)
+        field_defaults_list = [dict(family.defaults.get(generated_target_cls.alias, {})) for generated_target_cls in generated_target_classes]
     else:
-        template_fields = {}
+        field_defaults_list = [{}]
 
-    # Split out the `propagated_fields` before construction.
-    copied_fields = (
-        *target_type.copied_fields,
-        *target_type._find_copied_plugin_fields(union_membership),
-    )
-    moved_fields = (
-        *target_type.moved_fields,
-        *target_type._find_moved_plugin_fields(union_membership),
-    )
-    for field_type in copied_fields:
-        for alias in (field_type.deprecated_alias, field_type.alias):
-            if alias is None:
-                continue
-            # Any deprecated field use will be checked on the generator target.
-            field_value = generator_fields.get(alias, None)
-            if field_value is not None:
-                template_fields[alias] = field_value
-    for field_type in moved_fields:
-        # We must check for deprecated field usage here before passing the value to the generator.
-        if field_type.deprecated_alias is not None:
-            field_value = generator_fields.pop(field_type.deprecated_alias, None)
-            if field_value is not None:
-                warn_deprecated_field_type(field_type)
-                template_fields[field_type.deprecated_alias] = field_value
-        field_value = generator_fields.pop(field_type.alias, None)
-        if field_value is not None:
-            template_fields[field_type.alias] = field_value
-
-    # Move parametrize groups over to `template_fields` in order to expand them.
-    parametrize_group_field_names = [
-        name
-        for name, field in generator_fields.items()
-        if isinstance(field, Parametrize) and field.is_group
-    ]
-    for field_name in parametrize_group_field_names:
-        template_fields[field_name] = generator_fields.pop(field_name)
-
-    field_type_aliases = target_type._get_field_aliases_to_field_types(
-        target_type.class_field_types(union_membership)
-    ).keys()
-    generator_fields_parametrized = {
-        name
-        for name, field in generator_fields.items()
-        if isinstance(field, Parametrize) and name in field_type_aliases
-    }
-    if generator_fields_parametrized:
-        noun = pluralize(len(generator_fields_parametrized), "field", include_count=False)
-        generator_fields_parametrized_text = ", ".join(
-            repr(f) for f in generator_fields_parametrized
-        )
-        raise InvalidFieldException(
-            f"Only fields which will be moved to generated targets may be parametrized, "
-            f"so target generator {address} (with type {target_type.alias}) cannot "
-            f"parametrize the {generator_fields_parametrized_text} {noun}."
-        )
     return [
         (
             _create_target(
@@ -337,7 +341,8 @@ async def _parametrized_target_generators_with_templates(
             ),
             template,
         )
-        for address, template in Parametrize.expand(address, template_fields)
+        for defaults_populated in field_defaults_list
+        for address, template in Parametrize.expand(address, populate_template_fields_for_generated_target_type(defaults_populated))
     ]
 
 
