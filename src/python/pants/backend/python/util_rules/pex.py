@@ -745,7 +745,7 @@ async def build_pex(
             subcommand=(),
             extra_args=argv,
             additional_input_digest=merged_digest,
-            description=await _build_pex_description(request, req_strings, python_setup.resolves),
+            description=_build_pex_description(request, req_strings, python_setup.resolves),
             output_files=output_files,
             output_directories=output_directories,
             concurrency_available=requirements_setup.concurrency_available,
@@ -771,7 +771,7 @@ async def build_pex(
     )
 
 
-async def _build_pex_description(
+def _build_pex_description(
     request: PexRequest, req_strings: Sequence[str], resolve_to_lockfile: Mapping[str, str]
 ) -> str:
     if request.description:
