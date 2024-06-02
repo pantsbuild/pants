@@ -568,6 +568,29 @@ class PythonSetup(Subsystem):
         default=True,
         help="Whether to use the standard Python command history file when running a repl.",
     )
+    subset_lockfiles_before_builds = BoolOption(
+        default=True,  # FIXME: change default; deprecate setting?
+        help=softwrap(
+            """Compute a subset of a PEX lockfile before building with it.
+
+            This reduces spurious rebuilds of targets that aren't affected by a lockfile change. For
+            instance, a lockfile may include a dev-dependency like `pytest`, and a production
+            `pex_binary` target is likely to use that library.
+
+            - When this option is false, the whole lockfile contents is fed to the build of the target,
+              so any change to any library within the lockfile requires rerunning the whole build,
+              even when they aren't relevent.
+
+            - When this option is true, the relevant subset of the lockfile is extracted as a separate
+              step and only the result of that is fed into the build of the target. If irrelevant
+              dependencies change, the subsetting step will run, but the output will be identical, and
+              thus the build of the target can be served from cache. The subsetting is typically much
+              faster than a full pex build, so spending a bit of time to compute the subset usually
+              results in faster overall builds, by serving more from cache.
+
+            """
+        ),
+    )
 
     @property
     def enable_synthetic_lockfiles(self) -> bool:

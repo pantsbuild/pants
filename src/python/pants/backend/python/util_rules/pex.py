@@ -606,14 +606,48 @@ async def _setup_pex_requirements(
                 resolve_config=resolve_config,
             )
 
+        requirement_args = [
+            *reqs_info.req_strings,
+            "--lock",
+            loaded_lockfile.lockfile_path,
+        ]
+        if not python_setup.subset_lockfiles_before_builds:
+            return _BuildPexRequirementsSetup(
+                [loaded_lockfile.lockfile_digest],
+                [
+                    *requirement_args,
+                    *pex_lock_resolver_args,
+                ],
+                concurrency_available,
+            )
+
+        subset_path = "__requirements-subset.txt"
+        description = softwrap(
+            f"""
+            Subsetting {pluralize(len(reqs_info.req_strings), 'requirement')}
+            for {request.output_filename} from the {loaded_lockfile.lockfile_path} resolve:
+            {', '.join(reqs_info.req_strings)}
+            """
+        )
+        process_result = await Get(
+            ProcessResult,
+            PexCliProcess(
+                description=description,
+                subcommand=("lock", "export-subset"),
+                extra_args=(
+                    *requirement_args,
+                    "--output",
+                    subset_path,
+                ),
+                additional_input_digest=loaded_lockfile.lockfile_digest,
+                output_files=(subset_path,),
+                level=LogLevel.INFO,
+            ),
+        )
+
         return _BuildPexRequirementsSetup(
-            [loaded_lockfile.lockfile_digest],
-            [
-                *reqs_info.req_strings,
-                "--lock",
-                loaded_lockfile.lockfile_path,
-                *pex_lock_resolver_args,
-            ],
+            [process_result.output_digest],
+            ["--requirement", subset_path, "--no-transitive", *pip_resolver_args],
             concurrency_available,
         )
 
