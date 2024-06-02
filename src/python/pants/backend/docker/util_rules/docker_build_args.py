@@ -23,7 +23,7 @@ class DockerBuildArgs(KeyValueSequenceUtil):
         """
         values = {k: overrides.to_dict().get(k, v) for k, v in self.to_dict().items()}
         if only_with_value:
-            return {k: v for k, v in values if v}
+            return {k: v for k, v in values.items() if v}
         else:
             return values
 

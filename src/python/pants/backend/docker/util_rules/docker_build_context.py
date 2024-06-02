@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import re
+import shlex
 from abc import ABC
 from dataclasses import dataclass
 from typing import Iterable, Mapping
@@ -24,12 +25,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
 from pants.backend.docker.utils import suggest_renames
 from pants.backend.docker.value_interpolation import DockerBuildArgsInterpolationValue
 from pants.backend.shell.target_types import ShellSourceField
-from pants.core.goals.package import (
-    BuiltPackage,
-    EnvironmentAwarePackageRequest,
-    OutputPathField,
-    PackageFieldSet,
-)
+from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
@@ -294,14 +290,18 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     )
 
     # Package binary dependencies for build context.
-    embedded_pkgs = await MultiGet(
-        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+    pkgs_wanting_embedding = [
+        field_set
         for field_set in embedded_pkgs_per_target.field_sets
         # Exclude docker images, unless build_upstream_images is true.
         if (
             request.build_upstream_images
             or not isinstance(getattr(field_set, "source", None), DockerImageSourceField)
         )
+    ]
+    embedded_pkgs = await MultiGet(
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+        for field_set in pkgs_wanting_embedding
     )
 
     if request.build_upstream_images:
@@ -328,9 +328,11 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     # Requests for build args and env
     build_args_request = Get(DockerBuildArgs, DockerBuildArgsRequest(docker_image))
     build_env_request = Get(DockerBuildEnvironment, DockerBuildEnvironmentRequest(docker_image))
-    context, build_args, build_env = await MultiGet(
+    context, supplied_build_args, build_env = await MultiGet(
         context_request, build_args_request, build_env_request
     )
+
+    build_args = supplied_build_args
 
     upstream_image_ids = []
     if request.build_upstream_images:
@@ -338,7 +340,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
 
         # Get the FROM image build args with defined values in the Dockerfile & build args.
         dockerfile_build_args = dockerfile_info.from_image_build_args.with_overrides(
-            build_args, only_with_value=True
+            supplied_build_args, only_with_value=True
         )
         # Parse the build args values into Address instances.
         from_image_addresses = await Get(
@@ -376,6 +378,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
         build_args = build_args.extended(from_image_build_args)
 
     # Render build args for turning COPY values in ARGS which are targets into their output
+    dockerfile_copy_args = dockerfile_info.copy_build_args.with_overrides(supplied_build_args, only_with_value=True)
     copy_arg_addresses = await Get(
         Addresses,
         UnparsedAddressInputs(
@@ -390,12 +393,22 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
             skip_invalid_addresses=True,
         ),
     )
-    copy_arg_targets = await Get(Targets, Addresses, copy_arg_addresses)
-    arg_name_to_target = zip(dockerfile_info.copy_build_args.to_dict().keys(), copy_arg_targets)
-    # TODO: real file ending?
+
+    def get_artifact_paths(built_package: BuiltPackage) -> list[str]:
+        return [e.relpath for e in built_package.artifacts]
+
+    addrs_to_paths = {field_set.address: get_artifact_paths(pkg) for field_set, pkg in zip(embedded_pkgs_per_target.field_sets, embedded_pkgs)}
+
+    def resolve_arg(arg_name, maybe_addr) -> str:
+        if maybe_addr in addrs_to_paths:
+            return f"{arg_name}={shlex.join(addrs_to_paths[maybe_addr])}"
+        else:
+            # TODO: I think we won't end up here any more, since we use the copy_arg_addresses which already
+            return f"{arg_name}={maybe_addr}"
+
     copy_arg_as_build_args = [
-        f"{arg_name}={tgt.get(OutputPathField).value_or_default(file_ending='*')}"
-        for arg_name, tgt in arg_name_to_target
+        resolve_arg(arg_name, arg_value)
+        for arg_name, arg_value in (zip(dockerfile_copy_args.keys(), copy_arg_addresses))
     ]
 
     build_args = build_args.extended(copy_arg_as_build_args)
