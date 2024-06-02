@@ -470,25 +470,22 @@ async def add_codegen_to_export_result(
         MergeDigests([export_result.digest, codegen_digest, codegen_setup.setup_script_digest]),
     )
 
+    pkg_dir_path = os.path.join(
+        "{digest_root}",
+        _ExportPythonCodegenSetup.PKG_DIR,
+    )
+    script_path = os.path.join(pkg_dir_path, _ExportPythonCodegenSetup.SCRIPT_NAME)
+
     codegen_post_processing_cmds = (
         PostProcessingCommand(
             [
                 os.path.join("{digest_root}", "bin", "python"),
-                os.path.join(
-                    "{digest_root}",
-                    _ExportPythonCodegenSetup.PKG_DIR,
-                    _ExportPythonCodegenSetup.SCRIPT_NAME,
-                ),
-                os.path.join("{digest_root}", _ExportPythonCodegenSetup.PKG_DIR),
+                script_path,
+                pkg_dir_path,
             ]
         ),
-        PostProcessingCommand(
-            [
-                "rm",
-                "-rf",
-                os.path.join("{digest_root}", _ExportPythonCodegenSetup.PKG_DIR),
-            ]
-        ),
+        PostProcessingCommand(["rm", script_path]),
+        PostProcessingCommand(["rmdir", pkg_dir_path]),
     )
 
     return dataclasses.replace(
