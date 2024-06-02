@@ -51,6 +51,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, HydratedSources, HydrateSourcesRequest, SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import BoolOption, EnumOption, StrListOption
+from pants.util.docutil import doc_url
 from pants.util.strutil import path_safe, softwrap
 
 logger = logging.getLogger(__name__)
@@ -571,8 +572,10 @@ async def export_virtualenv_for_resolve(
                 request.resolve, export_result, codegen_setup
             )
         else:
-            logger.warning(
-                "Ignoring `--export-py-generated-sources` option because export is not to a mutable virtualenv."
+            logger.info(
+                "Ignoring `--export-py-generated-sources` option because the export is not to a mutable virtualenv. "
+                f"See {doc_url('reference/goals/export#py_generated_sources')} and {doc_url('reference/goals/export#py_resolve_format')} "
+                "for additional details."
             )
 
     return MaybeExportResult(export_result)
