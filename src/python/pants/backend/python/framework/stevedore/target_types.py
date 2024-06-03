@@ -17,14 +17,16 @@ class StevedoreNamespace(str):
     based on the `stevedore_namespaces` field.
 
     For example:
-        python_distribution(
-            ...
-            entry_points={{
-                stevedore_namespace("a.b.c"): {{
-                    "plugin_name": "some.entry:point",
-                }},
-            }},
-        )
+    ```python
+    python_distribution(
+        ...
+        entry_points={
+            stevedore_namespace("a.b.c"): {
+                "plugin_name": "some.entry:point",
+            },
+        },
+    )
+    ```
     """
 
     alias = "stevedore_namespace"
