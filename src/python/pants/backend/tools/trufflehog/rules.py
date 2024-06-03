@@ -24,7 +24,7 @@ from pants.source.filespec import FilespecMatcher
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
-from .subsystem import Trufflehog
+from pants.backend.tools.trufflehog.subsystem import Trufflehog
 
 
 class TrufflehogRequest(LintFilesRequest):
