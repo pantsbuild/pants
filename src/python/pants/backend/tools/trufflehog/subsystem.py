@@ -30,7 +30,7 @@ class Trufflehog(ExternalTool):
         f"{default_version}|linux_x86_64|{linux_amd_sha}|27805118",
     ]
 
-    exclude_options = StrListOption(
+    exclude = StrListOption(
         default=["README.md"],
         help=softwrap(
             """

@@ -41,7 +41,7 @@ async def partition_inputs(
 
     matched_filepaths = FilespecMatcher(
         includes=["**"],
-        excludes=trufflehog.exclude_options,
+        excludes=trufflehog.exclude,
     ).matches(tuple(request.files))
     return Partitions.single_partition(sorted(matched_filepaths))
 

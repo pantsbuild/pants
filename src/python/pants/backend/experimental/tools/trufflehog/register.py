@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from .rules import rules as trufflehog_rules
+from pants.backend.tools.trufflehog.rules import rules as trufflehog_rules
 
 
 def rules() -> list:
