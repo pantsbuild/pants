@@ -44,7 +44,7 @@ class Trufflehog(ExternalTool):
         advanced=True,
         help=softwrap(
             """
-            If trufflehog-config.yaml file found, file will be passed to trufflehog --config argument
+            If a trufflehog-config.yaml file is found, pass it to the trufflehog --config argument.
             """
         ),
     )
