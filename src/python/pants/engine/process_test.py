@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from pants.engine.environment import __LOCAL_WORKSPACE_ENV_NAME, EnvironmentName
+from pants.core.util_rules.environments import LocalWorkspaceEnvironmentTarget
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -309,8 +310,27 @@ def test_interactive_process_inputs(rule_runner: RuleRunner, run_in_workspace: b
         }
 
 
-def test_workspace_process_basic(rule_runner) -> None:
-    rule_runner = new_rule_runner(inherent_environment=EnvironmentName(__LOCAL_WORKSPACE_ENV_NAME))
+def test_workspace_execution_support() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            QueryRule(ProcessResult, [Process]),
+            QueryRule(FallibleProcessResult, [Process]),
+            QueryRule(InteractiveProcessResult, [InteractiveProcess]),
+            QueryRule(DigestEntries, [Digest]),
+            QueryRule(Platform, []),
+        ],
+        target_types=[LocalWorkspaceEnvironmentTarget],
+        inherent_environment=EnvironmentName("workspace"),
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": "workspace_environment(name='workspace')",
+        }
+    )
+    rule_runner.set_options(
+        ["--environments-preview-names={'workspace': '//:workspace'}"], env_inherit={"PATH"}
+    )
+
     build_root = Path(rule_runner.build_root)
 
     # Check that a custom exit code is returned as expected.
@@ -351,8 +371,8 @@ def test_workspace_process_basic(rule_runner) -> None:
         description="a workspace process",
         cache_scope=ProcessCacheScope.PER_SESSION,  # necessary to ensure result not cached from prior test runs
     )
-    result = rule_runner.request(ProcessResult, [process])
-    lines = result.stdout.decode().splitlines()
+    result2 = rule_runner.request(ProcessResult, [process])
+    lines = result2.stdout.decode().splitlines()
     assert lines == [
         "from-digest",
         rule_runner.build_root,
@@ -369,7 +389,7 @@ def test_workspace_process_basic(rule_runner) -> None:
         working_directory="subdir",
         cache_scope=ProcessCacheScope.PER_SESSION,  # necessary to ensure result not cached from prior test runs
     )
-    result = rule_runner.request(ProcessResult, [process])
+    _ = rule_runner.request(ProcessResult, [process])
     assert (subdir / "file-in-subdir").exists()
 
     # Test output capture correctly captures from the sandbox and not the workspace.
@@ -386,8 +406,8 @@ def test_workspace_process_basic(rule_runner) -> None:
         output_files=["capture-this-file", "will-not-capture-this-file"],
         cache_scope=ProcessCacheScope.PER_SESSION,  # necessary to ensure result not cached from prior test runs
     )
-    result = rule_runner.request(ProcessResult, [process])
-    assert result.stdout.decode() == "this-goes-to-stdout\n"
-    assert result.stderr.decode() == "this-goes-to-stderr\n"
-    snapshot = rule_runner.request(Snapshot, [result.output_digest])
+    result3 = rule_runner.request(ProcessResult, [process])
+    assert result3.stdout.decode() == "this-goes-to-stdout\n"
+    assert result3.stderr.decode() == "this-goes-to-stderr\n"
+    snapshot = rule_runner.request(Snapshot, [result3.output_digest])
     assert snapshot.files == ("capture-this-file",)
