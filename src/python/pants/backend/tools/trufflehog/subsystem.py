@@ -34,7 +34,7 @@ class Trufflehog(ExternalTool):
         default=["README.md"],
         help=softwrap(
             """
-            Excluding paths for trufflehog to run scans on
+            Exclude paths matching these globs from trufflehog scans.
             """
         ),
     )
