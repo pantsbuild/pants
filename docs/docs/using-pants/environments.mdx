@@ -16,7 +16,7 @@ By default, Pants will execute all sandboxed build work directly on localhost. B
 1. locally in Docker containers
 2. remotely via [remote execution](./remote-caching-and-execution/remote-execution.mdx)
 3. locally, but with a non-default set of environment variables and settings (such as when different platforms need different values, or when cross-building)
-4. locally, with execution performed in the workspace / repository and not an execution sandbox (with the trade-off that this is inherently UNSAFE)
+4. locally, but with execution performed in the workspace / repository and not an execution sandbox (with the trade-off that you must be cognizant of build reproducibility)
 
 ### Defining environments
 
@@ -71,8 +71,9 @@ To declare which environment they should build with, many target types (but part
 The `environment=` field may either:
 
 1. refer to an environment by name
-2. use a special `__local__` environment name, which resolves to any matching `local_environment` 
-3. use a special `__local_workspace__` environment environment name, which resolves to any matching `workspace_environment` (see "Environment matching" below)
+2. use one of the following special environment names to select a matching environment: (see "Environment matching" below)
+  1. `__local__` resolves to any matching `local_environment`
+  2. `__local_workspace__` resolves to any matching `workspace_environment` 
 
 :::caution Environment compatibility
 Currently, there is no static validation that a target's environment is compatible with its dependencies' environments -- only the implicit validation of the goals that you run successfully against those targets (`check`, `lint`, `test`, `package`, etc).
@@ -248,8 +249,18 @@ The `workspace_enviroment` target type configures a special "workspace" environm
 
 The primary motivation for this feature is to better support integration with third-party build orchestration tools (for example, Bazel) which may not operate properly when not invoked in the repository (including in some cases incurring signifcant performance penalties).
 
-There is a significant trade-off though which makes this feature inherently **UNSAFE**: Pants cannot reasonbly guarantee that build processes are reproducible if they run in the workspace environment. Thus, Pants puts that burden on you, the Pants user, to guarantee that any process executed in the workspace environment is reproducible based solely on inputs in the repository. If a process is not reproducible, then unknown side effects may occur.
+:::caution Caching and reproducibility
+
+Pants' caching relies on all process being reproducible based solely on inputs in the repository.
+Processes executed in a workspace environment can easily accidentally read unexpected files, that aren't specified as a dependency. 
+Thus, Pants puts that burden on you, the Pants user, to ensure a process output only depends on its specified input files, and doesn't read anything else.
+
+If a process isn't reproducible, re-running a build from the same source code could fail unexpectedly, or give different output to an earlier build.
+
+:::
 
 The special environment name `__local_workspace__` can be used to select a matching `workspace_environment` based on its `compatible_platforms` attribute.
 
-There is no `fallback_environment=` atribute on `workspace_enviroment` targets because in-workspace execution differs significantly from the other environemnts due to the lack of an execution sandbox.
+There is no `fallback_environment=` atribute on `workspace_enviroment` targets because in-workspace execution differs significantly from
+the other environemnts due to the lack of an execution sandbox.
+

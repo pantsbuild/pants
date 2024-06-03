@@ -197,15 +197,9 @@ class LocalWorkspaceEnvironmentTarget(Target):
         third-party build orchestration tools which may not run correctly when run from within the Pants
         execution sandbox.
 
-        SAFETY: Workspace environments are inherently UNSAFE since Pants cannot guarantee that any process invoked
-        as a workspace environment is in fact reproducible. By using this environment, you forgo the
-        "hermetic" nature of the Pants execution model and must guarantee to Pants that the invoked process
-        is repeatable and does not have side effects.
-
-        Environment configuration includes the platforms the environment is compatible with, and
-        optionally a fallback environment, along with environment-aware options (such as
-        environment variables and search paths) used by Pants to execute processes in this
-        environment.
+        Environment configuration includes the platforms the environment is compatible with along with
+        environment-aware options (such as environment variables and search paths) used by Pants to execute
+        processes in this environment.
 
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
@@ -214,6 +208,16 @@ class LocalWorkspaceEnvironmentTarget(Target):
         Only one `workspace_environment` may be defined in `[environments-preview].names` per platform, and
         when `{LOCAL_WORKSPACE_ENVIRONMENT_MATCHER}` is specified as the environment, the
         `workspace_environment` that matches the current platform (if defined) will be selected.
+
+        Caching and reproducibility:
+
+        Pants' caching relies on all process being reproducible based solely on inputs in the repository.
+        Processes executed in a workspace environment can easily accidentally read unexpected files,
+        that aren't specified as a dependency.  Thus, Pants puts that burden on you, the Pants user, to ensure
+        a process output only depends on its specified input files, and doesn't read anything else.
+
+        If a process isn't reproducible, re-running a build from the same source code could fail unexpectedly,
+        or give different output to an earlier build.
         """
     )
 
