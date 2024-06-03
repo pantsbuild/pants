@@ -7,6 +7,6 @@ from __future__ import annotations
 from pants.backend.tools.trufflehog.rules import rules as trufflehog_rules
 
 
-def rules() -> list:
+def rules():
     """Return trufflehog rules."""
     return trufflehog_rules()
