@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from pants.backend.tools.trufflehog.subsystem import Trufflehog
 from pants.core.goals.lint import LintFilesRequest, LintResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
@@ -23,8 +24,6 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.source.filespec import FilespecMatcher
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
-
-from pants.backend.tools.trufflehog.subsystem import Trufflehog
 
 
 class TrufflehogRequest(LintFilesRequest):
