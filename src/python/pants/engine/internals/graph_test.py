@@ -873,7 +873,7 @@ def test_invalid_target(transitive_targets_rule_runner: RuleRunner) -> None:
 
 
 @pytest.fixture
-def owners_rule_runner() -> RuleRunner:  # TODO: maybe update tests that use this rule runner
+def owners_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             QueryRule(Owners, [OwnersRequest]),
@@ -1035,7 +1035,7 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
 
 
 @pytest.fixture
-def generated_targets_rule_runner() -> RuleRunner:  # TODO: update tests that use this rule runner
+def generated_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             QueryRule(Addresses, [Specs]),
