@@ -799,12 +799,22 @@ def test_setup_pex_requirements() -> None:
         is_pex_lock=False,
     )
 
-    # Subset of Pex lockfile.
+    # Subset of Pex lockfile - without explicitly subsetting
     assert_setup(
         PexRequirements(["req1"], from_superset=Resolve("resolve", False)),
         _BuildPexRequirementsSetup(
             [lockfile_digest], ["req1", "--lock", lockfile_path, *pex_args], 1
         ),
+        subset_lockfiles_before_builds=False,
+    )
+
+    # Subset of Pex lockfile - without explicitly subsetting
+    assert_setup(
+        PexRequirements(["req1"], from_superset=Resolve("resolve", False)),
+        _BuildPexRequirementsSetup(
+            [lockfile_digest], ["req1", "--lock", lockfile_path, *pex_args], 1
+        ),
+        subset_lockfiles_before_builds=True,
     )
 
     # Subset of repository Pex.
