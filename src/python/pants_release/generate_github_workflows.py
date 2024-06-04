@@ -39,9 +39,10 @@ class Platform(Enum):
     MACOS10_15_X86_64 = "macOS10-15-x86_64"
     MACOS11_X86_64 = "macOS11-x86_64"
     MACOS11_ARM64 = "macOS11-ARM64"
+    MACOS14_ARM64 = "macOS14-ARM64"
 
 
-GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS11_X86_64}
+GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS11_X86_64, Platform.MACOS14_ARM64}
 SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
@@ -404,6 +405,8 @@ class Helper:
             ret += ["macos-11"]
         elif self.platform == Platform.MACOS11_ARM64:
             ret += ["macOS-11-ARM64"]
+        elif self.platform == Platform.MACOS14_ARM64:
+            ret += ["macos-14"]
         elif self.platform == Platform.MACOS10_15_X86_64:
             ret += ["macOS-10.15-X64"]
         elif self.platform == Platform.LINUX_X86_64:
@@ -826,6 +829,21 @@ def macos11_x86_64_test_jobs() -> Jobs:
     return jobs
 
 
+def macos14_arm64_test_jobs() -> Jobs:
+    helper = Helper(Platform.MACOS11_ARM64)
+    jobs = {
+        helper.job_name("bootstrap_pants"): bootstrap_jobs(
+            helper,
+            validate_ci_config=False,
+            rust_testing=RustTesting.SOME,
+        ),
+        helper.job_name("test_python"): test_jobs(
+            helper, shard=None, platform_specific=True, with_remote_caching=True
+        ),
+    }
+    return jobs
+
+
 def build_wheels_job(
     platform: Platform,
     for_deploy_ref: str | None,
@@ -1004,6 +1022,7 @@ def test_workflow_jobs() -> Jobs:
     jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
     jobs.update(**macos11_x86_64_test_jobs())
+    jobs.update(**macos14_arm64_test_jobs())
     jobs.update(**build_wheels_jobs())
     jobs.update(
         {
