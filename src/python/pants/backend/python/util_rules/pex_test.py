@@ -704,6 +704,7 @@ def test_setup_pex_requirements() -> None:
         *,
         is_pex_lock: bool = True,
         include_find_links: bool = False,
+        subset_lockfiles_before_builds: bool = False,
     ) -> None:
         request = PexRequest(
             output_filename="foo.pex",
@@ -712,7 +713,12 @@ def test_setup_pex_requirements() -> None:
         )
         result = run_rule_with_mocks(
             _setup_pex_requirements,
-            rule_args=[request, create_subsystem(PythonSetup)],
+            rule_args=[
+                request,
+                create_subsystem(
+                    PythonSetup, subset_lockfiles_before_builds=subset_lockfiles_before_builds
+                ),
+            ],
             mock_gets=[
                 MockGet(
                     output_type=Lockfile,
