@@ -830,7 +830,7 @@ def macos11_x86_64_test_jobs() -> Jobs:
 
 
 def macos14_arm64_test_jobs() -> Jobs:
-    helper = Helper(Platform.MACOS11_ARM64)
+    helper = Helper(Platform.MACOS14_ARM64)
     jobs = {
         helper.job_name("bootstrap_pants"): bootstrap_jobs(
             helper,

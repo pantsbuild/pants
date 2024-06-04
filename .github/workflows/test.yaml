@@ -202,96 +202,6 @@ jobs:
 
         ./cargo doc'
     timeout-minutes: 60
-  bootstrap_pants_macos11_arm64:
-    env:
-      PANTS_REMOTE_CACHE_READ: 'false'
-      PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
-    name: Bootstrap Pants, test Rust (macOS11-ARM64)
-    needs:
-    - classify_changes
-    runs-on:
-    - self-hosted
-    - macOS-11-ARM64
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 10
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Set rustup profile
-      run: rustup set profile default
-    - name: Cache Rust toolchain
-      uses: actions/cache@v3
-      with:
-        key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.78.0-*
-
-          ~/.rustup/update-hashes
-
-          ~/.rustup/settings.toml
-
-          '
-    - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
-      with:
-        cache-bin: 'false'
-        shared-key: engine
-        workspaces: src/rust/engine
-    - id: get-engine-hash
-      name: Get native engine hash
-      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
-      shell: bash
-    - name: Cache native engine
-      uses: actions/cache@v3
-      with:
-        key: macOS11-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-        path: 'src/python/pants/bin/native_client
-
-          src/python/pants/engine/internals/native_engine.so
-
-          src/python/pants/engine/internals/native_engine.so.metadata'
-    - name: Bootstrap Pants
-      run: arch -arm64 ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout
-        ]]
-    - name: Run smoke tests
-      run: 'arch -arm64 ./pants list ::
-
-        arch -arm64 ./pants roots
-
-        arch -arm64 ./pants help goals
-
-        arch -arm64 ./pants help targets
-
-        arch -arm64 ./pants help subsystems
-
-        '
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v3
-      with:
-        name: logs-bootstrap-macOS11-ARM64
-        path: .pants.d/workdir/*.log
-    - name: Upload native binaries
-      uses: actions/upload-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.macOS11-ARM64
-        path: 'src/python/pants/bin/native_client
-
-          src/python/pants/engine/internals/native_engine.so
-
-          src/python/pants/engine/internals/native_engine.so.metadata'
-    - env:
-        TMPDIR: ${{ runner.temp }}
-      if: needs.classify_changes.outputs.rust == 'true'
-      name: Test Rust
-      run: arch -arm64 ./cargo test --locked --tests -- --nocapture
-    timeout-minutes: 60
   bootstrap_pants_macos11_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -373,6 +283,98 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
+        path: 'src/python/pants/bin/native_client
+
+          src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine.so.metadata'
+    - env:
+        TMPDIR: ${{ runner.temp }}
+      if: needs.classify_changes.outputs.rust == 'true'
+      name: Test Rust
+      run: ./cargo test --locked --tests -- --nocapture
+    timeout-minutes: 60
+  bootstrap_pants_macos14_arm64:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Bootstrap Pants, test Rust (macOS14-ARM64)
+    needs:
+    - classify_changes
+    runs-on:
+    - macos-14
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
+    - name: Cache Rust toolchain
+      uses: actions/cache@v3
+      with:
+        key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.78.0-*
+
+          ~/.rustup/update-hashes
+
+          ~/.rustup/settings.toml
+
+          '
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
+    - id: get-engine-hash
+      name: Get native engine hash
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
+      shell: bash
+    - name: Cache native engine
+      uses: actions/cache@v3
+      with:
+        key: macOS14-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
+        path: 'src/python/pants/bin/native_client
+
+          src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine.so.metadata'
+    - name: Bootstrap Pants
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
+    - name: Run smoke tests
+      run: './pants list ::
+
+        ./pants roots
+
+        ./pants help goals
+
+        ./pants help targets
+
+        ./pants help subsystems
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-bootstrap-macOS14-ARM64
+        path: .pants.d/workdir/*.log
+    - name: Upload native binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.macOS14-ARM64
         path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
@@ -773,8 +775,8 @@ jobs:
     - check_release_notes
     - bootstrap_pants_linux_arm64
     - bootstrap_pants_linux_x86_64
-    - bootstrap_pants_macos11_arm64
     - bootstrap_pants_macos11_x86_64
+    - bootstrap_pants_macos14_arm64
     - build_wheels_linux_arm64
     - build_wheels_linux_x86_64
     - build_wheels_macos10_15_x86_64
@@ -794,8 +796,8 @@ jobs:
     - test_python_linux_x86_64_7
     - test_python_linux_x86_64_8
     - test_python_linux_x86_64_9
-    - test_python_macos11_arm64
     - test_python_macos11_x86_64
+    - test_python_macos14_arm64
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
@@ -1767,77 +1769,6 @@ jobs:
         name: logs-python-test-9_10-Linux-x86_64
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
-  test_python_macos11_arm64:
-    env:
-      ARCHFLAGS: -arch arm64
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
-    name: Test Python (macOS11-ARM64)
-    needs:
-    - bootstrap_pants_macos11_arm64
-    - classify_changes
-    runs-on:
-    - self-hosted
-    - macOS-11-ARM64
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 10
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      name: Launch bazel-remote
-      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
-        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
-        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
-        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
-        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
-        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
-        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
-        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
-        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
-        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
-        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
-        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
-        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
-        \n"
-    - name: Install AdoptJDK
-      uses: actions/setup-java@v3
-      with:
-        distribution: adopt
-        java-version: '11'
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.macOS11-ARM64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
-    - name: Run Python tests
-      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
-
-        '
-    - continue-on-error: true
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      if: always()
-      name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/macOS11-ARM64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-
-        echo "Uploading test reports to ${S3_DST}"
-
-        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-
-        '
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v3
-      with:
-        name: logs-python-test-macOS11-ARM64
-        path: .pants.d/workdir/*.log
-    timeout-minutes: 90
   test_python_macos11_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
@@ -1894,6 +1825,81 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-macOS11-x86_64
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
+  test_python_macos14_arm64:
+    env: {}
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (macOS14-ARM64)
+    needs:
+    - bootstrap_pants_macos14_arm64
+    - classify_changes
+    runs-on:
+    - macos-14
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Launch bazel-remote
+      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
+        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
+        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
+        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
+        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
+        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
+        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
+        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
+        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
+        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
+        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
+        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
+        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
+        \n"
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.macOS14-ARM64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python tests
+      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
+
+        '
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/macOS14-ARM64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-python-test-macOS14-ARM64
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
 name: Pull Request CI
