@@ -1211,6 +1211,7 @@ dependencies = [
  "bytes",
  "deepsize",
  "dirs-next",
+ "env_logger",
  "futures",
  "glob",
  "grpc_util",

@@ -33,6 +33,7 @@ fn assert_entry_is_err(tree: &DigestTrie, path: &str) {
 
 #[test]
 fn entry_simple() {
+    env_logger::init();
     let tree = make_tree(vec![
         TypedPath::Link {
             path: Path::new("linkfile"),
