@@ -1119,9 +1119,12 @@ class TargetFilesGenerator(TargetGenerator):
 
     Unlike TargetGenerator, no additional `@rules` are required to be installed, because generation
     is implemented declaratively. But an optional `settings_request_cls` can be declared to
-    dynamically control some settings of generation.
+    dynamically control some settings of generation. Additionally, a TargetFilesGenerator is limited
+    to a single generated target type.
     """
 
+    # Redefine `generated_target_cls` to a single target type only for TargetFilesGenerator
+    generated_target_cls: ClassVar[type[Target]]
     settings_request_cls: ClassVar[type[TargetFilesGeneratorSettingsRequest] | None] = None
 
     def validate(self) -> None:
