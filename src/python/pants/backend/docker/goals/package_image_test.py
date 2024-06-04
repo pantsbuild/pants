@@ -1648,6 +1648,25 @@ def test_get_context_root(
             ),
             "",
         ),
+        # Buildkit on Windows ??? Buildkit version?
+        (
+            DockerBinary("/bin/docker", "1234", is_podman=False),
+            "sha256:7805a7da5f45a70bb9e47e8de09b1f5acd8f479dda06fb144c5590b9d2b86dd7",
+            dedent(
+                """\
+                #5 [2/2] RUN sleep 1
+                #5 DONE 1.1s
+
+                #6 exporting to image
+                #6 exporting layers
+                #6 exporting layers 0.7s done
+                #6 writing image sha256:7805a7da5f45a70bb9e47e8de09b1f5acd8f479dda06fb144c5590b9d2b86dd7 0.0s done
+                #6 naming to docker.io/library/my-docker-image:latest 0.1s done
+                #6 DONE 1.1s
+                """
+            ),
+            "",
+        ),
         # Buildkit with containerd-snapshotter 0.12.1
         (
             DockerBinary("/bin/docker", "1234", is_podman=False),
