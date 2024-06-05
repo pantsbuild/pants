@@ -65,7 +65,11 @@ def given_package_with_name(name: str) -> str:
 
 
 def given_package_with_package_manager_and_workspaces(
-    name: str, version: str, package_manager: str, dependencies: dict[str, str] | None = None, *workspaces: str
+    name: str,
+    version: str,
+    package_manager: str,
+    dependencies: dict[str, str] | None = None,
+    *workspaces: str,
 ) -> str:
     return json.dumps(
         {
@@ -196,9 +200,13 @@ def test_generates_lockfile_for_npm_package_json_workspace(rule_runner: RuleRunn
     rule_runner.write_files(
         {
             "src/js/BUILD": "package_json()",
-            "src/js/package.json": given_package_with_package_manager_and_workspaces("ham", "1.0.0", "npm@10.7.0", None, "a"),
+            "src/js/package.json": given_package_with_package_manager_and_workspaces(
+                "ham", "1.0.0", "npm@10.7.0", None, "a"
+            ),
             "src/js/a/BUILD": "package_json()",
-            "src/js/a/package.json": given_package_with_package_manager_and_workspaces("spam", "0.1.0", "npm@10.7.0"),
+            "src/js/a/package.json": given_package_with_package_manager_and_workspaces(
+                "spam", "0.1.0", "npm@10.7.0"
+            ),
         }
     )
     [project] = rule_runner.request(AllNodeJSProjects, [])
@@ -241,7 +249,9 @@ def test_generates_lockfile_for_pnpm_package_json_workspace(rule_runner: RuleRun
                 "ham", "1.0.0", "pnpm@9.1.4", {"spam": "workspace:*"}
             ),
             "src/js/a/BUILD": "package_json()",
-            "src/js/a/package.json": given_package_with_package_manager_and_workspaces("spam", "0.1.0", "pnpm@9.1.4"),
+            "src/js/a/package.json": given_package_with_package_manager_and_workspaces(
+                "spam", "0.1.0", "pnpm@9.1.4"
+            ),
         }
     )
     [project] = rule_runner.request(AllNodeJSProjects, [])
@@ -265,11 +275,11 @@ def test_generates_lockfile_for_pnpm_package_json_workspace(rule_runner: RuleRun
             ".": {"dependencies": {"spam": {"specifier": "workspace:*", "version": "link:a"}}},
             "a": {},
         },
-        "lockfileVersion": '9.0',
-        'settings': {
-             'autoInstallPeers': True,
-             'excludeLinksFromLockfile': False,
-        }
+        "lockfileVersion": "9.0",
+        "settings": {
+            "autoInstallPeers": True,
+            "excludeLinksFromLockfile": False,
+        },
     }
 
 
@@ -282,7 +292,9 @@ def test_generates_lockfile_for_yarn_package_json_workspace(rule_runner: RuleRun
                 "ham", "1.0.0", "yarn@4.2.2", {"spam": "*"}, "a"
             ),
             "src/js/a/BUILD": "package_json()",
-            "src/js/a/package.json": given_package_with_package_manager_and_workspaces("spam", "0.1.0", "yarn@4.2.2"),
+            "src/js/a/package.json": given_package_with_package_manager_and_workspaces(
+                "spam", "0.1.0", "yarn@4.2.2"
+            ),
         }
     )
     [project] = rule_runner.request(AllNodeJSProjects, [])
