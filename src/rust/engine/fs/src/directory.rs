@@ -958,7 +958,7 @@ impl DigestTrie {
 
             if let Some(Entry::Symlink(s)) = maybe_matching_entry {
                 if link_depth >= MAX_LINK_DEPTH {
-                    warn!("Exceeded the maximum link depth while traversing link `{}` to path {:#?}. Stopping traversal.", s.name, s.target);
+                    warn!("Exceeded the maximum link depth while traversing link {:#?} to path {:#?}. Stopping traversal.", logical_path.join(PathBuf::from(s.name.as_str())), s.target);
                     return Ok(None);
                 }
 
