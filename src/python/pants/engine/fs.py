@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Tuple, Union
 
@@ -328,6 +329,64 @@ class SnapshotDiff:
     @classmethod
     def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> SnapshotDiff:
         return cls(*ours._diff(theirs))
+
+
+class PathMetadataKind(Enum):
+    """Enumeration denoting the kind of path entry represented by a `PathMetadata`."""
+
+    FILE = "file"
+    DIRECTORY = "directory"
+    SYMLINK = "symlink"
+
+
+@dataclass(frozen=True)
+class PathMetadata:
+    """Full metadata of a single path in the repository.
+
+    This dataclass represents the full metadata of a path in the filesystem, but not its contents. This API
+    exists to support certain APIs which have a special need to inspect a path's full metadata. Rule
+    code should normally just use the `Digest` and `Snapshot`-related APIs to capture file content
+    from the repository along with the subset of metadata actually supported across all execution environments
+    (e.g., the `is_executable` flag).
+
+    Some of the fields are optional because not all fields may be supported by the underlying system (e.g.,
+    the repository filesystem or an REAPI directopry tree).
+    """
+
+    path: str
+    kind: str  # see `PathMetadataKind` for supported values
+    length: int
+
+    is_executable: bool
+    read_only: bool
+    unix_mode: int | None
+
+    accessed_time: datetime | None
+    created_time: datetime | None
+    modification_time: datetime | None
+
+    symlink_target: str | None
+
+
+@dataclass(frozen=True)
+class PathMetadataRequest:
+    """Request the full metadata of a single path in the filesystem.
+
+    Note: This API is symlink aware and will distinguish between symlinks and regular files.
+    """
+
+    path: str
+
+
+@dataclass(frozen=True)
+class PathMetadataResult:
+    """Result of requesting the metadata for a path in the filesystem.
+
+    The `metadata` field will contain the metadata for the requested path, or else `None` if the
+    path does not exist.
+    """
+
+    metadata: PathMetadata | None
 
 
 def rules():

@@ -23,11 +23,12 @@ pub use crate::glob_matching::{
 };
 
 use std::cmp::min;
-use std::io;
+use std::io::{self, ErrorKind};
 use std::ops::Deref;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
+use std::time::SystemTime;
 use std::{fmt, fs};
 
 use async_trait::async_trait;
@@ -234,6 +235,47 @@ impl PathStat {
             PathStat::Link { path, .. } => path.as_path(),
         }
     }
+}
+
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
+pub enum PathMetadataKind {
+    File,
+    Directory,
+    Symlink,
+}
+
+/// Expanded version of `Stat` when access to additional filesystem attributes is necessary.
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
+pub struct PathMetadata {
+    /// Path to this filesystem entry.
+    pub path: PathBuf,
+
+    /// The kind of file at the path.
+    pub kind: PathMetadataKind,
+
+    /// Length of the filesystem entry.
+    pub length: u64,
+
+    /// True if the entry is marked executable.
+    pub is_executable: bool,
+
+    /// True if the entry is marked read-only.
+    pub read_only: bool,
+
+    /// UNIX mode (if available)
+    pub unix_mode: Option<u32>,
+
+    /// Modification time of the path (if available).
+    pub accessed_time: Option<SystemTime>,
+
+    /// Modification time of the path (if available).
+    pub created_time: Option<SystemTime>,
+
+    /// Modification time of the path (if available).
+    pub modification_time: Option<SystemTime>,
+
+    /// Symlink target
+    pub symlink_target: Option<PathBuf>,
 }
 
 #[derive(Debug, DeepSizeOf, Eq, PartialEq)]
@@ -559,6 +601,43 @@ impl PosixFS {
                 _ => Err(err),
             })
     }
+
+    pub async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, io::Error> {
+        let abs_path = self.root.0.join(&path);
+        match tokio::fs::symlink_metadata(&abs_path).await {
+            Ok(metadata) => {
+                let (kind, symlink_target) = match metadata.file_type() {
+                    ft if ft.is_symlink() => {
+                        let symlink_target = tokio::fs::read_link(&abs_path).await.unwrap();
+                        (PathMetadataKind::Symlink, Some(symlink_target))
+                    }
+                    ft if ft.is_dir() => (PathMetadataKind::Directory, None),
+                    _ => (PathMetadataKind::File, None),
+                };
+
+                #[cfg(target_family = "unix")]
+                let unix_mode = Some(metadata.permissions().mode());
+
+                #[cfg(not(target_family = "unix"))]
+                let unix_mode: Option<u32> = None;
+
+                Ok(Some(PathMetadata {
+                    path,
+                    kind,
+                    length: metadata.len(),
+                    is_executable: (metadata.permissions().mode() & 0o111) != 0,
+                    read_only: metadata.permissions().readonly(),
+                    unix_mode,
+                    accessed_time: metadata.accessed().ok(),
+                    created_time: metadata.created().ok(),
+                    modification_time: metadata.modified().ok(),
+                    symlink_target,
+                }))
+            }
+            Err(err) if err.kind() == ErrorKind::NotFound => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
 }
 
 #[async_trait]
@@ -569,6 +648,10 @@ impl Vfs<io::Error> for Arc<PosixFS> {
 
     async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, io::Error> {
         Ok(Arc::new(PosixFS::scandir(self, dir).await?))
+    }
+
+    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, io::Error> {
+        PosixFS::path_metadata(self, path).await
     }
 
     fn is_ignored(&self, stat: &Stat) -> bool {
@@ -648,6 +731,52 @@ impl Vfs<String> for DigestTrie {
         )))
     }
 
+    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, String> {
+        let entry = match self.entry(&path)? {
+            Some(e) => e,
+            None => return Ok(None),
+        };
+
+        Ok(Some(match entry {
+            directory::Entry::File(f) => PathMetadata {
+                path: PathBuf::from(f.name().as_str()),
+                kind: PathMetadataKind::File,
+                length: entry.digest().size_bytes as u64,
+                is_executable: f.is_executable(),
+                read_only: false,
+                unix_mode: None,
+                accessed_time: None,
+                created_time: None,
+                modification_time: None,
+                symlink_target: None,
+            },
+            directory::Entry::Symlink(s) => PathMetadata {
+                path: PathBuf::from(s.name().as_str()),
+                kind: PathMetadataKind::Symlink,
+                length: 0,
+                is_executable: false,
+                read_only: false,
+                unix_mode: None,
+                accessed_time: None,
+                created_time: None,
+                modification_time: None,
+                symlink_target: Some(s.target().to_path_buf()),
+            },
+            directory::Entry::Directory(d) => PathMetadata {
+                path: PathBuf::from(d.name().as_str()),
+                kind: PathMetadataKind::Directory,
+                length: entry.digest().size_bytes as u64,
+                is_executable: false,
+                read_only: false,
+                unix_mode: None,
+                accessed_time: None,
+                created_time: None,
+                modification_time: None,
+                symlink_target: None,
+            },
+        }))
+    }
+
     fn is_ignored(&self, _stat: &Stat) -> bool {
         false
     }
@@ -664,6 +793,7 @@ impl Vfs<String> for DigestTrie {
 pub trait Vfs<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     async fn read_link(&self, link: &Link) -> Result<PathBuf, E>;
     async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, E>;
+    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, E>;
     fn is_ignored(&self, stat: &Stat) -> bool;
     fn mk_error(msg: &str) -> E;
 }

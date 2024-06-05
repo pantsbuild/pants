@@ -71,6 +71,7 @@ class AdhocProcessRequest:
     log_output: bool
     capture_stdout_file: str | None
     capture_stderr_file: str | None
+    invalidation_globs: PathGlobs | None
     cache_scope: ProcessCacheScope | None = None
 
 
@@ -566,6 +567,16 @@ async def prepare_adhoc_process(
 
     if supplied_env_vars:
         command_env.update(supplied_env_vars)
+
+    # Hydrate the full stats for any invalidation path globs and put their hash into the environment as a dummy variable
+    # so that the process produced by this rule will depend on the actual values of those full stats.
+    if request.invalidation_globs:
+        paths = await Get(Paths, PathGlobs, request.invalidation_globs)
+        paths_list: list[str] = sorted([*paths.files, *paths.dirs])
+        metadatas = await MultiGet(
+            Get(PathMetadataResult, PathMetadataRequest(path)) for path in paths_list
+        )
+        command_env["__PANTS_INVALIDATION_GLOBS_HASH"] = str(hash(tuple(metadatas)))
 
     input_snapshot = await Get(Snapshot, Digest, request.input_digest)
 

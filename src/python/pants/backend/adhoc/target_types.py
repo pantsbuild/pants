@@ -253,6 +253,15 @@ class AdhocToolOutputRootDirField(StringField):
     )
 
 
+class AdhocToolInvalidationGlobsField(StringSequenceField):
+    alias: ClassVar[str] = "invalidation_globs"
+    help = help_text(
+        """
+        Path globs for files which should be used to invalidate this tool's execution.
+        """
+    )
+
+
 class AdhocToolTarget(Target):
     alias: ClassVar[str] = "adhoc_tool"
     core_fields = (
@@ -272,6 +281,7 @@ class AdhocToolTarget(Target):
         AdhocToolOutputRootDirField,
         AdhocToolStdoutFilenameField,
         AdhocToolStderrFilenameField,
+        AdhocToolInvalidationGlobsField,
         EnvironmentField,
     )
     help = help_text(
