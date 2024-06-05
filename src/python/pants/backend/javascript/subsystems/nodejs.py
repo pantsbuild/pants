@@ -137,7 +137,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     )
 
     package_managers = DictOption[str](
-        default={"npm": "8.5.5"},
+        default={"npm": "10.8.1"},
         help=help_text(
             """
             A mapping of package manager versions to semver releases.

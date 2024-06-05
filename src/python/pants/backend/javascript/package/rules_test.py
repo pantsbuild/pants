@@ -52,7 +52,7 @@ def rule_runner(package_manager_and_version: tuple[str, str]) -> RuleRunner:
         ],
         objects=dict(package_json.build_file_aliases().objects),
     )
-    rule_runner.set_options([f"--nodejs-package-manager={package_manager}"], env_inherit={"PATH"})
+    rule_runner.set_options([f"--nodejs-package-manager={package_manager}@{package_manager_version}"], env_inherit={"PATH"})
     return rule_runner
 
 
@@ -207,7 +207,13 @@ def test_packages_files_as_resource_in_workspace(
         {
             **workspace_files,
             "src/js/package.json": json.dumps(
-                {"name": "spam", "version": "0.0.1", "workspaces": ["a"], "private": True}
+                {
+                    "name": "spam",
+                    "version": "0.0.1",
+                    "packageManager": f"{package_manager}@{package_manager_version}",
+                    "workspaces": ["a"],
+                    "private": True
+                }
             ),
             "src/js/BUILD": "package_json()",
             "src/js/a/BUILD": dedent(
