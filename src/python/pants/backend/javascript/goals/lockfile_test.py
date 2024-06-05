@@ -230,7 +230,6 @@ def test_generates_lockfile_for_npm_package_json_workspace(rule_runner: RuleRunn
         "version": "1.0.0",
         "lockfileVersion": 3,
         "requires": True,
-        "dependencies": {"spam": {"version": "file:a"}},
         "packages": {
             "": {"name": "ham", "version": "1.0.0", "workspaces": ["a"]},
             "a": {"name": "spam", "version": "0.1.0"},
