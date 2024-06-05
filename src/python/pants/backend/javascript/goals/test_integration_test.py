@@ -255,7 +255,7 @@ def test_mocha_tests(
                 test_script={"test": "mocha"},
                 package_manager=package_manager,
                 package_manager_version=package_manager_version,
-                runner={"mocha": "^10.2.0"}
+                runner={"mocha": "^10.4.0"}
             ),
             **{f"foo/{key}": value for key, value in mocha_lockfile.items()},
             "foo/src/BUILD": "javascript_sources()",
