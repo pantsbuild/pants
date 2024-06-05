@@ -7,6 +7,7 @@ import os.path
 import tarfile
 import textwrap
 from textwrap import dedent
+from typing import cast
 
 import pytest
 
@@ -29,7 +30,7 @@ from pants.testutil.rule_runner import RuleRunner
 
 @pytest.fixture(params=[("pnpm", "7.33.7"), ("npm", "10.8.1"), ("yarn", "1.22.22")])
 def package_manager_and_version(request) -> tuple[str, str]:
-    return request.param
+    return cast(tuple[str, str], request.param)
 
 
 @pytest.fixture
