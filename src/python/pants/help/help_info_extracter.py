@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import difflib
 import inspect
 import itertools
 import json
@@ -44,6 +45,7 @@ from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
 from pants.option.scope import ScopeInfo
+from pants.util.collections import assert_single_element
 from pants.util.frozendict import LazyFrozenDict
 from pants.util.strutil import first_paragraph, strval
 
@@ -497,8 +499,9 @@ class HelpInfoExtracter:
                     )
                 provider = ""
                 if subsystem_cls is not None and build_configuration is not None:
-                    provider = cls.get_provider(
-                        build_configuration.subsystem_to_providers.get(subsystem_cls)
+                    provider = cls.get_closest_provider_for_subsystem(
+                        subsystem_cls,
+                        build_configuration.subsystem_to_providers.get(subsystem_cls),
                     )
                 return HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
                     scope_info.description,
@@ -677,6 +680,17 @@ class HelpInfoExtracter:
             return ""
         # Pick the shortest backend name.
         return sorted(providers, key=len)[0]
+
+    @classmethod
+    def get_closest_provider_for_subsystem(cls, subsystem_cls: Type, providers: tuple[str, ...] | None) -> str:
+        if not providers:
+            return ""
+
+        subsystem_fqcn = f"{subsystem_cls.__module__}.{subsystem_cls.__qualname__}"
+        closest_match_result = difflib.get_close_matches(subsystem_fqcn, providers, n=1, cutoff=0.0)
+        # There should be exactly 1 match in the list, because of n=1 and cutoff=0.0.
+        closest_match = assert_single_element(closest_match_result)
+        return closest_match
 
     @staticmethod
     def maybe_cleandoc(doc: str | None) -> str | None:
