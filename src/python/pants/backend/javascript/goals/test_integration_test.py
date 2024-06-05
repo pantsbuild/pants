@@ -32,13 +32,14 @@ from pants.testutil.rule_runner import RuleRunner
 ATTEMPTS_DEFAULT_OPTION = 2
 
 
-@pytest.fixture(params=["npm", "pnpm", "yarn"])
-def package_manager(request) -> str:
-    return cast(str, request.param)
+@pytest.fixture(params=[("npm", "10.8.1"), ("pnpm", "7.33.7"), ("yarn", "1.22.22")])
+def package_manager_and_version(request) -> tuple[str, str]:
+    return request.param
 
 
 @pytest.fixture
-def rule_runner(package_manager: str) -> RuleRunner:
+def rule_runner(package_manager_and_version: tuple[str, str]) -> RuleRunner:
+    package_manager, _ = package_manager_and_version
     rule_runner = RuleRunner(
         rules=[
             *test.rules(),
@@ -80,12 +81,14 @@ def _find_lockfile_resource(package_manager: str, resource_dir: str) -> dict[str
 
 
 @pytest.fixture
-def jest_lockfile(package_manager: str) -> dict[str, str]:
+def jest_lockfile(package_manager_and_version: tuple[str, str]) -> dict[str, str]:
+    package_manager, _ = package_manager_and_version
     return _find_lockfile_resource(package_manager, "jest_resources")
 
 
 @pytest.fixture
-def mocha_lockfile(package_manager: str) -> dict[str, str]:
+def mocha_lockfile(package_manager_and_version: tuple[str, str]) -> dict[str, str]:
+    package_manager, _ = package_manager_and_version
     return _find_lockfile_resource(package_manager, "mocha_resources")
 
 
@@ -101,7 +104,7 @@ def make_source_to_test(passing: bool = True):
     )
 
 
-def given_package_json(*, test_script: dict[str, str], runner: dict[str, str]) -> str:
+def given_package_json(*, test_script: dict[str, str], runner: dict[str, str], package_manager: str, package_manager_version: str) -> str:
     return json.dumps(
         {
             "name": "pkg",
@@ -109,6 +112,7 @@ def given_package_json(*, test_script: dict[str, str], runner: dict[str, str]) -
             "type": "module",
             "scripts": {**test_script},
             "devDependencies": runner,
+            "packageManager": f"{package_manager}@{package_manager_version}",
             "main": "./src/index.mjs",
         }
     )
@@ -133,17 +137,22 @@ def given_package_json(*, test_script: dict[str, str], runner: dict[str, str]) -
 )
 @pytest.mark.parametrize("passing", [True, False])
 def test_jest_tests_are_successful(
+    package_manager_and_version: tuple[str, str],
     rule_runner: RuleRunner,
     test_script: dict[str, str],
     package_json_target: str,
     passing: bool,
     jest_lockfile: dict[str, str],
 ) -> None:
+    package_manager, package_manager_version = package_manager_and_version
     rule_runner.write_files(
         {
             "foo/BUILD": package_json_target,
             "foo/package.json": given_package_json(
-                test_script=test_script, runner={"jest": "^29.5"}
+                test_script=test_script,
+                package_manager=package_manager,
+                package_manager_version=package_manager_version,
+                runner={"jest": "^29.7.0"},
             ),
             **{f"foo/{key}": value for key, value in jest_lockfile.items()},
             "foo/src/BUILD": "javascript_sources()",
@@ -178,14 +187,17 @@ def test_jest_tests_are_successful(
 
 
 def test_batched_jest_tests_are_successful(
-    rule_runner: RuleRunner, jest_lockfile: dict[str, str]
+    package_manager_and_version: tuple[str, str], rule_runner: RuleRunner, jest_lockfile: dict[str, str]
 ) -> None:
+    package_manager, package_manager_version = package_manager_and_version
     rule_runner.write_files(
         {
             "foo/BUILD": "package_json()",
             "foo/package.json": given_package_json(
                 test_script={"test": "NODE_OPTIONS=--experimental-vm-modules jest"},
-                runner={"jest": "^29.5"},
+                package_manager=package_manager,
+                package_manager_version=package_manager_version,
+                runner={"jest": "^29.7.0"},
             ),
             **{f"foo/{key}": value for key, value in jest_lockfile.items()},
             "foo/src/BUILD": "javascript_sources()",
@@ -233,13 +245,17 @@ def test_batched_jest_tests_are_successful(
 
 @pytest.mark.parametrize("passing", [True, False])
 def test_mocha_tests(
-    passing: bool, mocha_lockfile: dict[str, str], rule_runner: RuleRunner
+    passing: bool, mocha_lockfile: dict[str, str], package_manager_and_version: tuple[str, str], rule_runner: RuleRunner
 ) -> None:
+    package_manager, package_manager_version = package_manager_and_version
     rule_runner.write_files(
         {
             "foo/BUILD": "package_json()",
             "foo/package.json": given_package_json(
-                test_script={"test": "mocha"}, runner={"mocha": "^10.2.0"}
+                test_script={"test": "mocha"},
+                package_manager=package_manager,
+                package_manager_version=package_manager_version,
+                runner={"mocha": "^10.2.0"}
             ),
             **{f"foo/{key}": value for key, value in mocha_lockfile.items()},
             "foo/src/BUILD": "javascript_sources()",
@@ -270,8 +286,9 @@ def test_mocha_tests(
 
 
 def test_jest_test_with_coverage_reporting(
-    package_manager: str, rule_runner: RuleRunner, jest_lockfile: dict[str, str]
+    package_manager_and_version: tuple[str, str], rule_runner: RuleRunner, jest_lockfile: dict[str, str]
 ) -> None:
+    package_manager, package_manager_version = package_manager_and_version
     rule_runner.set_options(
         args=[f"--nodejs-package-manager={package_manager}", "--test-use-coverage", "True"],
         env_inherit={"PATH"},
@@ -292,7 +309,9 @@ def test_jest_test_with_coverage_reporting(
             ),
             "foo/package.json": given_package_json(
                 test_script={"test": "NODE_OPTIONS=--experimental-vm-modules jest"},
-                runner={"jest": "^29.5"},
+                package_manager=package_manager,
+                package_manager_version=package_manager_version,
+                runner={"jest": "^29.7.0"},
             ),
             **{f"foo/{key}": value for key, value in jest_lockfile.items()},
             "foo/src/BUILD": "javascript_sources()",
