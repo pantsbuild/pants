@@ -20,10 +20,10 @@ class Trufflehog(ExternalTool):
     help = "Trufflehog secrets scanning"
     skip = SkipOption("lint")
     default_known_versions = [
-        f"{default_version}|macos_arm64|19e10e34e95d797cbb924b342b873caa9e71296f9bead28b390d96981f47fbb0|26743363",
-        f"{default_version}|macos_x86_64|6a0a425be18ef1b3c0bf5ff88a895e01c1de70892ee48026b9a9ed89ad0398d4|27466237",
-        f"{default_version}|linux_arm64|6aeb5a91dbd981a5446312946072b470dc3a706711c85966394f62717cd71111|26021125",
-        f"{default_version}|linux_x86_64|2fda581fb26ed5c866045a4532ce73511f873b70f20eaaae01a7279c3b1c2993|27805118",
+        f"v3.34.0|macos_arm64|19e10e34e95d797cbb924b342b873caa9e71296f9bead28b390d96981f47fbb0|26743363",
+        f"v3.34.0|macos_x86_64|6a0a425be18ef1b3c0bf5ff88a895e01c1de70892ee48026b9a9ed89ad0398d4|27466237",
+        f"v3.34.0|linux_arm64|6aeb5a91dbd981a5446312946072b470dc3a706711c85966394f62717cd71111|26021125",
+        f"v3.34.0|linux_x86_64|2fda581fb26ed5c866045a4532ce73511f873b70f20eaaae01a7279c3b1c2993|27805118",
     ]
 
     exclude = StrListOption(
