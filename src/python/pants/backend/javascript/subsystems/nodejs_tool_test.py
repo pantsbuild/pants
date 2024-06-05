@@ -64,7 +64,7 @@ def test_execute_process_with_package_manager(
         [
             "--cowsay-version=cowsay@1.6.0",
             f"--nodejs-package-manager={package_manager}",
-            "--nodejs-package-managers={'npm': '10.7.0', 'yarn': '1.22.22', 'pnpm': '9.1.4'}",
+            "--nodejs-package-managers={'npm': '10.8.1', 'yarn': '1.22.22', 'pnpm': '9.1.4'}",
         ],
         env_inherit={"PATH"},
     )
@@ -86,7 +86,7 @@ def test_execute_process_with_package_manager(
     [
         pytest.param(Path(__file__).parent / "yarn.lock", "yarn", "1.22.22", id="yarn_resolve"),
         pytest.param(Path(__file__).parent / "pnpm-lock.yaml", "pnpm", "9.1.4", id="pnpm_resolve"),
-        pytest.param(Path(__file__).parent / "package-lock.json", "npm", "10.7.0",  id="npm_resolve"),
+        pytest.param(Path(__file__).parent / "package-lock.json", "npm", "10.8.1",  id="npm_resolve"),
     ],
 )
 def test_resolve_dictates_version(
