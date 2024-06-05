@@ -64,14 +64,15 @@ def given_package_with_name(name: str) -> str:
     return json.dumps({"name": name, "version": "0.0.1"})
 
 
-def given_package_with_workspaces(
-    name: str, version: str, dependencies: dict[str, str] | None = None, *workspaces: str
+def given_package_with_package_manager_and_workspaces(
+    name: str, version: str, package_manager: str, dependencies: dict[str, str] | None = None, *workspaces: str
 ) -> str:
     return json.dumps(
         {
             "name": name,
             "version": version,
             "private": True,
+            "packageManager": package_manager,
             "dependencies": dependencies or {},
             "workspaces": list(workspaces),
         }
@@ -195,9 +196,9 @@ def test_generates_lockfile_for_npm_package_json_workspace(rule_runner: RuleRunn
     rule_runner.write_files(
         {
             "src/js/BUILD": "package_json()",
-            "src/js/package.json": given_package_with_workspaces("ham", "1.0.0", None, "a"),
+            "src/js/package.json": given_package_with_package_manager_and_workspaces("ham", "1.0.0", "npm", None, "a"),
             "src/js/a/BUILD": "package_json()",
-            "src/js/a/package.json": given_package_with_workspaces("spam", "0.1.0"),
+            "src/js/a/package.json": given_package_with_package_manager_and_workspaces("spam", "0.1.0", "npm"),
         }
     )
     [project] = rule_runner.request(AllNodeJSProjects, [])
@@ -236,11 +237,11 @@ def test_generates_lockfile_for_pnpm_package_json_workspace(rule_runner: RuleRun
         {
             "src/js/BUILD": "package_json()",
             "src/js/pnpm-workspace.yaml": "",
-            "src/js/package.json": given_package_with_workspaces(
-                "ham", "1.0.0", {"spam": "workspace:*"}
+            "src/js/package.json": given_package_with_package_manager_and_workspaces(
+                "ham", "1.0.0", "pnpm", {"spam": "workspace:*"}
             ),
             "src/js/a/BUILD": "package_json()",
-            "src/js/a/package.json": given_package_with_workspaces("spam", "0.1.0"),
+            "src/js/a/package.json": given_package_with_package_manager_and_workspaces("spam", "0.1.0", "pnpm"),
         }
     )
     [project] = rule_runner.request(AllNodeJSProjects, [])
@@ -273,11 +274,11 @@ def test_generates_lockfile_for_yarn_package_json_workspace(rule_runner: RuleRun
     rule_runner.write_files(
         {
             "src/js/BUILD": "package_json()",
-            "src/js/package.json": given_package_with_workspaces(
-                "ham", "1.0.0", {"spam": "*"}, "a"
+            "src/js/package.json": given_package_with_package_manager_and_workspaces(
+                "ham", "1.0.0", "yarn", {"spam": "*"}, "a"
             ),
             "src/js/a/BUILD": "package_json()",
-            "src/js/a/package.json": given_package_with_workspaces("spam", "0.1.0"),
+            "src/js/a/package.json": given_package_with_package_manager_and_workspaces("spam", "0.1.0", "yarn"),
         }
     )
     [project] = rule_runner.request(AllNodeJSProjects, [])
