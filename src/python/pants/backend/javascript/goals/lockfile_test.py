@@ -185,7 +185,7 @@ def test_generates_lockfile_for_package_json_project(rule_runner: RuleRunner) ->
     assert json.loads(digest_contents[0].content) == {
         "name": "ham",
         "version": "0.0.1",
-        "lockfileVersion": 2,
+        "lockfileVersion": 3,
         "requires": True,
         "packages": {"": {"name": "ham", "version": "0.0.1"}},
     }
@@ -219,7 +219,7 @@ def test_generates_lockfile_for_npm_package_json_workspace(rule_runner: RuleRunn
     assert json.loads(digest_contents[0].content) == {
         "name": "ham",
         "version": "1.0.0",
-        "lockfileVersion": 2,
+        "lockfileVersion": 3,
         "requires": True,
         "dependencies": {"spam": {"version": "file:a"}},
         "packages": {
