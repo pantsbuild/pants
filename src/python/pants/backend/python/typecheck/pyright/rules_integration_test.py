@@ -108,12 +108,7 @@ PYRIGHT_LOCKFILE = json.dumps(
                 "dev": True,
                 "hasInstallScript": True,
                 "optional": True,
-                "os": [
-                    "darwin"
-                ],
-                "engines": {
-                    "node": "^8.16.0 || ^10.6.0 || >=11.0.0"
-                }
+                "engines": {"node": "^8.16.0 || ^10.6.0 || >=11.0.0"},
             },
             "node_modules/pyright": {
                 "version": PYRIGHT_VERSION,
@@ -131,17 +126,15 @@ PYRIGHT_LOCKFILE = json.dumps(
                 "resolved": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz",
                 "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==",
                 "dev": True,
-                "optional": True
+                "optional": True,
             },
             "pyright": {
                 "version": PYRIGHT_VERSION,
                 "resolved": f"https://registry.npmjs.org/pyright/-/pyright-{PYRIGHT_VERSION}.tgz",
                 "integrity": PYRIGHT_INTEGRITY_HASH,
                 "dev": True,
-                "requires": {
-                    "fsevents": "~2.3.3"
-                }
-            }
+                "requires": {"fsevents": "~2.3.3"},
+            },
         },
     }
 )
