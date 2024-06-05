@@ -7,7 +7,6 @@ import os.path
 import tarfile
 import textwrap
 from textwrap import dedent
-from typing import cast
 
 import pytest
 
@@ -52,11 +51,16 @@ def rule_runner(package_manager_and_version: tuple[str, str]) -> RuleRunner:
         ],
         objects=dict(package_json.build_file_aliases().objects),
     )
-    rule_runner.set_options([f"--nodejs-package-manager={package_manager}@{package_manager_version}"], env_inherit={"PATH"})
+    rule_runner.set_options(
+        [f"--nodejs-package-manager={package_manager}@{package_manager_version}"],
+        env_inherit={"PATH"},
+    )
     return rule_runner
 
 
-def test_creates_tar_for_package_json(rule_runner: RuleRunner, package_manager_and_version: tuple[str, str]) -> None:
+def test_creates_tar_for_package_json(
+    rule_runner: RuleRunner, package_manager_and_version: tuple[str, str]
+) -> None:
     package_manager, package_manager_version = package_manager_and_version
     rule_runner.write_files(
         {
@@ -200,7 +204,9 @@ def workspace_files(package_manager_and_version: tuple[str, str]) -> dict[str, s
 
 
 def test_packages_files_as_resource_in_workspace(
-    rule_runner: RuleRunner, package_manager_and_version: tuple[str, str], workspace_files: dict[str, str]
+    rule_runner: RuleRunner,
+    package_manager_and_version: tuple[str, str],
+    workspace_files: dict[str, str],
 ) -> None:
     package_manager, package_manager_version = package_manager_and_version
     rule_runner.write_files(
@@ -212,7 +218,7 @@ def test_packages_files_as_resource_in_workspace(
                     "version": "0.0.1",
                     "packageManager": f"{package_manager}@{package_manager_version}",
                     "workspaces": ["a"],
-                    "private": True
+                    "private": True,
                 }
             ),
             "src/js/BUILD": "package_json()",

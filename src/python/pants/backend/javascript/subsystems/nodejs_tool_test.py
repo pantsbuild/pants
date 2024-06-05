@@ -86,7 +86,9 @@ def test_execute_process_with_package_manager(
     [
         pytest.param(Path(__file__).parent / "yarn.lock", "yarn", "1.22.22", id="yarn_resolve"),
         pytest.param(Path(__file__).parent / "pnpm-lock.yaml", "pnpm", "7.33.7", id="pnpm_resolve"),
-        pytest.param(Path(__file__).parent / "package-lock.json", "npm", "10.8.1",  id="npm_resolve"),
+        pytest.param(
+            Path(__file__).parent / "package-lock.json", "npm", "10.8.1", id="npm_resolve"
+        ),
     ],
 )
 def test_resolve_dictates_version(
@@ -99,7 +101,7 @@ def test_resolve_dictates_version(
                 {
                     "name": "@the-company/project",
                     "devDependencies": {"cowsay": "1.6.0"},
-                    "packageManager": f"{package_manager}@{package_manager_version}"
+                    "packageManager": f"{package_manager}@{package_manager_version}",
                 },
             ),
             lockfile_path.name: lockfile_path.read_text(),
