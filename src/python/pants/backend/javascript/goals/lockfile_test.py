@@ -272,14 +272,10 @@ def test_generates_lockfile_for_pnpm_package_json_workspace(rule_runner: RuleRun
 
     assert yaml.safe_load(digest_contents[0].content) == {
         "importers": {
-            ".": {"dependencies": {"spam": {"specifier": "workspace:*", "version": "link:a"}}},
-            "a": {},
+            ".": {"dependencies": {"spam": "link:a"}, "specifiers": {"spam": "workspace:*"}},
+            "a": {"specifiers": {}},
         },
-        "lockfileVersion": "9.0",
-        "settings": {
-            "autoInstallPeers": True,
-            "excludeLinksFromLockfile": False,
-        },
+        "lockfileVersion": 5.4,
     }
 
 
