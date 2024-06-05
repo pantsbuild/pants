@@ -92,16 +92,17 @@ UNDEFINED_VARIABLE_TOML_CONFIG = dedent(
     """
 )
 
+PYRIGHT_VERSION = "1.1.365"
 PYRIGHT_LOCKFILE = json.dumps(
     {
         "name": "@the-company/project",
         "lockfileVersion": 2,
         "requires": True,
         "packages": {
-            "": {"name": "@the-company/project", "devDependencies": {"pyright": "1.1.316"}},
+            "": {"name": "@the-company/project", "devDependencies": {"pyright": PYRIGHT_VERSION}},
             "node_modules/pyright": {
-                "version": "1.1.316",
-                "resolved": "https://registry.npmjs.org/pyright/-/pyright-1.1.316.tgz",
+                "version": PYRIGHT_VERSION,
+                "resolved": f"https://registry.npmjs.org/pyright/-/pyright-{PYRIGHT_VERSION}.tgz",
                 "integrity": "sha512-Pdb9AwOO07uNOuEVtwCThyDpB0wigWmLjeCw5vdPG7gVbVYYgY2iw64kBdwTu78NrO0igVKzmoRuApMoL6ZE0w==",
                 "dev": True,
                 "bin": {"pyright": "index.js", "pyright-langserver": "langserver.index.js"},
@@ -110,8 +111,8 @@ PYRIGHT_LOCKFILE = json.dumps(
         },
         "dependencies": {
             "pyright": {
-                "version": "1.1.316",
-                "resolved": "https://registry.npmjs.org/pyright/-/pyright-1.1.316.tgz",
+                "version": PYRIGHT_VERSION,
+                "resolved": f"https://registry.npmjs.org/pyright/-/pyright-{PYRIGHT_VERSION}.tgz",
                 "integrity": "sha512-Pdb9AwOO07uNOuEVtwCThyDpB0wigWmLjeCw5vdPG7gVbVYYgY2iw64kBdwTu78NrO0igVKzmoRuApMoL6ZE0w==",
                 "dev": True,
             }
@@ -221,7 +222,7 @@ LIB_2_PACKAGE = f"{PACKAGE}/lib2"
                 f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
                 "src/js/lib3/BUILD": "package_json()",
                 "src/js/lib3/package.json": json.dumps(
-                    {"name": "@the-company/project", "dependencies": {"pyright": "1.1.316"}}
+                    {"name": "@the-company/project", "dependencies": {"pyright": PYRIGHT_VERSION}}
                 ),
                 "src/js/lib3/package-lock.json": PYRIGHT_LOCKFILE,
             },
@@ -239,7 +240,7 @@ LIB_2_PACKAGE = f"{PACKAGE}/lib2"
                 f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
                 "BUILD": "package_json(name='root_package')",
                 "package.json": json.dumps(
-                    {"name": "@the-company/project", "dependencies": {"pyright": "1.1.316"}}
+                    {"name": "@the-company/project", "dependencies": {"pyright": PYRIGHT_VERSION}}
                 ),
                 "package-lock.json": PYRIGHT_LOCKFILE,
             },
@@ -361,7 +362,7 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
                 f"{PACKAGE}/BUILD": "python_sources()",
                 "src/js/BUILD": "package_json()",
                 "src/js/package.json": json.dumps(
-                    {"name": "@the-company/project", "dependencies": {"pyright": "1.1.316"}}
+                    {"name": "@the-company/project", "dependencies": {"pyright": PYRIGHT_VERSION}}
                 ),
                 "src/js/package-lock.json": PYRIGHT_LOCKFILE,
             },
