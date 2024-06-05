@@ -1841,24 +1841,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      name: Launch bazel-remote
-      run: "mkdir -p ~/bazel-remote\nif [[ -z \"${AWS_ACCESS_KEY_ID}\" ]]; then\n  CACHE_WRITE=false\n  # If no secret read/write\
-        \ creds, use hard-coded read-only creds, so that\n  # cross-fork PRs can at least read from the cache.\n  # These\
-        \ creds are hard-coded here in this public repo, which makes the bucket\n  # world-readable. But since putting raw\
-        \ AWS tokens in a public repo, even\n  # deliberately, is icky, we base64-them. This will at least help hide from\n\
-        \  # automated scanners that look for checked in AWS keys.\n  # Not that it would be terrible if we were scanned,\
-        \ since this is public\n  # on purpose, but it's best not to draw attention.\n  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK'\
-        \ | base64 -d)\n  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64\
-        \ -d)\nelse\n  CACHE_WRITE=true\nfi\ndocker run --detach -u 1001:1000                   -v ~/bazel-remote:/data  \
-        \                 -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key\
-        \                   --s3.access_key_id=\"${AWS_ACCESS_KEY_ID}\"                   --s3.secret_access_key=\"${AWS_SECRET_ACCESS_KEY}\"\
-        \                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com  \
-        \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
-        \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
-        \n"
     - name: Install AdoptJDK
       uses: actions/setup-java@v3
       with:

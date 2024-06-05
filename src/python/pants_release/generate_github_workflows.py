@@ -820,10 +820,13 @@ def macos11_x86_64_test_jobs() -> Jobs:
             validate_ci_config=False,
             rust_testing=RustTesting.SOME,
         ),
-        # We run these on a dedicated host with ample local cache, so remote caching
-        # just adds cost but little value.
         helper.job_name("test_python"): test_jobs(
-            helper, shard=None, platform_specific=True, with_remote_caching=False
+            helper,
+            shard=None,
+            platform_specific=True,
+            # The GHA hosted runners do not have docker installed by default to be able to run
+            # bazel-remote
+            with_remote_caching=False,
         ),
     }
     return jobs
@@ -838,7 +841,12 @@ def macos14_arm64_test_jobs() -> Jobs:
             rust_testing=RustTesting.SOME,
         ),
         helper.job_name("test_python"): test_jobs(
-            helper, shard=None, platform_specific=True, with_remote_caching=True
+            helper,
+            shard=None,
+            platform_specific=True,
+            # The GHA hosted runners do not have docker installed by default to be able to run
+            # bazel-remote
+            with_remote_caching=False,
         ),
     }
     return jobs
