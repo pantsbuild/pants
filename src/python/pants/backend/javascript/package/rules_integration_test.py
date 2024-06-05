@@ -50,14 +50,14 @@ def rule_runner() -> RuleRunner:
 
 @pytest.fixture(
     params=[
-        pytest.param((Path(__file__).parent / "package-lock.json", "npm"), id="npm"),
-        pytest.param((Path(__file__).parent / "pnpm-lock.yaml", "pnpm"), id="pnpm"),
-        pytest.param((Path(__file__).parent / "yarn.lock", "yarn"), id="yarn"),
+        pytest.param((Path(__file__).parent / "package-lock.json", "npm", "10.8.1"), id="npm"),
+        pytest.param((Path(__file__).parent / "pnpm-lock.yaml", "pnpm", "9.1.4"), id="pnpm"),
+        pytest.param((Path(__file__).parent / "yarn.lock", "yarn", "1.22.22"), id="yarn"),
     ],
     autouse=True,
 )
 def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRunner:
-    lockfile, package_manager = request.param
+    lockfile, package_manager, package_manager_version = request.param
     rule_runner.set_options([f"--nodejs-package-manager={package_manager}"], env_inherit={"PATH"})
     rule_runner.write_files(
         {
@@ -84,6 +84,7 @@ def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRu
                     "scripts": {
                         "build": "parcel build lib/index.mjs --dist-dir=dist --cache-dir=.parcel-cache"
                     },
+                    "packageManager": f"{package_manager}@{package_manager_version}",
                     "devDependencies": {"parcel": "2.12.0"},
                 }
             ),
