@@ -753,3 +753,95 @@ def test_self_types_on_same_package(rule_runner: RuleRunner) -> None:
     assert sorted(analysis.fully_qualified_consumed_symbols()) == [
         "foo.Foo",
     ]
+
+
+def test_scala3_given_alias(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        args=[
+            "-ldebug",
+            "--scala-version-for-resolve={'jvm-default':'3.2.0'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+
+            import scala.Ord
+
+            given myFoo: Foo = new Foo
+            given myBar: Quxx = {
+                val bar = new Bar
+                bar.quxx
+            }
+            given scala.Ord[Int] = ???
+            """
+        ),
+    )
+
+    assert sorted(symbol.name for symbol in analysis.provided_symbols) == [
+        "foo.given_Ord_Int",
+        "foo.myBar",
+        "foo.myFoo",
+    ]
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "bar.quxx",
+        "foo.???",
+        "foo.Bar",
+        "foo.Foo",
+        "foo.Int",
+        "foo.Quxx",
+        "foo.bar",
+        "foo.bar.quxx",
+        "foo.scala.Ord",
+        "scala.Ord",
+    ]
+
+
+def test_scala3_import_given_all(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        args=[
+            "-ldebug",
+            "--scala-version-for-resolve={'jvm-default':'3.2.0'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+
+            import quxx.bar.given
+            """
+        ),
+    )
+    assert analysis.imports_by_scope.get("foo") == (ScalaImport("quxx.bar", None, True),)
+
+
+def test_scala3_import_given_single(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        args=[
+            "-ldebug",
+            "--scala-version-for-resolve={'jvm-default':'3.2.0'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+
+            import bar.{given Foo, given Bar}
+            import quxx.bar.given scala.Ord[Int]
+            """
+        ),
+    )
+    assert analysis.imports_by_scope.get("foo") == (
+        ScalaImport("bar.given_Foo", None, False),
+        ScalaImport("bar.given_Bar", None, False),
+        ScalaImport("quxx.bar.given_Ord_Int", None, False),
+    )

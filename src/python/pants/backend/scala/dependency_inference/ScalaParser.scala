@@ -117,6 +117,18 @@ class SourceAnalysisTraverser extends Traverser {
     }
   }
 
+  // Synthetised name for given definitions
+  // https://docs.scala-lang.org/scala3/reference/contextual/relationship-implicits.html
+  def anonymousGivenSynthetisedName(extractedTypeNames: Vector[String]) = {
+    // if any of the type names are qualified, we take the last part of it
+    // https://github.com/scala/scala3/discussions/19179
+    val namesFromTypeTree = extractedTypeNames.map { name =>
+      val parts = name.split('.')
+      parts.last
+    }
+    s"""given_${namesFromTypeTree.mkString("_")}"""
+  }
+
   def recordProvidedName(
       symbolName: String,
       sawObject: Boolean = false,
@@ -239,6 +251,7 @@ class SourceAnalysisTraverser extends Traverser {
       apply(defn.tparamClause)
       apply(defn.ctor)
       visitTemplate(defn.templ, name)
+      
     case Defn.EnumCase.After_4_6_0(mods, nameNode, tparamClause, ctor, _) =>
       visitMods(mods)
       val name = extractName(nameNode)
@@ -309,6 +322,20 @@ class SourceAnalysisTraverser extends Traverser {
       withSuppressProvidedNames(() => apply(body))
     }
 
+    case Defn.GivenAlias(mods, nameNode, _tparams, _params, decltype, body) => {
+      visitMods(mods)
+
+      val givenTypeNames = extractNamesFromTypeTree(decltype)
+      val name = nameNode match {
+        case Name.Anonymous() => anonymousGivenSynthetisedName(givenTypeNames)
+        case _ => extractName(nameNode)
+      }
+
+      recordProvidedName(name)
+      givenTypeNames.foreach(recordConsumedSymbol(_))
+      withSuppressProvidedNames(() => apply(body))
+    }
+
     case Decl.Def(mods, _nameNode, tparams, params, decltpe) => {
       visitMods(mods)
       extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
@@ -332,6 +359,10 @@ class SourceAnalysisTraverser extends Traverser {
         importees.foreach(importee => {
           importee match {
             case Importee.Wildcard() => recordImport(baseName, None, true)
+            case Importee.GivenAll() => recordImport(baseName, None, true)
+            case Importee.Given(tpe) =>
+              val givenName = anonymousGivenSynthetisedName(extractNamesFromTypeTree(tpe))
+              recordImport(s"${baseName}.${givenName}", None, false)
             case Importee.Name(nameNode) => {
               recordImport(s"${baseName}.${extractName(nameNode)}", None, false)
             }
@@ -386,6 +417,9 @@ class SourceAnalysisTraverser extends Traverser {
 
     case Self(_name, Some(decltpe)) =>
       extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+
+    case Term.Block(stats) =>
+      withSuppressProvidedNames(() => apply(stats))
 
     case node @ Term.Select(_, _) => {
       val name = extractName(node)
@@ -475,7 +509,7 @@ object ScalaParser {
 
     val tree = input.parse[Source].get
 
-    val analysisTraverser = new SourceAnalysisTraverser()
+    val analysisTraverser = new SourceAnalysisTraverser
     analysisTraverser.apply(tree)
     analysisTraverser.toAnalysis
   }
