@@ -54,6 +54,7 @@ from pants.core.util_rules import (
 from pants.core.util_rules.environments import (
     DockerEnvironmentTarget,
     LocalEnvironmentTarget,
+    LocalWorkspaceEnvironmentTarget,
     RemoteEnvironmentTarget,
 )
 from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
@@ -113,6 +114,7 @@ def target_types():
         FileTarget,
         GenericTarget,
         LocalEnvironmentTarget,
+        LocalWorkspaceEnvironmentTarget,
         LockfilesGeneratorTarget,
         LockfileTarget,
         RelocatedFiles,

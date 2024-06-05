@@ -9,9 +9,8 @@ from pants.engine.engine_aware import EngineAwareParameter
 # Reserved sentinel value directing Pants to find applicable local environment.
 LOCAL_ENVIRONMENT_MATCHER = "__local__"
 
-# Reserved sentinel value representing execution within the workspace and not local sandbox.
-# Note: This is temporary until support for `workspace_environment` target type lands.
-__LOCAL_WORKSPACE_ENV_NAME = "__local_workspace__"
+# Reserved sentinel value directing Pants to find applicable workspace environment.
+LOCAL_WORKSPACE_ENVIRONMENT_MATCHER = "__local_workspace__"
 
 
 @dataclass(frozen=True)
@@ -33,5 +32,13 @@ class EnvironmentName(EngineAwareParameter):
 @dataclass(frozen=True)
 class ChosenLocalEnvironmentName:
     """Which environment name from `[environments-preview].names` that __local__ resolves to."""
+
+    val: EnvironmentName
+
+
+@dataclass(frozen=True)
+class ChosenLocalWorkspaceEnvironmentName:
+    """Which environment name from `[environments-preview].names` that __local_workspace__ resolves
+    to."""
 
     val: EnvironmentName

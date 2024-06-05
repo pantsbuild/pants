@@ -38,7 +38,7 @@ from pants.core.util_rules.adhoc_process_support import (
     parse_relative_directory,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
-from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Snapshot
@@ -74,6 +74,7 @@ async def _prepare_process_request_from_target(
     shell_command: Target,
     shell_setup: ShellSetup.EnvironmentAware,
     bash: BashBinary,
+    env_target: EnvironmentTarget,
 ) -> AdhocProcessRequest:
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
@@ -146,6 +147,8 @@ async def _prepare_process_request_from_target(
         **(shell_command.get(ShellCommandNamedCachesField).value or {}),
     }
 
+    cache_scope = env_target.default_cache_scope
+
     return AdhocProcessRequest(
         description=description,
         address=shell_command.address,
@@ -164,6 +167,7 @@ async def _prepare_process_request_from_target(
         log_output=shell_command[ShellCommandLogOutputField].value,
         capture_stdout_file=None,
         capture_stderr_file=None,
+        cache_scope=cache_scope,
     )
 
 
@@ -172,8 +176,9 @@ async def run_adhoc_result_from_target(
     request: ShellCommandProcessFromTargetRequest,
     shell_setup: ShellSetup.EnvironmentAware,
     bash: BashBinary,
+    env_target: EnvironmentTarget,
 ) -> AdhocProcessResult:
-    scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash)
+    scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash, env_target)
     return await Get(AdhocProcessResult, AdhocProcessRequest, scpr)
 
 
@@ -182,9 +187,10 @@ async def prepare_process_request_from_target(
     request: ShellCommandProcessFromTargetRequest,
     shell_setup: ShellSetup.EnvironmentAware,
     bash: BashBinary,
+    env_target: EnvironmentTarget,
 ) -> Process:
     # Needed to support `experimental_test_shell_command`
-    scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash)
+    scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash, env_target)
     return await Get(Process, AdhocProcessRequest, scpr)
 
 
