@@ -6,6 +6,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import os
+import textwrap
 import uuid
 from dataclasses import dataclass
 from enum import Enum
@@ -13,7 +14,7 @@ from typing import Any, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PexLayout
+from pants.backend.python.target_types import PexLayout, PythonResolveField, PythonSourceField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists_pep660 import (
     EditableLocalDists,
@@ -33,11 +34,21 @@ from pants.core.goals.export import (
     PostProcessingCommand,
 )
 from pants.core.goals.resolves import ExportableTool
+from pants.core.util_rules.source_files import SourceFiles
+from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, Snapshot
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.internals.native_engine import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    Digest,
+    MergeDigests,
+    Snapshot,
+)
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.engine.target import AllTargets, HydratedSources, HydrateSourcesRequest, SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import BoolOption, EnumOption, StrListOption
 from pants.util.strutil import path_safe, softwrap
@@ -123,6 +134,17 @@ class ExportPluginOptions:
             """
         ),
         advanced=True,
+    )
+
+    py_generated_sources = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            When exporting a mutable virtualenv for a resolve, generate any sources
+            which result from code generation (for example, the `protobuf_sources` and `thrift_sources` targets)
+            and place the generated files under the site-packages directory of the virtualenv.
+            """
+        ),
     )
 
 
@@ -334,12 +356,152 @@ class MaybeExportResult:
     result: ExportResult | None
 
 
+@dataclass(frozen=True)
+class _ExportPythonCodegenRequest:
+    resolve: str
+
+
+@dataclass(frozen=True)
+class _ExportPythonCodegenResult:
+    digest: Digest
+
+
+@dataclass(frozen=True)
+class _ExportPythonCodegenSetup:
+    PKG_DIR = "__pants_codegen__"
+    SCRIPT_NAME = "codegen_setup.py"
+
+    setup_script_digest: Digest
+
+
+@rule
+async def python_codegen_export_setup() -> _ExportPythonCodegenSetup:
+    codegen_setup_script_digest = await Get(
+        Digest,
+        CreateDigest(
+            [
+                FileContent(
+                    path=f"{_ExportPythonCodegenSetup.PKG_DIR}/{_ExportPythonCodegenSetup.SCRIPT_NAME}",
+                    is_executable=True,
+                    content=textwrap.dedent(
+                        f"""\
+                        import os
+                        import site
+                        import sys
+
+                        site_packages_dirs = site.getsitepackages()
+                        if not site_packages_dirs:
+                            raise Exception("Unable to determine location of site-packages directory in venv.")
+                        site_packages_dir = site_packages_dirs[0]
+
+                        codegen_dir = sys.argv[1]
+
+                        for item in os.listdir(codegen_dir):
+                            if item == "{_ExportPythonCodegenSetup.SCRIPT_NAME}":
+                                continue
+                            os.rename(os.path.join(codegen_dir, item), os.path.join(site_packages_dir, item))
+                        """
+                    ).encode(),
+                )
+            ]
+        ),
+    )
+
+    return _ExportPythonCodegenSetup(codegen_setup_script_digest)
+
+
+@rule
+async def export_python_codegen(
+    request: _ExportPythonCodegenRequest, python_setup: PythonSetup, all_targets: AllTargets
+) -> _ExportPythonCodegenResult:
+    non_python_sources_in_python_resolve = [
+        tgt.get(SourcesField)
+        for tgt in all_targets
+        if tgt.has_field(PythonResolveField)
+        and tgt[PythonResolveField].normalized_value(python_setup) == request.resolve
+        and tgt.has_field(SourcesField)
+        and not tgt.has_field(PythonSourceField)
+    ]
+
+    if not non_python_sources_in_python_resolve:
+        return _ExportPythonCodegenResult(EMPTY_DIGEST)
+
+    hydrated_non_python_sources = await MultiGet(
+        Get(
+            HydratedSources,
+            HydrateSourcesRequest(
+                sources,
+                for_sources_types=(PythonSourceField,),
+                enable_codegen=True,
+            ),
+        )
+        for sources in non_python_sources_in_python_resolve
+    )
+
+    merged_snapshot = await Get(
+        Snapshot,
+        MergeDigests(
+            hydrated_sources.snapshot.digest for hydrated_sources in hydrated_non_python_sources
+        ),
+    )
+
+    stripped_source_files = await Get(StrippedSourceFiles, SourceFiles(merged_snapshot, ()))
+
+    return _ExportPythonCodegenResult(stripped_source_files.snapshot.digest)
+
+
+# Generate codegen Python sources and add them to the virtualenv to be exported.
+async def add_codegen_to_export_result(
+    resolve: str, export_result: ExportResult, codegen_setup: _ExportPythonCodegenSetup
+) -> ExportResult:
+    # Generate Python sources from codegen targets in this resolve.
+    codegen_result = await Get(
+        _ExportPythonCodegenResult, _ExportPythonCodegenRequest(resolve=resolve)
+    )
+    if codegen_result.digest == EMPTY_DIGEST:
+        return export_result
+
+    codegen_digest = await Get(
+        Digest, AddPrefix(codegen_result.digest, _ExportPythonCodegenSetup.PKG_DIR)
+    )
+
+    export_digest_with_codegen = await Get(
+        Digest,
+        MergeDigests([export_result.digest, codegen_digest, codegen_setup.setup_script_digest]),
+    )
+
+    pkg_dir_path = os.path.join(
+        "{digest_root}",
+        _ExportPythonCodegenSetup.PKG_DIR,
+    )
+    script_path = os.path.join(pkg_dir_path, _ExportPythonCodegenSetup.SCRIPT_NAME)
+
+    codegen_post_processing_cmds = (
+        PostProcessingCommand(
+            [
+                os.path.join("{digest_root}", "bin", "python"),
+                script_path,
+                pkg_dir_path,
+            ]
+        ),
+        PostProcessingCommand(["rm", script_path]),
+        PostProcessingCommand(["rmdir", pkg_dir_path]),
+    )
+
+    return dataclasses.replace(
+        export_result,
+        digest=export_digest_with_codegen,
+        post_processing_cmds=export_result.post_processing_cmds + codegen_post_processing_cmds,
+    )
+
+
 @rule
 async def export_virtualenv_for_resolve(
     request: _ExportVenvForResolveRequest,
     python_setup: PythonSetup,
     export_subsys: ExportSubsystem,
     union_membership: UnionMembership,
+    codegen_setup: _ExportPythonCodegenSetup,
 ) -> MaybeExportResult:
     resolve = request.resolve
     lockfile_path = python_setup.resolves.get(resolve)
@@ -401,6 +563,16 @@ async def export_virtualenv_for_resolve(
             editable_local_dists_digest=editable_local_dists_digest,
         ),
     )
+
+    # Add generated Python sources from codegen targets to the virtualenv.
+    if (
+        export_subsys.options.py_generated_sources
+        and export_subsys.options.py_resolve_format == PythonResolveExportFormat.mutable_virtualenv
+    ):
+        export_result = await add_codegen_to_export_result(
+            request.resolve, export_result, codegen_setup
+        )
+
     return MaybeExportResult(export_result)
 
 

@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import dataclasses
 import os
 import re
 import sys
@@ -15,16 +16,28 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
     PythonDistribution,
     PythonRequirementTarget,
+    PythonResolveField,
+    PythonSourceField,
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.util_rules import local_dists_pep660, pex_from_targets
 from pants.base.specs import RawSpecs
 from pants.core.goals.export import ExportResults
 from pants.core.util_rules import distdir
+from pants.engine.fs import CreateDigest, DigestContents
+from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.parametrize import Parametrize
-from pants.engine.rules import QueryRule
-from pants.engine.target import Targets
-from pants.testutil.rule_runner import RuleRunner
+from pants.engine.internals.selectors import Get
+from pants.engine.rules import QueryRule, rule
+from pants.engine.target import (
+    GeneratedSources,
+    GenerateSourcesRequest,
+    SingleSourceField,
+    Target,
+    Targets,
+)
+from pants.engine.unions import UnionRule
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 from pants.util.frozendict import FrozenDict
 
 pants_args_for_python_lockfiles = [
@@ -173,3 +186,82 @@ def test_export_tool(rule_runner: RuleRunner) -> None:
     result = results[0]
     assert result.resolve == isort_subsystem.Isort.options_scope
     assert "isort" in result.description
+
+
+def test_export_codegen_outputs():
+    class CodegenSourcesField(SingleSourceField):
+        pass
+
+    class CodegenTarget(Target):
+        alias = "codegen_target"
+        core_fields = (CodegenSourcesField, PythonResolveField)
+        help = "n/a"
+
+    class CodegenGenerateSourcesRequest(GenerateSourcesRequest):
+        input = CodegenSourcesField
+        output = PythonSourceField
+
+    @rule
+    async def do_codegen(request: CodegenGenerateSourcesRequest) -> GeneratedSources:
+        # Generate a Python file with the same contents as each input file.
+        input_files = await Get(DigestContents, Digest, request.protocol_sources.digest)
+        generated_files = [
+            dataclasses.replace(input_file, path=input_file.path + ".py")
+            for input_file in input_files
+        ]
+        result = await Get(Snapshot, CreateDigest(generated_files))
+        return GeneratedSources(result)
+
+    rule_runner = RuleRunner(
+        rules=[
+            *export.rules(),
+            *pex_from_targets.rules(),
+            *target_types_rules.rules(),
+            *distdir.rules(),
+            *local_dists_pep660.rules(),
+            do_codegen,
+            QueryRule(Targets, [RawSpecs]),
+            QueryRule(ExportResults, [ExportVenvsRequest]),
+            UnionRule(GenerateSourcesRequest, CodegenGenerateSourcesRequest),
+        ],
+        target_types=[
+            PythonRequirementTarget,
+            PythonSourcesGeneratorTarget,
+            PythonDistribution,
+            CodegenTarget,
+        ],
+    )
+
+    vinfo = sys.version_info
+    current_interpreter = f"{vinfo.major}.{vinfo.minor}.{vinfo.micro}"
+    rule_runner.set_options(
+        [
+            *pants_args_for_python_lockfiles,
+            f"--python-interpreter-constraints=['=={current_interpreter}']",
+            "--python-resolves={'test-resolve': 'test-resolve.lock'}",
+            "--source-root-patterns=src/python",
+            "--export-resolve=test-resolve",
+            "--export-py-generated-sources",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    rule_runner.write_files(
+        {
+            "test-resolve.lock": "",
+            "src/python/foo/BUILD": dedent(
+                """\
+            codegen_target(name="codegen", source="an-input", resolve="test-resolve")
+            """
+            ),
+            "src/python/foo/an-input": "print('Hello World!')\n",
+        }
+    )
+
+    export_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets=())])
+    assert len(export_results) == 1
+    export_result = export_results[0]
+
+    export_snapshot = rule_runner.request(Snapshot, [export_result.digest])
+    assert any(p.endswith("__pants_codegen__/codegen_setup.py") for p in export_snapshot.files)
+    assert any(p.endswith("__pants_codegen__/foo/an-input.py") for p in export_snapshot.files)

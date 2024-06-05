@@ -72,6 +72,8 @@ target(
         "src/python/pants/backend/experimental/scala/debug_goals",
         "src/python/pants/backend/experimental/scala/lint/scalafix",
         "src/python/pants/backend/experimental/scala/lint/scalafmt",
+        "src/python/pants/backend/experimental/sql",
+        "src/python/pants/backend/experimental/sql/lint/sqlfluff",
         "src/python/pants/backend/experimental/swift",
         "src/python/pants/backend/experimental/terraform",
         "src/python/pants/backend/experimental/terraform/lint/tfsec",

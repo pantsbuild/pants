@@ -9,6 +9,8 @@ use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
 
+use futures::future::{BoxFuture, Future};
+use futures::FutureExt;
 use lazy_static::lazy_static;
 use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -42,6 +44,7 @@ pub mod workunits;
 
 pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyFailure>()?;
+    m.add_class::<PyGeneratorResponseNativeCall>()?;
     m.add_class::<PyGeneratorResponseCall>()?;
     m.add_class::<PyGeneratorResponseGet>()?;
 
@@ -334,6 +337,8 @@ pub(crate) fn generator_send(
         // It isn't necessary to differentiate between `Get` and `Effect` here, as the static
         // analysis of `@rule`s has already validated usage.
         Ok(GeneratorResponse::Get(get.take()?))
+    } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseNativeCall>>(py) {
+        Ok(GeneratorResponse::NativeCall(call.take()?))
     } else if let Ok(get_multi) = response.downcast::<PySequence>(py) {
         // Was an `All` or `MultiGet`.
         let gogs = get_multi
@@ -460,6 +465,43 @@ fn interpret_get_inputs(
                 smallvec![INTERNS.key_insert(py, input_arg1.into())?],
             ))
         }
+    }
+}
+
+#[pyclass]
+pub struct PyGeneratorResponseNativeCall(RefCell<Option<NativeCall>>);
+
+impl PyGeneratorResponseNativeCall {
+    pub fn new(call: impl Future<Output = Result<Value, Failure>> + 'static + Send) -> Self {
+        Self(RefCell::new(Some(NativeCall { call: call.boxed() })))
+    }
+
+    fn take(&self) -> Result<NativeCall, String> {
+        self.0
+            .borrow_mut()
+            .take()
+            .ok_or_else(|| "A `NativeCall` may only be consumed once.".to_owned())
+    }
+}
+
+#[pymethods]
+impl PyGeneratorResponseNativeCall {
+    fn __await__(self_: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        self_
+    }
+
+    fn __iter__(self_: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        self_
+    }
+
+    fn __next__(self_: PyRef<'_, Self>) -> Option<PyRef<'_, Self>> {
+        Some(self_)
+    }
+
+    fn send(&self, py: Python, value: PyObject) -> PyResult<()> {
+        Err(PyStopIteration::new_err(
+            PyTuple::new(py, [value]).to_object(py),
+        ))
     }
 }
 
@@ -614,6 +656,10 @@ impl PyGeneratorResponseGet {
     }
 }
 
+pub struct NativeCall {
+    pub call: BoxFuture<'static, Result<Value, Failure>>,
+}
+
 #[derive(Debug)]
 pub struct Call {
     pub rule_id: RuleId,
@@ -681,6 +727,8 @@ pub enum GetOrGenerator {
 pub enum GeneratorResponse {
     /// The generator has completed with the given value of the given type.
     Break(Value, TypeId),
+    /// The generator is awaiting a call to a unknown native function.
+    NativeCall(NativeCall),
     /// The generator is awaiting a call to a known rule.
     Call(Call),
     /// The generator is awaiting a call to an unknown rule.

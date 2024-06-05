@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from textwrap import dedent
 
 import pytest
@@ -17,6 +18,7 @@ from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_type_rules
 from pants.core.util_rules import archive, source_files
 from pants.core.util_rules.adhoc_process_support import AdhocProcessRequest
+from pants.core.util_rules.environments import LocalWorkspaceEnvironmentTarget
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
@@ -52,6 +54,7 @@ def rule_runner() -> PythonRuleRunner:
             ArchiveTarget,
             FilesGeneratorTarget,
             PythonSourceTarget,
+            LocalWorkspaceEnvironmentTarget,
         ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
@@ -302,3 +305,32 @@ def test_execution_dependencies_and_runnable_dependencies(rule_runner: PythonRul
         Address("b", target_name="deps"),
         expected_contents={"b/stdout": file_contents},
     )
+
+
+def test_adhoc_tool_with_workspace_execution(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+            system_binary(name="bash", binary_name="bash")
+            adhoc_tool(
+                name="make-file",
+                runnable=":bash",
+                args=["-c", "echo 'workspace' > ./foo.txt"],
+                environment="workspace",
+                stderr="stderr",
+            )
+            workspace_environment(name="workspace")
+            """
+            )
+        }
+    )
+    rule_runner.set_options(
+        ["--environments-preview-names={'workspace': '//:workspace'}"], env_inherit={"PATH"}
+    )
+
+    assert_adhoc_tool_result(rule_runner, Address("", target_name="make-file"), {"stderr": ""})
+
+    workspace_output_path = Path(rule_runner.build_root).joinpath("foo.txt")
+    assert workspace_output_path.exists()
+    assert workspace_output_path.read_text().strip() == "workspace"

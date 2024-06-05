@@ -30,7 +30,13 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.native_engine import AddressInput, RemovePrefix
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult, ProductDescription
+from pants.engine.process import (
+    FallibleProcessResult,
+    Process,
+    ProcessCacheScope,
+    ProcessResult,
+    ProductDescription,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     FieldSetsPerTarget,
@@ -65,6 +71,7 @@ class AdhocProcessRequest:
     log_output: bool
     capture_stdout_file: str | None
     capture_stderr_file: str | None
+    cache_scope: ProcessCacheScope | None = None
 
 
 @dataclass(frozen=True)
@@ -581,6 +588,7 @@ async def prepare_adhoc_process(
         working_directory=working_directory,
         append_only_caches=append_only_caches,
         immutable_input_digests=immutable_input_digests,
+        cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
 
     return _output_at_build_root(proc, bash)

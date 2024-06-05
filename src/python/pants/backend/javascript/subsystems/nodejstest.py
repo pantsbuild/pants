@@ -19,6 +19,7 @@ from pants.util.strutil import help_text, softwrap
 _EXAMPLE = """\
 Consider a directory-layout:
 
+```
 ├── BUILD
 ├── src/
 │   ├── BUILD
@@ -27,10 +28,11 @@ Consider a directory-layout:
 │   │   └── index.test.js
 │   └── index.js
 └── package.json
+```
 
 where package.json contains
 
-# package.json
+```json title=\"package.json\"
 {
     ...
     "scripts": {
@@ -40,6 +42,7 @@ where package.json contains
         ...
     }
 }
+```
 """
 
 
