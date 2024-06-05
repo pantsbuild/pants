@@ -238,10 +238,10 @@ def test_generates_lockfile_for_pnpm_package_json_workspace(rule_runner: RuleRun
             "src/js/BUILD": "package_json()",
             "src/js/pnpm-workspace.yaml": "",
             "src/js/package.json": given_package_with_package_manager_and_workspaces(
-                "ham", "1.0.0", "pnpm^9.0.0", {"spam": "workspace:*"}
+                "ham", "1.0.0", "pnpm@9.1.4", {"spam": "workspace:*"}
             ),
             "src/js/a/BUILD": "package_json()",
-            "src/js/a/package.json": given_package_with_package_manager_and_workspaces("spam", "0.1.0", "pnpm^9.0.0"),
+            "src/js/a/package.json": given_package_with_package_manager_and_workspaces("spam", "0.1.0", "pnpm@9.1.4"),
         }
     )
     [project] = rule_runner.request(AllNodeJSProjects, [])
@@ -275,10 +275,10 @@ def test_generates_lockfile_for_yarn_package_json_workspace(rule_runner: RuleRun
         {
             "src/js/BUILD": "package_json()",
             "src/js/package.json": given_package_with_package_manager_and_workspaces(
-                "ham", "1.0.0", "yarn", {"spam": "*"}, "a"
+                "ham", "1.0.0", "yarn@4.2.2", {"spam": "*"}, "a"
             ),
             "src/js/a/BUILD": "package_json()",
-            "src/js/a/package.json": given_package_with_package_manager_and_workspaces("spam", "0.1.0", "yarn"),
+            "src/js/a/package.json": given_package_with_package_manager_and_workspaces("spam", "0.1.0", "yarn@4.2.2"),
         }
     )
     [project] = rule_runner.request(AllNodeJSProjects, [])
