@@ -135,6 +135,10 @@ class CompatiblePlatformsField(StringSequenceField):
     )
 
 
+class LocalCompatiblePlatformsField(CompatiblePlatformsField):
+    pass
+
+
 class LocalFallbackEnvironmentField(FallbackEnvironmentField):
     help = help_text(
         f"""
@@ -156,7 +160,11 @@ class LocalFallbackEnvironmentField(FallbackEnvironmentField):
 
 class LocalEnvironmentTarget(Target):
     alias = "local_environment"
-    core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField, LocalFallbackEnvironmentField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        LocalCompatiblePlatformsField,
+        LocalFallbackEnvironmentField,
+    )
     help = help_text(
         f"""
         Configuration of a local execution environment for specific platforms.
@@ -679,7 +687,7 @@ async def determine_local_environment(
     compatible_name_and_targets = [
         (name, tgt)
         for name, tgt in all_environment_targets.items()
-        if tgt.has_field(CompatiblePlatformsField)
+        if tgt.has_field(LocalCompatiblePlatformsField)
         and platform.value in tgt[CompatiblePlatformsField].value
     ]
     if not compatible_name_and_targets:
@@ -977,9 +985,9 @@ async def get_target_for_environment_name(
         raise ValueError(
             softwrap(
                 f"""
-                Expected to use the address to a `local_environment`, `docker_environment`, or
-                `remote_environment` target in the option `[environments-preview].names`, but the name
-                `{env_name.val}` was set to the target {address.spec} with the target type
+                Expected to use the address to a `local_environment`, `docker_environment`,
+                `remote_environment`, or `workspace_environment` target in the option `[environments-preview].names`,
+                but the name `{env_name.val}` was set to the target {address.spec} with the target type
                 `{tgt.alias}`.
                 """
             )
