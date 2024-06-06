@@ -9,8 +9,6 @@
 //     "CPython==3.9.*"
 //   ],
 //   "generated_with_requirements": [
-//     "flake8-2020<2,>=1.7.0",
-//     "flake8-comprehensions<4.0,>=3.10.0",
 //     "flake8-no-implicit-concat",
 //     "flake8<7,>=5.0.4"
 //   ],
@@ -51,47 +49,6 @@
           ],
           "requires_python": ">=3.8.1",
           "version": "6.0.0"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "1553b2b3638135b276f7a3252301e81376901e7b6a5eaccb07a969771f178375",
-              "url": "https://files.pythonhosted.org/packages/a5/6e/df5766df36c1280d0b96996e89e160cab2f1fa4ffd7434ff252c51025ca7/flake8_2020-1.8.0-py2.py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "f5312b3634266bd0f1957f64ecabeb62d67bbd9cee637e33a2651a80091f90aa",
-              "url": "https://files.pythonhosted.org/packages/3d/0e/29c1a6d15baa70865daa1ae6887742d5907fb75b92c4c1a8281915f8550d/flake8_2020-1.8.0.tar.gz"
-            }
-          ],
-          "project_name": "flake8-2020",
-          "requires_dists": [
-            "flake8>=5"
-          ],
-          "requires_python": ">=3.8",
-          "version": "1.8.0"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "013234637ec7dfcb7cd2900578fb53c512f81db909cefe371c019232695c362d",
-              "url": "https://files.pythonhosted.org/packages/9b/8d/b70f791311a8c6975c0c6634dd44db8fd712d6ad9ed6a3fe888b9be7c89b/flake8_comprehensions-3.12.0-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "419ef1a6e8de929203791a5e8ff5e3906caeba13eb3290eebdbf88a9078d502e",
-              "url": "https://files.pythonhosted.org/packages/65/b4/9a2cbbac095aaf1e8dbe3eac55a5155cb9f7860fbb0d9fa23443b5a3afd1/flake8_comprehensions-3.12.0.tar.gz"
-            }
-          ],
-          "project_name": "flake8-comprehensions",
-          "requires_dists": [
-            "flake8!=3.2.0,>=3.0",
-            "importlib-metadata; python_version < \"3.8\""
-          ],
-          "requires_python": ">=3.7",
-          "version": "3.12.0"
         },
         {
           "artifacts": [
@@ -212,8 +169,6 @@
   "pip_version": "23.1.2",
   "prefer_older_binary": false,
   "requirements": [
-    "flake8-2020<2,>=1.7.0",
-    "flake8-comprehensions<4.0,>=3.10.0",
     "flake8-no-implicit-concat",
     "flake8<7,>=5.0.4"
   ],

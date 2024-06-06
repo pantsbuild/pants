@@ -82,6 +82,10 @@ select = [
   "F",
   "E",
   "W",
+  # flake8-comprehensions
+  "C4",
+  # flake8-2020
+  "YTT",
 ]
 
 ignore = [
@@ -95,4 +99,6 @@ ignore = [
   "E731",
   # Ambiguous variable name (enable once fixed)
   "E741",
+  # Unnecessary dict call - rewrite as a literal
+  "C408",
 ]
