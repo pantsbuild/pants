@@ -191,7 +191,7 @@ class LocalWorkspaceCompatiblePlatformsField(CompatiblePlatformsField):
 
 
 class LocalWorkspaceEnvironmentTarget(Target):
-    alias = "experimental_experimental_workspace_environment"
+    alias = "experimental_workspace_environment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         LocalWorkspaceCompatiblePlatformsField,
