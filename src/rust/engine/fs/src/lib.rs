@@ -787,7 +787,7 @@ impl Vfs<String> for DigestTrie {
 
         Ok(Some(match entry {
             directory::Entry::File(f) => PathMetadata::new(
-                PathBuf::from(f.name().as_str()),
+                path,
                 PathMetadataKind::File,
                 entry.digest().size_bytes as u64,
                 f.is_executable(),
@@ -799,7 +799,7 @@ impl Vfs<String> for DigestTrie {
                 None,
             ),
             directory::Entry::Symlink(s) => PathMetadata::new(
-                PathBuf::from(s.name().as_str()),
+                path,
                 PathMetadataKind::Symlink,
                 0,
                 false,
@@ -810,8 +810,8 @@ impl Vfs<String> for DigestTrie {
                 None,
                 Some(s.target().to_path_buf()),
             ),
-            directory::Entry::Directory(d) => PathMetadata::new(
-                PathBuf::from(d.name().as_str()),
+            directory::Entry::Directory(_) => PathMetadata::new(
+                path,
                 PathMetadataKind::Directory,
                 entry.digest().size_bytes as u64,
                 false,
