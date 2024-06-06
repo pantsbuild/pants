@@ -1,23 +1,16 @@
 [flake8]
 extend-ignore:
-  # whitespace before ':' (conflicts with Black)
-  E203,
-  # Bad trailing comma (conflicts with Black)
-  E231,
-  # line too long (> 79 characters)
-  E501,
-  # Do not assign a lambda expression
-  E731,
-  # Ambiguous variable name (enable once fixed)
-  E741,
-  # line break before binary operator  (conflicts with Black)
-  W503,
   # Implicitly concatenated string literals over multiple lines
   NIC002,
   # Implicitly concatenated bytes literals over multiple lines
   NIC102,
   # Unnecessary dict call - rewrite as a literal
   C408,
+  # Handled by ruff:
+  F,
+  E,
+  W,
+  C90,
 
 [flake8:local-plugins]
 extension =

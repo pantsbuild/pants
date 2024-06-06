@@ -78,4 +78,21 @@ line-length = 100
 
 [tool.ruff.lint]
 select = [
+  # flake8 defaults:
+  "F",
+  "E",
+  "W",
+]
+
+ignore = [
+  # whitespace before ':' (conflicts with Black)
+  "E203",
+  # Bad trailing comma (conflicts with Black)
+  "E231",
+  # line too long (> 79 characters)
+  "E501",
+  # Do not assign a lambda expression
+  "E731",
+  # Ambiguous variable name (enable once fixed)
+  "E741",
 ]
