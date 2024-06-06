@@ -639,7 +639,7 @@ impl DigestTrie {
         root: &DigestTrie,
         path_so_far: PathBuf,
         symlink_behavior: SymlinkBehavior,
-        mut link_depth: LinkDepth,
+        link_depth: LinkDepth,
         f: &mut impl FnMut(&Path, &Entry),
     ) {
         for entry in &*self.0 {
@@ -647,18 +647,13 @@ impl DigestTrie {
             let mut entry = entry;
             if let SymlinkBehavior::Oblivious = symlink_behavior {
                 if let Entry::Symlink(s) = entry {
-                    link_depth += 1;
-                    if s.target == Component::CurDir.as_os_str() {
-                        if link_depth >= MAX_LINK_DEPTH {
-                            warn!("Exceeded the maximum link depth while traversing link `{}` to path {:#?}. Stopping traversal.", s.name, s.target);
-                            return;
-                        }
-                        self.walk_helper(root, path.clone(), symlink_behavior, link_depth, f);
-                        return;
+                    let is_current_dir = s.target == Component::CurDir.as_os_str();
+                    if is_current_dir || s.target == Component::ParentDir.as_os_str() {
+                        warn!("Infinite link at path {:#?} referencing the {} directory. Skipping traversal.", path_so_far, if is_current_dir { "current" } else { "parent" });
+                        continue;
                     }
-
                     let destination_path = path_so_far.join(s.target.clone());
-                    let destination_entry = root.entry_helper(root, &destination_path, link_depth);
+                    let destination_entry = root.entry_helper(root, &destination_path, link_depth + 1);
                     if let Ok(Some(valid_entry)) = destination_entry {
                         entry = valid_entry;
                     } else {
@@ -671,7 +666,7 @@ impl DigestTrie {
                 Entry::Directory(d) => {
                     f(&path, entry);
                     d.tree
-                        .walk_helper(root, path.to_path_buf(), symlink_behavior, link_depth, f);
+                        .walk_helper(root, path.to_path_buf(), symlink_behavior, link_depth + 1, f);
                 }
                 _ => f(&path, entry),
             };
