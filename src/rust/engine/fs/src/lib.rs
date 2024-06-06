@@ -664,16 +664,16 @@ impl PosixFS {
                 };
 
                 #[cfg(target_family = "unix")]
-                let unix_mode = Some(metadata.permissions().mode());
-
-                #[cfg(not(target_family = "unix"))]
-                let unix_mode: Option<u32> = None;
+                let (unix_mode, is_executable) = {
+                    let mode = metadata.permissions().mode();
+                    (Some(mode), (mode & 0o111) != 0)
+                };
 
                 Ok(Some(PathMetadata::new(
                     path,
                     kind,
                     metadata.len(),
-                    (metadata.permissions().mode() & 0o111) != 0,
+                    is_executable,
                     metadata.permissions().readonly(),
                     unix_mode,
                     metadata.accessed().ok(),
