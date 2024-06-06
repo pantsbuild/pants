@@ -418,9 +418,6 @@ class SourceAnalysisTraverser extends Traverser {
     case Self(_name, Some(decltpe)) =>
       extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
 
-    case Term.Block(stats) =>
-      withSuppressProvidedNames(() => apply(stats))
-
     case node @ Term.Select(_, _) => {
       val name = extractName(node)
       recordConsumedSymbol(name)
