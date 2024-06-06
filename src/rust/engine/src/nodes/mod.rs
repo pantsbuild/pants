@@ -241,6 +241,10 @@ pub enum NodeKey {
 }
 
 impl NodeKey {
+    /// Returns filesystem path (if any) in which this node is interested. Any changes to that path
+    /// will invalidate the applicable graph node.
+    ///
+    /// See `fs_path_to_watch` for where the filesystem watch is actually placed.
     pub fn fs_subject(&self) -> Option<&Path> {
         match self {
             NodeKey::DigestFile(s) => Some(s.0.path.as_path()),
@@ -262,9 +266,18 @@ impl NodeKey {
         }
     }
 
+    /// Returns the filesystem path where the inotify watch should be attached.
+    ///
+    /// This is not the same as `fs_subject`. There is a difference between the path on which to place the filesystem
+    /// watch and the path which actually invalidates this node. This is necessary because in the existing inotify logic,
+    /// if the path does not exist, then trying to place a watch on the path will fail with a "file not found" error.
     pub fn fs_path_to_watch(&self) -> Option<&Path> {
         match self {
+            // For `PathMetadata`, watch the parent directory so that nonexistence of the path can be monitored
+            // since creation/deletion events occur on the parent directory.
             NodeKey::PathMetadata(fs) => Some(fs.path().parent().unwrap_or_else(|| Path::new("."))),
+
+            // For all other node types, attach the watch to the actual path since the path is assumed or known to exist.
             _ => self.fs_subject(),
         }
     }
