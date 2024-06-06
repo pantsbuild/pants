@@ -1,10 +1,6 @@
 [flake8]
 extend-ignore:
-  # Implicitly concatenated string literals over multiple lines
-  NIC002,
-  # Implicitly concatenated bytes literals over multiple lines
-  NIC102,
-  # Handled by ruff:
+  # Defaults are all handled by ruff:
   F,
   E,
   W,

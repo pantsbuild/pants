@@ -9,7 +9,6 @@
 //     "CPython==3.9.*"
 //   ],
 //   "generated_with_requirements": [
-//     "flake8-no-implicit-concat",
 //     "flake8<7,>=5.0.4"
 //   ],
 //   "manylinux": "manylinux2014",
@@ -54,44 +53,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5c056e06f22820865cb34962a1da80767fed5273920b0768e97739021d428de5",
-              "url": "https://files.pythonhosted.org/packages/87/04/983ec9268488911103bc3b30bcdef3936cb9ed55a53d8ad25f023e76243a/flake8_no_implicit_concat-0.3.4-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "1b522becd7568ee2e288bc58e294ebd0d771996ee3138a5322a3cefb21c8464b",
-              "url": "https://files.pythonhosted.org/packages/00/f2/f7616a05059683e4e3970c21f7ed820b18eca08ab272e774dc5ed07aa9c6/flake8-no-implicit-concat-0.3.4.tar.gz"
-            }
-          ],
-          "project_name": "flake8-no-implicit-concat",
-          "requires_dists": [
-            "black; extra == \"dev\"",
-            "codecov; extra == \"dev\"",
-            "coverage; extra == \"dev\"",
-            "darglint; extra == \"dev\"",
-            "flake8",
-            "flake8-2020; extra == \"dev\"",
-            "flake8-black; extra == \"dev\"",
-            "flake8-broken-line; extra == \"dev\"",
-            "flake8-builtins; extra == \"dev\"",
-            "flake8-docstrings; extra == \"dev\"",
-            "flake8-isort; extra == \"dev\"",
-            "flake8-rst-docstrings; extra == \"dev\"",
-            "flake8; extra == \"dev\"",
-            "hacking>=4; extra == \"dev\"",
-            "isort; extra == \"dev\"",
-            "more-itertools; python_version < \"3.10\"",
-            "mypy; extra == \"dev\"",
-            "pep8-naming; extra == \"dev\"",
-            "typing; python_version < \"3.5\""
-          ],
-          "requires_python": ">=3.3",
-          "version": "0.3.4"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "6c2d30ab6be0e4a46919781807b4f0d834ebdd6c6e3dca0bda5a15f863427b6e",
               "url": "https://files.pythonhosted.org/packages/27/1a/1f68f9ba0c207934b35b86a8ca3aad8395a3d6dd7921c0686e23853ff5a9/mccabe-0.7.0-py2.py3-none-any.whl"
             },
@@ -105,24 +66,6 @@
           "requires_dists": [],
           "requires_python": ">=3.6",
           "version": "0.7.0"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "d2bc7f02446e86a68911e58ded76d6561eea00cddfb2a91e7019bbb586c799f3",
-              "url": "https://files.pythonhosted.org/packages/85/01/e2678ee4e0d7eed4fd6be9e5b043fff9d22d245d06c8c91def8ced664189/more_itertools-9.1.0-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "cabaa341ad0389ea83c17a94566a53ae4c9d07349861ecb14dc6d0345cf9ac5d",
-              "url": "https://files.pythonhosted.org/packages/2e/d0/bea165535891bd1dcb5152263603e902c0ec1f4c9a2e152cc4adff6b3a38/more-itertools-9.1.0.tar.gz"
-            }
-          ],
-          "project_name": "more-itertools",
-          "requires_dists": [],
-          "requires_python": ">=3.7",
-          "version": "9.1.0"
         },
         {
           "artifacts": [
@@ -169,7 +112,6 @@
   "pip_version": "23.1.2",
   "prefer_older_binary": false,
   "requirements": [
-    "flake8-no-implicit-concat",
     "flake8<7,>=5.0.4"
   ],
   "requires_python": [

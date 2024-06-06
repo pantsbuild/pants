@@ -1,2 +1,1 @@
 flake8>=5.0.4,<7
-flake8-no-implicit-concat

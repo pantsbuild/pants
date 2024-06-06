@@ -86,6 +86,8 @@ select = [
   "C4",
   # flake8-2020
   "YTT",
+  # flake8-implicit-str-concat, but only on a single line (includes bytes)
+  "ISC001",
 ]
 
 ignore = [
