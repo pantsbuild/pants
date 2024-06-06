@@ -530,8 +530,6 @@ async def determine_nodejs_binaries(
 @dataclass(frozen=True)
 class CorepackToolRequest:
     tool: str
-    input_digest: Digest
-    working_directory: str | None = None
     version: str | None = None
 
 
@@ -545,20 +543,16 @@ async def prepare_corepack_tool(
     request: CorepackToolRequest, environment: NodeJSProcessEnvironment, nodejs: NodeJS
 ) -> CorepackToolDigest:
     version = request.version or nodejs.package_managers.get(request.tool)
-    if not version and request.input_digest == EMPTY_DIGEST:
-        raise ValueError(f"Could not determine tool version for {request.tool}.")
     tool_spec = f"{request.tool}@{version}" if version else request.tool
     tool_description = tool_spec if version else f"default {tool_spec} version"
     result = await Get(
         ProcessResult,
         Process(
             argv=filter(
-                None, ("corepack", "prepare", tool_spec if version else None, "--activate")
+                None, ("corepack", "prepare", tool_spec if version else "--all", "--activate")
             ),
             description=f"Preparing configured {tool_description}.",
-            input_digest=request.input_digest,
             immutable_input_digests=environment.immutable_digest(),
-            working_directory=request.working_directory,
             level=LogLevel.DEBUG,
             env=environment.to_env_dict(),
             append_only_caches={**environment.append_only_caches},
@@ -576,12 +570,7 @@ async def setup_node_tool_process(
         tool_name = request.tool.replace("npx", "npm")
         corepack_tool = await Get(
             CorepackToolDigest,
-            CorepackToolRequest(
-                tool_name,
-                request.project_digest or EMPTY_DIGEST,
-                request.working_directory,
-                request.tool_version,
-            ),
+            CorepackToolRequest(tool_name, request.tool_version),
         )
         input_digest = await Get(Digest, MergeDigests([request.input_digest, corepack_tool.digest]))
     else:
