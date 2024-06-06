@@ -597,32 +597,34 @@ def _compute_env_field(field_set: FieldSet) -> EnvironmentField:
 
 @dataclass(frozen=True)
 class EnvironmentNameRequest(EngineAwareParameter):
-    f"""Normalize the value into a name from `[environments-preview].names`, such as by
-    applying {LOCAL_ENVIRONMENT_MATCHER}."""
+    """Normalize the value into a name from `[environments-preview].names`, such as by
+    applying `LOCAL_ENVIRONMENT_MATCHER` (__local__)."""
 
     raw_value: str
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
 
     @classmethod
     def from_target(cls, target: Target) -> EnvironmentNameRequest:
-        f"""Return a `EnvironmentNameRequest` with the environment this target should use when built.
+        """Return a `EnvironmentNameRequest` with the environment this target should use when built.
 
         If the Target includes `EnvironmentField` in its class definition, then this method will
-        use the value of that field. Otherwise, it will fall back to `{LOCAL_ENVIRONMENT_MATCHER}`.
+        use the value of that field. Otherwise, it will fall back to `LOCAL_ENVIRONMENT_MATCHER`
+        (__local__).
         """
         env_field = target.get(EnvironmentField)
         return cls._from_field(env_field, target.address)
 
     @classmethod
     def from_field_set(cls, field_set: FieldSet) -> EnvironmentNameRequest:
-        f"""Return a `EnvironmentNameRequest` with the environment this target should use when built.
+        """Return a `EnvironmentNameRequest` with the environment this target should use when built.
 
         If the FieldSet includes `EnvironmentField` in its class definition, then this method will
-        use the value of that field. Otherwise, it will fall back to `{LOCAL_ENVIRONMENT_MATCHER}`.
+        use the value of that field. Otherwise, it will fall back to `LOCAL_ENVIRONMENT_MATCHER`
+        (__local__).
 
         Rules can then use `Get(EnvironmentName, EnvironmentNameRequest,
         field_set.environment_name_request())` to normalize the environment value, and
-        then pass `{{resulting_environment_name: EnvironmentName}}` into a `Get` to change which
+        then pass `{resulting_environment_name: EnvironmentName}` into a `Get` to change which
         environment is used for the subgraph.
         """
         env_field = _compute_env_field(field_set)
