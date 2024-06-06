@@ -191,7 +191,7 @@ class LocalWorkspaceCompatiblePlatformsField(CompatiblePlatformsField):
 
 
 class LocalWorkspaceEnvironmentTarget(Target):
-    alias = "workspace_environment"
+    alias = "experimental_experimental_workspace_environment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         LocalWorkspaceCompatiblePlatformsField,
@@ -213,9 +213,9 @@ class LocalWorkspaceEnvironmentTarget(Target):
         `[environments-preview].names`. You can then consume this environment by specifying the name in
         the `environment` field defined on other targets.
 
-        Only one `workspace_environment` may be defined in `[environments-preview].names` per platform, and
+        Only one `experimental_workspace_environment` may be defined in `[environments-preview].names` per platform, and
         when `{LOCAL_WORKSPACE_ENVIRONMENT_MATCHER}` is specified as the environment, the
-        `workspace_environment` that matches the current platform (if defined) will be selected.
+        `experimental_workspace_environment` that matches the current platform (if defined) will be selected.
 
         Caching and reproducibility:
 
@@ -226,6 +226,9 @@ class LocalWorkspaceEnvironmentTarget(Target):
 
         If a process isn't reproducible, re-running a build from the same source code could fail unexpectedly,
         or give different output to an earlier build.
+
+        NOTE: This target type is EXPERIMENTAL and may change its semantics in subsequent Pants versions
+        without a deprecation cycle.
         """
     )
 
@@ -746,16 +749,16 @@ async def determine_local_workspace_environment(
     ]
 
     if not compatible_name_and_targets:
-        # Raise an exception since, unlike with `local_environment`, a `workspace_environment`
+        # Raise an exception since, unlike with `local_environment`, a `experimental_workspace_environment`
         # cannot be configured via global options.
         raise AmbiguousEnvironmentError(
             softwrap(
                 f"""
                 A target requested a compatible workspace environment via the
-                `{LOCAL_WORKSPACE_ENVIRONMENT_MATCHER}` special environment name. No `workspace_environment`
+                `{LOCAL_WORKSPACE_ENVIRONMENT_MATCHER}` special environment name. No `experimental_workspace_environment`
                 target exists, however, to satisfy that request.
 
-                Unlike local environmnts, with workspace environments, at least one `workspace_environment`
+                Unlike local environmnts, with workspace environments, at least one `experimental_workspace_environment`
                 target must exist and be named in the `[environments-preview.names]` option.
                 """
             )
@@ -768,7 +771,7 @@ async def determine_local_workspace_environment(
     raise AmbiguousEnvironmentError(
         softwrap(
             f"""
-            Multiple `workspace_environment` targets from `[environments-preview].names`
+            Multiple `experimental_workspace_environment` targets from `[environments-preview].names`
             are compatible with the current platform `{platform.value}`, so it is ambiguous
             which to use:
             {sorted(tgt.address.spec for _name, tgt in compatible_name_and_targets)}
@@ -777,7 +780,7 @@ async def determine_local_workspace_environment(
             targets so that only one includes the value `{platform.value}`, or change
             `[environments-preview].names` so that it does not define some of those targets.
 
-            It is often useful to still keep the same `workspace_environment` target definitions in
+            It is often useful to still keep the same `experimental_workspace_environment` target definitions in
             BUILD files; instead, do not give a name to each of them in
             `[environments-preview].names` to avoid ambiguity. Then, you can override which target
             a particular name points to by overriding `[environments-preview].names`. For example,
@@ -986,7 +989,7 @@ async def get_target_for_environment_name(
             softwrap(
                 f"""
                 Expected to use the address to a `local_environment`, `docker_environment`,
-                `remote_environment`, or `workspace_environment` target in the option `[environments-preview].names`,
+                `remote_environment`, or `experimental_workspace_environment` target in the option `[environments-preview].names`,
                 but the name `{env_name.val}` was set to the target {address.spec} with the target type
                 `{tgt.alias}`.
                 """
