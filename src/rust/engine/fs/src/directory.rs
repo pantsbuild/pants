@@ -639,7 +639,7 @@ impl DigestTrie {
         root: &DigestTrie,
         path_so_far: PathBuf,
         symlink_behavior: SymlinkBehavior,
-        link_depth: LinkDepth,
+        mut link_depth: LinkDepth,
         f: &mut impl FnMut(&Path, &Entry),
     ) {
         for entry in &*self.0 {
@@ -647,8 +647,9 @@ impl DigestTrie {
             let mut entry = entry;
             if let SymlinkBehavior::Oblivious = symlink_behavior {
                 if let Entry::Symlink(s) = entry {
+                    link_depth += 1;  // Counting total number of symlinks
                     let destination_path = if s.target == Component::CurDir.as_os_str() { None } else { Some(path_so_far.join(s.target.clone())) };
-                    let destination_entry = root.entry_helper(root, destination_path.as_ref().unwrap_or(&path), link_depth + 1);
+                    let destination_entry = root.entry_helper(root, destination_path.as_ref().unwrap_or(&path), link_depth);
                     if let Ok(Some(valid_entry)) = destination_entry {
                         entry = valid_entry;
                     } else {
@@ -661,7 +662,7 @@ impl DigestTrie {
                 Entry::Directory(d) => {
                     f(&path, entry);
                     d.tree
-                        .walk_helper(root, path.to_path_buf(), symlink_behavior, link_depth + 1, f);
+                        .walk_helper(root, path.to_path_buf(), symlink_behavior, link_depth, f);
                 }
                 _ => f(&path, entry),
             };
