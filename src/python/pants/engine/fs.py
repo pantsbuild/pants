@@ -335,7 +335,7 @@ class SnapshotDiff:
 class PathMetadataRequest:
     """Request the full metadata of a single path in the filesystem.
 
-    Note: This API is symlink aware and will distinguish between symlinks and regular files.
+    Note: This API is symlink-aware and will distinguish between symlinks and regular files.
     """
 
     path: str
