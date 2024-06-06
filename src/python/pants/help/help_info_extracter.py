@@ -682,9 +682,9 @@ class HelpInfoExtracter:
         # Pick the shortest backend name.
         return sorted(providers, key=len)[0]
 
-    @classmethod
+    @staticmethod
     def get_closest_provider_for_subsystem(
-        cls, subsystem_cls: Type, providers: tuple[str, ...] | None
+        subsystem_cls: Type, providers: tuple[str, ...] | None
     ) -> str:
         if not providers:
             return ""
