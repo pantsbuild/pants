@@ -17,7 +17,6 @@ from io import BytesIO
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Optional, Set, Union
 
-from pants.engine.internals.native_engine import PathMetadata, PathMetadataKind
 import pytest
 
 from pants.engine.console import Console
@@ -48,6 +47,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.native_engine import PathMetadata, PathMetadataKind
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, goal_rule, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner

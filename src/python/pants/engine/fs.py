@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Tuple, Union
 
@@ -12,7 +11,7 @@ from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Tuple, 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import SideEffecting
-from pants.engine.internals.native_engine import EMPTY_DIGEST as EMPTY_DIGEST, PathMetadata  # noqa: F401
+from pants.engine.internals.native_engine import EMPTY_DIGEST as EMPTY_DIGEST  # noqa: F401
 from pants.engine.internals.native_engine import (  # noqa: F401
     EMPTY_FILE_DIGEST as EMPTY_FILE_DIGEST,
 )
@@ -21,6 +20,7 @@ from pants.engine.internals.native_engine import AddPrefix as AddPrefix
 from pants.engine.internals.native_engine import Digest as Digest
 from pants.engine.internals.native_engine import FileDigest as FileDigest
 from pants.engine.internals.native_engine import MergeDigests as MergeDigests
+from pants.engine.internals.native_engine import PathMetadata
 from pants.engine.internals.native_engine import RemovePrefix as RemovePrefix
 from pants.engine.internals.native_engine import Snapshot as Snapshot
 from pants.engine.rules import QueryRule
