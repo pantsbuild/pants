@@ -647,13 +647,8 @@ impl DigestTrie {
             let mut entry = entry;
             if let SymlinkBehavior::Oblivious = symlink_behavior {
                 if let Entry::Symlink(s) = entry {
-                    let is_current_dir = s.target == Component::CurDir.as_os_str();
-                    if is_current_dir || s.target == Component::ParentDir.as_os_str() {
-                        warn!("Infinite link at path {:#?} referencing the {} directory. Skipping traversal.", path_so_far, if is_current_dir { "current" } else { "parent" });
-                        continue;
-                    }
-                    let destination_path = path_so_far.join(s.target.clone());
-                    let destination_entry = root.entry_helper(root, &destination_path, link_depth + 1);
+                    let destination_path = if s.target == Component::CurDir.as_os_str() { None } else { Some(path_so_far.join(s.target.clone())) };
+                    let destination_entry = root.entry_helper(root, destination_path.as_ref().unwrap_or(&path), link_depth + 1);
                     if let Ok(Some(valid_entry)) = destination_entry {
                         entry = valid_entry;
                     } else {
@@ -953,7 +948,7 @@ impl DigestTrie {
 
             if let Some(Entry::Symlink(s)) = maybe_matching_entry {
                 if link_depth >= MAX_LINK_DEPTH {
-                    warn!("Exceeded the maximum link depth while traversing link {:#?} to path {:#?}. Stopping traversal.", logical_path.join(PathBuf::from(s.name.as_str())), s.target);
+                    warn!("Exceeded the maximum link depth while traversing link {:#?} to path {:#?}. Stopping traversal.", logical_path, s.target);
                     return Ok(None);
                 }
 
