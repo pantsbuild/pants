@@ -520,8 +520,9 @@ class HelpInfoExtracter:
                 subsystem_cls = scope_info.subsystem_cls
                 assert subsystem_cls is not None
                 if build_configuration is not None:
-                    provider = cls.get_provider(
-                        build_configuration.subsystem_to_providers.get(subsystem_cls)
+                    provider = cls.get_closest_provider_for_subsystem(
+                        subsystem_cls,
+                        build_configuration.subsystem_to_providers.get(subsystem_cls),
                     )
                 goal_subsystem_cls = cast(Type[GoalSubsystem], subsystem_cls)
                 return GoalHelpInfo(
@@ -682,7 +683,9 @@ class HelpInfoExtracter:
         return sorted(providers, key=len)[0]
 
     @classmethod
-    def get_closest_provider_for_subsystem(cls, subsystem_cls: Type, providers: tuple[str, ...] | None) -> str:
+    def get_closest_provider_for_subsystem(
+        cls, subsystem_cls: Type, providers: tuple[str, ...] | None
+    ) -> str:
         if not providers:
             return ""
 
