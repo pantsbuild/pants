@@ -70,3 +70,12 @@ module = [
   "psutil",
 ]
 ignore_missing_imports = true
+
+[tool.ruff]
+target-version = "py39"
+# same as black
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+]
