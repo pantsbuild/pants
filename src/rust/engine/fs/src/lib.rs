@@ -656,7 +656,7 @@ impl PosixFS {
             Ok(metadata) => {
                 let (kind, symlink_target) = match metadata.file_type() {
                     ft if ft.is_symlink() => {
-                        let symlink_target = tokio::fs::read_link(&abs_path).await.unwrap();
+                        let symlink_target = tokio::fs::read_link(&abs_path).await.map_err(|e| io::Error::other(format!("path {abs_path:?} was previously a symlink but read_link failed: {e}")))?;
                         (PathMetadataKind::Symlink, Some(symlink_target))
                     }
                     ft if ft.is_dir() => (PathMetadataKind::Directory, None),
