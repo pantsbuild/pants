@@ -1224,6 +1224,7 @@ dependencies = [
  "log",
  "parking_lot 0.12.1",
  "protos",
+ "pyo3",
  "rlimit",
  "serde",
  "task_executor",

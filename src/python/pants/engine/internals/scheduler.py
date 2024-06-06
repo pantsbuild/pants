@@ -28,7 +28,6 @@ from pants.engine.fs import (
     NativeDownloadFile,
     PathGlobs,
     PathGlobsAndRoot,
-    PathMetadata,
     PathMetadataRequest,
     PathMetadataResult,
     Paths,
@@ -155,7 +154,6 @@ class Scheduler:
         # Create the native Scheduler and Session.
         types = PyTypes(
             paths=Paths,
-            path_metadata=PathMetadata,
             path_metadata_request=PathMetadataRequest,
             path_metadata_result=PathMetadataResult,
             file_content=FileContent,

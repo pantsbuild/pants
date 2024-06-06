@@ -13,8 +13,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyIterator, PyString, PyTuple, PyType};
 
 use fs::{
-    DirectoryDigest, FilespecMatcher, GlobExpansionConjunction, PathGlobs, StrictGlobMatching,
-    EMPTY_DIRECTORY_DIGEST,
+    DirectoryDigest, FilespecMatcher, GlobExpansionConjunction, PathGlobs, PathMetadata,
+    PathMetadataKind, StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
 };
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use store::Snapshot;
@@ -29,6 +29,8 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
     m.add_class::<PyAddPrefix>()?;
     m.add_class::<PyRemovePrefix>()?;
     m.add_class::<PyFilespecMatcher>()?;
+    m.add_class::<PathMetadataKind>()?; // from `fs` crate
+    m.add_class::<PathMetadata>()?; // from `fs` crate
 
     m.add("EMPTY_DIGEST", PyDigest(EMPTY_DIRECTORY_DIGEST.clone()))?;
     m.add("EMPTY_FILE_DIGEST", PyFileDigest(EMPTY_DIGEST))?;

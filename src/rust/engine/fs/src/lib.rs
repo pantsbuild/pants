@@ -34,6 +34,7 @@ use std::{fmt, fs};
 use async_trait::async_trait;
 use bytes::Bytes;
 use deepsize::DeepSizeOf;
+use pyo3::prelude::*;
 use serde::Serialize;
 
 const TARGET_NOFILE_LIMIT: u64 = 10000;
@@ -237,6 +238,7 @@ impl PathStat {
     }
 }
 
+#[pyclass]
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub enum PathMetadataKind {
     File,
@@ -245,37 +247,83 @@ pub enum PathMetadataKind {
 }
 
 /// Expanded version of `Stat` when access to additional filesystem attributes is necessary.
+#[pyclass]
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct PathMetadata {
     /// Path to this filesystem entry.
-    pub path: PathBuf,
+    #[pyo3(get)]
+    path: PathBuf,
 
     /// The kind of file at the path.
-    pub kind: PathMetadataKind,
+    #[pyo3(get)]
+    kind: PathMetadataKind,
 
     /// Length of the filesystem entry.
-    pub length: u64,
+    #[pyo3(get)]
+    length: u64,
 
     /// True if the entry is marked executable.
-    pub is_executable: bool,
+    #[pyo3(get)]
+    is_executable: bool,
 
     /// True if the entry is marked read-only.
-    pub read_only: bool,
+    #[pyo3(get)]
+    read_only: bool,
 
     /// UNIX mode (if available)
-    pub unix_mode: Option<u32>,
+    #[pyo3(get)]
+    unix_mode: Option<u32>,
 
     /// Modification time of the path (if available).
-    pub accessed_time: Option<SystemTime>,
+    #[pyo3(get)]
+    accessed_time: Option<SystemTime>,
 
     /// Modification time of the path (if available).
-    pub created_time: Option<SystemTime>,
+    #[pyo3(get)]
+    created_time: Option<SystemTime>,
 
     /// Modification time of the path (if available).
-    pub modification_time: Option<SystemTime>,
+    #[pyo3(get)]
+    modification_time: Option<SystemTime>,
 
     /// Symlink target
-    pub symlink_target: Option<PathBuf>,
+    #[pyo3(get)]
+    symlink_target: Option<PathBuf>,
+}
+
+impl PathMetadata {
+    pub fn new(
+        path: PathBuf,
+        kind: PathMetadataKind,
+        length: u64,
+        is_executable: bool,
+        read_only: bool,
+        unix_mode: Option<u32>,
+        accessed_time: Option<SystemTime>,
+        created_time: Option<SystemTime>,
+        modification_time: Option<SystemTime>,
+        symlink_target: Option<PathBuf>,
+    ) -> Self {
+        Self {
+            path,
+            kind,
+            length,
+            is_executable,
+            read_only,
+            unix_mode,
+            accessed_time,
+            created_time,
+            modification_time,
+            symlink_target,
+        }
+    }
+}
+
+#[pymethods]
+impl PathMetadata {
+    fn __repr__(&self) -> String {
+        format!("{:?}", self)
+    }
 }
 
 #[derive(Debug, DeepSizeOf, Eq, PartialEq)]
@@ -621,18 +669,18 @@ impl PosixFS {
                 #[cfg(not(target_family = "unix"))]
                 let unix_mode: Option<u32> = None;
 
-                Ok(Some(PathMetadata {
+                Ok(Some(PathMetadata::new(
                     path,
                     kind,
-                    length: metadata.len(),
-                    is_executable: (metadata.permissions().mode() & 0o111) != 0,
-                    read_only: metadata.permissions().readonly(),
+                    metadata.len(),
+                    (metadata.permissions().mode() & 0o111) != 0,
+                    metadata.permissions().readonly(),
                     unix_mode,
-                    accessed_time: metadata.accessed().ok(),
-                    created_time: metadata.created().ok(),
-                    modification_time: metadata.modified().ok(),
+                    metadata.accessed().ok(),
+                    metadata.created().ok(),
+                    metadata.modified().ok(),
                     symlink_target,
-                }))
+                )))
             }
             Err(err) if err.kind() == ErrorKind::NotFound => Ok(None),
             Err(err) => Err(err),
@@ -738,42 +786,42 @@ impl Vfs<String> for DigestTrie {
         };
 
         Ok(Some(match entry {
-            directory::Entry::File(f) => PathMetadata {
-                path: PathBuf::from(f.name().as_str()),
-                kind: PathMetadataKind::File,
-                length: entry.digest().size_bytes as u64,
-                is_executable: f.is_executable(),
-                read_only: false,
-                unix_mode: None,
-                accessed_time: None,
-                created_time: None,
-                modification_time: None,
-                symlink_target: None,
-            },
-            directory::Entry::Symlink(s) => PathMetadata {
-                path: PathBuf::from(s.name().as_str()),
-                kind: PathMetadataKind::Symlink,
-                length: 0,
-                is_executable: false,
-                read_only: false,
-                unix_mode: None,
-                accessed_time: None,
-                created_time: None,
-                modification_time: None,
-                symlink_target: Some(s.target().to_path_buf()),
-            },
-            directory::Entry::Directory(d) => PathMetadata {
-                path: PathBuf::from(d.name().as_str()),
-                kind: PathMetadataKind::Directory,
-                length: entry.digest().size_bytes as u64,
-                is_executable: false,
-                read_only: false,
-                unix_mode: None,
-                accessed_time: None,
-                created_time: None,
-                modification_time: None,
-                symlink_target: None,
-            },
+            directory::Entry::File(f) => PathMetadata::new(
+                PathBuf::from(f.name().as_str()),
+                PathMetadataKind::File,
+                entry.digest().size_bytes as u64,
+                f.is_executable(),
+                false,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+            directory::Entry::Symlink(s) => PathMetadata::new(
+                PathBuf::from(s.name().as_str()),
+                PathMetadataKind::Symlink,
+                0,
+                false,
+                false,
+                None,
+                None,
+                None,
+                None,
+                Some(s.target().to_path_buf()),
+            ),
+            directory::Entry::Directory(d) => PathMetadata::new(
+                PathBuf::from(d.name().as_str()),
+                PathMetadataKind::Directory,
+                entry.digest().size_bytes as u64,
+                false,
+                false,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
         }))
     }
 

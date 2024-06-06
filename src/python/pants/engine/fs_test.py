@@ -17,6 +17,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Optional, Set, Union
 
+from pants.engine.internals.native_engine import PathMetadata, PathMetadataKind
 import pytest
 
 from pants.engine.console import Console
@@ -38,8 +39,6 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
-    PathMetadata,
-    PathMetadataKind,
     PathMetadataRequest,
     PathMetadataResult,
     RemovePrefix,
@@ -1520,13 +1519,12 @@ def test_path_metadata_request(rule_runner: RuleRunner) -> None:
 
     def get_metadata(path: str) -> PathMetadata | None:
         result = rule_runner.request(PathMetadataResult, [PathMetadataRequest(path)])
-        print(f"metadata={result.metadata}")
         return result.metadata
 
     m1 = get_metadata("foo")
     assert m1 is not None
     assert m1.path == "foo"
-    assert m1.kind == PathMetadataKind.FILE.value
+    assert m1.kind == PathMetadataKind.File
     assert m1.length == len(b"xyzzy")
     assert m1.symlink_target is None
 
@@ -1540,12 +1538,12 @@ def test_path_metadata_request(rule_runner: RuleRunner) -> None:
     m4 = get_metadata("bar")
     assert m4 is not None
     assert m4.path == "bar"
-    assert m4.kind == PathMetadataKind.SYMLINK.value
+    assert m4.kind == PathMetadataKind.Symlink
     assert m4.length == 3
     assert m4.symlink_target == "foo"
 
     m5 = get_metadata("sub-dir")
     assert m5 is not None
     assert m5.path == "sub-dir"
-    assert m5.kind == PathMetadataKind.DIRECTORY.value
+    assert m5.kind == PathMetadataKind.Directory
     assert m5.symlink_target is None

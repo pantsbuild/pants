@@ -8,7 +8,6 @@ pub struct Types {
     pub file_digest: TypeId,
     pub snapshot: TypeId,
     pub paths: TypeId,
-    pub path_metadata: TypeId,
     pub path_metadata_request: TypeId,
     pub path_metadata_result: TypeId,
     pub file_content: TypeId,
