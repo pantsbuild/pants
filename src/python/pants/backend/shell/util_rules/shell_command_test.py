@@ -853,7 +853,7 @@ def test_shell_command_with_workspace_execution(rule_runner: RuleRunner) -> None
                 output_files=["out.log"],
                 environment="workspace",
             )
-            workspace_environment(name="workspace")
+            experimental_workspace_environment(name="workspace")
             """
             )
         }

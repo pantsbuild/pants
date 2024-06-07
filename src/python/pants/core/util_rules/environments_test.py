@@ -530,13 +530,13 @@ def test_executable_search_path_cache_scope() -> None:
 
 
 # Test for regression in choosing local environments.
-def test_find_chosen_local_and_workspace_environments(rule_runner: RuleRunner) -> None:
+def test_find_chosen_local_and_experimental_workspace_environments(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
             local_environment(name="local")
-            workspace_environment(name="workspace")
+            experimental_workspace_environment(name="workspace")
             """
             )
         }
