@@ -368,7 +368,7 @@ class Parser:
                 parse_state,
                 alias,
                 tuple(target_cls.class_field_types(union_membership)),
-                strval(target_cls.help),
+                strval(getattr(target_cls, "help", "")),
             )
 
         type_aliases = dict(map(create_registrar_for_target, registered_target_types.aliases))
