@@ -137,7 +137,7 @@ async def evaluate_preludes(
         env_vars.update(BUILDFileEnvVarExtractor.get_env_vars(file_content))
     # __builtins__ is a dict, so isn't hashable, and can't be put in a FrozenDict.
     # Fortunately, we don't care about it - preludes should not be able to override builtins, so we just pop it out.
-    # TODO: Give a nice error message if a prelude tries to set a expose a non-hashable value.
+    # TODO: Give a nice error message if a prelude tries to set and expose a non-hashable value.
     locals.pop("__builtins__", None)
     # Ensure preludes can reference each other by populating the shared globals object with references
     # to the other symbols

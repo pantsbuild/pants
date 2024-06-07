@@ -10,11 +10,12 @@ import re
 import threading
 import tokenize
 import traceback
-from dataclasses import dataclass
+import typing
+from dataclasses import InitVar, dataclass, field
 from difflib import get_close_matches
 from io import StringIO
 from pathlib import PurePath
-from typing import Any, Callable, Iterable, Mapping, TypeVar
+from typing import Annotated, Any, Callable, Iterable, Mapping, TypeVar
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import MappingError
@@ -29,7 +30,7 @@ from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
-from pants.util.strutil import docstring, softwrap
+from pants.util.strutil import docstring, softwrap, strval
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -64,8 +65,12 @@ class BuildFilePreludeSymbols(BuildFileSymbolsInfo):
     @classmethod
     def create(cls, ns: Mapping[str, Any], env_vars: Iterable[str]) -> BuildFilePreludeSymbols:
         info = {}
+        annotations = ns.get("__annotations__", {})
         for name, symb in ns.items():
-            info[name] = BuildFileSymbolInfo(name, symb)
+            if name.startswith("_"):
+                continue
+            # We only need type hints via `annotations` for top-level values which doesn't work with `inspect`.
+            info[name] = BuildFileSymbolInfo(name, symb, type_hints=annotations.get(name))
         return cls(info=FrozenDict(info), referenced_env_vars=tuple(sorted(env_vars)))
 
 
@@ -73,10 +78,26 @@ class BuildFilePreludeSymbols(BuildFileSymbolsInfo):
 class BuildFileSymbolInfo:
     name: str
     value: Any
+    help: str | None = field(default=None, compare=False)
 
-    @property
-    def help(self) -> str | None:
-        return inspect.getdoc(self.value) if hasattr(self.value, "__name__") else None
+    type_hints: InitVar[Any] = None
+
+    def __post_init__(self, type_hints: Any) -> None:
+        if self.help is not None:
+            return
+
+        if hasattr(self.value, "__name__"):
+            help = inspect.getdoc(self.value)
+
+        elif type_hints is not None:
+            if typing.get_origin(type_hints) is Annotated:
+                typ, doc = typing.get_args(type_hints)
+                help = f"[type: {typ.__name__}] {doc}"
+            else:
+                help = str(type_hints)
+        else:
+            help = None
+        object.__setattr__(self, "help", help)
 
     @property
     def signature(self) -> str | None:
@@ -237,8 +258,13 @@ class RegistrarField:
 
 class Registrar:
     def __init__(
-        self, parse_state: ParseState, type_alias: str, field_types: tuple[type[Field], ...]
+        self,
+        parse_state: ParseState,
+        type_alias: str,
+        field_types: tuple[type[Field], ...],
+        help: str,
     ) -> None:
+        self.__doc__ = help
         self._parse_state = parse_state
         self._type_alias = type_alias
         for field_type in field_types:
@@ -337,14 +363,12 @@ class Parser:
         parse_state = ParseState()
 
         def create_registrar_for_target(alias: str) -> tuple[str, Registrar]:
+            target_cls = registered_target_types.aliases_to_types[alias]
             return alias, Registrar(
                 parse_state,
                 alias,
-                tuple(
-                    registered_target_types.aliases_to_types[alias].class_field_types(
-                        union_membership
-                    )
-                ),
+                tuple(target_cls.class_field_types(union_membership)),
+                strval(target_cls.help),
             )
 
         type_aliases = dict(map(create_registrar_for_target, registered_target_types.aliases))
@@ -356,7 +380,10 @@ class Parser:
 
         symbols_info = BuildFileSymbolsInfo.from_info(
             parse_state._symbols,
-            (BuildFileSymbolInfo(alias, registrar) for alias, registrar in type_aliases.items()),
+            (
+                BuildFileSymbolInfo(alias, registrar, help=registrar.__doc__)
+                for alias, registrar in type_aliases.items()
+            ),
             (BuildFileSymbolInfo(alias, value) for alias, value in object_aliases.objects.items()),
             (
                 BuildFileSymbolInfo(alias, object_factory(parse_context))

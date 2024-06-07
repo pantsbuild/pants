@@ -315,7 +315,7 @@ def test_prelude_type_hint_code() -> None:
     assert 42 == ecr_docker_image.value()
 
 
-def test_prelude_docstrings() -> None:
+def test_prelude_docstring_on_function() -> None:
     macro_docstring = "This is the doc-string for `macro_func`."
     prelude_content = dedent(
         f"""
@@ -330,6 +330,29 @@ def test_prelude_docstrings() -> None:
     assert macro_docstring == info.help
     assert "(arg: int) -> str" == info.signature
     assert {"macro_func"} == set(result.info)
+
+
+def test_prelude_docstring_on_constant() -> None:
+    macro_docstring = "This is the doc-string for `MACRO_CONST`."
+    prelude_content = dedent(
+        f"""
+        MACRO_CONST: Annotated[str, '''{macro_docstring}'''] = "value"
+        OTHER_stuff: str = "undocumented"
+        _PRIVATE: int = 42
+        untyped = True
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    info = result.info["MACRO_CONST"]
+    assert (
+        BuildFileSymbolInfo(
+            "MACRO_CONST", result.symbols["MACRO_CONST"], help=f"[type: str] {macro_docstring}"
+        )
+        == info
+    )
+    assert info.signature is None
+    assert {"MACRO_CONST", "OTHER_stuff", "untyped"} == set(result.info)
+    assert "<class 'str'>" == result.info["OTHER_stuff"].help
 
 
 def test_prelude_reference_env_vars() -> None:
