@@ -11,7 +11,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Type, TypeVar, cast
+from typing import Any, Iterable, Iterator, Mapping, NamedTuple, Sequence, Type, TypeVar, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -262,7 +262,7 @@ async def _parametrized_target_generators_with_templates(
     target_type: type[TargetGenerator],
     generator_fields: dict[str, Any],
     union_membership: UnionMembership,
-) -> list[tuple[TargetGenerator, dict[str, Any]]]:
+) -> list[tuple[TargetGenerator, Mapping[str, Any]]]:
     # Pre-load field values from defaults for the target type being generated.
     if hasattr(target_type, "generated_target_cls"):
         family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
@@ -455,7 +455,7 @@ def _create_target(
     address: Address,
     target_type: type[_TargetType],
     target_adaptor: TargetAdaptor,
-    field_values: dict[str, Any],
+    field_values: Mapping[str, Any],
     union_membership: UnionMembership,
     name_explicitly_set: bool | None = None,
 ) -> _TargetType:

@@ -140,8 +140,8 @@ class Parametrize:
 
     @classmethod
     def expand(
-        cls, address: Address, fields: dict[str, Any | Parametrize]
-    ) -> Iterator[tuple[Address, dict[str, Any]]]:
+        cls, address: Address, fields: Mapping[str, Any | Parametrize]
+    ) -> Iterator[tuple[Address, Mapping[str, Any]]]:
         """Produces the cartesian product of fields for the given possibly-Parametrized fields.
 
         Only one level of expansion is performed: if individual field values might also contain
@@ -219,14 +219,18 @@ class Parametrize:
 
             if any(isinstance(group_value, Parametrize) for group_value in group_kwargs.values()):
                 # Expand nested parametrize within a parametrized group.
-                for grouped_address, grouped_fields in Parametrize.expand(expanded_address, group_kwargs):
-                    yield expanded_address.parametrize(grouped_address.parameters), expanded_fields | grouped_fields
+                for grouped_address, grouped_fields in Parametrize.expand(
+                    expanded_address, group_kwargs
+                ):
+                    yield expanded_address.parametrize(
+                        grouped_address.parameters
+                    ), expanded_fields | grouped_fields
             else:
                 yield expanded_address, expanded_fields | group_kwargs
 
     @staticmethod
     def _collect_parametrizations(
-        fields: dict[str, Any | Parametrize]
+        fields: Mapping[str, Any | Parametrize]
     ) -> Mapping[str | None, list[tuple[str, Parametrize]]]:
         parametrizations = defaultdict(list)
         for field_name, v in fields.items():

@@ -658,7 +658,9 @@ def test_default_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> 
     )
 
 
-def test_default_parametrized_groups_with_parametrizations(target_adaptor_rule_runner: RuleRunner) -> None:
+def test_default_parametrized_groups_with_parametrizations(
+    target_adaptor_rule_runner: RuleRunner,
+) -> None:
     target_adaptor_rule_runner.write_files(
         {
             "src/BUILD": dedent(
@@ -698,10 +700,25 @@ def test_default_parametrized_groups_with_parametrizations(target_adaptor_rule_r
     )
     targets = tuple(Parametrize.expand(address, target_adaptor.kwargs))
     assert targets == (
-        (address.parametrize(dict(parametrize="py310-compat")), dict(interpreter_constraints=("CPython == 3.9.*", "CPython == 3.10.*"), resolve="service-a")),
-        (address.parametrize(dict(parametrize="py39-compat", resolve="service-b")), dict(interpreter_constraints=("CPython == 3.9.*",), resolve="service-b")),
-        (address.parametrize(dict(parametrize="py39-compat", resolve="service-c")), dict(interpreter_constraints=("CPython == 3.9.*",), resolve="service-c")),
-        (address.parametrize(dict(parametrize="py39-compat", resolve="service-d")), dict(interpreter_constraints=("CPython == 3.9.*",), resolve="service-d")),
+        (
+            address.parametrize(dict(parametrize="py310-compat")),
+            dict(
+                interpreter_constraints=("CPython == 3.9.*", "CPython == 3.10.*"),
+                resolve="service-a",
+            ),
+        ),
+        (
+            address.parametrize(dict(parametrize="py39-compat", resolve="service-b")),
+            dict(interpreter_constraints=("CPython == 3.9.*",), resolve="service-b"),
+        ),
+        (
+            address.parametrize(dict(parametrize="py39-compat", resolve="service-c")),
+            dict(interpreter_constraints=("CPython == 3.9.*",), resolve="service-c"),
+        ),
+        (
+            address.parametrize(dict(parametrize="py39-compat", resolve="service-d")),
+            dict(interpreter_constraints=("CPython == 3.9.*",), resolve="service-d"),
+        ),
     )
 
 
