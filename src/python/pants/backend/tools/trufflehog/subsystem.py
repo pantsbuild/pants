@@ -7,7 +7,7 @@ from __future__ import annotations
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import ExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import BoolOption, SkipOption, StrListOption
+from pants.option.option_types import ArgsListOption, BoolOption, SkipOption, StrListOption
 from pants.util.strutil import softwrap
 
 
@@ -43,6 +43,12 @@ class Trufflehog(ExternalTool):
             If a trufflehog-config.yaml file is found, pass it to the trufflehog --config argument.
             """
         ),
+    )
+
+    args = ArgsListOption(
+        example="--no-json --exclude-detectors detector",
+        default=["--json"],
+        extra_help="This includes --json by default to reduce the volume of output.",
     )
 
     def generate_url(self, plat: Platform) -> str:

@@ -90,13 +90,13 @@ async def run_trufflehog(
                 "filesystem",
                 *snapshot.files,
                 "--fail",
-                "-j",
                 "--no-update",
                 *(
                     ("--config", *config_digest.snapshot.files)
                     if config_digest.snapshot.files
                     else ()
                 ),
+                *trufflehog.args,
             ),
             input_digest=input_digest,
             description=f"Run Trufflehog on {pluralize(len(snapshot.files), 'file')}.",
