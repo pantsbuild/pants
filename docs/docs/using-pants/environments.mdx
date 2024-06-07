@@ -73,7 +73,7 @@ The `environment=` field may either:
 1. refer to an environment by name
 2. use one of the following special environment names to select a matching environment: (see "Environment matching" below)
   1. `__local__` resolves to any matching `local_environment`
-  2. `__local_workspace__` resolves to any matching `workspace_environment` 
+  2. `__local_workspace__` resolves to any matching `experimental_workspace_environment` 
 
 :::caution Environment compatibility
 Currently, there is no static validation that a target's environment is compatible with its dependencies' environments -- only the implicit validation of the goals that you run successfully against those targets (`check`, `lint`, `test`, `package`, etc).
@@ -110,7 +110,7 @@ A single environment name may end up referring to different environment targets 
 - `local_environment` targets will match if their `compatible_platforms=` field matches localhost's platform.
 - `docker_environment` targets will match [if Docker is enabled](../../reference/global-options.mdx#docker_execution), and if their `platform=` field is compatible with localhost's platform.
 - `remote_environment` targets will match [if Remote execution is enabled](../../reference/global-options.mdx#remote_execution).
-- `workspace_environment` targets will match if their `compatible_platforms=` field matches localhost's platform.
+- `experimental_workspace_environment` targets will match if their `compatible_platforms=` field matches localhost's platform.
 
 If a particular environment target _doesn't_ match (other than for `workspace_enviroment` targets), it can configure a `fallback_environment=` which will be attempted next. This allows for forming preference chains which are referred to by whichever environment name is at the head of the chain. This does not apply to `workspace_enviroment` targets because in-workspace execution differs significantly from the execution in the other environments due to the lack of an execution sandbox.
 
@@ -243,7 +243,7 @@ You could then _override_ that name definition in `pants.ci.toml` (note the use 
 macos = "//:macos_ci"
 ```
 
-### In-Workspace Execution (`workspace_environment`)
+### In-Workspace Execution (`experimental_workspace_environment`)
 
 The `workspace_enviroment` target type configures a special "workspace" environment in which build actions are invoked in the repository / workspace instead of an execution sandbox as would be done with `local_environment` executions.
 
@@ -259,7 +259,7 @@ If a process isn't reproducible, re-running a build from the same source code co
 
 :::
 
-The special environment name `__local_workspace__` can be used to select a matching `workspace_environment` based on its `compatible_platforms` attribute.
+The special environment name `__local_workspace__` can be used to select a matching `experimental_workspace_environment` based on its `compatible_platforms` attribute.
 
 There is no `fallback_environment=` atribute on `workspace_enviroment` targets because in-workspace execution differs significantly from
 the other environemnts due to the lack of an execution sandbox.
