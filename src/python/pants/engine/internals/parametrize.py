@@ -147,6 +147,9 @@ class Parametrize:
         Only one level of expansion is performed: if individual field values might also contain
         Parametrize instances (in particular: an `overrides` field), expanding those will require
         separate calls.
+
+        Parametrized groups are expanded however (that is: any `parametrize` field values in a
+        `**parametrize()` group are also expanded).
         """
         try:
             parametrizations = cls._collect_parametrizations(fields)
@@ -212,10 +215,14 @@ class Parametrize:
                 if not (isinstance(field_value, Parametrize) and field_value.is_group)
             )
             expanded_fields: dict[str, Any] = dict(non_parametrized + parametrized_args_fields)
-            expanded_fields.update(group_kwargs)
-
             expanded_address = address.parametrize(expanded_parameters, replace=True)
-            yield expanded_address, expanded_fields
+
+            if any(isinstance(group_value, Parametrize) for group_value in group_kwargs.values()):
+                # Expand nested parametrize within a parametrized group.
+                for grouped_address, grouped_fields in Parametrize.expand(expanded_address, group_kwargs):
+                    yield expanded_address.parametrize(grouped_address.parameters), expanded_fields | grouped_fields
+            else:
+                yield expanded_address, expanded_fields | group_kwargs
 
     @staticmethod
     def _collect_parametrizations(

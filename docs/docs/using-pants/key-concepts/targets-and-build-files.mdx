@@ -385,7 +385,7 @@ python_test(
 )
 ```
 
-To parametrize multiple fields together as one parametrization, unpack a parametrize object with the field values to use for that group as the parametrization keyword arguments. The parametrization must be named by providing one positional string argument as the name. (See example below.) This is useful to avoid a full cartesian product if not every combination of field values makes sense. i.e. The previous example uses the same resolve (lockfile) for both interpreter constraints, however if you want to use a different resolve per interpreter, then grouping the resolve value with the interpreter constraint may be the way to go.
+To parametrize multiple fields together as one parametrization, unpack a parametrize object with the field values to use for that group as the parametrization keyword arguments. The parametrization must be named by providing one positional string argument as the name. (See example below.) This is useful to avoid a full cartesian product if not every combination of field values makes sense. i.e. The previous example uses the same resolve (lockfile) for both interpreter constraints, however if you want to use a different resolve per interpreter, then grouping the resolve value with the interpreter constraint may be the way to go. (Parametrizing grouped fields are also supported.)
 
 ```python title="example/BUILD"
 # Creates two targets:

@@ -658,6 +658,53 @@ def test_default_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> 
     )
 
 
+def test_default_parametrized_groups_with_parametrizations(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """
+                __defaults__(
+                  all=dict(
+                    **parametrize(
+                      "py310-compat",
+                      resolve="service-a",
+                      interpreter_constraints=[
+                        "CPython == 3.9.*",
+                        "CPython == 3.10.*",
+                      ]
+                    ),
+                    **parametrize(
+                      "py39-compat",
+                      resolve=parametrize(
+                        "service-b",
+                        "service-c",
+                        "service-d",
+                      ),
+                      interpreter_constraints=[
+                        "CPython == 3.9.*",
+                      ]
+                    )
+                  )
+                )
+                mock_tgt()
+                """
+            ),
+        }
+    )
+    address = Address("src")
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(address, description_of_origin="tests")],
+    )
+    targets = tuple(Parametrize.expand(address, target_adaptor.kwargs))
+    assert targets == (
+        (address.parametrize(dict(parametrize="py310-compat")), dict(interpreter_constraints=("CPython == 3.9.*", "CPython == 3.10.*"), resolve="service-a")),
+        (address.parametrize(dict(parametrize="py39-compat", resolve="service-b")), dict(interpreter_constraints=("CPython == 3.9.*",), resolve="service-b")),
+        (address.parametrize(dict(parametrize="py39-compat", resolve="service-c")), dict(interpreter_constraints=("CPython == 3.9.*",), resolve="service-c")),
+        (address.parametrize(dict(parametrize="py39-compat", resolve="service-d")), dict(interpreter_constraints=("CPython == 3.9.*",), resolve="service-d")),
+    )
+
+
 def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
     target_adaptor_rule_runner.write_files(
         {
