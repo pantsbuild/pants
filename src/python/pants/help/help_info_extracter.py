@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import difflib
 import inspect
 import itertools
 import json
@@ -498,7 +499,8 @@ class HelpInfoExtracter:
                 provider = ""
                 if subsystem_cls is not None and build_configuration is not None:
                     provider = cls.get_provider(
-                        build_configuration.subsystem_to_providers.get(subsystem_cls)
+                        build_configuration.subsystem_to_providers.get(subsystem_cls),
+                        subsystem_cls.__module__,
                     )
                 return HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
                     scope_info.description,
@@ -518,7 +520,8 @@ class HelpInfoExtracter:
                 assert subsystem_cls is not None
                 if build_configuration is not None:
                     provider = cls.get_provider(
-                        build_configuration.subsystem_to_providers.get(subsystem_cls)
+                        build_configuration.subsystem_to_providers.get(subsystem_cls),
+                        subsystem_cls.__module__,
                     )
                 goal_subsystem_cls = cast(Type[GoalSubsystem], subsystem_cls)
                 return GoalHelpInfo(
@@ -539,14 +542,18 @@ class HelpInfoExtracter:
                     provider=cls.get_provider(
                         build_configuration
                         and build_configuration.target_type_to_providers.get(target_type)
-                        or None
+                        or None,
+                        target_type.__module__,
                     ),
                     get_field_type_provider=lambda field_type: cls.get_provider(
-                        build_configuration.union_rule_to_providers.get(
-                            UnionRule(target_type.PluginField, field_type)
-                        )
-                        if build_configuration is not None
-                        else None
+                        (
+                            build_configuration.union_rule_to_providers.get(
+                                UnionRule(target_type.PluginField, field_type)
+                            )
+                            if build_configuration is not None
+                            else None
+                        ),
+                        field_type.__module__,
                     ),
                 )
 
@@ -672,11 +679,17 @@ class HelpInfoExtracter:
             return None
 
     @staticmethod
-    def get_provider(providers: tuple[str, ...] | None) -> str:
+    def get_provider(providers: tuple[str, ...] | None, hint: str | None = None) -> str:
         if not providers:
             return ""
-        # Pick the shortest backend name.
-        return sorted(providers, key=len)[0]
+        if not hint:
+            # Pick the shortest backend name.
+            return sorted(providers, key=len)[0]
+
+        # Pick the one closest to `hint`.
+        # No cutoff and max 1 result guarantees a result with a single element.
+        [provider] = difflib.get_close_matches(hint, providers, n=1, cutoff=0.0)
+        return provider
 
     @staticmethod
     def maybe_cleandoc(doc: str | None) -> str | None:
@@ -702,7 +715,9 @@ class HelpInfoExtracter:
 
         return LazyFrozenDict(
             {
-                rule.canonical_name: rule_info_loader(rule, cls.get_provider(providers))
+                rule.canonical_name: rule_info_loader(
+                    rule, cls.get_provider(providers, rule.canonical_name)
+                )
                 for rule, providers in build_configuration.rule_to_providers.items()
                 if isinstance(rule, TaskRule)
             }
@@ -756,7 +771,7 @@ class HelpInfoExtracter:
             for rule, providers in bc.rule_to_providers.items():
                 if not isinstance(rule, TaskRule):
                     continue
-                provider = cls.get_provider(providers)
+                provider = cls.get_provider(providers, rule.canonical_name)
                 yield rule.output_type, provider, tuple(_rule_dependencies(rule))
 
                 for constraint in rule.awaitables:
@@ -765,7 +780,7 @@ class HelpInfoExtracter:
 
             union_bases: set[type] = set()
             for union_rule, providers in bc.union_rule_to_providers.items():
-                provider = cls.get_provider(providers)
+                provider = cls.get_provider(providers, union_rule.union_member.__module__)
                 union_bases.add(union_rule.union_base)
                 yield union_rule.union_member, provider, (union_rule.union_base,)
 
