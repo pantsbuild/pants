@@ -1181,7 +1181,7 @@ class GenerateTargetsRequest(Generic[_TargetGenerator]):
     # applied within overrides.
     overrides: Mapping[str, Mapping[Address, Mapping[str, Any]]] = dataclasses.field(hash=False)
 
-    def require_unparametrized_overrides(self) -> Mapping[str, Mapping[str, Any]]:
+    def require_unparametrized_overrides(self) -> dict[str, Mapping[str, Any]]:
         """Flattens overrides for `GenerateTargetsRequest` impls which don't support `parametrize`.
 
         If `parametrize` has been used in overrides, this will raise an error indicating that that is
