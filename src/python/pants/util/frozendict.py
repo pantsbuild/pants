@@ -96,6 +96,13 @@ class FrozenDict(Mapping[K, V]):
         # optimising this, by, for instance, sorting on construction.
         return sorted(self._data.items()) < sorted(other._data.items())
 
+    def __or__(self, other: Any) -> FrozenDict[K, V]:
+        if isinstance(other, FrozenDict):
+            other = other._data
+        elif not isinstance(other, Mapping):
+            return NotImplemented
+        return FrozenDict(self._data | other)
+
     def _calculate_hash(self) -> int:
         try:
             h = 0

@@ -206,3 +206,13 @@ def test_frozendict_dot_frozen() -> None:
 
     assert frozen_a == FrozenDict(a)
     assert frozen_b is b
+
+
+def test_merge_frozen_dicts() -> None:
+    a = FrozenDict({"A": 1})
+    b = FrozenDict({"B": 2})
+    c = {"C": 3}
+    assert a | b == FrozenDict({"A": 1, "B": 2})
+    assert a | c == FrozenDict({"A": 1, "C": 3})
+    with pytest.raises(TypeError):
+        c | a
