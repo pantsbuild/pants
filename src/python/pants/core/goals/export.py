@@ -16,7 +16,6 @@ from pants.core.goals.generate_lockfiles import (
     UnrecognizedResolveNamesError,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
@@ -155,8 +154,6 @@ async def export(
     requests = tuple(request_type(targets) for request_type in request_types)
     all_results = await MultiGet(Get(ExportResults, ExportRequest, request) for request in requests)
     flattened_results = [res for results in all_results for res in results]
-
-    await _warn_on_non_local_environments(targets, "the `export` goal")
 
     prefixed_digests = await MultiGet(
         Get(Digest, AddPrefix(result.digest, result.reldir)) for result in flattened_results
