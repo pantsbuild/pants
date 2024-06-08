@@ -12,7 +12,7 @@ class TextBlock:
     Lines are 1 indexed, `start` is inclusive.
 
     TextBlock is used as a part of unified diff hunk, thus it can be empty,
-    i.e. count can be equeal to 0.
+    i.e. count can be equal to 0.
     """
 
     start: int
