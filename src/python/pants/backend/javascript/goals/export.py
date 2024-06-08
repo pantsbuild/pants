@@ -43,12 +43,14 @@ async def export_node_modules_for_resolve(
 ) -> MaybeExportResult:
     resolve = request.resolve
 
-    target = resolves.get(request.resolve)
+    requested_resolve = resolves.get(request.resolve)
 
-    if not target:
+    if not requested_resolve:
         return MaybeExportResult(None)
 
-    installation = await Get(InstalledNodePackage, InstalledNodePackageRequest(target.address))
+    installation = await Get(
+        InstalledNodePackage, InstalledNodePackageRequest(requested_resolve.address)
+    )
 
     return MaybeExportResult(
         ExportResult(
