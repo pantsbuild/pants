@@ -320,7 +320,7 @@ def test_adhoc_tool_with_workspace_execution(rule_runner: PythonRuleRunner) -> N
                 environment="workspace",
                 stderr="stderr",
             )
-            workspace_environment(name="workspace")
+            experimental_workspace_environment(name="workspace")
             """
             )
         }

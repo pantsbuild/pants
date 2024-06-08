@@ -202,16 +202,16 @@ jobs:
 
         ./cargo doc'
     timeout-minutes: 60
-  bootstrap_pants_macos11_x86_64:
+  bootstrap_pants_macos12_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
-    name: Bootstrap Pants, test Rust (macOS11-x86_64)
+    name: Bootstrap Pants, test Rust (macOS12-x86_64)
     needs:
     - classify_changes
     runs-on:
-    - macos-11
+    - macos-12
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -231,7 +231,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        key: macOS12-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.78.0-*
 
           ~/.rustup/update-hashes
@@ -252,7 +252,7 @@ jobs:
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: macOS11-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
+        key: macOS12-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
@@ -277,12 +277,12 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-bootstrap-macOS11-x86_64
+        name: logs-bootstrap-macOS12-x86_64
         path: .pants.d/workdir/*.log
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
-        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
+        name: native_binaries.${{ matrix.python-version }}.macOS12-x86_64
         path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
@@ -683,7 +683,7 @@ jobs:
     - check_release_notes
     - bootstrap_pants_linux_arm64
     - bootstrap_pants_linux_x86_64
-    - bootstrap_pants_macos11_x86_64
+    - bootstrap_pants_macos12_x86_64
     - build_wheels_linux_arm64
     - build_wheels_linux_x86_64
     - build_wheels_macos10_15_x86_64
@@ -703,7 +703,7 @@ jobs:
     - test_python_linux_x86_64_7
     - test_python_linux_x86_64_8
     - test_python_linux_x86_64_9
-    - test_python_macos11_x86_64
+    - test_python_macos12_x86_64
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
@@ -1675,16 +1675,16 @@ jobs:
         name: logs-python-test-9_10-Linux-x86_64
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
-  test_python_macos11_x86_64:
+  test_python_macos12_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
-    name: Test Python (macOS11-x86_64)
+    name: Test Python (macOS12-x86_64)
     needs:
-    - bootstrap_pants_macos11_x86_64
+    - bootstrap_pants_macos12_x86_64
     - classify_changes
     runs-on:
-    - macos-11
+    - macos-12
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -1704,7 +1704,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
+        name: native_binaries.${{ matrix.python-version }}.macOS12-x86_64
         path: src/python/pants
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
@@ -1718,7 +1718,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/macOS11-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/macOS12-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
 
         echo "Uploading test reports to ${S3_DST}"
 
@@ -1730,7 +1730,7 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-python-test-macOS11-x86_64
+        name: logs-python-test-macOS12-x86_64
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
 name: Pull Request CI

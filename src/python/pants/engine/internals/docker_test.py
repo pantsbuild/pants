@@ -17,7 +17,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_resolve_image_id(rule_runner: RuleRunner) -> None:
-    platform = Platform.create_for_localhost()
+    platform = Platform.create_for_localhost().for_linux()
     image_result = rule_runner.request(
         DockerResolveImageResult,
         [DockerResolveImageRequest(image_name="busybox:1", platform=platform.name)],

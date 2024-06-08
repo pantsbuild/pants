@@ -45,6 +45,7 @@ def run_run_request(
     args = [
         "--backend-packages=['pants.backend.python', 'pants.backend.python.providers.experimental.pyenv']",
         "--source-root-patterns=['src']",
+        "--pyenv-python-provider-installation-extra-env-vars=['HOME']",
     ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     run_request = rule_runner.request(RunRequest, [PythonSourceFieldSet.create(target)])
