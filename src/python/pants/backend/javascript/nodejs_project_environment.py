@@ -94,6 +94,17 @@ class NodeJsProjectEnvironmentProcess:
     timeout_seconds: int | None = None
     extra_env: FrozenDict[str, str] = field(default_factory=FrozenDict)
 
+    def targeted_args(self) -> tuple[str, ...]:
+        if not self.env.project.single_workspace and self.env.target and self.env.root_dir != self.env.package_dir():
+            target = self.env.ensure_target()
+            return (
+                self.env.project.workspace_specifier_arg,
+                target[NodePackageNameField].value,
+                *self.args,
+            )
+        else:
+            return tuple(self.args)
+
 
 @rule(desc="Assembling nodejs project environment")
 async def get_nodejs_environment(req: NodeJSProjectEnvironmentRequest) -> NodeJsProjectEnvironment:
@@ -114,15 +125,7 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
     )
     merged = await Get(Digest, MergeDigests((req.input_digest, lockfile_digest, project_digest)))
 
-    if not req.env.project.single_workspace and req.env.target:
-        target = req.env.ensure_target()
-        args = (
-            req.env.project.workspace_specifier_arg,
-            target[NodePackageNameField].value,
-            *req.args,
-        )
-    else:
-        args = tuple(req.args)
+    args = req.targeted_args()
     output_files = req.output_files
     output_directories = req.output_directories
     per_package_caches = FrozenDict(
