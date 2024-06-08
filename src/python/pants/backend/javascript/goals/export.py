@@ -5,19 +5,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.javascript.install_node_package import InstalledNodePackage, InstalledNodePackageRequest
+from pants.backend.javascript.install_node_package import (
+    InstalledNodePackage,
+    InstalledNodePackageRequest,
+)
 from pants.backend.javascript.resolve import FirstPartyNodePackageResolves
 from pants.backend.javascript.subsystems.nodejs import NodeJS
-from pants.core.goals.export import (
-    ExportRequest,
-    ExportResult,
-    ExportResults,
-    ExportSubsystem,
-)
+from pants.core.goals.export import ExportRequest, ExportResult, ExportResults, ExportSubsystem
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.internals.native_engine import (
-    Digest, RemovePrefix,
-)
+from pants.engine.internals.native_engine import Digest, RemovePrefix
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionMembership, UnionRule
