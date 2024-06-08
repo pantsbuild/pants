@@ -13,9 +13,7 @@ from pants.base.specs import RawSpecs
 from pants.core.goals.export import ExportResults
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.rules import QueryRule
-from pants.engine.target import (
-    Targets,
-)
+from pants.engine.target import Targets
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -27,7 +25,7 @@ def rule_runner() -> RuleRunner:
             *install_node_package.rules(),
             QueryRule(Targets, [RawSpecs]),
             QueryRule(ExportResults, [ExportNodeModulesRequest]),
-            QueryRule(Snapshot, [Digest])
+            QueryRule(Snapshot, [Digest]),
         ],
         target_types=[PackageJsonTarget],
     )
@@ -46,7 +44,9 @@ def test_export_node_modules(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": "package_json(name='root')",
-            "package-lock.json": (Path(__file__).parent / "jest_resources/package-lock.json").read_text(),
+            "package-lock.json": (
+                Path(__file__).parent / "jest_resources/package-lock.json"
+            ).read_text(),
             "package.json": given_package_with_name("ham"),
         }
     )
@@ -56,5 +56,5 @@ def test_export_node_modules(rule_runner: RuleRunner) -> None:
 
     snapshot = get_snapshot(rule_runner, result.digest)
 
-    assert result.resolve == 'nodejs-default'
-    assert 'node_modules/jest' in snapshot.dirs
+    assert result.resolve == "nodejs-default"
+    assert "node_modules/jest" in snapshot.dirs

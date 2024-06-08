@@ -95,7 +95,11 @@ class NodeJsProjectEnvironmentProcess:
     extra_env: FrozenDict[str, str] = field(default_factory=FrozenDict)
 
     def targeted_args(self) -> tuple[str, ...]:
-        if not self.env.project.single_workspace and self.env.target and self.env.root_dir != self.env.package_dir():
+        if (
+            not self.env.project.single_workspace
+            and self.env.target
+            and self.env.root_dir != self.env.package_dir()
+        ):
             target = self.env.ensure_target()
             return (
                 self.env.project.workspace_specifier_arg,
