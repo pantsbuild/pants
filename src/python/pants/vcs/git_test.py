@@ -119,7 +119,16 @@ def git(
         os.symlink("loop2", os.path.join(worktree, "loop1"))
 
         subprocess.check_call(
-            ["git", "add", "README", "dir", "loop1", "loop2", "link-to-dir", "not-a-dir"]
+            [
+                "git",
+                "add",
+                "README",
+                "dir",
+                "loop1",
+                "loop2",
+                "link-to-dir",
+                "not-a-dir",
+            ]
         )
         subprocess.check_call(["git", "commit", "-am", "initial commit with decode -> \x81b"])
 
@@ -153,6 +162,41 @@ def test_integration(worktree: Path, readme_file: Path, git: MutatingGitWorktree
 
     # Confirm that files outside of a given relative_to path are ignored
     assert set() == git.changed_files(relative_to="non-existent")
+
+
+def test_integration_lines(worktree: Path, readme_file: Path, git: MutatingGitWorktree) -> None:
+    files = ["README", "INSTALL"]
+    assert FrozenDict() == git.changed_files_lines(files)
+    assert {
+        "README": (
+            Hunk(
+                left=TextBlock(start=0, count=0),
+                right=TextBlock(start=1, count=1),
+            ),
+        )
+    } == git.changed_files_lines(files, from_commit="HEAD^")
+
+    assert "main" == git.branch_name
+
+    with readme_file.open(mode="a") as fp:
+        fp.write("More data.")
+
+    (worktree / "INSTALL").write_text("make install")
+
+    # Untracked files are ignored
+    assert FrozenDict(
+        {
+            "README": (
+                Hunk(
+                    left=TextBlock(start=1, count=1),
+                    right=TextBlock(start=1, count=1),
+                ),
+            )
+        }
+    ) == git.changed_files_lines(files)
+
+    # Confirm that files outside of a given relative_to path are ignored
+    assert FrozenDict() == git.changed_files_lines(files, relative_to="non-existent")
 
 
 def test_detect_worktree(tmp_path: Path, origin: PurePath, git: MutatingGitWorktree) -> None:
