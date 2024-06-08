@@ -287,9 +287,16 @@ class NodeJSProcessEnvironment:
 
     base_bin_dir: ClassVar[str] = "__node"
 
-    def to_env_dict(self) -> dict[str, str]:
+    def to_env_dict(self, extras: Mapping[str, str] | None = None) -> dict[str, str]:
+        extras = extras or {}
+        extra_path = extras.get("PATH", "")
+        path = [self.tool_binaries.path_component, self.corepack_shims, self.binary_directory]
+        if extra_path:
+            path.append(extra_path)
+
         return {
-            "PATH": f"{self.tool_binaries.path_component}:{self.corepack_shims}:{self.binary_directory}",
+            **extras,
+            "PATH": os.pathsep.join(path),
             "npm_config_cache": self.npm_config_cache,  # Normally stored at ~/.npm,
             "COREPACK_HOME": os.path.join("{chroot}", self.corepack_home),
             **self.corepack_env_vars,
@@ -594,7 +601,7 @@ async def setup_node_tool_process(
         output_directories=request.output_directories,
         description=request.description,
         level=request.level,
-        env={**request.extra_env, **environment.to_env_dict()},
+        env=environment.to_env_dict(request.extra_env),
         working_directory=request.working_directory,
         append_only_caches={**request.append_only_caches, **environment.append_only_caches},
         timeout_seconds=request.timeout_seconds,
