@@ -146,6 +146,12 @@ async def export(
     export_subsys: ExportSubsystem,
 ) -> Export:
     request_types = cast("Iterable[type[ExportRequest]]", union_membership.get(ExportRequest))
+
+    if not export_subsys.options.resolve:
+        raise ExportError("Must specify at least one --resolve to export")
+    if targets:
+        raise ExportError("The `export` goal does not take target specs.")
+
     requests = tuple(request_type(targets) for request_type in request_types)
     all_results = await MultiGet(Get(ExportResults, ExportRequest, request) for request in requests)
     flattened_results = [res for results in all_results for res in results]
