@@ -381,6 +381,31 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     dockerfile_copy_args = dockerfile_info.copy_build_args.with_overrides(
         supplied_build_args, only_with_value=True
     )
+
+    def get_artifact_paths(built_package: BuiltPackage) -> list[str]:
+        return [e.relpath for e in built_package.artifacts]
+
+    addrs_to_paths = {
+        field_set.address: get_artifact_paths(pkg)
+        for field_set, pkg in zip(embedded_pkgs_per_target.field_sets, embedded_pkgs)
+    }
+
+    copy_arg_as_build_args = await fill_args_from_copy(
+        dockerfile_copy_args, dockerfile_info, addrs_to_paths
+    )
+
+    build_args = build_args.extended(copy_arg_as_build_args)
+
+    return DockerBuildContext.create(
+        build_args=build_args,
+        snapshot=context,
+        upstream_image_ids=upstream_image_ids,
+        dockerfile_info=dockerfile_info,
+        build_env=build_env,
+    )
+
+
+async def fill_args_from_copy(dockerfile_copy_args, dockerfile_info, addrs_to_paths):
     copy_arg_addresses = await Get(
         Addresses,
         UnparsedAddressInputs(
@@ -396,14 +421,6 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
         ),
     )
 
-    def get_artifact_paths(built_package: BuiltPackage) -> list[str]:
-        return [e.relpath for e in built_package.artifacts]
-
-    addrs_to_paths = {
-        field_set.address: get_artifact_paths(pkg)
-        for field_set, pkg in zip(embedded_pkgs_per_target.field_sets, embedded_pkgs)
-    }
-
     def resolve_arg(arg_name, maybe_addr) -> str:
         if maybe_addr in addrs_to_paths:
             return f"{arg_name}={shlex.join(addrs_to_paths[maybe_addr])}"
@@ -415,16 +432,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
         resolve_arg(arg_name, arg_value)
         for arg_name, arg_value in (zip(dockerfile_copy_args.keys(), copy_arg_addresses))
     ]
-
-    build_args = build_args.extended(copy_arg_as_build_args)
-
-    return DockerBuildContext.create(
-        build_args=build_args,
-        snapshot=context,
-        upstream_image_ids=upstream_image_ids,
-        dockerfile_info=dockerfile_info,
-        build_env=build_env,
-    )
+    return copy_arg_as_build_args
 
 
 def rules():
