@@ -226,11 +226,13 @@ class DiffParser:
     def _filename_regex(self) -> re.Pattern:
         # This only handles whitespaces. It doesn't work if a filename has something weird
         # in it that needs escaping, e.g. a double quote.
-        return re.compile(r'^\+\+\+ (?:b/([^"]+)|"b/((?:[^"]|\\")+)")$')
+        a_file = r'(?:a/(?:[^"]+)|"a/(:?(?:[^"]|\\")+)")'
+        b_file = r'(?:b/(?P<unquoted>[^"]+)|"b/(?P<quoted>(?:[^"]|\\")+)")'
+        return re.compile(rf"^diff --git {a_file} {b_file}$")
 
     def _parse_filename(self, match: re.Match) -> str | None:
-        unquoted = str(g) if (g := match.groups()[0]) is not None else None
-        quoted = str(g).replace(r"\"", '"') if (g := match.groups()[1]) is not None else None
+        unquoted = str(g) if (g := match.group('unquoted')) is not None else None
+        quoted = str(g).replace(r"\"", '"') if (g := match.group('quoted')) is not None else None
         return unquoted or quoted
 
 

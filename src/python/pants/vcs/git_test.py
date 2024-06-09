@@ -552,6 +552,16 @@ def test_worktree_invalidation(origin: Path) -> None:
             ),
             {'q"ote.txt': (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)},
         ],
+        [
+            dedent(
+                """\
+                diff --git a/hey b/hey
+                new file mode 100644
+                index 0000000000..e69de29bb2
+                """
+            ),
+            {},
+        ],
     ],
 )
 def test_parse_unified_diff(diff, expected):
