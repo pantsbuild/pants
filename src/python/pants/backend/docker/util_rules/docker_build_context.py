@@ -378,7 +378,9 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
         build_args = build_args.extended(from_image_build_args)
 
     # Render build args for turning COPY values in ARGS which are targets into their output
-    dockerfile_copy_args = dockerfile_info.copy_build_args.with_overrides(supplied_build_args, only_with_value=True)
+    dockerfile_copy_args = dockerfile_info.copy_build_args.with_overrides(
+        supplied_build_args, only_with_value=True
+    )
     copy_arg_addresses = await Get(
         Addresses,
         UnparsedAddressInputs(
@@ -397,13 +399,16 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     def get_artifact_paths(built_package: BuiltPackage) -> list[str]:
         return [e.relpath for e in built_package.artifacts]
 
-    addrs_to_paths = {field_set.address: get_artifact_paths(pkg) for field_set, pkg in zip(embedded_pkgs_per_target.field_sets, embedded_pkgs)}
+    addrs_to_paths = {
+        field_set.address: get_artifact_paths(pkg)
+        for field_set, pkg in zip(embedded_pkgs_per_target.field_sets, embedded_pkgs)
+    }
 
     def resolve_arg(arg_name, maybe_addr) -> str:
         if maybe_addr in addrs_to_paths:
             return f"{arg_name}={shlex.join(addrs_to_paths[maybe_addr])}"
         else:
-            # TODO: I think we won't end up here any more, since we use the copy_arg_addresses which already
+            # When the ARG value is a reference to a normal file
             return f"{arg_name}={maybe_addr}"
 
     copy_arg_as_build_args = [

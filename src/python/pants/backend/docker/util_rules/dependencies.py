@@ -12,6 +12,8 @@ from pants.backend.docker.util_rules.docker_build_args import (
     DockerBuildArgs,
     DockerBuildArgsRequest,
 )
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.base.specs import FileLiteralSpec, RawSpecs
 from pants.core.goals.package import AllPackageableTargets, OutputPathField
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
@@ -59,21 +61,22 @@ async def infer_docker_dependencies(
             ),
         )
     )
-    putative_copy_addresses = await Get(
-        Addresses,
-        UnparsedAddressInputs(
-            dockerfile_info.copy_build_args.to_dict().values(),
-            owning_address=dockerfile_info.address,
-            description_of_origin=softwrap(
-                f"""
+    putative_copy_target_addresses = set(
+        await Get(
+            Addresses,
+            UnparsedAddressInputs(
+                dockerfile_info.copy_build_args.to_dict().values(),
+                owning_address=dockerfile_info.address,
+                description_of_origin=softwrap(
+                    f"""
                 the COPY arguments from the file {dockerfile_info.source}
                 from the target {dockerfile_info.address}
                 """
+                ),
+                skip_invalid_addresses=True,
             ),
-            skip_invalid_addresses=True,
-        ),
+        )
     )
-    # maybe_output_paths = set(dockerfile_info.copy_source_paths) | set(dockerfile_info.copy_build_args.to_dict().values())
     maybe_output_paths = set(dockerfile_info.copy_source_paths) | set(
         dockerfile_info.copy_build_args.to_dict().values()
     )
@@ -103,9 +106,26 @@ async def infer_docker_dependencies(
                 break
 
         # If the target has the same address as an ARG that will eventually be copied
-        for input_address in putative_copy_addresses:
-            if target.address == input_address:
-                inferred_addresses.append(target.address)
+        if target.address in putative_copy_target_addresses:
+            inferred_addresses.append(target.address)
+
+    # add addresses from source paths if they are files directly
+    addresses_from_source_paths = await Get(
+        Targets,
+        RawSpecs(
+            description_of_origin="halp",
+            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+            file_literals=tuple(
+                FileLiteralSpec(e)
+                for e in [
+                    *dockerfile_info.copy_source_paths,
+                    *dockerfile_info.copy_build_args.to_dict().values(),
+                ]
+            ),
+        ),
+    )
+
+    inferred_addresses.extend(e.address for e in addresses_from_source_paths)
 
     return InferredDependencies(Addresses(inferred_addresses))
 
