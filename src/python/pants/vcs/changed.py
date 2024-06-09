@@ -136,12 +136,14 @@ class ChangedOptions:
 
         changes_since = self.since or git_worktree.current_rev_identifier
         return git_worktree.changed_files(
-            from_commit=changes_since, include_untracked=True, relative_to=get_buildroot()
+            from_commit=changes_since,
+            include_untracked=True,
+            relative_to=get_buildroot(),
         )
 
     def diff_hunks(
         self, git_worktree: GitWorktree, paths: Iterable[str]
-    ) -> FrozenDict[str, tuple[Hunk, ...]]:
+    ) -> dict[str, tuple[Hunk, ...]]:
         """Determines the unified diff hunks changed according to SCM/workspace and options.
 
         More info on unified diff: https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
@@ -150,6 +152,7 @@ class ChangedOptions:
         return git_worktree.changed_files_lines(
             paths=paths,
             from_commit=changes_since,
+            include_untracked=True,
             relative_to=get_buildroot(),
         )
 

@@ -444,7 +444,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +two
                 """
             ),
-            FrozenDict({"file.txt": (Hunk(TextBlock(1, 0), TextBlock(2, 1)),)}),
+            {"file.txt": (Hunk(TextBlock(1, 0), TextBlock(2, 1)),)},
         ],
         [
             dedent(
@@ -457,7 +457,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 -two
                 """
             ),
-            FrozenDict({"file.txt": (Hunk(TextBlock(2, 1), TextBlock(1, 0)),)}),
+            {"file.txt": (Hunk(TextBlock(2, 1), TextBlock(1, 0)),)},
         ],
         [
             dedent(
@@ -471,7 +471,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +four
                 """
             ),
-            FrozenDict({"file.txt": (Hunk(TextBlock(2, 1), TextBlock(2, 1)),)}),
+            {"file.txt": (Hunk(TextBlock(2, 1), TextBlock(2, 1)),)},
         ],
         [
             dedent(
@@ -487,7 +487,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +six
                 """
             ),
-            FrozenDict({"file.txt": (Hunk(TextBlock(2, 2), TextBlock(2, 2)),)}),
+            {"file.txt": (Hunk(TextBlock(2, 2), TextBlock(2, 2)),)},
         ],
         [
             dedent(
@@ -508,12 +508,10 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +2
                 """
             ),
-            FrozenDict(
-                {
-                    "one.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),),
-                    "two.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),),
-                }
-            ),
+            {
+                "one.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),),
+                "two.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),),
+            },
         ],
         [
             dedent(
@@ -527,7 +525,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +t st
                 """
             ),
-            FrozenDict({"sp ce.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)}),
+            {"sp ce.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)},
         ],
         [
             dedent(
@@ -541,7 +539,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +test
                 """
             ),
-            FrozenDict({'q"ote.txt': (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)}),
+            {'q"ote.txt': (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)},
         ],
     ],
 )

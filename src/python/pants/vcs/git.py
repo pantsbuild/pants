@@ -23,7 +23,6 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
-from pants.util.frozendict import FrozenDict
 from pants.vcs.hunk import Hunk, TextBlock
 
 logger = logging.getLogger(__name__)
@@ -133,25 +132,43 @@ class GitWorktree(EngineAwareReturnType):
         *,
         from_commit: str | None = None,
         relative_to: PurePath | str | None = None,
-    ) -> FrozenDict[str, tuple[Hunk, ...]]:
+        include_untracked: bool = False,
+    ) -> dict[str, tuple[Hunk, ...]]:
         relative_to = (
             PurePath(relative_to) if relative_to is not None else self.worktree
         )
 
         from_commit_ = from_commit if from_commit is not None else "HEAD"
-        return self._diff_parser.parse_unified_diff(
-            self._git_binary._invoke_unsandboxed(
-                self._create_git_cmdline(
-                    [
-                        "diff",
-                        "--unified=0",
-                        from_commit_,
-                        "--",
-                        *[str(relative_to / path) for path in paths],
-                    ],
-                )
-            )
+        result = self._git_diff(
+            "--unified=0",
+            from_commit_,
+            "--",
+            *[str(relative_to / path) for path in paths],
         )
+
+        if include_untracked:
+            # There is no git diff flag to include untracked files, so we get
+            # the list of untracked files and manually create the diff by
+            # comparing each file to an empty /dev/null.
+            untracked_files = self._git(
+                "ls-files",
+                "--other",
+                "--exclude-standard",
+                "--full-name",
+            ).splitlines()
+            for file in untracked_files:
+                untracked_diff = self._git_diff("--no-index", "/dev/null", file)
+                result.update(untracked_diff)
+
+        return result
+
+    def _git(self, *args: str) -> str:
+        """Run unsandboxed git command."""
+        return self._git_binary._invoke_unsandboxed(self._create_git_cmdline(args))
+
+    def _git_diff(self, *args: str) -> dict[str, tuple[Hunk, ...]]:
+        """Run unsandboxed git diff command and parse the diff."""
+        return self._diff_parser.parse_unified_diff(self._git("diff", *args))
 
     def changes_in(
         self, diffspec: str, relative_to: PurePath | str | None = None
@@ -178,7 +195,7 @@ class ParseError(Exception):
 
 
 class DiffParser:
-    def parse_unified_diff(self, content: str) -> FrozenDict[str, tuple[Hunk, ...]]:
+    def parse_unified_diff(self, content: str) -> dict[str, tuple[Hunk, ...]]:
         buf = StringIO(content)
         current_file = None
         hunks: DefaultDict[str, list[Hunk]] = defaultdict(list)
@@ -203,9 +220,7 @@ class DiffParser:
                 hunks[current_file].append(hunk)
                 continue
 
-        return FrozenDict(
-            (filename, tuple(file_hunks)) for filename, file_hunks in hunks.items()
-        )
+        return {filename: tuple(file_hunks) for filename, file_hunks in hunks.items()}
 
     @cached_property
     def _lines_changed_regex(self) -> re.Pattern:
