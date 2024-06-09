@@ -555,12 +555,12 @@ def test_worktree_invalidation(origin: Path) -> None:
         [
             dedent(
                 """\
-                diff --git a/hey b/hey
+                diff --git a/empty b/empty
                 new file mode 100644
                 index 0000000000..e69de29bb2
                 """
             ),
-            {},
+            {'empty': ()},
         ],
     ],
 )

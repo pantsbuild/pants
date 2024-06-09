@@ -186,6 +186,8 @@ class DiffParser:
             line = line.strip()
 
             if match := self._filename_regex.match(line):
+                if current_file is not None:
+                    hunks.setdefault(current_file, [])
                 current_file = self._parse_filename(match)
                 if current_file is None:
                     raise ValueError(f"failed to parse filename from line: `{line}`")
@@ -203,6 +205,8 @@ class DiffParser:
                 hunks[current_file].append(hunk)
                 continue
 
+        if current_file is not None:
+            hunks.setdefault(current_file, [])
         return {filename: tuple(file_hunks) for filename, file_hunks in hunks.items()}
 
     @cached_property
