@@ -226,7 +226,7 @@ bytes = "1.5"
 chrono = "0.4.22"
 clap = "3"
 colored = "2.0.0"
-console = "0.15.7"
+console = "0.15.8"
 criterion = "0.4"
 crossbeam-channel = "0.5"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
@@ -255,7 +255,7 @@ hyper = "0.14"
 hyper-rustls = "0.24"
 ignore = { git = "https://github.com/pantsbuild/ripgrep.git", rev = "0f7e0fdd00ae528745a7fea24a320cae98235341" }
 indexmap = "1.9"
-indicatif = "0.17"
+indicatif = "0.17.8"
 internment = "0.6"
 itertools = "0.10"
 lazy_static = "1"
@@ -289,8 +289,8 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messa
 prost = "0.12"
 prost-build = "0.12"
 prost-types = "0.12"
-pyo3 = "0.20"
-pyo3-build-config = "0.20"
+pyo3 = { version = "0.21", features = ["gil-refs"] }
+pyo3-build-config = "0.21"
 rand = "0.8"
 regex = "1"
 rlimit = "0.8"
@@ -335,13 +335,6 @@ whoami = "1.4.1"
 tree-sitter = "0.20.10"
 tree-sitter-javascript = "0.20.1"
 tree-sitter-python = "0.20.4"
-
-[patch.crates-io]
-# https://github.com/console-rs/console/pull/186
-console = { version = "0.15.7", git = "https://github.com/tgolsson/console.git", rev = "5483880905f384679d322e83c37180f122951995" }
-# https://github.com/console-rs/indicatif/pull/608
-indicatif = { version = "0.17.7", git = "https://github.com/tgolsson/indicatif.git", rev = "31890f0ac55f9727d152ad314a78757ccc0142b6" }
-
 
 # Default lints adopted by most crates in this workspace.
 

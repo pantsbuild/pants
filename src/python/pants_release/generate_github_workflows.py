@@ -37,11 +37,12 @@ class Platform(Enum):
     LINUX_X86_64 = "Linux-x86_64"
     LINUX_ARM64 = "Linux-ARM64"
     MACOS10_15_X86_64 = "macOS10-15-x86_64"
-    MACOS11_X86_64 = "macOS11-x86_64"
+    # the oldest version of macOS supported by GitHub self-hosted runners
+    MACOS12_X86_64 = "macOS12-x86_64"
     MACOS11_ARM64 = "macOS11-ARM64"
 
 
-GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS11_X86_64}
+GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS12_X86_64}
 SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
@@ -400,8 +401,8 @@ class Helper:
         # any platform-specific labels, so we don't run on future GH-hosted
         # platforms without realizing it.
         ret = ["self-hosted"] if self.platform in SELF_HOSTED else []
-        if self.platform == Platform.MACOS11_X86_64:
-            ret += ["macos-11"]
+        if self.platform == Platform.MACOS12_X86_64:
+            ret += ["macos-12"]
         elif self.platform == Platform.MACOS11_ARM64:
             ret += ["macOS-11-ARM64"]
         elif self.platform == Platform.MACOS10_15_X86_64:
@@ -416,7 +417,7 @@ class Helper:
 
     def platform_env(self):
         ret = {}
-        if self.platform in {Platform.MACOS10_15_X86_64, Platform.MACOS11_X86_64}:
+        if self.platform in {Platform.MACOS10_15_X86_64, Platform.MACOS12_X86_64}:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
             # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
             ret["ARCHFLAGS"] = "-arch x86_64"
@@ -809,8 +810,8 @@ def linux_arm64_test_jobs() -> Jobs:
     return jobs
 
 
-def macos11_x86_64_test_jobs() -> Jobs:
-    helper = Helper(Platform.MACOS11_X86_64)
+def macos12_x86_64_test_jobs() -> Jobs:
+    helper = Helper(Platform.MACOS12_X86_64)
     jobs = {
         helper.job_name("bootstrap_pants"): bootstrap_jobs(
             helper,
@@ -1003,7 +1004,7 @@ def test_workflow_jobs() -> Jobs:
     }
     jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
-    jobs.update(**macos11_x86_64_test_jobs())
+    jobs.update(**macos12_x86_64_test_jobs())
     jobs.update(**build_wheels_jobs())
     jobs.update(
         {

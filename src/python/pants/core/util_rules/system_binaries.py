@@ -642,7 +642,15 @@ async def find_binary(
         bash = await Get(BashBinary)
         shebang = f"#!{bash.path}"
 
-    script_path = "./find_binary.sh"
+    # HACK: For workspace environments, the `find_binary.sh` will be mounted in the "chroot" directory
+    # which is not the current directory (since the process will execute in the workspace). Thus,
+    # adjust the path used as argv[0] to find the script.
+    script_name = "find_binary.sh"
+    sandbox_base_path = env_target.sandbox_base_path()
+    script_exec_path = (
+        f"./{script_name}" if not sandbox_base_path else f"{sandbox_base_path}/{script_name}"
+    )
+
     script_header = dedent(
         f"""\
         {shebang}
@@ -674,7 +682,7 @@ async def find_binary(
     script_content = script_header + script_body
     script_digest = await Get(
         Digest,
-        CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
+        CreateDigest([FileContent(script_name, script_content.encode(), is_executable=True)]),
     )
 
     # Some subtle notes about executing this script:
@@ -688,7 +696,7 @@ async def find_binary(
             description=f"Searching for `{request.binary_name}` on PATH={search_path}",
             level=LogLevel.DEBUG,
             input_digest=script_digest,
-            argv=[script_path, request.binary_name],
+            argv=[script_exec_path, request.binary_name],
             env={"PATH": search_path},
             cache_scope=env_target.executable_search_path_cache_scope(),
         ),

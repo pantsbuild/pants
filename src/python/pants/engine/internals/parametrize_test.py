@@ -128,6 +128,59 @@ def test_expand(
 
 
 @pytest.mark.parametrize(
+    "expected,parameters,fields",
+    [
+        # Single parameters remove any existing parameters from the address.
+        ([("a:a", {"f": "1"})], {"f": "0"}, {"f": "1"}),
+        # But keeps other parameters.
+        ([("a@g=0", {"f": "1"})], {"g": "0"}, {"f": "1"}),
+        # Test both case at the same time.
+        ([("a@g=0", {"f": "1"})], {"f": "0", "g": "0"}, {"f": "1"}),
+        # Group parameters remove existing covered parameters.
+        (
+            [
+                ("a@h=0,parametrize=A", {"f": "1", "g": "2", "i": "1"}),
+                ("a@f=0,h=0,parametrize=B", {"g": "1", "i": "1"}),
+            ],
+            {"f": "0", "g": "0", "h": "0", "i": "0"},
+            dict(
+                g="1",
+                i="1",
+                **Parametrize("A", f="1", g="2"),  # type: ignore[arg-type]
+                **Parametrize("B"),
+            ),
+        ),
+        # Re-Parametrize existing parameters
+        (
+            [
+                ("a@f=1,g=1,h=0", {"f": "1", "g": "1"}),
+                ("a@f=1,g=2,h=0", {"f": "1", "g": "2"}),
+            ],
+            {"f": "0", "g": "0", "h": "0"},
+            {
+                "f": Parametrize("1"),
+                "g": Parametrize("1", "2"),
+            },
+        ),
+    ],
+)
+def test_expand_existing_parameters(
+    expected: list[tuple[str, dict[str, Any]]],
+    parameters: dict[str, Any],
+    fields: dict[str, Any | Parametrize],
+) -> None:
+    assert sorted(expected) == sorted(
+        (
+            (address.spec, result_fields)
+            for address, result_fields in Parametrize.expand(
+                Address("a", parameters=parameters), fields
+            )
+        ),
+        key=lambda value: value[0],
+    )
+
+
+@pytest.mark.parametrize(
     "fields, expected_error",
     [
         (
