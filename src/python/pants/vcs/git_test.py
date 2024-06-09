@@ -165,7 +165,7 @@ def test_integration(worktree: Path, readme_file: Path, git: MutatingGitWorktree
 
 
 def test_integration_lines(worktree: Path, readme_file: Path, git: MutatingGitWorktree) -> None:
-    files = ["README", "INSTALL"]
+    files = ["README", "INSTALL", "WITH SPACE"]
     assert FrozenDict() == git.changed_files_lines(files)
     assert {
         "README": (
@@ -183,7 +183,6 @@ def test_integration_lines(worktree: Path, readme_file: Path, git: MutatingGitWo
 
     (worktree / "INSTALL").write_text("make install")
 
-    # Untracked files are ignored
     assert FrozenDict(
         {
             "README": (
@@ -194,6 +193,18 @@ def test_integration_lines(worktree: Path, readme_file: Path, git: MutatingGitWo
             )
         }
     ) == git.changed_files_lines(files)
+
+    assert {
+        "README": (Hunk(left=TextBlock(start=1, count=1), right=TextBlock(start=1, count=1)),),
+        "INSTALL": (Hunk(left=TextBlock(start=0, count=0), right=TextBlock(start=1, count=1)),),
+    } == git.changed_files_lines(files, include_untracked=True)
+
+    (worktree / "WITH SPACE").write_text("space in path")
+    assert {
+        "README": (Hunk(left=TextBlock(start=1, count=1), right=TextBlock(start=1, count=1)),),
+        "INSTALL": (Hunk(left=TextBlock(start=0, count=0), right=TextBlock(start=1, count=1)),),
+        "WITH SPACE": (Hunk(left=TextBlock(start=0, count=0), right=TextBlock(start=1, count=1)),),
+    } == git.changed_files_lines(files, include_untracked=True)
 
     # Confirm that files outside of a given relative_to path are ignored
     assert FrozenDict() == git.changed_files_lines(files, relative_to="non-existent")

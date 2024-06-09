@@ -15,11 +15,7 @@ from os import PathLike
 from pathlib import Path, PurePath
 from typing import Any, DefaultDict, Iterable
 
-from pants.core.util_rules.system_binaries import (
-    GitBinary,
-    GitBinaryException,
-    MaybeGitBinary,
-)
+from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
@@ -67,9 +63,7 @@ class GitWorktree(EngineAwareReturnType):
 
     @property
     def commit_id(self):
-        return self._git_binary._invoke_unsandboxed(
-            self._create_git_cmdline(["rev-parse", "HEAD"])
-        )
+        return self._git_binary._invoke_unsandboxed(self._create_git_cmdline(["rev-parse", "HEAD"]))
 
     @property
     def branch_name(self) -> str | None:
@@ -78,9 +72,7 @@ class GitWorktree(EngineAwareReturnType):
         )
         return None if branch == "HEAD" else branch
 
-    def _fix_git_relative_path(
-        self, worktree_path: str, relative_to: PurePath | str
-    ) -> str:
+    def _fix_git_relative_path(self, worktree_path: str, relative_to: PurePath | str) -> str:
         return str((self.worktree / worktree_path).relative_to(relative_to))
 
     def changed_files(
@@ -89,9 +81,7 @@ class GitWorktree(EngineAwareReturnType):
         include_untracked: bool = False,
         relative_to: PurePath | str | None = None,
     ) -> set[str]:
-        relative_to = (
-            PurePath(relative_to) if relative_to is not None else self.worktree
-        )
+        relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
         rel_suffix = ["--", str(relative_to)]
         uncommitted_changes = self._git_binary._invoke_unsandboxed(
             self._create_git_cmdline(
@@ -134,9 +124,7 @@ class GitWorktree(EngineAwareReturnType):
         relative_to: PurePath | str | None = None,
         include_untracked: bool = False,
     ) -> dict[str, tuple[Hunk, ...]]:
-        relative_to = (
-            PurePath(relative_to) if relative_to is not None else self.worktree
-        )
+        relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
 
         from_commit_ = from_commit if from_commit is not None else "HEAD"
         result = self._git_diff(
@@ -157,8 +145,9 @@ class GitWorktree(EngineAwareReturnType):
                 "--full-name",
             ).splitlines()
             for file in untracked_files:
-                untracked_diff = self._git_diff("--no-index", "/dev/null", file)
-                result.update(untracked_diff)
+                untracked_diff = self._git_diff("--no-index", "/dev/null", str(relative_to / file))
+                assert len(untracked_diff) == 1
+                result[file] = next(iter(untracked_diff.values()))
 
         return result
 
@@ -170,16 +159,10 @@ class GitWorktree(EngineAwareReturnType):
         """Run unsandboxed git diff command and parse the diff."""
         return self._diff_parser.parse_unified_diff(self._git("diff", *args))
 
-    def changes_in(
-        self, diffspec: str, relative_to: PurePath | str | None = None
-    ) -> set[str]:
-        relative_to = (
-            PurePath(relative_to) if relative_to is not None else self.worktree
-        )
+    def changes_in(self, diffspec: str, relative_to: PurePath | str | None = None) -> set[str]:
+        relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
         cmd = ["diff-tree", "--no-commit-id", "--name-only", "-r", diffspec]
-        files = self._git_binary._invoke_unsandboxed(
-            self._create_git_cmdline(cmd)
-        ).splitlines()
+        files = self._git_binary._invoke_unsandboxed(self._create_git_cmdline(cmd)).splitlines()
         return {self._fix_git_relative_path(f.strip(), relative_to) for f in files}
 
     def _create_git_cmdline(self, args: Iterable[str]) -> list[str]:
@@ -247,9 +230,7 @@ class DiffParser:
 
     def _parse_filename(self, match: re.Match) -> str | None:
         unquoted = str(g) if (g := match.groups()[0]) is not None else None
-        quoted = (
-            str(g).replace(r"\"", '"') if (g := match.groups()[1]) is not None else None
-        )
+        quoted = str(g).replace(r"\"", '"') if (g := match.groups()[1]) is not None else None
         return unquoted or quoted
 
 

@@ -7,6 +7,7 @@ import dataclasses
 import hashlib
 import logging
 import os
+import shlex
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
@@ -540,7 +541,7 @@ class GitBinary(BinaryPath):
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except OSError as e:
             # Binary DNE or is not executable
-            cmd_str = " ".join(cmd)
+            cmd_str = shlex.join(cmd)
             raise GitBinaryException(f"Failed to execute command {cmd_str}: {e!r}")
         out, err = process.communicate()
 
@@ -548,11 +549,10 @@ class GitBinary(BinaryPath):
 
         return out.decode().strip()
 
-    def _check_result(
-        self, cmd: Iterable[str], result: int, failure_msg: str | None = None
-    ) -> None:
-        if result != 0:
-            cmd_str = " ".join(cmd)
+    def _check_result(self, cmd: list[str], result: int, failure_msg: str | None = None) -> None:
+        # git diff --exit-code exits with 1 if there were differences.
+        if result != 0 and (result != 1 or "diff" not in cmd):
+            cmd_str = shlex.join(cmd)
             raise GitBinaryException(failure_msg or f"{cmd_str} failed with exit code {result}")
 
     def _log_call(self, cmd: Iterable[str]) -> None:

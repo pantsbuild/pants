@@ -9,7 +9,8 @@ from pants.engine.collection import Collection
 class TextBlock:
     """Block of lines in a file.
 
-    Lines are 1 indexed, `start` is inclusive.
+    Lines are 1 indexed, `start` is inclusive. If a file doesn't exist then
+    start=0 and count=0.
 
     TextBlock is used as a part of unified diff hunk, thus it can be empty,
     i.e. count can be equal to 0.
