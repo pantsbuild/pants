@@ -88,7 +88,7 @@ def calculate_specs(
             path,
             # Hunk stores information about the old block and the new block.
             # Here we only care about the final state, so we take `hunk.right`.
-            TextBlocks(hunk.right for hunk in hunks),
+            TextBlocks(hunk.right for hunk in hunks if hunk.right is not None),
         )
         for path, hunks in changed_options.diff_hunks(
             maybe_git_worktree.git_worktree,
