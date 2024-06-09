@@ -150,7 +150,7 @@ class ChangedOptions:
         """
         changes_since = self.since or git_worktree.current_rev_identifier
         return git_worktree.changed_files_lines(
-            paths=paths,
+            paths,
             from_commit=changes_since,
             include_untracked=True,
             relative_to=get_buildroot(),

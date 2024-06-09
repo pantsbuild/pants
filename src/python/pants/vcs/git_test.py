@@ -6,9 +6,10 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from functools import partial
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Iterator
+from typing import Any, Callable, Iterator
 
 import pytest
 
@@ -17,7 +18,6 @@ from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
 from pants.util.dirutil import touch
-from pants.util.frozendict import FrozenDict
 from pants.vcs.git import (
     DiffParser,
     GitWorktree,
@@ -143,71 +143,88 @@ def git(
         yield MutatingGitWorktree(binary=GitBinary(path="git"), gitdir=gitdir, worktree=worktree)
 
 
-def test_integration(worktree: Path, readme_file: Path, git: MutatingGitWorktree) -> None:
-    assert set() == git.changed_files()
-    assert {"README"} == git.changed_files(from_commit="HEAD^")
-
-    assert "main" == git.branch_name
-
-    with readme_file.open(mode="a") as fp:
-        fp.write("More data.")
-
-    (worktree / "INSTALL").write_text("make install")
-
-    assert {"README"} == git.changed_files()
-    assert {"README", "INSTALL"} == git.changed_files(include_untracked=True)
-
-    (worktree / "WITH SPACE").write_text("space in path")
-    assert {"README", "INSTALL", "WITH SPACE"} == git.changed_files(include_untracked=True)
-
-    # Confirm that files outside of a given relative_to path are ignored
-    assert set() == git.changed_files(relative_to="non-existent")
-
-
-def test_integration_lines(worktree: Path, readme_file: Path, git: MutatingGitWorktree) -> None:
-    files = ["README", "INSTALL", "WITH SPACE"]
-    assert FrozenDict() == git.changed_files_lines(files)
-    assert {
-        "README": (
-            Hunk(
-                left=TextBlock(start=0, count=0),
-                right=TextBlock(start=1, count=1),
+# This way we can make sure that `git.changed_files` and
+# `git.changed_files_lines` behave identically.
+parametrize_changed_files = pytest.mark.parametrize(
+    "name,changed,expected",
+    [
+        (
+            "changed_files",
+            lambda git: git.changed_files,
+            lambda files: set(files.keys()),
+        ),
+        (
+            "changed_files_lines",
+            lambda git: partial(
+                git.changed_files_lines, ["README", "INSTALL", "WITH SPACE", "untracked_file"]
             ),
-        )
-    } == git.changed_files_lines(files, from_commit="HEAD^")
+            lambda files: files,
+        ),
+    ],
+)
 
-    assert "main" == git.branch_name
 
-    with readme_file.open(mode="a") as fp:
-        fp.write("More data.")
-
-    (worktree / "INSTALL").write_text("make install")
-
-    assert FrozenDict(
+@parametrize_changed_files
+def test_integration(
+    worktree: Path,
+    readme_file: Path,
+    git: MutatingGitWorktree,
+    name: str,
+    changed: Callable[[Any], Any],
+    expected: Callable[[Any], Any],
+) -> None:
+    assert expected({}) == changed(git)()
+    assert expected(
         {
             "README": (
                 Hunk(
-                    left=TextBlock(start=1, count=1),
+                    left=TextBlock(start=0, count=0),
                     right=TextBlock(start=1, count=1),
                 ),
             )
         }
-    ) == git.changed_files_lines(files)
+    ) == changed(git)(from_commit="HEAD^")
 
-    assert {
-        "README": (Hunk(left=TextBlock(start=1, count=1), right=TextBlock(start=1, count=1)),),
-        "INSTALL": (Hunk(left=TextBlock(start=0, count=0), right=TextBlock(start=1, count=1)),),
-    } == git.changed_files_lines(files, include_untracked=True)
+    assert "main" == git.branch_name
+
+    with readme_file.open(mode="a") as fp:
+        fp.write("More data.")
+
+    (worktree / "INSTALL").write_text("make install")
+
+    assert (
+        expected(
+            {
+                "README": (
+                    Hunk(
+                        left=TextBlock(start=1, count=1),
+                        right=TextBlock(start=1, count=1),
+                    ),
+                )
+            }
+        )
+        == changed(git)()
+    )
+    assert expected(
+        {
+            "README": (Hunk(left=TextBlock(start=1, count=1), right=TextBlock(start=1, count=1)),),
+            "INSTALL": (Hunk(left=TextBlock(start=0, count=0), right=TextBlock(start=1, count=1)),),
+        }
+    ) == changed(git)(include_untracked=True)
 
     (worktree / "WITH SPACE").write_text("space in path")
-    assert {
-        "README": (Hunk(left=TextBlock(start=1, count=1), right=TextBlock(start=1, count=1)),),
-        "INSTALL": (Hunk(left=TextBlock(start=0, count=0), right=TextBlock(start=1, count=1)),),
-        "WITH SPACE": (Hunk(left=TextBlock(start=0, count=0), right=TextBlock(start=1, count=1)),),
-    } == git.changed_files_lines(files, include_untracked=True)
+    assert expected(
+        {
+            "README": (Hunk(left=TextBlock(start=1, count=1), right=TextBlock(start=1, count=1)),),
+            "INSTALL": (Hunk(left=TextBlock(start=0, count=0), right=TextBlock(start=1, count=1)),),
+            "WITH SPACE": (
+                Hunk(left=TextBlock(start=0, count=0), right=TextBlock(start=1, count=1)),
+            ),
+        }
+    ) == changed(git)(include_untracked=True)
 
     # Confirm that files outside of a given relative_to path are ignored
-    assert FrozenDict() == git.changed_files_lines(files, relative_to="non-existent")
+    assert expected({}) == changed(git)(relative_to="non-existent")
 
 
 def test_detect_worktree(tmp_path: Path, origin: PurePath, git: MutatingGitWorktree) -> None:
@@ -316,19 +333,33 @@ def test_changes_in(gitdir: PurePath, worktree: Path, git: MutatingGitWorktree) 
         assert {"foo", "bar", "baz"} == git.changes_in(f"{c1}..{c4}")
 
 
-def test_commit_with_new_untracked_file_adds_file(worktree: Path, git: MutatingGitWorktree) -> None:
+@parametrize_changed_files
+def test_commit_with_new_untracked_file_adds_file(
+    worktree: Path, git: MutatingGitWorktree, name: str, changed: Any, expected: Any
+) -> None:
     new_file = worktree / "untracked_file"
     new_file.touch()
 
-    assert {"untracked_file"} == git.changed_files(include_untracked=True)
+    assert expected(
+        {
+            "untracked_file": (Hunk(left=None, right=TextBlock(start=0, count=0)),),
+        }
+    ) == changed(git)(include_untracked=True)
 
     git.add(new_file)
 
-    assert {"untracked_file"} == git.changed_files()
+    assert (
+        expected(
+            {
+                "untracked_file": (Hunk(left=None, right=TextBlock(start=0, count=0)),),
+            }
+        )
+        == changed(git)()
+    )
 
     git.commit("API Changes.")
 
-    assert set() == git.changed_files(include_untracked=True)
+    assert expected({}) == changed(git)(include_untracked=True)
 
 
 def test_bad_ref_stderr_issues_13396(git: MutatingGitWorktree) -> None:
@@ -560,7 +591,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 index 0000000000..e69de29bb2
                 """
             ),
-            {'empty': ()},
+            {"empty": (Hunk(None, TextBlock(0, 0)),)},
         ],
     ],
 )

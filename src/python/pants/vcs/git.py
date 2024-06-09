@@ -119,6 +119,7 @@ class GitWorktree(EngineAwareReturnType):
     def changed_files_lines(
         self,
         paths: Iterable[str],
+        /,
         *,
         from_commit: str | None = None,
         relative_to: PurePath | str | None = None,
@@ -126,13 +127,21 @@ class GitWorktree(EngineAwareReturnType):
     ) -> dict[str, tuple[Hunk, ...]]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
 
-        from_commit_ = from_commit if from_commit is not None else "HEAD"
         result = self._git_diff(
             "--unified=0",
-            from_commit_,
+            "HEAD",
             "--",
             *[str(relative_to / path) for path in paths],
         )
+
+        if from_commit:
+            diff = self._git_diff(
+                "--unified=0",
+                from_commit + "...HEAD",
+                "--",
+                *[str(relative_to / path) for path in paths],
+            )
+            result.update(diff)
 
         if include_untracked:
             # There is no git diff flag to include untracked files, so we get
@@ -144,7 +153,7 @@ class GitWorktree(EngineAwareReturnType):
                 "--exclude-standard",
                 "--full-name",
             ).splitlines()
-            for file in untracked_files:
+            for file in set(untracked_files).intersection(paths):
                 untracked_diff = self._git_diff("--no-index", "/dev/null", str(relative_to / file))
                 assert len(untracked_diff) == 1
                 result[file] = next(iter(untracked_diff.values()))
@@ -187,7 +196,9 @@ class DiffParser:
 
             if match := self._filename_regex.match(line):
                 if current_file is not None:
-                    hunks.setdefault(current_file, [])
+                    hunks.setdefault(
+                        current_file, [Hunk(left=None, right=TextBlock(start=0, count=0))]
+                    )
                 current_file = self._parse_filename(match)
                 if current_file is None:
                     raise ValueError(f"failed to parse filename from line: `{line}`")
@@ -206,7 +217,7 @@ class DiffParser:
                 continue
 
         if current_file is not None:
-            hunks.setdefault(current_file, [])
+            hunks.setdefault(current_file, [Hunk(left=None, right=TextBlock(start=0, count=0))])
         return {filename: tuple(file_hunks) for filename, file_hunks in hunks.items()}
 
     @cached_property
@@ -235,8 +246,8 @@ class DiffParser:
         return re.compile(rf"^diff --git {a_file} {b_file}$")
 
     def _parse_filename(self, match: re.Match) -> str | None:
-        unquoted = str(g) if (g := match.group('unquoted')) is not None else None
-        quoted = str(g).replace(r"\"", '"') if (g := match.group('quoted')) is not None else None
+        unquoted = str(g) if (g := match.group("unquoted")) is not None else None
+        quoted = str(g).replace(r"\"", '"') if (g := match.group("quoted")) is not None else None
         return unquoted or quoted
 
 

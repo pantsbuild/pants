@@ -1,6 +1,7 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
+from typing import Optional
 
 from pants.engine.collection import Collection
 
@@ -9,11 +10,11 @@ from pants.engine.collection import Collection
 class TextBlock:
     """Block of lines in a file.
 
-    Lines are 1 indexed, `start` is inclusive. If a file doesn't exist then
-    start=0 and count=0.
+    Lines are 1 indexed, `start` is inclusive.
 
     TextBlock is used as a part of unified diff hunk, thus it can be empty,
-    i.e. count can be equal to 0.
+    i.e. count can be equal to 0. In the special case when the file is empty
+    start = 0 and count = 0.
     """
 
     start: int
@@ -43,7 +44,10 @@ class Hunk:
     """Hunk of difference in unified format.
 
     https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
+
+    In the special case when file is created left = None.
+    In the special case when file is deleted right = None.
     """
 
-    left: TextBlock
-    right: TextBlock
+    left: Optional[TextBlock]
+    right: Optional[TextBlock]
