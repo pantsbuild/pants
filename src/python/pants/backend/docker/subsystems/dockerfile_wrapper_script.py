@@ -231,6 +231,10 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
             for f in copied_files:
                 argref = self._extract_ref_from_arg(f)
                 if argref:
+                    if argref not in arg_references:
+                        # if a COPYed file is referenced in an arg but the arg has no value,
+                        # we can't resolve it in any way, so we omit it
+                        continue
                     constructed_arg = f"{argref}={arg_references[argref]}"
                     copy_in_arg.append(constructed_arg)
                 else:

@@ -61,11 +61,14 @@ def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunne
         ARG BASE_IMAGE=:base
         ARG PEX_BIN=:hello
         ARG PEX_BIN_DOTTED_PATH=dotted.path.as.arg/dpaa.pex
+        ARG OTHER_FILE=other/file
+        ARG NO_DEFAULT
         FROM $BASE_IMAGE
         COPY some.target/binary.pex some.target/tool.pex /bin
         COPY --from=scratch this.is/ignored.pex /opt
         COPY binary another/cli.pex tool /bin
-        COPY ${PEX_BIN} ${PEX_BIN_DOTTED_PATH} :technically_a_file /app/hello.pex
+        COPY $NO_DEFAULT /app/not_references
+        COPY $OTHER_FILE ${PEX_BIN} ${PEX_BIN_DOTTED_PATH} :technically_a_file /app/hello.pex
         """
     )
 
@@ -76,10 +79,17 @@ def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunne
     addr = Address("test")
     info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
     assert info.from_image_build_args.to_dict() == {"BASE_IMAGE": ":base"}
-    assert info.copy_build_args.to_dict() == {
+
+    # copy args
+    docker_copy_build_args = info.copy_build_args.to_dict()
+    assert docker_copy_build_args == {
         "PEX_BIN": ":hello",
         "PEX_BIN_DOTTED_PATH": "dotted.path.as.arg/dpaa.pex",
+        'OTHER_FILE': 'other/file',
     }
+    assert "NO_DEFAULT" not in docker_copy_build_args, "ARG with no value should not be included as it cannot be a reference to a target"
+    assert docker_copy_build_args.get("OTHER_FILE") == "other/file", "A file reference should still be copied even if it isn't an output path or an obvious target"
+
     assert info.copy_source_paths == (
         "some.target/binary.pex",
         "some.target/tool.pex",
