@@ -21,7 +21,8 @@ class DockerBuildArgs(KeyValueSequenceUtil):
 
         :param only_with_value: whether to return only those key-value pairs which have a truthy value
         """
-        values = {k: overrides.to_dict().get(k, v) for k, v in self.to_dict().items()}
+        overrides_dict = overrides.to_dict()
+        values = {k: overrides_dict.get(k, v) for k, v in self.to_dict().items()}
         if only_with_value:
             return {k: v for k, v in values.items() if v}
         else:
