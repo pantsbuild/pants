@@ -86,8 +86,6 @@ def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunne
         "binary",
         "another/cli.pex",
         "tool",
-        "${PEX_BIN}",  # TODO: Should this be here?
-        "${PEX_BIN_DOTTED_PATH}",  # TODO: Should this be here?
         ":technically_a_file",  # we don't resolve inline targets, since we'd need to rewrite the Dockerfile
     )
 

@@ -77,6 +77,11 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
     from dockerfile import Command, parse_file, parse_string  # pants: no-infer-dep
 
     @dataclass(frozen=True)
+    class CopyReferences:
+        in_arg: tuple[str, ...]
+        not_in_arg: tuple[str, ...]
+
+    @dataclass(frozen=True)
     class ParsedDockerfile:
         filename: str
         commands: tuple[Command, ...]
@@ -104,15 +109,20 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
                 if command.cmd.upper() == command_name:
                     yield command
 
-        def args_with_addresses(self):
+        def arg_references(self):
+            """Return ARGs which could have valid references."""
             build_args = {
                 key: value.strip("\"'")
                 for key, has_value, value in [
                     build_arg.partition("=") for build_arg in self.build_args()
                 ]
-                if has_value and valid_address(value)
+                if has_value
             }
             return build_args
+
+        def args_with_addresses(self):
+            """All ARGs which have an Address as a value."""
+            return {k: v for k, v in self.arg_references().items() if valid_address(v)}
 
         def from_image_build_args(self) -> tuple[str, ...]:
             build_args = self.args_with_addresses()
@@ -201,10 +211,11 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
             """Return all defined build args, including any default values."""
             return tuple(cmd.original[4:].strip() for cmd in self.get_all("ARG"))
 
-        def copy_source_paths(self) -> tuple[str, ...]:
-            """Return all files referenced from the build context using COPY instruction."""
+        def get_copy_references(self) -> CopyReferences:
+            """Get all references (files and addresses) of COPY instructions, partitioned by whether
+            the appear in ARGs or not."""
             # Exclude COPY --from instructions, as they don't refer to files from the build context.
-            return tuple(
+            copied_files = tuple(
                 chain(
                     *(
                         cmd.value[:-1]
@@ -213,21 +224,31 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
                     )
                 )
             )
+            arg_references = self.arg_references()
 
-        def copy_build_args(self) -> tuple[str]:
-            build_args = self.args_with_addresses()
-
-            copied_files = self.copy_source_paths()
-
-            out = []
+            copy_in_arg = []
+            copy_not_in_arg = []
             for f in copied_files:
                 argref = self._extract_ref_from_arg(f)
                 if argref:
-                    if argref in build_args:
-                        a = f"{argref}={build_args[argref]}"
-                        out.append(a)
+                    constructed_arg = f"{argref}={arg_references[argref]}"
+                    copy_in_arg.append(constructed_arg)
+                else:
+                    copy_not_in_arg.append(f)
 
-            return tuple(out)
+            return CopyReferences(tuple(copy_in_arg), tuple(copy_not_in_arg))
+
+        def copy_source_paths(self) -> tuple[str, ...]:
+            """All files referenced from the build context using COPY instruction.
+
+            Does not include ones from ARGs
+            """
+            return self.get_copy_references().not_in_arg
+
+        def copy_build_args(self) -> tuple[str, ...]:
+            """All files and targets referenced from the build context in ARGs which are used by a
+            COPY instruction."""
+            return self.get_copy_references().in_arg
 
     for parsed in map(ParsedDockerfile.from_file, dockerfile_names):
         yield parsed.get_info()
