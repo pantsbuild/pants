@@ -12,7 +12,7 @@ import tokenize
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path, PurePath
-from typing import Callable, Literal, TypedDict
+from typing import Callable, Literal, TypedDict, cast
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -611,12 +611,19 @@ class CallByNameVisitor(ast.NodeVisitor):
         if not self._should_visit_node(node.decorator_list):
             return
 
-        for child in node.body:
-            if isinstance(child, ast.If):
-                for if_child in child.body:
-                    self._maybe_add_replacements(node.name, if_child)
-            else:
-                self._maybe_add_replacements(node.name, child)
+        self._recurse_body_statements(node.name, node)
+
+    def _recurse_body_statements(self, root: str, node: ast.stmt):
+        """Recursively walk the body of a node, including properties of compound statements looking
+        for Get() calls to replace.
+
+        https://docs.python.org/3/reference/compound_stmts.html
+        """
+        for prop in ["body", "handlers", "orelse", "finalbody"]:
+            for child in getattr(node, prop, []):
+                self._recurse_body_statements(root, cast(ast.stmt, child))
+
+        self._maybe_add_replacements(root, node)
 
     def _maybe_add_replacements(self, calling_func: str, statement: ast.stmt):
         if call := self._maybe_replaceable_call(statement):
