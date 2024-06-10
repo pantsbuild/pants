@@ -680,10 +680,10 @@ class HelpInfoExtracter:
 
     @staticmethod
     def get_provider(providers: tuple[str, ...] | None, hint: str | None = None) -> str:
-        """
-        Get the best match for the provider.
-        
-        To take advantage of provider names being modules, `hint` should be something like the a subsystem's `__module__` or a rule's `canonical_name`
+        """Get the best match for the provider.
+
+        To take advantage of provider names being modules, `hint` should be something like the a
+        subsystem's `__module__` or a rule's `canonical_name`.
         """
         if not providers:
             return ""
