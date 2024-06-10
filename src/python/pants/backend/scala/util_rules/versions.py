@@ -23,7 +23,6 @@ class InvalidScalaVersion(ValueError):
 
 
 class ScalaCrossVersionMode(Enum):
-    PARTIAL = "partial"
     BINARY = "binary"
     FULL = "full"
 
