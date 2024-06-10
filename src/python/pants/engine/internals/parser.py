@@ -79,35 +79,35 @@ class BuildFileSymbolInfo:
     name: str
     value: Any
     help: str | None = field(default=None, compare=False)
-
+    signature: str | None = field(default=None, compare=False, init=False)
     type_hints: InitVar[Any] = None
 
     def __post_init__(self, type_hints: Any) -> None:
-        if self.help is not None:
-            return
+        annotated_type: type = type(self.value)
+        help: str | None = self.help
+        signature: str | None = None
 
-        if hasattr(self.value, "__name__"):
-            help = inspect.getdoc(self.value)
-
-        elif type_hints is not None:
+        if type_hints is not None:
             if typing.get_origin(type_hints) is Annotated:
-                typ, doc = typing.get_args(type_hints)
-                help = f"[type: {typ.__name__}] {doc}"
+                annotated_type, help = typing.get_args(type_hints)
             else:
-                help = str(type_hints)
-        else:
-            help = None
-        object.__setattr__(self, "help", help)
+                annotated_type = type_hints
 
-    @property
-    def signature(self) -> str | None:
-        if not callable(self.value):
-            return None
-        else:
+        if help is None:
+            if hasattr(self.value, "__name__"):
+                help = inspect.getdoc(self.value)
+
+        if self.help is None:
+            object.__setattr__(self, "help", softwrap(help))
+
+        if callable(self.value):
             try:
-                return str(inspect.signature(self.value))
+                signature = str(inspect.signature(self.value))
             except ValueError:
-                return None
+                signature = None
+        else:
+            signature = f": {annotated_type.__name__}"
+        object.__setattr__(self, "signature", signature)
 
 
 class ParseError(Exception):

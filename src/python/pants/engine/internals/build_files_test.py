@@ -333,26 +333,32 @@ def test_prelude_docstring_on_function() -> None:
 
 
 def test_prelude_docstring_on_constant() -> None:
-    macro_docstring = "This is the doc-string for `MACRO_CONST`."
+    macro_docstring = """This is the doc-string for `MACRO_CONST`.
+
+    Use weird indentations.
+
+    On purpose.
+    """
     prelude_content = dedent(
         f"""
-        MACRO_CONST: Annotated[str, '''{macro_docstring}'''] = "value"
+        MACRO_CONST: Annotated[str, {macro_docstring!r}] = "value"
         OTHER_stuff: str = "undocumented"
         _PRIVATE: int = 42
         untyped = True
         """
     )
     result = run_prelude_parsing_rule(prelude_content)
-    info = result.info["MACRO_CONST"]
-    assert (
-        BuildFileSymbolInfo(
-            "MACRO_CONST", result.symbols["MACRO_CONST"], help=f"[type: str] {macro_docstring}"
-        )
-        == info
-    )
-    assert info.signature is None
     assert {"MACRO_CONST", "OTHER_stuff", "untyped"} == set(result.info)
-    assert "<class 'str'>" == result.info["OTHER_stuff"].help
+
+    info = result.info["MACRO_CONST"]
+    assert info.value == "value"
+    assert info.help == softwrap(macro_docstring)
+    assert info.signature == ": str"
+
+    other = result.info["OTHER_stuff"]
+    assert other.value == "undocumented"
+    assert other.help == None
+    assert other.signature == ": str"
 
 
 def test_prelude_reference_env_vars() -> None:
