@@ -1625,7 +1625,7 @@ def test_get_context_root(
                 """
             ),
         ),
-        # Buildkit
+        # Buildkit without step duration
         (
             DockerBinary("/bin/docker", "1234", is_podman=False),
             "sha256:7805a7da5f45a70bb9e47e8de09b1f5acd8f479dda06fb144c5590b9d2b86dd7",
@@ -1648,7 +1648,7 @@ def test_get_context_root(
             ),
             "",
         ),
-        # Buildkit on Windows ??? Buildkit version?
+        # Buildkit with step duration
         (
             DockerBinary("/bin/docker", "1234", is_podman=False),
             "sha256:7805a7da5f45a70bb9e47e8de09b1f5acd8f479dda06fb144c5590b9d2b86dd7",
