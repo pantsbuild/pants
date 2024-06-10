@@ -93,7 +93,7 @@ class BuildFileSymbolInfo:
             if typing.get_origin(type_hints) is Annotated:
                 annotated_type, *metadata = typing.get_args(type_hints)
                 for meta in metadata:
-                    if isinstance(meta, typing_extensions.Doc):
+                    if isinstance(meta, typing_extensions.Doc):  # type: ignore[attr-defined]
                         help = meta.documentation
                         break
             else:
@@ -103,7 +103,7 @@ class BuildFileSymbolInfo:
             if hasattr(self.value, "__name__"):
                 help = inspect.getdoc(self.value)
 
-        if self.help is None:
+        if self.help is None and isinstance(help, str):
             object.__setattr__(self, "help", softwrap(help))
 
         if callable(self.value):
