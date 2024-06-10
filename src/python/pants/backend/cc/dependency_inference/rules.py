@@ -12,17 +12,15 @@ from pants.backend.cc.subsystems.cc_infer import CCInferSubsystem
 from pants.backend.cc.target_types import CCDependenciesField, CCSourceField
 from pants.build_graph.address import Address
 from pants.core.util_rules import stripped_source_files
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
-from pants.engine.fs import DigestContents
-from pants.engine.internals.native_engine import Digest
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies, hydrate_sources
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import directory_digest_to_digest_contents
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import (
     AllTargets,
     DependenciesRequest,
-    ExplicitlyProvidedDependencies,
     FieldSet,
-    HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
@@ -69,9 +67,8 @@ class CCFilesMapping:
 
 @rule(desc="Creating map of CC file names to CC targets", level=LogLevel.DEBUG)
 async def map_cc_files(cc_targets: AllCCTargets) -> CCFilesMapping:
-    stripped_file_per_target = await MultiGet(
-        Get(StrippedFileName, StrippedFileNameRequest(tgt[CCSourceField].file_path))
-        for tgt in cc_targets
+    stripped_file_per_target = await concurrently(
+        strip_file_name(StrippedFileNameRequest(tgt[CCSourceField].file_path)) for tgt in cc_targets
     )
 
     stripped_files_to_addresses: dict[str, Address] = {}
@@ -127,12 +124,14 @@ async def infer_cc_source_dependencies(
         return InferredDependencies([])
 
     address = request.field_set.address
-    explicitly_provided_deps, hydrated_sources = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources)),
+    explicitly_provided_deps, hydrated_sources = await concurrently(
+        determine_explicitly_provided_dependencies(
+            DependenciesRequest(request.field_set.dependencies), **implicitly()
+        ),
+        hydrate_sources(HydrateSourcesRequest(request.field_set.sources), **implicitly()),
     )
 
-    digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
+    digest_contents = await directory_digest_to_digest_contents(hydrated_sources.snapshot.digest)
     assert len(digest_contents) == 1
     file_content = digest_contents[0]
     file_path = PurePath(file_content.path)
