@@ -16,6 +16,7 @@ from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.subsystems.nodejs import (
     NodeJS,
     NodeJSBinaries,
+    NodeJSProcessEnvironment,
     _BinaryPathsPerVersion,
     _get_nvm_root,
     determine_nodejs_binaries,
@@ -32,7 +33,7 @@ from pants.core.util_rules.search_paths import (
     VersionManagerSearchPaths,
     VersionManagerSearchPathsRequest,
 )
-from pants.core.util_rules.system_binaries import BinaryNotFoundError, BinaryPath
+from pants.core.util_rules.system_binaries import BinaryNotFoundError, BinaryPath, BinaryShims
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.platform import Platform
@@ -295,3 +296,69 @@ def test_get_nvm_root(env: dict[str, str], expected_directory: str | None) -> No
         mock_gets=[MockGet(EnvironmentVars, (EnvironmentVarsRequest,), mock_environment_vars)],
     )
     assert result == expected_directory
+
+
+@pytest.mark.parametrize(
+    "extra_environment, expected",
+    [
+        pytest.param(
+            None,
+            {
+                "COREPACK_HOME": "{chroot}/._corepack_home",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v16",
+                "npm_config_cache": "npm_cache",
+            },
+            id="no_extra_environment",
+        ),
+        pytest.param(
+            {},
+            {
+                "COREPACK_HOME": "{chroot}/._corepack_home",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v16",
+                "npm_config_cache": "npm_cache",
+            },
+            id="empty_extra_environment",
+        ),
+        pytest.param(
+            {"PATH": "/usr/bin/"},
+            {
+                "COREPACK_HOME": "{chroot}/._corepack_home",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v16:/usr/bin/",
+                "npm_config_cache": "npm_cache",
+            },
+            id="extra_environment_extends_path",
+        ),
+        pytest.param(
+            {"PATH": "/usr/bin/", "SOME_VAR": "VAR"},
+            {
+                "COREPACK_HOME": "{chroot}/._corepack_home",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v16:/usr/bin/",
+                "npm_config_cache": "npm_cache",
+                "SOME_VAR": "VAR",
+            },
+            id="extra_environment_adds_to_environment",
+        ),
+        pytest.param(
+            {"npm_config_cache": "I am ignored"},
+            {
+                "COREPACK_HOME": "{chroot}/._corepack_home",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v16",
+                "npm_config_cache": "npm_cache",
+            },
+            id="extra_environment_cannot_override_some_vars",
+        ),
+    ],
+)
+def test_process_environment_variables_are_merged(
+    extra_environment: dict[str, str] | None, expected: dict[str, str]
+) -> None:
+    environment = NodeJSProcessEnvironment(
+        NodeJSBinaries("__node/v16"),
+        "npm_cache",
+        BinaryShims(EMPTY_DIGEST, "shim_cache"),
+        "._corepack_home",
+        "._corepack",
+        EnvironmentVars(),
+    )
+
+    assert environment.to_env_dict(extra_environment) == expected
