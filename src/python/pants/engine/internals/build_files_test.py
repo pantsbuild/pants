@@ -357,7 +357,7 @@ def test_prelude_docstring_on_constant() -> None:
 
     other = result.info["OTHER_stuff"]
     assert other.value == "undocumented"
-    assert other.help == None
+    assert other.help is None
     assert other.signature == ": str"
 
 
