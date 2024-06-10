@@ -363,7 +363,9 @@ def test_commit_with_new_untracked_file_adds_file(
 
 
 @parametrize_changed_files
-def test_bad_ref_stderr_issues_13396(git: MutatingGitWorktree, name: str, changed: Any, expected: Any) -> None:
+def test_bad_ref_stderr_issues_13396(
+    git: MutatingGitWorktree, name: str, changed: Any, expected: Any
+) -> None:
     with pytest.raises(
         GitBinaryException, match=re.escape("fatal: bad revision 'remote/dne...HEAD'\n")
     ):
