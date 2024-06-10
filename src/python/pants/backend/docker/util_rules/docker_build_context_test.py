@@ -352,7 +352,7 @@ def test_build_args_for_copy(rule_runner: RuleRunner) -> None:
             ARG PEX_BIN="testprojects/src/python:hello"
             ARG PEX_BIN_DOTTED_PATH="testprojects.src.python/hello_dotted.pex"
             ARG FILE_AS_ARG="testprojects/src/docker/file_as_arg.txt"
-            
+
             COPY		${PEX_BIN} /app/pex_bin
             COPY		$PEX_BIN_DOTTED_PATH /app/pex_var
             COPY		testprojects.src.python/hello_inline.pex /app/pex_bin_dotted_path
