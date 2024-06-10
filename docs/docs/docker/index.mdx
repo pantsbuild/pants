@@ -90,6 +90,13 @@ COPY $PEX_BIN /app/my_app
 
 Inference for Go binaries and artifacts of other packaged targets is similar.
 
+Inference on `file`/`files` targets is also done on files, for example:
+
+```dockerfile
+FROM python:3.9
+COPY src/file.txt /app/
+```
+
 Inference is also supported for `docker_image` targets specified in build arguments, for example:
 
 ```dockerfile
