@@ -239,7 +239,7 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
                 modified = False
                 for replacement in replacements:
                     if line_number == replacement.line_range[0]:
-                        line_end = ",\n" if replacement.is_argument else "\n"
+                        line_end = ",\n" if replacement.add_trailing_comma else "\n"
                         # On the first line of the range, emit the new source code where the old "Get" started
                         print(line[: replacement.col_range[0]], end="")
                         print(ast.unparse(replacement.new_source), end=line_end)
@@ -319,7 +319,8 @@ class Replacement:
     current_source: ast.Call
     new_source: ast.Call
     additional_imports: list[ast.ImportFrom]
-    is_argument: bool = False
+    # TODO: Use libcst or another CST, rather than an ast
+    add_trailing_comma: bool = False
 
     def sanitized_imports(self) -> list[ast.ImportFrom]:
         """Remove any circular or self-imports."""
@@ -359,7 +360,7 @@ class Replacement:
             current_source={ast.dump(self.current_source, indent=2)},
             new_source={ast.dump(self.new_source, indent=2)},
             additional_imports={[ast.dump(i, indent=2) for i in self.additional_imports]},
-            is_argument={self.is_argument}
+            add_trailing_comma={self.add_trailing_comma}
         )
         """
 
@@ -636,9 +637,7 @@ class CallByNameVisitor(ast.NodeVisitor):
             if replacement := self.syntax_mapper.map_get_to_new_syntax(
                 call, self.filename, calling_func=calling_func
             ):
-                # Fixes an issue with generators having trailing commas causing a syntax error
-                # TODO: A better solution might be to use libcst or similar, rather than an ast
-                replacement.is_argument = statement_type == "call"
+                replacement.add_trailing_comma = statement_type == "call"
                 self.replacements.append(replacement)
 
     def _should_visit_node(self, decorator_list: list[ast.expr]) -> bool:
