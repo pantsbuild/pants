@@ -24,7 +24,10 @@ class TFSec(ExternalTool):
     help = "tfsec by Aqua Security"
     default_version = "v1.28.1"
     default_known_versions = [
-        "v1.28.1|linux_x86_64|57b902b31da3eed12448a4e82a8aca30477e4bcd1bf99e3f65310eae0889f88d|26427634"
+        "v1.28.1|linux_x86_64|57b902b31da3eed12448a4e82a8aca30477e4bcd1bf99e3f65310eae0889f88d|26427634",
+        "v1.28.1|linux_arm64 |20daad803d2a7a781f2ef0ee72ba4ed4ae17dcb41a43a330ae7b98347762bec9|24299157",
+        "v1.28.1|macos_x86_64|6d9f5a747b1fcc1b6c314d30f4ff4d753371e5690309a99a5dd653d719d20d2d|27293876",
+        "v1.28.1|macos_arm64 |6d664dcdd37e2809d1b4f14b310ccda0973b4a29e4624e902286e4964d101e22|26478632",
     ]
 
     skip = SkipOption("lint")
