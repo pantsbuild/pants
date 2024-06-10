@@ -341,24 +341,31 @@ def test_prelude_docstring_on_constant() -> None:
     """
     prelude_content = dedent(
         f"""
-        MACRO_CONST: Annotated[str, {macro_docstring!r}] = "value"
-        OTHER_stuff: str = "undocumented"
+        Number = NewType("Number", int)
+        MACRO_CONST: Annotated[str, Doc({macro_docstring!r})] = "value"
+        MULTI_HINTS: Annotated[Number, "unrelated", Doc("this is it"), 24] = 42
+        ANON: str = "undocumented"
         _PRIVATE: int = 42
         untyped = True
         """
     )
     result = run_prelude_parsing_rule(prelude_content)
-    assert {"MACRO_CONST", "OTHER_stuff", "untyped"} == set(result.info)
+    assert {"MACRO_CONST", "ANON", "Number", "MULTI_HINTS", "untyped"} == set(result.info)
 
     info = result.info["MACRO_CONST"]
     assert info.value == "value"
     assert info.help == softwrap(macro_docstring)
     assert info.signature == ": str"
 
-    other = result.info["OTHER_stuff"]
-    assert other.value == "undocumented"
-    assert other.help is None
-    assert other.signature == ": str"
+    multi = result.info["MULTI_HINTS"]
+    assert multi.value == 42
+    assert multi.help == "this is it"
+    assert multi.signature == ": Number"
+
+    anon = result.info["ANON"]
+    assert anon.value == "undocumented"
+    assert anon.help is None
+    assert anon.signature == ": str"
 
 
 def test_prelude_reference_env_vars() -> None:

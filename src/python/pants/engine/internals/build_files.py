@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, Sequence, cast
 
+import typing_extensions
+
 from pants.build_graph.address import (
     Address,
     AddressInput,
@@ -118,8 +120,11 @@ async def evaluate_preludes(
         ),
     )
     globals: dict[str, Any] = {
-        **{name: getattr(builtins, name) for name in dir(builtins) if name.endswith("Error")},
+        # Later entries have precendence replacing conflicting keys from previous entries, so we
+        # start with typing_extensions as the lowest prio source for global values.
+        **{name: getattr(typing_extensions, name) for name in typing_extensions.__all__},
         **{name: getattr(typing, name) for name in typing.__all__},
+        **{name: getattr(builtins, name) for name in dir(builtins) if name.endswith("Error")},
         # Ensure the globals for each prelude includes the builtin symbols (E.g. `python_sources`)
         # and any build file aliases (e.g. from plugins)
         **parser.symbols,

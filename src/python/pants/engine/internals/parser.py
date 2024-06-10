@@ -17,6 +17,8 @@ from io import StringIO
 from pathlib import PurePath
 from typing import Annotated, Any, Callable, Iterable, Mapping, TypeVar
 
+import typing_extensions
+
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
@@ -89,7 +91,11 @@ class BuildFileSymbolInfo:
 
         if type_hints is not None:
             if typing.get_origin(type_hints) is Annotated:
-                annotated_type, help = typing.get_args(type_hints)
+                annotated_type, *metadata = typing.get_args(type_hints)
+                for meta in metadata:
+                    if isinstance(meta, typing_extensions.Doc):
+                        help = meta.documentation
+                        break
             else:
                 annotated_type = type_hints
 
