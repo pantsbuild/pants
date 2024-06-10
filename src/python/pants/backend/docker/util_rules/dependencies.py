@@ -42,8 +42,8 @@ async def infer_docker_dependencies(
     targets = await Get(Targets, Addresses([request.field_set.address]))
     build_args = await Get(DockerBuildArgs, DockerBuildArgsRequest(targets.expect_single()))
     dockerfile_build_args = dockerfile_info.from_image_build_args.with_overrides(
-        build_args, only_with_value=True
-    )
+        build_args
+    ).nonempty()
 
     putative_image_addresses = set(
         await Get(
@@ -65,7 +65,7 @@ async def infer_docker_dependencies(
         await Get(
             Addresses,
             UnparsedAddressInputs(
-                dockerfile_info.copy_build_args.to_dict().values(),
+                dockerfile_info.copy_build_args.nonempty().values(),
                 owning_address=dockerfile_info.address,
                 description_of_origin=softwrap(
                     f"""
@@ -78,7 +78,7 @@ async def infer_docker_dependencies(
         )
     )
     maybe_output_paths = set(dockerfile_info.copy_source_paths) | set(
-        dockerfile_info.copy_build_args.to_dict().values()
+        dockerfile_info.copy_build_args.nonempty().values()
     )
 
     # NB: There's no easy way of knowing the output path's default file ending as there could
@@ -119,7 +119,7 @@ async def infer_docker_dependencies(
                 FileLiteralSpec(e)
                 for e in [
                     *dockerfile_info.copy_source_paths,
-                    *dockerfile_info.copy_build_args.to_dict().values(),
+                    *dockerfile_info.copy_build_args.nonempty().values(),
                 ]
             ),
         ),

@@ -109,7 +109,7 @@ class DockerfileInfo:
     source: str
     build_args: DockerBuildArgs = DockerBuildArgs()
     copy_source_paths: tuple[str, ...] = ()
-    copy_build_args: DockerBuildArgs = ()
+    copy_build_args: DockerBuildArgs = DockerBuildArgs()
     from_image_build_args: DockerBuildArgs = DockerBuildArgs()
     version_tags: tuple[str, ...] = ()
 

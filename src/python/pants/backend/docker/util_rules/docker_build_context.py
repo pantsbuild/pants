@@ -340,8 +340,8 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
 
         # Get the FROM image build args with defined values in the Dockerfile & build args.
         dockerfile_build_args = dockerfile_info.from_image_build_args.with_overrides(
-            supplied_build_args, only_with_value=True
-        )
+            supplied_build_args
+        ).nonempty()
         # Parse the build args values into Address instances.
         from_image_addresses = await Get(
             Addresses,
@@ -379,11 +379,11 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
 
     # Render build args for turning COPY values in ARGS which are targets into their output
     dockerfile_copy_args = dockerfile_info.copy_build_args.with_overrides(
-        supplied_build_args, only_with_value=True
-    )
+        supplied_build_args
+    ).nonempty()
 
     def get_artifact_paths(built_package: BuiltPackage) -> list[str]:
-        return [e.relpath for e in built_package.artifacts]
+        return [e.relpath for e in built_package.artifacts if e.relpath]
 
     addrs_to_paths = {
         field_set.address: get_artifact_paths(pkg)
@@ -405,7 +405,9 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     )
 
 
-async def fill_args_from_copy(dockerfile_copy_args, dockerfile_info, addrs_to_paths):
+async def fill_args_from_copy(
+    dockerfile_copy_args: dict[str, str], dockerfile_info, addrs_to_paths
+):
     copy_arg_addresses = await Get(
         Addresses,
         UnparsedAddressInputs(

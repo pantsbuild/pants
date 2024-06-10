@@ -16,17 +16,18 @@ from pants.engine.target import Target
 class DockerBuildArgs(KeyValueSequenceUtil):
     """Collection of arguments to pass to a Docker build."""
 
-    def with_overrides(self, overrides: DockerBuildArgs, only_with_value: bool) -> dict[str, str]:
+    def nonempty(self) -> dict[str, str]:
+        return {k: v for k, v in self.to_dict().items() if v}
+
+    def with_overrides(self, overrides: DockerBuildArgs) -> DockerBuildArgs:
         """Override the values in this collection.
 
-        :param only_with_value: whether to return only those key-value pairs which have a truthy value
+        Will not extend with keys in overrides which do not exist in this collection.
         """
         overrides_dict = overrides.to_dict()
-        values = {k: overrides_dict.get(k, v) for k, v in self.to_dict().items()}
-        if only_with_value:
-            return {k: v for k, v in values.items() if v}
-        else:
-            return values
+        return DockerBuildArgs.from_dict(
+            {k: overrides_dict.get(k, v) for k, v in self.to_dict().items()}
+        )
 
     def extended(self, more: Union[DockerBuildArgs, list[str]]) -> DockerBuildArgs:
         """Create a new DockerBuildArgs out of this and a list of strs to add."""
