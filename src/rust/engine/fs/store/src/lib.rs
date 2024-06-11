@@ -21,7 +21,7 @@ use std::fs::Permissions as FSPermissions;
 use std::future::Future;
 use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
@@ -1203,6 +1203,7 @@ impl Store {
             }
         });
 
+        let force_all_mutable = mutable_paths.contains(&RelativePath::new(Component::CurDir).unwrap()) || force_mutable;
         let mut mutable_path_ancestors = BTreeSet::new();
         for relpath in mutable_paths {
             mutable_path_ancestors.extend(relpath.ancestors().map(|p| destination.join(p)));
@@ -1223,7 +1224,7 @@ impl Store {
         self.materialize_directory_children(
             destination,
             true,
-            force_mutable,
+            force_all_mutable,
             destination_is_hardlinkable,
             &parent_to_child,
             &mutable_path_ancestors,
