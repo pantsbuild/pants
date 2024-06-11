@@ -655,7 +655,7 @@ impl DigestTrie {
                                 let cs = component.as_os_str();
                                 logical_path.push(cs);
                                 if cs == entry.name().as_str() {
-                                    break
+                                    break;
                                 }
                             }
                             warn!("Exceeded the maximum link depth while traversing link {:#?} to path {:#?}. Stopping traversal.", logical_path, s.target);
