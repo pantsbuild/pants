@@ -10,7 +10,8 @@ use testutil::data::{TestData, TestDirectory};
 
 use bytes::Bytes;
 use fs::{
-    DigestEntry, DirectoryDigest, FileEntry, Link, PathStat, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST
+    DigestEntry, DirectoryDigest, FileEntry, Link, PathStat, Permissions, RelativePath,
+    EMPTY_DIRECTORY_DIGEST,
 };
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
