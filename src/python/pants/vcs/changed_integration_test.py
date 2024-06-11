@@ -28,6 +28,7 @@ def repo() -> Iterator[str]:
         _run_git(["init"])
         _run_git(["config", "user.email", "you@example.com"])
         _run_git(["config", "user.name", "Your Name"])
+        _run_git(["config", "commit.gpgsign", "false"])
 
         project = {
             ".gitignore": dedent(
