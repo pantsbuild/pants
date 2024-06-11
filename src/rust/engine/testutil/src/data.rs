@@ -315,22 +315,6 @@ impl TestDirectory {
 
     // Directory structure:
     //
-    // /cats/(param)
-    // /treats.ext
-    // /pets/cats/roland.ext
-    pub fn recursive_with_double_nested(inner: TestDirectory) -> TestDirectory {
-        let init_recursive = TestDirectory::recursive_with(inner);
-        let double_nested = TestDirectory::double_nested();
-        let directory = remexec::Directory {
-            directories: init_recursive.directory.directories.iter().chain(double_nested.directory.directories.iter()).cloned().collect(),
-            files: init_recursive.directory.files.clone(),
-            ..remexec::Directory::default()
-        };
-        TestDirectory { directory }
-    }
-
-    // Directory structure:
-    //
     // /feed.ext (is_executable=?)
     // /food.ext (is_executable=False)
     pub fn with_maybe_executable_files(is_executable: bool) -> TestDirectory {

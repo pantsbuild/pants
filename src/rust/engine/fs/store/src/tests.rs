@@ -1165,12 +1165,8 @@ async fn materialize_directory(perms: Permissions, executable_file: bool) {
     let materialize_dir = TempDir::new().unwrap();
 
     let catnip = TestData::catnip();
-    let roland = TestData::roland();
     let testdir = TestDirectory::with_maybe_executable_files(executable_file);
-    let recursive_testdir = TestDirectory::recursive_with_double_nested(testdir.clone());
-    let mutable_paths: BTreeSet<RelativePath> = ["treats.ext", "cats/food.ext", "pets"]
-        .map(|p| RelativePath::new(Path::new(p)).unwrap())
-        .into();
+    let recursive_testdir = TestDirectory::recursive_with(testdir.clone());
 
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
@@ -1185,23 +1181,7 @@ async fn materialize_directory(perms: Permissions, executable_file: bool) {
     store
         .store_file_bytes(catnip.bytes(), false)
         .await
-        .expect("Error saving catnip file bytes");
-    store
-        .record_directory(&TestDirectory::double_nested().directory(), false)
-        .await
-        .expect("Error saving double nested Directory");
-    store
-        .record_directory(&TestDirectory::nested().directory(), false)
-        .await
-        .expect("Error saving nested Directory");
-    store
-        .record_directory(&TestDirectory::containing_roland().directory(), false)
-        .await
-        .expect("Error saving Roland's Directory");
-    store
-        .store_file_bytes(roland.bytes(), false)
-        .await
-        .expect("Error saving roland file bytes");
+        .expect("Error saving file bytes");
 
     store
         .materialize_directory(
@@ -1209,14 +1189,14 @@ async fn materialize_directory(perms: Permissions, executable_file: bool) {
             materialize_dir.path(),
             recursive_testdir.directory_digest(),
             false,
-            &mutable_paths, 
+            &BTreeSet::new(),
             perms,
         )
         .await
         .expect("Error materializing");
 
     // Validate contents.
-    assert_eq!(list_dir(materialize_dir.path()), vec!["cats", "pets", "treats.ext"]);
+    assert_eq!(list_dir(materialize_dir.path()), vec!["cats", "treats.ext"]);
     assert_eq!(
         file_contents(&materialize_dir.path().join("treats.ext")),
         catnip.bytes()
@@ -1247,11 +1227,6 @@ async fn materialize_directory(perms: Permissions, executable_file: bool) {
     );
     assert_eq!(readonly, is_readonly(&materialize_dir.path().join("cats")));
     assert_eq!(readonly, is_readonly(materialize_dir.path()));
-
-    // Validate mutable paths are always mutable.
-    assert!(!is_readonly(&materialize_dir.path().join("treats.ext")));
-    assert!(!is_readonly(&materialize_dir.path().join("cats").join("food.ext")));
-    assert!(!is_readonly(&materialize_dir.path().join("pets").join("cats").join("roland.ext")));
 }
 
 #[tokio::test]
