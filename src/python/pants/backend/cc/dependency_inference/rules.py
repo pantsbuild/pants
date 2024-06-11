@@ -19,7 +19,7 @@ from pants.engine.intrinsics import directory_digest_to_digest_contents
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import (
     AllTargets,
-    DependenciesRequest,
+    ExplicitlyProvidedDependenciesRequest,
     FieldSet,
     HydrateSourcesRequest,
     InferDependenciesRequest,
@@ -126,7 +126,7 @@ async def infer_cc_source_dependencies(
     address = request.field_set.address
     explicitly_provided_deps, hydrated_sources = await concurrently(
         determine_explicitly_provided_dependencies(
-            DependenciesRequest(request.field_set.dependencies), **implicitly()
+            ExplicitlyProvidedDependenciesRequest(request.field_set.dependencies), **implicitly()
         ),
         hydrate_sources(HydrateSourcesRequest(request.field_set.sources), **implicitly()),
     )
