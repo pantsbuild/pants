@@ -11,7 +11,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Type, TypeVar, cast
+from typing import Any, Iterable, Iterator, Mapping, NamedTuple, Sequence, Type, TypeVar, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -256,20 +256,14 @@ async def resolve_all_generator_target_requests(
     )
 
 
-async def _parametrized_target_generators_with_templates(
+def populate_template_fields(
     address: Address,
-    target_adaptor: TargetAdaptor,
     target_type: type[TargetGenerator],
-    generator_fields: dict[str, Any],
+    base_generator_fields: Mapping[str, Any],
     union_membership: UnionMembership,
-) -> list[tuple[TargetGenerator, dict[str, Any]]]:
-    # Pre-load field values from defaults for the target type being generated.
-    if hasattr(target_type, "generated_target_cls"):
-        family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
-        template_fields = dict(family.defaults.get(target_type.generated_target_cls.alias, {}))
-    else:
-        template_fields = {}
-
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    generator_fields = dict(base_generator_fields)
+    template_fields = {}
     # Split out the `propagated_fields` before construction.
     copied_fields = (
         *target_type.copied_fields,
@@ -325,10 +319,38 @@ async def _parametrized_target_generators_with_templates(
             f"so target generator {address} (with type {target_type.alias}) cannot "
             f"parametrize the {generator_fields_parametrized_text} {noun}."
         )
+    return template_fields, generator_fields
+
+
+async def _parametrized_target_generators_with_templates(
+    address: Address,
+    target_adaptor: TargetAdaptor,
+    target_type: type[TargetGenerator],
+    template_fields_from_generator: Mapping[str, Any],
+    generator_fields: dict[str, Any],
+    union_membership: UnionMembership,
+) -> list[tuple[TargetGenerator, dict[str, Any]]]:
+    # Pre-load field values from defaults for the target type being generated.
+    if hasattr(target_type, "generated_target_cls"):
+        family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
+        generated_target_classes = (
+            target_type.generated_target_cls
+            if isinstance(target_type.generated_target_cls, tuple)
+            else (target_type.generated_target_cls,)
+        )
+        template_fields_list = [
+            dict(family.defaults.get(generated_target_cls.alias, {}))
+            for generated_target_cls in generated_target_classes
+        ]
+    else:
+        template_fields_list = [{}]
+
+    for field_defaults in template_fields_list:
+        field_defaults.update(template_fields_from_generator)
     return [
         (
             _create_target(
-                address,
+                parametrized_address,
                 target_type,
                 target_adaptor,
                 generator_fields,
@@ -337,7 +359,8 @@ async def _parametrized_target_generators_with_templates(
             ),
             template,
         )
-        for address, template in Parametrize.expand(address, template_fields)
+        for template_fields in template_fields_list
+        for parametrized_address, template in Parametrize.expand(address, template_fields)
     ]
 
 
@@ -381,11 +404,17 @@ async def resolve_generator_target_requests(
     generate_request = target_types_to_generate_requests.request_for(target_type)
     if not generate_request:
         return ResolvedTargetGeneratorRequests()
-    generator_fields = dict(target_adaptor.kwargs)
+    template_fields_from_generator, generator_fields = populate_template_fields(
+        req.address,
+        target_type,
+        target_adaptor.kwargs,
+        union_membership,
+    )
     generators = await _parametrized_target_generators_with_templates(
         req.address,
         target_adaptor,
         target_type,
+        template_fields_from_generator,
         generator_fields,
         union_membership,
     )

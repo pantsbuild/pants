@@ -9,7 +9,7 @@ import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Set, Tuple, Type
+from typing import Callable, Iterable, List, Set, Tuple, Type
 
 import pytest
 
@@ -49,7 +49,9 @@ from pants.engine.target import (
     FieldDefaultFactoryResult,
     FieldSet,
     GeneratedSources,
+    GeneratedTargets,
     GenerateSourcesRequest,
+    GenerateTargetsRequest,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
@@ -67,6 +69,7 @@ from pants.engine.target import (
     Tags,
     Target,
     TargetFilesGenerator,
+    TargetGenerator,
     Targets,
     TransitivelyExcludeDependencies,
     TransitivelyExcludeDependenciesRequest,
@@ -151,6 +154,52 @@ class MockTargetGenerator(TargetFilesGenerator):
     generated_target_cls = MockGeneratedTarget
     copied_fields = ()
     moved_fields = (MockDependencies, Tags, ResolveField)
+
+
+class MockAlsoGeneratedTarget(Target):
+    alias = "also_generated"
+    core_fields = (MockDependencies, Tags, MockSingleSourceField, ResolveField)
+
+
+class MockMultiTypeTargetGenerator(TargetGenerator):
+    alias = "multi_generator"
+    core_fields = (MockMultipleSourcesField, OverridesField)
+    generated_target_cls = (MockGeneratedTarget, MockAlsoGeneratedTarget)
+    copied_fields = ()
+    moved_fields = (MockDependencies, Tags, ResolveField)
+
+
+@dataclasses.dataclass(frozen=True)
+class MultiTypeTargetGenerationRequest(GenerateTargetsRequest):
+    generate_from = MockMultiTypeTargetGenerator
+
+
+@rule
+async def even_odd_generated_targets(
+    request: MultiTypeTargetGenerationRequest, union_membership: UnionMembership
+) -> GeneratedTargets:
+    matched_paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator[MockMultipleSourcesField])
+    )
+    return GeneratedTargets(
+        request.generator,
+        [
+            (MockAlsoGeneratedTarget if i % 2 else MockGeneratedTarget)(
+                {
+                    MockSingleSourceField.alias: (
+                        relative_file_path := os.path.relpath(
+                            source_file, request.template_address.spec_path
+                        )
+                    ),
+                    **request.template,
+                },
+                request.template_address.create_file(relative_file_path),
+                residence_dir=request.template_address.spec_path,
+                union_membership=union_membership,
+            )
+            for i, source_file in enumerate(sorted(matched_paths.files))
+        ],
+    )
 
 
 @pytest.fixture
@@ -996,8 +1045,19 @@ def generated_targets_rule_runner() -> RuleRunner:
             resolve_field_default_factory,
             MockGeneratedTarget.register_plugin_field(MockPluginField),
             MockTargetGenerator.register_plugin_field(MockPluginField, as_moved_field=True),
+            even_odd_generated_targets,
+            UnionRule(GenerateTargetsRequest, MultiTypeTargetGenerationRequest),
+            MockAlsoGeneratedTarget.register_plugin_field(MockPluginField),
+            MockMultiTypeTargetGenerator.register_plugin_field(
+                MockPluginField, as_moved_field=True
+            ),
         ],
-        target_types=[MockTargetGenerator, MockGeneratedTarget],
+        target_types=[
+            MockTargetGenerator,
+            MockGeneratedTarget,
+            MockMultiTypeTargetGenerator,
+            MockAlsoGeneratedTarget,
+        ],
         objects={"parametrize": Parametrize},
         # NB: The `graph` module masks the environment is most/all positions. We disable the
         # inherent environment so that the positions which do require the environment are
@@ -1056,47 +1116,120 @@ def assert_generated(
         } == expected_dependencies
 
 
-def test_generate_multiple(generated_targets_rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    argnames=("generator_alias", "create_expected_targets"),
+    argvalues=[
+        (
+            "generator",
+            lambda union_membership: {
+                MockGeneratedTarget(
+                    {SingleSourceField.alias: "f1.ext", Tags.alias: ["tag"]},
+                    Address("demo", relative_file_path="f1.ext"),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockGeneratedTarget(
+                    {SingleSourceField.alias: "f2.ext", Tags.alias: ["tag"]},
+                    Address("demo", relative_file_path="f2.ext"),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+            },
+        ),
+        (
+            "multi_generator",
+            lambda union_membership: {
+                MockGeneratedTarget(
+                    {SingleSourceField.alias: "f1.ext", Tags.alias: ["tag"]},
+                    Address("demo", relative_file_path="f1.ext"),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockAlsoGeneratedTarget(
+                    {SingleSourceField.alias: "f2.ext", Tags.alias: ["tag"]},
+                    Address("demo", relative_file_path="f2.ext"),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+            },
+        ),
+    ],
+    ids=("Single Type", "Multi Type"),
+)
+def test_generate_multiple(
+    generator_alias: str,
+    create_expected_targets: Callable[[UnionMembership], set[Target]],
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
     assert_generated(
         generated_targets_rule_runner,
         Address("demo"),
-        "generator(tags=['tag'], sources=['*.ext'])",
+        f"{generator_alias}(tags=['tag'], sources=['*.ext'])",
         ["f1.ext", "f2.ext"],
-        {
-            MockGeneratedTarget(
-                {SingleSourceField.alias: "f1.ext", Tags.alias: ["tag"]},
-                Address("demo", relative_file_path="f1.ext"),
-                residence_dir="demo",
-                union_membership=generated_targets_rule_runner.union_membership,
-            ),
-            MockGeneratedTarget(
-                {SingleSourceField.alias: "f2.ext", Tags.alias: ["tag"]},
-                Address("demo", relative_file_path="f2.ext"),
-                residence_dir="demo",
-                union_membership=generated_targets_rule_runner.union_membership,
-            ),
-        },
+        create_expected_targets(generated_targets_rule_runner.union_membership),
     )
 
 
-def test_generate_with_plugin_field(generated_targets_rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    argnames=("generator_alias", "files", "create_expected_targets"),
+    argvalues=[
+        (
+            "generator",
+            ["f1.ext"],
+            lambda union_membership: {
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["tag"],
+                        MockPluginField.alias: "a",
+                    },
+                    Address("demo", relative_file_path="f1.ext"),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+            },
+        ),
+        (
+            "multi_generator",
+            ["f1.ext", "f2.ext"],
+            lambda union_membership: {
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["tag"],
+                        MockPluginField.alias: "a",
+                    },
+                    Address("demo", relative_file_path="f1.ext"),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockAlsoGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f2.ext",
+                        Tags.alias: ["tag"],
+                        MockPluginField.alias: "a",
+                    },
+                    Address("demo", relative_file_path="f2.ext"),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+            },
+        ),
+    ],
+    ids=("Single Type", "Multi Type"),
+)
+def test_generate_with_plugin_field(
+    generator_alias: str,
+    files: list[str],
+    create_expected_targets: Callable[[UnionMembership], set[Target]],
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
     assert_generated(
         generated_targets_rule_runner,
         Address("demo"),
-        "generator(tags=['tag'], sources=['*.ext'], plugin_string='a')",
-        ["f1.ext"],
-        {
-            MockGeneratedTarget(
-                {
-                    SingleSourceField.alias: "f1.ext",
-                    Tags.alias: ["tag"],
-                    MockPluginField.alias: "a",
-                },
-                Address("demo", relative_file_path="f1.ext"),
-                residence_dir="demo",
-                union_membership=generated_targets_rule_runner.union_membership,
-            ),
-        },
+        f"{generator_alias}(tags=['tag'], sources=['*.ext'], plugin_string='a')",
+        files,
+        create_expected_targets(generated_targets_rule_runner.union_membership),
     )
 
 
@@ -1149,65 +1282,208 @@ def test_generate_overrides_unused(generated_targets_rule_runner: RuleRunner) ->
         )
 
 
-def test_parametrize(generated_targets_rule_runner: RuleRunner) -> None:
+def generate_expected_dependencies_for_parametrizations(
+    base_path: str, files: list[str], parametrizations: list[str]
+) -> dict[str, set[str]]:
+    generated_addrs = [
+        {f"{base_path}/{fn}@{parametrization}" for fn in files}
+        for parametrization in parametrizations
+    ]
+    return {
+        **{
+            f"{base_path}@{parametrization}": file_dep_set
+            for parametrization, file_dep_set in zip(parametrizations, generated_addrs)
+        },
+        **{addr: set() for addr in itertools.chain.from_iterable(generated_addrs)},
+    }
+
+
+@pytest.mark.parametrize(
+    argnames=("generator_alias", "files", "create_expected_targets"),
+    argvalues=[
+        (
+            "generator",
+            ["f1.ext"],
+            lambda union_membership: {
+                MockGeneratedTarget(
+                    {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"]},
+                    Address("demo", relative_file_path="f1.ext", parameters={"tags": "t1"}),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockGeneratedTarget(
+                    {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"]},
+                    Address("demo", relative_file_path="f1.ext", parameters={"tags": "t2"}),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+            },
+        ),
+        (
+            "multi_generator",
+            ["f1.ext", "f2.ext"],
+            lambda union_membership: {
+                MockGeneratedTarget(
+                    {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"]},
+                    Address("demo", relative_file_path="f1.ext", parameters={"tags": "t1"}),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockGeneratedTarget(
+                    {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"]},
+                    Address("demo", relative_file_path="f1.ext", parameters={"tags": "t2"}),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockAlsoGeneratedTarget(
+                    {SingleSourceField.alias: "f2.ext", Tags.alias: ["t1"]},
+                    Address("demo", relative_file_path="f2.ext", parameters={"tags": "t1"}),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockAlsoGeneratedTarget(
+                    {SingleSourceField.alias: "f2.ext", Tags.alias: ["t2"]},
+                    Address("demo", relative_file_path="f2.ext", parameters={"tags": "t2"}),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+            },
+        ),
+    ],
+    ids=("Single Type", "Multi Type"),
+)
+def test_parametrize(
+    generator_alias: str,
+    files: list[str],
+    create_expected_targets: Callable[[UnionMembership], set[Target]],
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
     assert_generated(
         generated_targets_rule_runner,
         Address("demo"),
-        "generator(tags=parametrize(t1=['t1'], t2=['t2']), sources=['f1.ext'])",
-        ["f1.ext"],
-        {
-            MockGeneratedTarget(
-                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"]},
-                Address("demo", relative_file_path="f1.ext", parameters={"tags": "t1"}),
-                residence_dir="demo",
-                union_membership=generated_targets_rule_runner.union_membership,
-            ),
-            MockGeneratedTarget(
-                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"]},
-                Address("demo", relative_file_path="f1.ext", parameters={"tags": "t2"}),
-                residence_dir="demo",
-                union_membership=generated_targets_rule_runner.union_membership,
-            ),
-        },
-        expected_dependencies={
-            "demo@tags=t1": {"demo/f1.ext@tags=t1"},
-            "demo@tags=t2": {"demo/f1.ext@tags=t2"},
-            "demo/f1.ext@tags=t1": set(),
-            "demo/f1.ext@tags=t2": set(),
-        },
+        f"{generator_alias}(tags=parametrize(t1=['t1'], t2=['t2']), sources=['*.ext'])",
+        files,
+        create_expected_targets(generated_targets_rule_runner.union_membership),
+        expected_dependencies=generate_expected_dependencies_for_parametrizations(
+            "demo", files, ["tags=t1", "tags=t2"]
+        ),
     )
 
 
-def test_parametrize_moved_plugin_field(generated_targets_rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    argnames=("generator_alias", "files", "create_expected_targets"),
+    argvalues=[
+        (
+            "generator",
+            ["f1.ext"],
+            lambda union_membership: {
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["t1"],
+                        MockPluginField.alias: "a",
+                    },
+                    Address(
+                        "demo", relative_file_path="f1.ext", parameters={"plugin_string": "pa"}
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["t1"],
+                        MockPluginField.alias: "b",
+                    },
+                    Address(
+                        "demo", relative_file_path="f1.ext", parameters={"plugin_string": "pb"}
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+            },
+        ),
+        (
+            "multi_generator",
+            ["f1.ext", "f2.ext"],
+            lambda union_membership: {
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["t1"],
+                        MockPluginField.alias: "a",
+                    },
+                    Address(
+                        "demo", relative_file_path="f1.ext", parameters={"plugin_string": "pa"}
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["t1"],
+                        MockPluginField.alias: "b",
+                    },
+                    Address(
+                        "demo", relative_file_path="f1.ext", parameters={"plugin_string": "pb"}
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockAlsoGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f2.ext",
+                        Tags.alias: ["t1"],
+                        MockPluginField.alias: "a",
+                    },
+                    Address(
+                        "demo", relative_file_path="f2.ext", parameters={"plugin_string": "pa"}
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockAlsoGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f2.ext",
+                        Tags.alias: ["t1"],
+                        MockPluginField.alias: "b",
+                    },
+                    Address(
+                        "demo", relative_file_path="f2.ext", parameters={"plugin_string": "pb"}
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+            },
+        ),
+    ],
+    ids=("Single Type", "Multi Type"),
+)
+def test_parametrize_moved_plugin_field(
+    generator_alias: str,
+    files: list[str],
+    create_expected_targets: Callable[[UnionMembership], set[Target]],
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
     assert_generated(
         generated_targets_rule_runner,
         Address("demo"),
-        "generator(tags=['t1'], sources=['f1.ext'], plugin_string=parametrize(pa='a', pb='b'))",
-        ["f1.ext"],
-        {
-            MockGeneratedTarget(
-                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"], MockPluginField.alias: "a"},
-                Address("demo", relative_file_path="f1.ext", parameters={"plugin_string": "pa"}),
-                residence_dir="demo",
-                union_membership=generated_targets_rule_runner.union_membership,
-            ),
-            MockGeneratedTarget(
-                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"], MockPluginField.alias: "b"},
-                Address("demo", relative_file_path="f1.ext", parameters={"plugin_string": "pb"}),
-                residence_dir="demo",
-                union_membership=generated_targets_rule_runner.union_membership,
-            ),
-        },
-        expected_dependencies={
-            "demo@plugin_string=pa": {"demo/f1.ext@plugin_string=pa"},
-            "demo@plugin_string=pb": {"demo/f1.ext@plugin_string=pb"},
-            "demo/f1.ext@plugin_string=pa": set(),
-            "demo/f1.ext@plugin_string=pb": set(),
-        },
+        f"{generator_alias}(tags=['t1'], sources=['*.ext'], plugin_string=parametrize(pa='a', pb='b'))",
+        files,
+        create_expected_targets(generated_targets_rule_runner.union_membership),
+        expected_dependencies=generate_expected_dependencies_for_parametrizations(
+            "demo", files, ["plugin_string=pa", "plugin_string=pb"]
+        ),
     )
 
 
-def test_cannot_parametrize_copied_plugin_field() -> None:
+@pytest.mark.parametrize(
+    argnames="generator_alias",
+    argvalues=("generator", "multi_generator"),
+    ids=("Single Type", "Multi Type"),
+)
+def test_cannot_parametrize_copied_plugin_field(generator_alias: str) -> None:
     rule_runner = RuleRunner(
         rules=[
             QueryRule(Addresses, [Specs]),
@@ -1215,10 +1491,19 @@ def test_cannot_parametrize_copied_plugin_field() -> None:
             QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest, EnvironmentName]),
             UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
             resolve_field_default_factory,
+            UnionRule(GenerateTargetsRequest, MultiTypeTargetGenerationRequest),
+            even_odd_generated_targets,
             MockGeneratedTarget.register_plugin_field(MockPluginField),
             MockTargetGenerator.register_plugin_field(MockPluginField),  # not moved
+            MockAlsoGeneratedTarget.register_plugin_field(MockPluginField),
+            MockMultiTypeTargetGenerator.register_plugin_field(MockPluginField),  # also not moved
         ],
-        target_types=[MockTargetGenerator, MockGeneratedTarget],
+        target_types=[
+            MockTargetGenerator,
+            MockGeneratedTarget,
+            MockMultiTypeTargetGenerator,
+            MockAlsoGeneratedTarget,
+        ],
         objects={"parametrize": Parametrize},
         inherent_environment=None,
     )
@@ -1227,7 +1512,7 @@ def test_cannot_parametrize_copied_plugin_field() -> None:
         assert_generated(
             rule_runner,
             Address("demo"),
-            "generator(tags=['t1'], sources=['f1.ext'], plugin_string=parametrize(pa='a', pb='b'))",
+            f"{generator_alias}(tags=['t1'], sources=['f1.ext'], plugin_string=parametrize(pa='a', pb='b'))",
             ["f1.ext"],
         )
 
@@ -1238,46 +1523,204 @@ def test_cannot_parametrize_copied_plugin_field() -> None:
     assert "Only fields which will be moved to generated targets may be parametrized" in msg
 
 
-def test_parametrize_multi(generated_targets_rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    argnames=("generator_alias", "files", "create_expected_targets"),
+    argvalues=[
+        (
+            "generator",
+            ["f1.ext"],
+            lambda union_membership: {
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["t1"],
+                        ResolveField.alias: "a",
+                    },
+                    Address(
+                        "demo",
+                        relative_file_path="f1.ext",
+                        parameters={"tags": "t1", "resolve": "a"},
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["t2"],
+                        ResolveField.alias: "a",
+                    },
+                    Address(
+                        "demo",
+                        relative_file_path="f1.ext",
+                        parameters={"tags": "t2", "resolve": "a"},
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["t1"],
+                        ResolveField.alias: "b",
+                    },
+                    Address(
+                        "demo",
+                        relative_file_path="f1.ext",
+                        parameters={"tags": "t1", "resolve": "b"},
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["t2"],
+                        ResolveField.alias: "b",
+                    },
+                    Address(
+                        "demo",
+                        relative_file_path="f1.ext",
+                        parameters={"tags": "t2", "resolve": "b"},
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+            },
+        ),
+        (
+            "multi_generator",
+            ["f1.ext", "f2.ext"],
+            lambda union_membership: {
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["t1"],
+                        ResolveField.alias: "a",
+                    },
+                    Address(
+                        "demo",
+                        relative_file_path="f1.ext",
+                        parameters={"tags": "t1", "resolve": "a"},
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["t2"],
+                        ResolveField.alias: "a",
+                    },
+                    Address(
+                        "demo",
+                        relative_file_path="f1.ext",
+                        parameters={"tags": "t2", "resolve": "a"},
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["t1"],
+                        ResolveField.alias: "b",
+                    },
+                    Address(
+                        "demo",
+                        relative_file_path="f1.ext",
+                        parameters={"tags": "t1", "resolve": "b"},
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f1.ext",
+                        Tags.alias: ["t2"],
+                        ResolveField.alias: "b",
+                    },
+                    Address(
+                        "demo",
+                        relative_file_path="f1.ext",
+                        parameters={"tags": "t2", "resolve": "b"},
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockAlsoGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f2.ext",
+                        Tags.alias: ["t1"],
+                        ResolveField.alias: "a",
+                    },
+                    Address(
+                        "demo",
+                        relative_file_path="f2.ext",
+                        parameters={"tags": "t1", "resolve": "a"},
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockAlsoGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f2.ext",
+                        Tags.alias: ["t2"],
+                        ResolveField.alias: "a",
+                    },
+                    Address(
+                        "demo",
+                        relative_file_path="f2.ext",
+                        parameters={"tags": "t2", "resolve": "a"},
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockAlsoGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f2.ext",
+                        Tags.alias: ["t1"],
+                        ResolveField.alias: "b",
+                    },
+                    Address(
+                        "demo",
+                        relative_file_path="f2.ext",
+                        parameters={"tags": "t1", "resolve": "b"},
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+                MockAlsoGeneratedTarget(
+                    {
+                        SingleSourceField.alias: "f2.ext",
+                        Tags.alias: ["t2"],
+                        ResolveField.alias: "b",
+                    },
+                    Address(
+                        "demo",
+                        relative_file_path="f2.ext",
+                        parameters={"tags": "t2", "resolve": "b"},
+                    ),
+                    residence_dir="demo",
+                    union_membership=union_membership,
+                ),
+            },
+        ),
+    ],
+    ids=("Single Type", "Multi Type"),
+)
+def test_parametrize_multi(
+    generator_alias: str,
+    files: list[str],
+    create_expected_targets: Callable[[UnionMembership], set[Target]],
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
     assert_generated(
         generated_targets_rule_runner,
         Address("demo"),
-        "generator(tags=parametrize(t1=['t1'], t2=['t2']), resolve=parametrize('a', 'b'), sources=['f1.ext'])",
-        ["f1.ext"],
-        {
-            MockGeneratedTarget(
-                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"], ResolveField.alias: "a"},
-                Address(
-                    "demo", relative_file_path="f1.ext", parameters={"tags": "t1", "resolve": "a"}
-                ),
-                residence_dir="demo",
-                union_membership=generated_targets_rule_runner.union_membership,
-            ),
-            MockGeneratedTarget(
-                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"], ResolveField.alias: "a"},
-                Address(
-                    "demo", relative_file_path="f1.ext", parameters={"tags": "t2", "resolve": "a"}
-                ),
-                residence_dir="demo",
-                union_membership=generated_targets_rule_runner.union_membership,
-            ),
-            MockGeneratedTarget(
-                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"], ResolveField.alias: "b"},
-                Address(
-                    "demo", relative_file_path="f1.ext", parameters={"tags": "t1", "resolve": "b"}
-                ),
-                residence_dir="demo",
-                union_membership=generated_targets_rule_runner.union_membership,
-            ),
-            MockGeneratedTarget(
-                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"], ResolveField.alias: "b"},
-                Address(
-                    "demo", relative_file_path="f1.ext", parameters={"tags": "t2", "resolve": "b"}
-                ),
-                residence_dir="demo",
-                union_membership=generated_targets_rule_runner.union_membership,
-            ),
-        },
+        f"{generator_alias}(tags=parametrize(t1=['t1'], t2=['t2']), resolve=parametrize('a', 'b'), sources=['*.ext'])",
+        files,
+        create_expected_targets(generated_targets_rule_runner.union_membership),
     )
 
 
