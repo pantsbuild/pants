@@ -14,9 +14,8 @@ from pants.build_graph.address import Address
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.engine.internals.graph import determine_explicitly_provided_dependencies, hydrate_sources
-from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import directory_digest_to_digest_contents
-from pants.engine.rules import Rule, collect_rules, implicitly, rule
+from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     AllTargets,
     ExplicitlyProvidedDependenciesRequest,
