@@ -97,7 +97,7 @@ class Process:
 
         Usually, you will want to provide input files/directories via the parameter `input_digest`.
         The process will then be able to access these paths through relative paths. If you want to
-        give multiple input digests, first merge them with `await Get(Digest, MergeDigests)`. Files 
+        give multiple input digests, first merge them with `await Get(Digest, MergeDigests)`. Files
         larger than 512KB will be read-only unless they are globbed as part of either `output_files`
         or `output_directories`.
 
