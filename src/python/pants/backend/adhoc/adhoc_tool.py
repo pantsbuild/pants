@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from pants.backend.adhoc.target_types import (
     AdhocToolArgumentsField,
     AdhocToolExecutionDependenciesField,
     AdhocToolExtraEnvVarsField,
+    AdhocToolHashOnlySourcesGlobsField,
     AdhocToolLogOutputField,
     AdhocToolNamedCachesField,
     AdhocToolOutputDirectoriesField,
@@ -20,6 +22,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolStdoutFilenameField,
     AdhocToolWorkdirField,
 )
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
@@ -30,7 +33,7 @@ from pants.core.util_rules.adhoc_process_support import (
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, Snapshot
+from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest
 from pants.engine.unions import UnionRule
@@ -81,6 +84,16 @@ async def run_in_sandbox_request(
 
     cache_scope = env_target.default_cache_scope
 
+    hash_only_sources_globs: PathGlobs | None = None
+    raw_hash_only_sources_globs = target.get(AdhocToolHashOnlySourcesGlobsField).value or ()
+    if raw_hash_only_sources_globs:
+        spec_path = target.address.spec_path
+        hash_only_sources_globs = PathGlobs(
+            globs=(os.path.join(spec_path, glob) for glob in raw_hash_only_sources_globs),
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"`{AdhocToolHashOnlySourcesGlobsField.alias}` for `adhoc_tool` target at `{target.address}`",
+        )
+
     process_request = AdhocProcessRequest(
         description=description,
         address=target.address,
@@ -99,6 +112,7 @@ async def run_in_sandbox_request(
         log_output=target[AdhocToolLogOutputField].value,
         capture_stderr_file=target[AdhocToolStderrFilenameField].value,
         capture_stdout_file=target[AdhocToolStdoutFilenameField].value,
+        hash_only_sources_globs=hash_only_sources_globs,
         cache_scope=cache_scope,
     )
 

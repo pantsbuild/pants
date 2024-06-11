@@ -27,6 +27,7 @@ from pants.engine.fs import (
     Directory,
     FileContent,
     MergeDigests,
+    PathGlobs,
     Snapshot,
 )
 from pants.engine.internals.native_engine import AddressInput, RemovePrefix
@@ -71,6 +72,7 @@ class AdhocProcessRequest:
     log_output: bool
     capture_stdout_file: str | None
     capture_stderr_file: str | None
+    hash_only_sources_globs: PathGlobs | None
     cache_scope: ProcessCacheScope | None = None
 
 
@@ -566,6 +568,14 @@ async def prepare_adhoc_process(
 
     if supplied_env_vars:
         command_env.update(supplied_env_vars)
+
+    # Compute the digest for any hash-ony sources and put the hash into the environment as a dummy variable
+    # so that the process produced by this rule will be invalidated if any of thr hash-only files change.
+    if request.hash_only_sources_globs is not None:
+        hash_only_sources_digest = await Get(Digest, PathGlobs, request.hash_only_sources_globs)
+        command_env[
+            "__PANTS_HASH_ONLY_SOURCES"
+        ] = f"{hash_only_sources_digest.fingerprint}-{hash_only_sources_digest.serialized_bytes_length}"
 
     input_snapshot = await Get(Snapshot, Digest, request.input_digest)
 

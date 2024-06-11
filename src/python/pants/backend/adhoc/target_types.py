@@ -253,6 +253,22 @@ class AdhocToolOutputRootDirField(StringField):
     )
 
 
+class AdhocToolHashOnlySourcesGlobsField(StringSequenceField):
+    alias: ClassVar[str] = "hash_only_sources_globs"
+    help = help_text(
+        """
+        Path globs for source files on which this target depends indirectly, but which should not be
+        materlized into the execution sandbox. Pants will compute the hash of all of the files
+        references by the globs and include that hash as part of the cache key for the
+        process to be executed (as an environment variable).
+
+        Note: The files will not materialized into the execution sandbox because this field is intended
+        to be used with the `workspace_environment` target type which executes processes in the
+        repository itself.
+        """
+    )
+
+
 class AdhocToolTarget(Target):
     alias: ClassVar[str] = "adhoc_tool"
     core_fields = (
@@ -272,6 +288,7 @@ class AdhocToolTarget(Target):
         AdhocToolOutputRootDirField,
         AdhocToolStdoutFilenameField,
         AdhocToolStderrFilenameField,
+        AdhocToolHashOnlySourcesGlobsField,
         EnvironmentField,
     )
     help = help_text(

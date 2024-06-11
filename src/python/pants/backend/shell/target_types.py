@@ -10,6 +10,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolDependenciesField,
     AdhocToolExecutionDependenciesField,
     AdhocToolExtraEnvVarsField,
+    AdhocToolHashOnlySourcesGlobsField,
     AdhocToolLogOutputField,
     AdhocToolNamedCachesField,
     AdhocToolOutputDependenciesField,
@@ -379,6 +380,10 @@ class ShellCommandNamedCachesField(AdhocToolNamedCachesField):
     pass
 
 
+class ShellCommandHashOnlySourcesGlobsField(AdhocToolHashOnlySourcesGlobsField):
+    pass
+
+
 class SkipShellCommandTestsField(BoolField):
     alias = "skip_tests"
     default = False
@@ -403,6 +408,7 @@ class ShellCommandTarget(Target):
         ShellCommandWorkdirField,
         ShellCommandNamedCachesField,
         ShellCommandOutputRootDirField,
+        ShellCommandHashOnlySourcesGlobsField,
         EnvironmentField,
     )
     help = help_text(

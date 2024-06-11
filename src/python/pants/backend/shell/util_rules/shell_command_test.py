@@ -69,9 +69,19 @@ def rule_runner() -> RuleRunner:
             FilesGeneratorTarget,
             LocalWorkspaceEnvironmentTarget,
         ],
+        isolated_local_store=True,
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
+
+
+def execute_shell_command(
+    rule_runner: RuleRunner,
+    address: Address,
+) -> GeneratedSources:
+    generator_type: type[GenerateSourcesRequest] = GenerateFilesFromShellCommandRequest
+    target = rule_runner.get_target(address)
+    return rule_runner.request(GeneratedSources, [generator_type(EMPTY_SNAPSHOT, target)])
 
 
 def assert_shell_command_result(
@@ -79,9 +89,7 @@ def assert_shell_command_result(
     address: Address,
     expected_contents: dict[str, str],
 ) -> None:
-    generator_type: type[GenerateSourcesRequest] = GenerateFilesFromShellCommandRequest
-    target = rule_runner.get_target(address)
-    result = rule_runner.request(GeneratedSources, [generator_type(EMPTY_SNAPSHOT, target)])
+    result = execute_shell_command(rule_runner, address)
     assert result.snapshot.files == tuple(expected_contents)
     contents = rule_runner.request(DigestContents, [result.snapshot.digest])
     for fc in contents:
@@ -871,3 +879,33 @@ def test_shell_command_with_workspace_execution(rule_runner: RuleRunner) -> None
     workspace_output_path = Path(rule_runner.build_root).joinpath("foo.txt")
     assert workspace_output_path.exists()
     assert workspace_output_path.read_text().strip() == "workspace"
+
+
+def test_shell_command_hash_only_sources_globs(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+            shell_command(
+              name="cmd",
+              # Use a random value so we can detect when re-execution occurs.
+              command='echo $RANDOM > out.log',
+              output_files=["out.log"],
+              hash_only_sources_globs=['a-file'],
+            )
+            """
+            ),
+            "src/a-file": "",
+        }
+    )
+    address = Address("src", target_name="cmd")
+
+    # Re-executing the initial execution should be cached.
+    result1 = execute_shell_command(rule_runner, address)
+    result2 = execute_shell_command(rule_runner, address)
+    assert result1.snapshot == result2.snapshot
+
+    # Update the hash-only source file's content. The shell_command should be re-executed now.
+    (Path(rule_runner.build_root) / "src" / "a-file").write_text("xyzzy")
+    result3 = execute_shell_command(rule_runner, address)
+    assert result1.snapshot != result3.snapshot
