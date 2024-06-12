@@ -3,7 +3,12 @@
 
 from pants.backend.python.goals import debug_goals, publish
 from pants.backend.python.subsystems import setuptools_scm, twine
-from pants.backend.python.target_types import VCSVersion
+from pants.backend.python.target_types import (
+    PythonTestsEntryPointDependenciesField,
+    PythonTestsGeneratorTarget,
+    PythonTestTarget,
+    VCSVersion,
+)
 from pants.backend.python.util_rules import pex, vcs_versioning
 
 
@@ -15,6 +20,11 @@ def rules():
         *setuptools_scm.rules(),
         *twine.rules(),
         *debug_goals.rules(),
+        PythonTestTarget.register_plugin_field(PythonTestsEntryPointDependenciesField),
+        PythonTestsGeneratorTarget.register_plugin_field(
+            PythonTestsEntryPointDependenciesField,
+            as_moved_field=True,
+        ),
     )
 
 

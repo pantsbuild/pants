@@ -936,6 +936,47 @@ class PythonTestsDependenciesField(PythonDependenciesField):
     supports_transitive_excludes = True
 
 
+class PythonTestsEntryPointDependenciesField(DictStringToStringSequenceField):
+    alias = "entry_point_dependencies"
+    help = help_text(
+        lambda: f"""
+        Dependencies on entry point metadata of `{PythonDistribution.alias}` targets.
+
+        This is a dict where each key is a `{PythonDistribution.alias}` address
+        and the value is a list or tuple of entry point groups and/or entry points
+        on that target. The strings in the value list/tuple must be one of:
+        - "entry.point.group/entry-point-name" to depend on a named entry point
+        - "entry.point.group" (without a "/") to depend on an entry point group
+        - "*" to get all entry points on the target
+        
+        For example:
+        
+            {PythonTestsEntryPointDependenciesField.alias}={{
+                "//foo/address:dist_tgt": ["*"],  # all entry points
+                "bar:dist_tgt": ["console_scripts"],  # only from this group
+                "foo/bar/baz:dist_tgt": ["console_scripts/my-script"],  # a single entry point
+                "another:dist_tgt": [  # multiple entry points
+                    "console_scripts/my-script",
+                    "console_scripts/another-script",
+                    "entry.point.group/entry-point-name",
+                    "other.group",
+                    "gui_scripts",
+                ],
+            }}
+
+        Code for matching `entry_points` on `{PythonDistribution.alias}` targets
+        will be added as dependencies so that they are available on PYTHONPATH
+        during tests.
+
+        Plus, an `entry_points.txt` file will be generated in the sandbox so that
+        each of the `{PythonDistribution.alias}`s appear to be "installed". The
+        `entry_points.txt` file will only include the entry points requested on this
+        field. This allows the tests, or the code under test, to lookup entry points
+        metadata using something like `pkg_resources.iter_entry_points` from `setuptools`.
+        """
+    )
+
+
 # TODO This field class should extend from a core `TestTimeoutField` once the deprecated options in `pytest` get removed.
 class PythonTestsTimeoutField(IntField):
     alias = "timeout"
@@ -1010,6 +1051,8 @@ class SkipPythonTestsField(BoolField):
 
 _PYTHON_TEST_MOVED_FIELDS = (
     PythonTestsDependenciesField,
+    # This field is registered in the experimental backend for now.
+    # PythonTestsEntryPointDependenciesField,
     PythonResolveField,
     PythonRunGoalUseSandboxField,
     PythonTestsTimeoutField,
