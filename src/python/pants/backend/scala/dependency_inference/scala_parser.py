@@ -91,11 +91,35 @@ class ScalaProvidedSymbol:
 
 
 @dataclass(frozen=True)
+class ScalaConsumedSymbol:
+    name: str
+    from_root: bool
+
+    @classmethod
+    def from_json_dict(cls, data: Mapping[str, Any]):
+        return cls(name=data["name"], from_root=data["fromRoot"])
+
+    @property
+    def is_qualified(self) -> bool:
+        # TODO: Similar to #13545: we assume that a symbol containing a dot might already
+        # be fully qualified.
+        return "." in self.name
+
+    def split(self) -> tuple[str, str]:
+        """Splits the symbol name in its relative prefix and the rest of the symbol name."""
+        symbol_rel_prefix, _, symbol_rel_suffix = self.name.partition(".")
+        return (symbol_rel_prefix, symbol_rel_suffix)
+
+    def to_debug_json_dict(self) -> dict[str, Any]:
+        return {"name": self.name, "fromRoot": self.from_root}
+
+
+@dataclass(frozen=True)
 class ScalaSourceDependencyAnalysis:
     provided_symbols: FrozenOrderedSet[ScalaProvidedSymbol]
     provided_symbols_encoded: FrozenOrderedSet[ScalaProvidedSymbol]
     imports_by_scope: FrozenDict[str, tuple[ScalaImport, ...]]
-    consumed_symbols_by_scope: FrozenDict[str, FrozenOrderedSet[str]]
+    _consumed_symbols_by_scope: FrozenDict[str, FrozenOrderedSet[ScalaConsumedSymbol]]
     scopes: FrozenOrderedSet[str]
 
     def all_imports(self) -> Iterator[str]:
@@ -119,32 +143,45 @@ class ScalaSourceDependencyAnalysis:
                     break
                 scope, _, _ = scope.rpartition(".")
 
-        for consumption_scope, consumed_symbols in self.consumed_symbols_by_scope.items():
+        for consumption_scope, consumed_symbols in self._consumed_symbols_by_scope.items():
             parent_scopes = tuple(scope_and_parents(consumption_scope))
             for symbol in consumed_symbols:
-                symbol_rel_prefix, dot_in_symbol, symbol_rel_suffix = symbol.partition(".")
-                if not self.scopes or dot_in_symbol:
-                    # TODO: Similar to #13545: we assume that a symbol containing a dot might already
-                    # be fully qualified.
-                    yield symbol
+                if not self.scopes or symbol.is_qualified or symbol.from_root:
+                    yield symbol.name
+
+                if symbol.from_root:
+                    # We do not need to qualify this symbol any further as we know its
+                    # name is the actual fully qualified name
+                    continue
+
                 for parent_scope in parent_scopes:
                     if parent_scope in self.scopes:
                         # A package declaration is a parent of this scope, and any of its symbols
                         # could be in scope.
-                        yield f"{parent_scope}.{symbol}"
+                        yield f"{parent_scope}.{symbol.name}"
 
                     for imp in self.imports_by_scope.get(parent_scope, ()):
                         if imp.is_wildcard:
                             # There is a wildcard import in a parent scope.
-                            yield f"{imp.name}.{symbol}"
-                        if dot_in_symbol:
+                            yield f"{imp.name}.{symbol.name}"
+                        if symbol.is_qualified:
                             # If the parent scope has an import which defines the first token of the
                             # symbol, then it might be a relative usage of an import.
+                            symbol_rel_prefix, symbol_rel_suffix = symbol.split()
                             if imp.alias:
                                 if imp.alias == symbol_rel_prefix:
                                     yield f"{imp.name}.{symbol_rel_suffix}"
                             elif imp.name.endswith(f".{symbol_rel_prefix}"):
                                 yield f"{imp.name}.{symbol_rel_suffix}"
+
+    @property
+    def consumed_symbols_by_scope(self) -> FrozenDict[str, FrozenOrderedSet[str]]:
+        return FrozenDict(
+            {
+                key: FrozenOrderedSet(v.name for v in values)
+                for key, values in self._consumed_symbols_by_scope.items()
+            }
+        )
 
     @classmethod
     def from_json_dict(cls, d: dict) -> ScalaSourceDependencyAnalysis:
@@ -161,9 +198,9 @@ class ScalaSourceDependencyAnalysis:
                     for key, values in d["importsByScope"].items()
                 }
             ),
-            consumed_symbols_by_scope=FrozenDict(
+            _consumed_symbols_by_scope=FrozenDict(
                 {
-                    key: FrozenOrderedSet(values)
+                    key: FrozenOrderedSet(ScalaConsumedSymbol.from_json_dict(v) for v in values)
                     for key, values in d["consumedSymbolsByScope"].items()
                 }
             ),
@@ -181,7 +218,8 @@ class ScalaSourceDependencyAnalysis:
                 for key, values in self.imports_by_scope.items()
             },
             "consumed_symbols_by_scope": {
-                k: sorted(v) for k, v in self.consumed_symbols_by_scope.items()
+                key: [v.to_debug_json_dict() for v in values]
+                for key, values in self._consumed_symbols_by_scope.items()
             },
             "scopes": list(self.scopes),
         }
