@@ -109,7 +109,7 @@ class SourceAnalysisTraverser extends Traverser {
 
   def currentScope: QualifiedName = {
     // We know `nameParts` is always non-empty, so we can be unsafe here
-    QualifiedName(NonEmptyChain.fromChainUnsafe(Chain.fromSeq(nameParts.toList)))
+    QualifiedName(NonEmptyChain.fromChainUnsafe(Chain.fromSeq(nameParts.toVector)))
   }
 
   // Extract a qualified name from a tree.
@@ -265,7 +265,7 @@ class SourceAnalysisTraverser extends Traverser {
     case Pkg(ref, stats) => {
       extractName(ref).foreach { qname =>
         recordScope(qname)
-        qname.parents.toList.foreach(nameParts.append(_))
+        qname.parents.iterator.foreach(nameParts.append(_))
         qname.simpleName.foreach { name =>
           withNamePart(name, () => super.apply(stats))
         }    
@@ -340,7 +340,7 @@ class SourceAnalysisTraverser extends Traverser {
       visitMods(mods)
       extractName(nameNode).foreach { name =>
         recordProvidedName(name)
-        extractNamesFromTypeTree(body).toList.foreach(recordConsumedSymbol(_))
+        extractNamesFromTypeTree(body).iterator.foreach(recordConsumedSymbol(_))
       }
     }
 
@@ -350,7 +350,7 @@ class SourceAnalysisTraverser extends Traverser {
         extractName(pat).foreach(recordProvidedName(_))
       })
       decltpe.foreach(tpe => {
-        extractNamesFromTypeTree(tpe).toList.foreach(recordConsumedSymbol(_))
+        extractNamesFromTypeTree(tpe).iterator.foreach(recordConsumedSymbol(_))
       })
       super.apply(rhs)
     }
@@ -361,7 +361,7 @@ class SourceAnalysisTraverser extends Traverser {
         extractName(pat).foreach(recordProvidedName(_))
       })
       decltpe.foreach(tpe => {
-        extractNamesFromTypeTree(tpe).toList.foreach(recordConsumedSymbol(_))
+        extractNamesFromTypeTree(tpe).iterator.foreach(recordConsumedSymbol(_))
       })
       super.apply(rhs)
     }
@@ -371,7 +371,7 @@ class SourceAnalysisTraverser extends Traverser {
       extractName(nameNode).foreach(recordProvidedName(_))
 
       decltpe.foreach(tpe => {
-        extractNamesFromTypeTree(tpe).toList.foreach(recordConsumedSymbol(_))
+        extractNamesFromTypeTree(tpe).iterator.foreach(recordConsumedSymbol(_))
       })
 
       apply(tparams)
@@ -382,19 +382,19 @@ class SourceAnalysisTraverser extends Traverser {
 
     case Decl.Def(mods, _nameNode, tparams, params, decltpe) => {
       visitMods(mods)
-      extractNamesFromTypeTree(decltpe).toList.foreach(recordConsumedSymbol(_))
+      extractNamesFromTypeTree(decltpe).iterator.foreach(recordConsumedSymbol(_))
       apply(tparams)
       params.foreach(param => apply(param))
     }
 
     case Decl.Val(mods, _pats, decltpe) => {
       visitMods(mods)
-      extractNamesFromTypeTree(decltpe).toList.foreach(recordConsumedSymbol(_))
+      extractNamesFromTypeTree(decltpe).iterator.foreach(recordConsumedSymbol(_))
     }
 
     case Decl.Var(mods, _pats, decltpe) => {
       visitMods(mods)
-      extractNamesFromTypeTree(decltpe).toList.foreach(recordConsumedSymbol(_))
+      extractNamesFromTypeTree(decltpe).iterator.foreach(recordConsumedSymbol(_))
     }
 
     case Import(importers) => {
@@ -424,21 +424,21 @@ class SourceAnalysisTraverser extends Traverser {
     }
 
     case Init(tpe, _name, argss) => {
-      extractNamesFromTypeTree(tpe).toList.foreach(recordConsumedSymbol(_))
+      extractNamesFromTypeTree(tpe).iterator.foreach(recordConsumedSymbol(_))
       argss.foreach(_.foreach(apply))
     }
 
     case Term.Param(mods, _name, decltpe, _default) => {
       visitMods(mods)
       decltpe.foreach(tpe => {
-        extractNamesFromTypeTree(tpe).toList.foreach(recordConsumedSymbol(_))
+        extractNamesFromTypeTree(tpe).iterator.foreach(recordConsumedSymbol(_))
       })
     }
 
     case Type.Param(mods, _name, _tparams, bounds, _vbounds, cbounds) => {
       visitMods(mods)
-      extractNamesFromTypeTree(bounds).toList.foreach(recordConsumedSymbol(_))
-      Chain.fromSeq(cbounds).flatMap(extractNamesFromTypeTree(_)).toList.foreach(recordConsumedSymbol(_))
+      extractNamesFromTypeTree(bounds).iterator.foreach(recordConsumedSymbol(_))
+      Chain.fromSeq(cbounds).flatMap(extractNamesFromTypeTree(_)).iterator.foreach(recordConsumedSymbol(_))
     }
 
     case Ctor.Primary(mods, _name, params_list) => {
@@ -457,7 +457,7 @@ class SourceAnalysisTraverser extends Traverser {
     }
 
     case Self(_name, Some(decltpe)) =>
-      extractNamesFromTypeTree(decltpe).toList.foreach(recordConsumedSymbol(_))
+      extractNamesFromTypeTree(decltpe).iterator.foreach(recordConsumedSymbol(_))
 
     case node @ Term.Select(_, _) => {
       extractName(node).foreach(recordConsumedSymbol(_))
