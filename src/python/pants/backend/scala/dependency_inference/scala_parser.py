@@ -93,11 +93,11 @@ class ScalaProvidedSymbol:
 @dataclass(frozen=True)
 class ScalaConsumedSymbol:
     name: str
-    from_root: bool
+    is_absolute: bool
 
     @classmethod
     def from_json_dict(cls, data: Mapping[str, Any]):
-        return cls(name=data["name"], from_root=data["fromRoot"])
+        return cls(name=data["name"], is_absolute=data["isAbsolute"])
 
     @property
     def is_qualified(self) -> bool:
@@ -111,7 +111,7 @@ class ScalaConsumedSymbol:
         return (symbol_rel_prefix, symbol_rel_suffix)
 
     def to_debug_json_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "fromRoot": self.from_root}
+        return {"name": self.name, "isAbsolute": self.is_absolute}
 
 
 @dataclass(frozen=True)
@@ -146,10 +146,10 @@ class ScalaSourceDependencyAnalysis:
         for consumption_scope, consumed_symbols in self._consumed_symbols_by_scope.items():
             parent_scopes = tuple(scope_and_parents(consumption_scope))
             for symbol in consumed_symbols:
-                if not self.scopes or symbol.is_qualified or symbol.from_root:
+                if not self.scopes or symbol.is_qualified or symbol.is_absolute:
                     yield symbol.name
 
-                if symbol.from_root:
+                if symbol.is_absolute:
                     # We do not need to qualify this symbol any further as we know its
                     # name is the actual fully qualified name
                     continue

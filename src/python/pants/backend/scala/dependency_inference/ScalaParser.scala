@@ -25,26 +25,30 @@ object Constants {
 }
 
 case class QualifiedName(parts: NonEmptyChain[String]) {
-  def fromRoot: Boolean = parts.head == Constants.RootPackageQualifier
+  def isAbsolute: Boolean = parts.head == Constants.RootPackageQualifier
 
-  def rootlessParts: Chain[String] = {
-    if (fromRoot) parts.tail
+  def elements: Chain[String] =
+    if (isAbsolute) parts.tail
     else parts.toChain
+
+  def parents: Chain[String] = {
+    elements.initLast.map(_._1).getOrElse(Chain.empty)
   }
 
-  def rootlessName: String = {
-    rootlessParts.intercalate(".")
+  def simpleName: Option[String] = {
+    elements.lastOption
   }
 
-  def fullName: String =
-    parts.intercalate(".")
+  lazy val fullName: String = {
+    elements.intercalate(".")
+  }
 
   def qualify(name: String): QualifiedName =
     if (name.isEmpty) this
     else QualifiedName(parts ++ NonEmptyChain.one(name))
 
   def qualify(other: QualifiedName): QualifiedName =
-    if (other.fromRoot) other
+    if (other.isAbsolute) other
     else QualifiedName(parts ++ other.parts)
 
 }
@@ -78,7 +82,7 @@ case class Analysis(
 )
 object Analysis {
   case class ProvidedSymbol(name: String, recursive: Boolean)
-  case class ConsumedSymbol(name: String, fromRoot: Boolean)
+  case class ConsumedSymbol(name: String, isAbsolute: Boolean)
 
   implicit val providedSymbolOrdering: Ordering[ProvidedSymbol] = Ordering.by(_.name)
   implicit val consumedSymbolOrdering: Ordering[ConsumedSymbol] = Ordering.by(_.name)
@@ -249,9 +253,11 @@ class SourceAnalysisTraverser extends Traverser {
   override def apply(tree: Tree): Unit = tree match {
     case Pkg(ref, stats) => {
       extractName(ref).foreach { qname =>
-        val name = qname.fullName
-        recordScope(name)
-        withNamePart(name, () => super.apply(stats))
+        scopes.add(currentScope.qualify(qname))
+        qname.parents.toList.foreach(nameParts.append(_))
+        qname.simpleName.foreach { name =>
+          withNamePart(name, () => super.apply(stats))
+        }    
       }
     }
 
@@ -455,7 +461,7 @@ class SourceAnalysisTraverser extends Traverser {
     providedSymbolsByScope
       .flatMap({ case (scopeName, symbolsForScope) =>
         symbolsForScope.map { case (symbolName, symbol) =>
-          Analysis.ProvidedSymbol(scopeName.qualify(symbolName).rootlessName, symbol.recursive)
+          Analysis.ProvidedSymbol(scopeName.qualify(symbolName).fullName, symbol.recursive)
         }.toVector
       })
       .to(SortedSet)
@@ -480,19 +486,19 @@ class SourceAnalysisTraverser extends Traverser {
           }
         })
 
-        encodedSymbolsForScope.map(symbol => symbol.copy(name = scopeName.qualify(symbol.name).rootlessName))
+        encodedSymbolsForScope.map(symbol => symbol.copy(name = scopeName.qualify(symbol.name).fullName))
       })
       .to(SortedSet)
   }
 
   def gatherImportsByScope(): Map[String, List[AnImport[String]]] =
     importsByScope.toMap.map { case (scopeName, imports) =>
-      scopeName.rootlessName -> imports.toList.map(_.map(_.rootlessName))
+      scopeName.fullName -> imports.toList.map(_.map(_.fullName))
     }
 
   def gatherConsumerSymbolsByScope(): Map[String, SortedSet[Analysis.ConsumedSymbol]] = {
     consumedSymbolsByScope.toMap.map { case (scopeName, consumedSymbolNames) =>
-      scopeName.rootlessName -> consumedSymbolNames.map(qname => Analysis.ConsumedSymbol(qname.rootlessName, qname.fromRoot)).to(SortedSet)
+      scopeName.fullName -> consumedSymbolNames.map(qname => Analysis.ConsumedSymbol(qname.fullName, qname.isAbsolute)).to(SortedSet)
     }
   }
 
@@ -502,7 +508,7 @@ class SourceAnalysisTraverser extends Traverser {
       providedSymbolsEncoded = gatherEncodedProvidedSymbols(),
       importsByScope = gatherImportsByScope(),
       consumedSymbolsByScope = gatherConsumerSymbolsByScope(),
-      scopes = scopes.map(_.rootlessName).toVector
+      scopes = scopes.map(_.fullName).toVector
     )
   }
 }
