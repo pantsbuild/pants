@@ -22,6 +22,7 @@ import scala.reflect.NameTransformer
 
 object Constants {
   val RootPackageQualifier = "_root_"
+  val NameSeparator = '.'
 }
 
 case class QualifiedName(parts: NonEmptyChain[String]) {
@@ -39,13 +40,11 @@ case class QualifiedName(parts: NonEmptyChain[String]) {
     elements.lastOption
   }
 
-  lazy val fullName: String = {
-    elements.intercalate(".")
-  }
+  lazy val fullName: String =
+    elements.intercalate(Constants.NameSeparator.toString)
 
   def qualify(name: String): QualifiedName =
-    if (name.isEmpty) this
-    else QualifiedName(parts ++ NonEmptyChain.one(name))
+    QualifiedName.fromString(name).map(qualify(_)).getOrElse(this)
 
   def qualify(other: QualifiedName): QualifiedName =
     if (other.isAbsolute) other
@@ -53,11 +52,17 @@ case class QualifiedName(parts: NonEmptyChain[String]) {
 
 }
 object QualifiedName {
-  def apply(head: String, tail: String*): QualifiedName =
-    QualifiedName(NonEmptyChain.of(head, tail:_*))
+  val Root = QualifiedName(NonEmptyChain.one(Constants.RootPackageQualifier))
 
-  def fromChain(parts: Chain[String]): QualifiedName =
-    QualifiedName(NonEmptyChain.fromChainUnsafe(parts))
+  def of(name: String): QualifiedName =
+    QualifiedName(NonEmptyChain.one(name))
+
+  def fromString(str: String): Option[QualifiedName] = {
+    // This split shouldn't be necessary, it's just a fail-safe
+    val parts = str.split(Constants.NameSeparator)
+    NonEmptyChain.fromSeq(parts).map(QualifiedName(_))
+  }
+
 }
 
 case class AnImport[A](
@@ -102,8 +107,10 @@ class SourceAnalysisTraverser extends Traverser {
   val consumedSymbolsByScope = HashMap[QualifiedName, HashSet[QualifiedName]]()
   val scopes = HashSet[QualifiedName]()
 
-  def currentScope: QualifiedName =
-    QualifiedName.fromChain(Chain.fromSeq(nameParts.toList))
+  def currentScope: QualifiedName = {
+    // We know `nameParts` is always non-empty, so we can be unsafe here
+    QualifiedName(NonEmptyChain.fromChainUnsafe(Chain.fromSeq(nameParts.toList)))
+  }
 
   // Extract a qualified name from a tree.
   def extractName(tree: Tree): Option[QualifiedName] = {
@@ -119,10 +126,10 @@ class SourceAnalysisTraverser extends Traverser {
       tree match {
         case Term.Select(qual, name)  => extractNameSelect(qual, name)
         case Type.Select(qual, name)  => extractNameSelect(qual, name)
-        case Term.Name(name)          => Some(QualifiedName(name))
-        case Type.Name(name)          => Some(QualifiedName(name))
+        case Term.Name(name)          => QualifiedName.fromString(name)
+        case Type.Name(name)          => QualifiedName.fromString(name)
         case Pat.Var(node)            => maybeExtractName(node)
-        case Name.Indeterminate(name) => Some(QualifiedName(name))
+        case Name.Indeterminate(name) => QualifiedName.fromString(name)
         case _                        => None
       }
 
@@ -131,9 +138,9 @@ class SourceAnalysisTraverser extends Traverser {
 
   def extractNamesFromTypeTree(tree: Tree): Chain[QualifiedName] = {
     tree match {
-      case Type.Name(name) => Chain.one(QualifiedName(name))
+      case Type.Name(name) => Chain.one(QualifiedName.of(name))
       case Type.Select(qual, Type.Name(name)) => {
-        val symbol = extractName(qual).map(_.qualify(name)).getOrElse(QualifiedName(name))
+        val symbol = extractName(qual).map(_.qualify(name)).getOrElse(QualifiedName.of(name))
         Chain.one(symbol)
       }
       case Type.Apply(tpe, args) =>
@@ -227,6 +234,10 @@ class SourceAnalysisTraverser extends Traverser {
   }
 
   def recordScope(name: String): Unit = {
+    QualifiedName.fromString(name).foreach(recordScope(_))
+  }
+
+  def recordScope(name: QualifiedName): Unit = {
     scopes.add(currentScope.qualify(name))
   }
 
@@ -253,7 +264,7 @@ class SourceAnalysisTraverser extends Traverser {
   override def apply(tree: Tree): Unit = tree match {
     case Pkg(ref, stats) => {
       extractName(ref).foreach { qname =>
-        scopes.add(currentScope.qualify(qname))
+        recordScope(qname)
         qname.parents.toList.foreach(nameParts.append(_))
         qname.simpleName.foreach { name =>
           withNamePart(name, () => super.apply(stats))
@@ -386,7 +397,8 @@ class SourceAnalysisTraverser extends Traverser {
 
     case Import(importers) => {
       importers.foreach({ case Importer(ref, importees) =>
-        val baseName = extractName(ref).get
+        // Importers will always have a named ref
+        val baseName = extractName(ref).getOrElse(QualifiedName.Root)
         importees.foreach(importee => {
           importee match {
             case Importee.Wildcard() => recordImport(baseName, None, true)
