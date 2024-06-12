@@ -80,7 +80,7 @@ The context is assembled as follows:
 
 ### Dependency inference support
 
-When you `COPY` PEX binaries into your image, the dependency on the `pex_binary` target will be inferred, so you don't have to add that explicitly to the list of `dependencies` on your `docker_image` target. For example, the `pex_binary` target `src/python/helloworld/bin.pex` has the default `output_path` of `src.python.helloworld/bin.pex`. So, Pants can infer a dependency based on the line `COPY src.python.helloworld/bin.pex /bin/helloworld`. This inference is also done on with targets specified in build arguments, for example:
+When you `COPY` PEX binaries into your image, the dependency on the `pex_binary` target will be inferred, so you don't have to add that explicitly to the list of `dependencies` on your `docker_image` target. For example, the `pex_binary` target `src/python/helloworld/bin.pex` has the default `output_path` of `src.python.helloworld/bin.pex`. So, Pants can infer a dependency based on the line `COPY src.python.helloworld/bin.pex /bin/helloworld`. This inference is also done for targets referenced by their target address in build arguments, for example:
 
 ```dockerfile
 FROM python:3.9

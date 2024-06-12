@@ -69,9 +69,9 @@ async def infer_docker_dependencies(
                 owning_address=dockerfile_info.address,
                 description_of_origin=softwrap(
                     f"""
-                the COPY arguments from the file {dockerfile_info.source}
-                from the target {dockerfile_info.address}
-                """
+                    the COPY arguments from the file {dockerfile_info.source}
+                    from the target {dockerfile_info.address}
+                    """
                 ),
                 skip_invalid_addresses=True,
             ),
