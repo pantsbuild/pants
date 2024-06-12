@@ -25,7 +25,7 @@ object Constants {
   val NameSeparator = '.'
 }
 
-case class QualifiedName(parts: NonEmptyChain[String]) {
+case class QualifiedName(private val parts: NonEmptyChain[String]) {
   def isAbsolute: Boolean = parts.head == Constants.RootPackageQualifier
 
   def elements: Chain[String] =
@@ -275,8 +275,7 @@ class SourceAnalysisTraverser extends Traverser {
     case Pkg.Object(mods, nameNode, templ) => {
       visitMods(mods)
       extractName(nameNode).foreach { qname =>
-        val name = qname.parts.last
-        recordScope(name)
+        recordScope(qname)
 
         // TODO: should object already be recursive?
         // an object is recursive if extends another type because we cannot figure out the provided types
@@ -288,14 +287,16 @@ class SourceAnalysisTraverser extends Traverser {
         // however for a package object the inits part can actually be found both in the inner scope as well (package inner).
         // therefore we are not calling visitTemplate, calling all the apply methods in the inner scope.
         // issue https://github.com/pantsbuild/pants/issues/16259
-        withNamePart(
-          name,
-          () => {
-            templ.inits.foreach(init => apply(init))
-            apply(templ.early)
-            apply(templ.stats)
-          }
-        )
+        qname.simpleName.foreach { name =>
+          withNamePart(
+            name,
+            () => {
+              templ.inits.foreach(init => apply(init))
+              apply(templ.early)
+              apply(templ.stats)
+            }
+          )
+        }
       }
     }
 
@@ -305,7 +306,7 @@ class SourceAnalysisTraverser extends Traverser {
         recordProvidedName(name)
         apply(defn.tparamClause)
         apply(defn.ctor)
-        visitTemplate(defn.templ, name.parts.last)
+        name.simpleName.foreach(visitTemplate(defn.templ, _))        
       }
 
     case Defn.EnumCase.After_4_6_0(mods, nameNode, tparamClause, ctor, _) =>
@@ -325,12 +326,13 @@ class SourceAnalysisTraverser extends Traverser {
         val recursive = !templ.inits.isEmpty
         recordProvidedName(name, sawObject = true, recursive = recursive)
 
-        // If the object is recursive, no need to provide the symbols inside
-        val templateName = name.parts.last
-        if (recursive)
-          withSuppressProvidedNames(() => visitTemplate(templ, templateName))
-        else
-          visitTemplate(templ, templateName)
+        name.simpleName.foreach { templateName =>
+          // If the object is recursive, no need to provide the symbols inside
+          if (recursive)
+            withSuppressProvidedNames(() => visitTemplate(templ, templateName))
+          else
+            visitTemplate(templ, templateName)
+        }        
       }
     }
 
