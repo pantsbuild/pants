@@ -471,6 +471,9 @@ class SourceAnalysisTraverser extends Traverser {
       extractName(node).foreach(recordConsumedSymbol(_))
     }
 
+    case Pat.Typed((_name, decltpe)) =>
+      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+
     case node => super.apply(node)
   }
 
