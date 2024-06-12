@@ -46,17 +46,17 @@ def test_target_generator() -> None:
         ],
     ).parametrizations
     assert len(result) == 2
-    pants_req = next(t for t in result.values() if t.address.generated_name == "pantsbuild.pants")
+    pants_req = next(t for t in result.values() if t.address.generated_name == "pantsbuild-pants")
     testutil_req = next(
-        t for t in result.values() if t.address.generated_name == "pantsbuild.pants.testutil"
+        t for t in result.values() if t.address.generated_name == "pantsbuild-pants-testutil"
     )
     assert pants_req[PythonRequirementModulesField].value == ("pants",)
     assert testutil_req[PythonRequirementModulesField].value == ("pants.testutil",)
     assert pants_req[PythonRequirementsField].value == (
-        PipRequirement.parse(f"pantsbuild.pants=={VERSION}"),
+        PipRequirement.parse(f"pantsbuild-pants=={VERSION}"),
     )
     assert testutil_req[PythonRequirementsField].value == (
-        PipRequirement.parse(f"pantsbuild.pants.testutil=={VERSION}"),
+        PipRequirement.parse(f"pantsbuild-pants-testutil=={VERSION}"),
     )
     assert pants_req[PythonRequirementFindLinksField].value == (
         "https://wheels.pantsbuild.org/simple",
@@ -77,7 +77,7 @@ def test_target_generator() -> None:
         ],
     ).parametrizations
     assert len(result) == 1
-    assert next(iter(result.keys())).generated_name == "pantsbuild.pants"
+    assert next(iter(result.keys())).generated_name == "pantsbuild-pants"
     pants_req = next(iter(result.values()))
     assert pants_req[PythonRequirementResolveField].value == "a"
 
@@ -89,15 +89,15 @@ def test_target_generator() -> None:
             )
         ],
     ).parametrizations
-    pants_req = next(t for t in result.values() if t.address.generated_name == "pantsbuild.pants")
+    pants_req = next(t for t in result.values() if t.address.generated_name == "pantsbuild-pants")
     testutil_req = next(
-        t for t in result.values() if t.address.generated_name == "pantsbuild.pants.testutil"
+        t for t in result.values() if t.address.generated_name == "pantsbuild-pants-testutil"
     )
     assert pants_req[PythonRequirementsField].value == (
-        PipRequirement.parse("pantsbuild.pants>=2.16.0,<2.17.0"),
+        PipRequirement.parse("pantsbuild-pants>=2.16.0,<2.17.0"),
     )
     assert testutil_req[PythonRequirementsField].value == (
-        PipRequirement.parse("pantsbuild.pants.testutil>=2.16.0,<2.17.0"),
+        PipRequirement.parse("pantsbuild-pants-testutil>=2.16.0,<2.17.0"),
     )
     assert pants_req[PythonRequirementFindLinksField].value == (
         "https://wheels.pantsbuild.org/simple",
