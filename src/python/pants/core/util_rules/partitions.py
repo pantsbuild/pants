@@ -69,8 +69,7 @@ class PartitionerType(Enum):
 
 class PartitionMetadata(Protocol):
     @property
-    def description(self) -> str | None:
-        ...
+    def description(self) -> str | None: ...
 
 
 class _EmptyMetadata:
@@ -125,15 +124,13 @@ class Partitions(Collection[Partition[PartitionElementT, PartitionMetadataT]]):
     @classmethod
     def single_partition(
         cls, elements: Iterable[PartitionElementT]
-    ) -> Partitions[PartitionElementT, _EmptyMetadata]:
-        ...
+    ) -> Partitions[PartitionElementT, _EmptyMetadata]: ...
 
     @overload
     @classmethod
     def single_partition(
         cls, elements: Iterable[PartitionElementT], *, metadata: PartitionMetadataT
-    ) -> Partitions[PartitionElementT, PartitionMetadataT]:
-        ...
+    ) -> Partitions[PartitionElementT, PartitionMetadataT]: ...
 
     @classmethod
     def single_partition(

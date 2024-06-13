@@ -78,11 +78,13 @@ def test_extract_process_config_from_environment() -> None:
     def assert_config(
         *,
         envs_enabled: bool = True,
-        env_tgt: LocalEnvironmentTarget
-        | LocalWorkspaceEnvironmentTarget
-        | RemoteEnvironmentTarget
-        | DockerEnvironmentTarget
-        | None,
+        env_tgt: (
+            LocalEnvironmentTarget
+            | LocalWorkspaceEnvironmentTarget
+            | RemoteEnvironmentTarget
+            | DockerEnvironmentTarget
+            | None
+        ),
         enable_remote_execution: bool,
         expected_remote_execution: bool,
         expected_docker_image: str | None,
@@ -377,9 +379,9 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
     ) -> LocalEnvironmentTarget:
         return LocalEnvironmentTarget(
             {
-                CompatiblePlatformsField.alias: [plat.value for plat in compatible_platforms]
-                if compatible_platforms
-                else None,
+                CompatiblePlatformsField.alias: (
+                    [plat.value for plat in compatible_platforms] if compatible_platforms else None
+                ),
                 FallbackEnvironmentField.alias: "fallback" if fallback else None,
             },
             Address("envs"),

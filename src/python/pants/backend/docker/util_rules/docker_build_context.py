@@ -236,9 +236,11 @@ class DockerBuildContext:
             # values from the Dockerfile however, in order to not having to duplicate them in
             # the BUILD files.
             return {
-                arg_name: arg_value
-                if has_value
-                else build_env.get(arg_name, build_arg_defaults.get(arg_name))
+                arg_name: (
+                    arg_value
+                    if has_value
+                    else build_env.get(arg_name, build_arg_defaults.get(arg_name))
+                )
                 for arg_name, has_value, arg_value in [
                     build_arg.partition("=") for build_arg in build_args
                 ]

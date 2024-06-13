@@ -95,8 +95,9 @@ def assert_build_context(
     *,
     build_upstream_images: bool = False,
     expected_files: list[str],
-    expected_interpolation_context: dict[str, str | dict[str, str] | InterpolationValue]
-    | None = None,
+    expected_interpolation_context: (
+        dict[str, str | dict[str, str] | InterpolationValue] | None
+    ) = None,
     expected_num_upstream_images: int = 0,
     pants_args: list[str] | None = None,
     runner_options: dict[str, Any] | None = None,

@@ -523,12 +523,10 @@ class RuleRunner:
         return path
 
     @overload
-    def write_files(self, files: Mapping[str, str | bytes]) -> tuple[str, ...]:
-        ...
+    def write_files(self, files: Mapping[str, str | bytes]) -> tuple[str, ...]: ...
 
     @overload
-    def write_files(self, files: Mapping[PurePath, str | bytes]) -> tuple[str, ...]:
-        ...
+    def write_files(self, files: Mapping[PurePath, str | bytes]) -> tuple[str, ...]: ...
 
     def write_files(
         self, files: Mapping[PurePath, str | bytes] | Mapping[str, str | bytes]

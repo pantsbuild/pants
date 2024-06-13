@@ -728,9 +728,11 @@ def test_setup_pex_requirements() -> None:
                     output_type=PexRequirementsInfo,
                     input_types=(PexRequirements,),
                     mock=lambda _: PexRequirementsInfo(
-                        tuple(str(x) for x in requirements.req_strings_or_addrs)
-                        if isinstance(requirements, PexRequirements)
-                        else tuple(),
+                        (
+                            tuple(str(x) for x in requirements.req_strings_or_addrs)
+                            if isinstance(requirements, PexRequirements)
+                            else tuple()
+                        ),
                         ("imma/link",) if include_find_links else tuple(),
                     ),
                 ),

@@ -280,9 +280,9 @@ async def find_available_third_party_artifacts(
     address_mapping: DefaultDict[
         tuple[_ResolveName, UnversionedCoordinate], OrderedSet[Address]
     ] = defaultdict(OrderedSet)
-    package_mapping: DefaultDict[
-        tuple[_ResolveName, UnversionedCoordinate], OrderedSet[str]
-    ] = defaultdict(OrderedSet)
+    package_mapping: DefaultDict[tuple[_ResolveName, UnversionedCoordinate], OrderedSet[str]] = (
+        defaultdict(OrderedSet)
+    )
     for tgt in all_jvm_artifact_tgts:
         coord = UnversionedCoordinate(
             group=tgt[JvmArtifactGroupField].value, artifact=tgt[JvmArtifactArtifactField].value

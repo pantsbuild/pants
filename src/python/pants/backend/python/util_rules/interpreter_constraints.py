@@ -27,12 +27,10 @@ from pants.util.strutil import softwrap
 # https://mypy.readthedocs.io/en/stable/protocols.html.
 class FieldSetWithInterpreterConstraints(Protocol):
     @property
-    def address(self) -> Address:
-        ...
+    def address(self) -> Address: ...
 
     @property
-    def interpreter_constraints(self) -> InterpreterConstraintsField:
-        ...
+    def interpreter_constraints(self) -> InterpreterConstraintsField: ...
 
 
 _FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)

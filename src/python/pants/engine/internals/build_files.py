@@ -511,15 +511,15 @@ async def get_dependencies_rule_application(
     for dependency_address, (dependency_rules_family, dependency_target) in zip(
         request.dependencies, dependencies_family_adaptor
     ):
-        dependencies_rule[
-            dependency_address
-        ] = build_file_dependency_rules_class.check_dependency_rules(
-            origin_address=request.address,
-            origin_adaptor=origin_target,
-            dependencies_rules=origin_rules_family.dependencies_rules,
-            dependency_address=dependency_address,
-            dependency_adaptor=dependency_target,
-            dependents_rules=dependency_rules_family.dependents_rules,
+        dependencies_rule[dependency_address] = (
+            build_file_dependency_rules_class.check_dependency_rules(
+                origin_address=request.address,
+                origin_adaptor=origin_target,
+                dependencies_rules=origin_rules_family.dependencies_rules,
+                dependency_address=dependency_address,
+                dependency_adaptor=dependency_target,
+                dependents_rules=dependency_rules_family.dependents_rules,
+            )
         )
     return DependenciesRuleApplication(request.address, FrozenDict(dependencies_rule))
 

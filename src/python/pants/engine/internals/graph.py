@@ -1106,9 +1106,10 @@ async def find_owners(
     live_dirs = FrozenOrderedSet(os.path.dirname(s) for s in live_files)
     deleted_dirs = FrozenOrderedSet(os.path.dirname(s) for s in deleted_files)
 
-    def create_live_and_deleted_gets(
-        *, filter_by_global_options: bool
-    ) -> tuple[Get[FilteredTargets | Targets], Get[UnexpandedTargets],]:
+    def create_live_and_deleted_gets(*, filter_by_global_options: bool) -> tuple[
+        Get[FilteredTargets | Targets],
+        Get[UnexpandedTargets],
+    ]:
         """Walk up the buildroot looking for targets that would conceivably claim changed sources.
 
         For live files, we use Targets, which causes generated targets to be used rather than their

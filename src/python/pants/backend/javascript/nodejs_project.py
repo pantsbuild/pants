@@ -223,9 +223,11 @@ async def find_node_js_projects(
     resolve_names: UserChosenNodeJSResolveAliases,
 ) -> AllNodeJSProjects:
     project_paths = (
-        ProjectPaths(pkg.root_dir, ["", *pkg.workspaces])
-        if pkg not in pnpm_workspaces
-        else ProjectPaths(pkg.root_dir, ["", *pnpm_workspaces[pkg].packages])
+        (
+            ProjectPaths(pkg.root_dir, ["", *pkg.workspaces])
+            if pkg not in pnpm_workspaces
+            else ProjectPaths(pkg.root_dir, ["", *pnpm_workspaces[pkg].packages])
+        )
         for pkg in package_workspaces
     )
 

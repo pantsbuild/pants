@@ -203,13 +203,11 @@ class PexBinaryDependenciesField(Dependencies):
 
 class MainSpecification(ABC):
     @abstractmethod
-    def iter_pex_args(self) -> Iterator[str]:
-        ...
+    def iter_pex_args(self) -> Iterator[str]: ...
 
     @property
     @abstractmethod
-    def spec(self) -> str:
-        ...
+    def spec(self) -> str: ...
 
 
 @dataclass(frozen=True)

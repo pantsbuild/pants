@@ -74,9 +74,11 @@ async def bundle_openapi_document(request: _BundleOpenApiDocument, redocly: Redo
     source_root_request = Get(
         SourceRoot,
         SourceRootRequest,
-        SourceRootRequest(PurePath(request.bundle_source_root))
-        if request.bundle_source_root
-        else SourceRootRequest.for_target(request.target),
+        (
+            SourceRootRequest(PurePath(request.bundle_source_root))
+            if request.bundle_source_root
+            else SourceRootRequest.for_target(request.target)
+        ),
     )
 
     target_stripped_sources_request = Get(

@@ -359,9 +359,9 @@ def _normalize_fingerprints(tds: Sequence[TargetData]) -> list[TargetData]:
     return [
         dataclasses.replace(
             td,
-            expanded_sources=None
-            if td.expanded_sources is None
-            else _snapshot("", td.expanded_sources.files),
+            expanded_sources=(
+                None if td.expanded_sources is None else _snapshot("", td.expanded_sources.files)
+            ),
         )
         for td in tds
     ]

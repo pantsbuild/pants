@@ -73,9 +73,9 @@ async def generate_entry_points_txt_from_stevedore_extension(
     )
 
     # arrange in sibling groups
-    stevedore_extensions_by_path: dict[
-        str, list[ResolvedPythonDistributionEntryPoints]
-    ] = defaultdict(list)
+    stevedore_extensions_by_path: dict[str, list[ResolvedPythonDistributionEntryPoints]] = (
+        defaultdict(list)
+    )
     for resolved_ep, paths in zip(all_resolved_entry_points, resolved_paths):
         path = paths.dirs[0]  # just take the first match
         stevedore_extensions_by_path[path].append(resolved_ep)

@@ -74,8 +74,7 @@ def run_yamllint(
     *,
     extra_args: list[str] | None = None,
     expected_partitions: None = None,
-) -> LintResult:
-    ...
+) -> LintResult: ...
 
 
 @overload
@@ -84,8 +83,7 @@ def run_yamllint(
     *,
     extra_args: list[str] | None = None,
     expected_partitions: tuple[tuple[str, ...], dict[str, tuple[str, ...]]],
-) -> list[LintResult]:
-    ...
+) -> list[LintResult]: ...
 
 
 def run_yamllint(
