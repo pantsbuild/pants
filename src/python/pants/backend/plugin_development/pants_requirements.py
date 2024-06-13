@@ -92,9 +92,9 @@ def generate_from_pants_requirements(
             union_membership,
         )
 
-    result = [create_tgt("pantsbuild.pants", "pants")]
+    result = [create_tgt("pantsbuild-pants", "pants")]
     if generator[PantsRequirementsTestutilField].value:
-        result.append(create_tgt("pantsbuild.pants.testutil", "pants.testutil"))
+        result.append(create_tgt("pantsbuild-pants-testutil", "pants.testutil"))
     return GeneratedTargets(generator, result)
 
 
