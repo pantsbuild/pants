@@ -145,7 +145,86 @@ async def get_filtered_entry_point_dependencies(
     )
 
 
+@dataclass(frozen=True)
+class PythonTestsEntryPointDependenciesInferenceFieldSet(FieldSet):
+
+    required_fields = (
+        PythonTestsDependenciesField,
+        PythonTestsEntryPointDependenciesField,
+    )
+    entry_point_dependencies: PythonTestsEntryPointDependenciesField
+
+
+class InferEntryPointDependencies(InferDependenciesRequest):
+    infer_from = PythonTestsEntryPointDependenciesField
+
+
+@rule(
+    desc=f"Infer dependencies based on `{PythonTestsEntryPointDependenciesField.alias}` field.",
+    level=LogLevel.DEBUG,
+)
+async def infer_entry_point_dependencies(
+    request: InferEntryPointDependencies,
+) -> InferredDependencies:
+    entry_point_deps: PythonTestsEntryPointDependenciesField = (
+        request.field_set.entry_point_dependencies
+    )
+    if entry_point_deps.value is None:
+        return InferredDependencies([])
+
+    targets = await Get(
+        Targets,
+        UnparsedAddressInputs(
+            entry_point_deps.value.keys(),
+            owning_address=request.field_set.address,
+            description_of_origin=f"{PythonTestsEntryPointDependenciesField.alias} from {request.field_set.address}",
+        ),
+    )
+
+    requested_entry_points: dict[PythonDistribution, set[str]] = {}
+
+    address: Address
+    requested_ep: tuple[str, ...]
+    for target, (address, requested_ep) in zip(targets, entry_point_deps.value.items()):
+        assert target.address == address, "sort order was not preserved"
+
+        if not requested_ep:
+            # requested an empty list, so no entry points were actually requested.
+            continue
+        if "*" in requested_ep and len(requested_ep) > 1:
+            requested_ep = ("*",)
+
+        if not target.has_field(PythonDistributionEntryPointsField):
+            # unknown target type. ignore
+            continue
+        if not target.get(PythonDistributionEntryPointsField).value:
+            # no entry points can be resolved.
+            # TODO: Maybe warn that the requested entry points do not exist?
+            continue
+        requested_entry_points[target] = set(requested_ep)
+
+    def predicate(tgt: PythonDistribution, ep_group: str, ep_name: str) -> bool:
+        relevant = {"*", ep_group, f"{ep_group}/{ep_name}"}
+        requested = requested_entry_points[tgt]
+        if relevant & requested:
+            # at least one item in requested is relevant
+            return True
+        return False
+
+    entry_point_dependencies = await Get(
+        EntryPointDependencies,
+        GetEntryPointDependenciesRequest(Targets(requested_entry_points.keys()), predicate),
+    )
+    return InferredDependencies(entry_point_dependencies.addresses)
+
+
 def rules():
     return [
         *collect_rules(),
+        PythonTestTarget.register_plugin_field(PythonTestsEntryPointDependenciesField),
+        PythonTestsGeneratorTarget.register_plugin_field(
+            PythonTestsEntryPointDependenciesField,
+            as_moved_field=True,
+        ),
+        UnionRule(InferDependenciesRequest, InferEntryPointDependencies),
     ]
