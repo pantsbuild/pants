@@ -28,7 +28,7 @@ from pants.engine.target import GeneratedSources
 from pants.testutil.rule_runner import RuleRunner
 
 
-@pytest.fixture(params=[("pnpm", "7.33.7"), ("npm", "10.8.1"), ("yarn", "1.22.22")])
+@pytest.fixture(params=[("pnpm", "8.15.8"), ("npm", "10.8.1"), ("yarn", "1.22.22")])
 def package_manager_and_version(request) -> tuple[str, str]:
     return cast(tuple[str, str], request.param)
 

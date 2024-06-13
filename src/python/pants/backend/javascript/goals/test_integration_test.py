@@ -32,7 +32,7 @@ from pants.testutil.rule_runner import RuleRunner
 ATTEMPTS_DEFAULT_OPTION = 2
 
 
-@pytest.fixture(params=[("npm", "10.8.1"), ("pnpm", "7.33.7"), ("yarn", "1.22.22")])
+@pytest.fixture(params=[("npm", "10.8.1"), ("pnpm", "8.15.8"), ("yarn", "1.22.22")])
 def package_manager_and_version(request) -> tuple[str, str]:
     return cast(tuple[str, str], request.param)
 
