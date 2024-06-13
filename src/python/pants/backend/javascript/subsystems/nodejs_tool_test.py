@@ -100,7 +100,7 @@ def test_resolve_dictates_version(
             "package.json": json.dumps(
                 {
                     "name": "@the-company/project",
-                    "devDependencies": {"cowsay": "1.6.0"},
+                    "devDependencies": {"cowsay": "^1.6.0"},
                     "packageManager": f"{package_manager}@{package_manager_version}",
                 },
             ),
