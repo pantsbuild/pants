@@ -99,6 +99,16 @@ class FetchedHelmArtifact(EngineAwareReturnType):
         return {"snapshot": self.snapshot}
 
 
+def assemble_pull_target(resolved_artifact: ResolvedHelmArtifact) -> list[str]:
+    """The target of `pull` need different args depending on whether it's an OCI Registry or a Helm
+    Chart Repository."""
+    is_oci = resolved_artifact.requirement.location.spec.startswith("oci://")
+    if is_oci:
+        return [f"{resolved_artifact.location_url}/{resolved_artifact.name}"]
+    else:
+        return [resolved_artifact.name, "--repo", resolved_artifact.location_url]
+
+
 @rule(desc="Fetch Helm artifact", level=LogLevel.DEBUG)
 async def fetch_helm_artifact(request: FetchHelmArtifactRequest) -> FetchedHelmArtifact:
     download_prefix = "__downloads"
@@ -113,9 +123,7 @@ async def fetch_helm_artifact(request: FetchHelmArtifactRequest) -> FetchedHelmA
         HelmProcess(
             argv=[
                 "pull",
-                resolved_artifact.name,
-                "--repo",
-                resolved_artifact.location_url,
+                *assemble_pull_target(resolved_artifact),
                 "--version",
                 resolved_artifact.version,
                 "--destination",
