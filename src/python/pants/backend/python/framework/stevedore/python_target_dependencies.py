@@ -21,7 +21,6 @@ from pants.backend.python.target_types import (
     PythonTestsGeneratorTarget,
     PythonTestTarget,
 )
-from pants.backend.python.util_rules import entry_points
 from pants.backend.python.util_rules.entry_points import (
     EntryPointDependencies,
     GetEntryPointDependenciesRequest,
@@ -163,7 +162,6 @@ async def infer_stevedore_namespaces_dependencies(
 def rules():
     return [
         *collect_rules(),
-        *entry_points.rules(),
         PythonTestsGeneratorTarget.register_plugin_field(StevedoreNamespacesField),
         PythonTestTarget.register_plugin_field(StevedoreNamespacesField),
         UnionRule(InferDependenciesRequest, InferStevedoreNamespacesDependencies),
