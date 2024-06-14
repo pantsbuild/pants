@@ -42,8 +42,8 @@ from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
-PythonDistributionEntryPointGroupPredicate = Callable[[PythonDistribution, str], bool]
-PythonDistributionEntryPointPredicate = Callable[[PythonDistribution, str, str], bool]
+PythonDistributionEntryPointGroupPredicate = Callable[[Target, str], bool]
+PythonDistributionEntryPointPredicate = Callable[[Target, str, str], bool]
 
 
 def get_python_distribution_entry_point_unambiguous_module_owners(
@@ -53,7 +53,7 @@ def get_python_distribution_entry_point_unambiguous_module_owners(
     entry_point: EntryPoint,
     explicitly_provided_deps: ExplicitlyProvidedDependencies,
     owners: PythonModuleOwners,
-) -> tuple[Address]:
+) -> tuple[Address, ...]:
     field_str = repr({entry_point_group: {entry_point_name: entry_point.spec}})
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
         owners.ambiguous,
@@ -100,14 +100,14 @@ async def get_filtered_entry_point_dependencies(
             ExplicitlyProvidedDependencies,
             DependenciesRequest(tgt[PythonDistributionDependenciesField]),
         )
-        for _, tgt in request.targets
+        for tgt in request.targets
     )
     resolved_entry_points = await MultiGet(
         Get(
             ResolvedPythonDistributionEntryPoints,
             ResolvePythonDistributionEntryPointsRequest(tgt[PythonDistributionEntryPointsField]),
         )
-        for _, tgt in request.targets
+        for tgt in request.targets
     )
 
     filtered_entry_point_pex_addresses: list[Address] = []
@@ -119,13 +119,12 @@ async def get_filtered_entry_point_dependencies(
     for tgt, distribution_entry_points, explicitly_provided_deps in zip(
         request.targets, resolved_entry_points, all_explicit_dependencies
     ):
-        entry_points_field = tgt[PythonDistributionEntryPointsField]
         # use .val instead of .explicit_modules and .pex_binary_addresses to facilitate filtering
         for ep_group, entry_points in distribution_entry_points.val.items():
-            if not request.group_predicate(entry_points_field, ep_group):
+            if not request.group_predicate(tgt, ep_group):
                 continue
             for ep_name, ep_val in entry_points.items():
-                if not request.predicate(entry_points_field, ep_group, ep_name):
+                if not request.predicate(tgt, ep_group, ep_name):
                     continue
                 if ep_val.pex_binary_address:
                     filtered_entry_point_pex_addresses.append(ep_val.pex_binary_address)
@@ -155,7 +154,7 @@ async def get_filtered_entry_point_dependencies(
         )
 
     return EntryPointDependencies(
-        Addresses(*filtered_entry_point_pex_addresses, *filtered_unambiguous_module_owners)
+        Addresses((*filtered_entry_point_pex_addresses, *filtered_unambiguous_module_owners))
     )
 
 
@@ -197,26 +196,24 @@ async def infer_entry_point_dependencies(
 
 
 async def get_entry_point_deps_targets_and_predicates(
-    address: Address, entry_point_deps: PythonTestsEntryPointDependenciesField
+    owning_address: Address, entry_point_deps: PythonTestsEntryPointDependenciesField
 ) -> tuple[
     Targets, PythonDistributionEntryPointGroupPredicate, PythonDistributionEntryPointPredicate
 ]:
+    assert entry_point_deps.value, "Unexpected empty entry_point_dependencies field"
     targets = await Get(
         Targets,
         UnparsedAddressInputs(
             entry_point_deps.value.keys(),
-            owning_address=address,
-            description_of_origin=f"{PythonTestsEntryPointDependenciesField.alias} from {address}",
+            owning_address=owning_address,
+            description_of_origin=f"{PythonTestsEntryPointDependenciesField.alias} from {owning_address}",
         ),
     )
 
-    requested_entry_points: dict[PythonDistribution, set[str]] = {}
+    requested_entry_points: dict[Target, set[str]] = {}
 
-    address: Address
     requested_ep: tuple[str, ...]
-    for target, (address, requested_ep) in zip(targets, entry_point_deps.value.items()):
-        assert target.address == address, "sort order was not preserved"
-
+    for target, requested_ep in zip(targets, entry_point_deps.value.values()):
         if not requested_ep:
             # requested an empty list, so no entry points were actually requested.
             continue
@@ -232,14 +229,14 @@ async def get_entry_point_deps_targets_and_predicates(
             continue
         requested_entry_points[target] = set(requested_ep)
 
-    def group_predicate(tgt: PythonDistribution, ep_group: str) -> bool:
+    def group_predicate(tgt: Target, ep_group: str) -> bool:
         relevant = ("*", ep_group)
         for item in sorted(requested_entry_points[tgt]):
             if item in relevant or item.startswith(f"{ep_group}/"):
                 return True
         return False
 
-    def predicate(tgt: PythonDistribution, ep_group: str, ep_name: str) -> bool:
+    def predicate(tgt: Target, ep_group: str, ep_name: str) -> bool:
         relevant = {"*", ep_group, f"{ep_group}/{ep_name}"}
         if relevant & requested_entry_points[tgt]:
             # at least one requested entry point is relevant
@@ -284,8 +281,12 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
     )
 
     entry_points_by_path: dict[
-        str, list[tuple[PythonDistribution, ResolvedPythonDistributionEntryPoints]]
+        str, list[tuple[Target, ResolvedPythonDistributionEntryPoints]]
     ] = defaultdict(list)
+
+    target: Target
+    resolved_ep: ResolvedPythonDistributionEntryPoints
+    paths: Paths
     for target, resolved_ep, paths in zip(
         request.targets, all_resolved_entry_points, resolved_paths
     ):
@@ -293,10 +294,10 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
         entry_points_by_path[path].append((target, resolved_ep))
 
     entry_points_txt_files = []
-    for module_path, (target, resolved_eps) in entry_points_by_path.items():
+    for module_path, target_and_resolved_eps in entry_points_by_path.items():
         group_sections = {}
 
-        for resolved_ep in resolved_eps:
+        for target, resolved_ep in target_and_resolved_eps:
             ep_group: str
             entry_points: FrozenDict[str, PythonDistributionEntryPoint]
             for ep_group, entry_points in resolved_ep.val.items():
