@@ -9,6 +9,7 @@ from pants.backend.python.dependency_inference.module_mapper import (
 )
 from pants.backend.python.target_types import (
     EntryPoint,
+    PythonDistribution,
     PythonDistributionDependenciesField,
     PythonDistributionEntryPointsField,
     PythonTestTarget,
@@ -34,14 +35,6 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
-
-
-PythonDistributionEntryPointGroupPredicate = Callable[
-    [PythonDistributionEntryPointsField, str], bool
-]
-PythonDistributionEntryPointPredicate = Callable[
-    [PythonDistributionEntryPointsField, str, str], bool
-]
 
 
 def get_python_distribution_entry_point_unambiguous_module_owners(
@@ -75,8 +68,8 @@ def get_python_distribution_entry_point_unambiguous_module_owners(
 @dataclass(frozen=True)
 class GetEntryPointDependenciesRequest:
     targets: Targets
-    group_predicate: PythonDistributionEntryPointGroupPredicate
-    predicate: PythonDistributionEntryPointPredicate
+    group_predicate: Callable[[PythonDistribution, str], bool]
+    predicate: Callable[[PythonDistribution, str, str], bool]
 
 
 @dataclass(frozen=True)
@@ -193,8 +186,7 @@ async def infer_entry_point_dependencies(
         ),
     )
 
-    requested_entry_points: dict[PythonDistributionEntryPointsField, set[str]] = {}
-    wanted_targets = []
+    requested_entry_points: dict[PythonDistribution, set[str]] = {}
 
     address: Address
     requested_ep: tuple[str, ...]
@@ -210,31 +202,31 @@ async def infer_entry_point_dependencies(
         if not target.has_field(PythonDistributionEntryPointsField):
             # unknown target type. ignore
             continue
-        entry_points_field = target.get(PythonDistributionEntryPointsField)
-        if not entry_points_field.value:
+        if not target.get(PythonDistributionEntryPointsField).value:
             # no entry points can be resolved.
             # TODO: Maybe warn that the requested entry points do not exist?
             continue
-        wanted_targets.append(target)
-        requested_entry_points[entry_points_field] = set(requested_ep)
+        requested_entry_points[target] = set(requested_ep)
 
-    def group_predicate(field: PythonDistributionEntryPointsField, ep_group: str) -> bool:
+    def group_predicate(tgt: PythonDistribution, ep_group: str) -> bool:
         relevant = {"*", ep_group}
-        requested = requested_entry_points[field]
+        requested = requested_entry_points[tgt]
         if relevant & requested:
             # at least one item in requested is relevant
             return True
         return False
 
-    def predicate(field: PythonDistributionEntryPointsField, ep_group: str, ep_name: str) -> bool:
-        requested = requested_entry_points[field]
+    def predicate(tgt: PythonDistribution, ep_group: str, ep_name: str) -> bool:
+        requested = requested_entry_points[tgt]
         if f"{ep_group}/{ep_name}" in requested:
             return True
         return False
 
     entry_point_dependencies = await Get(
         EntryPointDependencies,
-        GetEntryPointDependenciesRequest(Targets(wanted_targets), group_predicate, predicate),
+        GetEntryPointDependenciesRequest(
+            Targets(requested_entry_points.keys()), group_predicate, predicate
+        ),
     )
     return InferredDependencies(entry_point_dependencies.addresses)
 
