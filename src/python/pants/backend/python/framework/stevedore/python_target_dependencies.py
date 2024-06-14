@@ -152,8 +152,8 @@ async def infer_stevedore_namespaces_dependencies(
         EntryPointDependencies,
         GetEntryPointDependenciesRequest(
             targets,
-            lambda tgt, ns, ep_name: True,
-            lambda tgt, ns: ns in requested_namespaces_value,
+            lambda field, ns: ns in requested_namespaces_value,
+            lambda field, ns, ep_name: True,
         ),
     )
 

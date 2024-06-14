@@ -9,7 +9,6 @@ from pants.backend.python.dependency_inference.module_mapper import (
 )
 from pants.backend.python.target_types import (
     EntryPoint,
-    PythonDistribution,
     PythonDistributionDependenciesField,
     PythonDistributionEntryPointsField,
     PythonTestTarget,
@@ -37,8 +36,12 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 
-PythonDistributionEntryPointPredicate = Callable[[PythonDistribution, str, str], bool]
-PythonDistributionEntryPointGroupPredicate = Callable[[PythonDistribution, str], bool]
+PythonDistributionEntryPointGroupPredicate = Callable[
+    [PythonDistributionEntryPointsField, str], bool
+]
+PythonDistributionEntryPointPredicate = Callable[
+    [PythonDistributionEntryPointsField, str, str], bool
+]
 
 
 def get_python_distribution_entry_point_unambiguous_module_owners(
@@ -72,8 +75,8 @@ def get_python_distribution_entry_point_unambiguous_module_owners(
 @dataclass(frozen=True)
 class GetEntryPointDependenciesRequest:
     targets: Targets
-    predicate: PythonDistributionEntryPointPredicate
     group_predicate: PythonDistributionEntryPointGroupPredicate
+    predicate: PythonDistributionEntryPointPredicate
 
 
 @dataclass(frozen=True)
@@ -114,13 +117,14 @@ async def get_filtered_entry_point_dependencies(
     for tgt, distribution_entry_points, explicitly_provided_deps in zip(
         request.targets, resolved_entry_points, all_explicit_dependencies
     ):
+        entry_points_field = tgt[PythonDistributionEntryPointsField]
         # use .val instead of .explicit_modules and .pex_binary_addresses to facilitate filtering
         for ep_group, entry_points in distribution_entry_points.val.items():
-            want_group = request.group_predicate(tgt, ep_group)
+            want_group = request.group_predicate(entry_points_field, ep_group)
             if not want_group:
                 continue
             for ep_name, ep_val in entry_points.items():
-                if want_group or request.predicate(tgt, ep_group, ep_name):
+                if want_group or request.predicate(entry_points_field, ep_group, ep_name):
                     if ep_val.pex_binary_address:
                         filtered_entry_point_pex_addresses.append(ep_val.pex_binary_address)
                     else:
@@ -189,7 +193,8 @@ async def infer_entry_point_dependencies(
         ),
     )
 
-    requested_entry_points: dict[PythonDistribution, set[str]] = {}
+    requested_entry_points: dict[PythonDistributionEntryPointsField, set[str]] = {}
+    wanted_targets = []
 
     address: Address
     requested_ep: tuple[str, ...]
@@ -205,31 +210,31 @@ async def infer_entry_point_dependencies(
         if not target.has_field(PythonDistributionEntryPointsField):
             # unknown target type. ignore
             continue
-        if not target.get(PythonDistributionEntryPointsField).value:
+        entry_points_field = target.get(PythonDistributionEntryPointsField)
+        if not entry_points_field.value:
             # no entry points can be resolved.
             # TODO: Maybe warn that the requested entry points do not exist?
             continue
-        requested_entry_points[target] = set(requested_ep)
+        wanted_targets.append(target)
+        requested_entry_points[entry_points_field] = set(requested_ep)
 
-    def predicate(tgt: PythonDistribution, ep_group: str, ep_name: str) -> bool:
-        requested = requested_entry_points[tgt]
-        if f"{ep_group}/{ep_name}" in requested:
-            return True
-        return False
-
-    def group_predicate(tgt: PythonDistribution, ep_group: str) -> bool:
+    def group_predicate(field: PythonDistributionEntryPointsField, ep_group: str) -> bool:
         relevant = {"*", ep_group}
-        requested = requested_entry_points[tgt]
+        requested = requested_entry_points[field]
         if relevant & requested:
             # at least one item in requested is relevant
             return True
         return False
 
+    def predicate(field: PythonDistributionEntryPointsField, ep_group: str, ep_name: str) -> bool:
+        requested = requested_entry_points[field]
+        if f"{ep_group}/{ep_name}" in requested:
+            return True
+        return False
+
     entry_point_dependencies = await Get(
         EntryPointDependencies,
-        GetEntryPointDependenciesRequest(
-            Targets(requested_entry_points.keys()), predicate, group_predicate
-        ),
+        GetEntryPointDependenciesRequest(Targets(wanted_targets), group_predicate, predicate),
     )
     return InferredDependencies(entry_point_dependencies.addresses)
 
