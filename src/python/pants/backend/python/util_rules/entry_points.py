@@ -183,17 +183,8 @@ async def infer_entry_point_dependencies(
     if entry_point_deps.value is None:
         return InferredDependencies([])
 
-    targets = await Get(
-        Targets,
-        UnparsedAddressInputs(
-            entry_point_deps.value.keys(),
-            owning_address=request.field_set.address,
-            description_of_origin=f"{PythonTestsEntryPointDependenciesField.alias} from {request.field_set.address}",
-        ),
-    )
-
-    dist_targets, group_predicate, predicate = get_requested_entry_points_predicates(
-        targets, entry_point_deps
+    dist_targets, group_predicate, predicate = await get_entry_point_deps_targets_and_predicates(
+        request.field_set.address, entry_point_deps
     )
 
     entry_point_dependencies = await Get(
@@ -203,11 +194,20 @@ async def infer_entry_point_dependencies(
     return InferredDependencies(entry_point_dependencies.addresses)
 
 
-def get_requested_entry_points_predicates(
-    targets: Targets, entry_point_deps: PythonTestsEntryPointDependenciesField
+async def get_entry_point_deps_targets_and_predicates(
+    address: Address, entry_point_deps: PythonTestsEntryPointDependenciesField
 ) -> tuple[
     Targets, PythonDistributionEntryPointGroupPredicate, PythonDistributionEntryPointPredicate
 ]:
+    targets = await Get(
+        Targets,
+        UnparsedAddressInputs(
+            entry_point_deps.value.keys(),
+            owning_address=address,
+            description_of_origin=f"{PythonTestsEntryPointDependenciesField.alias} from {address}",
+        ),
+    )
+
     requested_entry_points: dict[PythonDistribution, set[str]] = {}
 
     address: Address
