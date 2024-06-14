@@ -1,5 +1,6 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
@@ -7,6 +8,7 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
 )
+from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
 from pants.backend.python.target_types import (
     EntryPoint,
     PythonDistribution,
@@ -21,8 +23,8 @@ from pants.backend.python.target_types import (
     ResolvedPythonDistributionEntryPoints,
 )
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
-from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.native_engine import Address, Digest
+from pants.engine.fs import CreateDigest, FileContent, PathGlobs, Paths
+from pants.engine.internals.native_engine import Address, Digest, EMPTY_DIGEST
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
@@ -31,6 +33,7 @@ from pants.engine.target import (
     FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
+    Target,
     Targets,
 )
 from pants.engine.unions import UnionRule
@@ -323,6 +326,38 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
     return EntryPointsTxt(digest)
 
 
+class GenerateEntryPointsTxtFromEntryPointDependenciesRequest(PytestPluginSetupRequest):
+    @classmethod
+    def is_applicable(cls, target: Target) -> bool:
+        # select python_tests targets with entry_point_dependencies field
+        return (
+            target.has_field(PythonTestsEntryPointDependenciesField)
+            and target.get(PythonTestsEntryPointDependenciesField).value is not None
+        )
+
+
+@rule(
+    desc=f"Generate entry_points.txt to imitate `{PythonDistribution.alias}` installation.",
+    level=LogLevel.DEBUG,
+)
+async def generate_entry_points_txt_from_entry_point_dependencies(
+    request: GenerateEntryPointsTxtFromEntryPointDependenciesRequest,
+) -> PytestPluginSetup:
+    entry_point_deps = request.target[PythonTestsEntryPointDependenciesField]
+    if not entry_point_deps.value:
+        return PytestPluginSetup(EMPTY_DIGEST)
+
+    dist_targets, group_predicate, predicate = await get_entry_point_deps_targets_and_predicates(
+        request.target.address, entry_point_deps
+    )
+
+    entry_points_txt = await Get(
+        EntryPointsTxt,
+        GenerateEntryPointsTxtRequest(dist_targets, group_predicate, predicate),
+    )
+    return PytestPluginSetup(entry_points_txt.digest)
+
+
 def rules():
     return [
         *collect_rules(),
@@ -332,4 +367,8 @@ def rules():
             as_moved_field=True,
         ),
         UnionRule(InferDependenciesRequest, InferEntryPointDependencies),
+        UnionRule(
+            PytestPluginSetupRequest,
+            GenerateEntryPointsTxtFromEntryPointDependenciesRequest,
+        ),
     ]
