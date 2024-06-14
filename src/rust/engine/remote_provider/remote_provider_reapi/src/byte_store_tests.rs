@@ -12,7 +12,9 @@ use testutil::file::mk_tempfile;
 use tokio::fs::File;
 use workunit_store::WorkunitStore;
 
-use remote_provider_traits::{ByteStoreProvider, RemoteProvider, RemoteStoreOptions};
+use remote_provider_traits::{
+    ByteStoreProvider, ListMissingDigestsAssurance, RemoteProvider, RemoteStoreOptions,
+};
 
 use crate::byte_store::Provider;
 
@@ -428,12 +430,18 @@ async fn list_missing_digests_none_missing() {
 
     let provider = new_provider(&cas).await;
 
-    assert_eq!(
-        provider
-            .list_missing_digests(&mut vec![testdata.digest()].into_iter())
-            .await,
-        Ok(HashSet::new())
-    )
+    for assurance in [
+        // both assurances behave the same
+        ListMissingDigestsAssurance::ConfirmExistence,
+        ListMissingDigestsAssurance::AllowFalsePositives,
+    ] {
+        assert_eq!(
+            provider
+                .list_missing_digests(&mut vec![testdata.digest()].into_iter(), assurance)
+                .await,
+            Ok(HashSet::new())
+        )
+    }
 }
 
 #[tokio::test]
@@ -446,12 +454,18 @@ async fn list_missing_digests_some_missing() {
     let mut digest_set = HashSet::new();
     digest_set.insert(digest);
 
-    assert_eq!(
-        provider
-            .list_missing_digests(&mut vec![digest].into_iter())
-            .await,
-        Ok(digest_set)
-    )
+    for assurance in [
+        // both assurances behave the same
+        ListMissingDigestsAssurance::ConfirmExistence,
+        ListMissingDigestsAssurance::AllowFalsePositives,
+    ] {
+        assert_eq!(
+            provider
+                .list_missing_digests(&mut vec![digest].into_iter(), assurance)
+                .await,
+            Ok(digest_set.clone())
+        )
+    }
 }
 
 #[tokio::test]
@@ -459,19 +473,28 @@ async fn list_missing_digests_grpc_error() {
     let cas = StubCAS::cas_always_errors();
     let provider = new_provider(&cas).await;
 
-    let error = provider
-        .list_missing_digests(&mut vec![TestData::roland().digest()].into_iter())
-        .await
-        .expect_err("Want error");
-    assert!(
-        error.contains("StubCAS is configured to always fail"),
-        "Bad error message, got: {error}"
-    );
-    // retries:
-    assert_eq!(
-        cas.request_counts
-            .lock()
-            .get(&RequestType::CASFindMissingBlobs),
-        Some(&3)
-    );
+    for assurance in [
+        // both assurances behave the same
+        ListMissingDigestsAssurance::ConfirmExistence,
+        ListMissingDigestsAssurance::AllowFalsePositives,
+    ] {
+        let error = provider
+            .list_missing_digests(
+                &mut vec![TestData::roland().digest()].into_iter(),
+                assurance,
+            )
+            .await
+            .expect_err("Want error");
+        assert!(
+            error.contains("StubCAS is configured to always fail"),
+            "Bad error message, got: {error}"
+        );
+        // retries:
+        assert_eq!(
+            cas.request_counts
+                .lock()
+                .get(&RequestType::CASFindMissingBlobs),
+            Some(&3)
+        );
+    }
 }

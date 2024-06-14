@@ -19,7 +19,8 @@ use tokio::fs::File;
 use workunit_store::{Metric, ObservationMetric};
 
 use remote_provider_traits::{
-    ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
+    ActionCacheProvider, ByteStoreProvider, ListMissingDigestsAssurance, LoadDestination,
+    RemoteStoreOptions,
 };
 
 #[cfg(test)]
@@ -262,7 +263,27 @@ impl ByteStoreProvider for Provider {
     async fn list_missing_digests(
         &self,
         digests: &mut (dyn Iterator<Item = Digest> + Send),
+        assurance: ListMissingDigestsAssurance,
     ) -> Result<HashSet<Digest>, String> {
+        match assurance {
+            // Since there's no bulk-query API, let's be efficient when the caller is doesn't need
+            // confirmed answers: assume all digests are missing. The `store_...` code already has
+            // to be resilient to re-uploading an existing digest, so we can rely on that if the
+            // caller is just trying to skip some uploads.
+            ListMissingDigestsAssurance::AllowFalsePositives => {
+                return Ok(digests
+                    .filter(|digest| {
+                        // Some providers (e.g. GitHub Actions Cache) don't like storing an empty
+                        // file, so we don't store it, but can still magic it up when loading, i.e.
+                        // it is never missing.
+                        *digest == EMPTY_DIGEST
+                    })
+                    .collect());
+            }
+            // The caller is demanding we actually run the checks:
+            ListMissingDigestsAssurance::ConfirmExistence => {}
+        };
+
         // NB. this is doing individual requests and thus may be expensive.
         let existences = future::try_join_all(digests.map(|digest| async move {
             // Some providers (e.g. GitHub Actions Cache) don't like storing an empty file, so we don't

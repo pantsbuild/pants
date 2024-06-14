@@ -42,6 +42,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::Tree;
+use remote_provider::ListMissingDigestsAssurance;
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
 #[cfg(target_os = "macos")]
@@ -765,7 +766,10 @@ impl Store {
                     ingested_digests.keys().cloned().collect()
                 } else {
                     remote
-                        .list_missing_digests(ingested_digests.keys().cloned())
+                        .list_missing_digests(
+                            ingested_digests.keys().cloned(),
+                            ListMissingDigestsAssurance::AllowFalsePositives,
+                        )
                         .await?
                 };
 
@@ -918,7 +922,13 @@ impl Store {
         } else {
             return Ok(false);
         };
-        let missing = remote.store.list_missing_digests(missing_locally).await?;
+        let missing = remote
+            .store
+            .list_missing_digests(
+                missing_locally,
+                ListMissingDigestsAssurance::ConfirmExistence,
+            )
+            .await?;
 
         Ok(missing.is_empty())
     }

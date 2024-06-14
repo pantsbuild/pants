@@ -10,7 +10,8 @@ use futures::Future;
 use hashing::Digest;
 use log::Level;
 use remote_provider::{
-    choose_byte_store_provider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
+    choose_byte_store_provider, ByteStoreProvider, ListMissingDigestsAssurance, LoadDestination,
+    RemoteStoreOptions,
 };
 use tokio::fs::File;
 use workunit_store::{in_workunit, Metric, ObservationMetric};
@@ -170,9 +171,13 @@ impl ByteStore {
 
     ///
     /// Given a collection of Digests (digests),
-    /// returns the set of digests from that collection not present in the CAS.
+    /// returns the set of digests from that collection are not be present in the CAS.
     ///
-    pub async fn list_missing_digests<I>(&self, digests: I) -> Result<HashSet<Digest>, String>
+    pub async fn list_missing_digests<I>(
+        &self,
+        digests: I,
+        assurance: ListMissingDigestsAssurance,
+    ) -> Result<HashSet<Digest>, String>
     where
         I: IntoIterator<Item = Digest>,
         I::IntoIter: Send,
@@ -181,7 +186,11 @@ impl ByteStore {
         in_workunit!(
             "list_missing_digests",
             Level::Trace,
-            |_workunit| async move { self.provider.list_missing_digests(&mut iter).await }
+            |_workunit| async move {
+                self.provider
+                    .list_missing_digests(&mut iter, assurance)
+                    .await
+            }
         )
         .await
     }

@@ -29,7 +29,9 @@ use tokio::sync::Mutex;
 use tonic::{Code, Request, Status};
 use workunit_store::{Metric, ObservationMetric};
 
-use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteStoreOptions};
+use remote_provider_traits::{
+    ByteStoreProvider, ListMissingDigestsAssurance, LoadDestination, RemoteStoreOptions,
+};
 
 pub struct Provider {
     instance_name: Option<String>,
@@ -392,7 +394,20 @@ impl ByteStoreProvider for Provider {
     async fn list_missing_digests(
         &self,
         digests: &mut (dyn Iterator<Item = Digest> + Send),
+        assurance: ListMissingDigestsAssurance,
     ) -> Result<HashSet<Digest>, String> {
+        match assurance {
+            // Callers of this that allow false positives are likely to be deciding whether to
+            // (attempt to) upload digests or not: this gRPC API supports bulk existence checking,
+            // so it'll likely be more efficient to actually do that than do each upload and
+            // discover it's already there.
+            //
+            // (We do this pointless match to have a place to put this
+            // comment, and so, that we're prompted to update this code, if the enum changes)
+            ListMissingDigestsAssurance::AllowFalsePositives
+            | ListMissingDigestsAssurance::ConfirmExistence => {}
+        };
+
         let request = remexec::FindMissingBlobsRequest {
             instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
             blob_digests: digests.into_iter().map(|d| d.into()).collect::<Vec<_>>(),
