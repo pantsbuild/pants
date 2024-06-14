@@ -1204,7 +1204,7 @@ impl Store {
         });
 
         let force_all_mutable =
-            mutable_paths.contains(&RelativePath::new(Component::CurDir).unwrap()) || force_mutable;
+            force_mutable || mutable_paths.contains(&RelativePath::new(Component::CurDir).unwrap());
         let mut mutable_path_ancestors = BTreeSet::new();
         for relpath in mutable_paths {
             mutable_path_ancestors.extend(relpath.ancestors().map(|p| destination.join(p)));
