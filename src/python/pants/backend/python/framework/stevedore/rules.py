@@ -54,41 +54,13 @@ async def generate_entry_points_txt_from_stevedore_extension(
         StevedoreNamespacesProviderTargetsRequest(requested_namespaces),
     )
 
-    all_resolved_entry_points = await MultiGet(
-        Get(
-            ResolvedPythonDistributionEntryPoints,
-            ResolvePythonDistributionEntryPointsRequest(tgt[PythonDistributionEntryPointsField]),
-        )
-        for tgt in stevedore_targets
-    )
-
-    possible_paths = [
-        {
-            f"{tgt.address.spec_path}/{ep.entry_point.module.split('.')[0]}"
-            for _, entry_points in (resolved_eps.val or {}).items()
-            for ep in entry_points.values()
-        }
-        for tgt, resolved_eps in zip(stevedore_targets, all_resolved_entry_points)
-    ]
-    resolved_paths = await MultiGet(
-        Get(Paths, PathGlobs(module_candidate_paths)) for module_candidate_paths in possible_paths
-    )
-
-    # arrange in sibling groups
-    stevedore_extensions_by_path: dict[
-        str, list[ResolvedPythonDistributionEntryPoints]
-    ] = defaultdict(list)
-    for resolved_ep, paths in zip(all_resolved_entry_points, resolved_paths):
-        path = paths.dirs[0]  # just take the first match
-        stevedore_extensions_by_path[path].append(resolved_ep)
-
     requested_namespaces_value = requested_namespaces.value
     entry_points_txt = await Get(
         EntryPointsTxt,
         GenerateEntryPointsTxtRequest(
-            stevedore_extensions_by_path,
-            lambda ns: ns in requested_namespaces_value,
-            lambda ns, ep_name: True,
+            stevedore_targets,
+            lambda tgt, ns: ns in requested_namespaces_value,
+            lambda tgt, ns, ep_name: True,
         ),
     )
     return PytestPluginSetup(entry_points_txt.digest)
