@@ -66,8 +66,8 @@ Example: [#21007](https://github.com/pantsbuild/pants/pull/21007).
 
 Some editors can use JSON Schema for better completions (etc.) when editing TOML files like  `pants.toml`. To generate such a schema:
 
-1. Run `./pants help-all > all-help.json`
-2. Run `./pants run build-support/bin/generate_json_schema.py -- --all-help-file=all-help.json`
+1. Run `pants help-all > all-help.json`
+2. Run `pants run build-support/bin/generate_json_schema.py -- --all-help-file=all-help.json`
 3. For a new release, upload the resulting file to https://www.schemastore.org/json/
 
 ## Update or create FaaS complete platforms files
