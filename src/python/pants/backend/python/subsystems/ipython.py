@@ -20,6 +20,8 @@ class IPython(PythonToolBase):
     default_requirements = ["ipython>=7.34,<9"]
     default_interpreter_constraints = ["CPython>=3.8,<4"]
 
+    register_interpreter_constraints = True
+
     default_lockfile_resource = ("pants.backend.python.subsystems", "ipython.lock")
 
     ignore_cwd = BoolOption(
