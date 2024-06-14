@@ -169,7 +169,7 @@ class PythonTestsEntryPointDependenciesInferenceFieldSet(FieldSet):
 
 
 class InferEntryPointDependencies(InferDependenciesRequest):
-    infer_from = PythonTestsEntryPointDependenciesField
+    infer_from = PythonTestsEntryPointDependenciesInferenceFieldSet
 
 
 @rule(
