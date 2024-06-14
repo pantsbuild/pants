@@ -385,7 +385,7 @@ python_test(
 )
 ```
 
-To parametrize multiple fields together as one parametrization, unpack a parametrize object with the field values to use for that group as the parametrization keyword arguments. The parametrization must be named by providing one positional string argument as the name. (See example below.) This is useful to avoid a full cartesian product if not every combination of field values makes sense. i.e. The previous example uses the same resolve (lockfile) for both interpreter constraints, however if you want to use a different resolve per interpreter, then grouping the resolve value with the interpreter constraint may be the way to go. (Parametrizing grouped fields are also supported.)
+To parametrize multiple fields together as one parametrization, unpack a parametrize object with the field values to use for that group as the parametrization keyword arguments. The parametrization must be named by providing one positional string argument as the name. (See example below.) This is useful to avoid a full cartesian product if not every combination of field values makes sense. i.e. The previous example uses the same resolve (lockfile) for both interpreter constraints, however if you want to use a different resolve per interpreter, then grouping the resolve value with the interpreter constraint may be the way to go.
 
 ```python title="example/BUILD"
 # Creates two targets:
@@ -400,6 +400,8 @@ python_test(
     **parametrize("py3", interpreter_constraints=[">=3.6,<3.7"], resolve="lock-b"),
 )
 ```
+
+(Using `parametrize` on grouped fields is also supported. For instance, if there is two resolves to use for Python 3.10, these can be provided within the py310 group: `**parametrize("py310", interpreter_constraints=[">=3.10,<3.11"], resolve=parametrize("lock-b", "lock-c"))`.)
 
 The targets' addresses will have `@key=value` at the end, as shown above. Run [`pants list dir:`](../project-introspection.mdx) in the directory of the parametrized target to see all parametrized target addresses, and [`pants peek dir:`](../project-introspection.mdx) to see all their metadata.
 

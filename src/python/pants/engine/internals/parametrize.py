@@ -224,9 +224,9 @@ class Parametrize:
                 ):
                     yield expanded_address.parametrize(
                         grouped_address.parameters
-                    ), expanded_fields | grouped_fields
+                    ), expanded_fields | dict(grouped_fields)
             else:
-                yield expanded_address, expanded_fields | group_kwargs
+                yield expanded_address, expanded_fields | dict(group_kwargs)
 
     @staticmethod
     def _collect_parametrizations(

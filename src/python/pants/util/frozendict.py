@@ -113,12 +113,12 @@ class FrozenDict(Mapping[K, V]):
             return NotImplemented
         return FrozenDict(self._data | other)
 
-    def __ror__(self, other: Any) -> MutableMapping[K, V]:
+    def __ror__(self, other: Any) -> FrozenDict[K, V]:
         if isinstance(other, FrozenDict):
             other = other._data
         elif not isinstance(other, Mapping):
             return NotImplemented
-        return cast(Mapping, other) | self._data
+        return FrozenDict(other | self._data)
 
     def _calculate_hash(self) -> int:
         try:

@@ -701,12 +701,12 @@ def test_default_parametrized_groups_with_parametrizations(
         {
             "src/BUILD": dedent(
                 """
-                __defaults__(
-                  all=dict(
+                __defaults__({
+                  mock_tgt: dict(
                     **parametrize(
                       "py310-compat",
                       resolve="service-a",
-                      interpreter_constraints=[
+                      tags=[
                         "CPython == 3.9.*",
                         "CPython == 3.10.*",
                       ]
@@ -718,12 +718,12 @@ def test_default_parametrized_groups_with_parametrizations(
                         "service-c",
                         "service-d",
                       ),
-                      interpreter_constraints=[
+                      tags=[
                         "CPython == 3.9.*",
                       ]
                     )
                   )
-                )
+                })
                 mock_tgt()
                 """
             ),
@@ -739,21 +739,21 @@ def test_default_parametrized_groups_with_parametrizations(
         (
             address.parametrize(dict(parametrize="py310-compat")),
             dict(
-                interpreter_constraints=("CPython == 3.9.*", "CPython == 3.10.*"),
+                tags=("CPython == 3.9.*", "CPython == 3.10.*"),
                 resolve="service-a",
             ),
         ),
         (
             address.parametrize(dict(parametrize="py39-compat", resolve="service-b")),
-            dict(interpreter_constraints=("CPython == 3.9.*",), resolve="service-b"),
+            dict(tags=("CPython == 3.9.*",), resolve="service-b"),
         ),
         (
             address.parametrize(dict(parametrize="py39-compat", resolve="service-c")),
-            dict(interpreter_constraints=("CPython == 3.9.*",), resolve="service-c"),
+            dict(tags=("CPython == 3.9.*",), resolve="service-c"),
         ),
         (
             address.parametrize(dict(parametrize="py39-compat", resolve="service-d")),
-            dict(interpreter_constraints=("CPython == 3.9.*",), resolve="service-d"),
+            dict(tags=("CPython == 3.9.*",), resolve="service-d"),
         ),
     )
 

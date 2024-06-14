@@ -215,5 +215,5 @@ def test_merge_frozen_dicts() -> None:
     assert a | b == FrozenDict({"A": 1, "B": 2})
     assert a | c == FrozenDict({"A": 1, "B": 4, "C": 3})
     assert b | c == FrozenDict({"B": 4, "C": 3})
-    assert c | a == {"A": 1, "B": 4, "C": 3}
-    assert c | b == {"B": 2, "C": 3}
+    assert c | a == FrozenDict({"A": 1, "B": 4, "C": 3})
+    assert c | b == FrozenDict({"B": 2, "C": 3})
