@@ -948,9 +948,9 @@ class PythonTestsEntryPointDependenciesField(DictStringToStringSequenceField):
         - "entry.point.group/entry-point-name" to depend on a named entry point
         - "entry.point.group" (without a "/") to depend on an entry point group
         - "*" to get all entry points on the target
-        
+
         For example:
-        
+
             {PythonTestsEntryPointDependenciesField.alias}={{
                 "//foo/address:dist_tgt": ["*"],  # all entry points
                 "bar:dist_tgt": ["console_scripts"],  # only from this group
