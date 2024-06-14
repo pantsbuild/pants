@@ -113,23 +113,23 @@ async def get_filtered_entry_point_dependencies(
         entry_points_field = tgt[PythonDistributionEntryPointsField]
         # use .val instead of .explicit_modules and .pex_binary_addresses to facilitate filtering
         for ep_group, entry_points in distribution_entry_points.val.items():
-            want_group = request.group_predicate(entry_points_field, ep_group)
-            if not want_group:
+            if not request.group_predicate(entry_points_field, ep_group):
                 continue
             for ep_name, ep_val in entry_points.items():
-                if want_group or request.predicate(entry_points_field, ep_group, ep_name):
-                    if ep_val.pex_binary_address:
-                        filtered_entry_point_pex_addresses.append(ep_val.pex_binary_address)
-                    else:
-                        filtered_entry_point_modules.append(
-                            (
-                                tgt.address,
-                                ep_group,
-                                ep_name,
-                                ep_val.entry_point,
-                                explicitly_provided_deps,
-                            )
+                if not request.predicate(entry_points_field, ep_group, ep_name):
+                    continue
+                if ep_val.pex_binary_address:
+                    filtered_entry_point_pex_addresses.append(ep_val.pex_binary_address)
+                else:
+                    filtered_entry_point_modules.append(
+                        (
+                            tgt.address,
+                            ep_group,
+                            ep_name,
+                            ep_val.entry_point,
+                            explicitly_provided_deps,
                         )
+                    )
     filtered_module_owners = await MultiGet(
         Get(PythonModuleOwners, PythonModuleOwnersRequest(entry_point.module, resolve=None))
         for _, _, _, entry_point, _ in filtered_entry_point_modules
@@ -209,16 +209,16 @@ async def infer_entry_point_dependencies(
         requested_entry_points[target] = set(requested_ep)
 
     def group_predicate(tgt: PythonDistribution, ep_group: str) -> bool:
-        relevant = {"*", ep_group}
-        requested = requested_entry_points[tgt]
-        if relevant & requested:
-            # at least one item in requested is relevant
-            return True
+        relevant = ("*", ep_group)
+        for item in sorted(requested_entry_points[tgt]):
+            if item in relevant or item.startswith(f"{ep_group}/"):
+                return True
         return False
 
     def predicate(tgt: PythonDistribution, ep_group: str, ep_name: str) -> bool:
-        requested = requested_entry_points[tgt]
-        if f"{ep_group}/{ep_name}" in requested:
+        relevant = {"*", ep_group, f"{ep_group}/{ep_name}"}
+        if relevant & requested_entry_points[tgt]:
+            # at least one requested entry point is relevant
             return True
         return False
 
