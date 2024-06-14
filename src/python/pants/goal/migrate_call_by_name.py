@@ -12,7 +12,7 @@ import tokenize
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path, PurePath
-from typing import Callable, TypedDict
+from typing import Callable, Literal, TypedDict, cast
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -225,8 +225,6 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
         This function is not idempotent, so it should be run only once per file (per migration plan).
 
         Replacement imports are bulk added below the existing "pants.engine.rules" import.
-
-
         """
 
         imports_added = False
@@ -241,7 +239,7 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
                 modified = False
                 for replacement in replacements:
                     if line_number == replacement.line_range[0]:
-                        line_end = ",\n" if replacement.is_argument else "\n"
+                        line_end = ",\n" if replacement.add_trailing_comma else "\n"
                         # On the first line of the range, emit the new source code where the old "Get" started
                         print(line[: replacement.col_range[0]], end="")
                         print(ast.unparse(replacement.new_source), end=line_end)
@@ -321,7 +319,8 @@ class Replacement:
     current_source: ast.Call
     new_source: ast.Call
     additional_imports: list[ast.ImportFrom]
-    is_argument: bool = False
+    # TODO: Use libcst or another CST, rather than an ast
+    add_trailing_comma: bool = False
 
     def sanitized_imports(self) -> list[ast.ImportFrom]:
         """Remove any circular or self-imports."""
@@ -361,7 +360,7 @@ class Replacement:
             current_source={ast.dump(self.current_source, indent=2)},
             new_source={ast.dump(self.new_source, indent=2)},
             additional_imports={[ast.dump(i, indent=2) for i in self.additional_imports]},
-            is_argument={self.is_argument}
+            add_trailing_comma={self.add_trailing_comma}
         )
         """
 
@@ -613,19 +612,33 @@ class CallByNameVisitor(ast.NodeVisitor):
         if not self._should_visit_node(node.decorator_list):
             return
 
-        for child in node.body:
-            if call := self._maybe_replaceable_call(child):
-                if replacement := self.syntax_mapper.map_get_to_new_syntax(
-                    call, self.filename, calling_func=node.name
-                ):
-                    self.replacements.append(replacement)
+        self._recurse_body_statements(node.name, node)
 
-            for call in self._maybe_replaceable_multiget(child):
-                if replacement := self.syntax_mapper.map_get_to_new_syntax(
-                    call, self.filename, calling_func=node.name
-                ):
-                    replacement.is_argument = True
-                    self.replacements.append(replacement)
+    def _recurse_body_statements(self, root: str, node: ast.stmt):
+        """Recursively walk the body of a node, including properties of compound statements looking
+        for Get() calls to replace.
+
+        https://docs.python.org/3/reference/compound_stmts.html
+        """
+        for prop in ["body", "handlers", "orelse", "finalbody"]:
+            for child in getattr(node, prop, []):
+                self._recurse_body_statements(root, cast(ast.stmt, child))
+
+        self._maybe_add_replacements(root, node)
+
+    def _maybe_add_replacements(self, calling_func: str, statement: ast.stmt):
+        if call := self._maybe_replaceable_call(statement):
+            if replacement := self.syntax_mapper.map_get_to_new_syntax(
+                call, self.filename, calling_func=calling_func
+            ):
+                self.replacements.append(replacement)
+
+        for call, statement_type in self._maybe_replaceable_multiget(statement):
+            if replacement := self.syntax_mapper.map_get_to_new_syntax(
+                call, self.filename, calling_func=calling_func
+            ):
+                replacement.add_trailing_comma = statement_type == "call"
+                self.replacements.append(replacement)
 
     def _should_visit_node(self, decorator_list: list[ast.expr]) -> bool:
         """Only interested in async functions with the @rule(...) or @goal_rule(...) decorator."""
@@ -667,23 +680,37 @@ class CallByNameVisitor(ast.NodeVisitor):
             return call_node
         return None
 
-    def _maybe_replaceable_multiget(self, statement: ast.stmt) -> list[ast.Call]:
-        """Looks for the following form of MultiGet that we want to replace:
+    def _maybe_replaceable_multiget(
+        self, statement: ast.stmt
+    ) -> list[tuple[ast.Call, Literal["call", "generator"]]]:
+        """Looks for the following forms of MultiGet that we want to replace:
 
         - multigot = await MultiGet(Get(...), Get(...), ...)
+        - multigot = await MultiGet(Get(...) for x in y)
         """
-        if (
+        if not (
             isinstance(statement, ast.Assign)
             and isinstance((await_node := statement.value), ast.Await)
             and isinstance((call_node := await_node.value), ast.Call)
             and isinstance(call_node.func, ast.Name)
             and call_node.func.id == "MultiGet"
         ):
-            return [
-                arg
-                for arg in call_node.args
-                if isinstance(arg, ast.Call)
+            return []
+
+        args: list[tuple[ast.Call, Literal["call", "generator"]]] = []
+        for arg in call_node.args:
+            if (
+                isinstance(arg, ast.Call)
                 and isinstance(arg.func, ast.Name)
                 and arg.func.id == "Get"
-            ]
-        return []
+            ):
+                args.append((arg, "call"))
+
+            if (
+                isinstance(arg, ast.GeneratorExp)
+                and isinstance((call_arg := arg.elt), ast.Call)
+                and isinstance(call_arg.func, ast.Name)
+                and call_arg.func.id == "Get"
+            ):
+                args.append((call_arg, "generator"))
+        return args

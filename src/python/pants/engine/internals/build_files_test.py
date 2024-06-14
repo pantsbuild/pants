@@ -315,7 +315,7 @@ def test_prelude_type_hint_code() -> None:
     assert 42 == ecr_docker_image.value()
 
 
-def test_prelude_docstrings() -> None:
+def test_prelude_docstring_on_function() -> None:
     macro_docstring = "This is the doc-string for `macro_func`."
     prelude_content = dedent(
         f"""
@@ -330,6 +330,42 @@ def test_prelude_docstrings() -> None:
     assert macro_docstring == info.help
     assert "(arg: int) -> str" == info.signature
     assert {"macro_func"} == set(result.info)
+
+
+def test_prelude_docstring_on_constant() -> None:
+    macro_docstring = """This is the doc-string for `MACRO_CONST`.
+
+    Use weird indentations.
+
+    On purpose.
+    """
+    prelude_content = dedent(
+        f"""
+        Number = NewType("Number", int)
+        MACRO_CONST: Annotated[str, Doc({macro_docstring!r})] = "value"
+        MULTI_HINTS: Annotated[Number, "unrelated", Doc("this is it"), 24] = 42
+        ANON: str = "undocumented"
+        _PRIVATE: int = 42
+        untyped = True
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    assert {"MACRO_CONST", "ANON", "Number", "MULTI_HINTS", "untyped"} == set(result.info)
+
+    info = result.info["MACRO_CONST"]
+    assert info.value == "value"
+    assert info.help == softwrap(macro_docstring)
+    assert info.signature == ": str"
+
+    multi = result.info["MULTI_HINTS"]
+    assert multi.value == 42
+    assert multi.help == "this is it"
+    assert multi.signature == ": Number"
+
+    anon = result.info["ANON"]
+    assert anon.value == "undocumented"
+    assert anon.help is None
+    assert anon.signature == ": str"
 
 
 def test_prelude_reference_env_vars() -> None:

@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import re
 import string
 from collections import namedtuple
 from dataclasses import FrozenInstanceError, dataclass
@@ -11,6 +12,7 @@ import pytest
 
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.internals.target_adaptor import SourceBlock, SourceBlocks
 from pants.engine.target import (
     NO_VALUE,
     AsyncFieldMixin,
@@ -43,6 +45,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     ValidNumbers,
+    _validate_origin_sources_blocks,
     generate_file_based_overrides_field_help_message,
     get_shard,
     parse_shard_spec,
@@ -1542,3 +1545,22 @@ def test_generate_file_based_overrides_field_help_message() -> None:
     assert "example:\n\n    overrides={\n" in message
     assert '\n        "bar.proto"' in message
     assert "\n    }\n\nFile" in message
+
+
+def test_validate_origin_sources_blocks():
+    with pytest.raises(ValueError, match=re.compile("^Expected .*`FrozenDict`, got .*list")):
+        _validate_origin_sources_blocks([SourceBlock(start=0, end=1)])
+    with pytest.raises(
+        ValueError,
+        match=re.compile(r"^Expected .*`SourceBlocks`, got .*SourceBlock"),
+    ):
+        _validate_origin_sources_blocks(FrozenDict([("file.txt", SourceBlock(start=0, end=1))]))
+    with pytest.raises(
+        ValueError,
+        match=re.compile(r"^Expected .*`SourceBlocks`, got .*tuple"),
+    ):
+        _validate_origin_sources_blocks(FrozenDict([("file.txt", ((0, 1),))]))
+
+    _validate_origin_sources_blocks(
+        FrozenDict([("file.txt", SourceBlocks([SourceBlock(start=0, end=1)]))])
+    )
