@@ -13,16 +13,18 @@ from pants.backend.python.framework.stevedore.target_types import (
 from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
 from pants.backend.python.target_types import (
     PythonDistribution,
-    PythonDistributionEntryPoint,
     PythonDistributionEntryPointsField,
     ResolvedPythonDistributionEntryPoints,
     ResolvePythonDistributionEntryPointsRequest,
 )
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, PathGlobs, Paths
+from pants.backend.python.util_rules.entry_points import (
+    GenerateEntryPointsTxtRequest,
+    EntryPointsTxt,
+)
+from pants.engine.fs import EMPTY_DIGEST, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
@@ -80,35 +82,16 @@ async def generate_entry_points_txt_from_stevedore_extension(
         path = paths.dirs[0]  # just take the first match
         stevedore_extensions_by_path[path].append(resolved_ep)
 
-    entry_points_txt_files = []
-    for module_path, resolved_eps in stevedore_extensions_by_path.items():
-        namespace_sections = {}
-
-        for resolved_ep in resolved_eps:
-            namespace: str
-            entry_points: FrozenDict[str, PythonDistributionEntryPoint]
-            for namespace, entry_points in resolved_ep.val.items():
-                if not entry_points or namespace not in requested_namespaces.value:
-                    continue
-
-                entry_points_txt_section = f"[{namespace}]\n"
-                for entry_point_name, ep in sorted(entry_points.items()):
-                    entry_points_txt_section += f"{entry_point_name} = {ep.entry_point.spec}\n"
-                entry_points_txt_section += "\n"
-                namespace_sections[namespace] = entry_points_txt_section
-
-        # consistent sorting
-        entry_points_txt_contents = "".join(
-            namespace_sections[ns] for ns in sorted(namespace_sections)
-        )
-
-        entry_points_txt_path = f"{module_path}.egg-info/entry_points.txt"
-        entry_points_txt_files.append(
-            FileContent(entry_points_txt_path, entry_points_txt_contents.encode("utf-8"))
-        )
-
-    digest = await Get(Digest, CreateDigest(entry_points_txt_files))
-    return PytestPluginSetup(digest)
+    requested_namespaces_value = requested_namespaces.value
+    entry_points_txt = await Get(
+        EntryPointsTxt,
+        GenerateEntryPointsTxtRequest(
+            stevedore_extensions_by_path,
+            lambda ns: ns in requested_namespaces_value,
+            lambda ns, ep_name: True,
+        ),
+    )
+    return PytestPluginSetup(entry_points_txt.digest)
 
 
 def rules():

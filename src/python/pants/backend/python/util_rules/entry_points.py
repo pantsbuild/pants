@@ -11,6 +11,7 @@ from pants.backend.python.target_types import (
     EntryPoint,
     PythonDistribution,
     PythonDistributionDependenciesField,
+    PythonDistributionEntryPoint,
     PythonDistributionEntryPointsField,
     PythonTestTarget,
     PythonTestsDependenciesField,
@@ -20,7 +21,8 @@ from pants.backend.python.target_types import (
     ResolvedPythonDistributionEntryPoints,
 )
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
-from pants.engine.internals.native_engine import Address
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.internals.native_engine import Address, Digest
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
@@ -32,6 +34,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
@@ -229,6 +232,69 @@ async def infer_entry_point_dependencies(
         ),
     )
     return InferredDependencies(entry_point_dependencies.addresses)
+
+
+@dataclass(frozen=True)
+class GenerateEntryPointsTxtRequest:
+    entry_points_by_path: FrozenDict[str, tuple[ResolvedPythonDistributionEntryPoints]]
+    group_predicate: Callable[[str], bool]
+    predicate: Callable[[str, str], bool]
+
+    def __init__(
+        self,
+        entry_points_by_path: dict[str, Iterable[ResolvedPythonDistributionEntryPoints]],
+        group_predicate: Callable[[str], bool],
+        predicate: Callable[[str, str], bool],
+    ) -> None:
+        object.__setattr__(
+            self,
+            "entry_points_by_path",
+            FrozenDict(
+                (path, tuple(entry_points)) for path, entry_points in entry_points_by_path.items()
+            ),
+        )
+        object.__setattr__(self, "group_predicate", group_predicate)
+        object.__setattr__(self, "predicate", predicate)
+
+
+@dataclass(frozen=True)
+class EntryPointsTxt:
+    digest: Digest
+
+
+@rule
+async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> EntryPointsTxt:
+    entry_points_txt_files = []
+    for module_path, resolved_eps in request.entry_points_by_path.items():
+        group_sections = {}
+
+        for resolved_ep in resolved_eps:
+            ep_group: str
+            entry_points: FrozenDict[str, PythonDistributionEntryPoint]
+            for ep_group, entry_points in resolved_ep.val.items():
+                if not entry_points or not request.group_predicate(ep_group):
+                    continue
+
+                entry_points_txt_section = f"[{ep_group}]\n"
+                for entry_point_name, ep in sorted(entry_points.items()):
+                    if not request.predicate(ep_group, entry_point_name):
+                        continue
+                    entry_points_txt_section += f"{entry_point_name} = {ep.entry_point.spec}\n"
+                entry_points_txt_section += "\n"
+                group_sections[ep_group] = entry_points_txt_section
+
+        # consistent sorting
+        entry_points_txt_contents = "".join(
+            group_sections[ep_group] for ep_group in sorted(group_sections)
+        )
+
+        entry_points_txt_path = f"{module_path}.egg-info/entry_points.txt"
+        entry_points_txt_files.append(
+            FileContent(entry_points_txt_path, entry_points_txt_contents.encode("utf-8"))
+        )
+
+    digest = await Get(Digest, CreateDigest(entry_points_txt_files))
+    return EntryPointsTxt(digest)
 
 
 def rules():
