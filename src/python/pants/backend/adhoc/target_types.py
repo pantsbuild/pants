@@ -346,6 +346,20 @@ class SystemBinaryFingerprintDependenciesField(AdhocToolRunnableDependenciesFiel
     )
 
 
+class SystemBinaryExtraEnvVarsField(StringSequenceField):
+    alias: ClassVar[str] = "extra_env_vars"
+    help = help_text(
+        """
+        Additional environment variables to provide to the system binary during fingerprinting
+        and execution. `extra_env_vars` defined at targets `adhoc_tool` and `shell_command`
+        have higher precedence over any dependent `system_binary`.
+
+        Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+        `ENV_VAR` to copy the value of a variable in Pants's own environment.
+        """
+    )
+
+
 class SystemBinaryTarget(Target):
     alias: ClassVar[str] = "system_binary"
     core_fields = (
@@ -355,6 +369,7 @@ class SystemBinaryTarget(Target):
         SystemBinaryFingerprintPattern,
         SystemBinaryFingerprintArgsField,
         SystemBinaryFingerprintDependenciesField,
+        SystemBinaryExtraEnvVarsField,
     )
     help = help_text(
         lambda: f"""

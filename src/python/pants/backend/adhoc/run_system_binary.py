@@ -6,9 +6,10 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Mapping, Sequence
 
 from pants.backend.adhoc.target_types import (
+    SystemBinaryExtraEnvVarsField,
     SystemBinaryExtraSearchPathsField,
     SystemBinaryFingerprintArgsField,
     SystemBinaryFingerprintDependenciesField,
@@ -28,6 +29,7 @@ from pants.core.util_rules.system_binaries import (
     SearchPath,
     SystemBinariesSubsystem,
 )
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process
@@ -47,6 +49,7 @@ class SystemBinaryFieldSet(RunFieldSet):
         SystemBinaryFingerprintPattern,
         SystemBinaryFingerprintArgsField,
         SystemBinaryFingerprintDependenciesField,
+        SystemBinaryExtraEnvVarsField,
     )
 
     name: SystemBinaryNameField
@@ -54,6 +57,7 @@ class SystemBinaryFieldSet(RunFieldSet):
     fingerprint_pattern: SystemBinaryFingerprintPattern
     fingerprint_argv: SystemBinaryFingerprintArgsField
     fingerprint_dependencies: SystemBinaryFingerprintDependenciesField
+    extra_env_vars: SystemBinaryExtraEnvVarsField
 
 
 async def _find_binary(
@@ -63,6 +67,7 @@ async def _find_binary(
     fingerprint_pattern: str | None,
     fingerprint_args: tuple[str, ...] | None,
     fingerprint_dependencies: tuple[str, ...] | None,
+    extra_env_vars: Sequence[str] | None,
 ) -> BinaryPath:
     binaries = await Get(
         BinaryPaths,
@@ -82,6 +87,9 @@ async def _find_binary(
     env: dict[str, str] = {}
     append_only_caches: Mapping[str, str] = {}
     immutable_input_digests: Mapping[str, Digest] = {}
+    if extra_env_vars:
+        extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(extra_env_vars))
+        env.update(extra_env)
     if rds:
         env = {"PATH": rds.path_component}
         env.update(**(rds.extra_env or {}))
@@ -143,6 +151,7 @@ async def create_system_binary_run_request(
         field_set.fingerprint_pattern.value,
         field_set.fingerprint_argv.value,
         field_set.fingerprint_dependencies.value,
+        field_set.extra_env_vars.value,
     )
 
     return RunRequest(
