@@ -3,26 +3,19 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
-
 from pants.backend.python.framework.stevedore.target_types import (
     StevedoreExtensionTargets,
     StevedoreNamespacesField,
     StevedoreNamespacesProviderTargetsRequest,
 )
 from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
-from pants.backend.python.target_types import (
-    PythonDistribution,
-    PythonDistributionEntryPointsField,
-    ResolvedPythonDistributionEntryPoints,
-    ResolvePythonDistributionEntryPointsRequest,
-)
+from pants.backend.python.target_types import PythonDistribution
 from pants.backend.python.util_rules.entry_points import (
-    GenerateEntryPointsTxtRequest,
     EntryPointsTxt,
+    GenerateEntryPointsTxtRequest,
 )
-from pants.engine.fs import EMPTY_DIGEST, PathGlobs, Paths
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.fs import EMPTY_DIGEST
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel

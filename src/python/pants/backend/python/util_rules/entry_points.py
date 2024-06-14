@@ -15,16 +15,16 @@ from pants.backend.python.target_types import (
     PythonDistributionDependenciesField,
     PythonDistributionEntryPoint,
     PythonDistributionEntryPointsField,
-    PythonTestTarget,
     PythonTestsDependenciesField,
     PythonTestsEntryPointDependenciesField,
     PythonTestsGeneratorTarget,
-    ResolvePythonDistributionEntryPointsRequest,
+    PythonTestTarget,
     ResolvedPythonDistributionEntryPoints,
+    ResolvePythonDistributionEntryPointsRequest,
 )
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, FileContent, PathGlobs, Paths
-from pants.engine.internals.native_engine import Address, Digest, EMPTY_DIGEST
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Address, Digest
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
@@ -161,7 +161,6 @@ async def get_filtered_entry_point_dependencies(
 
 @dataclass(frozen=True)
 class PythonTestsEntryPointDependenciesInferenceFieldSet(FieldSet):
-
     required_fields = (
         PythonTestsDependenciesField,
         PythonTestsEntryPointDependenciesField,
