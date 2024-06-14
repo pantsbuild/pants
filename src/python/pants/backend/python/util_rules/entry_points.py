@@ -37,6 +37,10 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 
+PythonDistributionEntryPointPredicate = Callable[[PythonDistribution, str, str], bool]
+PythonDistributionEntryPointGroupPredicate = Callable[[PythonDistribution, str], bool]
+
+
 def get_python_distribution_entry_point_unambiguous_module_owners(
     address: Address,
     entry_point_group: str,  # group is the pypa term; aka category or namespace
@@ -68,7 +72,8 @@ def get_python_distribution_entry_point_unambiguous_module_owners(
 @dataclass(frozen=True)
 class GetEntryPointDependenciesRequest:
     targets: Targets
-    predicate: Callable[[PythonDistribution, str, str], bool]
+    predicate: PythonDistributionEntryPointPredicate
+    group_predicate: PythonDistributionEntryPointGroupPredicate
 
 
 @dataclass(frozen=True)
@@ -111,8 +116,11 @@ async def get_filtered_entry_point_dependencies(
     ):
         # use .val instead of .explicit_modules and .pex_binary_addresses to facilitate filtering
         for ep_group, entry_points in distribution_entry_points.val.items():
+            want_group = request.group_predicate(tgt, ep_group)
+            if not want_group:
+                continue
             for ep_name, ep_val in entry_points.items():
-                if request.predicate(tgt, ep_group, ep_name):
+                if want_group or request.predicate(tgt, ep_group, ep_name):
                     if ep_val.pex_binary_address:
                         filtered_entry_point_pex_addresses.append(ep_val.pex_binary_address)
                     else:
@@ -204,7 +212,13 @@ async def infer_entry_point_dependencies(
         requested_entry_points[target] = set(requested_ep)
 
     def predicate(tgt: PythonDistribution, ep_group: str, ep_name: str) -> bool:
-        relevant = {"*", ep_group, f"{ep_group}/{ep_name}"}
+        requested = requested_entry_points[tgt]
+        if f"{ep_group}/{ep_name}" in requested:
+            return True
+        return False
+
+    def group_predicate(tgt: PythonDistribution, ep_group: str) -> bool:
+        relevant = {"*", ep_group}
         requested = requested_entry_points[tgt]
         if relevant & requested:
             # at least one item in requested is relevant
@@ -213,7 +227,9 @@ async def infer_entry_point_dependencies(
 
     entry_point_dependencies = await Get(
         EntryPointDependencies,
-        GetEntryPointDependenciesRequest(Targets(requested_entry_points.keys()), predicate),
+        GetEntryPointDependenciesRequest(
+            Targets(requested_entry_points.keys()), predicate, group_predicate
+        ),
     )
     return InferredDependencies(entry_point_dependencies.addresses)
 
