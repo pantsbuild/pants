@@ -95,6 +95,20 @@ RULES1_FILE = dedent(
         pex = await Get(VenvPex, PexRequest, black.to_pex_request())
         digest = await Get(Digest, CreateArchive(EMPTY_SNAPSHOT))
         paths = await Get(BinaryPaths, {{BinaryPathRequest(binary_name="time", search_path=("/usr/bin")): BinaryPathRequest, local_env.val: EnvironmentName}})
+        try:
+            try_all_targets_try = await Get(AllTargets)
+        except:
+            try_all_targets_except = await Get(AllTargets)
+        else:
+            try_all_targets_else = await Get(AllTargets)
+        finally:
+            try_all_targets_finally = await Get(AllTargets)
+        if True:
+            conditional_all_targets_if = await Get(AllTargets)
+        elif False:
+            conditional_all_targets_elif = await Get(AllTargets)
+        else:
+            conditional_all_targets_else = await Get(AllTargets)
 
     class Bar:
         pass
@@ -136,6 +150,10 @@ RULES1_FILE = dedent(
             ),
             digest_get
         )
+        multigot_forloop = await MultiGet(
+            Get(Digest, CreateArchive(EMPTY_SNAPSHOT))
+            for i in [0, 1, 2]
+        )
 
     def rules():
         return collect_rules()
@@ -168,6 +186,20 @@ MIGRATED_RULES1_FILE = dedent(
         pex = await create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
         digest = await create_archive(CreateArchive(EMPTY_SNAPSHOT), **implicitly())
         paths = await find_binary(**implicitly({BinaryPathRequest(binary_name='time', search_path='/usr/bin'): BinaryPathRequest, local_env.val: EnvironmentName}))
+        try:
+            try_all_targets_try = await find_all_targets(**implicitly())
+        except:
+            try_all_targets_except = await find_all_targets(**implicitly())
+        else:
+            try_all_targets_else = await find_all_targets(**implicitly())
+        finally:
+            try_all_targets_finally = await find_all_targets(**implicitly())
+        if True:
+            conditional_all_targets_if = await find_all_targets(**implicitly())
+        elif False:
+            conditional_all_targets_elif = await find_all_targets(**implicitly())
+        else:
+            conditional_all_targets_else = await find_all_targets(**implicitly())
 
     class Bar:
         pass
@@ -200,6 +232,10 @@ MIGRATED_RULES1_FILE = dedent(
             all_targets_get,
             create_venv_pex(**implicitly({black.to_pex_request(): PexRequest})),
             digest_get
+        )
+        multigot_forloop = await concurrently(
+            create_archive(CreateArchive(EMPTY_SNAPSHOT), **implicitly())
+            for i in [0, 1, 2]
         )
 
     def rules():
@@ -275,8 +311,9 @@ def test_migrate_call_by_name_syntax():
         # Ensure the JSON output contains the paths to the files we expect to migrate
         assert all(str(p) in result.stdout for p in [register_path, rules1_path, rules2_path])
         # Ensure the warning for embedded comments is logged
+        # Note: This assertion is brittle - adding extra content to rules1.py will probably mean updating the range
         assert (
-            f"Comments found in {tmpdir}/src/migrateme/rules1.py within replacement range: (37, 42)"
+            f"Comments found in {tmpdir}/src/migrateme/rules1.py within replacement range: (51, 56)"
             in result.stderr
         )
 

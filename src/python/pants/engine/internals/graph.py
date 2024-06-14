@@ -9,9 +9,22 @@ import itertools
 import json
 import logging
 import os.path
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, Mapping, NamedTuple, Sequence, Type, TypeVar, cast
+from typing import (
+    Any,
+    DefaultDict,
+    FrozenSet,
+    Iterable,
+    Iterator,
+    Mapping,
+    NamedTuple,
+    Sequence,
+    Type,
+    TypeVar,
+    cast,
+)
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -37,7 +50,7 @@ from pants.engine.internals.parametrize import (  # noqa: F401
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizationsRequest as _TargetParametrizationsRequest,
 )
-from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
+from pants.engine.internals.target_adaptor import SourceBlocks, TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
@@ -100,6 +113,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list, pluralize, softwrap
+from pants.vcs.hunk import TextBlocks
 
 logger = logging.getLogger(__name__)
 
@@ -469,6 +483,7 @@ def _create_target(
         ),
         union_membership=union_membership,
         description_of_origin=target_adaptor.description_of_origin,
+        origin_sources_blocks=target_adaptor.origin_sources_blocks,
     )
     # Check for any deprecated field usage.
     for field_type in target.field_types:
@@ -581,6 +596,7 @@ async def resolve_target_for_bootstrapping(
         union_membership=union_membership,
         ignore_unrecognized_fields=True,
         description_of_origin=target_adaptor.description_of_origin,
+        origin_sources_blocks=target_adaptor.origin_sources_blocks,
     )
     return WrappedTargetForBootstrap(target)
 
@@ -983,17 +999,86 @@ def _log_or_raise_unmatched_owners(
 
 
 @dataclass(frozen=True)
+class TargetSourceBlocks:
+    address: Address
+    source_blocks: SourceBlocks
+
+
+class FilenameTargetSourceBlocksMapping(FrozenDict[str, tuple[TargetSourceBlocks, ...]]):
+    """Map file paths to all TargetSourceBlocks owned by that file."""
+
+
+@dataclass(frozen=True)
+class TargetOriginSourcesBlocksOptions:
+    enable: bool
+
+
+@rule
+def extract_enable_target_origin_sources_blocks(
+    global_options: GlobalOptions,
+) -> TargetOriginSourcesBlocksOptions:
+    return TargetOriginSourcesBlocksOptions(
+        enable=global_options.enable_target_origin_sources_blocks
+    )
+
+
+@rule
+def calc_source_block_mapping(
+    targets: AllTargets,
+    options: TargetOriginSourcesBlocksOptions,
+) -> FilenameTargetSourceBlocksMapping:
+    if not options.enable:
+        return FilenameTargetSourceBlocksMapping()
+
+    result: DefaultDict[str, list[TargetSourceBlocks]] = defaultdict(list)
+    for target in targets:
+        for filename, sources_blocks in target.origin_sources_blocks.items():
+            result[filename].append(
+                TargetSourceBlocks(address=target.address, source_blocks=sources_blocks)
+            )
+
+    return FilenameTargetSourceBlocksMapping(
+        (filename, tuple(blocks)) for filename, blocks in result.items()
+    )
+
+
+class FilesWithSourceBlocks(FrozenSet[str]):
+    pass
+
+
+@rule
+def calc_files_with_sources_blocks(
+    mapping: FilenameTargetSourceBlocksMapping,
+) -> FilesWithSourceBlocks:
+    return FilesWithSourceBlocks(mapping.keys())
+
+
+@dataclass(frozen=True)
 class OwnersRequest:
     """A request for the owners of a set of file paths.
+
+    The resulting owners will be those identified for the sources as well as those
+    for sources_blocks. Do not include a source filename in sources if it is also
+    present in sources_blocks, as that will be redundant, and cancel the finer level
+    of detail gained by inspecting the originating text blocks.
 
     TODO: This is widely used as an effectively-public API. It should probably move to
     `pants.engine.target`.
     """
 
     sources: tuple[str, ...]
+    sources_blocks: FrozenDict[str, TextBlocks] = FrozenDict()
     owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
+
+
+@dataclass(frozen=True)
+class TextBlocksOwnersRequest:
+    """Request for file text block owners."""
+
+    filename: str
+    text_blocks: TextBlocks
 
 
 class Owners(FrozenOrderedSet[Address]):
@@ -1005,6 +1090,15 @@ async def find_owners(
     owners_request: OwnersRequest,
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> Owners:
+    block_owners: tuple[Owners, ...] = (
+        await MultiGet(
+            Get(Owners, TextBlocksOwnersRequest(filename, blocks))
+            for filename, blocks in owners_request.sources_blocks.items()
+        )
+        if owners_request.sources_blocks
+        else ()
+    )
+
     # Determine which of the sources are live and which are deleted.
     sources_paths = await Get(Paths, PathGlobs(owners_request.sources))
 
@@ -1094,7 +1188,34 @@ async def find_owners(
             [PurePath(path) for path in unmatched_sources], owners_request.owners_not_found_behavior
         )
 
-    return Owners(result)
+    return Owners(result.union(*block_owners))
+
+
+@rule
+def find_source_blocks_owners(
+    request: TextBlocksOwnersRequest, mapping: FilenameTargetSourceBlocksMapping
+) -> Owners:
+    file_blocks = mapping.get(request.filename)
+    if not file_blocks:
+        return Owners()
+
+    owners = set()
+
+    # Let's say the rule is called to figure out which targets has changed given the `git diff` output.
+    # Then `request.source_blocks` is populated with source blocks parsed from `git diff` output
+    # and `file_blocks` is holding the list of all source blocks for the given `request.filename`.
+    # In order to get an answer we need to find an intersection for all pairs of blocks and return
+    # the targets they correspond to.
+    #
+    # TODO Use interval tree?
+    for request_block, target_blocks in itertools.product(request.text_blocks, file_blocks):
+        for target_block in target_blocks.source_blocks:
+            if not target_block.is_touched_by(request_block):
+                continue
+            owners.add(target_blocks.address)
+            break  # continue outer loop
+
+    return Owners(owners)
 
 
 # -----------------------------------------------------------------------------------------------
