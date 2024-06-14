@@ -18,6 +18,7 @@ class IPython(PythonToolBase):
 
     default_main = ConsoleScript("ipython")
     default_requirements = ["ipython>=7.34,<9"]
+    default_interpreter_constraints = ["CPython>=3.8,<4"]
 
     default_lockfile_resource = ("pants.backend.python.subsystems", "ipython.lock")
 
