@@ -22,6 +22,7 @@ class ParsedDockerfileInfo:
     source: str
     build_args: tuple[str, ...]  # "ARG_NAME=VALUE", ...
     copy_source_paths: tuple[str, ...]
+    copy_build_args: tuple[str, ...]  # "ARG_NAME=UPSTREAM_TARGET_ADDRESS", ...
     from_image_build_args: tuple[str, ...]  # "ARG_NAME=UPSTREAM_TARGET_ADDRESS", ...
     version_tags: tuple[str, ...]  # "STAGE TAG", ...
 
@@ -76,6 +77,11 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
     from dockerfile import Command, parse_file, parse_string  # pants: no-infer-dep
 
     @dataclass(frozen=True)
+    class CopyReferences:
+        in_arg: tuple[str, ...]
+        not_in_arg: tuple[str, ...]
+
+    @dataclass(frozen=True)
     class ParsedDockerfile:
         filename: str
         commands: tuple[Command, ...]
@@ -93,6 +99,7 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
                 source=self.filename,
                 build_args=self.build_args(),
                 copy_source_paths=self.copy_source_paths(),
+                copy_build_args=self.copy_build_args(),
                 from_image_build_args=self.from_image_build_args(),
                 version_tags=self.baseimage_tags(),
             )
@@ -102,14 +109,23 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
                 if command.cmd.upper() == command_name:
                     yield command
 
-        def from_image_build_args(self) -> tuple[str, ...]:
+        def arg_references(self):
+            """Return ARGs which could have valid references."""
             build_args = {
                 key: value.strip("\"'")
                 for key, has_value, value in [
                     build_arg.partition("=") for build_arg in self.build_args()
                 ]
-                if has_value and valid_address(value)
+                if has_value
             }
+            return build_args
+
+        def args_with_addresses(self):
+            """All ARGs which have an Address as a value."""
+            return {k: v for k, v in self.arg_references().items() if valid_address(v)}
+
+        def from_image_build_args(self) -> tuple[str, ...]:
+            build_args = self.args_with_addresses()
 
             return tuple(
                 f"{image_build_arg}={build_args[image_build_arg]}"
@@ -118,7 +134,7 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
             )
 
         @staticmethod
-        def _get_image_ref_build_arg(image_ref: str) -> str | None:
+        def _extract_ref_from_arg(image_ref: str) -> str | None:
             build_arg = re.match(r"\$\{?([a-zA-Z0-9_]+)\}?$", image_ref)
             return build_arg.group(1) if build_arg else None
 
@@ -131,7 +147,7 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
                 FROM ${BASE_IMAGE}
             """
             for cmd in self.get_all("FROM"):
-                build_arg = self._get_image_ref_build_arg(cmd.value[0])
+                build_arg = self._extract_ref_from_arg(cmd.value[0])
                 if build_arg:
                     yield build_arg
 
@@ -171,7 +187,7 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
                 """The image ref is in the form `registry/repo/name[/...][:tag][@digest]` and where
                 `digest` is `sha256:hex value`, or a build arg reference with $ARG."""
                 if image_ref.startswith("$"):
-                    build_arg = self._get_image_ref_build_arg(image_ref)
+                    build_arg = self._extract_ref_from_arg(image_ref)
                     if build_arg:
                         return f"build-arg:{build_arg}"
                 parsed = re.match(_image_ref_regexp, image_ref)
@@ -195,10 +211,11 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
             """Return all defined build args, including any default values."""
             return tuple(cmd.original[4:].strip() for cmd in self.get_all("ARG"))
 
-        def copy_source_paths(self) -> tuple[str, ...]:
-            """Return all files referenced from the build context using COPY instruction."""
+        def get_copy_references(self) -> CopyReferences:
+            """Get all references (files and addresses) of COPY instructions, partitioned by whether
+            the appear in ARGs or not."""
             # Exclude COPY --from instructions, as they don't refer to files from the build context.
-            return tuple(
+            copied_files = tuple(
                 chain(
                     *(
                         cmd.value[:-1]
@@ -207,6 +224,35 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
                     )
                 )
             )
+            arg_references = self.arg_references()
+
+            copy_in_arg = []
+            copy_not_in_arg = []
+            for f in copied_files:
+                argref = self._extract_ref_from_arg(f)
+                if argref:
+                    if argref not in arg_references:
+                        # if a COPYed file is referenced in an arg but the arg has no value,
+                        # we can't resolve it in any way, so we omit it
+                        continue
+                    constructed_arg = f"{argref}={arg_references[argref]}"
+                    copy_in_arg.append(constructed_arg)
+                else:
+                    copy_not_in_arg.append(f)
+
+            return CopyReferences(tuple(copy_in_arg), tuple(copy_not_in_arg))
+
+        def copy_source_paths(self) -> tuple[str, ...]:
+            """All files referenced from the build context using COPY instruction.
+
+            Does not include ones from ARGs
+            """
+            return self.get_copy_references().not_in_arg
+
+        def copy_build_args(self) -> tuple[str, ...]:
+            """All files and targets referenced from the build context in ARGs which are used by a
+            COPY instruction."""
+            return self.get_copy_references().in_arg
 
     for parsed in map(ParsedDockerfile.from_file, dockerfile_names):
         yield parsed.get_info()
