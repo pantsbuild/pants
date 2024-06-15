@@ -260,6 +260,9 @@ class EntryPointsTxt:
 
 @rule
 async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> EntryPointsTxt:
+    if not request.targets:
+        return EntryPointsTxt(EMPTY_DIGEST)
+
     all_resolved_entry_points = await MultiGet(
         Get(
             ResolvedPythonDistributionEntryPoints,
@@ -305,12 +308,19 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
                     continue
 
                 entry_points_txt_section = f"[{ep_group}]\n"
+                selected_entry_points_in_group = False
                 for entry_point_name, ep in sorted(entry_points.items()):
                     if not request.predicate(target, ep_group, entry_point_name):
                         continue
+                    selected_entry_points_in_group = True
                     entry_points_txt_section += f"{entry_point_name} = {ep.entry_point.spec}\n"
+                if not selected_entry_points_in_group:
+                    continue
                 entry_points_txt_section += "\n"
                 group_sections[ep_group] = entry_points_txt_section
+
+        if not group_sections:
+            continue
 
         # consistent sorting
         entry_points_txt_contents = "".join(
@@ -322,7 +332,10 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
             FileContent(entry_points_txt_path, entry_points_txt_contents.encode("utf-8"))
         )
 
-    digest = await Get(Digest, CreateDigest(entry_points_txt_files))
+    if not entry_points_txt_files:
+        digest = EMPTY_DIGEST
+    else:
+        digest = await Get(Digest, CreateDigest(entry_points_txt_files))
     return EntryPointsTxt(digest)
 
 
