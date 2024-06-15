@@ -12,6 +12,7 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
+    Executable,
     MainSpecification,
     PexLayout,
     PythonRequirementsField,
@@ -46,7 +47,7 @@ from pants.backend.python.util_rules.python_sources import rules as python_sourc
 from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.core.goals.package import TraverseIfNotPackageTarget
 from pants.core.target_types import FileSourceField
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -538,10 +539,14 @@ async def create_pex_from_targets(
     if request.additional_sources:
         sources_digests.append(request.additional_sources)
     if request.include_source_files:
+        if isinstance(request.main, Executable):
+            addresses = (*request.addresses, f"//{request.main.executable}")
+        else:
+            addresses = request.addresses
         transitive_targets = await Get(
             TransitiveTargets,
             TransitiveTargetsRequest(
-                request.addresses,
+                addresses,
                 should_traverse_deps_predicate=TraverseIfNotPackageTarget(
                     roots=request.addresses,
                     union_membership=union_membership,
@@ -554,6 +559,20 @@ async def create_pex_from_targets(
             await _warn_about_any_files_targets(
                 request.addresses, transitive_targets, union_membership
             )
+    elif isinstance(request.main, Executable):
+        # The source for an --executable main must be embedded in the pex even if other sources aren't
+        description_of_origin = (
+            f"The PexFromTargets request with main {request.main} ({request.description})"
+        )
+        targets = await Get(
+            Targets,
+            UnparsedAddressInputs(
+                [f"//{request.main.executable}"],
+                owning_address=None,
+                description_of_origin=description_of_origin,
+            ),
+        )
+        sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(targets))
     else:
         sources = PythonSourceFiles.empty()
 
