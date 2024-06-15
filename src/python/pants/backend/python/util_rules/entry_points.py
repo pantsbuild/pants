@@ -283,9 +283,9 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
         Get(Paths, PathGlobs(module_candidate_paths)) for module_candidate_paths in possible_paths
     )
 
-    entry_points_by_path: dict[str, list[tuple[Target, ResolvedPythonDistributionEntryPoints]]] = (
-        defaultdict(list)
-    )
+    entry_points_by_path: dict[
+        str, list[tuple[Target, ResolvedPythonDistributionEntryPoints]]
+    ] = defaultdict(list)
 
     target: Target
     resolved_ep: ResolvedPythonDistributionEntryPoints
