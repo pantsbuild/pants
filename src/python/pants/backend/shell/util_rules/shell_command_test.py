@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import shlex
+import time
 from pathlib import Path
 from textwrap import dedent
 
@@ -907,5 +908,6 @@ def test_shell_command_workspace_invalidation_sources(rule_runner: RuleRunner) -
 
     # Update the hash-only source file's content. The shell_command should be re-executed now.
     (Path(rule_runner.build_root) / "src" / "a-file").write_text("xyzzy")
+    time.sleep(0.100)
     result3 = execute_shell_command(rule_runner, address)
     assert result1.snapshot != result3.snapshot
