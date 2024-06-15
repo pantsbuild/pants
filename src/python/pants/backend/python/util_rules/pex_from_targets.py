@@ -535,12 +535,28 @@ async def create_pex_from_targets(
         request.to_interpreter_constraints_request(),
     )
 
+    if not isinstance(request.main, Executable):
+        executable_addresses = Addresses([])
+    else:
+        # The source for an --executable main must be embedded in the pex even if other sources aren't
+        description_of_origin = (
+            f"The PexFromTargetsRequest with main {request.main} ({request.description})"
+        )
+        executable_addresses = await Get(
+            Addresses,
+            UnparsedAddressInputs(
+                [f"//{request.main.spec}"],
+                owning_address=None,
+                description_of_origin=description_of_origin,
+            ),
+        )
+
     sources_digests = []
     if request.additional_sources:
         sources_digests.append(request.additional_sources)
     if request.include_source_files:
-        if isinstance(request.main, Executable):
-            addresses = (*request.addresses, f"//{request.main.executable}")
+        if executable_addresses:
+            addresses = (*request.addresses, *executable_addresses)
         else:
             addresses = request.addresses
         transitive_targets = await Get(
@@ -559,19 +575,8 @@ async def create_pex_from_targets(
             await _warn_about_any_files_targets(
                 request.addresses, transitive_targets, union_membership
             )
-    elif isinstance(request.main, Executable):
-        # The source for an --executable main must be embedded in the pex even if other sources aren't
-        description_of_origin = (
-            f"The PexFromTargets request with main {request.main} ({request.description})"
-        )
-        targets = await Get(
-            Targets,
-            UnparsedAddressInputs(
-                [f"//{request.main.executable}"],
-                owning_address=None,
-                description_of_origin=description_of_origin,
-            ),
-        )
+    elif executable_addresses:
+        targets = await Get(Targets, Addresses, executable_addresses)
         sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(targets))
     else:
         sources = PythonSourceFiles.empty()
