@@ -158,44 +158,7 @@ async def get_filtered_entry_point_dependencies(
     )
 
 
-@dataclass(frozen=True)
-class PythonTestsEntryPointDependenciesInferenceFieldSet(FieldSet):
-    required_fields = (
-        PythonTestsDependenciesField,
-        PythonTestsEntryPointDependenciesField,
-    )
-    entry_point_dependencies: PythonTestsEntryPointDependenciesField
-
-
-class InferEntryPointDependencies(InferDependenciesRequest):
-    infer_from = PythonTestsEntryPointDependenciesInferenceFieldSet
-
-
-@rule(
-    desc=f"Infer dependencies based on `{PythonTestsEntryPointDependenciesField.alias}` field.",
-    level=LogLevel.DEBUG,
-)
-async def infer_entry_point_dependencies(
-    request: InferEntryPointDependencies,
-) -> InferredDependencies:
-    entry_point_deps: PythonTestsEntryPointDependenciesField = (
-        request.field_set.entry_point_dependencies
-    )
-    if entry_point_deps.value is None:
-        return InferredDependencies([])
-
-    dist_targets, group_predicate, predicate = await get_entry_point_deps_targets_and_predicates(
-        request.field_set.address, entry_point_deps
-    )
-
-    entry_point_dependencies = await Get(
-        EntryPointDependencies,
-        GetEntryPointDependenciesRequest(dist_targets, group_predicate, predicate),
-    )
-    return InferredDependencies(entry_point_dependencies.addresses)
-
-
-async def get_entry_point_deps_targets_and_predicates(
+async def _get_entry_point_deps_targets_and_predicates(
     owning_address: Address, entry_point_deps: PythonTestsEntryPointDependenciesField
 ) -> tuple[
     Targets, PythonDistributionEntryPointGroupPredicate, PythonDistributionEntryPointPredicate
@@ -244,6 +207,43 @@ async def get_entry_point_deps_targets_and_predicates(
         return False
 
     return Targets(requested_entry_points.keys()), group_predicate, predicate
+
+
+@dataclass(frozen=True)
+class PythonTestsEntryPointDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (
+        PythonTestsDependenciesField,
+        PythonTestsEntryPointDependenciesField,
+    )
+    entry_point_dependencies: PythonTestsEntryPointDependenciesField
+
+
+class InferEntryPointDependencies(InferDependenciesRequest):
+    infer_from = PythonTestsEntryPointDependenciesInferenceFieldSet
+
+
+@rule(
+    desc=f"Infer dependencies based on `{PythonTestsEntryPointDependenciesField.alias}` field.",
+    level=LogLevel.DEBUG,
+)
+async def infer_entry_point_dependencies(
+    request: InferEntryPointDependencies,
+) -> InferredDependencies:
+    entry_point_deps: PythonTestsEntryPointDependenciesField = (
+        request.field_set.entry_point_dependencies
+    )
+    if entry_point_deps.value is None:
+        return InferredDependencies([])
+
+    dist_targets, group_predicate, predicate = await _get_entry_point_deps_targets_and_predicates(
+        request.field_set.address, entry_point_deps
+    )
+
+    entry_point_dependencies = await Get(
+        EntryPointDependencies,
+        GetEntryPointDependenciesRequest(dist_targets, group_predicate, predicate),
+    )
+    return InferredDependencies(entry_point_dependencies.addresses)
 
 
 @dataclass(frozen=True)
@@ -347,7 +347,7 @@ async def generate_entry_points_txt_from_entry_point_dependencies(
     if not entry_point_deps.value:
         return PytestPluginSetup(EMPTY_DIGEST)
 
-    dist_targets, group_predicate, predicate = await get_entry_point_deps_targets_and_predicates(
+    dist_targets, group_predicate, predicate = await _get_entry_point_deps_targets_and_predicates(
         request.target.address, entry_point_deps
     )
 
