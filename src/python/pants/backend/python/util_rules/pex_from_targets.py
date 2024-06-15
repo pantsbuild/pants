@@ -555,14 +555,10 @@ async def create_pex_from_targets(
     if request.additional_sources:
         sources_digests.append(request.additional_sources)
     if request.include_source_files:
-        if executable_addresses:
-            addresses = (*request.addresses, *executable_addresses)
-        else:
-            addresses = request.addresses
         transitive_targets = await Get(
             TransitiveTargets,
             TransitiveTargetsRequest(
-                addresses,
+                (*request.addresses, *executable_addresses),
                 should_traverse_deps_predicate=TraverseIfNotPackageTarget(
                     roots=request.addresses,
                     union_membership=union_membership,
