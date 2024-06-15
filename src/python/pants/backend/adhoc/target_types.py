@@ -253,18 +253,23 @@ class AdhocToolOutputRootDirField(StringField):
     )
 
 
-class AdhocToolHashOnlySourcesGlobsField(StringSequenceField):
-    alias: ClassVar[str] = "hash_only_sources_globs"
+class AdhocToolWorkspaceInvalidationSourcesField(StringSequenceField):
+    alias: ClassVar[str] = "workspace_invalidation_sources"
     help = help_text(
         """
-        Path globs for source files on which this target depends indirectly, but which should not be
-        materlized into the execution sandbox. Pants will compute the hash of all of the files
-        references by the globs and include that hash as part of the cache key for the
-        process to be executed (as an environment variable).
+        Path globs for source files on which this target depends and for which any changes should cause
+        this target's process to be re-executed. Unlike ordinary dependencies, the files referenced by
+        `workspace_invalidation_sources` globs are not materialized into any execution sandbox
+        and are referenced solely for cache invalidation purposes.
 
-        Note: The files will not materialized into the execution sandbox because this field is intended
-        to be used with the `workspace_environment` target type which executes processes in the
-        repository itself.
+        Note: This field is intended to work with the in-workspace execution environment configured by
+        the `workspace_environment` target type. It should only be used when the configured
+        environment for a target is a `workspace_environment`.
+
+        Implementation: Pants computes a digest of all of the files referenced by the provided globs
+        and injects that digest into the process as an environment variable. Since environment variables
+        are part of the cache key for a process's execution, any changes to the referenced files will
+        change the digest and thus force re-exection of the process.
         """
     )
 
@@ -288,7 +293,7 @@ class AdhocToolTarget(Target):
         AdhocToolOutputRootDirField,
         AdhocToolStdoutFilenameField,
         AdhocToolStderrFilenameField,
-        AdhocToolHashOnlySourcesGlobsField,
+        AdhocToolWorkspaceInvalidationSourcesField,
         EnvironmentField,
     )
     help = help_text(

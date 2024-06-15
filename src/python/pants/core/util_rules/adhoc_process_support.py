@@ -72,7 +72,7 @@ class AdhocProcessRequest:
     log_output: bool
     capture_stdout_file: str | None
     capture_stderr_file: str | None
-    hash_only_sources_globs: PathGlobs | None
+    workspace_invalidation_globs: PathGlobs | None
     cache_scope: ProcessCacheScope | None = None
 
 
@@ -569,13 +569,14 @@ async def prepare_adhoc_process(
     if supplied_env_vars:
         command_env.update(supplied_env_vars)
 
-    # Compute the digest for any hash-ony sources and put the hash into the environment as a dummy variable
-    # so that the process produced by this rule will be invalidated if any of thr hash-only files change.
-    if request.hash_only_sources_globs is not None:
-        hash_only_sources_digest = await Get(Digest, PathGlobs, request.hash_only_sources_globs)
-        command_env[
-            "__PANTS_HASH_ONLY_SOURCES"
-        ] = f"{hash_only_sources_digest.fingerprint}-{hash_only_sources_digest.serialized_bytes_length}"
+    # Compute the digest for any workspace invalidation sources and put the digest into the environment as a dummy variable
+    # so that the process produced by this rule will be invalidated if any of the referenced files change.
+    if request.workspace_invalidation_globs is not None:
+        workspace_invalidation_digest = await Get(
+            Digest, PathGlobs, request.workspace_invalidation_globs
+        )
+        digest_str = f"{workspace_invalidation_digest.fingerprint}-{workspace_invalidation_digest.serialized_bytes_length}"
+        command_env["__PANTS_WORKSPACE_INVALIDATION_SOURCES_DIGEST"] = digest_str
 
     input_snapshot = await Get(Snapshot, Digest, request.input_digest)
 

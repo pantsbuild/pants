@@ -14,7 +14,6 @@ from pants.backend.shell.target_types import (
     ShellCommandCommandField,
     ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
-    ShellCommandHashOnlySourcesGlobsField,
     ShellCommandLogOutputField,
     ShellCommandNamedCachesField,
     ShellCommandOutputDirectoriesField,
@@ -26,6 +25,7 @@ from pants.backend.shell.target_types import (
     ShellCommandTimeoutField,
     ShellCommandToolsField,
     ShellCommandWorkdirField,
+    ShellCommandWorkspaceInvalidationSourcesField,
 )
 from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
@@ -152,16 +152,16 @@ async def _prepare_process_request_from_target(
 
     cache_scope = env_target.default_cache_scope
 
-    hash_only_sources_globs: PathGlobs | None = None
-    raw_hash_only_sources_globs = (
-        shell_command.get(ShellCommandHashOnlySourcesGlobsField).value or ()
+    workspace_invalidation_globs: PathGlobs | None = None
+    workspace_invalidation_sources = (
+        shell_command.get(ShellCommandWorkspaceInvalidationSourcesField).value or ()
     )
-    if raw_hash_only_sources_globs:
+    if workspace_invalidation_sources:
         spec_path = shell_command.address.spec_path
-        hash_only_sources_globs = PathGlobs(
-            globs=(os.path.join(spec_path, glob) for glob in raw_hash_only_sources_globs),
+        workspace_invalidation_globs = PathGlobs(
+            globs=(os.path.join(spec_path, glob) for glob in workspace_invalidation_sources),
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin=f"`{ShellCommandHashOnlySourcesGlobsField.alias}` for `shell_command` target at `{shell_command.address}`",
+            description_of_origin=f"`{ShellCommandWorkspaceInvalidationSourcesField.alias}` for `shell_command` target at `{shell_command.address}`",
         )
 
     return AdhocProcessRequest(
@@ -182,7 +182,7 @@ async def _prepare_process_request_from_target(
         log_output=shell_command[ShellCommandLogOutputField].value,
         capture_stdout_file=None,
         capture_stderr_file=None,
-        hash_only_sources_globs=hash_only_sources_globs,
+        workspace_invalidation_globs=workspace_invalidation_globs,
         cache_scope=cache_scope,
     )
 

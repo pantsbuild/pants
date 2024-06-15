@@ -9,7 +9,6 @@ from pants.backend.adhoc.target_types import (
     AdhocToolArgumentsField,
     AdhocToolExecutionDependenciesField,
     AdhocToolExtraEnvVarsField,
-    AdhocToolHashOnlySourcesGlobsField,
     AdhocToolLogOutputField,
     AdhocToolNamedCachesField,
     AdhocToolOutputDirectoriesField,
@@ -21,6 +20,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolStderrFilenameField,
     AdhocToolStdoutFilenameField,
     AdhocToolWorkdirField,
+    AdhocToolWorkspaceInvalidationSourcesField,
 )
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.target_types import FileSourceField
@@ -84,14 +84,16 @@ async def run_in_sandbox_request(
 
     cache_scope = env_target.default_cache_scope
 
-    hash_only_sources_globs: PathGlobs | None = None
-    raw_hash_only_sources_globs = target.get(AdhocToolHashOnlySourcesGlobsField).value or ()
-    if raw_hash_only_sources_globs:
+    workspace_invalidation_globs: PathGlobs | None = None
+    workspace_invalidation_sources = (
+        target.get(AdhocToolWorkspaceInvalidationSourcesField).value or ()
+    )
+    if workspace_invalidation_sources:
         spec_path = target.address.spec_path
-        hash_only_sources_globs = PathGlobs(
-            globs=(os.path.join(spec_path, glob) for glob in raw_hash_only_sources_globs),
+        workspace_invalidation_globs = PathGlobs(
+            globs=(os.path.join(spec_path, glob) for glob in workspace_invalidation_sources),
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin=f"`{AdhocToolHashOnlySourcesGlobsField.alias}` for `adhoc_tool` target at `{target.address}`",
+            description_of_origin=f"`{AdhocToolWorkspaceInvalidationSourcesField.alias}` for `adhoc_tool` target at `{target.address}`",
         )
 
     process_request = AdhocProcessRequest(
@@ -112,7 +114,7 @@ async def run_in_sandbox_request(
         log_output=target[AdhocToolLogOutputField].value,
         capture_stderr_file=target[AdhocToolStderrFilenameField].value,
         capture_stdout_file=target[AdhocToolStdoutFilenameField].value,
-        hash_only_sources_globs=hash_only_sources_globs,
+        workspace_invalidation_globs=workspace_invalidation_globs,
         cache_scope=cache_scope,
     )
 

@@ -10,7 +10,6 @@ from pants.backend.adhoc.target_types import (
     AdhocToolDependenciesField,
     AdhocToolExecutionDependenciesField,
     AdhocToolExtraEnvVarsField,
-    AdhocToolHashOnlySourcesGlobsField,
     AdhocToolLogOutputField,
     AdhocToolNamedCachesField,
     AdhocToolOutputDependenciesField,
@@ -20,6 +19,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolRunnableDependenciesField,
     AdhocToolTimeoutField,
     AdhocToolWorkdirField,
+    AdhocToolWorkspaceInvalidationSourcesField,
 )
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
@@ -380,7 +380,7 @@ class ShellCommandNamedCachesField(AdhocToolNamedCachesField):
     pass
 
 
-class ShellCommandHashOnlySourcesGlobsField(AdhocToolHashOnlySourcesGlobsField):
+class ShellCommandWorkspaceInvalidationSourcesField(AdhocToolWorkspaceInvalidationSourcesField):
     pass
 
 
@@ -408,7 +408,7 @@ class ShellCommandTarget(Target):
         ShellCommandWorkdirField,
         ShellCommandNamedCachesField,
         ShellCommandOutputRootDirField,
-        ShellCommandHashOnlySourcesGlobsField,
+        ShellCommandWorkspaceInvalidationSourcesField,
         EnvironmentField,
     )
     help = help_text(

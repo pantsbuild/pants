@@ -344,7 +344,7 @@ def test_adhoc_tool_with_workspace_execution(rule_runner: PythonRuleRunner) -> N
     assert workspace_output_path.read_text().strip() == "workspace"
 
 
-def test_adhoc_tool_hash_only_sources_globs(rule_runner: PythonRuleRunner) -> None:
+def test_adhoc_tool_workspace_invalidation_sources(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/BUILD": dedent(
@@ -356,7 +356,7 @@ def test_adhoc_tool_hash_only_sources_globs(rule_runner: PythonRuleRunner) -> No
               # Use a random value so we can detect when re-execution occurs.
               args=["-c", "echo $RANDOM > out.log"],
               output_files=["out.log"],
-              hash_only_sources_globs=['a-file'],
+              workspace_invalidation_sources=['a-file'],
             )
             """
             ),

@@ -881,7 +881,7 @@ def test_shell_command_with_workspace_execution(rule_runner: RuleRunner) -> None
     assert workspace_output_path.read_text().strip() == "workspace"
 
 
-def test_shell_command_hash_only_sources_globs(rule_runner: RuleRunner) -> None:
+def test_shell_command_workspace_invalidation_sources(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/BUILD": dedent(
@@ -891,7 +891,7 @@ def test_shell_command_hash_only_sources_globs(rule_runner: RuleRunner) -> None:
               # Use a random value so we can detect when re-execution occurs.
               command='echo $RANDOM > out.log',
               output_files=["out.log"],
-              hash_only_sources_globs=['a-file'],
+              workspace_invalidation_sources=['a-file'],
             )
             """
             ),
