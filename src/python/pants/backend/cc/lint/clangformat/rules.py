@@ -15,7 +15,11 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
+from pants.engine.rules import Get, concurrently, Rule, collect_rules, rule
+from pants.backend.python.util_rules.pex import create_pex
+from pants.core.util_rules.config_files import find_config_file
+from pants.engine.intrinsics import merge_digests_request_to_digest
+from pants.engine.rules import implicitly
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -40,27 +44,14 @@ class ClangFormatRequest(FmtTargetsRequest):
 @rule(level=LogLevel.DEBUG)
 async def clangformat_fmt(request: ClangFormatRequest.Batch, clangformat: ClangFormat) -> FmtResult:
     # Look for any/all of the clang-format configuration files (recurse sub-dirs)
-    config_files_get = Get(
-        ConfigFiles,
-        ConfigFilesRequest,
-        clangformat.config_request(request.snapshot.dirs),
-    )
+    config_files_get = find_config_file(**implicitly({clangformat.config_request(request.snapshot.dirs): ConfigFilesRequest}))
 
-    clangformat_pex, config_files = await MultiGet(
-        Get(Pex, PexRequest, clangformat.to_pex_request()), config_files_get
+    clangformat_pex, config_files = await concurrently(
+        create_pex(**implicitly({clangformat.to_pex_request(): PexRequest})),
     )
 
     # Merge source files, config files, and clang-format pex process
-    input_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                request.snapshot.digest,
-                config_files.snapshot.digest,
-                clangformat_pex.digest,
-            ]
-        ),
-    )
+    input_digest = await merge_digests_request_to_digest(MergeDigests([request.snapshot.digest, config_files.snapshot.digest, clangformat_pex.digest]), **implicitly())
 
     result = await Get(
         ProcessResult,
