@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional
 
 from pants.backend.python.lint.ruff.common import RunRuffRequest, run_ruff
 from pants.backend.python.lint.ruff.format.skip_field import SkipRuffFormatField
@@ -14,9 +13,9 @@ from pants.backend.python.target_types import (
     PythonSourceField,
 )
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.fmt import AbstractFmtRequest, FmtResult, FmtTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
+from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
@@ -55,20 +54,19 @@ class RuffFormatRequest(FmtTargetsRequest):
 async def _run_ruff_fmt(
     request: AbstractFmtRequest.Batch,
     ruff: Ruff,
-    interpreter_constraints: Optional[InterpreterConstraints] = None,
+    platform: Platform,
 ) -> FmtResult:
     run_ruff_request = RunRuffRequest(
         snapshot=request.snapshot,
         mode=RuffMode.FORMAT,
-        interpreter_constraints=interpreter_constraints,
     )
-    result = await run_ruff(run_ruff_request, ruff)
+    result = await run_ruff(run_ruff_request, ruff, platform)
     return await FmtResult.create(request, result)
 
 
 @rule(desc="Format with `ruff format`", level=LogLevel.DEBUG)
-async def ruff_fmt(request: RuffFormatRequest.Batch, ruff: Ruff) -> FmtResult:
-    return await _run_ruff_fmt(request, ruff)
+async def ruff_fmt(request: RuffFormatRequest.Batch, ruff: Ruff, platform: Platform) -> FmtResult:
+    return await _run_ruff_fmt(request, ruff, platform)
 
 
 def rules():
