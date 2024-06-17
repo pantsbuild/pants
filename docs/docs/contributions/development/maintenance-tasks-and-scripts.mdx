@@ -84,3 +84,34 @@ Example: [#21004](https://github.com/pantsbuild/pants/pull/21004).
 ### Google Cloud Functions
 
 Complete platforms are not provided for GCF yet: [#18195](https://github.com/pantsbuild/pants/issues/18195).
+
+## Cherry-pick a pull request to an older version
+
+We maintain multiple versions, with `main` being our development branch, and various `2.*.x` branches for the stable versions (see [Release strategy](../releases/release-strategy.mdx) for more details).
+
+### Cherry-picking a new pull request
+
+When a change needs to land in `main` but also one or more older versions, the usual process is:
+
+1. Create or review the pull request against `main` as usual
+2. Label it as `needs-cherrypick` and set milestone to the oldest release to which it should be cherry-picked
+3. Merge the pull request as normal
+4. At this point, automation kicks in and attempts to cherrypick the merged commit to the release in the milestone and any newer ones.
+5. The automation opens pull requests targeting each of the relevant `2.*.x` branches for which cherry-picking succeeds.
+6. If the automation fails to do a cherry-pick, it will mark the PR as `auto-cherry-picking-failed`
+7. In either case, the automation will add a comment describing what happened to the original pull request.
+
+For example, suppose `main` is for `2.23.x` and we're still maintaining `2.20.x`, `2.21.x` and `2.22.x`. If a pull request is labelled `needs-cherrypick` and has milestone `2.21.x`, then merging it will attempt to cherry pick to `2.21.x` and `2.22.x`.
+
+The process may fail in one of two ways:
+
+- The cherry-picking process failed, and tagged the PR with `auto-cherry-picking-failed`: follow the instructions in the comment on the pull request. (This likely means there are merge conflicts that require manual resolution.)
+- the cherry-pick hasn't (yet) run: trigger the automation manually by going to [the GitHub Action](https://github.com/pantsbuild/pants/actions/workflows/auto-cherry-picker.yaml), clicking on the "Run workflow" button, and providing the PR number.
+
+### Cherry-picking a merged pull request
+
+A pull request might merged without being configured for cherry-picking, and we decide later that it should be. To cherry-pick in this case:
+
+1. Label the pull request as `needs-cherrypick` and set milestone to the oldest release to which it should be cherry-picked
+2. Trigger the automation manually by going to [the GitHub Action](https://github.com/pantsbuild/pants/actions/workflows/auto-cherry-picker.yaml), clicking on the "Run workflow" button, and providing the PR number.
+3. As above, the automation may (partially) succeed or fail, and will leave a comment describing what happened.
