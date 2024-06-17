@@ -535,22 +535,6 @@ async def create_pex_from_targets(
         request.to_interpreter_constraints_request(),
     )
 
-    if not isinstance(request.main, Executable):
-        executable_addresses = Addresses([])
-    else:
-        # The source for an --executable main must be embedded in the pex even if other sources aren't
-        description_of_origin = (
-            f"The PexFromTargetsRequest with main {request.main} ({request.description})"
-        )
-        executable_addresses = await Get(
-            Addresses,
-            UnparsedAddressInputs(
-                [f"//{request.main.spec}"],
-                owning_address=None,
-                description_of_origin=description_of_origin,
-            ),
-        )
-
     sources_digests = []
     if request.additional_sources:
         sources_digests.append(request.additional_sources)
@@ -558,7 +542,7 @@ async def create_pex_from_targets(
         transitive_targets = await Get(
             TransitiveTargets,
             TransitiveTargetsRequest(
-                (*request.addresses, *executable_addresses),
+                request.addresses,
                 should_traverse_deps_predicate=TraverseIfNotPackageTarget(
                     roots=request.addresses,
                     union_membership=union_membership,
@@ -571,8 +555,20 @@ async def create_pex_from_targets(
             await _warn_about_any_files_targets(
                 request.addresses, transitive_targets, union_membership
             )
-    elif executable_addresses:
-        targets = await Get(Targets, Addresses, executable_addresses)
+    elif isinstance(request.main, Executable):
+        # The source for an --executable main must be embedded in the pex even if not request.include_source_files.
+        # If include_source_files is True, the executable source should be included in the (transitive) dependencies.
+        description_of_origin = (
+            f"The PexFromTargetsRequest with main {request.main} ({request.description})"
+        )
+        targets = await Get(
+            Targets,
+            UnparsedAddressInputs(
+                [f"//{request.main.spec}"],
+                owning_address=None,
+                description_of_origin=description_of_origin,
+            ),
+        )
         sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(targets))
     else:
         sources = PythonSourceFiles.empty()
