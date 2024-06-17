@@ -4,6 +4,7 @@
 from pants.backend.python.goals import debug_goals, publish
 from pants.backend.python.subsystems import setuptools_scm, twine
 from pants.backend.python.target_types import VCSVersion
+from pants.backend.python.target_types_rules import rules as target_types_rules
 from pants.backend.python.util_rules import entry_points, pex, vcs_versioning
 
 
@@ -15,6 +16,7 @@ def rules():
         *setuptools_scm.rules(),
         *twine.rules(),
         *debug_goals.rules(),
+        *target_types_rules(),
         *entry_points.rules(),
     )
 
