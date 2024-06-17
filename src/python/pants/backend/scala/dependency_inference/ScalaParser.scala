@@ -21,7 +21,10 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 import scala.reflect.NameTransformer
 
 object Constants {
+  // `_root_` is used in Scala as a marker for absolute qualified names
+  // https://docs.scala-lang.org/tour/packages-and-imports.html#imports
   val RootPackageQualifier = "_root_"
+
   val NameSeparator = '.'
 }
 
