@@ -10,6 +10,11 @@ from typing import Any
 
 from pants.backend.docker.target_types import AllDockerImageTargets
 from pants.backend.docker.target_types import rules as docker_target_types_rules
+from pants.backend.helm.dependency_inference.subsystem import (
+    HelmInferSubsystem,
+    UnownedDependencyError,
+    UnownedDependencyUsage,
+)
 from pants.backend.helm.subsystems import k8s_parser
 from pants.backend.helm.subsystems.k8s_parser import ParsedKubeManifest, ParseKubeManifestRequest
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
@@ -125,7 +130,9 @@ class FirstPartyHelmDeploymentMapping:
 
 @rule
 async def first_party_helm_deployment_mapping(
-    request: FirstPartyHelmDeploymentMappingRequest, docker_targets: AllDockerImageTargets
+    request: FirstPartyHelmDeploymentMappingRequest,
+    docker_targets: AllDockerImageTargets,
+    helm_infer: HelmInferSubsystem,
 ) -> FirstPartyHelmDeploymentMapping:
     deployment_report = await Get(
         HelmDeploymentReport, AnalyseHelmDeploymentRequest(request.field_set)
@@ -164,6 +171,7 @@ async def first_party_helm_deployment_mapping(
         if not isinstance(maybe_addr.val, Address):
             return None
         if maybe_addr.val not in docker_target_addresses:
+            _handle_missing_docker_image(helm_infer, image_ref, maybe_addr)
             return None
         return image_ref, maybe_addr.val
 
@@ -173,6 +181,18 @@ async def first_party_helm_deployment_mapping(
             image_ref_to_actual_address
         ),
     )
+
+
+def _handle_missing_docker_image(
+    helm_infer: HelmInferSubsystem, image_ref: str, maybe_addr: MaybeAddress
+):
+    message = f"Error resolving Docker image dependency of a Helm chart. `{image_ref}` was supplied but the docker target at `{maybe_addr.val}` does not exist."
+    if helm_infer.unowned_dependency_behavior == UnownedDependencyUsage.RaiseError:
+        raise UnownedDependencyError(message)
+    elif helm_infer.unowned_dependency_behavior == UnownedDependencyUsage.LogWarning:
+        logging.warning(message)
+    else:
+        return
 
 
 class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):

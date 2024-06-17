@@ -160,7 +160,15 @@ def make_pod_yaml(idx: int):
     )
 
 
-def test_resolve_relative_docker_addresses_to_deployment(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("correct_target_name", [True, False])
+def test_resolve_relative_docker_addresses_to_deployment(
+    rule_runner: RuleRunner, correct_target_name: bool
+) -> None:
+    if correct_target_name:
+        target_name = "myapp"
+    else:
+        target_name = "myoop"
+
     rule_runner.write_files(
         {
             "src/mychart/BUILD": "helm_chart()",
@@ -174,19 +182,19 @@ def test_resolve_relative_docker_addresses_to_deployment(rule_runner: RuleRunner
             "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
             "src/mychart/templates/pod.yaml": "---".join(make_pod_yaml(idx) for idx in range(4)),
             "src/deployment/BUILD": dedent(
-                """\
+                f"""\
                 docker_image(name="myapp0")
                 docker_image(name="myapp1")
 
                 helm_deployment(
                     name="foo",
                     chart="//src/mychart",
-                    values={
-                        "container.image_ref0": ":myapp0",  # bare target
-                        "container.image_ref1": "//src/deployment:myapp1",  # absolute target
-                        "container.image_ref2": "./subdir:myapp2",  # target in subdir
+                    values={{
+                        "container.image_ref0": ":{target_name}0",  # bare target
+                        "container.image_ref1": "//src/deployment:{target_name}1",  # absolute target
+                        "container.image_ref2": "./subdir:{target_name}2",  # target in subdir
                         "container.image_ref3": "busybox:latest",  # a normal docker container
-                    }
+                    }}
                 )
                 """
             ),
@@ -206,16 +214,21 @@ def test_resolve_relative_docker_addresses_to_deployment(rule_runner: RuleRunner
     tgt = rule_runner.get_target(deployment_addr)
     field_set = HelmDeploymentFieldSet.create(tgt)
 
-    expected = [
-        (":myapp0", Address("src/deployment", target_name="myapp0")),
-        ("//src/deployment:myapp1", Address("src/deployment", target_name="myapp1")),
-        ("./subdir:myapp2", Address("src/deployment/subdir", target_name="myapp2")),
-    ]
-
     mapping = rule_runner.request(
         FirstPartyHelmDeploymentMapping, [FirstPartyHelmDeploymentMappingRequest(field_set)]
     )
-    assert list(mapping.indexed_docker_addresses.values()) == expected
+
+    if correct_target_name:
+        expected = [
+            (":myapp0", Address("src/deployment", target_name="myapp0")),
+            ("//src/deployment:myapp1", Address("src/deployment", target_name="myapp1")),
+            ("./subdir:myapp2", Address("src/deployment/subdir", target_name="myapp2")),
+        ]
+        assert list(mapping.indexed_docker_addresses.values()) == expected
+
+    else:
+        expected = []
+        assert list(mapping.indexed_docker_addresses.values()) == expected
 
 
 def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
