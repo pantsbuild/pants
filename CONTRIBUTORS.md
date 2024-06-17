@@ -35,6 +35,7 @@ Created as part of the release process.
 + Bob Gregory
 + Borja Lorente
 + Brandon Milton
++ Brandon Novick
 + Brian Larson
 + Brian Wickman
 + Bruno Bieth
@@ -202,6 +203,7 @@ Created as part of the release process.
 + Lei Wang
 + Leo Kim
 + Lex Spoon
++ Li Li
 + Liam Deacon
 + Liam Wilson
 + Luc Cary
