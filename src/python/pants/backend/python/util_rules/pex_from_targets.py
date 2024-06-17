@@ -47,9 +47,10 @@ from pants.backend.python.util_rules.python_sources import rules as python_sourc
 from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.core.goals.package import TraverseIfNotPackageTarget
 from pants.core.target_types import FileSourceField
-from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
+from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, MergeDigests, PathGlobs
+from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Target,
@@ -556,20 +557,16 @@ async def create_pex_from_targets(
                 request.addresses, transitive_targets, union_membership
             )
     elif isinstance(request.main, Executable):
-        # The source for an --executable main must be embedded in the pex even if not request.include_source_files.
+        # The source for an --executable main must be embedded in the pex even if request.include_source_files is False.
         # If include_source_files is True, the executable source should be included in the (transitive) dependencies.
-        description_of_origin = (
-            f"The PexFromTargetsRequest with main {request.main} ({request.description})"
-        )
-        targets = await Get(
-            Targets,
-            UnparsedAddressInputs(
-                [f"//{request.main.spec}"],
-                owning_address=None,
-                description_of_origin=description_of_origin,
+        owners = await Get(
+            Owners,
+            OwnersRequest(
+                (request.main.spec,), owners_not_found_behavior=GlobMatchErrorBehavior.error
             ),
         )
-        sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(targets))
+        owning_targets = await Get(Targets, Addresses(owners))
+        sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(owning_targets))
     else:
         sources = PythonSourceFiles.empty()
 
