@@ -169,7 +169,10 @@ async def first_party_helm_deployment_mapping(
         if not maybe_addr:
             return None
         if not isinstance(maybe_addr.val, Address):
+            if image_ref.startswith("//") or image_ref.startswith("./"):
+                _handle_missing_docker_image(helm_infer, image_ref, maybe_addr)
             return None
+
         if maybe_addr.val not in docker_target_addresses:
             _handle_missing_docker_image(helm_infer, image_ref, maybe_addr)
             return None
