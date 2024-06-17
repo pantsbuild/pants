@@ -142,6 +142,24 @@ def test_inject_chart_into_deployment_dependencies(rule_runner: RuleRunner) -> N
     assert list(inferred_dependencies.include)[0] == Address("src/mychart")
 
 
+def make_pod_yaml(idx: int):
+    return dedent(
+        """\
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: {{ template "fullname" . }}
+          labels:
+            chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+        spec:
+          containers:
+            - name: myapp-container
+              image: {{ .Values.container.image_ref%s }}
+        """
+        % idx
+    )
+
+
 def test_resolve_relative_docker_addresses_to_deployment(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -154,34 +172,27 @@ def test_resolve_relative_docker_addresses_to_deployment(rule_runner: RuleRunner
                 """
             ),
             "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "src/mychart/templates/pod.yaml": dedent(
-                """\
-                apiVersion: v1
-                kind: Pod
-                metadata:
-                  name: {{ template "fullname" . }}
-                  labels:
-                    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
-                spec:
-                  containers:
-                    - name: myapp-container
-                      image: {{ .Values.container.image_ref }}
-                """
-            ),
+            "src/mychart/templates/pod.yaml": "---".join(make_pod_yaml(idx) for idx in range(4)),
             "src/deployment/BUILD": dedent(
                 """\
-                docker_image(name="myapp")
+                docker_image(name="myapp0")
+                docker_image(name="myapp1")
 
                 helm_deployment(
                     name="foo",
                     chart="//src/mychart",
                     values={
-                        "container.image_ref": ":myapp"
+                        "container.image_ref0": ":myapp0",  # bare target
+                        "container.image_ref1": "//src/deployment:myapp1",  # absolute target
+                        "container.image_ref2": "./subdir:myapp2",  # target in subdir
+                        "container.image_ref3": "busybox:latest",  # a normal docker container
                     }
                 )
                 """
             ),
             "src/deployment/Dockerfile": "FROM busybox:1.28",
+            "src/deployment/subdir/BUILD": """docker_image(name="myapp2")""",
+            "src/deployment/subdir/Dockerfile": "FROM busybox:1.28",
         }
     )
 
@@ -195,15 +206,16 @@ def test_resolve_relative_docker_addresses_to_deployment(rule_runner: RuleRunner
     tgt = rule_runner.get_target(deployment_addr)
     field_set = HelmDeploymentFieldSet.create(tgt)
 
-    expected_image_ref = ":myapp"
-    expected_dependency_addr = Address("src/deployment", target_name="myapp")
+    expected = [
+        (":myapp0", Address("src/deployment", target_name="myapp0")),
+        ("//src/deployment:myapp1", Address("src/deployment", target_name="myapp1")),
+        ("./subdir:myapp2", Address("src/deployment/subdir", target_name="myapp2")),
+    ]
 
     mapping = rule_runner.request(
         FirstPartyHelmDeploymentMapping, [FirstPartyHelmDeploymentMappingRequest(field_set)]
     )
-    assert list(mapping.indexed_docker_addresses.values()) == [
-        (expected_image_ref, expected_dependency_addr)
-    ]
+    assert list(mapping.indexed_docker_addresses.values()) == expected
 
 
 def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
