@@ -191,9 +191,11 @@ def test_run_sample_script(
         f"--debug-adapter-port={debugadapter_port_for_testing()}",
         *(
             (
-                "--python-default-run-goal-use-sandbox"
-                if global_default_value
-                else "--no-python-default-run-goal-use-sandbox",
+                (
+                    "--python-default-run-goal-use-sandbox"
+                    if global_default_value
+                    else "--no-python-default-run-goal-use-sandbox"
+                ),
             )
             if global_default_value is not None
             else ()

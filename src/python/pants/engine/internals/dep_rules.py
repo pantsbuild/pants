@@ -90,8 +90,7 @@ class BuildFileDependencyRules(ABC):
     @abstractmethod
     def create_parser_state(
         path: str, parent: BuildFileDependencyRules | None
-    ) -> BuildFileDependencyRulesParserState:
-        ...
+    ) -> BuildFileDependencyRulesParserState: ...
 
     @staticmethod
     @abstractmethod
@@ -114,8 +113,7 @@ class BuildFileDependencyRules(ABC):
         """
 
     @abstractmethod
-    def get_ruleset(self, address: Address, target: TargetAdaptor) -> DependencyRuleSet | None:
-        ...
+    def get_ruleset(self, address: Address, target: TargetAdaptor) -> DependencyRuleSet | None: ...
 
 
 class BuildFileDependencyRulesParserState(ABC):

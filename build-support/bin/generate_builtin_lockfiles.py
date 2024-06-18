@@ -90,13 +90,11 @@ class Tool(Generic[ToolBaseT]):
 
 
 @dataclass
-class PythonTool(Tool[PythonToolRequirementsBase]):
-    ...
+class PythonTool(Tool[PythonToolRequirementsBase]): ...
 
 
 @dataclass
-class JvmTool(Tool[JvmToolBase]):
-    ...
+class JvmTool(Tool[JvmToolBase]): ...
 
 
 all_python_tools = tuple(

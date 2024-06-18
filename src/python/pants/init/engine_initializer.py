@@ -318,9 +318,11 @@ class EngineInitializer:
                 *(
                     QueryRule(
                         goal_type,
-                        environment_selecting_goal_param_types
-                        if goal_type._selects_environments()
-                        else GraphSession.goal_param_types,
+                        (
+                            environment_selecting_goal_param_types
+                            if goal_type._selects_environments()
+                            else GraphSession.goal_param_types
+                        ),
                     )
                     for goal_type in goal_map.values()
                 ),

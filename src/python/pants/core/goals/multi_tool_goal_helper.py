@@ -103,18 +103,15 @@ def determine_specified_tool_ids(
 
 class _ResultWithReport(Protocol):
     @property
-    def report(self) -> Digest:
-        ...
+    def report(self) -> Digest: ...
 
     @property
-    def partition_description(self) -> str | None:
-        ...
+    def partition_description(self) -> str | None: ...
 
 
 class _ResultsWithReports(Protocol):
     @property
-    def results(self) -> Sequence[_ResultWithReport]:
-        ...
+    def results(self) -> Sequence[_ResultWithReport]: ...
 
 
 _R = TypeVar("_R", bound=_ResultsWithReports)

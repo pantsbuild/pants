@@ -15,13 +15,11 @@ _T = TypeVar("_T", bound=type)
 
 
 @overload
-def union(cls: _T, *, in_scope_types: None = None) -> _T:
-    ...
+def union(cls: _T, *, in_scope_types: None = None) -> _T: ...
 
 
 @overload
-def union(cls: None = None, *, in_scope_types: list[type]) -> Callable[[_T], _T]:
-    ...
+def union(cls: None = None, *, in_scope_types: list[type]) -> Callable[[_T], _T]: ...
 
 
 def union(
@@ -183,15 +181,13 @@ class _DistinctUnionTypePerSubclassGetter(Generic[_T]):
 
 
 @overload
-def distinct_union_type_per_subclass(cls: _T, *, in_scope_types: None = None) -> _T:
-    ...
+def distinct_union_type_per_subclass(cls: _T, *, in_scope_types: None = None) -> _T: ...
 
 
 @overload
 def distinct_union_type_per_subclass(
     cls: None = None, *, in_scope_types: list[type]
-) -> Callable[[_T], _T]:
-    ...
+) -> Callable[[_T], _T]: ...
 
 
 def distinct_union_type_per_subclass(

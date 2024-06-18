@@ -6,6 +6,8 @@ extend-ignore:
   E231,
   # line too long (> 79 characters)
   E501,
+  # multiple statements on one line (colon) (conflicts with Black)
+  E701,
   # Do not assign a lambda expression
   E731,
   # Ambiguous variable name (enable once fixed)

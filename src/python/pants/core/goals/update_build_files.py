@@ -443,9 +443,9 @@ async def maybe_rename_deprecated_targets(
     return RewrittenBuildFile(
         request.path,
         tuple(new_content.content.decode("utf-8").splitlines()),
-        change_descriptions=("Renamed deprecated targets",)
-        if old_bytes != new_content.content
-        else (),
+        change_descriptions=(
+            ("Renamed deprecated targets",) if old_bytes != new_content.content else ()
+        ),
     )
 
 
@@ -471,9 +471,9 @@ async def maybe_rename_deprecated_fields(
     return RewrittenBuildFile(
         request.path,
         tuple(new_content.content.decode("utf-8").splitlines()),
-        change_descriptions=("Renamed deprecated fields",)
-        if old_bytes != new_content.content
-        else (),
+        change_descriptions=(
+            ("Renamed deprecated fields",) if old_bytes != new_content.content else ()
+        ),
     )
 
 

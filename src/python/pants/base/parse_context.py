@@ -6,8 +6,7 @@ from typing import Any, Mapping, Protocol
 
 
 class FilePathOracle(Protocol):
-    def filepath(self) -> str:
-        ...
+    def filepath(self) -> str: ...
 
 
 class ParseContext:

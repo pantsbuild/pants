@@ -189,9 +189,9 @@ class BuildConfiguration:
                     "Overwriting!".format(alias)
                 )
 
-            self._exposed_context_aware_object_factory_by_alias[
-                alias
-            ] = context_aware_object_factory
+            self._exposed_context_aware_object_factory_by_alias[alias] = (
+                context_aware_object_factory
+            )
 
         def register_subsystems(
             self, plugin_or_backend: str, subsystems: Iterable[type[Subsystem]]

@@ -167,18 +167,20 @@ class BuildServerCapabilities:
     @classmethod
     def from_json_dict(cls, d):
         return cls(
-            compile_provider=CompileProvider.from_json_dict(d["compileProvider"])
-            if "compileProvider" in d
-            else None,
-            test_provider=TestProvider.from_json_dict(d["testProvider"])
-            if "testProvider" in d
-            else None,
-            run_provider=RunProvider.from_json_dict(d["runProvider"])
-            if "runProvider" in d
-            else None,
-            debug_provider=DebugProvider.from_json_dict(d["debugProvider"])
-            if "debugProvider" in d
-            else None,
+            compile_provider=(
+                CompileProvider.from_json_dict(d["compileProvider"])
+                if "compileProvider" in d
+                else None
+            ),
+            test_provider=(
+                TestProvider.from_json_dict(d["testProvider"]) if "testProvider" in d else None
+            ),
+            run_provider=(
+                RunProvider.from_json_dict(d["runProvider"]) if "runProvider" in d else None
+            ),
+            debug_provider=(
+                DebugProvider.from_json_dict(d["debugProvider"]) if "debugProvider" in d else None
+            ),
             inverse_sources_provider=d.get("inverseSourcesProvider"),
             dependency_sources_provider=d.get("dependencySourcesProvider"),
             dependency_modules_provider=d.get("dependencyModulesProvider"),

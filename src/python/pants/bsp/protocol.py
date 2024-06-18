@@ -28,13 +28,11 @@ _logger = logging.getLogger(__name__)
 
 class BSPRequestTypeProtocol(Protocol):
     @classmethod
-    def from_json_dict(cls, d: dict[str, Any]) -> Any:
-        ...
+    def from_json_dict(cls, d: dict[str, Any]) -> Any: ...
 
 
 class BSPResponseTypeProtocol(Protocol):
-    def to_json_dict(self) -> dict[str, Any]:
-        ...
+    def to_json_dict(self) -> dict[str, Any]: ...
 
 
 @union(in_scope_types=[EnvironmentName])

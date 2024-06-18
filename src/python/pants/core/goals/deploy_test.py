@@ -134,9 +134,9 @@ async def mock_deploy(field_set: MockDeployFieldSet) -> DeployProcess:
         name="test-deploy",
         publish_dependencies=tuple(dependencies),
         description="(requested)" if dest == "skip" else None,
-        process=None
-        if dest == "skip"
-        else InteractiveProcess(["echo", dest], run_in_workspace=True),
+        process=(
+            None if dest == "skip" else InteractiveProcess(["echo", dest], run_in_workspace=True)
+        ),
     )
 
 

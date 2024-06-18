@@ -300,7 +300,12 @@ async def bsp_resolve_scala_metadata(
 
 def _jdk_request_sort_key(
     jvm: JvmSubsystem,
-) -> Callable[[JdkRequest,], tuple[int, ...]]:
+) -> Callable[
+    [
+        JdkRequest,
+    ],
+    tuple[int, ...],
+]:
     def sort_key_function(request: JdkRequest) -> tuple[int, ...]:
         if request == JdkRequest.SYSTEM:
             return (-1,)

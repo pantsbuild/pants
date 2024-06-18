@@ -100,15 +100,13 @@ runner.dialect = scala213
 @overload
 def run_scalafmt(
     rule_runner: RuleRunner, targets: list[Target], expected_partitions: None = None
-) -> FmtResult:
-    ...
+) -> FmtResult: ...
 
 
 @overload
 def run_scalafmt(
     rule_runner: RuleRunner, targets: list[Target], expected_partitions: dict[str, tuple[str, ...]]
-) -> list[FmtResult]:
-    ...
+) -> list[FmtResult]: ...
 
 
 def run_scalafmt(

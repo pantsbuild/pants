@@ -271,9 +271,9 @@ class TargetTypeHelpInfo:
             fields=tuple(
                 TargetFieldHelpInfo.create(
                     field,
-                    provider=""
-                    if get_field_type_provider is None
-                    else get_field_type_provider(field),
+                    provider=(
+                        "" if get_field_type_provider is None else get_field_type_provider(field)
+                    ),
                 )
                 for field in fields
                 if not field.alias.startswith("_") and field.removal_version is None

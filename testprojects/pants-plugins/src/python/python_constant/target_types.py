@@ -290,9 +290,9 @@ async def infer_python_dependencies_on_python_constants(
     vars = ImportVisitor.search_for_vars(content, interesting_modules)
     logger.debug("vars %s", vars)
 
-    filenames_to_python_constant_targets: DefaultDict[
-        str, List[PythonConstantTarget]
-    ] = defaultdict(list)
+    filenames_to_python_constant_targets: DefaultDict[str, List[PythonConstantTarget]] = (
+        defaultdict(list)
+    )
     for path, target in zip(paths, python_constant_targets):
         for filename in path.files:
             filenames_to_python_constant_targets[filename].append(target)

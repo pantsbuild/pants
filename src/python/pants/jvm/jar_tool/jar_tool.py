@@ -101,9 +101,11 @@ class JarToolRequest:
         return [
             (
                 pattern,
-                action
-                if isinstance(action, JarDuplicateAction)
-                else JarDuplicateAction(action.lower()),
+                (
+                    action
+                    if isinstance(action, JarDuplicateAction)
+                    else JarDuplicateAction(action.lower())
+                ),
             )
             for (pattern, action) in policies
         ]

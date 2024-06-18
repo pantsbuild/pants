@@ -201,7 +201,9 @@ class GenerateJvmLockfileFromTool:
     artifact_option_name: str
     lockfile_option_name: str
     resolve_name: str
-    read_lockfile_dest: str  # Path to lockfile when reading, or DEFAULT_TOOL_LOCKFILE to read from resource.
+    read_lockfile_dest: (
+        str  # Path to lockfile when reading, or DEFAULT_TOOL_LOCKFILE to read from resource.
+    )
     write_lockfile_dest: str  # Path to lockfile when generating the lockfile.
     default_lockfile_resource: tuple[str, str]
 
