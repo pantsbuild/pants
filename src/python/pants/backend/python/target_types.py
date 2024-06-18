@@ -301,6 +301,12 @@ class ConsoleScript(MainSpecification):
 class Executable(MainSpecification):
     executable: str
 
+    @classmethod
+    def create(cls, address: Address, filename: str) -> Executable:
+        # spec_path is relative to the workspace. The rule is responsible for
+        # stripping the source root as needed.
+        return cls(os.path.join(address.spec_path, filename).lstrip(os.path.sep))
+
     def iter_pex_args(self) -> Iterator[str]:
         yield "--executable"
         # We do NOT yield self.executable or self.spec
@@ -409,9 +415,7 @@ class PexExecutableField(Field):
             return None
         if not isinstance(value, str):
             raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
-        # spec_path is relative to the workspace. The rule is responsible for
-        # stripping the source root as needed.
-        return Executable(os.path.join(address.spec_path, value).lstrip(os.path.sep))
+        return Executable.create(address, value)
 
 
 class PexArgsField(StringSequenceField):
