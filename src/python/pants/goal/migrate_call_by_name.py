@@ -9,9 +9,9 @@ import logging
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path, PurePath
-from typing import Callable, Sequence, TypedDict
+from typing import Callable, TypedDict, Union
 
-import libcst
+import libcst as cst
 import libcst.matchers as m
 from libcst.display import dump
 
@@ -104,7 +104,7 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
             with open(file) as f:
                 logging.info(f"Processing {file}")
                 source_code = f.read()
-                tree = libcst.parse_module(source_code)
+                tree = cst.parse_module(source_code)
                 new_tree = tree.visit(transformer)
                 new_source = new_tree.code
                 # logger.error(f"New source is {new_source}")
@@ -216,17 +216,18 @@ class RuleFunction(TypedDict):
 class Replacement:
     filename: PurePath
     module: str
-    current_source: libcst.Call
-    new_source: libcst.Call
-    additional_imports: list[libcst.ImportFrom]
+    current_source: cst.Call
+    new_source: cst.Call
+    additional_imports: list[cst.ImportFrom]
 
-    # def sanitized_imports(self) -> list[libcst.ImportFrom]:
-    #     """Remove any circular or self-imports."""
-    #     return [i for i in self.additional_imports if i.module != self.module]
+    def sanitized_imports(self) -> list[cst.ImportFrom]:
+        """Remove any circular or self-imports."""
+        cst_module = _make_importfrom_attr(self.module)
+        return [i for i in self.additional_imports if i.module != cst_module]
 
     # def sanitize(self, names: set[str]):
     #     """Remove any shadowing of names, except if the new_func is in the current file."""
-    #     assert isinstance(self.new_source.func, libcst.Name)
+    #     assert isinstance(self.new_source.func, cst.Name)
     #     func_name = self.new_source.func.id
     #     if func_name not in names:
     #         return
@@ -264,14 +265,12 @@ class CallByNameSyntaxMapper:
         self.graphs = graphs
 
         self.mapping: dict[
-            tuple[int, type[libcst.Call] | type[libcst.Dict] | None],
-            Callable[
-                [libcst.Call, list[RuleGraphGetDep]], tuple[libcst.Call, list[libcst.ImportFrom]]
-            ],
+            tuple[int, type[cst.Call] | type[cst.Dict] | None],
+            Callable[[cst.Call, list[RuleGraphGetDep]], tuple[cst.Call, list[cst.ImportFrom]]],
         ] = {
             (1, None): self.map_no_args_get_to_new_syntax,
-            (2, libcst.Call): self.map_short_form_get_to_new_syntax,
-            (2, libcst.Dict): self.map_dict_form_get_to_new_syntax,
+            (2, cst.Call): self.map_short_form_get_to_new_syntax,
+            (2, cst.Dict): self.map_dict_form_get_to_new_syntax,
             (3, None): self.map_long_form_get_to_new_syntax,
         }
 
@@ -286,15 +285,15 @@ class CallByNameSyntaxMapper:
         )
 
     def map_get_to_new_syntax(
-        self, get: libcst.Call, filename: PurePath, calling_func: str
+        self, get: cst.Call, filename: PurePath, calling_func: str
     ) -> Replacement | None:
         """There are 4 forms of Get() syntax.
 
         This function picks the correct one.
         """
 
-        new_source: libcst.Call | None = None
-        imports: list[libcst.ImportFrom] = []
+        new_source: cst.Call | None = None
+        imports: list[cst.ImportFrom] = []
 
         if not (graph_item := self._get_graph_item(filename, calling_func)):
             logger.warning(f"Failed to find dependencies for {filename} {calling_func}")
@@ -306,17 +305,26 @@ class CallByNameSyntaxMapper:
         arg_type = None
         if num_args == 2:
             arg_type = type(get.args[1].value)
-            if arg_type not in [libcst.Call, libcst.Dict]:
+            if arg_type not in [cst.Call, cst.Dict]:
                 logger.warning(f"Failed to migrate: Unknown arg type {get.args[1]}")
                 logger.warning(type(get.args[1].value))
                 return None
 
         try:
-            new_source, imports = self.mapping[(num_args, arg_type)](get, get_deps)
+            logger.error(f"Lookup is {num_args}, {arg_type}")
+            lookup = (num_args, arg_type)
+            logger.error(f"Lookup is {lookup}")
+            func = self.mapping[lookup]
+            logger.error(f"Func is {func}")
+            new_source, imports = func(get, get_deps)
+            # new_source, imports = self.mapping[(num_args, arg_type)](get, get_deps)
         except Exception as e:
-            logger.warning(f"Failed to migrate Get in {filename}:{calling_func} due to: {e}\n")
+            logger.warning(
+                f"Failed to migrate Get ({num_args}, {arg_type}) in {filename}:{calling_func} due to: {e}\n"
+            )
             logger.debug(
-                f"Failed to migrate Get in {filename}:{calling_func} due to: {e}", exc_info=True
+                f"Failed to migrate Get ({num_args}, {arg_type}) in {filename}:{calling_func} due to: {e}",
+                exc_info=True,
             )
             return None
 
@@ -325,15 +333,12 @@ class CallByNameSyntaxMapper:
             module=graph_item["module"],
             current_source=get,
             new_source=new_source,
-            additional_imports=[
-                _make_import_from("pants.engine.rules", "implicitly"),
-                *imports,
-            ],
+            additional_imports=imports,
         )
 
     def map_no_args_get_to_new_syntax(
-        self, get: libcst.Call, deps: list[RuleGraphGetDep]
-    ) -> tuple[libcst.Call, list[libcst.ImportFrom]]:
+        self, get: cst.Call, deps: list[RuleGraphGetDep]
+    ) -> tuple[cst.Call, list[cst.ImportFrom]]:
         """Map the no-args form of Get() to the new syntax.
 
         The expected mapping is roughly:
@@ -343,7 +348,7 @@ class CallByNameSyntaxMapper:
         """
 
         logger.debug(dump(get))
-        output_type = libcst.ensure_type(get.args[0].value, libcst.Name).value
+        output_type = cst.ensure_type(get.args[0].value, cst.Name).value
 
         dep = next(
             dep
@@ -356,16 +361,19 @@ class CallByNameSyntaxMapper:
         # test = _get_call_from_module(module, new_function)
         # logger.error(f"Test is {dump(test)}")
 
-        new_call = libcst.Call(
-            func=libcst.Name(new_function),
-            args=[libcst.Arg(value=libcst.Call(libcst.Name("implicitly")), star="**")],
+        new_call = cst.Call(
+            func=cst.Name(new_function),
+            args=[cst.Arg(value=cst.Call(cst.Name("implicitly")), star="**")],
         )
+        if called_func := _get_call_from_module(module, new_function):
+            new_call = remove_unused_implicitly(new_call, called_func)
+
         imports = [_make_import_from(module, new_function)]
         return new_call, imports
 
     def map_long_form_get_to_new_syntax(
-        self, get: libcst.Call, deps: list[RuleGraphGetDep]
-    ) -> tuple[libcst.Call, list[libcst.ImportFrom]]:
+        self, get: cst.Call, deps: list[RuleGraphGetDep]
+    ) -> tuple[cst.Call, list[cst.ImportFrom]]:
         """Map the long form of Get() to the new syntax.
 
         The expected mapping is roughly:
@@ -375,8 +383,8 @@ class CallByNameSyntaxMapper:
         """
 
         logger.debug(dump(get))
-        output_type = libcst.ensure_type(get.args[0].value, libcst.Name).value
-        input_type = libcst.ensure_type(get.args[1].value, libcst.Name).value
+        output_type = cst.ensure_type(get.args[0].value, cst.Name).value
+        input_type = cst.ensure_type(get.args[1].value, cst.Name).value
 
         dep = next(
             dep
@@ -387,18 +395,18 @@ class CallByNameSyntaxMapper:
         )
         module, new_function = dep["rule_dep"]["module"], dep["rule_dep"]["function"]
 
-        new_call = libcst.Call(
-            func=libcst.Name(new_function),
+        new_call = cst.Call(
+            func=cst.Name(new_function),
             args=[
-                libcst.Arg(
-                    value=libcst.Call(
-                        func=libcst.Name("implicitly"),
+                cst.Arg(
+                    value=cst.Call(
+                        func=cst.Name("implicitly"),
                         args=[
-                            libcst.Arg(
-                                value=libcst.Dict(
+                            cst.Arg(
+                                value=cst.Dict(
                                     [
-                                        libcst.DictElement(
-                                            key=get.args[2].value, value=libcst.Name(input_type)
+                                        cst.DictElement(
+                                            key=get.args[2].value, value=cst.Name(input_type)
                                         )
                                     ]
                                 )
@@ -414,8 +422,8 @@ class CallByNameSyntaxMapper:
         return new_call, imports
 
     def map_short_form_get_to_new_syntax(
-        self, get: libcst.Call, deps: list[RuleGraphGetDep]
-    ) -> tuple[libcst.Call, list[libcst.ImportFrom]]:
+        self, get: cst.Call, deps: list[RuleGraphGetDep]
+    ) -> tuple[cst.Call, list[cst.ImportFrom]]:
         """Map the short form of Get() to the new syntax.
 
         The expected mapping is roughly:
@@ -425,9 +433,9 @@ class CallByNameSyntaxMapper:
         """
 
         logger.debug(dump(get))
-        output_type = libcst.ensure_type(get.args[0].value, libcst.Name).value
-        input_call = libcst.ensure_type(get.args[1].value, libcst.Call)
-        input_type = libcst.ensure_type(input_call.func, libcst.Name).value
+        output_type = cst.ensure_type(get.args[0].value, cst.Name).value
+        input_call = cst.ensure_type(get.args[1].value, cst.Call)
+        input_type = cst.ensure_type(input_call.func, cst.Name).value
 
         dep = next(
             dep
@@ -438,19 +446,19 @@ class CallByNameSyntaxMapper:
         )
         module, new_function = dep["rule_dep"]["module"], dep["rule_dep"]["function"]
 
-        new_call = libcst.Call(
-            func=libcst.Name(new_function),
+        new_call = cst.Call(
+            func=cst.Name(new_function),
             args=[
-                libcst.Arg(value=input_call),
-                libcst.Arg(value=libcst.Call(libcst.Name("implicitly")), star="**"),
+                cst.Arg(value=input_call),
+                cst.Arg(value=cst.Call(cst.Name("implicitly")), star="**"),
             ],
         )
         imports = [_make_import_from(module, new_function)]
         return new_call, imports
 
     def map_dict_form_get_to_new_syntax(
-        self, get: libcst.Call, deps: list[RuleGraphGetDep]
-    ) -> tuple[libcst.Call, list[libcst.ImportFrom]]:
+        self, get: cst.Call, deps: list[RuleGraphGetDep]
+    ) -> tuple[cst.Call, list[cst.ImportFrom]]:
         """Map the dict form of Get() to the new syntax.
 
         The expected mapping is roughly:
@@ -459,10 +467,16 @@ class CallByNameSyntaxMapper:
         This form expects that the `get` call has exactly 2 args (otherwise, a different form would be used)
         """
 
-        logger.debug(dump(get))
-        output_type = libcst.ensure_type(get.args[0].value, libcst.Name).value
-        input_dict = libcst.ensure_type(get.args[1].value, libcst.Dict)
-        input_types = {k.value for k in input_dict.elements if isinstance(k, libcst.Name)}
+        logger.error(dump(get))
+        output_type = cst.ensure_type(get.args[0].value, cst.Name).value
+        input_dict = cst.ensure_type(get.args[1].value, cst.Dict)
+        input_types = {
+            element.value.value
+            for element in input_dict.elements
+            if isinstance(element.value, cst.Name)
+        }
+
+        logger.error(f"After types {input_types}")
 
         dep = next(
             dep
@@ -471,18 +485,18 @@ class CallByNameSyntaxMapper:
             and {i["name"] for i in dep["input_types"]} == input_types
         )
         module, new_function = dep["rule_dep"]["module"], dep["rule_dep"]["function"]
+        logger.error("After module")
 
-        new_call = libcst.Call(
-            func=libcst.Name(new_function),
+        new_call = cst.Call(
+            func=cst.Name(new_function),
             args=[
-                libcst.Arg(
-                    value=libcst.Call(
-                        func=libcst.Name("implicitly"), args=[libcst.Arg(input_dict)]
-                    ),
+                cst.Arg(
+                    value=cst.Call(func=cst.Name("implicitly"), args=[cst.Arg(input_dict)]),
                     star="**",
                 )
             ],
         )
+        logger.error("before imports")
 
         imports = [_make_import_from(module, new_function)]
         return new_call, imports
@@ -500,48 +514,123 @@ class CallByNameTransformer(m.MatcherDecoratableTransformer):
         self.filename = filename
         self.syntax_mapper = syntax_mapper
         self.calling_function: str = ""
-        # self.replacements: list[Replacement] = []
+        self.additional_imports: list[cst.ImportFrom] = []
 
-    def visit_FunctionDef(self, node: libcst.FunctionDef) -> None:
+    def visit_FunctionDef(self, node: cst.FunctionDef) -> None:
         self.calling_function = node.name.value
 
     def leave_FunctionDef(
-        self, original_node: libcst.FunctionDef, updated_node: libcst.FunctionDef
-    ) -> libcst.FunctionDef:
+        self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef
+    ) -> cst.FunctionDef:
         self.calling_function = ""
         return updated_node
 
     @m.leave(m.Call(func=m.Name("Get")))
-    def handle_get(self, original_node: libcst.Call, updated_node: libcst.Call) -> libcst.Call:
+    def handle_get(self, original_node: cst.Call, updated_node: cst.Call) -> cst.Call:
         replacement = self.syntax_mapper.map_get_to_new_syntax(
             original_node, self.filename, self.calling_function
         )
-        if replacement:
-            return replacement.new_source
+        if not replacement:
+            return updated_node
 
-        return original_node
+        # TODO: Should we update_node.with_changes? As we're replacing the entire Call, doesn't matter?
+        self.additional_imports.extend(replacement.sanitized_imports())
+        return replacement.new_source
 
-    # @m.leave(m.Call(func=m.Name("MultiGet")))
-    # def handle_multiget(
-    #     self, original_node: libcst.Call, updated_node: libcst.Call
-    # ) -> libcst.Call:
-    #     print(original_node.args[0].value, self.calling_function)
-    #     return original_node
+    @m.leave(m.Name("MultiGet"))
+    def handle_multiget(self, original_node: cst.Name, updated_node: cst.Name) -> cst.Name:
+        return updated_node.with_changes(value="concurrently")
+
+    def leave_Module(self, original_node: cst.Module, updated_node: cst.Module) -> cst.Module:
+        if not self.additional_imports:
+            return updated_node
+
+        rules_import_index = 1
+        for i, statement in enumerate(updated_node.body):
+            if m.matches(
+                statement,
+                matcher=m.SimpleStatementLine(
+                    body=[m.ImportFrom(module=_make_import_from_1("pants.engine.rules"))]
+                ),
+            ):
+                logger.error(i)
+                rules_import_index = i + 1
+                break
+
+        self.additional_imports.append(_make_import_from("pants.engine.rules", "implicitly"))
+        additional_import_statements = [
+            cst.SimpleStatementLine(body=[i]) for i in self.additional_imports
+        ]
+        additional_import_statements = [
+            v1
+            for i, v1 in enumerate(additional_import_statements)
+            if not any(v1.deep_equals(v2) for v2 in additional_import_statements[:i])
+        ]
+
+        return updated_node.with_changes(
+            body=[
+                *updated_node.body[:rules_import_index],
+                *additional_import_statements,
+                *updated_node.body[rules_import_index:],
+            ]
+        )
 
 
 # ------------------------------------------------------------------------------------------
-# libcst utilities
+# cst utilities
 # ------------------------------------------------------------------------------------------
 
 
-def _make_import_from(module: str, func: str) -> libcst.ImportFrom:
+def _make_import_from(module: str, func: str) -> cst.ImportFrom:
     """Manually generating ImportFrom using Attributes is tricky, parse a string instead."""
-    statement = libcst.parse_statement(f"from {module} import {func}")
-    assert isinstance(statement.body, Sequence)
-    return libcst.ensure_type(statement.body[0], libcst.ImportFrom)
+    return cst.ImportFrom(
+        module=_make_importfrom_attr(module), names=[cst.ImportAlias(cst.Name(func))]
+    )
+    # cst.ImportFrom(module=_make_import_from_1(module), names=[])
+    # statement = cst.parse_statement(f"from {module} import {func}")
+    # assert isinstance(statement.body, Sequence)
+    # return cst.ensure_type(statement.body[0], cst.ImportFrom)
 
 
-def _get_call_from_module(module: str, func: str) -> libcst.FunctionDef | None:
+def _make_importfrom_attr(module: str) -> cst.Attribute | cst.Name:
+    parts = module.split(".")
+    if len(parts) == 1:
+        return cst.Name(parts[0])
+    # Otherwise, it is an Attribute
+    partial_module = ".".join(parts[:-1])
+    return cst.Attribute(value=_make_importfrom_attr(partial_module), attr=cst.Name(parts[-1]))
+
+
+def _make_import_from_1(module: str) -> Union[m.Attribute, m.Name]:
+    """Build matcher for a module given sequence of import parts."""
+    # If only one element, it is just a Name
+    parts = module.split(".")
+    if len(parts) == 1:
+        return m.Name(parts[0])
+    # Otherwise, it is an Attribute
+    partial_module = ".".join(parts[:-1])
+    return m.Attribute(value=_make_import_from_1(partial_module), attr=m.Name(parts[-1]))
+
+    # *values, attr = parts
+    # value = _make_import_from_1(values)
+    # return m.Attribute(value=value, attr=m.Name(attr))
+
+
+def remove_unused_implicitly(call: cst.Call, called_func: cst.FunctionDef) -> cst.Call:
+    """The CallByNameSyntaxMapper aggressively adds `implicitly` for safety. This function removes
+    unnecessary ones.
+
+    The following cases are handled:
+    - The called function takes no arguments
+    - TODO: The called function takes the same number of arguments that are passed to it
+    - TODO: Check the types of the passed in parameters, if they don't match, they need to be implicitly passed
+    """
+    called_params = len(called_func.params.params)
+    if called_params == 0:
+        return call.with_changes(args=[])
+
+
+def _get_call_from_module(module: str, func: str) -> cst.FunctionDef | None:
     """Open the associated file, and parse the func into a Call.
 
     The purpose of this is to determine whether we need `implicitly` or not.
@@ -556,8 +645,8 @@ def _get_call_from_module(module: str, func: str) -> libcst.FunctionDef | None:
 
     with open(spec.origin) as f:
         source_code = f.read()
-        tree = libcst.parse_module(source_code)
+        tree = cst.parse_module(source_code)
         # m.matches(tree.body[0], matcher=m.FunctionDef())
         results = m.findall(tree, matcher=m.FunctionDef(m.Name(func)))
         logger.error(f"Results are {results}")
-        return libcst.ensure_type(results[0], libcst.FunctionDef) if results else None
+        return cst.ensure_type(results[0], cst.FunctionDef) if results else None

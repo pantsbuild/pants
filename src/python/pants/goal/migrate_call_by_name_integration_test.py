@@ -94,7 +94,7 @@ RULES1_FILE = dedent(
         all_targets = await Get(AllTargets)
         pex = await Get(VenvPex, PexRequest, black.to_pex_request())
         digest = await Get(Digest, CreateArchive(EMPTY_SNAPSHOT))
-        paths = await Get(BinaryPaths, {{BinaryPathRequest(binary_name="time", search_path=("/usr/bin")): BinaryPathRequest, local_env.val: EnvironmentName}})
+        paths = await Get(BinaryPaths, {{BinaryPathRequest(binary_name='time', search_path=['/usr/bin']): BinaryPathRequest, local_env.val: EnvironmentName}})
         try:
             try_all_targets_try = await Get(AllTargets)
         except:
@@ -177,10 +177,10 @@ MIGRATED_RULES1_FILE = dedent(
     from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
     from pants.engine.fs import Digest, EMPTY_SNAPSHOT
     from pants.engine.rules import collect_rules, Get, concurrently, rule
+    from pants.engine.internals.graph import find_all_targets
     from pants.backend.python.util_rules.pex import create_venv_pex
     from pants.core.util_rules.archive import create_archive
     from pants.core.util_rules.system_binaries import find_binary
-    from pants.engine.internals.graph import find_all_targets
     from pants.engine.rules import implicitly
     from pants.engine.target import AllTargets
 
@@ -192,7 +192,7 @@ MIGRATED_RULES1_FILE = dedent(
         all_targets = await find_all_targets()
         pex = await create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
         digest = await create_archive(CreateArchive(EMPTY_SNAPSHOT), **implicitly())
-        paths = await find_binary(**implicitly({BinaryPathRequest(binary_name='time', search_path='/usr/bin'): BinaryPathRequest, local_env.val: EnvironmentName}))
+        paths = await find_binary(**implicitly({BinaryPathRequest(binary_name='time', search_path=['/usr/bin']): BinaryPathRequest, local_env.val: EnvironmentName}))
         try:
             try_all_targets_try = await find_all_targets()
         except:
@@ -320,13 +320,6 @@ def test_migrate_call_by_name_syntax():
 
         # Ensure the JSON output contains the paths to the files we expect to migrate
         assert all(str(p) in result.stdout for p in [register_path, rules1_path, rules2_path])
-        # Ensure the warning for embedded comments is logged
-        # Note: This assertion is brittle - adding extra content to rules1.py will probably mean updating the range
-        # assert (
-        #     f"Comments found in {tmpdir}/src/migrateme/rules1.py within replacement range: (51, 56)"
-        #     in result.stderr
-        # )
-
         # with open(register_path) as f:
         #     assert f.read() == MIGRATED_REGISTER_FILE
         with open(rules1_path) as f:
