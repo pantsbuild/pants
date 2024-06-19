@@ -161,41 +161,48 @@ async def first_party_helm_deployment_mapping(
         for ((ref, _), maybe_addr) in zip(indexed_address_inputs.values(), maybe_addresses)
     }
 
-    def image_ref_to_actual_address(
-        image_ref_ai: tuple[str, AddressInput]
-    ) -> tuple[str, Address] | None:
-        image_ref, _ = image_ref_ai
-        maybe_addr = maybe_addresses_by_ref.get(image_ref)
-        if not maybe_addr:
-            return None
-        if not isinstance(maybe_addr.val, Address):
-            if image_ref.startswith("//") or image_ref.startswith("./"):
-                _handle_missing_docker_image(helm_infer, image_ref, maybe_addr)
-            return None
-
-        if maybe_addr.val not in docker_target_addresses:
-            _handle_missing_docker_image(helm_infer, image_ref, maybe_addr)
-            return None
-        return image_ref, maybe_addr.val
+    resolver = ImageReferenceResolver(helm_infer, maybe_addresses_by_ref, docker_target_addresses)
 
     return FirstPartyHelmDeploymentMapping(
         address=request.field_set.address,
         indexed_docker_addresses=indexed_address_inputs.transform_values(
-            image_ref_to_actual_address
+            resolver.image_ref_to_actual_address
         ),
     )
 
 
-def _handle_missing_docker_image(
-    helm_infer: HelmInferSubsystem, image_ref: str, maybe_addr: MaybeAddress
-):
-    message = f"Error resolving Docker image dependency of a Helm chart. `{image_ref}` was supplied but the docker target at `{maybe_addr.val}` does not exist."
-    if helm_infer.unowned_dependency_behavior == UnownedDependencyUsage.RaiseError:
-        raise UnownedDependencyError(message)
-    elif helm_infer.unowned_dependency_behavior == UnownedDependencyUsage.LogWarning:
-        logging.warning(message)
-    else:
-        return
+@dataclass
+class ImageReferenceResolver:
+    helm_infer: HelmInferSubsystem
+    maybe_addresses_by_ref: dict[str, MaybeAddress]
+    docker_target_addresses: set[Address]
+
+    def image_ref_to_actual_address(
+        self,
+        image_ref_ai: tuple[str, AddressInput],
+    ) -> tuple[str, Address] | None:
+        image_ref, _ = image_ref_ai
+        maybe_addr = self.maybe_addresses_by_ref.get(image_ref)
+        if not maybe_addr:
+            return None
+        if not isinstance(maybe_addr.val, Address):
+            if image_ref.startswith("//") or image_ref.startswith("./"):
+                self._handle_missing_docker_image(image_ref, maybe_addr)
+            return None
+
+        if maybe_addr.val not in self.docker_target_addresses:
+            self._handle_missing_docker_image(image_ref, maybe_addr)
+            return None
+        return image_ref, maybe_addr.val
+
+    def _handle_missing_docker_image(self, image_ref: str, maybe_addr: MaybeAddress):
+        message = f"Error resolving Docker image dependency of a Helm chart. `{image_ref}` was supplied but the docker target at `{maybe_addr.val}` does not exist."
+        if self.helm_infer.unowned_dependency_behavior == UnownedDependencyUsage.RaiseError:
+            raise UnownedDependencyError(message)
+        elif self.helm_infer.unowned_dependency_behavior == UnownedDependencyUsage.LogWarning:
+            logging.warning(message)
+        else:
+            return
 
 
 class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
