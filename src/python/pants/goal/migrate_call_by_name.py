@@ -3,17 +3,17 @@
 
 from __future__ import annotations
 
-import ast
-import fileinput
 import importlib.util
 import json
 import logging
-import tokenize
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from functools import partial
 from pathlib import Path, PurePath
-from typing import Callable, Literal, TypedDict, cast
+from typing import Callable, Iterable, Sequence, TypedDict
 
+import libcst
+import libcst.matchers as m
+from libcst.display import dump
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
@@ -24,7 +24,6 @@ from pants.goal.builtin_goal import BuiltinGoal
 from pants.init.engine_initializer import GraphSession
 from pants.option.option_types import BoolOption
 from pants.option.options import Options
-from pants.util.astutil import maybe_narrow_type, narrow_type
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -98,9 +97,20 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
         syntax_mapper = CallByNameSyntaxMapper(migration_plan)
         for f in sorted(files_to_migrate):
             file = Path(f)
-            if replacements := self._create_replacements_for_file(file, syntax_mapper):
-                self._perform_replacements_on_file(file, replacements)
-                self._perform_renaming_on_file(file, {"MultiGet": "concurrently"})
+            logger.error(f"Processing {file}")
+
+            transformer = CallByNameTransformer(file, syntax_mapper)
+            with open(file) as f:
+                logging.info(f"Processing {file}")
+                source_code = f.read()
+                tree = libcst.parse_module(source_code)
+                new_tree = tree.visit(transformer)
+                new_source = new_tree.code  
+                logger.error(f"New source is {new_source}")
+                if source_code != new_source:
+                    logger.error(f"Rewriting {file}")
+                    with open(file, "w") as f:
+                        f.write(new_source)
 
         return PANTS_SUCCEEDED_EXIT_CODE
 
@@ -167,120 +177,9 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
 
         return sorted(items, key=lambda x: (x["filepath"], x["function"]))
 
-    def _create_replacements_for_file(
-        self, file: Path, syntax_mapper: CallByNameSyntaxMapper
-    ) -> list[Replacement]:
-        """Create a list of replacements using the CallByNameVisitor on a file.
-
-        After the replacements are created, they are sanitized to avoid shadowing names,
-        and any replacements with comments are filtered out - as those are not safe to replace
-        """
-        visitor = CallByNameVisitor(file, syntax_mapper)
-        with open(file) as f:
-            logging.info(f"Processing {file}")
-            try:
-                source_code = f.read()
-                tree = ast.parse(source_code, filename=file, type_comments=True)
-                visitor.visit(tree)
-
-                for replacement in visitor.replacements:
-                    replacement.sanitize(visitor.names)
-
-                included: list[Replacement] = []
-                for r in visitor.replacements:
-                    if r.contains_comments(source_code):
-                        logger.warning(
-                            softwrap(
-                                f"""
-                                Comments found in {file} within replacement range: {r.line_range}. This migration
-                                replacement will not be applied, as it is not safe to replace embedded comments.
-
-                                Please review and apply one of the following suggestions:
-                                - Move the comment(s) above or below the replacement range
-                                - Remove the comments from the replacement range, if they are no longer relevant
-                                - If the comments are part of non-`Get` initializer/function args, extract the args to a separate
-                                  variable and pass it in
-                                - Manually apply the replacement. Run the migration with the `--json` flag to get the migration plan,
-                                  and manually import the new function and replace the `Get` call with the new function call
-                                """
-                            )
-                        )
-                        continue
-
-                    included.append(r)
-
-                return included
-
-            except SyntaxError as e:
-                logging.error(f"SyntaxError in {file}: {e}")
-            except tokenize.TokenError as e:
-                logging.error(f"TokenError in {file}: {e}")
-        return []
-
-    def _perform_replacements_on_file(self, file: Path, replacements: list[Replacement]):
-        """
-        Overwrite replacements for the new source code in a file using `fileinput` - so any "print" calls
-        will be redirected to the file. This is a destructive operation.
-
-        This function is not idempotent, so it should be run only once per file (per migration plan).
-
-        Replacement imports are bulk added below the existing "pants.engine.rules" import.
-        """
-
-        imports_added = False
-        import_strings: set[str] = set()
-        for replacement in replacements:
-            import_strings.update(ast.unparse(i) for i in replacement.sanitized_imports())
-
-        with fileinput.input(file, inplace=True) as f:
-            for line in f:
-                line_number = f.lineno()
-
-                modified = False
-                for replacement in replacements:
-                    if line_number == replacement.line_range[0]:
-                        line_end = ",\n" if replacement.add_trailing_comma else "\n"
-                        # On the first line of the range, emit the new source code where the old "Get" started
-                        print(line[: replacement.col_range[0]], end="")
-                        print(ast.unparse(replacement.new_source), end=line_end)
-                        modified = True
-
-                    elif line_number in range(
-                        replacement.line_range[0], replacement.line_range[1] + 1
-                    ):
-                        # If there are other lines in the range, just skip them
-                        modified = True
-                        continue
-
-                if not modified:
-                    # For any lines that were not involved with replacements, emit them verbatim to the file
-                    print(line, end="")
-
-                # Add imports below "pants.engine.rules"
-                # Note: Intentionally not trying to add to the existing "pants.engine.rules" import, as merging and unparsing would wipe out comments (if any)
-                # Instead, add a new import and let the formatters sort it out
-                if not imports_added and line.startswith("from pants.engine.rules"):
-                    print("\n".join(sorted(import_strings)))
-                    imports_added = True
-
-    def _perform_renaming_on_file(self, file: Path, rename_map: dict[str, str]):
-        """In-place renaming for the new source code in a file.
-
-        This should be a separate Visitor/Transformer/Tokenizer which allows intelligent renaming based on AST context (e.g. only in Imports)
-        TODO: This system is already done in the deprecation fixer using tokenize.
-        """
-
-        with fileinput.input(file, inplace=True) as f:
-            for line in f:
-                for old, new in rename_map.items():
-                    line = line.replace(old, new)
-                print(line, end="")
-
-
 # ------------------------------------------------------------------------------------------
 # Migration Plan Typed Dicts
 # ------------------------------------------------------------------------------------------
-
 
 class RuleGraphGet(TypedDict):
     filepath: str
@@ -314,53 +213,40 @@ class RuleFunction(TypedDict):
 class Replacement:
     filename: PurePath
     module: str
-    line_range: tuple[int, int]
-    col_range: tuple[int, int]
-    current_source: ast.Call
-    new_source: ast.Call
-    additional_imports: list[ast.ImportFrom]
-    # TODO: Use libcst or another CST, rather than an ast
-    add_trailing_comma: bool = False
+    current_source: libcst.Call
+    new_source: libcst.Call
+    additional_imports: list[libcst.ImportFrom]
 
-    def sanitized_imports(self) -> list[ast.ImportFrom]:
-        """Remove any circular or self-imports."""
-        return [i for i in self.additional_imports if i.module != self.module]
+    # def sanitized_imports(self) -> list[libcst.ImportFrom]:
+    #     """Remove any circular or self-imports."""
+    #     return [i for i in self.additional_imports if i.module != self.module]
 
-    def sanitize(self, names: set[str]):
-        """Remove any shadowing of names, except if the new_func is in the current file."""
-        assert isinstance(self.new_source.func, ast.Name)
-        func_name = self.new_source.func.id
-        if func_name not in names:
-            return
+    # def sanitize(self, names: set[str]):
+    #     """Remove any shadowing of names, except if the new_func is in the current file."""
+    #     assert isinstance(self.new_source.func, libcst.Name)
+    #     func_name = self.new_source.func.id
+    #     if func_name not in names:
+    #         return
 
-        # If the new function is not in the sanitized imports, it must be in the current file
-        if not any(i.names[0].name == func_name for i in self.sanitized_imports()):
-            return
+    #     # If the new function is not in the sanitized imports, it must be in the current file
+    #     if not any(i.names[0].name == func_name for i in self.sanitized_imports()):
+    #         return
 
-        bound_name = f"{func_name}_get"
-        self.new_source.func.id = bound_name
-        for i in self.additional_imports:
-            if i.names[0].name == func_name:
-                i.names[0].asname = bound_name
-        logging.warning(f"Renamed {func_name} to {bound_name} to avoid shadowing")
-
-    def contains_comments(self, source_code: str) -> bool:
-        """Check if there are any comments within the replacement range of the passed-in source
-        code."""
-        lines = source_code.split("\n")
-        return any("#" in line for line in lines[self.line_range[0] - 1 : self.line_range[1]])
+    #     bound_name = f"{func_name}_get"
+    #     self.new_source.func.id = bound_name
+    #     for i in self.additional_imports:
+    #         if i.names[0].name == func_name:
+    #             i.names[0].asname = bound_name
+    #     logging.warning(f"Renamed {func_name} to {bound_name} to avoid shadowing")
 
     def __str__(self) -> str:
         return f"""
         Replacement(
             filename={self.filename},
             module={self.module},
-            line_range={self.line_range},
-            col_range={self.col_range},
-            current_source={ast.dump(self.current_source, indent=2)},
-            new_source={ast.dump(self.new_source, indent=2)},
-            additional_imports={[ast.dump(i, indent=2) for i in self.additional_imports]},
-            add_trailing_comma={self.add_trailing_comma}
+            current_source={dump(self.current_source)},
+            new_source={dump(self.new_source)},
+            additional_imports={[dump(i) for i in self.additional_imports]},
         )
         """
 
@@ -369,30 +255,22 @@ class Replacement:
 # Call-by-name syntax mapping
 # ------------------------------------------------------------------------------------------
 
-
 class CallByNameSyntaxMapper:
     def __init__(self, graphs: list[RuleGraphGet]) -> None:
         self.graphs = graphs
 
         self.mapping: dict[
-            tuple[int, type[ast.Call] | type[ast.Dict] | None],
-            Callable[[ast.Call, list[RuleGraphGetDep]], tuple[ast.Call, list[ast.ImportFrom]]],
+            tuple[int, type[libcst.Call] | type[libcst.Dict] | None],
+            Callable[[libcst.Call, list[RuleGraphGetDep]], tuple[libcst.Call, list[libcst.ImportFrom]]],
         ] = {
             (1, None): self.map_no_args_get_to_new_syntax,
-            (2, ast.Call): self.map_short_form_get_to_new_syntax,
-            (2, ast.Dict): self.map_dict_form_get_to_new_syntax,
-            (3, None): self.map_long_form_get_to_new_syntax,
+            # (2, libcst.Call): self.map_short_form_get_to_new_syntax,
+            # (2, libcst.Dict): self.map_dict_form_get_to_new_syntax,
+            # (3, None): self.map_long_form_get_to_new_syntax,
         }
 
-    def map_get_to_new_syntax(
-        self, get: ast.Call, filename: PurePath, calling_func: str
-    ) -> Replacement | None:
-        """There are 4 forms the old Get() syntax can take, so we can account for each one of them
-        individually."""
-        new_source: ast.Call | None = None
-        imports: list[ast.ImportFrom] = []
-
-        graph_item = next(
+    def _get_graph_item(self, filename: PurePath, calling_func: str) -> RuleGraphGet | None:
+        return next(
             (
                 item
                 for item in self.graphs
@@ -400,43 +278,46 @@ class CallByNameSyntaxMapper:
             ),
             None,
         )
-        if not graph_item:
+
+    def map_get_to_new_syntax(
+        self, get: libcst.Call, filename: PurePath, calling_func: str
+    ) -> Replacement | None:
+        """There are 4 forms of Get() syntax. This function picks the correct one."""
+
+        new_source: libcst.Call | None = None
+        imports: list[libcst.ImportFrom] = []
+
+        if not (graph_item := self._get_graph_item(filename, calling_func)):
             logger.warning(f"Failed to find dependencies for {filename} {calling_func}")
             return None
 
         get_deps = graph_item["gets"]
-
         num_args = len(get.args)
-        arg_type: type[ast.Call] | type[ast.Dict] | None = None
-        if num_args == 2 and (arg := maybe_narrow_type(get.args[1], (ast.Call, ast.Dict))):
-            arg_type = type(arg) if arg else None  # type: ignore
+        arg_type: type[libcst.Call] | type[libcst.Dict] | None = None
+        
+        # if num_args == 2 and (arg := libcst.ensure_type(get.args[1], Union[libcst.Call, libcst.Dict])):
+        #     arg_type = type(arg) if arg else None 
 
         try:
             new_source, imports = self.mapping[(num_args, arg_type)](get, get_deps)
         except Exception as e:
-            logging.warning(f"Failed to migrate {ast.unparse(get)} with {e}\n")
+            logging.warning(f"Failed to migrate  with {e}\n")
             return None
 
-        assert get.end_lineno is not None
-        assert get.end_col_offset is not None
         return Replacement(
             filename=filename,
             module=graph_item["module"],
-            line_range=(get.lineno, get.end_lineno),
-            col_range=(get.col_offset, get.end_col_offset),
             current_source=get,
             new_source=new_source,
             additional_imports=[
-                ast.ImportFrom(
-                    module="pants.engine.rules", names=[ast.alias("implicitly")], level=0
-                ),
+                _make_import_from("pants.engine.rules", "implicitly"),
                 *imports,
             ],
         )
 
     def map_no_args_get_to_new_syntax(
-        self, get: ast.Call, deps: list[RuleGraphGetDep]
-    ) -> tuple[ast.Call, list[ast.ImportFrom]]:
+        self, get: libcst.Call, deps: list[RuleGraphGetDep]
+    ) -> tuple[libcst.Call, list[libcst.ImportFrom]]:
         """Map the no-args form of Get() to the new syntax.
 
         The expected mapping is roughly:
@@ -445,141 +326,143 @@ class CallByNameSyntaxMapper:
         This form expects that the `get` call has exactly 1 arg (otherwise, a different form would be used)
         """
 
-        logger.debug(ast.dump(get, indent=2))
-        output_type = narrow_type(get.args[0], ast.Name)
+        logger.error(dump(get))
+        output_type = libcst.ensure_type(get.args[0].value, libcst.Name).value
 
         dep = next(
             dep
             for dep in deps
-            if dep["output_type"]["name"] == output_type.id and not dep["input_types"]
+            if dep["output_type"]["name"] == output_type and not dep["input_types"]
         )
         module = dep["rule_dep"]["module"]
         new_function = dep["rule_dep"]["function"]
 
-        new_call = ast.Call(
-            func=ast.Name(id=new_function),
-            args=[],
-            keywords=[
-                ast.keyword(value=ast.Call(func=ast.Name(id="implicitly"), args=[], keywords=[]))
+        new_call = libcst.Call(
+            func=libcst.Name(value=new_function),
+            args=[
+                libcst.Arg(
+                    value=libcst.Name(value="implicitly"),
+                    star="**"
+                )   
             ],
         )
-        imports = [ast.ImportFrom(module, names=[ast.alias(new_function)], level=0)]
+        imports = [_make_import_from(module, new_function)]
         return new_call, imports
 
-    def map_long_form_get_to_new_syntax(
-        self, get: ast.Call, deps: list[RuleGraphGetDep]
-    ) -> tuple[ast.Call, list[ast.ImportFrom]]:
-        """Map the long form of Get() to the new syntax.
+    # def map_long_form_get_to_new_syntax(
+    #     self, get: libcst.Call, deps: list[RuleGraphGetDep]
+    # ) -> tuple[libcst.Call, list[libcst.ImportFrom]]:
+    #     """Map the long form of Get() to the new syntax.
 
-        The expected mapping is roughly:
-        Get(<OutputType>, <InputType>, input) -> the_rule_to_call(**implicitly(input))
+    #     The expected mapping is roughly:
+    #     Get(<OutputType>, <InputType>, input) -> the_rule_to_call(**implicitly(input))
 
-        This form expects that the `get` call has exactly 3 args (otherwise, a different form would be used)
-        """
+    #     This form expects that the `get` call has exactly 3 args (otherwise, a different form would be used)
+    #     """
 
-        logger.debug(ast.dump(get, indent=2))
-        output_type = narrow_type(get.args[0], ast.Name)
-        input_type = narrow_type(get.args[1], ast.Name)
+    #     logger.debug(dump(get, indent=2))
+    #     output_type = narrow_type(get.args[0], libcst.Name)
+    #     input_type = narrow_type(get.args[1], libcst.Name)
 
-        dep = next(
-            dep
-            for dep in deps
-            if dep["output_type"]["name"] == output_type.id
-            and len(dep["input_types"]) == 1
-            and dep["input_types"][0]["name"] == input_type.id
-        )
-        module = dep["rule_dep"]["module"]
-        new_function = dep["rule_dep"]["function"]
+    #     dep = next(
+    #         dep
+    #         for dep in deps
+    #         if dep["output_type"]["name"] == output_type.id
+    #         and len(dep["input_types"]) == 1
+    #         and dep["input_types"][0]["name"] == input_type.id
+    #     )
+    #     module = dep["rule_dep"]["module"]
+    #     new_function = dep["rule_dep"]["function"]
 
-        new_call = ast.Call(
-            func=ast.Name(id=new_function),
-            args=[],
-            keywords=[
-                ast.keyword(
-                    value=ast.Call(
-                        func=ast.Name(id="implicitly"),
-                        args=[ast.Dict(keys=[get.args[2]], values=[ast.Name(id=input_type.id)])],
-                        keywords=[],
-                    )
-                )
-            ],
-        )
-        imports = [ast.ImportFrom(module, names=[ast.alias(new_function)], level=0)]
-        return new_call, imports
+    #     new_call = libcst.Call(
+    #         func=libcst.Name(id=new_function),
+    #         args=[],
+    #         keywords=[
+    #             libcst.keyword(
+    #                 value=libcst.Call(
+    #                     func=libcst.Name(id="implicitly"),
+    #                     args=[libcst.Dict(keys=[get.args[2]], values=[libcst.Name(id=input_type.id)])],
+    #                     keywords=[],
+    #                 )
+    #             )
+    #         ],
+    #     )
+    #     imports = [libcst.ImportFrom(module, names=[libcst.alias(new_function)], level=0)]
+    #     return new_call, imports
 
-    def map_short_form_get_to_new_syntax(
-        self, get: ast.Call, deps: list[RuleGraphGetDep]
-    ) -> tuple[ast.Call, list[ast.ImportFrom]]:
-        """Map the short form of Get() to the new syntax.
+    # def map_short_form_get_to_new_syntax(
+    #     self, get: libcst.Call, deps: list[RuleGraphGetDep]
+    # ) -> tuple[libcst.Call, list[libcst.ImportFrom]]:
+    #     """Map the short form of Get() to the new syntax.
 
-        The expected mapping is roughly:
-        Get(<OutputType>, <InputType>(<constructor args for input>)) -> the_rule_to_call(input, **implicitly())
+    #     The expected mapping is roughly:
+    #     Get(<OutputType>, <InputType>(<constructor args for input>)) -> the_rule_to_call(input, **implicitly())
 
-        This form expects that the `get` call has exactly 2 args (otherwise, a different form would be used)
-        """
+    #     This form expects that the `get` call has exactly 2 args (otherwise, a different form would be used)
+    #     """
 
-        logger.debug(ast.dump(get, indent=2))
-        output_type = narrow_type(get.args[0], ast.Name)
-        input_call = narrow_type(get.args[1], ast.Call)
-        input_type = narrow_type(input_call.func, ast.Name)
+    #     logger.debug(dump(get, indent=2))
+    #     output_type = narrow_type(get.args[0], libcst.Name)
+    #     input_call = narrow_type(get.args[1], libcst.Call)
+    #     input_type = narrow_type(input_call.func, libcst.Name)
 
-        dep = next(
-            dep
-            for dep in deps
-            if dep["output_type"]["name"] == output_type.id
-            and len(dep["input_types"]) == 1
-            and dep["input_types"][0]["name"] == input_type.id
-        )
-        module = dep["rule_dep"]["module"]
-        new_function = dep["rule_dep"]["function"]
+    #     dep = next(
+    #         dep
+    #         for dep in deps
+    #         if dep["output_type"]["name"] == output_type.id
+    #         and len(dep["input_types"]) == 1
+    #         and dep["input_types"][0]["name"] == input_type.id
+    #     )
+    #     module = dep["rule_dep"]["module"]
+    #     new_function = dep["rule_dep"]["function"]
 
-        new_call = ast.Call(
-            func=ast.Name(id=new_function),
-            args=[input_call],
-            keywords=[
-                ast.keyword(value=ast.Call(func=ast.Name(id="implicitly"), args=[], keywords=[]))
-            ],
-        )
-        imports = [ast.ImportFrom(module, names=[ast.alias(new_function)], level=0)]
-        return new_call, imports
+    #     new_call = libcst.Call(
+    #         func=libcst.Name(id=new_function),
+    #         args=[input_call],
+    #         keywords=[
+    #             libcst.keyword(value=libcst.Call(func=libcst.Name(id="implicitly"), args=[], keywords=[]))
+    #         ],
+    #     )
+    #     imports = [libcst.ImportFrom(module, names=[libcst.alias(new_function)], level=0)]
+    #     return new_call, imports
 
-    def map_dict_form_get_to_new_syntax(
-        self, get: ast.Call, deps: list[RuleGraphGetDep]
-    ) -> tuple[ast.Call, list[ast.ImportFrom]]:
-        """Map the dict form of Get() to the new syntax.
+    # def map_dict_form_get_to_new_syntax(
+    #     self, get: libcst.Call, deps: list[RuleGraphGetDep]
+    # ) -> tuple[libcst.Call, list[libcst.ImportFrom]]:
+    #     """Map the dict form of Get() to the new syntax.
 
-        The expected mapping is roughly:
-        Get(<OutputType>, {input1: <Input1Type>, ..inputN: <InputNType>}) -> the_rule_to_call(**implicitly(input))
+    #     The expected mapping is roughly:
+    #     Get(<OutputType>, {input1: <Input1Type>, ..inputN: <InputNType>}) -> the_rule_to_call(**implicitly(input))
 
-        This form expects that the `get` call has exactly 2 args (otherwise, a different form would be used)
-        """
+    #     This form expects that the `get` call has exactly 2 args (otherwise, a different form would be used)
+    #     """
 
-        logger.debug(ast.dump(get, indent=2))
-        output_type = narrow_type(get.args[0], ast.Name)
-        input_dict = narrow_type(get.args[1], ast.Dict)
-        input_types = {k.id for k in input_dict.values if isinstance(k, ast.Name)}
+    #     logger.debug(dump(get, indent=2))
+    #     output_type = narrow_type(get.args[0], libcst.Name)
+    #     input_dict = narrow_type(get.args[1], libcst.Dict)
+    #     input_types = {k.id for k in input_dict.values if isinstance(k, libcst.Name)}
 
-        dep = next(
-            dep
-            for dep in deps
-            if dep["output_type"]["name"] == output_type.id
-            and {i["name"] for i in dep["input_types"]} == input_types
-        )
+    #     dep = next(
+    #         dep
+    #         for dep in deps
+    #         if dep["output_type"]["name"] == output_type.id
+    #         and {i["name"] for i in dep["input_types"]} == input_types
+    #     )
 
-        module = dep["rule_dep"]["module"]
-        new_function = dep["rule_dep"]["function"]
+    #     module = dep["rule_dep"]["module"]
+    #     new_function = dep["rule_dep"]["function"]
 
-        new_call = ast.Call(
-            func=ast.Name(id=new_function),
-            args=[],
-            keywords=[
-                ast.keyword(
-                    value=ast.Call(func=ast.Name(id="implicitly"), args=[input_dict], keywords=[])
-                )
-            ],
-        )
-        imports = [ast.ImportFrom(module, names=[ast.alias(new_function)], level=0)]
-        return new_call, imports
+    #     new_call = libcst.Call(
+    #         func=libcst.Name(id=new_function),
+    #         args=[],
+    #         keywords=[
+    #             libcst.keyword(
+    #                 value=libcst.Call(func=libcst.Name(id="implicitly"), args=[input_dict], keywords=[])
+    #             )
+    #         ],
+    #     )
+    #     imports = [libcst.ImportFrom(module, names=[libcst.alias(new_function)], level=0)]
+    #     return new_call, imports
 
 
 # ------------------------------------------------------------------------------------------
@@ -587,130 +470,53 @@ class CallByNameSyntaxMapper:
 # ------------------------------------------------------------------------------------------
 
 
-class CallByNameVisitor(ast.NodeVisitor):
+class CallByNameTransformer(m.MatcherDecoratableTransformer):
     def __init__(self, filename: PurePath, syntax_mapper: CallByNameSyntaxMapper) -> None:
         super().__init__()
 
         self.filename = filename
         self.syntax_mapper = syntax_mapper
-        self.names: set[str] = set()
-        self.replacements: list[Replacement] = []
+        self.calling_function: str = ""
+        # self.replacements: list[Replacement] = []
+    
+    def visit_FunctionDef(self, node: libcst.FunctionDef) -> None:
+        self.calling_function = node.name.value
+    
+    def leave_FunctionDef(self, original_node: libcst.FunctionDef, updated_node: libcst.FunctionDef) -> libcst.FunctionDef:
+        self.calling_function = ""
+        return updated_node
+    # .with_changes(name=libcst.Name("sj"),
+            # lpar=libcst.LeftParen(),
+            # rpar=libcst.RightParen(),
+        # )
 
-    def visit_Name(self, node: ast.Name):
-        """Collect all names in the file, so we can avoid shadowing them with the new imports."""
-        self.names.add(node.id)
+    @m.leave(m.Call(func=m.Name(value="Get")))
+    def handle_get(
+        self, original_node: libcst.Call, updated_node: libcst.Call
+    ) -> libcst.Call:
+        replacement = self.syntax_mapper.map_get_to_new_syntax(original_node, self.filename, self.calling_function)
+        if replacement:
+            # logger.error(f"Rewriting {dump(original_node)} to {dump(replacement.new_source)}")
+            # updated_node = replacement.new_source
+            return replacement.new_source
+            # return updated_node.with_changes(func=libcst.Name(value="implicitly"))
 
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
-        """This function will determine if the node is a rule, if there are any Get(...) calls of
-        interest, and then call out to the syntax mapper to create the new syntax and imports for
-        the replacement."""
+        return original_node
+    
+    # @m.leave(m.Call(func=m.Name(value="MultiGet")))
+    # def handle_multiget(
+    #     self, original_node: libcst.Call, updated_node: libcst.Call
+    # ) -> libcst.Call:
+    #     print(original_node.args[0].value, self.calling_function)
+    #     return original_node
 
-        # Ensure we collect all names in this function, as well
-        names = [n.id for n in ast.walk(node) if isinstance(n, ast.Name)]
-        self.names.update(names)
 
-        if not self._should_visit_node(node.decorator_list):
-            return
+# ------------------------------------------------------------------------------------------
+# libcst utilities
+# ------------------------------------------------------------------------------------------
 
-        self._recurse_body_statements(node.name, node)
-
-    def _recurse_body_statements(self, root: str, node: ast.stmt):
-        """Recursively walk the body of a node, including properties of compound statements looking
-        for Get() calls to replace.
-
-        https://docs.python.org/3/reference/compound_stmts.html
-        """
-        for prop in ["body", "handlers", "orelse", "finalbody"]:
-            for child in getattr(node, prop, []):
-                self._recurse_body_statements(root, cast(ast.stmt, child))
-
-        self._maybe_add_replacements(root, node)
-
-    def _maybe_add_replacements(self, calling_func: str, statement: ast.stmt):
-        if call := self._maybe_replaceable_call(statement):
-            if replacement := self.syntax_mapper.map_get_to_new_syntax(
-                call, self.filename, calling_func=calling_func
-            ):
-                self.replacements.append(replacement)
-
-        for call, statement_type in self._maybe_replaceable_multiget(statement):
-            if replacement := self.syntax_mapper.map_get_to_new_syntax(
-                call, self.filename, calling_func=calling_func
-            ):
-                replacement.add_trailing_comma = statement_type == "call"
-                self.replacements.append(replacement)
-
-    def _should_visit_node(self, decorator_list: list[ast.expr]) -> bool:
-        """Only interested in async functions with the @rule(...) or @goal_rule(...) decorator."""
-        for decorator in decorator_list:
-            if isinstance(decorator, ast.Name) and decorator.id in ["rule", "goal_rule"]:
-                # Accounts for isolated decorators e.g. "@rule"
-                return True
-
-            if (
-                isinstance(decorator, ast.Call)
-                and isinstance(decorator.func, ast.Name)
-                and decorator.func.id in ["rule", "goal_rule"]
-            ):
-                # Accounts for decorators with params e.g. "@rule(desc=..., level=...)"
-                return True
-
-        return False
-
-    def _maybe_replaceable_call(self, statement: ast.stmt) -> ast.Call | None:
-        """Looks for the following forms of Get that we want to replace:
-
-        - bar_get = Get(...)
-        - bar = await Get(...)
-        This function is pretty gross, but a lot of it is to satisfy the type checker and
-        to not need to try/catch everywhere.
-        """
-        if (
-            isinstance(statement, ast.Assign)
-            and (
-                isinstance((call_node := statement.value), ast.Call)
-                or (
-                    isinstance((await_node := statement.value), ast.Await)
-                    and isinstance((call_node := await_node.value), ast.Call)
-                )
-            )
-            and isinstance(call_node.func, ast.Name)
-            and call_node.func.id == "Get"
-        ):
-            return call_node
-        return None
-
-    def _maybe_replaceable_multiget(
-        self, statement: ast.stmt
-    ) -> list[tuple[ast.Call, Literal["call", "generator"]]]:
-        """Looks for the following forms of MultiGet that we want to replace:
-
-        - multigot = await MultiGet(Get(...), Get(...), ...)
-        - multigot = await MultiGet(Get(...) for x in y)
-        """
-        if not (
-            isinstance(statement, ast.Assign)
-            and isinstance((await_node := statement.value), ast.Await)
-            and isinstance((call_node := await_node.value), ast.Call)
-            and isinstance(call_node.func, ast.Name)
-            and call_node.func.id == "MultiGet"
-        ):
-            return []
-
-        args: list[tuple[ast.Call, Literal["call", "generator"]]] = []
-        for arg in call_node.args:
-            if (
-                isinstance(arg, ast.Call)
-                and isinstance(arg.func, ast.Name)
-                and arg.func.id == "Get"
-            ):
-                args.append((arg, "call"))
-
-            if (
-                isinstance(arg, ast.GeneratorExp)
-                and isinstance((call_arg := arg.elt), ast.Call)
-                and isinstance(call_arg.func, ast.Name)
-                and call_arg.func.id == "Get"
-            ):
-                args.append((call_arg, "generator"))
-        return args
+def _make_import_from(module: str, func: str) -> libcst.ImportFrom:
+    """Manually generating ImportFrom using Attributes is tricky, parse a string instead"""
+    statement = libcst.parse_statement(f"from {module} import {func}")
+    assert isinstance(statement.body, Sequence)
+    return libcst.ensure_type(statement.body[0], libcst.ImportFrom)
