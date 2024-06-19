@@ -128,7 +128,7 @@ RULES1_FILE = dedent(
         pex = await Get(
             VenvPex,
             PexRequest,
-            # Some comment that the AST parse wipes out, so we can't migrate this call safely
+            # Some comment that the AST parse wipes out, but CST should keep
             black.to_pex_request()
         )
 
@@ -222,7 +222,7 @@ MIGRATED_RULES1_FILE = dedent(
         pex = await Get(
             VenvPex,
             PexRequest,
-            # Some comment that the AST parse wipes out, so we can't migrate this call safely
+            # Some comment that the AST parse wipes out, but CST should keep
             black.to_pex_request()
         )
 

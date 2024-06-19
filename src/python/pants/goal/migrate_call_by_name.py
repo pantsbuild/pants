@@ -98,7 +98,7 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
         syntax_mapper = CallByNameSyntaxMapper(migration_plan)
         for f in sorted(files_to_migrate):
             file = Path(f)
-            logger.error(f"Processing {file}")
+            logger.info(f"Processing {file}")
 
             transformer = CallByNameTransformer(file, syntax_mapper)
             with open(file) as f:
@@ -107,9 +107,8 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
                 tree = cst.parse_module(source_code)
                 new_tree = tree.visit(transformer)
                 new_source = new_tree.code
-                # logger.error(f"New source is {new_source}")
-                if source_code != new_source:
-                    logger.error(f"Rewriting {file}")
+
+                if not tree.deep_equals(new_tree):
                     with open(file, "w") as f:
                         f.write(new_source)
 
@@ -311,20 +310,10 @@ class CallByNameSyntaxMapper:
                 return None
 
         try:
-            logger.error(f"Lookup is {num_args}, {arg_type}")
-            lookup = (num_args, arg_type)
-            logger.error(f"Lookup is {lookup}")
-            func = self.mapping[lookup]
-            logger.error(f"Func is {func}")
-            new_source, imports = func(get, get_deps)
-            # new_source, imports = self.mapping[(num_args, arg_type)](get, get_deps)
+            new_source, imports = self.mapping[(num_args, arg_type)](get, get_deps)
         except Exception as e:
             logger.warning(
                 f"Failed to migrate Get ({num_args}, {arg_type}) in {filename}:{calling_func} due to: {e}\n"
-            )
-            logger.debug(
-                f"Failed to migrate Get ({num_args}, {arg_type}) in {filename}:{calling_func} due to: {e}",
-                exc_info=True,
             )
             return None
 
@@ -356,10 +345,6 @@ class CallByNameSyntaxMapper:
             if dep["output_type"]["name"] == output_type and not dep["input_types"]
         )
         module, new_function = dep["rule_dep"]["module"], dep["rule_dep"]["function"]
-
-        # Look up file associated with module
-        # test = _get_call_from_module(module, new_function)
-        # logger.error(f"Test is {dump(test)}")
 
         new_call = cst.Call(
             func=cst.Name(new_function),
@@ -467,7 +452,7 @@ class CallByNameSyntaxMapper:
         This form expects that the `get` call has exactly 2 args (otherwise, a different form would be used)
         """
 
-        logger.error(dump(get))
+        logger.debug(dump(get))
         output_type = cst.ensure_type(get.args[0].value, cst.Name).value
         input_dict = cst.ensure_type(get.args[1].value, cst.Dict)
         input_types = {
@@ -476,8 +461,6 @@ class CallByNameSyntaxMapper:
             if isinstance(element.value, cst.Name)
         }
 
-        logger.error(f"After types {input_types}")
-
         dep = next(
             dep
             for dep in deps
@@ -485,7 +468,6 @@ class CallByNameSyntaxMapper:
             and {i["name"] for i in dep["input_types"]} == input_types
         )
         module, new_function = dep["rule_dep"]["module"], dep["rule_dep"]["function"]
-        logger.error("After module")
 
         new_call = cst.Call(
             func=cst.Name(new_function),
@@ -496,7 +478,6 @@ class CallByNameSyntaxMapper:
                 )
             ],
         )
-        logger.error("before imports")
 
         imports = [_make_import_from(module, new_function)]
         return new_call, imports
@@ -553,7 +534,6 @@ class CallByNameTransformer(m.MatcherDecoratableTransformer):
                     body=[m.ImportFrom(module=_make_import_from_1("pants.engine.rules"))]
                 ),
             ):
-                logger.error(i)
                 rules_import_index = i + 1
                 break
 
@@ -586,10 +566,6 @@ def _make_import_from(module: str, func: str) -> cst.ImportFrom:
     return cst.ImportFrom(
         module=_make_importfrom_attr(module), names=[cst.ImportAlias(cst.Name(func))]
     )
-    # cst.ImportFrom(module=_make_import_from_1(module), names=[])
-    # statement = cst.parse_statement(f"from {module} import {func}")
-    # assert isinstance(statement.body, Sequence)
-    # return cst.ensure_type(statement.body[0], cst.ImportFrom)
 
 
 def _make_importfrom_attr(module: str) -> cst.Attribute | cst.Name:
@@ -610,10 +586,6 @@ def _make_import_from_1(module: str) -> Union[m.Attribute, m.Name]:
     # Otherwise, it is an Attribute
     partial_module = ".".join(parts[:-1])
     return m.Attribute(value=_make_import_from_1(partial_module), attr=m.Name(parts[-1]))
-
-    # *values, attr = parts
-    # value = _make_import_from_1(values)
-    # return m.Attribute(value=value, attr=m.Name(attr))
 
 
 def remove_unused_implicitly(call: cst.Call, called_func: cst.FunctionDef) -> cst.Call:
@@ -646,7 +618,5 @@ def _get_call_from_module(module: str, func: str) -> cst.FunctionDef | None:
     with open(spec.origin) as f:
         source_code = f.read()
         tree = cst.parse_module(source_code)
-        # m.matches(tree.body[0], matcher=m.FunctionDef())
         results = m.findall(tree, matcher=m.FunctionDef(m.Name(func)))
-        logger.error(f"Results are {results}")
         return cst.ensure_type(results[0], cst.FunctionDef) if results else None
