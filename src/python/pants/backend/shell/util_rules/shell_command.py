@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import shlex
 from dataclasses import dataclass
 
@@ -24,8 +25,10 @@ from pants.backend.shell.target_types import (
     ShellCommandTimeoutField,
     ShellCommandToolsField,
     ShellCommandWorkdirField,
+    ShellCommandWorkspaceInvalidationSourcesField,
 )
 from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.adhoc_process_support import (
@@ -41,7 +44,7 @@ from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_s
 from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, Snapshot
+from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import Process
 from pants.engine.rules import Get, collect_rules, rule
@@ -149,6 +152,18 @@ async def _prepare_process_request_from_target(
 
     cache_scope = env_target.default_cache_scope
 
+    workspace_invalidation_globs: PathGlobs | None = None
+    workspace_invalidation_sources = (
+        shell_command.get(ShellCommandWorkspaceInvalidationSourcesField).value or ()
+    )
+    if workspace_invalidation_sources:
+        spec_path = shell_command.address.spec_path
+        workspace_invalidation_globs = PathGlobs(
+            globs=(os.path.join(spec_path, glob) for glob in workspace_invalidation_sources),
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"`{ShellCommandWorkspaceInvalidationSourcesField.alias}` for `shell_command` target at `{shell_command.address}`",
+        )
+
     return AdhocProcessRequest(
         description=description,
         address=shell_command.address,
@@ -167,6 +182,7 @@ async def _prepare_process_request_from_target(
         log_output=shell_command[ShellCommandLogOutputField].value,
         capture_stdout_file=None,
         capture_stderr_file=None,
+        workspace_invalidation_globs=workspace_invalidation_globs,
         cache_scope=cache_scope,
     )
 

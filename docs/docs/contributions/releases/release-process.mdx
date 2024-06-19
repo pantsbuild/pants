@@ -77,7 +77,7 @@ The release commit is the commit that bumps the VERSION string. For `dev`/`a0` r
 
 ### Bump the VERSION
 
-From the `main` branch, run `pants run src/python/pants_release/start_release.py -- --new 2.9.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
+From the `main` branch, run `pants --no-watch-filesystem --no-pantsd run src/python/pants_release/start_release.py -- --new 2.99.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
 
 This will create a pull request that:
 
