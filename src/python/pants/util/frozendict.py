@@ -5,8 +5,10 @@ from __future__ import annotations
 
 from typing import Any, Callable, Iterable, Iterator, Mapping, TypeVar, cast, overload
 
+from pants.base.deprecated import deprecated
 from pants.util.memo import memoized_method
 from pants.util.strutil import softwrap
+from pants.util.typing import SupportsRichComparison
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -89,6 +91,18 @@ class FrozenDict(Mapping[K, V]):
         # defer to dict's __eq__
         return self._data == other
 
+    @deprecated(
+        "2.24.0.dev0",
+        hint=softwrap(
+            """
+            If you are comparing `FrozenDict`s in a plugin, use `OrderedFrozenDict` instead.
+
+            If you are not using a plugin that compares `FrozenDict`s, please file an issue
+            https://github.com/pantsbuild/pants/issues/new/choose with information about what you
+            are doing to see this warning.
+            """
+        ),
+    )
     def __lt__(self, other: Any) -> bool:
         if not isinstance(other, FrozenDict):
             return NotImplemented
@@ -159,3 +173,50 @@ class LazyFrozenDict(FrozenDict[K, V]):
     @memoized_method
     def _get_value(self, k: K) -> V:
         return cast("Callable[[], V]", self._data[k])()
+
+
+KComparable = TypeVar("KComparable", bound=SupportsRichComparison)
+VComparable = TypeVar("VComparable", bound=SupportsRichComparison)
+
+
+class OrderedFrozenDict(FrozenDict[KComparable, VComparable]):
+    """A version of `FrozenDict` that supports being compared."""
+
+    @overload
+    def __init__(
+        self, __items: Iterable[tuple[KComparable, VComparable]], **kwargs: VComparable
+    ) -> None:
+        ...
+
+    @overload
+    def __init__(self, __other: Mapping[KComparable, VComparable], **kwargs: VComparable) -> None:
+        ...
+
+    @overload
+    def __init__(self, **kwargs: VComparable) -> None:
+        ...
+
+    def __init__(
+        self,
+        *item: Mapping[KComparable, VComparable] | Iterable[tuple[KComparable, VComparable]],
+        **kwargs: VComparable,
+    ) -> None:
+        """Creates a `OrderedFrozenDict` with arguments accepted by `dict` that also must be
+        hashable and orderable."""
+        if len(item) > 1:
+            raise ValueError(
+                f"{type(self).__name__} was called with {len(item)} positional arguments but it expects one."
+            )
+
+        data = dict(item[0]) if item else dict()
+        data.update(**kwargs)
+
+        # rely on stable order of dicts: creating a dict from an ordered sequence will give a dict
+        # that itself has that order
+        super().__init__(sorted(data.items()))
+
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, OrderedFrozenDict):
+            return NotImplemented
+
+        return tuple(self._data.items()) < tuple(other._data.items())
