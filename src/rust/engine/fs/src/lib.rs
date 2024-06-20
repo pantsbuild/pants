@@ -279,34 +279,6 @@ pub struct PathMetadata {
     pub symlink_target: Option<PathBuf>,
 }
 
-impl PathMetadata {
-    pub fn new(
-        path: PathBuf,
-        kind: PathMetadataKind,
-        length: u64,
-        is_executable: bool,
-        read_only: bool,
-        unix_mode: Option<u32>,
-        accessed_time: Option<SystemTime>,
-        created_time: Option<SystemTime>,
-        modification_time: Option<SystemTime>,
-        symlink_target: Option<PathBuf>,
-    ) -> Self {
-        Self {
-            path,
-            kind,
-            length,
-            is_executable,
-            read_only,
-            unix_mode,
-            accessed: accessed_time,
-            created: created_time,
-            modified: modification_time,
-            symlink_target,
-        }
-    }
-}
-
 #[derive(Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct DirectoryListing(pub Vec<Stat>);
 
@@ -651,18 +623,18 @@ impl PosixFS {
                     (Some(mode), (mode & 0o111) != 0)
                 };
 
-                Ok(Some(PathMetadata::new(
+                Ok(Some(PathMetadata {
                     path,
                     kind,
-                    metadata.len(),
+                    length: metadata.len(),
                     is_executable,
-                    metadata.permissions().readonly(),
+                    read_only: metadata.permissions().readonly(),
                     unix_mode,
-                    metadata.accessed().ok(),
-                    metadata.created().ok(),
-                    metadata.modified().ok(),
+                    accessed: metadata.accessed().ok(),
+                    created: metadata.created().ok(),
+                    modified: metadata.modified().ok(),
                     symlink_target,
-                )))
+                }))
             }
             Err(err) if err.kind() == ErrorKind::NotFound => Ok(None),
             Err(err) => Err(err),
@@ -768,42 +740,42 @@ impl Vfs<String> for DigestTrie {
         };
 
         Ok(Some(match entry {
-            directory::Entry::File(f) => PathMetadata::new(
+            directory::Entry::File(f) => PathMetadata {
                 path,
-                PathMetadataKind::File,
-                entry.digest().size_bytes as u64,
-                f.is_executable(),
-                false,
-                None,
-                None,
-                None,
-                None,
-                None,
-            ),
-            directory::Entry::Symlink(s) => PathMetadata::new(
+                kind: PathMetadataKind::File,
+                length: entry.digest().size_bytes as u64,
+                is_executable: f.is_executable(),
+                read_only: false,
+                unix_mode: None,
+                accessed: None,
+                created: None,
+                modified: None,
+                symlink_target: None,
+            },
+            directory::Entry::Symlink(s) => PathMetadata {
                 path,
-                PathMetadataKind::Symlink,
-                0,
-                false,
-                false,
-                None,
-                None,
-                None,
-                None,
-                Some(s.target().to_path_buf()),
-            ),
-            directory::Entry::Directory(_) => PathMetadata::new(
+                kind: PathMetadataKind::Symlink,
+                length: 0,
+                is_executable: false,
+                read_only: false,
+                unix_mode: None,
+                accessed: None,
+                created: None,
+                modified: None,
+                symlink_target: Some(s.target().to_path_buf()),
+            },
+            directory::Entry::Directory(_) => PathMetadata {
                 path,
-                PathMetadataKind::Directory,
-                entry.digest().size_bytes as u64,
-                false,
-                false,
-                None,
-                None,
-                None,
-                None,
-                None,
-            ),
+                kind: PathMetadataKind::Directory,
+                length: entry.digest().size_bytes as u64,
+                is_executable: false,
+                read_only: false,
+                unix_mode: None,
+                accessed: None,
+                created: None,
+                modified: None,
+                symlink_target: None,
+            },
         }))
     }
 
