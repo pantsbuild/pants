@@ -14,7 +14,7 @@ REGISTER_FILE = dedent(
     from pants.engine.rules import collect_rules, Get, rule, goal_rule
     from pants.engine.goal import Goal, GoalSubsystem
 
-    from migrateme.rules1 import Bar, Baz, Foo, Thud, rules as rules1
+    from migrateme.rules1 import Bar, Foo, Thud, rules as rules1
     from migrateme.rules2 import Qux, rules as rules2
 
     class ContrivedGoalSubsystem(GoalSubsystem):
@@ -29,7 +29,6 @@ REGISTER_FILE = dedent(
     async def setup_migrateme(black: Black) -> ContrivedGoal:
         foo = await Get(Foo, Black, black)
         bar = await Get(Bar, Black, black)
-        #baz = await Get(Baz, Black, black)
         qux = await Get(Qux, Black, black)
         thud = await Get(Thud, Black, black)
 
@@ -42,15 +41,14 @@ MIGRATED_REGISTER_FILE = dedent(
     """\
     from pants.backend.python.lint.black.subsystem import Black
     from pants.engine.rules import collect_rules, Get, rule, goal_rule
-    from migrateme.rules1 import embedded_comments
-    from migrateme.rules1 import multiget
-    from migrateme.rules1 import multiline
     from migrateme.rules1 import variants
+    from migrateme.rules1 import multiline
     from migrateme.rules2 import shadowed
+    from migrateme.rules1 import multiget
     from pants.engine.rules import implicitly
     from pants.engine.goal import Goal, GoalSubsystem
 
-    from migrateme.rules1 import Bar, Baz, Foo, Thud, rules as rules1
+    from migrateme.rules1 import Bar, Foo, Thud, rules as rules1
     from migrateme.rules2 import Qux, rules as rules2
 
     class ContrivedGoalSubsystem(GoalSubsystem):
@@ -65,7 +63,6 @@ MIGRATED_REGISTER_FILE = dedent(
     async def setup_migrateme(black: Black) -> ContrivedGoal:
         foo = await variants(**implicitly({black: Black}))
         bar = await multiline(**implicitly({black: Black}))
-        baz = await non_annotated_rule_helpers(**implicitly({black: Black}))
         qux = await shadowed(**implicitly({black: Black}))
         thud = await multiget(**implicitly({black: Black}))
 
@@ -85,6 +82,14 @@ RULES1_FILE = dedent(
     from pants.engine.fs import Digest, EMPTY_SNAPSHOT
     from pants.engine.rules import collect_rules, Get, MultiGet, rule
     from pants.engine.target import AllTargets
+
+    async def non_annotated_rule_helpers():
+        await Get(
+            VenvPex,
+            PexRequest,
+            # Some comment that the AST parse wipes out, but CST should keep
+            black.to_pex_request()
+        )
 
     class Foo:
         pass
@@ -109,6 +114,7 @@ RULES1_FILE = dedent(
             conditional_all_targets_elif = await Get(AllTargets)
         else:
             conditional_all_targets_else = await Get(AllTargets)
+        await non_annotated_rule_helpers()
 
     class Bar:
         pass
@@ -118,17 +124,6 @@ RULES1_FILE = dedent(
         pex = await Get(
             VenvPex,
             PexRequest,
-            black.to_pex_request()
-        )
-
-    class Baz:
-        pass
-
-    async def non_annotated_rule_helpers(black: Black) -> Baz:
-        pex = await Get(
-            VenvPex,
-            PexRequest,
-            # Some comment that the AST parse wipes out, but CST should keep
             black.to_pex_request()
         )
 
@@ -184,6 +179,9 @@ MIGRATED_RULES1_FILE = dedent(
     from pants.engine.rules import implicitly
     from pants.engine.target import AllTargets
 
+    async def non_annotated_rule_helpers():
+        await create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
+
     class Foo:
         pass
 
@@ -207,6 +205,7 @@ MIGRATED_RULES1_FILE = dedent(
             conditional_all_targets_elif = await find_all_targets()
         else:
             conditional_all_targets_else = await find_all_targets()
+        await non_annotated_rule_helpers()
 
     class Bar:
         pass
@@ -214,17 +213,6 @@ MIGRATED_RULES1_FILE = dedent(
     @rule(desc="Ensure multi-line calls are migrated")
     async def multiline(black: Black) -> Bar:
         pex = await create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
-
-    class Baz:
-        pass
-
-    async def non_annotated_rule_helpers(black: Black) -> Baz:
-        pex = await Get(
-            VenvPex,
-            PexRequest,
-            # Some comment that the AST parse wipes out, but CST should keep
-            black.to_pex_request()
-        )
 
     class Thud:
         pass
@@ -320,8 +308,8 @@ def test_migrate_call_by_name_syntax():
 
         # Ensure the JSON output contains the paths to the files we expect to migrate
         assert all(str(p) in result.stdout for p in [register_path, rules1_path, rules2_path])
-        # with open(register_path) as f:
-        #     assert f.read() == MIGRATED_REGISTER_FILE
+        with open(register_path) as f:
+            assert f.read() == MIGRATED_REGISTER_FILE
         with open(rules1_path) as f:
             assert f.read() == MIGRATED_RULES1_FILE
         with open(rules2_path) as f:

@@ -6,11 +6,11 @@ from __future__ import annotations
 import libcst as cst
 import libcst.matchers as m
 
-from pants.util import cstutil
+from pants.util.cstutil import make_importfrom, make_importfrom_attr, make_importfrom_attr_matcher
 
 
 def test_make_importfrom():
-    imp = cstutil.make_importfrom("pants.engine.rules", "collect_rules")
+    imp = make_importfrom("pants.engine.rules", "collect_rules")
     assert imp.deep_equals(
         cst.ImportFrom(
             module=cst.Attribute(
@@ -26,7 +26,7 @@ def test_make_importfrom():
 
 
 def test_make_importfrom_attr():
-    attr = cstutil.make_importfrom_attr("pants.engine.rules")
+    attr = make_importfrom_attr("pants.engine.rules")
     assert attr.deep_equals(
         cst.Attribute(
             value=cst.Attribute(
@@ -39,6 +39,6 @@ def test_make_importfrom_attr():
 
 
 def test_make_importfrom_attr_matcher():
-    node = cstutil.make_importfrom_attr("pants.engine.rules")
-    assert m.matches(node, cstutil.make_importfrom_attr_matcher("pants.engine.rules"))
-    assert not m.matches(node, cstutil.make_importfrom_attr_matcher("pants.engine.rulez"))
+    node = make_importfrom_attr("pants.engine.rules")
+    assert m.matches(node, make_importfrom_attr_matcher("pants.engine.rules"))
+    assert not m.matches(node, make_importfrom_attr_matcher("pants.engine.rulez"))

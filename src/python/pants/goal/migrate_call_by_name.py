@@ -9,7 +9,7 @@ import logging
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path, PurePath
-from typing import Callable, Iterable, TypedDict, Union
+from typing import Callable, Iterable, TypedDict
 
 import libcst as cst
 import libcst.matchers as m
@@ -26,6 +26,7 @@ from pants.goal.builtin_goal import BuiltinGoal
 from pants.init.engine_initializer import GraphSession
 from pants.option.option_types import BoolOption
 from pants.option.options import Options
+from pants.util import cstutil
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -219,22 +220,25 @@ class Replacement:
 
     def sanitized_imports(self) -> list[cst.ImportFrom]:
         """Remove any circular or self-imports."""
-        cst_module = _make_importfrom_attr(self.module)
-        return [i for i in self.additional_imports if i.module != cst_module]
+        cst_module = cstutil.make_importfrom_attr(self.module)
+        return [
+            i for i in self.additional_imports if i.module and not cst_module.deep_equals(i.module)
+        ]
 
     def sanitize(self, unavailable_names: set[str]):
         """Remove any shadowing of names, except if the new_func is in the current file."""
+
         func_name = cst.ensure_type(self.new_source.func, cst.Name)
         if func_name.value not in unavailable_names:
             return
 
-        # If the new func_name is not in the sanitized imports, it must already by in the current file
+        # If the new func_name is not in the sanitized imports, it must already be in the current file
         imported_names: set[str] = set()
         for i in self.sanitized_imports():
             assert isinstance(i.names, Iterable)
-            for alias in i.names:
-                assert isinstance(alias.name, cst.Name)
-                imported_names.add(alias.name.value)
+            for import_alias in i.names:
+                alias_name = cst.ensure_type(import_alias.name, cst.Name)
+                imported_names.add(alias_name.value)
 
         if func_name.value not in imported_names:
             return
@@ -242,11 +246,12 @@ class Replacement:
         # In-place update this replacement and additional imports
         bound_name = f"{func_name.value}_get"
         self.new_source = self.new_source.with_deep_changes(self.new_source.func, value=bound_name)
+
         for i, imp in enumerate(self.additional_imports):
             assert isinstance(imp.names, Iterable)
             for import_alias in imp.names:
-                assert isinstance(import_alias.name, cst.Name)
-                if import_alias.name.value == func_name.value:
+                alias_name = cst.ensure_type(import_alias.name, cst.Name)
+                if alias_name.value == func_name.value:
                     self.additional_imports[i] = imp.with_changes(
                         names=[cst.ImportAlias(func_name, asname=cst.AsName(cst.Name(bound_name)))]
                     )
@@ -306,7 +311,7 @@ class CallByNameTransformer(m.MatcherDecoratableTransformer):
         return updated_node.with_changes(value="concurrently")
 
     def visit_Module(self, node: cst.Module):
-        """Collect all names we risk shadowing."""
+        """Collects all names we risk shadowing."""
         wrapper = libcst.metadata.MetadataWrapper(module=node)
         scopes = set(wrapper.resolve(libcst.metadata.ScopeProvider).values())
         self.unavailable_names = {
@@ -314,6 +319,7 @@ class CallByNameTransformer(m.MatcherDecoratableTransformer):
         }
 
     def leave_Module(self, original_node: cst.Module, updated_node: cst.Module) -> cst.Module:
+        """Performs final updates on imports, and sanitization."""
         if not self.additional_imports:
             return updated_node
 
@@ -322,13 +328,17 @@ class CallByNameTransformer(m.MatcherDecoratableTransformer):
             if m.matches(
                 statement,
                 matcher=m.SimpleStatementLine(
-                    body=[m.ImportFrom(module=_make_importfrom_attr_matcher("pants.engine.rules"))]
+                    body=[
+                        m.ImportFrom(
+                            module=cstutil.make_importfrom_attr_matcher("pants.engine.rules")
+                        )
+                    ]
                 ),
             ):
                 rules_import_index = i + 1
                 break
 
-        self.additional_imports.append(_make_import_from("pants.engine.rules", "implicitly"))
+        self.additional_imports.append(cstutil.make_importfrom("pants.engine.rules", "implicitly"))
         additional_import_statements = [
             cst.SimpleStatementLine(body=[i]) for i in self.additional_imports
         ]
@@ -428,10 +438,10 @@ class CallByNameSyntaxMapper:
             func=cst.Name(new_function),
             args=[cst.Arg(value=cst.Call(cst.Name("implicitly")), star="**")],
         )
-        if called_func := _get_call_from_module(module, new_function):
-            new_call = remove_unused_implicitly(new_call, called_func)
+        if called_funcdef := cstutil.extract_functiondef_from_module(module, new_function):
+            new_call = remove_unused_implicitly(new_call, called_funcdef)
 
-        imports = [_make_import_from(module, new_function)]
+        imports = [cstutil.make_importfrom(module, new_function)]
         return new_call, imports
 
     def map_long_form_get_to_new_syntax(
@@ -474,7 +484,7 @@ class CallByNameSyntaxMapper:
             ],
         )
 
-        imports = [_make_import_from(module, new_function)]
+        imports = [cstutil.make_importfrom(module, new_function)]
         return new_call, imports
 
     def map_short_form_get_to_new_syntax(
@@ -502,7 +512,7 @@ class CallByNameSyntaxMapper:
                 cst.Arg(value=cst.Call(cst.Name("implicitly")), star="**"),
             ],
         )
-        imports = [_make_import_from(module, new_function)]
+        imports = [cstutil.make_importfrom(module, new_function)]
         return new_call, imports
 
     def map_dict_form_get_to_new_syntax(
@@ -537,5 +547,29 @@ class CallByNameSyntaxMapper:
             ],
         )
 
-        imports = [_make_import_from(module, new_function)]
+        imports = [cstutil.make_importfrom(module, new_function)]
         return new_call, imports
+
+
+# ------------------------------------------------------------------------------------------
+# Implicity helpers
+# ------------------------------------------------------------------------------------------
+
+
+def remove_unused_implicitly(call: cst.Call, called_func: cst.FunctionDef) -> cst.Call:
+    """The CallByNameSyntaxMapper aggressively adds `implicitly` for safety. This function removes
+    unnecessary ones.
+
+    The following cases are handled:
+    - The called function takes no arguments
+    - TODO: The called function takes the same number of arguments that are passed to it
+    - TODO: Check the types of the passed in parameters, if they don't match, they need to be implicitly passed
+    """
+    call_func_name = cst.ensure_type(call.func, cst.Name).value
+    if call_func_name != called_func.name.value:
+        return call
+
+    called_params = len(called_func.params.params)
+    if called_params == 0:
+        return call.with_changes(args=[])
+    return call
