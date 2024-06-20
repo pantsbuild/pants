@@ -552,7 +552,14 @@ async def run_adhoc_process(
     return AdhocProcessResult(result, adjusted)
 
 
-async def compute_workspace_invalidation_hash(path_globs: PathGlobs) -> str:
+# Compute a stable hash value for a `PathMetadata` since the hash value should be stable when used outside the process.
+# (for example, in the cache). The `__hash__` dunder method computes an unstable hash
+# which can and does vary across different process invocations.
+#
+# Ultimately, this may be more of an intellectual correctness point than a necessity since this code will likely never
+# see the same `m.modified` value. It does matter, however, for a single user to see the same
+# behavior across process invocations if pantsd restarts.
+def _path_metadata_to_bytes(m: PathMetadata | None) -> bytes:
     # Helper to convert a PathMetadataKind to an integer.
     def kind_to_int(kind: PathMetadataKind) -> int:
         if kind == PathMetadataKind.FILE:
@@ -564,29 +571,23 @@ async def compute_workspace_invalidation_hash(path_globs: PathGlobs) -> str:
         else:
             raise TypeError(f"Unable to discriminate instance of `PathMetadataKind`: {repr(kind)}")
 
-    # Compute a stable hash value for a `PathMetadata` since the hash value should be stable when used outside the process.
-    # (for example, in the cache). The `__hash__` dunder method computes an unstable hash
-    # which can and does vary across different process invocations.)
-    #
-    # Ultimately, this may be more of an intellectual correctness point than a necessity since this code will likely never
-    # see the same `m.modified` value. It does matter, however, for a single user to see the same
-    # behavior across process invocations if pantsd restarts.
-    def stable_metadata_bytes(m: PathMetadata | None) -> bytes:
-        if m is None:
-            return b""
+    if m is None:
+        return b""
 
-        return struct.pack(
-            "sBQBIsss",
-            m.path,
-            kind_to_int(m.kind),
-            m.length,
-            1 if m.is_executable else 0,
-            m.unix_mode if m.unix_mode is not None else 0,
-            m.created.isoformat() if m.created is not None else "",
-            m.modified.isoformat() if m.modified is not None else "",
-            m.symlink_target if m.symlink_target else "",
-        )
+    return struct.pack(
+        "sBQBIsss",
+        m.path.encode(),
+        kind_to_int(m.kind),
+        m.length,
+        1 if m.is_executable else 0,
+        m.unix_mode if m.unix_mode is not None else 0,
+        (m.created.isoformat() if m.created is not None else "").encode(),
+        (m.modified.isoformat() if m.modified is not None else "").encode(),
+        (m.symlink_target if m.symlink_target else "").encode(),
+    )
 
+
+async def compute_workspace_invalidation_hash(path_globs: PathGlobs) -> str:
     raw_paths = await Get(Paths, PathGlobs, path_globs)
     paths = sorted([*raw_paths.files, *raw_paths.dirs])
     metadata_results = await MultiGet(
@@ -598,7 +599,7 @@ async def compute_workspace_invalidation_hash(path_globs: PathGlobs) -> str:
     # a third party dependency.
     h = hashlib.sha256()
     for mr in metadata_results:
-        h.update(stable_metadata_bytes(mr.metadata))
+        h.update(_path_metadata_to_bytes(mr.metadata))
     return h.hexdigest()
 
 
