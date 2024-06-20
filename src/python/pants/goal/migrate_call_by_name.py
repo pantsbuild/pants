@@ -9,9 +9,10 @@ import logging
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path, PurePath
-from typing import Callable, TypedDict, Union
+from typing import Callable, Iterable, TypedDict, Union
 
 import libcst as cst
+import libcst.metadata
 import libcst.matchers as m
 from libcst.display import dump
 
@@ -224,23 +225,34 @@ class Replacement:
         cst_module = _make_importfrom_attr(self.module)
         return [i for i in self.additional_imports if i.module != cst_module]
 
-    # def sanitize(self, names: set[str]):
-    #     """Remove any shadowing of names, except if the new_func is in the current file."""
-    #     assert isinstance(self.new_source.func, cst.Name)
-    #     func_name = self.new_source.func.id
-    #     if func_name not in names:
-    #         return
+    def sanitize(self, unavailable_names: set[str]):
+        """Remove any shadowing of names, except if the new_func is in the current file."""
+        func_name = cst.ensure_type(self.new_source.func, cst.Name)
+        if func_name.value not in unavailable_names:
+            return
 
-    #     # If the new function is not in the sanitized imports, it must be in the current file
-    #     if not any(i.names[0].name == func_name for i in self.sanitized_imports()):
-    #         return
+        # If the new func_name is not in the sanitized imports, it must already by in the current file
+        imported_names: set[str] = set()
+        for i in self.sanitized_imports():
+            assert isinstance(i.names, Iterable)
+            for alias in i.names:
+                assert isinstance(alias.name, cst.Name)
+                imported_names.add(alias.name.value)
 
-    #     bound_name = f"{func_name}_get"
-    #     self.new_source.func.id = bound_name
-    #     for i in self.additional_imports:
-    #         if i.names[0].name == func_name:
-    #             i.names[0].asname = bound_name
-    #     logging.warning(f"Renamed {func_name} to {bound_name} to avoid shadowing")
+        if not func_name.value in imported_names:
+            return
+
+        # In-place update this replacement and additional imports
+        bound_name = f"{func_name.value}_get"
+        self.new_source = self.new_source.with_deep_changes(self.new_source.func, value=bound_name)
+        for i, imp in enumerate(self.additional_imports):
+            assert isinstance(imp.names, Iterable)
+            for import_alias in imp.names:
+                assert isinstance(import_alias.name, cst.Name)
+                if import_alias.name.value == func_name.value:
+                    self.additional_imports[i] = imp.with_changes(names=[cst.ImportAlias(func_name, asname=cst.AsName(cst.Name(bound_name)))])
+                
+        logging.warning(f"Renamed {func_name} to {bound_name} to avoid shadowing")
 
     def __str__(self) -> str:
         return f"""
@@ -286,11 +298,7 @@ class CallByNameSyntaxMapper:
     def map_get_to_new_syntax(
         self, get: cst.Call, filename: PurePath, calling_func: str
     ) -> Replacement | None:
-        """There are 4 forms of Get() syntax.
-
-        This function picks the correct one.
-        """
-
+        
         new_source: cst.Call | None = None
         imports: list[cst.ImportFrom] = []
 
@@ -302,12 +310,9 @@ class CallByNameSyntaxMapper:
         num_args = len(get.args)
 
         arg_type = None
-        if num_args == 2:
-            arg_type = type(get.args[1].value)
-            if arg_type not in [cst.Call, cst.Dict]:
-                logger.warning(f"Failed to migrate: Unknown arg type {get.args[1]}")
-                logger.warning(type(get.args[1].value))
-                return None
+        if num_args == 2 and (arg_type := type(get.args[1].value)) not in [cst.Call, cst.Dict]:
+            logger.warning(f"Failed to migrate: Unknown arg type {get.args[1]}")
+            return None
 
         try:
             new_source, imports = self.mapping[(num_args, arg_type)](get, get_deps)
@@ -328,15 +333,8 @@ class CallByNameSyntaxMapper:
     def map_no_args_get_to_new_syntax(
         self, get: cst.Call, deps: list[RuleGraphGetDep]
     ) -> tuple[cst.Call, list[cst.ImportFrom]]:
-        """Map the no-args form of Get() to the new syntax.
+        """Get(<OutputType>) => the_rule_to_call(**implicitly())"""
 
-        The expected mapping is roughly:
-        Get(<OutputType>) => the_rule_to_call(**implicitly())
-
-        This form expects that the `get` call has exactly 1 arg (otherwise, a different form would be used)
-        """
-
-        logger.debug(dump(get))
         output_type = cst.ensure_type(get.args[0].value, cst.Name).value
 
         dep = next(
@@ -359,13 +357,7 @@ class CallByNameSyntaxMapper:
     def map_long_form_get_to_new_syntax(
         self, get: cst.Call, deps: list[RuleGraphGetDep]
     ) -> tuple[cst.Call, list[cst.ImportFrom]]:
-        """Map the long form of Get() to the new syntax.
-
-        The expected mapping is roughly:
-        Get(<OutputType>, <InputType>, input) => the_rule_to_call(**implicitly(input))
-
-        This form expects that the `get` call has exactly 3 args (otherwise, a different form would be used)
-        """
+        """Get(<OutputType>, <InputType>, input) => the_rule_to_call(**implicitly(input)) """
 
         logger.debug(dump(get))
         output_type = cst.ensure_type(get.args[0].value, cst.Name).value
@@ -409,15 +401,8 @@ class CallByNameSyntaxMapper:
     def map_short_form_get_to_new_syntax(
         self, get: cst.Call, deps: list[RuleGraphGetDep]
     ) -> tuple[cst.Call, list[cst.ImportFrom]]:
-        """Map the short form of Get() to the new syntax.
+        """Get(<OutputType>, <InputType>(<constructor args for input>)) => the_rule_to_call(input, **implicitly())"""
 
-        The expected mapping is roughly:
-        Get(<OutputType>, <InputType>(<constructor args for input>)) => the_rule_to_call(input, **implicitly())
-
-        This form expects that the `get` call has exactly 2 args (otherwise, a different form would be used)
-        """
-
-        logger.debug(dump(get))
         output_type = cst.ensure_type(get.args[0].value, cst.Name).value
         input_call = cst.ensure_type(get.args[1].value, cst.Call)
         input_type = cst.ensure_type(input_call.func, cst.Name).value
@@ -444,15 +429,8 @@ class CallByNameSyntaxMapper:
     def map_dict_form_get_to_new_syntax(
         self, get: cst.Call, deps: list[RuleGraphGetDep]
     ) -> tuple[cst.Call, list[cst.ImportFrom]]:
-        """Map the dict form of Get() to the new syntax.
+        """Get(<OutputType>, {input1: <Input1Type>, ..inputN: <InputNType>}) => the_rule_to_call(**implicitly(input))"""
 
-        The expected mapping is roughly:
-        Get(<OutputType>, {input1: <Input1Type>, ..inputN: <InputNType>}) => the_rule_to_call(**implicitly(input))
-
-        This form expects that the `get` call has exactly 2 args (otherwise, a different form would be used)
-        """
-
-        logger.debug(dump(get))
         output_type = cst.ensure_type(get.args[0].value, cst.Name).value
         input_dict = cst.ensure_type(get.args[1].value, cst.Dict)
         input_types = {
@@ -484,7 +462,7 @@ class CallByNameSyntaxMapper:
 
 
 # ------------------------------------------------------------------------------------------
-# Call-by-name visitor
+# Call-by-name transformer
 # ------------------------------------------------------------------------------------------
 
 
@@ -496,6 +474,7 @@ class CallByNameTransformer(m.MatcherDecoratableTransformer):
         self.syntax_mapper = syntax_mapper
         self.calling_function: str = ""
         self.additional_imports: list[cst.ImportFrom] = []
+        self.unavailable_names: set[str] = set()
 
     def visit_FunctionDef(self, node: cst.FunctionDef) -> None:
         self.calling_function = node.name.value
@@ -513,14 +492,20 @@ class CallByNameTransformer(m.MatcherDecoratableTransformer):
         )
         if not replacement:
             return updated_node
-
-        # TODO: Should we update_node.with_changes? As we're replacing the entire Call, doesn't matter?
+        
+        replacement.sanitize(self.unavailable_names)
         self.additional_imports.extend(replacement.sanitized_imports())
         return replacement.new_source
 
     @m.leave(m.Name("MultiGet"))
     def handle_multiget(self, original_node: cst.Name, updated_node: cst.Name) -> cst.Name:
         return updated_node.with_changes(value="concurrently")
+
+    def visit_Module(self, node: cst.Module):
+        """Collect all names we risk shadowing"""
+        wrapper = libcst.metadata.MetadataWrapper(module=node)
+        scopes = set(wrapper.resolve(libcst.metadata.ScopeProvider).values())
+        self.unavailable_names = {assignment.name for scope in scopes if scope for assignment in scope.assignments}
 
     def leave_Module(self, original_node: cst.Module, updated_node: cst.Module) -> cst.Module:
         if not self.additional_imports:
