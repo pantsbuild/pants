@@ -393,7 +393,7 @@ class CallByNameSyntaxMapper:
         imports: list[cst.ImportFrom] = []
 
         if not (graph_item := self._get_graph_item(filename, calling_func)):
-            logger.warning(f"Failed to find dependencies for {filename} {calling_func}")
+            logger.warning(f"Failed to find dependencies for {calling_func} in {filename}")
             return None
 
         get_deps = graph_item["gets"]

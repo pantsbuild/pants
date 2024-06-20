@@ -83,6 +83,7 @@ RULES1_FILE = dedent(
     from pants.engine.rules import collect_rules, Get, MultiGet, rule
     from pants.engine.target import AllTargets
 
+    # TODO: Not handled by rule-graph
     async def non_annotated_rule_helpers():
         await Get(
             VenvPex,
@@ -179,8 +180,14 @@ MIGRATED_RULES1_FILE = dedent(
     from pants.engine.rules import implicitly
     from pants.engine.target import AllTargets
 
+    # TODO: Not handled by rule-graph
     async def non_annotated_rule_helpers():
-        await create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
+        await Get(
+            VenvPex,
+            PexRequest,
+            # Some comment that the AST parse wipes out, but CST should keep
+            black.to_pex_request()
+        )
 
     class Foo:
         pass
