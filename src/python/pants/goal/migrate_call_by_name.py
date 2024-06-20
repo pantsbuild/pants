@@ -234,9 +234,9 @@ class Replacement:
 
         # If the new func_name is not in the sanitized imports, it must already be in the current file
         imported_names: set[str] = set()
-        for i in self.sanitized_imports():
-            assert isinstance(i.names, Iterable)
-            for import_alias in i.names:
+        for imp in self.sanitized_imports():
+            assert isinstance(imp.names, Iterable)
+            for import_alias in imp.names:
                 alias_name = cst.ensure_type(import_alias.name, cst.Name)
                 imported_names.add(alias_name.value)
 
@@ -405,7 +405,7 @@ class CallByNameSyntaxMapper:
             return None
 
         try:
-            new_source, imports = self.mapping[(num_args, arg_type)](get, get_deps)
+            new_source, imports = self.mapping[(num_args, arg_type)](get, get_deps)  # type: ignore
         except Exception as e:
             logger.warning(
                 f"Failed to migrate Get ({num_args}, {arg_type}) in {filename}:{calling_func} due to: {e}\n"
