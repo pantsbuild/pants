@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -14,8 +15,10 @@ from pants.backend.helm.dependency_inference.deployment import (
     FirstPartyHelmDeploymentMapping,
     FirstPartyHelmDeploymentMappingRequest,
     HelmDeploymentReport,
+    ImageReferenceResolver,
     InferHelmDeploymentDependenciesRequest,
 )
+from pants.backend.helm.dependency_inference.subsystem import HelmInferSubsystem
 from pants.backend.helm.target_types import (
     HelmChartTarget,
     HelmDeploymentFieldSet,
@@ -29,12 +32,14 @@ from pants.backend.helm.testutil import (
 )
 from pants.backend.helm.util_rules import chart, tool
 from pants.backend.python.util_rules import pex
+from pants.build_graph.address import MaybeAddress, ResolveError
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
 from pants.engine import process
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import rules as graph_rules
 from pants.engine.rules import QueryRule
 from pants.engine.target import InferredDependencies
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
 
@@ -194,6 +199,7 @@ def test_resolve_relative_docker_addresses_to_deployment(
                         "container.image_ref1": "//src/deployment:{target_name}1",  # absolute target
                         "container.image_ref2": "./subdir:{target_name}2",  # target in subdir
                         "container.image_ref3": "busybox:latest",  # a normal docker container
+                        "container.image_ref_4": "./baddir:{target_name}",
                     }}
                 )
                 """
@@ -229,6 +235,72 @@ def test_resolve_relative_docker_addresses_to_deployment(
     else:
         expected = []
         assert list(mapping.indexed_docker_addresses.values()) == expected
+
+
+def test_resolving_docker_image() -> None:
+    resolver = ImageReferenceResolver(
+        create_subsystem(HelmInferSubsystem, third_party_docker_images=["busybox"]),
+        {
+            "busybox:latest": MaybeAddress(val=ResolveError("short error")),
+            "python:latest": MaybeAddress(val=ResolveError("short error")),
+            "testprojects/src/helm/deployment:myapp": MaybeAddress(
+                val=Address("testprojects/src/helm/deployment", target_name="myapp")
+            ),
+            "testprojects/src/helm/deployment/myapp:1.0.0": MaybeAddress(
+                val=ResolveError("short error")
+            ),
+            "testprojects/src/helm/deployment:myaapp": MaybeAddress(
+                val=Address("testprojects/src/helm/deployment", target_name="myaapp")
+            ),
+            "//testprojects/src/helm/deployment/oops:docker": MaybeAddress(
+                val=ResolveError("short error")
+            ),
+            "testprojects/src/helm/deployment:file": MaybeAddress(val=Address("testprojects/src/helm/deployment", target_name="file")),
+        },
+        {
+            Address("testprojects/src/helm/deployment", target_name="myapp"),
+        },
+    )
+    resolver._handle_missing_docker_image = MagicMock(return_value=None)
+
+    errors_count = 0
+
+    try:
+        assert (
+            resolver.image_ref_to_actual_address("busybox:latest") == None
+        ), "image in known 3rd party should have no resolution"
+
+        assert (
+            resolver.image_ref_to_actual_address("python:latest") == None
+        ), "image not in known 3rd party should have no resolution"
+        errors_count += 1
+        assert resolver._handle_missing_docker_image.call_count == errors_count
+
+        assert resolver.image_ref_to_actual_address("testprojects/src/helm/deployment:myapp") == (
+            "testprojects/src/helm/deployment:myapp",
+            Address("testprojects/src/helm/deployment", target_name="myapp"),
+        ), "A valid target should resolve correctly"
+
+        assert (
+            resolver.image_ref_to_actual_address("testprojects/src/helm/deployment/myapp:1.0.0") == None
+        ), "an invalid target that looks like a normal target should not resolve"
+        errors_count += 1
+        assert resolver._handle_missing_docker_image.call_count == errors_count
+
+        assert (
+            resolver.image_ref_to_actual_address("//testprojects/src/helm/deployment/oops:docker") == None, "something that is obviously a Pants target that isn't found should not resolve"
+        )
+        errors_count += 1
+        assert resolver._handle_missing_docker_image.call_count == errors_count
+
+        assert(
+            resolver.image_ref_to_actual_address("testprojects/src/helm/deployment:file") == None
+        ), "a target which is not a docker_image should not resolve"
+        errors_count += 1
+        assert resolver._handle_missing_docker_image.call_count == errors_count
+    except AssertionError:
+        print(resolver._handle_missing_docker_image.call_args_list)
+        raise
 
 
 def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
