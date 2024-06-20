@@ -5,6 +5,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use itertools::Itertools;
 use pyo3::basic::CompareOp;
@@ -29,6 +30,8 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
     m.add_class::<PyAddPrefix>()?;
     m.add_class::<PyRemovePrefix>()?;
     m.add_class::<PyFilespecMatcher>()?;
+    m.add_class::<PyPathMetadataKind>()?;
+    m.add_class::<PyPathMetadata>()?;
 
     m.add("EMPTY_DIGEST", PyDigest(EMPTY_DIRECTORY_DIGEST.clone()))?;
     m.add("EMPTY_FILE_DIGEST", PyFileDigest(EMPTY_DIGEST))?;
@@ -466,6 +469,86 @@ impl PyFilespecMatcher {
                 .filter(|p| self.0.matches(Path::new(p)))
                 .collect())
         })
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Path Metadata
+// -----------------------------------------------------------------------------
+
+/// The kind of path (e.g., file, directory, symlink) as identified in `PathMetadata`
+#[pyclass(name = "PathMetadataKind", rename_all = "UPPERCASE")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PyPathMetadataKind {
+    File,
+    Directory,
+    Symlink,
+}
+
+impl From<fs::PathMetadataKind> for PyPathMetadataKind {
+    fn from(value: fs::PathMetadataKind) -> Self {
+        match value {
+            fs::PathMetadataKind::File => PyPathMetadataKind::File,
+            fs::PathMetadataKind::Directory => PyPathMetadataKind::Directory,
+            fs::PathMetadataKind::Symlink => PyPathMetadataKind::Symlink,
+        }
+    }
+}
+
+/// Expanded version of `Stat` when access to additional filesystem attributes is necessary.
+#[pyclass(name = "PathMetadata")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PyPathMetadata(pub fs::PathMetadata);
+
+#[pymethods]
+impl PyPathMetadata {
+    #[getter]
+    pub fn path(&self) -> PyResult<PathBuf> {
+        Ok(self.0.path.clone())
+    }
+
+    #[getter]
+    pub fn kind(&self) -> PyResult<PyPathMetadataKind> {
+        Ok(PyPathMetadataKind::from(self.0.kind))
+    }
+
+    #[getter]
+    pub fn length(&self) -> PyResult<u64> {
+        Ok(self.0.length)
+    }
+
+    #[getter]
+    pub fn is_executable(&self) -> PyResult<bool> {
+        Ok(self.0.is_executable)
+    }
+
+    #[getter]
+    pub fn unix_mode(&self) -> PyResult<Option<u32>> {
+        Ok(self.0.unix_mode)
+    }
+
+    #[getter]
+    pub fn accessed(&self) -> PyResult<Option<SystemTime>> {
+        Ok(self.0.accessed)
+    }
+
+    #[getter]
+    pub fn created(&self) -> PyResult<Option<SystemTime>> {
+        Ok(self.0.created)
+    }
+
+    #[getter]
+    pub fn modified(&self) -> PyResult<Option<SystemTime>> {
+        Ok(self.0.modified)
+    }
+
+    #[getter]
+    pub fn symlink_target(&self) -> PyResult<Option<PathBuf>> {
+        Ok(self.0.symlink_target.clone())
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{:?}", self.0)
     }
 }
 
