@@ -826,16 +826,12 @@ def test_build_pex_description(rule_runner: RuleRunner) -> None:
             requirements=requirements,
             description=description,
         )
-        req_strings = (
-            requirements.req_strings_or_addrs if isinstance(requirements, PexRequirements) else []
-        )
-        assert (
-            run_rule_with_mocks(
-                _build_pex_description,
-                rule_args=[request, req_strings, {}],
-            )
-            == expected
-        )
+        req_strings = []
+        if isinstance(requirements, PexRequirements):
+            for s in requirements.req_strings_or_addrs:
+                assert isinstance(s, str)
+                req_strings.append(s)
+        assert _build_pex_description(request, req_strings, {}) == expected
 
     repo_pex = Pex(EMPTY_DIGEST, "repo.pex", None)
 
