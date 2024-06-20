@@ -19,6 +19,7 @@ def make_importfrom(module: str, func: str) -> cst.ImportFrom:
         module=make_importfrom_attr(module), names=[cst.ImportAlias(cst.Name(func))]
     )
 
+
 def make_importfrom_attr(module: str) -> cst.Attribute | cst.Name:
     """Generates a cst.Attribute or cst.Name from a module string."""
     parts = module.split(".")
