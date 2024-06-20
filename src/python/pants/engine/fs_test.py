@@ -11,6 +11,7 @@ import socket
 import ssl
 import tarfile
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
@@ -1508,6 +1509,29 @@ def test_snapshot_diff(
     assert diff.changed_files == expected_diff.changed_files
 
 
+@contextmanager
+def retry_assertions(n: int, sleep_duration: float = 0.05):
+    """Retry the inner block if any assertions failed.
+
+    This is used to handle any failures resulting from an external system not fully processing
+    certain events as expected.
+    """
+    last_exception: BaseException | None = None
+
+    while n > 0:
+        try:
+            yield
+            break
+        except AssertionError as e:
+            last_exception = e
+            n -= 1
+            time.sleep(sleep_duration)
+            sleep_duration *= 2
+
+    assert last_exception is not None
+    raise last_exception
+
+
 def test_path_metadata_request(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -1531,9 +1555,9 @@ def test_path_metadata_request(rule_runner: RuleRunner) -> None:
     m2 = get_metadata("not-found")
     assert m2 is None
     (Path(rule_runner.build_root) / "not-found").write_bytes(b"is found")
-    time.sleep(0.250)
-    m3 = get_metadata("not-found")
-    assert m3 is not None
+    with retry_assertions(3):
+        m3 = get_metadata("not-found")
+        assert m3 is not None
 
     m4 = get_metadata("bar")
     assert m4 is not None
