@@ -533,18 +533,18 @@ impl PyPathMetadata {
     }
 
     #[getter]
-    pub fn accessed_time(&self) -> PyResult<Option<SystemTime>> {
-        Ok(self.0.accessed_time)
+    pub fn accessed(&self) -> PyResult<Option<SystemTime>> {
+        Ok(self.0.accessed)
     }
 
     #[getter]
-    pub fn created_time(&self) -> PyResult<Option<SystemTime>> {
-        Ok(self.0.created_time)
+    pub fn created(&self) -> PyResult<Option<SystemTime>> {
+        Ok(self.0.created)
     }
 
     #[getter]
-    pub fn modification_time(&self) -> PyResult<Option<SystemTime>> {
-        Ok(self.0.modification_time)
+    pub fn modified(&self) -> PyResult<Option<SystemTime>> {
+        Ok(self.0.modified)
     }
 
     #[getter]

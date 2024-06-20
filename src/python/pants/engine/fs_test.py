@@ -1508,7 +1508,7 @@ def test_snapshot_diff(
     assert diff.changed_files == expected_diff.changed_files
 
 
-def retry_failed_assertions(callable: Callable[[], Any], n: int, sleep_duration: float = 0.05):
+def retry_failed_assertions(callable: Callable[[], Any], n: int, sleep_duration: float = 0.05) -> None:
     """Retry the callable if any assertions failed.
 
     This is used to handle any failures resulting from an external system not fully processing
@@ -1554,7 +1554,7 @@ def test_path_metadata_request(rule_runner: RuleRunner) -> None:
     assert m2 is None
     (Path(rule_runner.build_root) / "not-found").write_bytes(b"is found")
 
-    def check_metadata_exists():
+    def check_metadata_exists() -> None:
         m3 = get_metadata("not-found")
         assert m3 is not None
 

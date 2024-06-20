@@ -267,13 +267,13 @@ pub struct PathMetadata {
     pub unix_mode: Option<u32>,
 
     /// Modification time of the path (if available).
-    pub accessed_time: Option<SystemTime>,
+    pub accessed: Option<SystemTime>,
 
     /// Modification time of the path (if available).
-    pub created_time: Option<SystemTime>,
+    pub created: Option<SystemTime>,
 
     /// Modification time of the path (if available).
-    pub modification_time: Option<SystemTime>,
+    pub modified: Option<SystemTime>,
 
     /// Symlink target
     pub symlink_target: Option<PathBuf>,
@@ -299,9 +299,9 @@ impl PathMetadata {
             is_executable,
             read_only,
             unix_mode,
-            accessed_time,
-            created_time,
-            modification_time,
+            accessed: accessed_time,
+            created: created_time,
+            modified: modification_time,
             symlink_target,
         }
     }

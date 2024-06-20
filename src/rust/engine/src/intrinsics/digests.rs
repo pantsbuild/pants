@@ -15,7 +15,9 @@ use pyo3::IntoPy;
 use store::{SnapshotOps, SubsetParams};
 
 use crate::externs;
-use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyMergeDigests, PyPathMetadata, PyRemovePrefix};
+use crate::externs::fs::{
+    PyAddPrefix, PyFileDigest, PyMergeDigests, PyPathMetadata, PyRemovePrefix,
+};
 use crate::externs::PyGeneratorResponseNativeCall;
 use crate::nodes::{
     lift_directory_digest, task_get_context, unmatched_globs_additional_context, DownloadedFile,
