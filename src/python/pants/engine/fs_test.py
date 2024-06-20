@@ -1521,7 +1521,7 @@ def retry_assertions(n: int, sleep_duration: float = 0.05):
     while n > 0:
         try:
             yield
-            break
+            return
         except AssertionError as e:
             last_exception = e
             n -= 1
