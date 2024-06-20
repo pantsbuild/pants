@@ -12,8 +12,8 @@ from pathlib import Path, PurePath
 from typing import Callable, Iterable, TypedDict, Union
 
 import libcst as cst
-import libcst.metadata
 import libcst.matchers as m
+import libcst.metadata
 from libcst.display import dump
 
 from pants.base.build_environment import get_buildroot
@@ -102,16 +102,13 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
             logger.info(f"Processing {file}")
 
             transformer = CallByNameTransformer(file, syntax_mapper)
-            with open(file) as f:
-                logging.info(f"Processing {file}")
-                source_code = f.read()
-                tree = cst.parse_module(source_code)
-                new_tree = tree.visit(transformer)
-                new_source = new_tree.code
+            source_code = Path.read_text(file)
+            source_tree = cst.parse_module(source_code)
+            new_tree = source_tree.visit(transformer)
 
-                if not tree.deep_equals(new_tree):
-                    with open(file, "w") as f:
-                        f.write(new_source)
+            if not new_tree.deep_equals(source_tree):
+                new_source = new_tree.code
+                Path.write_text(file, new_source)
 
         return PANTS_SUCCEEDED_EXIT_CODE
 
@@ -239,7 +236,7 @@ class Replacement:
                 assert isinstance(alias.name, cst.Name)
                 imported_names.add(alias.name.value)
 
-        if not func_name.value in imported_names:
+        if func_name.value not in imported_names:
             return
 
         # In-place update this replacement and additional imports
@@ -250,8 +247,10 @@ class Replacement:
             for import_alias in imp.names:
                 assert isinstance(import_alias.name, cst.Name)
                 if import_alias.name.value == func_name.value:
-                    self.additional_imports[i] = imp.with_changes(names=[cst.ImportAlias(func_name, asname=cst.AsName(cst.Name(bound_name)))])
-                
+                    self.additional_imports[i] = imp.with_changes(
+                        names=[cst.ImportAlias(func_name, asname=cst.AsName(cst.Name(bound_name)))]
+                    )
+
         logging.warning(f"Renamed {func_name} to {bound_name} to avoid shadowing")
 
     def __str__(self) -> str:
@@ -264,6 +263,88 @@ class Replacement:
             additional_imports={[dump(i) for i in self.additional_imports]},
         )
         """
+
+
+# ------------------------------------------------------------------------------------------
+# Call-by-name transformer
+# ------------------------------------------------------------------------------------------
+
+
+class CallByNameTransformer(m.MatcherDecoratableTransformer):
+    def __init__(self, filename: PurePath, syntax_mapper: CallByNameSyntaxMapper) -> None:
+        super().__init__()
+
+        self.filename = filename
+        self.syntax_mapper = syntax_mapper
+        self.calling_function: str = ""
+        self.additional_imports: list[cst.ImportFrom] = []
+        self.unavailable_names: set[str] = set()
+
+    def visit_FunctionDef(self, node: cst.FunctionDef) -> None:
+        self.calling_function = node.name.value
+
+    def leave_FunctionDef(
+        self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef
+    ) -> cst.FunctionDef:
+        self.calling_function = ""
+        return updated_node
+
+    @m.leave(m.Call(func=m.Name("Get")))
+    def handle_get(self, original_node: cst.Call, updated_node: cst.Call) -> cst.Call:
+        replacement = self.syntax_mapper.map_get_to_new_syntax(
+            original_node, self.filename, self.calling_function
+        )
+        if not replacement:
+            return updated_node
+
+        replacement.sanitize(self.unavailable_names)
+        self.additional_imports.extend(replacement.sanitized_imports())
+        return replacement.new_source
+
+    @m.leave(m.Name("MultiGet"))
+    def handle_multiget(self, original_node: cst.Name, updated_node: cst.Name) -> cst.Name:
+        return updated_node.with_changes(value="concurrently")
+
+    def visit_Module(self, node: cst.Module):
+        """Collect all names we risk shadowing."""
+        wrapper = libcst.metadata.MetadataWrapper(module=node)
+        scopes = set(wrapper.resolve(libcst.metadata.ScopeProvider).values())
+        self.unavailable_names = {
+            assignment.name for scope in scopes if scope for assignment in scope.assignments
+        }
+
+    def leave_Module(self, original_node: cst.Module, updated_node: cst.Module) -> cst.Module:
+        if not self.additional_imports:
+            return updated_node
+
+        rules_import_index = 1
+        for i, statement in enumerate(updated_node.body):
+            if m.matches(
+                statement,
+                matcher=m.SimpleStatementLine(
+                    body=[m.ImportFrom(module=_make_importfrom_attr_matcher("pants.engine.rules"))]
+                ),
+            ):
+                rules_import_index = i + 1
+                break
+
+        self.additional_imports.append(_make_import_from("pants.engine.rules", "implicitly"))
+        additional_import_statements = [
+            cst.SimpleStatementLine(body=[i]) for i in self.additional_imports
+        ]
+        additional_import_statements = [
+            v1
+            for i, v1 in enumerate(additional_import_statements)
+            if not any(v1.deep_equals(v2) for v2 in additional_import_statements[:i])
+        ]
+
+        return updated_node.with_changes(
+            body=[
+                *updated_node.body[:rules_import_index],
+                *additional_import_statements,
+                *updated_node.body[rules_import_index:],
+            ]
+        )
 
 
 # ------------------------------------------------------------------------------------------
@@ -298,7 +379,6 @@ class CallByNameSyntaxMapper:
     def map_get_to_new_syntax(
         self, get: cst.Call, filename: PurePath, calling_func: str
     ) -> Replacement | None:
-        
         new_source: cst.Call | None = None
         imports: list[cst.ImportFrom] = []
 
@@ -357,9 +437,8 @@ class CallByNameSyntaxMapper:
     def map_long_form_get_to_new_syntax(
         self, get: cst.Call, deps: list[RuleGraphGetDep]
     ) -> tuple[cst.Call, list[cst.ImportFrom]]:
-        """Get(<OutputType>, <InputType>, input) => the_rule_to_call(**implicitly(input)) """
+        """Get(<OutputType>, <InputType>, input) => the_rule_to_call(**implicitly(input))"""
 
-        logger.debug(dump(get))
         output_type = cst.ensure_type(get.args[0].value, cst.Name).value
         input_type = cst.ensure_type(get.args[1].value, cst.Name).value
 
@@ -401,7 +480,7 @@ class CallByNameSyntaxMapper:
     def map_short_form_get_to_new_syntax(
         self, get: cst.Call, deps: list[RuleGraphGetDep]
     ) -> tuple[cst.Call, list[cst.ImportFrom]]:
-        """Get(<OutputType>, <InputType>(<constructor args for input>)) => the_rule_to_call(input, **implicitly())"""
+        """Get(<OutType>, <InputType>(<input args>)) => the_rule_to_call(input, **implicitly())"""
 
         output_type = cst.ensure_type(get.args[0].value, cst.Name).value
         input_call = cst.ensure_type(get.args[1].value, cst.Call)
@@ -429,7 +508,8 @@ class CallByNameSyntaxMapper:
     def map_dict_form_get_to_new_syntax(
         self, get: cst.Call, deps: list[RuleGraphGetDep]
     ) -> tuple[cst.Call, list[cst.ImportFrom]]:
-        """Get(<OutputType>, {input1: <Input1Type>, ..inputN: <InputNType>}) => the_rule_to_call(**implicitly(input))"""
+        """Get(<OutputType>, {input1: <Input1Type>, ..inputN: <InputNType>}) =>
+        the_rule_to_call(**implicitly(input))"""
 
         output_type = cst.ensure_type(get.args[0].value, cst.Name).value
         input_dict = cst.ensure_type(get.args[1].value, cst.Dict)
@@ -459,149 +539,3 @@ class CallByNameSyntaxMapper:
 
         imports = [_make_import_from(module, new_function)]
         return new_call, imports
-
-
-# ------------------------------------------------------------------------------------------
-# Call-by-name transformer
-# ------------------------------------------------------------------------------------------
-
-
-class CallByNameTransformer(m.MatcherDecoratableTransformer):
-    def __init__(self, filename: PurePath, syntax_mapper: CallByNameSyntaxMapper) -> None:
-        super().__init__()
-
-        self.filename = filename
-        self.syntax_mapper = syntax_mapper
-        self.calling_function: str = ""
-        self.additional_imports: list[cst.ImportFrom] = []
-        self.unavailable_names: set[str] = set()
-
-    def visit_FunctionDef(self, node: cst.FunctionDef) -> None:
-        self.calling_function = node.name.value
-
-    def leave_FunctionDef(
-        self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef
-    ) -> cst.FunctionDef:
-        self.calling_function = ""
-        return updated_node
-
-    @m.leave(m.Call(func=m.Name("Get")))
-    def handle_get(self, original_node: cst.Call, updated_node: cst.Call) -> cst.Call:
-        replacement = self.syntax_mapper.map_get_to_new_syntax(
-            original_node, self.filename, self.calling_function
-        )
-        if not replacement:
-            return updated_node
-        
-        replacement.sanitize(self.unavailable_names)
-        self.additional_imports.extend(replacement.sanitized_imports())
-        return replacement.new_source
-
-    @m.leave(m.Name("MultiGet"))
-    def handle_multiget(self, original_node: cst.Name, updated_node: cst.Name) -> cst.Name:
-        return updated_node.with_changes(value="concurrently")
-
-    def visit_Module(self, node: cst.Module):
-        """Collect all names we risk shadowing"""
-        wrapper = libcst.metadata.MetadataWrapper(module=node)
-        scopes = set(wrapper.resolve(libcst.metadata.ScopeProvider).values())
-        self.unavailable_names = {assignment.name for scope in scopes if scope for assignment in scope.assignments}
-
-    def leave_Module(self, original_node: cst.Module, updated_node: cst.Module) -> cst.Module:
-        if not self.additional_imports:
-            return updated_node
-
-        rules_import_index = 1
-        for i, statement in enumerate(updated_node.body):
-            if m.matches(
-                statement,
-                matcher=m.SimpleStatementLine(
-                    body=[m.ImportFrom(module=_make_import_from_1("pants.engine.rules"))]
-                ),
-            ):
-                rules_import_index = i + 1
-                break
-
-        self.additional_imports.append(_make_import_from("pants.engine.rules", "implicitly"))
-        additional_import_statements = [
-            cst.SimpleStatementLine(body=[i]) for i in self.additional_imports
-        ]
-        additional_import_statements = [
-            v1
-            for i, v1 in enumerate(additional_import_statements)
-            if not any(v1.deep_equals(v2) for v2 in additional_import_statements[:i])
-        ]
-
-        return updated_node.with_changes(
-            body=[
-                *updated_node.body[:rules_import_index],
-                *additional_import_statements,
-                *updated_node.body[rules_import_index:],
-            ]
-        )
-
-
-# ------------------------------------------------------------------------------------------
-# cst utilities
-# ------------------------------------------------------------------------------------------
-
-
-def _make_import_from(module: str, func: str) -> cst.ImportFrom:
-    """Manually generating ImportFrom using Attributes is tricky, parse a string instead."""
-    return cst.ImportFrom(
-        module=_make_importfrom_attr(module), names=[cst.ImportAlias(cst.Name(func))]
-    )
-
-
-def _make_importfrom_attr(module: str) -> cst.Attribute | cst.Name:
-    parts = module.split(".")
-    if len(parts) == 1:
-        return cst.Name(parts[0])
-    # Otherwise, it is an Attribute
-    partial_module = ".".join(parts[:-1])
-    return cst.Attribute(value=_make_importfrom_attr(partial_module), attr=cst.Name(parts[-1]))
-
-
-def _make_import_from_1(module: str) -> Union[m.Attribute, m.Name]:
-    """Build matcher for a module given sequence of import parts."""
-    # If only one element, it is just a Name
-    parts = module.split(".")
-    if len(parts) == 1:
-        return m.Name(parts[0])
-    # Otherwise, it is an Attribute
-    partial_module = ".".join(parts[:-1])
-    return m.Attribute(value=_make_import_from_1(partial_module), attr=m.Name(parts[-1]))
-
-
-def remove_unused_implicitly(call: cst.Call, called_func: cst.FunctionDef) -> cst.Call:
-    """The CallByNameSyntaxMapper aggressively adds `implicitly` for safety. This function removes
-    unnecessary ones.
-
-    The following cases are handled:
-    - The called function takes no arguments
-    - TODO: The called function takes the same number of arguments that are passed to it
-    - TODO: Check the types of the passed in parameters, if they don't match, they need to be implicitly passed
-    """
-    called_params = len(called_func.params.params)
-    if called_params == 0:
-        return call.with_changes(args=[])
-
-
-def _get_call_from_module(module: str, func: str) -> cst.FunctionDef | None:
-    """Open the associated file, and parse the func into a Call.
-
-    The purpose of this is to determine whether we need `implicitly` or not.
-    so perform this call as lazily as possible - rather than adding it to
-    the migration.
-    """
-    if not (spec := importlib.util.find_spec(module)):
-        logger.warning(f"Failed to find module {module}")
-        return None
-
-    assert spec.origin is not None
-
-    with open(spec.origin) as f:
-        source_code = f.read()
-        tree = cst.parse_module(source_code)
-        results = m.findall(tree, matcher=m.FunctionDef(m.Name(func)))
-        return cst.ensure_type(results[0], cst.FunctionDef) if results else None

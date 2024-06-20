@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
-import ast
 from copy import deepcopy
 from pathlib import PurePath
 from typing import Final
 
+import libcst as cst
+
+from pants.util import cstutil
 from pants.goal.migrate_call_by_name import Replacement
 
 OLD_FUNC_NAME: Final[str] = "hello"
@@ -16,13 +18,11 @@ NEW_FUNC_NAME: Final[str] = "goodbye"
 DEFAULT_REPLACEMENT: Final[Replacement] = Replacement(
     filename=PurePath("pants/foo/bar.py"),
     module="pants.foo.bar",
-    line_range=(1, 3),
-    col_range=(3, 4),
-    current_source=ast.Call(func=ast.Name(id=OLD_FUNC_NAME), args=[], keywords=[]),
-    new_source=ast.Call(func=ast.Name(id=NEW_FUNC_NAME), args=[], keywords=[]),
+    current_source=cst.Call(func=cst.Name(OLD_FUNC_NAME)),
+    new_source=cst.Call(func=cst.Name(NEW_FUNC_NAME)),
     additional_imports=[
-        ast.ImportFrom(module="pants.engine.rules", names=[ast.alias("implicitly")], level=0),
-        ast.ImportFrom(module="pants.greeting", names=[ast.alias(NEW_FUNC_NAME)], level=0),
+        cst.ImportFrom(module=cstutil.make_importfrom_attr("pants.engine.rules"), names=[ast.alias("implicitly")]),
+        cst.ImportFrom(module=cstutil.make_importfrom_attr("pants.greeting"), names=[ast.alias(NEW_FUNC_NAME)]),
     ],
 )
 
