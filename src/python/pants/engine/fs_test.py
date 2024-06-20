@@ -11,12 +11,11 @@ import socket
 import ssl
 import tarfile
 import time
-from contextlib import contextmanager
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Optional, Set, Union
+from typing import Any, Callable, Dict, Iterable, Optional, Set, Union
 
 import pytest
 
@@ -1509,9 +1508,8 @@ def test_snapshot_diff(
     assert diff.changed_files == expected_diff.changed_files
 
 
-@contextmanager
-def retry_assertions(n: int, sleep_duration: float = 0.05):
-    """Retry the inner block if any assertions failed.
+def retry_failed_assertions(callable: Callable[[], Any], n: int, sleep_duration: float = 0.05):
+    """Retry the callable if any assertions failed.
 
     This is used to handle any failures resulting from an external system not fully processing
     certain events as expected.
@@ -1520,7 +1518,7 @@ def retry_assertions(n: int, sleep_duration: float = 0.05):
 
     while n > 0:
         try:
-            yield
+            callable()
             return
         except AssertionError as e:
             last_exception = e
@@ -1555,9 +1553,12 @@ def test_path_metadata_request(rule_runner: RuleRunner) -> None:
     m2 = get_metadata("not-found")
     assert m2 is None
     (Path(rule_runner.build_root) / "not-found").write_bytes(b"is found")
-    with retry_assertions(3):
+
+    def check_metadata_exists():
         m3 = get_metadata("not-found")
         assert m3 is not None
+
+    retry_failed_assertions(check_metadata_exists, 3)
 
     m4 = get_metadata("bar")
     assert m4 is not None
