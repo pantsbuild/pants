@@ -58,6 +58,9 @@ class HelmInferSubsystem(Subsystem):
                 values={"container.image_ref": "python:3.10"},
             )
             ```
+
+            Use the value '*' to disable this check.
+            This will limit Pants's ability to warn on unknown docker images.
             """
         ),
     )
