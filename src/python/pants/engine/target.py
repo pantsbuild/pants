@@ -275,7 +275,7 @@ class Target:
     @final
     def __init__(
         self,
-        unhydrated_values: dict[str, Any],
+        unhydrated_values: Mapping[str, Any],
         address: Address,
         # NB: `union_membership` is only optional to facilitate tests. In production, we should
         # always provide this parameter. This should be safe to do because production code should
@@ -352,7 +352,7 @@ class Target:
     @final
     def _calculate_field_values(
         self,
-        unhydrated_values: dict[str, Any],
+        unhydrated_values: Mapping[str, Any],
         address: Address,
         # See `__init__`.
         union_membership: UnionMembership | None,
@@ -1199,13 +1199,13 @@ class GenerateTargetsRequest(Generic[_TargetGenerator]):
     template_address: Address
     # The `TargetGenerator.moved_field/copied_field` Field values that the generator
     # should generate targets with.
-    template: dict[str, Any] = dataclasses.field(hash=False)
+    template: Mapping[str, Any] = dataclasses.field(hash=False)
     # Per-generated-Target overrides, with an additional `template_address` to be applied. The
     # per-instance Address might not match the base `template_address` if parametrization was
     # applied within overrides.
-    overrides: dict[str, dict[Address, dict[str, Any]]] = dataclasses.field(hash=False)
+    overrides: Mapping[str, Mapping[Address, Mapping[str, Any]]] = dataclasses.field(hash=False)
 
-    def require_unparametrized_overrides(self) -> dict[str, dict[str, Any]]:
+    def require_unparametrized_overrides(self) -> dict[str, Mapping[str, Any]]:
         """Flattens overrides for `GenerateTargetsRequest` impls which don't support `parametrize`.
 
         If `parametrize` has been used in overrides, this will raise an error indicating that that is
@@ -1276,8 +1276,8 @@ def _generate_file_level_targets(
     generator: Target,
     paths: Sequence[str],
     template_address: Address,
-    template: dict[str, Any],
-    overrides: dict[str, dict[Address, dict[str, Any]]],
+    template: Mapping[str, Any],
+    overrides: Mapping[str, Mapping[Address, Mapping[str, Any]]],
     # NB: Should only ever be set to `None` in tests.
     union_membership: UnionMembership | None,
     *,
