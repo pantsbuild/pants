@@ -238,69 +238,88 @@ def test_resolve_relative_docker_addresses_to_deployment(
 
 
 def test_resolving_docker_image() -> None:
+    valid_target = "testprojects/src/helm/deployment:myapp"
+    image_with_target_name = "testprojects/src/helm/deployment/myapp:1.0.0"
+    target_not_found = "//testprojects/src/helm/deployment/oops:docker"
+    target_wrong_type = "testprojects/src/helm/deployment:file"
     resolver = ImageReferenceResolver(
         create_subsystem(HelmInferSubsystem, third_party_docker_images=["busybox"]),
         {
             "busybox:latest": MaybeAddress(val=ResolveError("short error")),
             "python:latest": MaybeAddress(val=ResolveError("short error")),
-            "testprojects/src/helm/deployment:myapp": MaybeAddress(
+            valid_target: MaybeAddress(
                 val=Address("testprojects/src/helm/deployment", target_name="myapp")
             ),
-            "testprojects/src/helm/deployment/myapp:1.0.0": MaybeAddress(
-                val=ResolveError("short error")
-            ),
+            image_with_target_name: MaybeAddress(val=ResolveError("short error")),
             "testprojects/src/helm/deployment:myaapp": MaybeAddress(
                 val=Address("testprojects/src/helm/deployment", target_name="myaapp")
             ),
-            "//testprojects/src/helm/deployment/oops:docker": MaybeAddress(
-                val=ResolveError("short error")
+            target_not_found: MaybeAddress(val=ResolveError("short error")),
+            target_wrong_type: MaybeAddress(
+                val=Address("testprojects/src/helm/deployment", target_name="file")
             ),
-            "testprojects/src/helm/deployment:file": MaybeAddress(val=Address("testprojects/src/helm/deployment", target_name="file")),
         },
         {
             Address("testprojects/src/helm/deployment", target_name="myapp"),
         },
     )
-    resolver._handle_missing_docker_image = MagicMock(return_value=None)
+    resolver._handle_missing_docker_image = MagicMock(return_value=None)  # type: ignore[method-assign]
 
     errors_count = 0
 
     try:
         assert (
-            resolver.image_ref_to_actual_address("busybox:latest") == None
+            resolver.image_ref_to_actual_address("busybox:latest") is None
         ), "image in known 3rd party should have no resolution"
 
         assert (
-            resolver.image_ref_to_actual_address("python:latest") == None
+            resolver.image_ref_to_actual_address("python:latest") is None
         ), "image not in known 3rd party should have no resolution"
         errors_count += 1
         assert resolver._handle_missing_docker_image.call_count == errors_count
 
-        assert resolver.image_ref_to_actual_address("testprojects/src/helm/deployment:myapp") == (
-            "testprojects/src/helm/deployment:myapp",
+        assert resolver.image_ref_to_actual_address(valid_target) == (
+            valid_target,
             Address("testprojects/src/helm/deployment", target_name="myapp"),
         ), "A valid target should resolve correctly"
 
         assert (
-            resolver.image_ref_to_actual_address("testprojects/src/helm/deployment/myapp:1.0.0") == None
+            resolver.image_ref_to_actual_address(image_with_target_name) is None
         ), "an invalid target that looks like a normal target should not resolve"
         errors_count += 1
         assert resolver._handle_missing_docker_image.call_count == errors_count
 
         assert (
-            resolver.image_ref_to_actual_address("//testprojects/src/helm/deployment/oops:docker") == None, "something that is obviously a Pants target that isn't found should not resolve"
-        )
+            resolver.image_ref_to_actual_address(target_not_found) is None
+        ), "something that is obviously a Pants target that isn't found should not resolve"
         errors_count += 1
         assert resolver._handle_missing_docker_image.call_count == errors_count
 
-        assert(
-            resolver.image_ref_to_actual_address("testprojects/src/helm/deployment:file") == None
+        assert (
+            resolver.image_ref_to_actual_address(target_wrong_type) is None
         ), "a target which is not a docker_image should not resolve"
         errors_count += 1
         assert resolver._handle_missing_docker_image.call_count == errors_count
     except AssertionError:
         print(resolver._handle_missing_docker_image.call_args_list)
         raise
+
+
+def test_resolving_docker_image_no_thirdparty() -> None:
+    resolver = ImageReferenceResolver(
+        create_subsystem(HelmInferSubsystem, third_party_docker_images=["*"]),
+        {
+            "busybox:latest": MaybeAddress(val=ResolveError("short error")),
+        },
+        set(),
+    )
+    resolver._handle_missing_docker_image = MagicMock(return_value=None)  # type: ignore[method-assign]
+    assert (
+        resolver.image_ref_to_actual_address("busybox:latest") is None
+    ), "with 3rdparty permitting everything, anything 3rdparty should not resolve"
+    assert (
+        not resolver._handle_missing_docker_image.call_args_list
+    ), "with 3rdparty permitting everything, we should not warn"
 
 
 def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:

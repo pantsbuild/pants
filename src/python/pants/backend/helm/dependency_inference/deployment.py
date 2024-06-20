@@ -165,8 +165,6 @@ async def first_party_helm_deployment_mapping(
 
     resolver = ImageReferenceResolver(helm_infer, maybe_addresses_by_ref, docker_target_addresses)
 
-
-    print(f"{indexed_address_inputs=} aaa")
     return FirstPartyHelmDeploymentMapping(
         address=request.field_set.address,
         indexed_docker_addresses=indexed_address_inputs.transform_values(
@@ -196,8 +194,8 @@ class ImageReferenceResolver:
                 return None
             else:
                 message = f"""\
-                `{image_ref}` was supplied, but Pants cannot determine 
-                whether this should be a target's address or a 3rd-party dependency. 
+                `{image_ref}` was supplied, but Pants cannot determine
+                whether this should be a target's address or a 3rd-party dependency.
                 One of the following should resolve the situation:
 
                 - add `{image_ref}` to `[helm-infer].third_party_docker_images`
@@ -221,6 +219,10 @@ class ImageReferenceResolver:
         else:
             image_name = parsed.group("repository")
 
+        # Putting this wildcard check after parsing
+        # will mean that we don't approve things that don't look like docker images.
+        if "*" in self.helm_infer.third_party_docker_images:
+            return True
         if image_name in self.helm_infer.third_party_docker_images:
             return True
 
