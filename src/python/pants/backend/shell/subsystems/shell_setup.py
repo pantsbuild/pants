@@ -20,11 +20,24 @@ class ShellSetup(Subsystem):
     )
     tailor = BoolOption(
         default=True,
-        help=softwrap(
+        help=softwrap("If true, add `shell_sources` targets with the `tailor` goal."),
+        removal_version="2.25.0.dev0",
+        removal_hint=softwrap(
             """
-            If true, add `shell_sources` and `shunit2_tests` targets with
-            the `tailor` goal."""
+            Use `tailor_sources` and/or `tailor_shunit2_tests` instead.
+            For backwards compatibility, if this option is `False`, it will override the other options.
+            """
         ),
+        advanced=True,
+    )
+    tailor_sources = BoolOption(
+        default=True,
+        help=softwrap("If true, add `shell_sources` targets with the `tailor` goal."),
+        advanced=True,
+    )
+    tailor_shunit2_tests = BoolOption(
+        default=True,
+        help=softwrap("If true, add `shunit2_tests` targets with the `tailor` goal."),
         advanced=True,
     )
 

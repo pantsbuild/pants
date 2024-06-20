@@ -68,7 +68,7 @@ To override the default on a particular target, you can use the [`jdk=` field](.
 
 #### Scala version
 
-The Scala version to use is configured on a resolve-by-resolve basis (see the "Third-party dependencies" section below) using the [`[scala].version_for_resolve` option](../../reference/subsystems/scala.mdx#section-version_for_resolve). The default Scala version for your repository will thus be whichever Scala version is configured for the "default" resolve, which is configured by the [`[jvm].default_resolve` option](reference-jvm#section-default-resolve).
+The Scala version to use is configured on a resolve-by-resolve basis (see the "Third-party dependencies" section below) using the [`[scala].version_for_resolve` option](../../reference/subsystems/scala.mdx#section-version_for_resolve). The default Scala version for your repository will thus be whichever Scala version is configured for the "default" resolve, which is configured by the [`[jvm].default_resolve` option](../../reference/subsystems/jvm#default_resolve).
 
 To use multiple Scala versions in a repository, you would define multiple resolves, and then adjust the [`resolve` field](../../reference/targets/scalatest_test.mdx#resolve) of any targets which should be used with the non-`default_resolve` resolve.
 

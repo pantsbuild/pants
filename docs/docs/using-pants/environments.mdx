@@ -257,6 +257,8 @@ Thus, Pants puts that burden on you, the Pants user, to ensure a process output 
 
 If a process isn't reproducible, re-running a build from the same source code could fail unexpectedly, or give different output to an earlier build.
 
+You should use the `workspace_invalidation_sources` field available on the `adhoc_tool` and `shell_command` target types to inform Pants of what files should cause re-execution of the target's process if they change.
+
 :::
 
 The special environment name `__local_workspace__` can be used to select a matching `experimental_workspace_environment` based on its `compatible_platforms` attribute.

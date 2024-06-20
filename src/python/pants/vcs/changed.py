@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, cast
+from typing import Iterable
 
 from pants.backend.project_info import dependents
 from pants.backend.project_info.dependents import Dependents, DependentsRequest
@@ -20,9 +20,11 @@ from pants.option.option_types import EnumOption, StrOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text
 from pants.vcs.git import GitWorktree
+from pants.vcs.hunk import Hunk, TextBlocks
 
 
 class DependentsOption(Enum):
@@ -34,6 +36,7 @@ class DependentsOption(Enum):
 @dataclass(frozen=True)
 class ChangedRequest:
     sources: tuple[str, ...]
+    sources_blocks: FrozenDict[str, TextBlocks]
     dependents: DependentsOption
 
 
@@ -43,7 +46,8 @@ class ChangedAddresses(Collection[Address]):
 
 @rule
 async def find_changed_owners(
-    request: ChangedRequest, specs_filter: SpecsFilter
+    request: ChangedRequest,
+    specs_filter: SpecsFilter,
 ) -> ChangedAddresses:
     no_dependents = request.dependents == DependentsOption.NONE
     owners = await Get(
@@ -56,8 +60,10 @@ async def find_changed_owners(
             filter_by_global_options=no_dependents,
             # Changing a BUILD file might impact the targets it defines.
             match_if_owning_build_file_included_in_sources=True,
+            sources_blocks=request.sources_blocks,
         ),
     )
+
     if no_dependents:
         return ChangedAddresses(owners)
 
@@ -114,19 +120,31 @@ class ChangedOptions:
     def provided(self) -> bool:
         return bool(self.since) or bool(self.diffspec)
 
-    def changed_files(self, git_worktree: GitWorktree) -> list[str]:
+    def changed_files(self, git_worktree: GitWorktree) -> set[str]:
         """Determines the files changed according to SCM/workspace and options."""
         if self.diffspec:
-            return cast(
-                List[str], git_worktree.changes_in(self.diffspec, relative_to=get_buildroot())
-            )
+            return git_worktree.changes_in(self.diffspec, relative_to=get_buildroot())
 
         changes_since = self.since or git_worktree.current_rev_identifier
-        return cast(
-            List[str],
-            git_worktree.changed_files(
-                from_commit=changes_since, include_untracked=True, relative_to=get_buildroot()
-            ),
+        return git_worktree.changed_files(
+            from_commit=changes_since,
+            include_untracked=True,
+            relative_to=get_buildroot(),
+        )
+
+    def diff_hunks(
+        self, git_worktree: GitWorktree, paths: Iterable[str]
+    ) -> dict[str, tuple[Hunk, ...]]:
+        """Determines the unified diff hunks changed according to SCM/workspace and options.
+
+        More info on unified diff: https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
+        """
+        changes_since = self.since or git_worktree.current_rev_identifier
+        return git_worktree.changed_files_lines(
+            paths,
+            from_commit=changes_since,
+            include_untracked=True,
+            relative_to=get_buildroot(),
         )
 
 

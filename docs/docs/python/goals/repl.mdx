@@ -20,34 +20,24 @@ To use IPython, run `pants repl --shell=ipython`. To permanently use IPython, ad
 shell = "ipython"
 ```
 
-You can change IPython's version with `[ipython].version`. If you change it, Pants's default lockfile for IPython will not work. Either set the `lockfile` option to a custom path or `"<none>"` to opt-out. See [Third-party dependencies](../overview/third-party-dependencies.mdx#tool-lockfiles).
+You can change IPython's version [like any other tool, using `install_from_resolve`](../overview/lockfiles#lockfiles-for-tools).
 
-```toml title="pants.toml"
-[ipython]
-version = "ipython>=8.0.0"
-lockfile = "3rdparty/python/ipython_lock.txt"
-```
-
-If you set the `version` lower than IPython 7, then you must set `[ipython].ignore_cwd = false` to avoid Pants setting an option that did not exist in earlier IPython releases.
+If you use a version lower than IPython 7, then you must set `[ipython].ignore_cwd = false` to avoid Pants setting an option that did not exist in earlier IPython releases.
 
 :::note Python 2 support
-Pants uses IPython 7 by default, which does not work with Python 2. You can override `version` to use IPython 5. As mentioned above, you must set `ignore_cwd = false`.
+Pants uses IPython 7 by default, which does not work with Python 2. You can use `install_from_resolve` to install IPython 5:
 
-```toml
+```toml tab={"label":"pants.toml"}
+[python.resolves]
+...
+ipython = "3rdparty/python/ipython.lock"
+
 [ipython]
-version = "ipython<6"
-lockfile = "3rdparty/python/ipython_lock.txt"
+install_from_resolve = "ipython"
 ignore_cwd = false
 ```
-
-You can even use IPython 7 for Python 3 code, and IPython 5 for Python 2 code:
-
-```toml
-[ipython]
-version = "ipython==7.16.1 ; python_version >= '3.6'"
-extra_requirements.add = ["ipython<6 ; python_version == '2.7'"]
-lockfile = "3rdparty/python/ipython_lock.txt"
-ignore_cwd = false
+```toml tab={"label": "BUILD"}
+python_requirement(name="ipython", requirements=["ipython<6"], resolve="ipython")
 ```
 
 :::
