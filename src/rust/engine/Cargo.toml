@@ -37,7 +37,6 @@ default = []
 address = { path = "address" }
 async_latch = { path = "async_latch" }
 async-trait = { workspace = true }
-chrono = { workspace = true }
 protos = { path = "protos" }
 bytes = { workspace = true }
 cache = { path = "cache" }

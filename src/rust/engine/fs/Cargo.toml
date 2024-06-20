@@ -22,7 +22,6 @@ lazy_static = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
 protos = { path = "../protos" }
-pyo3 = { workspace = true }
 rlimit = { workspace = true }
 serde = { workspace = true }
 task_executor = { path = "../task_executor" }

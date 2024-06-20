@@ -15,7 +15,7 @@ use pyo3::IntoPy;
 use store::{SnapshotOps, SubsetParams};
 
 use crate::externs;
-use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyMergeDigests, PyRemovePrefix};
+use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyMergeDigests, PyPathMetadata, PyRemovePrefix};
 use crate::externs::PyGeneratorResponseNativeCall;
 use crate::nodes::{
     lift_directory_digest, task_get_context, unmatched_globs_additional_context, DownloadedFile,
@@ -372,7 +372,8 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
         let context = task_get_context();
         let metadata_opt = context
             .get(PathMetadataNode::new(PathBuf::from_str(&path).unwrap()))
-            .await?;
+            .await?
+            .map(PyPathMetadata);
 
         Ok(Python::with_gil(|py| {
             let path_metadata_opt = match metadata_opt {

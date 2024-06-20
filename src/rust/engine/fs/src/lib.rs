@@ -34,7 +34,6 @@ use std::{fmt, fs};
 use async_trait::async_trait;
 use bytes::Bytes;
 use deepsize::DeepSizeOf;
-use pyo3::prelude::*;
 use serde::Serialize;
 
 const TARGET_NOFILE_LIMIT: u64 = 10000;
@@ -239,8 +238,7 @@ impl PathStat {
 }
 
 /// The kind of path (e.g., file, directory, symlink) as identified in `PathMetadata`
-#[pyclass(rename_all = "UPPERCASE")]
-#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq)]
 pub enum PathMetadataKind {
     File,
     Directory,
@@ -248,48 +246,37 @@ pub enum PathMetadataKind {
 }
 
 /// Expanded version of `Stat` when access to additional filesystem attributes is necessary.
-#[pyclass]
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct PathMetadata {
     /// Path to this filesystem entry.
-    #[pyo3(get)]
-    path: PathBuf,
+    pub path: PathBuf,
 
     /// The kind of file at the path.
-    #[pyo3(get)]
-    kind: PathMetadataKind,
+    pub kind: PathMetadataKind,
 
     /// Length of the filesystem entry.
-    #[pyo3(get)]
-    length: u64,
+    pub length: u64,
 
     /// True if the entry is marked executable.
-    #[pyo3(get)]
-    is_executable: bool,
+    pub is_executable: bool,
 
     /// True if the entry is marked read-only.
-    #[pyo3(get)]
-    read_only: bool,
+    pub read_only: bool,
 
     /// UNIX mode (if available)
-    #[pyo3(get)]
-    unix_mode: Option<u32>,
+    pub unix_mode: Option<u32>,
 
     /// Modification time of the path (if available).
-    #[pyo3(get)]
-    accessed_time: Option<SystemTime>,
+    pub accessed_time: Option<SystemTime>,
 
     /// Modification time of the path (if available).
-    #[pyo3(get)]
-    created_time: Option<SystemTime>,
+    pub created_time: Option<SystemTime>,
 
     /// Modification time of the path (if available).
-    #[pyo3(get)]
-    modification_time: Option<SystemTime>,
+    pub modification_time: Option<SystemTime>,
 
     /// Symlink target
-    #[pyo3(get)]
-    symlink_target: Option<PathBuf>,
+    pub symlink_target: Option<PathBuf>,
 }
 
 impl PathMetadata {
@@ -317,13 +304,6 @@ impl PathMetadata {
             modification_time,
             symlink_target,
         }
-    }
-}
-
-#[pymethods]
-impl PathMetadata {
-    fn __repr__(&self) -> String {
-        format!("{:?}", self)
     }
 }
 
