@@ -21,6 +21,7 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.builtin_goal import BuiltinGoal
+from pants.goal.daemon_goal import DaemonGoalContext
 from pants.init.engine_initializer import GraphSession
 from pants.option.option_types import BoolOption, FileListOption, StrListOption
 from pants.option.option_value_container import OptionValueContainer
@@ -32,7 +33,7 @@ from pants.version import VERSION
 _logger = logging.getLogger(__name__)
 
 
-class BSPGoal(BuiltinGoal):
+class BSPGoal(DaemonGoal):
     name = "experimental-bsp"
     help = "Setup repository for Build Server Protocol (https://build-server-protocol.github.io/)."
 
@@ -102,23 +103,18 @@ class BSPGoal(BuiltinGoal):
 
     def run(
         self,
-        *,
-        build_config: BuildConfiguration,
-        graph_session: GraphSession,
-        options: Options,
-        specs: Specs,
-        union_membership: UnionMembership,
+        context: DaemonGoalContext,
     ) -> ExitCode:
-        goal_options = options.for_scope(self.name)
+        goal_options = context.options.for_scope(self.name)
         if goal_options.server:
             return self._run_server(
-                graph_session=graph_session,
-                union_membership=union_membership,
+                graph_session=context.graph_session,
+                union_membership=context.union_membership,
             )
-        current_session_values = graph_session.scheduler_session.py_session.session_values
+        current_session_values = context.graph_session.scheduler_session.py_session.session_values
         env = current_session_values[CompleteEnvironmentVars]
         return self._setup_bsp_connection(
-            union_membership=union_membership, env=env, options=goal_options
+            union_membership=context.union_membership, env=env, options=goal_options
         )
 
     def _setup_bsp_connection(

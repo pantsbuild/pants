@@ -135,7 +135,7 @@ class ArgSplitter:
         specs: list[str] = []
         passthru: list[str] = []
         unknown_scopes: list[str] = []
-        builtin_goal: str | None = None
+        builtin_or_daemon_goal: str | None = None
 
         def add_scope(s: str) -> None:
             # Force the scope to appear, even if empty.
@@ -150,19 +150,19 @@ class ArgSplitter:
                 add_scope(scope)
                 return scope
 
-            nonlocal builtin_goal
-            if scope_info.is_builtin and (not builtin_goal or scope.startswith("-")):
-                if builtin_goal:
-                    goals.add(builtin_goal)
+            nonlocal builtin_or_daemon_goal
+            if (scope_info.is_builtin or scope_info.is_daemon) and (not builtin_or_daemon_goal or scope.startswith("-")):
+                if builtin_or_daemon_goal:
+                    goals.add(builtin_or_daemon_goal)
 
-                # Get scope from info in case we hit an aliased builtin goal.
-                builtin_goal = scope_info.scope
+                # Get scope from info in case we hit an aliased builtin/daemon goal.
+                builtin_or_daemon_goal = scope_info.scope
             else:
                 goals.add(scope_info.scope)
             add_scope(scope_info.scope)
 
-            # Use builtin goal as default scope for args.
-            return builtin_goal or scope_info.scope
+            # Use builtin/daemon goal as default scope for args.
+            return builtin_or_daemon_goal or scope_info.scope
 
         self._unconsumed_args = list(reversed(args))
         # The first token is the binary name, so skip it.
@@ -198,11 +198,11 @@ class ArgSplitter:
             else:
                 add_goal(arg)
 
-        if not builtin_goal:
+        if not builtin_or_daemon_goal:
             if unknown_scopes and UNKNOWN_GOAL_NAME in self._known_goal_scopes:
-                builtin_goal = UNKNOWN_GOAL_NAME
+                builtin_or_daemon_goal = UNKNOWN_GOAL_NAME
             elif not goals and NO_GOAL_NAME in self._known_goal_scopes:
-                builtin_goal = NO_GOAL_NAME
+                builtin_or_daemon_goal = NO_GOAL_NAME
 
         if self._at_standalone_double_dash():
             self._unconsumed_args.pop()
@@ -223,7 +223,7 @@ class ArgSplitter:
                 )
 
         return SplitArgs(
-            builtin_goal=builtin_goal,
+            builtin_goal=builtin_or_daemon_goal,
             goals=list(goals),
             unknown_goals=unknown_scopes,
             scope_to_flags=dict(scope_to_flags),

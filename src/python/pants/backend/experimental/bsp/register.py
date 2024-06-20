@@ -5,7 +5,7 @@ from pants.bsp.goal import BSPGoal
 from pants.bsp.rules import rules as bsp_rules
 
 
-def builtin_goals():
+def daemon_goals():
     return (BSPGoal,)
 
 
