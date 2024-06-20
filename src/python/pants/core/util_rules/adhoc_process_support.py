@@ -576,12 +576,13 @@ async def compute_workspace_invalidation_hash(path_globs: PathGlobs) -> str:
             return b""
 
         return struct.pack(
-            "sBQBIss",
+            "sBQBIsss",
             m.path,
             kind_to_int(m.kind),
             m.length,
             1 if m.is_executable else 0,
             m.unix_mode if m.unix_mode is not None else 0,
+            m.created.isoformat() if m.created is not None else "",
             m.modified.isoformat() if m.modified is not None else "",
             m.symlink_target if m.symlink_target else "",
         )
