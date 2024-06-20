@@ -158,6 +158,30 @@ Once the workflow finishes, look through any failures and determine if there's a
 
 Alternatively, after starting the workflow, post the link to the in-progress run in `#development` in Slack, so that someone can come back to it when it does finish.
 
+## Step 5: Publish a schema in JSON Schema Store
+
+Some editors can use JSON Schema for better completions when editing TOML files like `pants.toml`.
+Pants configuration file schema is published at https://www.schemastore.org/. For every stable `2.x.0` release,
+a new schema needs to be generated and uploaded by submitting a PR against https://github.com/SchemaStore/schemastore.
+This is an example pull request for reference: https://github.com/SchemaStore/schemastore/pull/3880.
+
+To produce `pantsbuild-<version>.json` schema file, run:
+
+```bash
+pants help-all > all-help.json
+pants run build-support/bin/generate_json_schema.py -- --all-help-file=all-help.json
+```
+
+It may be helpful to compare the last schema file with the newly produced one to make sure there are no discrepancies
+(e.g. the config values have a sensible type and the help strings are rendered adequately). You can download the
+schemas of previous releases from the store website; the JSON files are available at
+`https://json.schemastore.org/pantsbuild-<version>.json`.
+
+Watch out for any configuration parameters that may rely on your local environment as certain default config values
+will be expanded using local runtime environment which is undesirable. The script handles those known config values
+by keeping a list of them, however, it may need to be extended as more options with environment specific default
+values are added.
+
 ## When Things Go Wrong
 
 From time to time, a release will fail. It's a complex process. The first thing to do after you've
