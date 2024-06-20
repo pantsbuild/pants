@@ -184,10 +184,7 @@ It is strongly recommended that these tools be installed from a hermetic lockfil
 
 The only time you need to think about this is if you want to customize the tool requirements that Pants uses. This might be the case if you want to modify the version of a tool or add extra requirements (for example, tool plugins).
 
-:::caution Exporting tools requires a custom lockfile
-:::
-
-If you want a tool to be installed from some resolve, instead of from the built-in lockfile, you set `install_from_resolve` and `requirements` on the tool's config section:
+Tools can also be installed from a specific resolve instead of from the built-in lockfile. This is useful for specifying a version of the tool and including extra packages. To do this, set `install_from_resolve` and `requirements` on the tool's config section:
 
 ```toml title="pants.toml"
 [python.resolves]

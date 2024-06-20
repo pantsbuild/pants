@@ -8,6 +8,7 @@ from typing import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.rules import Rule, collect_rules
 from pants.engine.target import Dependencies, FieldSet, SingleSourceField, Target
 from pants.engine.unions import UnionRule
@@ -74,4 +75,7 @@ class SemgrepSubsystem(PythonToolBase):
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(ExportableTool, SemgrepSubsystem),
+    ]

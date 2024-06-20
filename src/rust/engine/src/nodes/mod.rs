@@ -23,7 +23,7 @@ use crate::context::{Context, SessionCore};
 use crate::externs;
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
-use crate::tasks::{self, Rule};
+use crate::tasks::Rule;
 
 // Sub-modules for the differnt node kinds.
 mod digest_file;
@@ -51,6 +51,7 @@ pub use self::task::Task;
 
 tokio::task_local! {
     static TASK_SIDE_EFFECTED: Arc<AtomicBool>;
+    static TASK_CONTEXT: Arc<Context>;
 }
 
 pub fn task_side_effected() -> Result<(), String> {
@@ -65,15 +66,23 @@ pub fn task_side_effected() -> Result<(), String> {
         })
 }
 
-pub async fn maybe_side_effecting<T, F: future::Future<Output = T>>(
+pub fn task_get_context() -> Context {
+    TASK_CONTEXT.with(|c| (**c).clone())
+}
+
+pub async fn task_context<T, F: future::Future<Output = T>>(
+    context: Context,
     is_side_effecting: bool,
     side_effected: &Arc<AtomicBool>,
     f: F,
 ) -> T {
+    let context = Arc::new(context);
     if is_side_effecting {
-        TASK_SIDE_EFFECTED.scope(side_effected.clone(), f).await
+        TASK_SIDE_EFFECTED
+            .scope(side_effected.clone(), TASK_CONTEXT.scope(context, f))
+            .await
     } else {
-        f.await
+        TASK_CONTEXT.scope(context, f).await
     }
 }
 
@@ -121,43 +130,18 @@ async fn select(
     });
     match entry.as_ref() {
         &rule_graph::Entry::WithDeps(wd) => match wd.as_ref() {
-            rule_graph::EntryWithDeps::Rule(ref rule) => match rule.rule() {
-                tasks::Rule::Task(task) => {
-                    context
-                        .get(Task {
-                            params: params.clone(),
-                            args,
-                            args_arity,
-                            task: *task,
-                            entry: entry,
-                            side_effected: Arc::new(AtomicBool::new(false)),
-                        })
-                        .await
-                }
-                Rule::Intrinsic(intrinsic) => {
-                    let values = future::try_join_all(
-                        intrinsic
-                            .inputs
-                            .iter()
-                            .map(|dependency_key| {
-                                select_product(
-                                    context.clone(),
-                                    params.clone(),
-                                    dependency_key,
-                                    "intrinsic",
-                                    entry,
-                                )
-                            })
-                            .collect::<Vec<_>>(),
-                    )
-                    .await?;
-                    context
-                        .core
-                        .intrinsics
-                        .run(intrinsic, context.clone(), values)
-                        .await
-                }
-            },
+            rule_graph::EntryWithDeps::Rule(ref rule) => {
+                context
+                    .get(Task {
+                        params: params.clone(),
+                        args,
+                        args_arity,
+                        task: rule.rule().0,
+                        entry: entry,
+                        side_effected: Arc::new(AtomicBool::new(false)),
+                    })
+                    .await
+            }
             rule_graph::EntryWithDeps::Reentry(reentry) => {
                 select_reentry(context, params, &reentry.query).await
             }
@@ -203,32 +187,6 @@ fn select_reentry(
         let entry = edges
             .entry_for(&DependencyKey::new(product))
             .unwrap_or_else(|| panic!("{edges:?} did not declare a dependency on {product}"));
-        select(context, None, 0, params, entry).await
-    }
-    .boxed()
-}
-
-fn select_product<'a>(
-    context: Context,
-    params: Params,
-    dependency_key: &'a DependencyKey<TypeId>,
-    caller_description: &'a str,
-    entry: Intern<rule_graph::Entry<Rule>>,
-) -> BoxFuture<'a, NodeResult<Value>> {
-    let edges = context
-        .core
-        .rule_graph
-        .edges_for_inner(&entry)
-        .ok_or_else(|| {
-            throw(format!(
-                "Tried to request {dependency_key} for {caller_description} but found no edges"
-            ))
-        });
-    async move {
-        let edges = edges?;
-        let entry = edges.entry_for(dependency_key).unwrap_or_else(|| {
-            panic!("{caller_description} did not declare a dependency on {dependency_key:?}")
-        });
         select(context, None, 0, params, entry).await
     }
     .boxed()

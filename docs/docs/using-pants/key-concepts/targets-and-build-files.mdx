@@ -401,6 +401,8 @@ python_test(
 )
 ```
 
+(Using `parametrize` on grouped fields is also supported. For instance, if there is two resolves to use for Python 3.10, these can be provided within the py310 group: `**parametrize("py310", interpreter_constraints=[">=3.10,<3.11"], resolve=parametrize("lock-b", "lock-c"))`.)
+
 The targets' addresses will have `@key=value` at the end, as shown above. Run [`pants list dir:`](../project-introspection.mdx) in the directory of the parametrized target to see all parametrized target addresses, and [`pants peek dir:`](../project-introspection.mdx) to see all their metadata.
 
 Generally, you can use the address without the `@` suffix as an alias to all the parametrized targets. For example, `pants test example:tests` will run all the targets in parallel. Use the more precise address if you only want to use one parameter value, e.g. `pants test example:tests@shell=bash`.

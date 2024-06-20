@@ -3,7 +3,9 @@
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import EntryPoint
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.rules import collect_rules
+from pants.engine.unions import UnionRule
 
 
 class SetuptoolsSCM(PythonToolBase):
@@ -21,4 +23,7 @@ class SetuptoolsSCM(PythonToolBase):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(ExportableTool, SetuptoolsSCM),
+    ]

@@ -523,7 +523,7 @@ def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: byte
             "|".join(
                 (
                     # BuildKit output.
-                    r"(writing image (?P<digest>sha256:\S+) done)",
+                    r"(writing image (?P<digest>sha256:\S+))",
                     # BuildKit with containerd-snapshotter output.
                     r"(exporting manifest list (?P<manifest_list>sha256:\S+))",
                     # Docker output.

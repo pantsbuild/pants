@@ -138,8 +138,8 @@ class ClasspathEntryRequestFactory:
             if set(partial[0].field_sets).issubset(set(consume_only[0].field_sets_consume_only)):
                 return partial[0](component, resolve, consume_only[0](component, resolve, None))
 
-        impls_str = ", ".join(sorted(impl.__name__ for impl in impls))
         if compatible:
+            impls_str = ", ".join(sorted(impl.__name__ for impl in compatible))
             raise ClasspathSourceAmbiguity(
                 f"More than one JVM classpath provider ({impls_str}) was compatible with "
                 f"the inputs:\n{component.bullet_list()}"
@@ -148,6 +148,7 @@ class ClasspathEntryRequestFactory:
             # TODO: There is more subtlety of error messages possible here if there are multiple
             # partial providers, but can cross that bridge when we have them (multiple Scala or Java
             # compiler implementations, for example).
+            impls_str = ", ".join(sorted(impl.__name__ for impl in impls))
             raise ClasspathSourceMissing(
                 f"No JVM classpath providers (from: {impls_str}) were compatible with the "
                 f"combination of inputs:\n{component.bullet_list()}"

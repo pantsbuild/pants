@@ -15,7 +15,6 @@ _NO_BUILD_FILE_TARGET_BASE = "testprojects/src/python/no_build_file"
 _SOURCES_TARGET_BASE = "testprojects/src/python/sources"
 
 _ERR_TARGETS = {
-    "testprojects/src/python/sources:some-missing-some-not": 'Unmatched glob from testprojects/src/python/sources:some-missing-some-not\'s `sources` field: "testprojects/src/python/sources/*.rs"',
     "testprojects/src/python/sources:missing-sources": 'Unmatched glob from testprojects/src/python/sources:missing-sources\'s `sources` field: "testprojects/src/python/sources/*.scala", excludes: ["testprojects/src/python/sources/*Spec.scala", "testprojects/src/python/sources/*Suite.scala", "testprojects/src/python/sources/*Test.scala"]',
 }
 

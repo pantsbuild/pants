@@ -16,7 +16,7 @@ from pants.backend.codegen.protobuf.target_types import (
 )
 from pants.backend.experimental.java.register import rules as java_backend_rules
 from pants.backend.java.target_types import JavaSourceField
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -42,7 +42,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
@@ -53,10 +53,6 @@ class GenerateJavaFromProtobufRequest(GenerateSourcesRequest):
     output = JavaSourceField
 
 
-class GrpcJavaToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = JavaProtobufGrpcSubsystem.options_scope
-
-
 @dataclass(frozen=True)
 class ProtobufJavaGrpcPlugin:
     digest: Digest
@@ -64,8 +60,11 @@ class ProtobufJavaGrpcPlugin:
 
 
 @rule
-async def resolve_protobuf_java_grpc_plugin(platform: Platform) -> ProtobufJavaGrpcPlugin:
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, GrpcJavaToolLockfileSentinel())
+async def resolve_protobuf_java_grpc_plugin(
+    platform: Platform,
+    tool: JavaProtobufGrpcSubsystem,
+) -> ProtobufJavaGrpcPlugin:
+    lockfile_request = GenerateJvmLockfileFromTool.create(tool)
     classpath = await Get(
         ToolClasspath,
         ToolClasspathRequest(lockfile=lockfile_request),
@@ -200,21 +199,13 @@ async def generate_java_from_protobuf(
     return GeneratedSources(source_root_restored)
 
 
-@rule
-async def generate_grpc_java_lockfile_request(
-    _: GrpcJavaToolLockfileSentinel,
-    tool: JavaProtobufGrpcSubsystem,
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(tool)
-
-
 def rules():
     return [
         *collect_rules(),
         *dependency_inference.rules(),
         *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromProtobufRequest),
-        UnionRule(GenerateToolLockfileSentinel, GrpcJavaToolLockfileSentinel),
+        UnionRule(ExportableTool, JavaProtobufGrpcSubsystem),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),
