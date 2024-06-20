@@ -523,11 +523,6 @@ impl PyPathMetadata {
     }
 
     #[getter]
-    pub fn read_only(&self) -> PyResult<bool> {
-        Ok(self.0.read_only)
-    }
-
-    #[getter]
     pub fn unix_mode(&self) -> PyResult<Option<u32>> {
         Ok(self.0.unix_mode)
     }

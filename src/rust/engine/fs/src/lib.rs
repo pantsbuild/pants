@@ -260,9 +260,6 @@ pub struct PathMetadata {
     /// True if the entry is marked executable.
     pub is_executable: bool,
 
-    /// True if the entry is marked read-only.
-    pub read_only: bool,
-
     /// UNIX mode (if available)
     pub unix_mode: Option<u32>,
 
@@ -628,7 +625,6 @@ impl PosixFS {
                     kind,
                     length: metadata.len(),
                     is_executable,
-                    read_only: metadata.permissions().readonly(),
                     unix_mode,
                     accessed: metadata.accessed().ok(),
                     created: metadata.created().ok(),
@@ -745,7 +741,6 @@ impl Vfs<String> for DigestTrie {
                 kind: PathMetadataKind::File,
                 length: entry.digest().size_bytes as u64,
                 is_executable: f.is_executable(),
-                read_only: false,
                 unix_mode: None,
                 accessed: None,
                 created: None,
@@ -757,7 +752,6 @@ impl Vfs<String> for DigestTrie {
                 kind: PathMetadataKind::Symlink,
                 length: 0,
                 is_executable: false,
-                read_only: false,
                 unix_mode: None,
                 accessed: None,
                 created: None,
@@ -769,7 +763,6 @@ impl Vfs<String> for DigestTrie {
                 kind: PathMetadataKind::Directory,
                 length: entry.digest().size_bytes as u64,
                 is_executable: false,
-                read_only: false,
                 unix_mode: None,
                 accessed: None,
                 created: None,
