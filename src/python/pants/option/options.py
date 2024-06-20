@@ -166,7 +166,7 @@ class Options:
         native_parser = NativeOptionParser(args, env, config.sources(), allow_pantsrc=True)
 
         return cls(
-            builtin_goal=split_args.builtin_goal,
+            builtin_goal=split_args.builtin_or_daemon_goal,
             goals=split_args.goals,
             unknown_goals=split_args.unknown_goals,
             scope_to_flags=split_args.scope_to_flags,

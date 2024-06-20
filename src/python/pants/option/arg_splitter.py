@@ -22,7 +22,7 @@ class ArgSplitterError(Exception):
 class SplitArgs:
     """The result of splitting args."""
 
-    builtin_goal: str | None  # Requested builtin goal (explicitly or implicitly).
+    builtin_or_daemon_goal: str | None  # Requested builtin goal (explicitly or implicitly).
     goals: list[str]  # Explicitly requested goals.
     unknown_goals: list[str]  # Any unknown goals.
     scope_to_flags: dict[str, list[str]]  # Scope name -> list of flags in that scope.
@@ -223,7 +223,7 @@ class ArgSplitter:
                 )
 
         return SplitArgs(
-            builtin_goal=builtin_or_daemon_goal,
+            builtin_or_daemon_goal=builtin_or_daemon_goal,
             goals=list(goals),
             unknown_goals=unknown_scopes,
             scope_to_flags=dict(scope_to_flags),
