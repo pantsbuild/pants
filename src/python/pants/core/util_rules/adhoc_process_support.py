@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import logging
 import os
 import shlex
+import struct
 from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, TypeVar, Union
@@ -28,9 +30,17 @@ from pants.engine.fs import (
     FileContent,
     MergeDigests,
     PathGlobs,
+    PathMetadataRequest,
+    PathMetadataResult,
+    Paths,
     Snapshot,
 )
-from pants.engine.internals.native_engine import AddressInput, RemovePrefix
+from pants.engine.internals.native_engine import (
+    AddressInput,
+    PathMetadata,
+    PathMetadataKind,
+    RemovePrefix,
+)
 from pants.engine.process import (
     FallibleProcessResult,
     Process,
@@ -542,6 +552,55 @@ async def run_adhoc_process(
     return AdhocProcessResult(result, adjusted)
 
 
+async def compute_workspace_invalidation_hash(path_globs: PathGlobs) -> str:
+    # Helper to convert a PathMetadataKind to an integer.
+    def kind_to_int(kind: PathMetadataKind) -> int:
+        if kind == PathMetadataKind.FILE:
+            return 0
+        elif kind == PathMetadataKind.DIRECTORY:
+            return 1
+        elif kind == PathMetadataKind.SYMLINK:
+            return 2
+        else:
+            raise TypeError(f"Unable to discriminate instance of `PathMetadataKind`: {repr(kind)}")
+
+    # Compute a stable hash value for a `PathMetadata` since the hash value should be stable when used outside the process.
+    # (for example, in the cache). The `__hash__` dunder method computes an unstable hash
+    # which can and does vary across different process invocations.)
+    #
+    # Ultimately, this may be more of an intellectual correctness point than a necessity since this code will likely never
+    # see the same `m.modified` value. It does matter, however, for a single user to see the same
+    # behavior across process invocations if pantsd restarts.
+    def stable_metadata_bytes(m: PathMetadata | None) -> bytes:
+        if m is None:
+            return b""
+
+        return struct.pack(
+            "sBQBIss",
+            m.path,
+            kind_to_int(m.kind),
+            m.length,
+            1 if m.is_executable else 0,
+            m.unix_mode if m.unix_mode is not None else 0,
+            m.modified.isoformat() if m.modified is not None else "",
+            m.symlink_target if m.symlink_target else "",
+        )
+
+    raw_paths = await Get(Paths, PathGlobs, path_globs)
+    paths = sorted([*raw_paths.files, *raw_paths.dirs])
+    metadata_results = await MultiGet(
+        Get(PathMetadataResult, PathMetadataRequest(path)) for path in paths
+    )
+
+    # Compute a stable hash of all of the metadatas.
+    # Note: This could probbaly use a non-cryptographic hash (e.g., Murmur), but that would require
+    # a third party dependency.
+    h = hashlib.sha256()
+    for mr in metadata_results:
+        h.update(stable_metadata_bytes(mr.metadata))
+    return h.hexdigest()
+
+
 @rule
 async def prepare_adhoc_process(
     request: AdhocProcessRequest,
@@ -569,14 +628,13 @@ async def prepare_adhoc_process(
     if supplied_env_vars:
         command_env.update(supplied_env_vars)
 
-    # Compute the digest for any workspace invalidation sources and put the digest into the environment as a dummy variable
+    # Compute the hash for any workspace invalidation sources and put the hash into the environment as a dummy variable
     # so that the process produced by this rule will be invalidated if any of the referenced files change.
     if request.workspace_invalidation_globs is not None:
-        workspace_invalidation_digest = await Get(
-            Digest, PathGlobs, request.workspace_invalidation_globs
+        workspace_invalidation_hash = await compute_workspace_invalidation_hash(
+            request.workspace_invalidation_globs
         )
-        digest_str = f"{workspace_invalidation_digest.fingerprint}-{workspace_invalidation_digest.serialized_bytes_length}"
-        command_env["__PANTS_WORKSPACE_INVALIDATION_SOURCES_DIGEST"] = digest_str
+        command_env["__PANTS_WORKSPACE_INVALIDATION_SOURCES_HASH"] = workspace_invalidation_hash
 
     input_snapshot = await Get(Snapshot, Digest, request.input_digest)
 
