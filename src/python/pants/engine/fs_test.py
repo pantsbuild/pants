@@ -1508,7 +1508,9 @@ def test_snapshot_diff(
     assert diff.changed_files == expected_diff.changed_files
 
 
-def retry_failed_assertions(callable: Callable[[], Any], n: int, sleep_duration: float = 0.05) -> None:
+def retry_failed_assertions(
+    callable: Callable[[], Any], n: int, sleep_duration: float = 0.05
+) -> None:
     """Retry the callable if any assertions failed.
 
     This is used to handle any failures resulting from an external system not fully processing
