@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any
 
 from pants.backend.docker.target_types import AllDockerImageTargets
 from pants.backend.docker.target_types import rules as docker_target_types_rules
+from pants.backend.docker.utils import image_ref_regexp
 from pants.backend.helm.dependency_inference.subsystem import (
     HelmInferSubsystem,
     UnownedDependencyError,
@@ -163,10 +165,12 @@ async def first_party_helm_deployment_mapping(
 
     resolver = ImageReferenceResolver(helm_infer, maybe_addresses_by_ref, docker_target_addresses)
 
+
+    print(f"{indexed_address_inputs=} aaa")
     return FirstPartyHelmDeploymentMapping(
         address=request.field_set.address,
         indexed_docker_addresses=indexed_address_inputs.transform_values(
-            resolver.image_ref_to_actual_address
+            lambda image_ref_ai: resolver.image_ref_to_actual_address(image_ref_ai[0])
         ),
     )
 
@@ -177,26 +181,53 @@ class ImageReferenceResolver:
     maybe_addresses_by_ref: dict[str, MaybeAddress]
     docker_target_addresses: set[Address]
 
-    def image_ref_to_actual_address(
-        self,
-        image_ref_ai: tuple[str, AddressInput],
-    ) -> tuple[str, Address] | None:
-        image_ref, _ = image_ref_ai
+    def image_ref_to_actual_address(self, image_ref: str) -> tuple[str, Address] | None:
         maybe_addr = self.maybe_addresses_by_ref.get(image_ref)
         if not maybe_addr:
             return None
         if not isinstance(maybe_addr.val, Address):
+            # obviously intended to be a Pants target
             if image_ref.startswith("//") or image_ref.startswith("./"):
-                self._handle_missing_docker_image(image_ref, maybe_addr)
-            return None
+                message = f"`{image_ref}` was supplied but the docker_image target at `{maybe_addr.val}` does not exist."
+                self._handle_missing_docker_image(message)
+                return None
+            # explicit 3rd party
+            elif self._image_ref_is_3rdparty(image_ref):
+                return None
+            else:
+                message = f"""\
+                `{image_ref}` was supplied, but Pants cannot determine 
+                whether this should be a target's address or a 3rd-party dependency. 
+                One of the following should resolve the situation:
+
+                - add `{image_ref}` to `[helm-infer].third_party_docker_images`
+                - add the registry component of the docker image. For example, `python:3.9` becomes `docker.io/library/python:3.9`; or `myapp:latest` becomes `registry.example.com/myapp:latest`.
+                """
+                self._handle_missing_docker_image(message)
+                return None
 
         if maybe_addr.val not in self.docker_target_addresses:
-            self._handle_missing_docker_image(image_ref, maybe_addr)
+            message = f"The address `{image_ref}` was supplied, but the target at `{maybe_addr.val}` is not a docker_image target."
+            self._handle_missing_docker_image(message)
             return None
         return image_ref, maybe_addr.val
 
-    def _handle_missing_docker_image(self, image_ref: str, maybe_addr: MaybeAddress):
-        message = f"Error resolving Docker image dependency of a Helm chart. `{image_ref}` was supplied but the docker target at `{maybe_addr.val}` does not exist."
+    def _image_ref_is_3rdparty(self, image_ref: str) -> bool:
+        parsed = re.match(image_ref_regexp, image_ref.strip("\"'"))
+        if not parsed:
+            return False
+        if parsed.group("registry"):
+            image_name = parsed.group("registry") + parsed.group("repository")
+        else:
+            image_name = parsed.group("repository")
+
+        if image_name in self.helm_infer.third_party_docker_images:
+            return True
+
+        return False
+
+    def _handle_missing_docker_image(self, message):
+        message = "Error resolving Docker image dependency of a Helm chart.\n" + message
         if self.helm_infer.unowned_dependency_behavior == UnownedDependencyUsage.RaiseError:
             raise UnownedDependencyError(message)
         elif self.helm_infer.unowned_dependency_behavior == UnownedDependencyUsage.LogWarning:

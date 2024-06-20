@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from enum import Enum
+from functools import cached_property
 
-from pants.option.option_types import EnumOption
+from pants.option.option_types import EnumOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -38,3 +39,29 @@ class HelmInferSubsystem(Subsystem):
             """
         ),
     )
+
+    third_party_docker_images = StrListOption(
+        default=[],
+        help=softwrap(
+            """
+            Docker image names that are not provided by targets in this repository
+            and should be ignored for calculating dependencies.
+
+            For example, adding `python` to this setting
+            will cause Pants to not try to find the target `python:3.10`
+            in the following `helm_deployment`:
+
+            ```
+            helm_deployment(
+                name="my-deployment",
+                chart=":mychart",
+                values={"container.image_ref": "python:3.10"},
+            )
+            ```
+            """
+        ),
+    )
+
+    @cached_property
+    def third_party_base_images(self) -> set[str]:
+        return set(self.third_party_docker_images)
