@@ -163,7 +163,11 @@ async def _get_entry_point_deps_targets_and_predicates(
 ) -> tuple[
     Targets, PythonDistributionEntryPointGroupPredicate, PythonDistributionEntryPointPredicate
 ]:
-    assert entry_point_deps.value, "Unexpected empty entry_point_dependencies field"
+    if not entry_point_deps.value:  # type narrowing for mypy
+        raise ValueError(
+            "Please file an issue if you see this error. This rule helper must not "
+            "be called with an empty entry_point_dependencies field."
+        )
     targets = await Get(
         Targets,
         UnparsedAddressInputs(
