@@ -238,7 +238,8 @@ impl PathStat {
     }
 }
 
-#[pyclass]
+/// The kind of path (e.g., file, directory, symlink) as identified in `PathMetadata`
+#[pyclass(rename_all = "UPPERCASE")]
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub enum PathMetadataKind {
     File,
@@ -660,7 +661,8 @@ impl PosixFS {
                         (PathMetadataKind::Symlink, Some(symlink_target))
                     }
                     ft if ft.is_dir() => (PathMetadataKind::Directory, None),
-                    _ => (PathMetadataKind::File, None),
+                    ft if ft.is_file() => (PathMetadataKind::File, None),
+                    _ => unreachable!("std::fs::FileType was not a symlink, directory, or file"),
                 };
 
                 #[cfg(target_family = "unix")]

@@ -1548,7 +1548,7 @@ def test_path_metadata_request(rule_runner: RuleRunner) -> None:
     m1 = get_metadata("foo")
     assert m1 is not None
     assert m1.path == "foo"
-    assert m1.kind == PathMetadataKind.File
+    assert m1.kind == PathMetadataKind.FILE
     assert m1.length == len(b"xyzzy")
     assert m1.symlink_target is None
 
@@ -1562,12 +1562,12 @@ def test_path_metadata_request(rule_runner: RuleRunner) -> None:
     m4 = get_metadata("bar")
     assert m4 is not None
     assert m4.path == "bar"
-    assert m4.kind == PathMetadataKind.Symlink
+    assert m4.kind == PathMetadataKind.SYMLINK
     assert m4.length == 3
     assert m4.symlink_target == "foo"
 
     m5 = get_metadata("sub-dir")
     assert m5 is not None
     assert m5.path == "sub-dir"
-    assert m5.kind == PathMetadataKind.Directory
+    assert m5.kind == PathMetadataKind.DIRECTORY
     assert m5.symlink_target is None
