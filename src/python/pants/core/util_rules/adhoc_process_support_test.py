@@ -2,9 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from datetime import timedelta
 import os
-from pathlib import Path
+from datetime import timedelta
 
 import pytest
 

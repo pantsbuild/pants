@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import dataclasses
-from datetime import datetime
 import hashlib
 import json
 import logging
 import os
 import shlex
-import struct
 from dataclasses import dataclass
+from datetime import datetime
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, TypeVar, Union
 
@@ -37,12 +36,7 @@ from pants.engine.fs import (
     Paths,
     Snapshot,
 )
-from pants.engine.internals.native_engine import (
-    AddressInput,
-    PathMetadata,
-    PathMetadataKind,
-    RemovePrefix,
-)
+from pants.engine.internals.native_engine import AddressInput, PathMetadata, RemovePrefix
 from pants.engine.process import (
     FallibleProcessResult,
     Process,
