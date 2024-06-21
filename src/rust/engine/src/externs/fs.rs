@@ -495,6 +495,16 @@ impl From<fs::PathMetadataKind> for PyPathMetadataKind {
     }
 }
 
+impl From<PyPathMetadataKind> for fs::PathMetadataKind {
+    fn from(value: PyPathMetadataKind) -> Self {
+        match value {
+            PyPathMetadataKind::File => fs::PathMetadataKind::File,
+            PyPathMetadataKind::Directory => fs::PathMetadataKind::Directory,
+            PyPathMetadataKind::Symlink => fs::PathMetadataKind::Symlink,
+        }
+    }
+}
+
 /// Expanded version of `Stat` when access to additional filesystem attributes is necessary.
 #[pyclass(name = "PathMetadata")]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -507,9 +517,21 @@ impl PyPathMetadata {
         Ok(self.0.path.clone())
     }
 
+    #[setter]
+    pub fn set_path(&mut self, path: PathBuf) -> PyResult<()> {
+        self.0.path = path;
+        Ok(())
+    }
+
     #[getter]
     pub fn kind(&self) -> PyResult<PyPathMetadataKind> {
-        Ok(PyPathMetadataKind::from(self.0.kind))
+        Ok(self.0.kind.into())
+    }
+
+    #[setter]
+    pub fn set_kind(&mut self, kind: PyPathMetadataKind) -> PyResult<()> {
+        self.0.kind = kind.into();
+        Ok(())
     }
 
     #[getter]
@@ -517,9 +539,21 @@ impl PyPathMetadata {
         Ok(self.0.length)
     }
 
+    #[setter]
+    pub fn set_length(&mut self, length: u64) -> PyResult<()> {
+        self.0.length = length;
+        Ok(())
+    }
+
     #[getter]
     pub fn is_executable(&self) -> PyResult<bool> {
         Ok(self.0.is_executable)
+    }
+
+    #[setter]
+    pub fn set_is_executable(&mut self, is_executable: bool) -> PyResult<()> {
+        self.0.is_executable = is_executable;
+        Ok(())
     }
 
     #[getter]
@@ -527,9 +561,21 @@ impl PyPathMetadata {
         Ok(self.0.unix_mode)
     }
 
+    #[setter]
+    pub fn set_unix_mode(&mut self, unix_mode: Option<u32>) -> PyResult<()> {
+        self.0.unix_mode = unix_mode;
+        Ok(())
+    }
+
     #[getter]
     pub fn accessed(&self) -> PyResult<Option<SystemTime>> {
         Ok(self.0.accessed)
+    }
+
+    #[setter]
+    pub fn set_accessed(&mut self, accessed: Option<SystemTime>) -> PyResult<()> {
+        self.0.accessed = accessed;
+        Ok(())
     }
 
     #[getter]
@@ -537,14 +583,36 @@ impl PyPathMetadata {
         Ok(self.0.created)
     }
 
+    #[setter]
+    pub fn set_created(&mut self, created: Option<SystemTime>) -> PyResult<()> {
+        self.0.created = created;
+        Ok(())
+    }
+
     #[getter]
     pub fn modified(&self) -> PyResult<Option<SystemTime>> {
         Ok(self.0.modified)
     }
 
+    #[setter]
+    pub fn set_modified(&mut self, modified: Option<SystemTime>) -> PyResult<()> {
+        self.0.modified = modified;
+        Ok(())
+    }
+
     #[getter]
     pub fn symlink_target(&self) -> PyResult<Option<PathBuf>> {
         Ok(self.0.symlink_target.clone())
+    }
+
+    #[setter]
+    pub fn set_symlink_target(&mut self, symlink_target: Option<PathBuf>) -> PyResult<()> {
+        self.0.symlink_target = symlink_target;
+        Ok(())
+    }
+
+    pub fn copy(&self) -> PyResult<Self> {
+        Ok(self.clone())
     }
 
     fn __repr__(&self) -> String {
