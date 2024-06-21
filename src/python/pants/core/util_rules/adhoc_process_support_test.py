@@ -2,7 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from datetime import timedelta
 import os
+from pathlib import Path
 
 import pytest
 
@@ -36,18 +38,39 @@ def test_path_metadata_to_bytes(rule_runner: RuleRunner) -> None:
     )
     os.symlink("foo", os.path.join(rule_runner.build_root, "bar"))
 
-    m1 = get_metadata("foo")
-    b1 = _path_metadata_to_bytes(m1)
+    m_file = get_metadata("foo")
+    assert m_file is not None
+    b_file = _path_metadata_to_bytes(m_file)
+    assert len(b_file) > 0
+
+    m_dir = get_metadata("sub-dir")
+    assert m_dir is not None
+    b_dir = _path_metadata_to_bytes(m_dir)
+    assert len(b_dir) > 0
+
+    m_symlink = get_metadata("bar")
+    assert m_symlink is not None
+    b_symlink = _path_metadata_to_bytes(m_symlink)
+    assert len(b_symlink) > 0
+
+    m_missing = get_metadata("missing")
+    assert m_missing is None
+    b_missing = _path_metadata_to_bytes(m_missing)
+    assert len(b_missing) == 0
+
+    # Update the access time only and see if conversion remains the same.
+    m = m_file.copy()
+    atime = m.accessed
+    assert atime is not None
+    m.accessed = atime + timedelta(seconds=1)
+    b1 = _path_metadata_to_bytes(m)
     assert len(b1) > 0
+    assert b_file == b1
 
-    m2 = get_metadata("sub-dir")
-    b2 = _path_metadata_to_bytes(m2)
+    # Update the modified time and conversion should differ.
+    mtime = m.modified
+    assert mtime is not None
+    m.modified = mtime + timedelta(seconds=1)
+    b2 = _path_metadata_to_bytes(m)
     assert len(b2) > 0
-
-    m3 = get_metadata("bar")
-    b3 = _path_metadata_to_bytes(m3)
-    assert len(b3) > 0
-
-    m4 = get_metadata("missing")
-    b4 = _path_metadata_to_bytes(m4)
-    assert len(b4) == 0
+    assert b1 != b2

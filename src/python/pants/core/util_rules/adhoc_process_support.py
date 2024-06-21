@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import dataclasses
+from datetime import datetime
 import hashlib
+import json
 import logging
 import os
 import shlex
@@ -552,39 +554,29 @@ async def run_adhoc_process(
     return AdhocProcessResult(result, adjusted)
 
 
-# Compute a stable hash value for a `PathMetadata` since the hash value should be stable when used outside the process.
-# (for example, in the cache). The `__hash__` dunder method computes an unstable hash
-# which can and does vary across different process invocations.
-#
-# Ultimately, this may be more of an intellectual correctness point than a necessity since this code will likely never
-# see the same `m.modified` value. It does matter, however, for a single user to see the same
-# behavior across process invocations if pantsd restarts.
+# Compute a stable bytes value for a `PathMetadata` consisting of the values to be hashed.
+# Access time is not included to avoid having mere access to a file invalidating an execution.
 def _path_metadata_to_bytes(m: PathMetadata | None) -> bytes:
-    # Helper to convert a PathMetadataKind to an integer.
-    def kind_to_int(kind: PathMetadataKind) -> int:
-        if kind == PathMetadataKind.FILE:
-            return 0
-        elif kind == PathMetadataKind.DIRECTORY:
-            return 1
-        elif kind == PathMetadataKind.SYMLINK:
-            return 2
-        else:
-            raise TypeError(f"Unable to discriminate instance of `PathMetadataKind`: {repr(kind)}")
-
     if m is None:
         return b""
 
-    return struct.pack(
-        "sBQBIsss",
-        m.path.encode(),
-        kind_to_int(m.kind),
-        m.length,
-        1 if m.is_executable else 0,
-        m.unix_mode if m.unix_mode is not None else 0,
-        (m.created.isoformat() if m.created is not None else "").encode(),
-        (m.modified.isoformat() if m.modified is not None else "").encode(),
-        (m.symlink_target if m.symlink_target else "").encode(),
-    )
+    def dt_fmt(dt: datetime | None) -> str | None:
+        if dt is not None:
+            return dt.isoformat()
+        return None
+
+    d = {
+        "path": m.path,
+        "kind": str(m.kind),
+        "length": m.length,
+        "is_executable": m.is_executable,
+        "unix_mode": m.unix_mode,
+        "created": dt_fmt(m.created),
+        "modified": dt_fmt(m.modified),
+        "symlink_target": m.symlink_target,
+    }
+
+    return json.dumps(d, sort_keys=True).encode()
 
 
 async def compute_workspace_invalidation_hash(path_globs: PathGlobs) -> str:
@@ -594,7 +586,13 @@ async def compute_workspace_invalidation_hash(path_globs: PathGlobs) -> str:
         Get(PathMetadataResult, PathMetadataRequest(path)) for path in paths
     )
 
-    # Compute a stable hash of all of the metadatas.
+    # Compute a stable hash of all of the metadatas since the hash value should be stable
+    # when used outside the process (for example, in the cache). (The `__hash__` dunder method
+    # computes an unstable hash which can and does vary across different process invocations.)
+    #
+    # While it could be more of an intellectual correctness point than a necessity, tt does matter,
+    # however, for a single user to see the same behavior across process invocations if pantsd restarts.
+    #
     # Note: This could probbaly use a non-cryptographic hash (e.g., Murmur), but that would require
     # a third party dependency.
     h = hashlib.sha256()
