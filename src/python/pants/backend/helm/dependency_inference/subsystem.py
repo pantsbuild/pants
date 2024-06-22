@@ -27,7 +27,7 @@ class HelmInferSubsystem(Subsystem):
     help = "Options controlling which dependencies will be inferred for Helm targets."
 
     unowned_dependency_behavior = EnumOption(
-        default=UnownedDependencyUsage.LogWarning,
+        default=UnownedDependencyUsage.RaiseError,
         help=softwrap(
             """
             How to handle inferred dependencies that don't have an inferrable owner.

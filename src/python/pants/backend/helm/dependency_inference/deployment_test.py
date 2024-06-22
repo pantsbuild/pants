@@ -18,7 +18,11 @@ from pants.backend.helm.dependency_inference.deployment import (
     ImageReferenceResolver,
     InferHelmDeploymentDependenciesRequest,
 )
-from pants.backend.helm.dependency_inference.subsystem import HelmInferSubsystem
+from pants.backend.helm.dependency_inference.subsystem import (
+    HelmInferSubsystem,
+    UnownedDependencyError,
+    UnownedDependencyUsage,
+)
 from pants.backend.helm.target_types import (
     HelmChartTarget,
     HelmDeploymentFieldSet,
@@ -37,6 +41,7 @@ from pants.core.util_rules import config_files, external_tool, stripped_source_f
 from pants.engine import process
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import rules as graph_rules
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.engine.target import InferredDependencies
 from pants.testutil.option_util import create_subsystem
@@ -212,7 +217,10 @@ def test_resolve_relative_docker_addresses_to_deployment(
 
     source_root_patterns = ("src/*",)
     rule_runner.set_options(
-        [f"--source-root-patterns={repr(source_root_patterns)}"],
+        [
+            f"--source-root-patterns={repr(source_root_patterns)}",
+            "--helm-infer-external-docker-images=busybox",
+        ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
@@ -220,9 +228,10 @@ def test_resolve_relative_docker_addresses_to_deployment(
     tgt = rule_runner.get_target(deployment_addr)
     field_set = HelmDeploymentFieldSet.create(tgt)
 
-    mapping = rule_runner.request(
-        FirstPartyHelmDeploymentMapping, [FirstPartyHelmDeploymentMappingRequest(field_set)]
-    )
+    def make_request():
+        return rule_runner.request(
+            FirstPartyHelmDeploymentMapping, [FirstPartyHelmDeploymentMappingRequest(field_set)]
+        )
 
     if correct_target_name:
         expected = [
@@ -230,11 +239,12 @@ def test_resolve_relative_docker_addresses_to_deployment(
             ("//src/deployment:myapp1", Address("src/deployment", target_name="myapp1")),
             ("./subdir:myapp2", Address("src/deployment/subdir", target_name="myapp2")),
         ]
-        assert list(mapping.indexed_docker_addresses.values()) == expected
+        assert list(make_request().indexed_docker_addresses.values()) == expected
 
     else:
-        expected = []
-        assert list(mapping.indexed_docker_addresses.values()) == expected
+        with pytest.raises(ExecutionError) as e:
+            make_request()
+        assert isinstance(e.value.wrapped_exceptions[0], UnownedDependencyError)
 
 
 def test_resolving_docker_image() -> None:
@@ -243,7 +253,11 @@ def test_resolving_docker_image() -> None:
     target_not_found = "//testprojects/src/helm/deployment/oops:docker"
     target_wrong_type = "testprojects/src/helm/deployment:file"
     resolver = ImageReferenceResolver(
-        create_subsystem(HelmInferSubsystem, external_docker_images=["busybox"]),
+        create_subsystem(
+            HelmInferSubsystem,
+            unowned_dependency_behavior=UnownedDependencyUsage.RaiseError,
+            external_docker_images=["busybox"],
+        ),
         {
             "busybox:latest": MaybeAddress(val=ResolveError("short error")),
             "python:latest": MaybeAddress(val=ResolveError("short error")),
@@ -263,46 +277,30 @@ def test_resolving_docker_image() -> None:
             Address("testprojects/src/helm/deployment", target_name="myapp"),
         },
     )
-    resolver._handle_missing_docker_image = MagicMock(return_value=None)  # type: ignore[method-assign]
+    assert (
+        resolver.image_ref_to_actual_address("busybox:latest") is None
+    ), "image in known 3rd party should have no resolution"
 
-    errors_count = 0
+    with pytest.raises(UnownedDependencyError):
+        # image not in known 3rd party should have no resolution
+        resolver.image_ref_to_actual_address("python:latest")
 
-    try:
-        assert (
-            resolver.image_ref_to_actual_address("busybox:latest") is None
-        ), "image in known 3rd party should have no resolution"
+    assert resolver.image_ref_to_actual_address(valid_target) == (
+        valid_target,
+        Address("testprojects/src/helm/deployment", target_name="myapp"),
+    ), "A valid target should resolve correctly"
 
-        assert (
-            resolver.image_ref_to_actual_address("python:latest") is None
-        ), "image not in known 3rd party should have no resolution"
-        errors_count += 1
-        assert resolver._handle_missing_docker_image.call_count == errors_count
+    with pytest.raises(UnownedDependencyError):
+        # an invalid target that looks like a normal target should not resolve
+        resolver.image_ref_to_actual_address(image_with_target_name)
 
-        assert resolver.image_ref_to_actual_address(valid_target) == (
-            valid_target,
-            Address("testprojects/src/helm/deployment", target_name="myapp"),
-        ), "A valid target should resolve correctly"
+    with pytest.raises(UnownedDependencyError):
+        # something that is obviously a Pants target that isn't found should not resolve
+        resolver.image_ref_to_actual_address(target_not_found)
 
-        assert (
-            resolver.image_ref_to_actual_address(image_with_target_name) is None
-        ), "an invalid target that looks like a normal target should not resolve"
-        errors_count += 1
-        assert resolver._handle_missing_docker_image.call_count == errors_count
-
-        assert (
-            resolver.image_ref_to_actual_address(target_not_found) is None
-        ), "something that is obviously a Pants target that isn't found should not resolve"
-        errors_count += 1
-        assert resolver._handle_missing_docker_image.call_count == errors_count
-
-        assert (
-            resolver.image_ref_to_actual_address(target_wrong_type) is None
-        ), "a target which is not a docker_image should not resolve"
-        errors_count += 1
-        assert resolver._handle_missing_docker_image.call_count == errors_count
-    except AssertionError:
-        print(resolver._handle_missing_docker_image.call_args_list)
-        raise
+    with pytest.raises(UnownedDependencyError):
+        # a target which is not a docker_image should not resolve
+        resolver.image_ref_to_actual_address(target_wrong_type)
 
 
 def test_resolving_docker_image_no_thirdparty() -> None:
