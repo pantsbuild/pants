@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Sequence
+from typing import Sequence, Optional
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
@@ -19,6 +19,7 @@ from pants.backend.terraform.target_types import (
 )
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import DirGlobSpec, DirLiteralSpec, RawSpecs
+from pants.core.target_types import LockfileTarget
 from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import Address, AddressInput
@@ -181,6 +182,7 @@ class TerraformDeploymentInvocationFiles:
 
     backend_configs: tuple[TerraformBackendTarget, ...]
     vars_files: tuple[TerraformVarFileTarget, ...]
+    lockfile: Optional[LockfileTarget]
 
 
 @rule
@@ -221,7 +223,14 @@ def identify_terraform_backend_and_vars(
     else:
         vars_targets = has_explicit_var
 
-    return TerraformDeploymentInvocationFiles(backend_targets, vars_targets)
+    lockfiles = find_targets_of_type(tgts_in_dir, LockfileTarget)
+    if lockfiles:
+        # TODO: could we be getting multiple lockfiles, for non-terraform items?
+        lockfile = lockfiles[0]
+    else:
+        lockfile = None
+
+    return TerraformDeploymentInvocationFiles(backend_targets, vars_targets, lockfile)
 
 
 @rule
@@ -240,6 +249,8 @@ async def infer_terraform_deployment_dependencies(
     )
     deps.extend(e.address for e in invocation_files.backend_configs)
     deps.extend(e.address for e in invocation_files.vars_files)
+    if invocation_files.lockfile:
+        deps.append(invocation_files.lockfile.address)
 
     return InferredDependencies(deps)
 
