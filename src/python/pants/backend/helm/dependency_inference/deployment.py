@@ -198,7 +198,7 @@ class ImageReferenceResolver:
                 whether this should be a target's address or a 3rd-party dependency.
                 One of the following should resolve the situation:
 
-                - add `{image_ref}` to `[helm-infer].third_party_docker_images`
+                - add `{image_ref}` to `[helm-infer].external_docker_images`
                 - add the registry component of the docker image. For example, `python:3.9` becomes `docker.io/library/python:3.9`; or `myapp:latest` becomes `registry.example.com/myapp:latest`.
                 """
                 self._handle_missing_docker_image(message)
@@ -221,9 +221,9 @@ class ImageReferenceResolver:
 
         # Putting this wildcard check after parsing
         # will mean that we don't approve things that don't look like docker images.
-        if "*" in self.helm_infer.third_party_docker_images:
+        if "*" in self.helm_infer.external_docker_images:
             return True
-        if image_name in self.helm_infer.third_party_docker_images:
+        if image_name in self.helm_infer.external_docker_images:
             return True
 
         return False

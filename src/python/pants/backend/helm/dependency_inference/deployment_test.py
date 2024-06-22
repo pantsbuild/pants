@@ -243,7 +243,7 @@ def test_resolving_docker_image() -> None:
     target_not_found = "//testprojects/src/helm/deployment/oops:docker"
     target_wrong_type = "testprojects/src/helm/deployment:file"
     resolver = ImageReferenceResolver(
-        create_subsystem(HelmInferSubsystem, third_party_docker_images=["busybox"]),
+        create_subsystem(HelmInferSubsystem, external_docker_images=["busybox"]),
         {
             "busybox:latest": MaybeAddress(val=ResolveError("short error")),
             "python:latest": MaybeAddress(val=ResolveError("short error")),
@@ -307,7 +307,7 @@ def test_resolving_docker_image() -> None:
 
 def test_resolving_docker_image_no_thirdparty() -> None:
     resolver = ImageReferenceResolver(
-        create_subsystem(HelmInferSubsystem, third_party_docker_images=["*"]),
+        create_subsystem(HelmInferSubsystem, external_docker_images=["*"]),
         {
             "busybox:latest": MaybeAddress(val=ResolveError("short error")),
         },
