@@ -63,8 +63,9 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
+from pants.engine.intrinsics import add_prefix_request_to_digest
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
@@ -418,6 +419,7 @@ class _BuildPexPythonSetup:
     argv: list[str]
 
 
+@rule
 async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexPythonSetup:
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
@@ -509,6 +511,7 @@ async def get_req_strings(pex_reqs: PexRequirements) -> PexRequirementsInfo:
     return PexRequirementsInfo(tuple(sorted(req_strings)), tuple(sorted(find_links)))
 
 
+@rule
 async def _setup_pex_requirements(
     request: PexRequest, python_setup: PythonSetup
 ) -> _BuildPexRequirementsSetup:
@@ -643,7 +646,7 @@ async def build_pex(
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
 
-    if not request.interpreter_constraints:
+    if not request.python and not request.interpreter_constraints:
         # Blank ICs in the request means that the caller wants us to use the ICs configured
         # for the resolve (falling back to the global ICs).
         resolve_name = ""
@@ -665,16 +668,41 @@ async def build_pex(
                 ),
             )
 
+    source_dir_name = "source_files"
+
+    pex_python_setup_req = _determine_pex_python_and_platforms(request)
+    requirements_setup_req = _setup_pex_requirements(**implicitly({request: PexRequest}))
+    sources_digest_as_subdir_req = add_prefix_request_to_digest(
+        AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
+    )
+    if isinstance(request.requirements, PexRequirements):
+        (
+            pex_python_setup,
+            requirements_setup,
+            sources_digest_as_subdir,
+            req_info,
+        ) = await concurrently(
+            pex_python_setup_req,
+            requirements_setup_req,
+            sources_digest_as_subdir_req,
+            get_req_strings(request.requirements),
+        )
+        req_strings = req_info.req_strings
+    else:
+        pex_python_setup, requirements_setup, sources_digest_as_subdir = await concurrently(
+            pex_python_setup_req,
+            requirements_setup_req,
+            sources_digest_as_subdir_req,
+        )
+        req_strings = ()
+
     argv = [
         "--output-file",
         request.output_filename,
         *request.additional_args,
     ]
 
-    pex_python_setup = await _determine_pex_python_and_platforms(request)
     argv.extend(pex_python_setup.argv)
-
-    source_dir_name = "source_files"
 
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())
@@ -705,12 +733,8 @@ async def build_pex(
         argv.append("--no-pre-install-wheels")
 
     argv.append(f"--sources-directory={source_dir_name}")
-    sources_digest_as_subdir = await Get(
-        Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
-    )
 
     # Include any additional arguments and input digests required by the requirements.
-    requirements_setup = await _setup_pex_requirements(request, python_setup)
     argv.extend(requirements_setup.argv)
 
     merged_digest = await Get(
@@ -734,18 +758,13 @@ async def build_pex(
     else:
         output_directories = [request.output_filename]
 
-    req_strings = (
-        (await Get(PexRequirementsInfo, PexRequirements, request.requirements)).req_strings
-        if isinstance(request.requirements, PexRequirements)
-        else []
-    )
     result = await Get(
         ProcessResult,
         PexCliProcess(
             subcommand=(),
             extra_args=argv,
             additional_input_digest=merged_digest,
-            description=await _build_pex_description(request, req_strings, python_setup.resolves),
+            description=_build_pex_description(request, req_strings, python_setup.resolves),
             output_files=output_files,
             output_directories=output_directories,
             concurrency_available=requirements_setup.concurrency_available,
@@ -771,7 +790,7 @@ async def build_pex(
     )
 
 
-async def _build_pex_description(
+def _build_pex_description(
     request: PexRequest, req_strings: Sequence[str], resolve_to_lockfile: Mapping[str, str]
 ) -> str:
     if request.description:

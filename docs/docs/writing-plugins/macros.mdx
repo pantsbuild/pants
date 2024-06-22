@@ -107,3 +107,41 @@ custom_python_sources(
     has_type_hints=False,
 )
 ```
+
+## Documenting your macros
+
+Using doc-strings to document your macros, Pants will pick up and present these for the online help text. Also global constants can be documented using `Doc` wrapped in `Annotated`.
+
+```python title="pants-plugins/macros.py"
+OUR_GLOBAL_CONSTANT: Annotated[
+  int,
+  Doc(
+    """This is our magic number.
+
+    It is useful when you need the answer to the meaning of life, the universe and everythin.
+    """
+  )
+] = 42
+
+
+def custom_python_sources(has_type_hints: bool = True, **kwargs):
+    """Custom target for Python sources.
+
+    This target adds the `type_checked` tag for targets for which `has_type_hints` is true.
+    """
+    # ...
+```
+
+For CLI help, this information is presented when calling pants with:
+```
+pants OUR_GLOBAL_CONSTANT --help
+pants custom_python_sources --help
+```
+
+To list all available symbols, along with the first sentence of the docs for each:
+```
+pants symbols --help
+
+# To also include targets (to list only targets, there is "pants targets --help"):
+pants symbols --help-advanced
+```

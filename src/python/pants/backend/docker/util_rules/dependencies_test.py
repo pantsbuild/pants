@@ -20,6 +20,7 @@ from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinariesGeneratorTarget, PexBinary
 from pants.backend.python.util_rules import pex
 from pants.core.goals import package
+from pants.core.target_types import FileTarget
 from pants.engine.addresses import Address
 from pants.engine.target import GenerateTargetsRequest, InferredDependencies
 from pants.engine.unions import UnionRule
@@ -48,6 +49,7 @@ def rule_runner() -> RuleRunner:
             PexBinary,
             PexBinariesGeneratorTarget,
             GoBinaryTarget,
+            FileTarget,
         ],
     )
     rule_runner.set_options(
@@ -95,11 +97,16 @@ def test_infer_docker_dependencies(files, rule_runner: RuleRunner) -> None:
     dockerfile_content = dedent(
         """\
             ARG BASE_IMAGE=:base
+            ARG PEX_BIN=project/hello/main/py:from_arg
+            ARG PEX_BIN_DOTTED_PATH=project.hello.main.py/from_arg_dotted_path.pex
             FROM $BASE_IMAGE
             ENTRYPOINT ["./entrypoint"]
             COPY project.hello.main.py/main_binary.pex /entrypoint
             COPY project.hello.main.py/cmd1_py.pex /entrypoint
             COPY project.hello.main.go/go_bin /entrypoint
+            COPY ${PEX_BIN} /entrypoint
+            COPY ${PEX_BIN_DOTTED_PATH} /entrypoint
+            COPY project/hello/main/files/msg.txt /entrypoint
         """
     )
 
@@ -113,11 +120,23 @@ def test_infer_docker_dependencies(files, rule_runner: RuleRunner) -> None:
                 """\
                 pex_binary(name="main_binary")
                 pex_binaries(name="cmds", entry_points=["cmd1.py"])
+                pex_binary(name="from_arg")
+                pex_binary(name="from_arg_dotted_path")
                 """
             ),
             "project/hello/main/go/BUILD": dedent(
                 """\
                 go_binary(name="go_bin")
+                """
+            ),
+            "project/hello/main/files/BUILD": dedent(
+                """\
+                file(name="file", source="msg.txt")
+                """
+            ),
+            "project/hello/main/files/msg.txt": dedent(
+                """\
+                Some text. This file needs to exist so that RawSpecs(file_literals=...) can find this file
                 """
             ),
         }
@@ -134,6 +153,9 @@ def test_infer_docker_dependencies(files, rule_runner: RuleRunner) -> None:
             Address("project/hello/main/py", target_name="main_binary"),
             Address("project/hello/main/py", target_name="cmds", generated_name="cmd1.py"),
             Address("project/hello/main/go", target_name="go_bin"),
+            Address("project/hello/main/py", target_name="from_arg"),
+            Address("project/hello/main/py", target_name="from_arg_dotted_path"),
+            Address("project/hello/main/files", target_name="file"),
         ]
     )
 

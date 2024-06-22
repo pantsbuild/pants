@@ -56,9 +56,19 @@ def rule_runner() -> PythonRuleRunner:
             PythonSourceTarget,
             LocalWorkspaceEnvironmentTarget,
         ],
+        isolated_local_store=True,
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
+
+
+def execute_adhoc_tool(
+    rule_runner: PythonRuleRunner,
+    address: Address,
+) -> GeneratedSources:
+    generator_type: type[GenerateSourcesRequest] = GenerateFilesFromAdhocToolRequest
+    target = rule_runner.get_target(address)
+    return rule_runner.request(GeneratedSources, [generator_type(EMPTY_SNAPSHOT, target)])
 
 
 def assert_adhoc_tool_result(
@@ -66,9 +76,7 @@ def assert_adhoc_tool_result(
     address: Address,
     expected_contents: dict[str, str],
 ) -> None:
-    generator_type: type[GenerateSourcesRequest] = GenerateFilesFromAdhocToolRequest
-    target = rule_runner.get_target(address)
-    result = rule_runner.request(GeneratedSources, [generator_type(EMPTY_SNAPSHOT, target)])
+    result = execute_adhoc_tool(rule_runner, address)
     assert result.snapshot.files == tuple(expected_contents)
     contents = rule_runner.request(DigestContents, [result.snapshot.digest])
     for fc in contents:
@@ -320,7 +328,7 @@ def test_adhoc_tool_with_workspace_execution(rule_runner: PythonRuleRunner) -> N
                 environment="workspace",
                 stderr="stderr",
             )
-            workspace_environment(name="workspace")
+            experimental_workspace_environment(name="workspace")
             """
             )
         }
@@ -334,3 +342,35 @@ def test_adhoc_tool_with_workspace_execution(rule_runner: PythonRuleRunner) -> N
     workspace_output_path = Path(rule_runner.build_root).joinpath("foo.txt")
     assert workspace_output_path.exists()
     assert workspace_output_path.read_text().strip() == "workspace"
+
+
+def test_adhoc_tool_workspace_invalidation_sources(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+            system_binary(name="bash", binary_name="bash")
+            adhoc_tool(
+              name="cmd",
+              runnable=":bash",
+              # Use a random value so we can detect when re-execution occurs.
+              args=["-c", "echo $RANDOM > out.log"],
+              output_files=["out.log"],
+              workspace_invalidation_sources=['a-file'],
+            )
+            """
+            ),
+            "src/a-file": "",
+        }
+    )
+    address = Address("src", target_name="cmd")
+
+    # Re-executing the initial execution should be cached.
+    result1 = execute_adhoc_tool(rule_runner, address)
+    result2 = execute_adhoc_tool(rule_runner, address)
+    assert result1.snapshot == result2.snapshot
+
+    # Update the hash-only source file's content. The adhoc_tool should be re-executed now.
+    (Path(rule_runner.build_root) / "src" / "a-file").write_text("xyzzy")
+    result3 = execute_adhoc_tool(rule_runner, address)
+    assert result1.snapshot != result3.snapshot

@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 import itertools
 import operator
-from collections import defaultdict
+from collections import abc, defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from functools import reduce
@@ -140,32 +140,42 @@ class Parametrize:
 
     @classmethod
     def expand(
-        cls, address: Address, fields: dict[str, Any | Parametrize]
-    ) -> Iterator[tuple[Address, dict[str, Any]]]:
+        cls,
+        address: Address,
+        fields: Mapping[str, Any | Parametrize],
+    ) -> Iterator[tuple[Address, Mapping[str, Any]]]:
         """Produces the cartesian product of fields for the given possibly-Parametrized fields.
 
         Only one level of expansion is performed: if individual field values might also contain
         Parametrize instances (in particular: an `overrides` field), expanding those will require
         separate calls.
+
+        Parametrized groups are expanded however (that is: any `parametrize` field values in a
+        `**parametrize()` group are also expanded).
         """
         try:
-            parametrizations = cls._collect_parametrizations(fields)
-            cls._check_parametrizations(parametrizations)
-            parametrized: list[list[tuple[str, str, Any]]] = [
-                [
-                    (field_name, alias, field_value)
-                    for alias, field_value in v.to_parameters().items()
-                ]
-                for field_name, v in parametrizations.get(None, ())
-            ]
-            parametrized_groups: list[tuple[str, str, Parametrize]] = [
-                ("parametrize", group_name, vs[0][1])
-                for group_name, vs in parametrizations.items()
-                if group_name is not None
-            ]
+            yield from cls._expand(address, fields)
         except Exception as e:
             raise Exception(f"Failed to parametrize `{address}`:\n  {e}") from e
 
+    @classmethod
+    def _expand(
+        cls,
+        address: Address,
+        fields: Mapping[str, Any | Parametrize],
+        _parametrization_group_prefix: str = "",
+    ) -> Iterator[tuple[Address, Mapping[str, Any]]]:
+        parametrizations = cls._collect_parametrizations(fields)
+        cls._check_parametrizations(parametrizations)
+        parametrized: list[list[tuple[str, str, Any]]] = [
+            [(field_name, alias, field_value) for alias, field_value in v.to_parameters().items()]
+            for field_name, v in parametrizations.get(None, ())
+        ]
+        parametrized_groups: list[tuple[str, str, Parametrize]] = [
+            ("parametrize", (_parametrization_group_prefix + group_name), vs[0][1])
+            for group_name, vs in parametrizations.items()
+            if group_name is not None
+        ]
         parameters = address.parameters
         non_parametrized = tuple(
             (field_name, field_value)
@@ -193,17 +203,24 @@ class Parametrize:
                 field_name: alias for field_name, alias, _ in parametrized_args
             }
             # There will be at most one group per cross product.
-            group_kwargs: Mapping[str, Any] = next(
+            parametrize_group: Parametrize | None = next(
                 (
-                    field_value.kwargs
+                    field_value
                     for _, _, field_value in parametrized_args
                     if isinstance(field_value, Parametrize) and field_value.is_group
                 ),
-                {},
+                None,
             )
-            # Exclude fields from parametrize group from address parameters.
-            for k in group_kwargs.keys() & parameters.keys():
-                expanded_parameters.pop(k, None)
+            if parametrize_group is not None:
+                # Exclude fields from parametrize group from address parameters.
+                for k in parametrize_group.kwargs.keys() & parameters.keys():
+                    expanded_parameters.pop(k, None)
+                expand_recursively = any(
+                    isinstance(group_value, Parametrize)
+                    for group_value in parametrize_group.kwargs.values()
+                )
+            else:
+                expand_recursively = False
 
             parametrized_args_fields = tuple(
                 (field_name, field_value)
@@ -212,14 +229,36 @@ class Parametrize:
                 if not (isinstance(field_value, Parametrize) and field_value.is_group)
             )
             expanded_fields: dict[str, Any] = dict(non_parametrized + parametrized_args_fields)
-            expanded_fields.update(group_kwargs)
-
             expanded_address = address.parametrize(expanded_parameters, replace=True)
-            yield expanded_address, expanded_fields
+
+            if expand_recursively:
+                assert parametrize_group is not None  # Type narrowing to satisfy mypy.
+                # Expand nested parametrize within a parametrized group.
+                for grouped_address, grouped_fields in cls._expand(
+                    expanded_address,
+                    parametrize_group.kwargs,
+                    _parametrization_group_prefix=_parametrization_group_prefix
+                    + parametrize_group.group_name
+                    + "-",
+                ):
+                    cls._check_conflicting(
+                        {
+                            name
+                            for name in grouped_fields.keys()
+                            if isinstance(fields.get(name), Parametrize)
+                        }
+                    )
+                    yield expanded_address.parametrize(
+                        grouped_address.parameters
+                    ), expanded_fields | dict(grouped_fields)
+            else:
+                if parametrize_group is not None:
+                    expanded_fields |= dict(parametrize_group.kwargs)
+                yield expanded_address, expanded_fields
 
     @staticmethod
     def _collect_parametrizations(
-        fields: dict[str, Any | Parametrize]
+        fields: Mapping[str, Any | Parametrize]
     ) -> Mapping[str | None, list[tuple[str, Parametrize]]]:
         parametrizations = defaultdict(list)
         for field_name, v in fields.items():
@@ -246,13 +285,18 @@ class Parametrize:
             if group_name is not None
             for field_name in groups[0][1].kwargs.keys()
         }
-        conflicting = parametrize_field_names.intersection(parametrize_field_names_from_groups)
+        Parametrize._check_conflicting(
+            parametrize_field_names.intersection(parametrize_field_names_from_groups)
+        )
+
+    @staticmethod
+    def _check_conflicting(conflicting: abc.Collection[str]) -> None:
         if conflicting:
             raise ValueError(
                 softwrap(
                     f"""
                     Conflicting parametrizations for {pluralize(len(conflicting), "field", include_count=False)}:
-                    {', '.join(sorted(conflicting))}
+                    {', '.join(map(repr, sorted(conflicting)))}
                     """
                 )
             )
