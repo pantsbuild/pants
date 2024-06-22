@@ -252,11 +252,12 @@ def test_resolving_docker_image() -> None:
     image_with_target_name = "testprojects/src/helm/deployment/myapp:1.0.0"
     target_not_found = "//testprojects/src/helm/deployment/oops:docker"
     target_wrong_type = "testprojects/src/helm/deployment:file"
+    docker_with_registry = "quay.io/kiwigrid/k8s-sidecar:1.14.2"
     resolver = ImageReferenceResolver(
         create_subsystem(
             HelmInferSubsystem,
             unowned_dependency_behavior=UnownedDependencyUsage.RaiseError,
-            external_docker_images=["busybox"],
+            external_docker_images=["busybox", "quay.io/kiwigrid/k8s-sidecar"],
         ),
         {
             "busybox:latest": MaybeAddress(val=ResolveError("short error")),
@@ -272,35 +273,50 @@ def test_resolving_docker_image() -> None:
             target_wrong_type: MaybeAddress(
                 val=Address("testprojects/src/helm/deployment", target_name="file")
             ),
+            docker_with_registry: MaybeAddress(val=ResolveError("short error")),
         },
         {
             Address("testprojects/src/helm/deployment", target_name="myapp"),
         },
     )
+
+    def do_Resolve(image_ref):
+        """Perform the image resolution, raise any errors, and reset the resolver."""
+        try:
+            res = resolver.image_ref_to_actual_address(image_ref)
+            resolver.report_errors()
+            return res
+        finally:
+            resolver.errors = []
+
     assert (
-        resolver.image_ref_to_actual_address("busybox:latest") is None
+        do_Resolve("busybox:latest") is None
     ), "image in known 3rd party should have no resolution"
 
     with pytest.raises(UnownedDependencyError):
         # image not in known 3rd party should have no resolution
-        resolver.image_ref_to_actual_address("python:latest")
+        do_Resolve("python:latest")
 
-    assert resolver.image_ref_to_actual_address(valid_target) == (
+    assert do_Resolve(valid_target) == (
         valid_target,
         Address("testprojects/src/helm/deployment", target_name="myapp"),
     ), "A valid target should resolve correctly"
 
     with pytest.raises(UnownedDependencyError):
         # an invalid target that looks like a normal target should not resolve
-        resolver.image_ref_to_actual_address(image_with_target_name)
+        do_Resolve(image_with_target_name)
 
     with pytest.raises(UnownedDependencyError):
         # something that is obviously a Pants target that isn't found should not resolve
-        resolver.image_ref_to_actual_address(target_not_found)
+        do_Resolve(target_not_found)
 
     with pytest.raises(UnownedDependencyError):
         # a target which is not a docker_image should not resolve
-        resolver.image_ref_to_actual_address(target_wrong_type)
+        do_Resolve(target_wrong_type)
+
+    assert (
+        do_Resolve(docker_with_registry) is None
+    ), "image with registry in known 3rd party should have no resolution"
 
 
 def test_resolving_docker_image_no_thirdparty() -> None:
