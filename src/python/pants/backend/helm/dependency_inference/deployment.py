@@ -195,7 +195,11 @@ class ImageReferenceResolver:
             return None
         if not isinstance(maybe_addr.val, Address):
             # obviously intended to be a Pants target
-            if image_ref.startswith("//") or image_ref.startswith("./"):
+            if (
+                image_ref.startswith("//")
+                or image_ref.startswith("./")
+                or image_ref.startswith(":")
+            ):
                 message = f"`{image_ref}` was supplied but the docker_image target at `{maybe_addr.val}` does not exist."
                 self._handle_missing_docker_image(message)
                 return None
