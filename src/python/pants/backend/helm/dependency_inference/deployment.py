@@ -231,7 +231,10 @@ class ImageReferenceResolver:
         # will mean that we don't approve things that don't look like docker images.
         if "*" in self.helm_infer.external_docker_images:
             return True
-        if image_name in self.helm_infer.external_docker_images:
+        if (
+            image_name in self.helm_infer.external_docker_images
+            or image_ref in self.helm_infer.external_docker_images
+        ):
             return True
 
         return False
