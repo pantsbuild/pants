@@ -27,7 +27,7 @@ from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, logging
 
 ATTEMPTS_DEFAULT_OPTION = 2
 
@@ -52,6 +52,7 @@ def rule_runner(package_manager: str) -> RuleRunner:
             JSTestTarget,
         ],
         objects=dict(package_json.build_file_aliases().objects),
+        preserve_tmpdirs=True
     )
     rule_runner.set_options(
         [
@@ -118,6 +119,7 @@ def given_package_json(
     )
 
 
+@logging
 @pytest.mark.parametrize(
     "test_script, package_json_target",
     [
@@ -237,6 +239,7 @@ def test_batched_jest_tests_are_successful(
     assert result.exit_code == 0
 
 
+@logging
 @pytest.mark.parametrize("passing", [True, False])
 def test_mocha_tests(
     passing: bool,
@@ -278,6 +281,7 @@ def test_mocha_tests(
         assert len(result.process_results) == ATTEMPTS_DEFAULT_OPTION
 
 
+@logging
 def test_jest_test_with_coverage_reporting(
     package_manager: str,
     rule_runner: RuleRunner,
@@ -322,6 +326,7 @@ def test_jest_test_with_coverage_reporting(
                 test('adds 1 + 2 to equal 3', () => {
                     expect(add(1, 2)).toBe(3);
                 });
+                
                 """
             ),
         }
