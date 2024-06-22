@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import PurePath
 from typing import Any
 
@@ -165,19 +165,29 @@ async def first_party_helm_deployment_mapping(
 
     resolver = ImageReferenceResolver(helm_infer, maybe_addresses_by_ref, docker_target_addresses)
 
+    indexed_docker_addresses = indexed_address_inputs.transform_values(
+        lambda image_ref_ai: resolver.image_ref_to_actual_address(image_ref_ai[0])
+    )
+
+    resolver.report_errors()
     return FirstPartyHelmDeploymentMapping(
         address=request.field_set.address,
-        indexed_docker_addresses=indexed_address_inputs.transform_values(
-            lambda image_ref_ai: resolver.image_ref_to_actual_address(image_ref_ai[0])
-        ),
+        indexed_docker_addresses=indexed_docker_addresses,
     )
 
 
 @dataclass
 class ImageReferenceResolver:
+    """Attempt to resolve images to their references.
+
+    Errors are stored internally and are surfaced by a call to `report_errors`
+    """
+
     helm_infer: HelmInferSubsystem
     maybe_addresses_by_ref: dict[str, MaybeAddress]
     docker_target_addresses: set[Address]
+
+    errors: list[str] = field(default_factory=list)
 
     def image_ref_to_actual_address(self, image_ref: str) -> tuple[str, Address] | None:
         maybe_addr = self.maybe_addresses_by_ref.get(image_ref)
@@ -190,16 +200,14 @@ class ImageReferenceResolver:
                 self._handle_missing_docker_image(message)
                 return None
             # explicit 3rd party
-            elif self._image_ref_is_3rdparty(image_ref):
+            elif self._image_ref_is_known_external(image_ref):
                 return None
             else:
                 message = f"""\
                 `{image_ref}` was supplied, but Pants cannot determine
                 whether this should be a target's address or a 3rd-party dependency.
-                One of the following should resolve this:
-
-                - add `{image_ref}` to `[{HelmInferSubsystem.options_scope}].external_docker_images`
-                - add the registry component of the docker image. For example, `python:3.9` becomes `docker.io/library/python:3.9`; or `myapp:latest` becomes `registry.example.com/myapp:latest`.
+                If this should be an external image, add `{image_ref}` to `[{HelmInferSubsystem.options_scope}].external_docker_images`
+                If this should be a target address, use an absolute path instead (possibly `//{image_ref}`).
                 """
                 self._handle_missing_docker_image(message)
                 return None
@@ -210,12 +218,12 @@ class ImageReferenceResolver:
             return None
         return image_ref, maybe_addr.val
 
-    def _image_ref_is_3rdparty(self, image_ref: str) -> bool:
+    def _image_ref_is_known_external(self, image_ref: str) -> bool:
         parsed = re.match(image_ref_regexp, image_ref.strip("\"'"))
         if not parsed:
             return False
         if parsed.group("registry"):
-            image_name = parsed.group("registry") + parsed.group("repository")
+            image_name = parsed.group("registry") + "/" + parsed.group("repository")
         else:
             image_name = parsed.group("repository")
 
@@ -229,10 +237,16 @@ class ImageReferenceResolver:
         return False
 
     def _handle_missing_docker_image(self, message):
+        self.errors.append(message)
+
+    def report_errors(self):
+        if not self.errors:
+            return
+
         message = "\n".join(
             [
                 "Error resolving Docker image dependency of a Helm chart.",
-                message,
+                *self.errors,
                 f"The behavior for unowned imports can also be set with the `[{HelmInferSubsystem.options_scope}].unowned_dependency_behavior`",
             ]
         )
