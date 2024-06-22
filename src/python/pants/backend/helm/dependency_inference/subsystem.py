@@ -40,7 +40,7 @@ class HelmInferSubsystem(Subsystem):
         ),
     )
 
-    third_party_docker_images = StrListOption(
+    external_docker_images = StrListOption(
         default=[],
         help=softwrap(
             """
@@ -66,5 +66,5 @@ class HelmInferSubsystem(Subsystem):
     )
 
     @cached_property
-    def third_party_base_images(self) -> set[str]:
-        return set(self.third_party_docker_images)
+    def external_base_images(self) -> set[str]:
+        return set(self.external_docker_images)
