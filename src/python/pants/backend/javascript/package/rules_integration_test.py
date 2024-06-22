@@ -18,11 +18,11 @@ from pants.backend.javascript.package.rules import rules as package_rules
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSourceTarget
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
-from pants.core.target_types import FileTarget, ResourceTarget
+from pants.core.target_types import FileTarget, ResourceTarget  
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, logging
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRu
     rule_runner.set_options(
         [
             f"--nodejs-package-manager={package_manager}",
-            "--nodejs-package-managers={'npm': '7.20.1', 'pnpm': '8.15.5', 'yarn': '1.22.15'}",
+            "--nodejs-package-managers={'pnpm': '8.15.5', 'npm': '8.5.5'}",
         ],
         env_inherit={"PATH"},
     )
@@ -139,7 +139,6 @@ def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRu
                     "dependencies": {"child-lib": "*"},
                     "devDependencies": {"parcel": "2.6.2"},
                     "private": True,
-                    # "packageManager": "pnpm@8.15.7",
                 }
             ),
             "src/js/ham/style.css": "",
@@ -159,6 +158,7 @@ def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRu
     return rule_runner
 
 
+@logging()
 def test_packages_sources_as_resource_using_build_tool(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("src/js/ham", generated_name="build"))
     snapshot = rule_runner.request(Snapshot, (EMPTY_DIGEST,))
