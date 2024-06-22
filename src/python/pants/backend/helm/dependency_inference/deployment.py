@@ -196,9 +196,9 @@ class ImageReferenceResolver:
                 message = f"""\
                 `{image_ref}` was supplied, but Pants cannot determine
                 whether this should be a target's address or a 3rd-party dependency.
-                One of the following should resolve the situation:
+                One of the following should resolve this:
 
-                - add `{image_ref}` to `[helm-infer].external_docker_images`
+                - add `{image_ref}` to `[{HelmInferSubsystem.options_scope}].external_docker_images`
                 - add the registry component of the docker image. For example, `python:3.9` becomes `docker.io/library/python:3.9`; or `myapp:latest` becomes `registry.example.com/myapp:latest`.
                 """
                 self._handle_missing_docker_image(message)
@@ -229,7 +229,13 @@ class ImageReferenceResolver:
         return False
 
     def _handle_missing_docker_image(self, message):
-        message = "Error resolving Docker image dependency of a Helm chart.\n" + message
+        message = "\n".join(
+            [
+                "Error resolving Docker image dependency of a Helm chart.",
+                message,
+                f"The behavior for unowned imports can also be set with the `[{HelmInferSubsystem.options_scope}].unowned_dependency_behavior`",
+            ]
+        )
         if self.helm_infer.unowned_dependency_behavior == UnownedDependencyUsage.RaiseError:
             raise UnownedDependencyError(message)
         elif self.helm_infer.unowned_dependency_behavior == UnownedDependencyUsage.LogWarning:

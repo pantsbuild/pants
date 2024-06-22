@@ -83,7 +83,10 @@ def rule_runner() -> RuleRunner:
     )
     source_root_patterns = ("src/*",)
     rule_runner.set_options(
-        [f"--source-root-patterns={repr(source_root_patterns)}"],
+        [
+            f"--source-root-patterns={repr(source_root_patterns)}",
+            "--helm-infer-external-docker-images=['busybox']",
+        ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     return rule_runner
