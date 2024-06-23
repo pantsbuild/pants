@@ -14,6 +14,7 @@ from pants.backend.terraform.target_types import (
     TerraformBackendTarget,
     TerraformDependenciesField,
     TerraformDeploymentFieldSet,
+    TerraformLockfileTarget,
     TerraformModuleSourcesField,
     TerraformVarFileTarget,
 )
@@ -223,7 +224,7 @@ def identify_terraform_backend_and_vars(
     else:
         vars_targets = has_explicit_var
 
-    lockfiles = find_targets_of_type(tgts_in_dir, LockfileTarget)
+    lockfiles = find_targets_of_type(tgts_in_dir, TerraformLockfileTarget)
     if lockfiles:
         # TODO: could we be getting multiple lockfiles, for non-terraform items?
         lockfile = lockfiles[0]
