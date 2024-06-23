@@ -129,6 +129,11 @@ struct Opt {
     #[structopt(long)]
     server: Option<String>,
 
+    /// The platform that the remote process will be executed on.
+    /// MUST be set if executing remotely.
+    #[structopt(long, default_value = Platform::Linux_x86_64.as_ref())]
+    remote_execution_platform: Platform,
+
     /// Path to file containing root certificate authority certificates for the execution server.
     /// If not set, TLS will not be used when connecting to the execution server.
     #[structopt(long)]
@@ -444,10 +449,17 @@ async fn make_request(
         let strategy = ProcessExecutionStrategy::RemoteExecution(collection_from_keyvalues(
             args.command.extra_platform_property.iter(),
         ));
+
+        // Not sure if this is the best way to handle this - we could default to the remote platform
+        // being Linux_x86_64 as before.
+        let platform = args.remote_execution_platform.ok_or_else(|| {
+            "remote_execution_platform must be set when executing remotely".to_string()
+        })?;
+
+
         ProcessExecutionEnvironment {
             name: None,
-            // TODO: Make configurable.
-            platform: Platform::Linux_x86_64,
+            platform,
             strategy,
         }
     } else {

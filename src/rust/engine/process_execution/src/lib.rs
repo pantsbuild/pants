@@ -212,6 +212,17 @@ impl TryFrom<String> for Platform {
     }
 }
 
+impl AsRef<str> for Platform {
+    fn as_ref(&self) -> &str {
+        match self {
+            Platform::Linux_x86_64 => "linux_x86_64",
+            Platform::Linux_arm64 => "linux_arm64",
+            Platform::Macos_arm64 => "macos_arm64",
+            Platform::Macos_x86_64 => "macos_x86_64",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq, Hash, Serialize)]
 pub enum ProcessCacheScope {
     // Cached in all locations, regardless of success or failure.
