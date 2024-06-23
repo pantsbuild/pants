@@ -7,6 +7,7 @@ from pathlib import Path
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.target_types import (
     TerraformDependenciesField,
+    TerraformLockfileTarget,
     TerraformModuleSourcesField,
     TerraformModuleTarget,
     TerraformRootModuleField,
@@ -150,7 +151,7 @@ async def terraform_lockfile_synthetic_targets(
                 os.path.join(path, "BUILD.terraform-lockfiles"),
                 (
                     TargetAdaptor(
-                        "_lockfile",
+                        TerraformLockfileTarget.alias,
                         name=".terraform.lock.hcl",
                         source=".terraform.lock.hcl",
                         __description_of_origin__="terraform",
