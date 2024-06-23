@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional, Sequence
+from typing import Iterable, Optional, Sequence
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
@@ -43,6 +43,7 @@ from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.resources import read_resource
+from pants.util.strutil import bullet_list, softwrap
 
 
 class TerraformHcl2Parser(PythonToolRequirementsBase):
@@ -208,6 +209,28 @@ async def get_terraform_backend_and_vars(
     return identify_terraform_backend_and_vars(explicit_deps_tgt, tgts_in_dir)
 
 
+class InvalidLockfileException(Exception):
+    @classmethod
+    def too_many_lockfiles(
+        cls, lockfiles: Iterable[TerraformLockfileTarget]
+    ) -> InvalidLockfileException:
+        addresses = sorted(tgt.address.spec for tgt in lockfiles)
+        return cls(
+            softwrap(
+                f"""\
+                A Terraform deployment has {len(addresses)} lockfiles supplied:
+                {bullet_list(addresses)}
+                Terraform requires at most 1 lockfile; it must be called `.terraform.lock.hcl`;
+                and it must be in the same directory as the root module.
+
+                Pants generates targets for Terraform lockfiles automatically.
+                If you manually added `{TerraformLockfileTarget.alias}` targets, removing them should resolve this error.
+                If you have not, please report this as a bug.
+                """
+            )
+        )
+
+
 def identify_terraform_backend_and_vars(
     explicit_deps: Sequence[Target], tgts_in_dir: Sequence[Target]
 ) -> TerraformDeploymentInvocationFiles:
@@ -225,9 +248,12 @@ def identify_terraform_backend_and_vars(
         vars_targets = has_explicit_var
 
     lockfiles = find_targets_of_type(tgts_in_dir, TerraformLockfileTarget)
-    if lockfiles:
-        # TODO: could we be getting multiple lockfiles, for non-terraform items?
+    if len(lockfiles) == 1:
         lockfile = lockfiles[0]
+    elif len(lockfiles) > 1:
+        # Unlikely, since we generate them based on a constant filename.
+        # Indicates manual specification of targets
+        raise InvalidLockfileException.too_many_lockfiles(lockfiles)
     else:
         lockfile = None
 

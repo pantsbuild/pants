@@ -148,6 +148,8 @@ def all_terraform_deployment_targets(targets: AllTargets) -> AllTerraformDeploym
 class LockfileSourceField(SingleSourceField):
     """Source field for synthesized `_lockfile` targets."""
 
+    default = ".terraform.lock.hcl"
+
 
 class LockfileDependenciesField(Dependencies):
     pass
