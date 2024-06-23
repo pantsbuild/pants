@@ -20,6 +20,7 @@ from pants.backend.terraform.target_types import (
 from pants.core.goals import deploy
 from pants.core.goals.deploy import DeployProcess
 from pants.core.register import rules as core_rules
+from pants.core.target_types import LockfileTarget
 from pants.core.util_rules import source_files
 from pants.engine import process
 from pants.engine.internals.native_engine import Address
@@ -35,6 +36,7 @@ def rule_runner_with_auto_approve() -> RuleRunner:
             TerraformDeploymentTarget,
             TerraformBackendTarget,
             TerraformVarFileTarget,
+            LockfileTarget,
         ],
         rules=[
             *dependency_inference.rules(),
