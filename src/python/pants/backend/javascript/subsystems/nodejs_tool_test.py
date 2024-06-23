@@ -74,7 +74,7 @@ def test_execute_process_with_package_manager(
 
     to_run = rule_runner.request(Process, [request])
 
-    assert to_run.argv == expected_argv + ("cowsay@1.5.0", "--version")
+    assert to_run.argv == expected_argv + ("cowsay@1.6.0", "--version")
 
     result = rule_runner.request(ProcessResult, [request])
 
