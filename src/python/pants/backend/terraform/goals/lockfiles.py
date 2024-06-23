@@ -152,7 +152,7 @@ async def terraform_lockfile_synthetic_targets(
                     TargetAdaptor(
                         "_lockfile",
                         name=".terraform.lock.hcl",
-                        source=lockfile.files[0],
+                        source=".terraform.lock.hcl",
                         __description_of_origin__="terraform",
                     ),
                 ),
