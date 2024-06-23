@@ -54,38 +54,24 @@ class NfpmArch(Enum):
     wasm = "wasm"
 
 
-class GoOS(Enum):
-    # GOOS possible values come from `okgoos` var at:
-    # https://github.com/golang/go/blob/go1.20.3/src/cmd/dist/build.go#L81-L98
-    darwin = "darwin"
-    dragonfly = "dragonfly"
-    illumos = "illumos"
-    ios = "ios"
-    js = "js"
-    linux = "linux"  # apk, archlinux - no other value accepted
-    android = "android"
-    solaris = "solaris"
-    freebsd = "freebsd"
-    nacl = "nacl"
-    netbsd = "netbsd"
-    openbsd = "openbsd"
-    plan9 = "plan9"
-    windows = "windows"
-    aix = "aix"
-
-
 class NfpmArchField(StringField):
     nfpm_alias = "arch"
     alias: ClassVar[str] = nfpm_alias
     # valid_choices = NfpmArch  # no valid_choices to support pass-through values.
     default = NfpmArch.amd64.value  # based on nFPM default
     help = help_text(
-        """
+        f"""
         The package architecture.
 
         This should be a valid GOARCH value (or GOARCH+GOARM) that nFPM can
-        translate into the package-specific equivalent. Otherwise, pants tells
+        convert into the package-specific equivalent. Otherwise, pants tells
         nFPM to use this value as-is.
+
+        nFPM conversion from GOARCH to package-specific value is documented here:
+        https://nfpm.goreleaser.com/goarch-to-pkg/
+
+        Use one of these values unless you need nFPM to use your value as-is:
+        {", ".join(repr(arch.value) for arch in NfpmArch.__members__.values())}
         """
     )
 
@@ -93,8 +79,8 @@ class NfpmArchField(StringField):
 class NfpmPlatformField(StringField):
     nfpm_alias = "platform"
     alias: ClassVar[str] = nfpm_alias
-    # valid_choices = GoOS  # no valid_choices to support pass-through values.
-    default = GoOS.linux.value  # based on nFPM default
+    # no valid_choices to support pass-through values.
+    default = "linux"  # based on nFPM default
     help = help_text(
         f"""
         The package platform or OS.
@@ -103,7 +89,7 @@ class NfpmPlatformField(StringField):
         with the assumption that this is a GOOS value (since nFPM is part of the
         "goreleaser" project). But, nFPM does not do much with it.
 
-        For archlinux and apk, the only valid value is '{GoOS.linux.value}'.
+        For archlinux and apk, the only valid value is 'linux'.
         For deb, this can be used as part of the 'Architecture' entry.
         For rpm, this populates the "OS" tag.
         """
