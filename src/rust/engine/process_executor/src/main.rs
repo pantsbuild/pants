@@ -1,29 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
-// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![deny(
-    clippy::all,
-    clippy::default_trait_access,
-    clippy::expl_impl_clone_on_copy,
-    clippy::if_not_else,
-    clippy::needless_continue,
-    clippy::unseparated_literal_suffix,
-    clippy::used_underscore_binding
-)]
-// It is often more clear to show that nothing is being moved.
-#![allow(clippy::match_ref_pats)]
-// Subjective style.
-#![allow(
-    clippy::len_without_is_empty,
-    clippy::redundant_field_names,
-    clippy::too_many_arguments
-)]
-// Default isn't as big a deal as people seem to think it is.
-#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
-#![allow(clippy::mutex_atomic)]
 #![type_length_limit = "1257309"]
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -45,7 +22,8 @@ use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
 use remote::remote_cache::RemoteCacheRunnerOptions;
-use store::{ImmutableInputs, RemoteStoreOptions, Store};
+use store::{ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store};
+use tokio::sync::RwLock;
 use workunit_store::{in_workunit, Level, WorkunitStore};
 
 #[derive(Clone, Debug, Default)]
@@ -284,7 +262,8 @@ async fn main() {
         .expect("failed parsing root CA certs");
 
       local_only_store
-        .into_with_remote(RemoteStoreOptions {
+            .into_with_remote(RemoteStoreOptions {
+                provider: RemoteProvider::Reapi,
           store_address: cas_server.to_owned(),
           instance_name: args.remote_instance_name.clone(),
           tls_config,
@@ -386,6 +365,7 @@ async fn main() {
                                 .map(|p| p.to_string_lossy().to_string()),
                         },
                         RemoteStoreOptions {
+                            provider: RemoteProvider::Reapi,
                             instance_name: process_metadata.instance_name.clone(),
                             store_address: address,
                             tls_config,
@@ -414,6 +394,7 @@ async fn main() {
             ),
             ImmutableInputs::new(store.clone(), &workdir).unwrap(),
             KeepSandboxes::Never,
+            Arc::new(RwLock::new(())),
         )) as Box<dyn process_execution::CommandRunner>,
     };
 

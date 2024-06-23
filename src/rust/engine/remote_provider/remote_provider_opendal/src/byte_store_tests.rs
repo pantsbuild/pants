@@ -6,7 +6,7 @@ use std::time::Duration;
 use bytes::Bytes;
 use grpc_util::tls;
 use opendal::services::Memory;
-use remote_provider_traits::{ByteStoreProvider, RemoteStoreOptions};
+use remote_provider_traits::{ByteStoreProvider, RemoteProvider, RemoteStoreOptions};
 use testutil::data::TestData;
 use testutil::file::mk_tempfile;
 
@@ -26,6 +26,7 @@ fn test_path(data: &TestData) -> String {
 }
 fn remote_options() -> RemoteStoreOptions {
     RemoteStoreOptions {
+        provider: RemoteProvider::ExperimentalFile,
         store_address: "".to_owned(),
         instance_name: None,
         tls_config: tls::Config::default(),
@@ -45,7 +46,7 @@ fn new_provider() -> Provider {
 async fn write_test_data(provider: &Provider, data: &TestData) {
     provider
         .operator
-        .write(&test_path(&data), data.bytes())
+        .write(&test_path(data), data.bytes())
         .await
         .unwrap();
 }

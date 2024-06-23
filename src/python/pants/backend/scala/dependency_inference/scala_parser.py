@@ -10,6 +10,11 @@ from typing import Any, Iterator, Mapping
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
+from pants.backend.scala.util_rules.versions import (
+    ScalaArtifactsForVersionRequest,
+    ScalaArtifactsForVersionResult,
+    ScalaVersion,
+)
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
@@ -30,7 +35,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.jdk_rules import rules as jdk_rules
-from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.subsystems import JvmSubsystem
@@ -43,8 +48,8 @@ from pants.util.resources import read_resource
 logger = logging.getLogger(__name__)
 
 
-_PARSER_SCALA_VERSION = "2.13.8"
-_PARSER_SCALA_BINARY_VERSION = _PARSER_SCALA_VERSION.rpartition(".")[0]
+_PARSER_SCALA_VERSION = ScalaVersion.parse("2.13.8")
+_PARSER_SCALA_BINARY_VERSION = _PARSER_SCALA_VERSION.binary
 
 
 class ScalaParserToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -86,11 +91,35 @@ class ScalaProvidedSymbol:
 
 
 @dataclass(frozen=True)
+class ScalaConsumedSymbol:
+    name: str
+    is_absolute: bool
+
+    @classmethod
+    def from_json_dict(cls, data: Mapping[str, Any]):
+        return cls(name=data["name"], is_absolute=data["isAbsolute"])
+
+    @property
+    def is_qualified(self) -> bool:
+        # TODO: Similar to #13545: we assume that a symbol containing a dot might already
+        # be fully qualified.
+        return "." in self.name
+
+    def split(self) -> tuple[str, str]:
+        """Splits the symbol name in its relative prefix and the rest of the symbol name."""
+        symbol_rel_prefix, _, symbol_rel_suffix = self.name.partition(".")
+        return (symbol_rel_prefix, symbol_rel_suffix)
+
+    def to_debug_json_dict(self) -> dict[str, Any]:
+        return {"name": self.name, "isAbsolute": self.is_absolute}
+
+
+@dataclass(frozen=True)
 class ScalaSourceDependencyAnalysis:
     provided_symbols: FrozenOrderedSet[ScalaProvidedSymbol]
     provided_symbols_encoded: FrozenOrderedSet[ScalaProvidedSymbol]
     imports_by_scope: FrozenDict[str, tuple[ScalaImport, ...]]
-    consumed_symbols_by_scope: FrozenDict[str, FrozenOrderedSet[str]]
+    _consumed_symbols_by_scope: FrozenDict[str, FrozenOrderedSet[ScalaConsumedSymbol]]
     scopes: FrozenOrderedSet[str]
 
     def all_imports(self) -> Iterator[str]:
@@ -114,32 +143,45 @@ class ScalaSourceDependencyAnalysis:
                     break
                 scope, _, _ = scope.rpartition(".")
 
-        for consumption_scope, consumed_symbols in self.consumed_symbols_by_scope.items():
+        for consumption_scope, consumed_symbols in self._consumed_symbols_by_scope.items():
             parent_scopes = tuple(scope_and_parents(consumption_scope))
             for symbol in consumed_symbols:
-                symbol_rel_prefix, dot_in_symbol, symbol_rel_suffix = symbol.partition(".")
-                if not self.scopes or dot_in_symbol:
-                    # TODO: Similar to #13545: we assume that a symbol containing a dot might already
-                    # be fully qualified.
-                    yield symbol
+                if not self.scopes or symbol.is_qualified or symbol.is_absolute:
+                    yield symbol.name
+
+                if symbol.is_absolute:
+                    # We do not need to qualify this symbol any further as we know its
+                    # name is the actual fully qualified name
+                    continue
+
                 for parent_scope in parent_scopes:
                     if parent_scope in self.scopes:
                         # A package declaration is a parent of this scope, and any of its symbols
                         # could be in scope.
-                        yield f"{parent_scope}.{symbol}"
+                        yield f"{parent_scope}.{symbol.name}"
 
                     for imp in self.imports_by_scope.get(parent_scope, ()):
                         if imp.is_wildcard:
                             # There is a wildcard import in a parent scope.
-                            yield f"{imp.name}.{symbol}"
-                        if dot_in_symbol:
+                            yield f"{imp.name}.{symbol.name}"
+                        if symbol.is_qualified:
                             # If the parent scope has an import which defines the first token of the
                             # symbol, then it might be a relative usage of an import.
+                            symbol_rel_prefix, symbol_rel_suffix = symbol.split()
                             if imp.alias:
                                 if imp.alias == symbol_rel_prefix:
                                     yield f"{imp.name}.{symbol_rel_suffix}"
                             elif imp.name.endswith(f".{symbol_rel_prefix}"):
                                 yield f"{imp.name}.{symbol_rel_suffix}"
+
+    @property
+    def consumed_symbols_by_scope(self) -> FrozenDict[str, FrozenOrderedSet[str]]:
+        return FrozenDict(
+            {
+                key: FrozenOrderedSet(v.name for v in values)
+                for key, values in self._consumed_symbols_by_scope.items()
+            }
+        )
 
     @classmethod
     def from_json_dict(cls, d: dict) -> ScalaSourceDependencyAnalysis:
@@ -156,9 +198,9 @@ class ScalaSourceDependencyAnalysis:
                     for key, values in d["importsByScope"].items()
                 }
             ),
-            consumed_symbols_by_scope=FrozenDict(
+            _consumed_symbols_by_scope=FrozenDict(
                 {
-                    key: FrozenOrderedSet(values)
+                    key: FrozenOrderedSet(ScalaConsumedSymbol.from_json_dict(v) for v in values)
                     for key, values in d["consumedSymbolsByScope"].items()
                 }
             ),
@@ -176,7 +218,8 @@ class ScalaSourceDependencyAnalysis:
                 for key, values in self.imports_by_scope.items()
             },
             "consumed_symbols_by_scope": {
-                k: sorted(v) for k, v in self.consumed_symbols_by_scope.items()
+                key: [v.to_debug_json_dict() for v in values]
+                for key, values in self._consumed_symbols_by_scope.items()
             },
             "scopes": list(self.scopes),
         }
@@ -194,7 +237,7 @@ class ScalaParserCompiledClassfiles(ClasspathEntry):
 @dataclass(frozen=True)
 class AnalyzeScalaSourceRequest:
     source_files: SourceFiles
-    scala_version: str
+    scala_version: ScalaVersion
     source3: bool
 
 
@@ -274,7 +317,7 @@ async def analyze_scala_source_dependencies(
                 "org.pantsbuild.backend.scala.dependency_inference.ScalaParser",
                 analysis_output_path,
                 source_path,
-                request.scala_version,
+                str(request.scala_version),
                 str(request.source3),
             ],
             input_digest=prefixed_source_files_digest,
@@ -319,8 +362,9 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
 
     parser_source = FileContent("ScalaParser.scala", parser_source_content)
 
-    parser_lockfile_request = await Get(
-        GenerateJvmLockfileFromTool, ScalaParserToolLockfileSentinel()
+    parser_lockfile_request, scala_artifacts = await MultiGet(
+        Get(GenerateJvmLockfileFromTool, ScalaParserToolLockfileSentinel()),
+        Get(ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(_PARSER_SCALA_VERSION)),
     )
 
     tool_classpath, parser_classpath, source_digest = await MultiGet(
@@ -329,23 +373,7 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
             ToolClasspathRequest(
                 prefix="__toolcp",
                 artifact_requirements=ArtifactRequirements.from_coordinates(
-                    [
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-compiler",
-                            version=_PARSER_SCALA_VERSION,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-library",
-                            version=_PARSER_SCALA_VERSION,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-reflect",
-                            version=_PARSER_SCALA_VERSION,
-                        ),
-                    ]
+                    scala_artifacts.all_coordinates
                 ),
             ),
         ),
@@ -397,15 +425,18 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
 
 
 @rule
-def generate_scala_parser_lockfile_request(
+async def generate_scala_parser_lockfile_request(
     _: ScalaParserToolLockfileSentinel,
 ) -> GenerateJvmLockfileFromTool:
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(_PARSER_SCALA_VERSION)
+    )
     return GenerateJvmLockfileFromTool(
         artifact_inputs=FrozenOrderedSet(
             {
                 f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.8.7",
                 f"io.circe:circe-generic_{_PARSER_SCALA_BINARY_VERSION}:0.14.1",
-                f"org.scala-lang:scala-library:{_PARSER_SCALA_VERSION}",
+                scala_artifacts.library_coordinate.to_coord_str(),
             }
         ),
         artifact_option_name="n/a",

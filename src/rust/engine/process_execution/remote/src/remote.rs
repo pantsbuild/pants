@@ -211,7 +211,7 @@ impl CommandRunner {
         let capabilities_fut = async {
             let mut request = remexec::GetCapabilitiesRequest::default();
             if let Some(s) = self.instance_name.as_ref() {
-                request.instance_name = s.clone();
+                request.instance_name.clone_from(s);
             }
 
             let request = apply_headers(Request::new(request), "");
@@ -560,7 +560,7 @@ impl CommandRunner {
                 None
             })?;
 
-        ExecutionStageValue::from_i32(eom.stage)
+        ExecutionStageValue::try_from(eom.stage).ok()
     }
 
     // pub(crate) for testing

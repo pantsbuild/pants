@@ -1,30 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
-// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![deny(
-    clippy::all,
-    clippy::default_trait_access,
-    clippy::expl_impl_clone_on_copy,
-    clippy::if_not_else,
-    clippy::needless_continue,
-    clippy::unseparated_literal_suffix,
-    clippy::used_underscore_binding
-)]
-// It is often more clear to show that nothing is being moved.
-#![allow(clippy::match_ref_pats)]
-// Subjective style.
-#![allow(
-    clippy::len_without_is_empty,
-    clippy::redundant_field_names,
-    clippy::too_many_arguments
-)]
-// Default isn't as big a deal as people seem to think it is.
-#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
-#![allow(clippy::mutex_atomic)]
-
 pub mod directory;
 #[cfg(test)]
 mod directory_tests;
@@ -47,11 +23,12 @@ pub use crate::glob_matching::{
 };
 
 use std::cmp::min;
-use std::io;
+use std::io::{self, ErrorKind};
 use std::ops::Deref;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
+use std::time::SystemTime;
 use std::{fmt, fs};
 
 use async_trait::async_trait;
@@ -258,6 +235,45 @@ impl PathStat {
             PathStat::Link { path, .. } => path.as_path(),
         }
     }
+}
+
+/// The kind of path (e.g., file, directory, symlink) as identified in `PathMetadata`
+#[derive(Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq)]
+pub enum PathMetadataKind {
+    File,
+    Directory,
+    Symlink,
+}
+
+/// Expanded version of `Stat` when access to additional filesystem attributes is necessary.
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
+pub struct PathMetadata {
+    /// Path to this filesystem entry.
+    pub path: PathBuf,
+
+    /// The kind of file at the path.
+    pub kind: PathMetadataKind,
+
+    /// Length of the filesystem entry.
+    pub length: u64,
+
+    /// True if the entry is marked executable.
+    pub is_executable: bool,
+
+    /// UNIX mode (if available)
+    pub unix_mode: Option<u32>,
+
+    /// Modification time of the path (if available).
+    pub accessed: Option<SystemTime>,
+
+    /// Modification time of the path (if available).
+    pub created: Option<SystemTime>,
+
+    /// Modification time of the path (if available).
+    pub modified: Option<SystemTime>,
+
+    /// Symlink target
+    pub symlink_target: Option<PathBuf>,
 }
 
 #[derive(Debug, DeepSizeOf, Eq, PartialEq)]
@@ -583,6 +599,43 @@ impl PosixFS {
                 _ => Err(err),
             })
     }
+
+    pub async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, io::Error> {
+        let abs_path = self.root.0.join(&path);
+        match tokio::fs::symlink_metadata(&abs_path).await {
+            Ok(metadata) => {
+                let (kind, symlink_target) = match metadata.file_type() {
+                    ft if ft.is_symlink() => {
+                        let symlink_target = tokio::fs::read_link(&abs_path).await.map_err(|e| io::Error::other(format!("path {abs_path:?} was previously a symlink but read_link failed: {e}")))?;
+                        (PathMetadataKind::Symlink, Some(symlink_target))
+                    }
+                    ft if ft.is_dir() => (PathMetadataKind::Directory, None),
+                    ft if ft.is_file() => (PathMetadataKind::File, None),
+                    _ => unreachable!("std::fs::FileType was not a symlink, directory, or file"),
+                };
+
+                #[cfg(target_family = "unix")]
+                let (unix_mode, is_executable) = {
+                    let mode = metadata.permissions().mode();
+                    (Some(mode), (mode & 0o111) != 0)
+                };
+
+                Ok(Some(PathMetadata {
+                    path,
+                    kind,
+                    length: metadata.len(),
+                    is_executable,
+                    unix_mode,
+                    accessed: metadata.accessed().ok(),
+                    created: metadata.created().ok(),
+                    modified: metadata.modified().ok(),
+                    symlink_target,
+                }))
+            }
+            Err(err) if err.kind() == ErrorKind::NotFound => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
 }
 
 #[async_trait]
@@ -593,6 +646,10 @@ impl Vfs<io::Error> for Arc<PosixFS> {
 
     async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, io::Error> {
         Ok(Arc::new(PosixFS::scandir(self, dir).await?))
+    }
+
+    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, io::Error> {
+        PosixFS::path_metadata(self, path).await
     }
 
     fn is_ignored(&self, stat: &Stat) -> bool {
@@ -672,6 +729,49 @@ impl Vfs<String> for DigestTrie {
         )))
     }
 
+    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, String> {
+        let entry = match self.entry(&path)? {
+            Some(e) => e,
+            None => return Ok(None),
+        };
+
+        Ok(Some(match entry {
+            directory::Entry::File(f) => PathMetadata {
+                path,
+                kind: PathMetadataKind::File,
+                length: entry.digest().size_bytes as u64,
+                is_executable: f.is_executable(),
+                unix_mode: None,
+                accessed: None,
+                created: None,
+                modified: None,
+                symlink_target: None,
+            },
+            directory::Entry::Symlink(s) => PathMetadata {
+                path,
+                kind: PathMetadataKind::Symlink,
+                length: 0,
+                is_executable: false,
+                unix_mode: None,
+                accessed: None,
+                created: None,
+                modified: None,
+                symlink_target: Some(s.target().to_path_buf()),
+            },
+            directory::Entry::Directory(_) => PathMetadata {
+                path,
+                kind: PathMetadataKind::Directory,
+                length: entry.digest().size_bytes as u64,
+                is_executable: false,
+                unix_mode: None,
+                accessed: None,
+                created: None,
+                modified: None,
+                symlink_target: None,
+            },
+        }))
+    }
+
     fn is_ignored(&self, _stat: &Stat) -> bool {
         false
     }
@@ -688,6 +788,7 @@ impl Vfs<String> for DigestTrie {
 pub trait Vfs<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     async fn read_link(&self, link: &Link) -> Result<PathBuf, E>;
     async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, E>;
+    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, E>;
     fn is_ignored(&self, stat: &Stat) -> bool;
     fn mk_error(msg: &str) -> E;
 }

@@ -2,11 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Iterable, Set, Tuple, Type
+from pathlib import PurePath
+from typing import Collection, Iterable, Set, Tuple, Type, Union
 
 from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField
+from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Target
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,35 @@ async def determine_source_files(request: SourceFilesRequest) -> SourceFiles:
     )
     result = await Get(Snapshot, MergeDigests(digests_to_merge))
     return SourceFiles(result, tuple(sorted(unrooted_files)))
+
+
+@dataclass(frozen=True)
+class ClassifiedSources:
+    target_type: type[Target]
+    files: Collection[str]
+    name: Union[str, None] = None
+
+
+def classify_files_for_sources_and_tests(
+    paths: Iterable[str],
+    test_file_glob: tuple[str, ...],
+    sources_generator: type[Target],
+    tests_generator: type[Target],
+) -> Iterable[ClassifiedSources]:
+    """Classify files when running the tailor goal logic.
+
+    This function is to be re-used by any tailor related code that needs to separate sources
+    collected for the target generators to own sources code (`language-name_sources` targets) and
+    tests code (`language-name_tests` targets).
+    """
+    sources_files = set(paths)
+    test_files = {
+        path for path in paths if any(PurePath(path).match(glob) for glob in test_file_glob)
+    }
+    if sources_files:
+        yield ClassifiedSources(sources_generator, files=sources_files - test_files)
+    if test_files:
+        yield ClassifiedSources(tests_generator, test_files, "tests")
 
 
 def rules():

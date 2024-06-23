@@ -8,8 +8,10 @@ from typing import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileListOption, SkipOption
 from pants.util.strutil import softwrap
 
@@ -17,7 +19,7 @@ from pants.util.strutil import softwrap
 class Isort(PythonToolBase):
     options_scope = "isort"
     name = "isort"
-    help = "The Python import sorter tool (https://pycqa.github.io/isort/)."
+    help_short = "The Python import sorter tool (https://pycqa.github.io/isort/)."
 
     default_main = ConsoleScript("isort")
     default_requirements = ["isort[pyproject,colors]>=5.9.3,<6.0"]
@@ -91,4 +93,7 @@ class Isort(PythonToolBase):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(ExportableTool, Isort),
+    ]

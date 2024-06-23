@@ -13,7 +13,7 @@ from pants.util.strutil import help_text, softwrap
 class Pytype(PythonToolBase):
     options_scope = "pytype"
     name = "Pytype"
-    help = help_text(
+    help_short = help_text(
         """
         The Pytype utility for typechecking Python code
         (https://github.com/google/pytype).
@@ -21,7 +21,7 @@ class Pytype(PythonToolBase):
     )
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<3.10"]
+    default_interpreter_constraints = ["CPython>=3.7,<3.11"]
 
     default_main = ConsoleScript("pytype")
     default_requirements = ["pytype==2023.6.16"]

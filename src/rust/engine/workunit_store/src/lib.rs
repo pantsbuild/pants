@@ -1,30 +1,6 @@
 // Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
-// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![deny(
-    clippy::all,
-    clippy::default_trait_access,
-    clippy::expl_impl_clone_on_copy,
-    clippy::if_not_else,
-    clippy::needless_continue,
-    clippy::unseparated_literal_suffix,
-    clippy::used_underscore_binding
-)]
-// It is often more clear to show that nothing is being moved.
-#![allow(clippy::match_ref_pats)]
-// Subjective style.
-#![allow(
-    clippy::len_without_is_empty,
-    clippy::redundant_field_names,
-    clippy::too_many_arguments
-)]
-// Default isn't as big a deal as people seem to think it is.
-#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
-#![allow(clippy::mutex_atomic)]
-
 use std::any::Any;
 use std::cell::RefCell;
 use std::cmp::Reverse;
@@ -565,7 +541,7 @@ impl HeavyHittersData {
 
 impl WorkunitStore {
     pub fn new(log_starting_workunits: bool, max_level: Level) -> WorkunitStore {
-        // NB: Although it would be nice not to have seperate allocations per consumer, it is
+        // NB: Although it would be nice not to have separate allocations per consumer, it is
         // difficult to use a channel like `tokio::sync::broadcast` due to that channel being bounded.
         // Subscribers receive messages at very different rates, and adjusting the workunit level
         // affects the total number of messages that might be queued at any given time.
@@ -808,7 +784,7 @@ pub struct WorkunitStoreHandle {
 }
 
 thread_local! {
-  static THREAD_WORKUNIT_STORE_HANDLE: RefCell<Option<WorkunitStoreHandle >> = RefCell::new(None)
+  static THREAD_WORKUNIT_STORE_HANDLE: RefCell<Option<WorkunitStoreHandle >> = const { RefCell::new(None) }
 }
 
 task_local! {

@@ -33,7 +33,7 @@ _DOCKERFILE_PACKAGE = "pants.backend.docker.subsystems"
 
 class DockerfileParser(PythonToolRequirementsBase):
     options_scope = "dockerfile-parser"
-    help = "Used to parse Dockerfile build specs to infer their dependencies."
+    help_short = "Used to parse Dockerfile build specs to infer their dependencies."
 
     default_requirements = ["dockerfile>=3.2.0,<4"]
 
@@ -109,6 +109,7 @@ class DockerfileInfo:
     source: str
     build_args: DockerBuildArgs = DockerBuildArgs()
     copy_source_paths: tuple[str, ...] = ()
+    copy_build_args: DockerBuildArgs = DockerBuildArgs()
     from_image_build_args: DockerBuildArgs = DockerBuildArgs()
     version_tags: tuple[str, ...] = ()
 
@@ -167,6 +168,9 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
                 *info["build_args"], duplicates_must_match=True
             ),
             copy_source_paths=tuple(info["copy_source_paths"]),
+            copy_build_args=DockerBuildArgs.from_strings(
+                *info["copy_build_args"], duplicates_must_match=True
+            ),
             from_image_build_args=DockerBuildArgs.from_strings(
                 *info["from_image_build_args"], duplicates_must_match=True
             ),

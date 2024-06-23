@@ -1,30 +1,6 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
-// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![deny(
-    clippy::all,
-    clippy::default_trait_access,
-    clippy::expl_impl_clone_on_copy,
-    clippy::if_not_else,
-    clippy::needless_continue,
-    clippy::unseparated_literal_suffix,
-    clippy::used_underscore_binding
-)]
-// It is often more clear to show that nothing is being moved.
-#![allow(clippy::match_ref_pats)]
-// Subjective style.
-#![allow(
-    clippy::len_without_is_empty,
-    clippy::redundant_field_names,
-    clippy::too_many_arguments
-)]
-// Default isn't as big a deal as people seem to think it is.
-#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
-#![allow(clippy::mutex_atomic)]
-
 use std::collections::HashSet;
 use std::time::Instant;
 
@@ -119,7 +95,7 @@ impl Provider {
         // extract the token from the `authorization: Bearer ...` header because OpenDAL's Ghac service
         // reasons about it separately (although does just stick it in its own `authorization: Bearer
         // ...` header internally).
-        let header_help_blurb = "Using GitHub Actions Cache remote cache requires a token set in a `authorization: Bearer ...` header, set via [GLOBAL].remote_store_headers or [GLOBAL].remote_oauth_bearer_token_path";
+        let header_help_blurb = "Using GitHub Actions Cache remote cache requires a token set in a `authorization: Bearer ...` header, set via [GLOBAL].remote_store_headers or [GLOBAL].remote_oauth_bearer_token";
         let Some(auth_header_value) = options.headers.get(AUTHORIZATION.as_str()) else {
             let existing_headers = options.headers.keys().collect::<Vec<_>>();
             return Err(format!(

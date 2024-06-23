@@ -171,7 +171,7 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
         with temporary_dir(root_dir=os.getcwd()) as dot_pants_dot_d:
             pid_dir = os.path.join(dot_pants_dot_d, "pids")
             workdir = os.path.join(dot_pants_dot_d, "workdir")
-            print(f"\npantsd log is {workdir}/pantsd/pantsd.log")
+            print(f"\npantsd log is {workdir}/pants.log")
             pantsd_config = {
                 "GLOBAL": {
                     "pantsd": True,

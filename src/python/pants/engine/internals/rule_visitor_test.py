@@ -11,7 +11,7 @@ import pytest
 from pants.base.exceptions import RuleTypeError
 from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import Get, GetParseError, MultiGet
-from pants.engine.rules import implicitly, rule, rule_helper
+from pants.engine.rules import implicitly, rule
 from pants.util.strutil import softwrap
 
 # The visitor inspects the module for definitions.
@@ -20,24 +20,20 @@ INT = int
 BOOL = bool
 
 
-@rule_helper
 async def _top_helper(arg1):
     a = await Get(STR, INT, arg1)
     return await _helper_helper(a)
 
 
-@rule_helper
 async def _helper_helper(arg1):
     return await Get(INT, STR, arg1)
 
 
 class HelperContainer:
-    @rule_helper
     async def _method_helper(self):
         return await Get(STR, INT, 42)
 
     @staticmethod
-    @rule_helper
     async def _static_helper():
         a = await Get(STR, INT, 42)
         return await _helper_helper(a)
@@ -138,11 +134,12 @@ def test_byname() -> None:
         return 2
 
     async def rule3() -> int:
-        one = await rule1(**implicitly(int(1)))
+        one_explicit = await rule1(1)
+        one_implicit = await rule1(**implicitly(int(1)))
         two = await rule2()
-        return one + two
+        return one_explicit + one_implicit + two
 
-    assert_awaitables(rule3, [(int, int), (int, [])])
+    assert_awaitables(rule3, [(int, []), (int, int), (int, [])])
 
 
 def test_rule_helpers_free_functions() -> None:

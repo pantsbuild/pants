@@ -6,9 +6,7 @@ import json
 import re
 import textwrap
 from itertools import cycle
-from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
-
-from typing_extensions import Literal
+from typing import Callable, Dict, Iterable, List, Literal, Optional, Set, Tuple, cast
 
 from pants.base.build_environment import pants_version
 from pants.help.help_formatter import HelpFormatter
@@ -529,7 +527,7 @@ class HelpPrinter(MaybeColor):
         print()
         self._print_table(
             {
-                "activated by": type_info.provider,
+                "activated by": "\n".join(type_info.provider),
                 "union type": type_info.union_type,
                 "union members": "\n".join(type_info.union_members) if type_info.is_union else None,
                 "dependencies": "\n".join(type_info.dependencies) if show_advanced else None,
@@ -573,7 +571,7 @@ class HelpPrinter(MaybeColor):
                 "activated by": rule.provider,
                 "returns": rule.output_type,
                 f"takes {pluralize(len(rule.input_types), 'input')}": ", ".join(rule.input_types),
-                f"awaits {pluralize(len(rule.input_gets), 'get')}": "\n".join(rule.input_gets)
+                f"awaits {pluralize(len(rule.awaitables), 'get')}": "\n".join(rule.awaitables)
                 if show_advanced
                 else None,
             }

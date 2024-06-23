@@ -1,0 +1,426 @@
+1.8.x Stable Releases
+=====================
+
+This document describes releases leading up to the ``1.8.x`` ``stable`` series.
+
+1.8.0 (07/19/2018)
+------------------
+
+The first stable release of the 1.8.x series, with no changes since `rc1`.
+
+Includes helpful new features like the `--owner-of` option for selecting targets by owned filename,
+and warnings/errors for unmatched globs. Additionally, updates Pants' usage of the zinc incremental
+Scala compiler to a 1.0.x release.
+
+1.8.0rc1 (06/29/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix bad exclusion introduced during rushed change. (#6034)
+  `PR #6034 <https://github.com/pantsbuild/pants/pull/6034>`_
+
+* Fix unicode handling in Exiters (#6032)
+  `PR #6032 <https://github.com/pantsbuild/pants/pull/6032>`_
+
+* [pantsd] Improve environment unicode handling. (#6031)
+  `PR #6031 <https://github.com/pantsbuild/pants/pull/6031>`_
+
+* Run scalafix before scalafmt (#6011)
+  `PR #6011 <https://github.com/pantsbuild/pants/pull/6011>`_
+
+1.8.0rc0 (06/18/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Shorten safe filenames further, and combine codepaths to make them readable. (#5971)
+  `PR #5971 <https://github.com/pantsbuild/pants/pull/5971>`_
+
+* Whitelist the --owner-of option to not restart the daemon. (#5979)
+  `PR #5979 <https://github.com/pantsbuild/pants/pull/5979>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove DeprecatedPythonTaskTestBase (#5973)
+  `Issue #5870 <https://github.com/pantsbuild/pants/issues/5870>`_
+  `PR #5973 <https://github.com/pantsbuild/pants/pull/5973>`_
+
+* Mark a few options that should not show up in `./pants help`. (#5968)
+  `PR #5968 <https://github.com/pantsbuild/pants/pull/5968>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* adding more documentation for python_app (#5965)
+  `PR #5965 <https://github.com/pantsbuild/pants/pull/5965>`_
+
+1.8.0.dev4 (06/15/2018)
+-----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Allow manylinux wheels when resolving plugins. (#5959)
+  `PR #5959 <https://github.com/pantsbuild/pants/pull/5959>`_
+
+* Separate the resolution cache and repository cache in Ivy (#5844)
+  `PR #5844 <https://github.com/pantsbuild/pants/pull/5844>`_
+
+* Allow pants to select targets by file(s) (#5930)
+  `PR #5930 <https://github.com/pantsbuild/pants/pull/5930>`_
+
+Bugfixes
+~~~~~~~~
+
+* Cobertura coverage: Include the full target closure's classpath entries for instrumentation (#5879)
+  `PR #5879 <https://github.com/pantsbuild/pants/pull/5879>`_
+
+* `exclude-patterns` and `tag` should apply only to roots (#5786)
+  `PR #5786 <https://github.com/pantsbuild/pants/pull/5786>`_
+
+* Fixup macosx platform version. (#5938)
+  `PR #5938 <https://github.com/pantsbuild/pants/pull/5938>`_
+
+* Ban bad `readonly` shell pattern (#5924)
+  `PR #5924 <https://github.com/pantsbuild/pants/pull/5924>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Record start times per graph node and expose a method to summarize them. (#5964)
+  `PR #5964 <https://github.com/pantsbuild/pants/pull/5964>`_
+
+* Remove value wrapper on the python side of ffi. (#5961)
+  `PR #5961 <https://github.com/pantsbuild/pants/pull/5961>`_
+
+* Construct rule_graph recursively (#5955)
+  `PR #5955 <https://github.com/pantsbuild/pants/pull/5955>`_
+
+* Support output directory saving for local process execution. (#5944)
+  `PR #5944 <https://github.com/pantsbuild/pants/pull/5944>`_
+
+* use liblzma.dylib for xz on osx and add platform-specific testing to the rust osx shard (#5936)
+  `PR #5936 <https://github.com/pantsbuild/pants/pull/5936>`_
+
+* Improve PythonInterpreterCache logging (#5954)
+  `PR #5954 <https://github.com/pantsbuild/pants/pull/5954>`_
+
+* Re-shade zinc to avoid classpath collisions with annotation processors. (#5953)
+  `PR #5953 <https://github.com/pantsbuild/pants/pull/5953>`_
+
+* [pantsd] Robustify client connection logic. (#5952)
+  `PR #5952 <https://github.com/pantsbuild/pants/pull/5952>`_
+
+* Enable fromfile support for --owner-of and increase test coverage (#5948)
+  `PR #5948 <https://github.com/pantsbuild/pants/pull/5948>`_
+
+* move glob matching into its own file (#5945)
+  `PR #5945 <https://github.com/pantsbuild/pants/pull/5945>`_
+
+* Add new remote execution options (#5932)
+  `PR #5932 <https://github.com/pantsbuild/pants/pull/5932>`_
+
+* Use target not make_target in some tests (#5939)
+  `PR #5939 <https://github.com/pantsbuild/pants/pull/5939>`_
+
+* [jvm-compile] template-methodify JvmCompile further; add compiler choices (#5923)
+  `PR #5923 <https://github.com/pantsbuild/pants/pull/5923>`_
+
+* Add script to get a list of failing pants from travis (#5946)
+  `PR #5946 <https://github.com/pantsbuild/pants/pull/5946>`_
+
+* Integration test for daemon environment scrubbing (#5893)
+  `PR #5893 <https://github.com/pantsbuild/pants/pull/5893>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* release notes for 1.7.0.rc1 (#5942)
+  `PR #5942 <https://github.com/pantsbuild/pants/pull/5942>`_
+
+* Add the --owner-of= usage on Target Address documentation (#5931)
+  `PR #5931 <https://github.com/pantsbuild/pants/pull/5931>`_
+
+1.8.0.dev3 (06/08/2018)
+-----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Initial @rules for Options computation via the engine. (#5889)
+  `PR #5889 <https://github.com/pantsbuild/pants/pull/5889>`_
+
+* Pantsd terminates if its pidfile changes (#5877)
+  `PR #5877 <https://github.com/pantsbuild/pants/pull/5877>`_
+
+* Populate output_directory in ExecuteProcessResponse (#5896)
+  `PR #5896 <https://github.com/pantsbuild/pants/pull/5896>`_
+
+* Add support for passing an incremental_import option via idea-plugin (#5886)
+  `PR #5886 <https://github.com/pantsbuild/pants/pull/5886>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix `SelectInterpreter` read of `interpreter.path` (#5925)
+  `PR #5925 <https://github.com/pantsbuild/pants/pull/5925>`_
+
+* Fix rust log level comparison (#5918)
+  `PR #5918 <https://github.com/pantsbuild/pants/pull/5918>`_
+
+* Fix a trivial bug in error reporting in the kythe indexing task. (#5913)
+  `PR #5913 <https://github.com/pantsbuild/pants/pull/5913>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Put the ChangeCalculator implementation next to TargetRootsCalculator (#5917)
+  `PR #5917 <https://github.com/pantsbuild/pants/pull/5917>`_
+
+* Remove sdist publishing hack. (#5926)
+  `PR #5926 <https://github.com/pantsbuild/pants/pull/5926>`_
+
+* Upgrade to pex 1.4.3. (#5910)
+  `PR #5910 <https://github.com/pantsbuild/pants/pull/5910>`_
+
+* Kill unused legacy code. (#5921)
+  `PR #5921 <https://github.com/pantsbuild/pants/pull/5921>`_
+
+* Add @classproperty (#5901)
+  `PR #5901 <https://github.com/pantsbuild/pants/pull/5901>`_
+
+* Simplify PathGlobs python datatype (#5915)
+  `PR #5915 <https://github.com/pantsbuild/pants/pull/5915>`_
+
+* Split short-form from long-form of setup_legacy_graph (#5911)
+  `PR #5911 <https://github.com/pantsbuild/pants/pull/5911>`_
+
+* Add Daniel McClanahan & Dorothy Ordogh to committers (#5909)
+  `PR #5909 <https://github.com/pantsbuild/pants/pull/5909>`_
+
+* Merge Root/Inner Entry cases into an EntryWithDeps case. (#5914)
+  `PR #5914 <https://github.com/pantsbuild/pants/pull/5914>`_
+
+* Make mock test server emit timing data (#5891)
+  `PR #5891 <https://github.com/pantsbuild/pants/pull/5891>`_
+
+* Update release jvm docs to have notes about gpg 2.1 (#5907)
+  `PR #5907 <https://github.com/pantsbuild/pants/pull/5907>`_
+
+* Set output_files field on remote Action (#5902)
+  `PR #5902 <https://github.com/pantsbuild/pants/pull/5902>`_
+
+* From<Digest> no longer panics (#5832)
+  `PR #5832 <https://github.com/pantsbuild/pants/pull/5832>`_
+
+* Use tempfile crate not tempdir crate (#5900)
+  `PR #5900 <https://github.com/pantsbuild/pants/pull/5900>`_
+
+1.8.0.dev2 (06/02/2018)
+-----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix using classpath jars with compiler plugins (#5890)
+  `PR #5890 <https://github.com/pantsbuild/pants/pull/5890>`_
+
+* Fix visualize-to option post addition of Sessions (#5885)
+  `PR #5885 <https://github.com/pantsbuild/pants/pull/5885>`_
+
+* Robustify go_protobuf_library (#5887)
+  `PR #5887 <https://github.com/pantsbuild/pants/pull/5887>`_
+
+* Repair hermetic_environment_as for C-level environment variable access. (#5898)
+  `PR #5898 <https://github.com/pantsbuild/pants/pull/5898>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add deprecation warning for pep8 'plugin' in pythonstyle suppress file (#5888)
+  `PR #5888 <https://github.com/pantsbuild/pants/pull/5888>`_
+
+* warn or error on matching source globs (#5769)
+  `PR #5769 <https://github.com/pantsbuild/pants/pull/5769>`_
+
+* Mark things which generate cffi for change detection (#5883)
+  `PR #5883 <https://github.com/pantsbuild/pants/pull/5883>`_
+
+* Sort list goal output (#5872)
+  `PR #5872 <https://github.com/pantsbuild/pants/pull/5872>`_
+
+* Output stdout and stderr when nailgun fails to connect (#5892)
+  `PR #5892 <https://github.com/pantsbuild/pants/pull/5892>`_
+
+New features
+~~~~~~~~~~~~
+
+* Remote execution can be enabled by flags (#5881)
+  `PR #5881 <https://github.com/pantsbuild/pants/pull/5881>`_
+
+1.8.0.dev1 (05/25/2018)
+-----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix Go distribution SYSTEM_ID key (#5861)
+  `PR #5861 <https://github.com/pantsbuild/pants/pull/5861>`_
+
+* Improve logging/handling of signaled, killed, and terminated tests (#5859)
+  `PR #5859 <https://github.com/pantsbuild/pants/pull/5859>`_
+
+* Use write_all not write (#5852)
+  `PR #5852 <https://github.com/pantsbuild/pants/pull/5852>`_
+
+New features
+~~~~~~~~~~~~
+
+* Add go_protobuf_library (#5838)
+  `PR #5838 <https://github.com/pantsbuild/pants/pull/5838>`_
+
+* setup_requires argument for python_dist targets (#5825)
+  `PR #5825 <https://github.com/pantsbuild/pants/pull/5825>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Update pep8 to pycodestyle (#5867)
+  `PR #5867 <https://github.com/pantsbuild/pants/pull/5867>`_
+
+* Update pyflakes to 2.0.0 (#5866)
+  `PR #5866 <https://github.com/pantsbuild/pants/pull/5866>`_
+
+* Port BaseTest to v2 engine as TestBase (#5611)
+  `PR #5611 <https://github.com/pantsbuild/pants/pull/5611>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [remoting] Store raw bytes for stdout and stderr if received inline. (#5855)
+  `PR #5855 <https://github.com/pantsbuild/pants/pull/5855>`_
+
+* [rust/engine] add timeout \ description for grpc process requests (#5632)
+  `PR #5632 <https://github.com/pantsbuild/pants/pull/5632>`_
+
+* Use tokio for scheduler requests and local process execution (#5846)
+  `PR #5846 <https://github.com/pantsbuild/pants/pull/5846>`_
+
+* Rust compilation is more robust and fast (#5857)
+  `PR #5857 <https://github.com/pantsbuild/pants/pull/5857>`_
+
+* Core has a CommandRunner (#5850)
+  `PR #5850 <https://github.com/pantsbuild/pants/pull/5850>`_
+
+* Only depend on subprocess32 in python2. (#5847)
+  `PR #5847 <https://github.com/pantsbuild/pants/pull/5847>`_
+
+* Hermeticize cargo build. (#5742)
+  `PR #5742 <https://github.com/pantsbuild/pants/pull/5742>`_
+
+* A utility to aggregate s3 access logs. (#5777)
+  `PR #5777 <https://github.com/pantsbuild/pants/pull/5777>`_
+
+* Update all rust dependencies (ie, ran `cargo update`). (#5845)
+  `PR #5845 <https://github.com/pantsbuild/pants/pull/5845>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Document how to select a Python interpreter (#5843)
+  `PR #5843 <https://github.com/pantsbuild/pants/pull/5843>`_
+
+1.8.0.dev0 (05/18/2018)
+-----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Invalidate all tasks on source root changes. (#5821)
+  `PR #5821 <https://github.com/pantsbuild/pants/pull/5821>`_
+
+New features
+~~~~~~~~~~~~
+
+* Allow alternate binaries download urls generation and convert GoDistribution and LLVM subsystems to use it (#5780)
+  `PR #5780 <https://github.com/pantsbuild/pants/pull/5780>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Remove SelectDependencies. (#5800)
+  `PR #5800 <https://github.com/pantsbuild/pants/pull/5800>`_
+
+* Zinc 1.0.0 upgrade: Python portion (#4729)
+  `PR #4729 <https://github.com/pantsbuild/pants/pull/4729>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Revert to non-forked grpcio-compiler (#5842)
+  `PR #5842 <https://github.com/pantsbuild/pants/pull/5842>`_
+
+* cloc uses v2 process execution (#5840)
+  `PR #5840 <https://github.com/pantsbuild/pants/pull/5840>`_
+
+* Remove extra workunit from coursier resolve (#5837)
+  `PR #5837 <https://github.com/pantsbuild/pants/pull/5837>`_
+
+* Remove stale comment (#5839)
+  `PR #5839 <https://github.com/pantsbuild/pants/pull/5839>`_
+
+* Script BinaryUtils can be captured as snapshots (#5835)
+  `PR #5835 <https://github.com/pantsbuild/pants/pull/5835>`_
+
+* CommandRunners implement a single trait (#5836)
+  `PR #5836 <https://github.com/pantsbuild/pants/pull/5836>`_
+
+* Directories can be merged synchronously (#5834)
+  `PR #5834 <https://github.com/pantsbuild/pants/pull/5834>`_
+
+* Allow arbitrary directories to be Snapshotted (#5801)
+  `PR #5801 <https://github.com/pantsbuild/pants/pull/5801>`_
+
+* Regression test for #4596 (#4608)
+  `PR #4608 <https://github.com/pantsbuild/pants/pull/4608>`_
+
+* Empty digest is always known (#5829)
+  `PR #5829 <https://github.com/pantsbuild/pants/pull/5829>`_
+
+* Local process execution can fetch output files (#5784)
+  `PR #5784 <https://github.com/pantsbuild/pants/pull/5784>`_
+
+* Fetch native stack traces if any cores were dumped (#5828)
+  `PR #5828 <https://github.com/pantsbuild/pants/pull/5828>`_
+
+* FileContents is gotten from DirectoryDigest not Snapshot (#5820)
+  `PR #5820 <https://github.com/pantsbuild/pants/pull/5820>`_
+
+* [release.sh] Use git configured gpg binary if one is set (#5826)
+  `PR #5826 <https://github.com/pantsbuild/pants/pull/5826>`_
+
+* [release-doc] rm explicit owner list in favor of just using -o (#5823)
+  `PR #5823 <https://github.com/pantsbuild/pants/pull/5823>`_
+
+* brfs: Sleep a bit after mounting the filesystem (#5819)
+  `PR #5819 <https://github.com/pantsbuild/pants/pull/5819>`_
+
+* Snapshot contains a DirectoryDigest (#5811)
+  `PR #5811 <https://github.com/pantsbuild/pants/pull/5811>`_
+
+* Add a facility for exposing metrics from the native engine (#5808)
+  `PR #5808 <https://github.com/pantsbuild/pants/pull/5808>`_
+
+* Expand engine readme (#5759)
+  `PR #5759 <https://github.com/pantsbuild/pants/pull/5759>`_
+
+* Document python_app target in Python readme. (#5816)
+  `PR #5816 <https://github.com/pantsbuild/pants/pull/5816>`_
+
+* [release-docs] Update step 0, linkify links (#5806)
+  `PR #5806 <https://github.com/pantsbuild/pants/pull/5806>`_
+

@@ -10,6 +10,9 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
+    PythonFaaSLayoutField,
+    PythonFaaSPex3VenvCreateExtraArgsField,
+    PythonFaaSPexBuildExtraArgs,
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
@@ -46,6 +49,7 @@ class PythonGoogleCloudFunctionRuntimes(Enum):
     PYTHON_39 = "python39"
     PYTHON_310 = "python310"
     PYTHON_311 = "python311"
+    PYTHON_312 = "python312"
 
 
 class PythonGoogleCloudFunctionRuntime(PythonFaaSRuntimeField):
@@ -116,6 +120,9 @@ class PythonGoogleCloudFunction(Target):
         PythonGoogleCloudFunctionRuntime,
         PythonFaaSCompletePlatforms,
         PythonGoogleCloudFunctionType,
+        PythonFaaSPex3VenvCreateExtraArgsField,
+        PythonFaaSPexBuildExtraArgs,
+        PythonFaaSLayoutField,
         PythonResolveField,
         EnvironmentField,
     )
@@ -123,7 +130,7 @@ class PythonGoogleCloudFunction(Target):
         f"""
         A self-contained Python function suitable for uploading to Google Cloud Function.
 
-        See {doc_url('google-cloud-function-python')}.
+        See {doc_url('docs/python/integrations/google-cloud-functions')}.
         """
     )
 

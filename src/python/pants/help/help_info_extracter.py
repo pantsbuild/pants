@@ -5,13 +5,15 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import difflib
 import inspect
+import itertools
 import json
 from collections import defaultdict, namedtuple
 from dataclasses import dataclass
 from enum import Enum
+from functools import reduce
 from itertools import chain
-from operator import attrgetter
 from pathlib import Path
 from typing import (
     Any,
@@ -297,7 +299,7 @@ class RuleInfo:
     provider: str
     output_type: str
     input_types: tuple[str, ...]
-    input_gets: tuple[str, ...]
+    awaitables: tuple[str, ...]
 
     @classmethod
     def create(cls, rule: TaskRule, provider: str) -> RuleInfo:
@@ -306,8 +308,8 @@ class RuleInfo:
             description=rule.desc,
             documentation=maybe_cleandoc(rule.func.__doc__),
             provider=provider,
-            input_types=tuple(selector.__name__ for selector in rule.input_selectors),
-            input_gets=tuple(str(constraints) for constraints in rule.input_gets),
+            input_types=tuple(typ.__name__ for typ in rule.parameters.values()),
+            awaitables=tuple(str(constraints) for constraints in rule.awaitables),
             output_type=rule.output_type.__name__,
         )
 
@@ -322,7 +324,7 @@ class PluginAPITypeInfo:
     name: str
     module: str
     documentation: str | None
-    provider: str
+    provider: tuple[str, ...]
     is_union: bool
     union_type: str | None
     union_members: tuple[str, ...]
@@ -331,6 +333,14 @@ class PluginAPITypeInfo:
     returned_by_rules: tuple[str, ...]
     consumed_by_rules: tuple[str, ...]
     used_in_rules: tuple[str, ...]
+
+    @property
+    def fully_qualified_name(self) -> str:
+        return f"{self.module}.{self.name}"
+
+    @staticmethod
+    def fully_qualified_name_from_type(t: type):
+        return f"{t.__module__}.{t.__qualname__}"
 
     @classmethod
     def create(
@@ -345,7 +355,7 @@ class PluginAPITypeInfo:
         task_rules = [rule for rule in rules if isinstance(rule, TaskRule)]
 
         return cls(
-            name=api_type.__name__,
+            name=api_type.__qualname__,
             module=api_type.__module__,
             documentation=maybe_cleandoc(api_type.__doc__),
             is_union=is_union(api_type),
@@ -365,7 +375,7 @@ class PluginAPITypeInfo:
     @staticmethod
     def _rule_consumes(api_type: type) -> Callable[[TaskRule], bool]:
         def satisfies(rule: TaskRule) -> bool:
-            return api_type in rule.input_selectors
+            return api_type in rule.parameters.values()
 
         return satisfies
 
@@ -381,7 +391,7 @@ class PluginAPITypeInfo:
         def satisfies(rule: TaskRule) -> bool:
             return any(
                 api_type in (*constraint.input_types, constraint.output_type)
-                for constraint in rule.input_gets
+                for constraint in rule.awaitables
             )
 
         return satisfies
@@ -392,6 +402,25 @@ class PluginAPITypeInfo:
             return isinstance(rule, UnionRule) and rule.union_member is api_type
 
         return satisfies
+
+    def merged_with(self, that: PluginAPITypeInfo) -> PluginAPITypeInfo:
+        def merge_tuples(l, r):
+            return tuple(sorted({*l, *r}))
+
+        return PluginAPITypeInfo(
+            self.name,
+            self.module,
+            self.documentation,
+            merge_tuples(self.provider, that.provider),
+            self.is_union,
+            self.union_type,
+            merge_tuples(self.union_members, that.union_members),
+            merge_tuples(self.dependencies, that.dependencies),
+            merge_tuples(self.dependents, that.dependents),
+            merge_tuples(self.returned_by_rules, that.returned_by_rules),
+            merge_tuples(self.consumed_by_rules, that.consumed_by_rules),
+            merge_tuples(self.used_in_rules, that.used_in_rules),
+        )
 
 
 @dataclass(frozen=True)
@@ -470,7 +499,8 @@ class HelpInfoExtracter:
                 provider = ""
                 if subsystem_cls is not None and build_configuration is not None:
                     provider = cls.get_provider(
-                        build_configuration.subsystem_to_providers.get(subsystem_cls)
+                        build_configuration.subsystem_to_providers.get(subsystem_cls),
+                        subsystem_cls.__module__,
                     )
                 return HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
                     scope_info.description,
@@ -490,7 +520,8 @@ class HelpInfoExtracter:
                 assert subsystem_cls is not None
                 if build_configuration is not None:
                     provider = cls.get_provider(
-                        build_configuration.subsystem_to_providers.get(subsystem_cls)
+                        build_configuration.subsystem_to_providers.get(subsystem_cls),
+                        subsystem_cls.__module__,
                     )
                 goal_subsystem_cls = cast(Type[GoalSubsystem], subsystem_cls)
                 return GoalHelpInfo(
@@ -511,14 +542,18 @@ class HelpInfoExtracter:
                     provider=cls.get_provider(
                         build_configuration
                         and build_configuration.target_type_to_providers.get(target_type)
-                        or None
+                        or None,
+                        target_type.__module__,
                     ),
                     get_field_type_provider=lambda field_type: cls.get_provider(
-                        build_configuration.union_rule_to_providers.get(
-                            UnionRule(target_type.PluginField, field_type)
-                        )
-                        if build_configuration is not None
-                        else None
+                        (
+                            build_configuration.union_rule_to_providers.get(
+                                UnionRule(target_type.PluginField, field_type)
+                            )
+                            if build_configuration is not None
+                            else None
+                        ),
+                        field_type.__module__,
                     ),
                 )
 
@@ -644,11 +679,22 @@ class HelpInfoExtracter:
             return None
 
     @staticmethod
-    def get_provider(providers: tuple[str, ...] | None) -> str:
+    def get_provider(providers: tuple[str, ...] | None, hint: str | None = None) -> str:
+        """Get the best match for the provider.
+
+        To take advantage of provider names being modules, `hint` should be something like the a
+        subsystem's `__module__` or a rule's `canonical_name`.
+        """
         if not providers:
             return ""
-        # Pick the shortest backend name.
-        return sorted(providers, key=len)[0]
+        if not hint:
+            # Pick the shortest backend name.
+            return sorted(providers, key=len)[0]
+
+        # Pick the one closest to `hint`.
+        # No cutoff and max 1 result guarantees a result with a single element.
+        [provider] = difflib.get_close_matches(hint, providers, n=1, cutoff=0.0)
+        return provider
 
     @staticmethod
     def maybe_cleandoc(doc: str | None) -> str | None:
@@ -674,7 +720,9 @@ class HelpInfoExtracter:
 
         return LazyFrozenDict(
             {
-                rule.canonical_name: rule_info_loader(rule, cls.get_provider(providers))
+                rule.canonical_name: rule_info_loader(
+                    rule, cls.get_provider(providers, rule.canonical_name)
+                )
                 for rule, providers in build_configuration.rule_to_providers.items()
                 if isinstance(rule, TaskRule)
             }
@@ -718,8 +766,8 @@ class HelpInfoExtracter:
             return api_type.__module__
 
         def _rule_dependencies(rule: TaskRule) -> Iterator[type]:
-            yield from rule.input_selectors
-            for constraint in rule.input_gets:
+            yield from rule.parameters.values()
+            for constraint in rule.awaitables:
                 yield constraint.output_type
 
         def _extract_api_types() -> Iterator[tuple[type, str, tuple[type, ...]]]:
@@ -728,16 +776,16 @@ class HelpInfoExtracter:
             for rule, providers in bc.rule_to_providers.items():
                 if not isinstance(rule, TaskRule):
                     continue
-                provider = cls.get_provider(providers)
+                provider = cls.get_provider(providers, rule.canonical_name)
                 yield rule.output_type, provider, tuple(_rule_dependencies(rule))
 
-                for constraint in rule.input_gets:
+                for constraint in rule.awaitables:
                     for input_type in constraint.input_types:
                         yield input_type, _find_provider(input_type), ()
 
             union_bases: set[type] = set()
             for union_rule, providers in bc.union_rule_to_providers.items():
-                provider = cls.get_provider(providers)
+                provider = cls.get_provider(providers, union_rule.union_member.__module__)
                 union_bases.add(union_rule.union_base)
                 yield union_rule.union_member, provider, (union_rule.union_base,)
 
@@ -810,27 +858,40 @@ class HelpInfoExtracter:
             ),
         )
 
-        def get_api_type_info_loader(api_type: type) -> Callable[[], PluginAPITypeInfo]:
+        def get_api_type_info(api_types: tuple[type, ...]):
+            """Gather the info from each of the types and aggregate it.
+
+            The gathering is the expensive operation, and we can only aggregate once we've gathered.
+            """
+
             def load() -> PluginAPITypeInfo:
-                return PluginAPITypeInfo.create(
-                    api_type,
-                    rules,
-                    provider=", ".join(type_graph[api_type]["providers"]),
-                    dependencies=type_graph[api_type]["dependencies"],
-                    dependents=type_graph[api_type].get("dependents", ()),
-                    union_members=tuple(
-                        sorted(member.__name__ for member in union_membership.get(api_type))
-                    ),
-                )
+                gatherered_infos = [
+                    PluginAPITypeInfo.create(
+                        api_type,
+                        rules,
+                        provider=type_graph[api_type]["providers"],
+                        dependencies=type_graph[api_type]["dependencies"],
+                        dependents=type_graph[api_type].get("dependents", ()),
+                        union_members=tuple(
+                            sorted(member.__qualname__ for member in union_membership.get(api_type))
+                        ),
+                    )
+                    for api_type in api_types
+                ]
+                return reduce(lambda x, y: x.merged_with(y), gatherered_infos)
 
             return load
 
-        return LazyFrozenDict(
-            {
-                f"{api_type.__module__}.{api_type.__name__}": get_api_type_info_loader(api_type)
-                for api_type in sorted(all_types, key=attrgetter("__name__"))
-            }
-        )
+        # We want to provide a lazy dict so we don't spend so long doing the info gathering.
+        # We provide a list of the types here, and the lookup function performs the gather and the aggregation
+        api_type_name = PluginAPITypeInfo.fully_qualified_name_from_type
+        all_types_sorted = sorted(all_types, key=api_type_name)
+        infos: dict[str, Callable[[], PluginAPITypeInfo]] = {
+            k: get_api_type_info(tuple(v))
+            for k, v in itertools.groupby(all_types_sorted, key=api_type_name)
+        }
+
+        return LazyFrozenDict(infos)
 
     @classmethod
     def get_backend_help_info(cls, options: Options) -> LazyFrozenDict[str, BackendHelpInfo]:

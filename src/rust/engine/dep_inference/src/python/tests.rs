@@ -12,15 +12,11 @@ fn assert_collected(
     let mut collector = ImportCollector::new(code);
     collector.collect();
     assert_eq!(
-        HashMap::from_iter(import_map.iter().map(|(k, v)| (k.to_string(), v.clone()))),
+        HashMap::from_iter(import_map.iter().map(|(k, v)| (k.to_string(), *v))),
         collector.import_map
     );
     assert_eq!(
-        HashMap::from_iter(
-            string_candidates
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.clone()))
-        ),
+        HashMap::from_iter(string_candidates.iter().map(|(k, v)| (k.to_string(), *v))),
         collector.string_candidates
     );
 }
@@ -685,6 +681,32 @@ fn string_candidates() {
     // Technically the value of the string doesn't contain whitespace, but the parser isn't that
     // sophisticated yet.
     assert_strings("'''\\\na'''", &[]);
+
+    // pragma ignored strings
+    assert_strings("'a' # pants: no-infer-dep", &[]);
+    assert_strings("'''a''' # pants: no-infer-dep", &[]);
+    assert_strings("'a.b' # pants: no-infer-dep", &[]);
+    assert_strings("'a.b.c_狗' # pants: no-infer-dep", &[]);
+    assert_strings("'..a.b.c.d' # pants: no-infer-dep", &[]);
+    assert_strings("['a.b'] # pants: no-infer-dep", &[]);
+    assert_strings("[{'a.b': 1}] # pants: no-infer-dep", &[]);
+    assert_strings("[{('a.b',): 1}] # pants: no-infer-dep", &[]);
+    assert_strings("[{2: 'a.b'}] # pants: no-infer-dep", &[]);
+    assert_strings("[{2: ('a.b',)}] # pants: no-infer-dep", &[]);
+    assert_strings("print('a.b') # pants: no-infer-dep", &[]);
+    assert_strings("print('a.b' if x else 3) # pants: no-infer-dep", &[]);
+    assert_strings("print(3 if x else 'a.b') # pants: no-infer-dep", &[]);
+    assert_strings(
+        "print([a for a in b if a not in ['a.b', 'c.d']]) # pants: no-infer-dep",
+        &[],
+    );
+    assert_strings(
+        r"
+    for a, b in foo['a.b'].items(): # pants: no-infer-dep
+        pass
+    ",
+        &[],
+    );
 }
 
 #[test]

@@ -9,3 +9,6 @@ publish = false
 log = { workspace = true }
 parking_lot = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }
+
+[lints]
+workspace = true

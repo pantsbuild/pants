@@ -13,6 +13,9 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
     PythonFaaSKnownRuntime,
+    PythonFaaSLayoutField,
+    PythonFaaSPex3VenvCreateExtraArgsField,
+    PythonFaaSPexBuildExtraArgs,
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
@@ -109,6 +112,7 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         PythonFaaSKnownRuntime(3, 9, "3.9-x86_64"),
         PythonFaaSKnownRuntime(3, 10, "3.10-x86_64"),
         PythonFaaSKnownRuntime(3, 11, "3.11-x86_64"),
+        PythonFaaSKnownRuntime(3, 12, "3.12-x86_64"),
     )
 
     @classmethod
@@ -150,6 +154,9 @@ class _AWSLambdaBaseTarget(Target):
         PythonAwsLambdaIncludeRequirements,
         PythonAwsLambdaRuntime,
         PythonFaaSCompletePlatforms,
+        PythonFaaSPex3VenvCreateExtraArgsField,
+        PythonFaaSPexBuildExtraArgs,
+        PythonFaaSLayoutField,
         PythonResolveField,
         EnvironmentField,
     )
@@ -177,9 +184,6 @@ class _AWSLambdaBaseTarget(Target):
 class PythonAWSLambda(_AWSLambdaBaseTarget):
     alias = "python_aws_lambda_function"
 
-    deprecated_alias = "python_awslambda"
-    deprecated_alias_removal_version = "2.21.0.dev0"
-
     core_fields = (
         *_AWSLambdaBaseTarget.core_fields,
         PythonFaaSDependencies,
@@ -189,7 +193,7 @@ class PythonAWSLambda(_AWSLambdaBaseTarget):
         f"""
         A self-contained Python function suitable for uploading to AWS Lambda.
 
-        See {doc_url('awslambda-python')}.
+        See {doc_url('docs/python/integrations/aws-lambda')}.
         """
     )
 
@@ -205,7 +209,7 @@ class PythonAWSLambdaLayer(_AWSLambdaBaseTarget):
         f"""
         A Python layer suitable for uploading to AWS Lambda.
 
-        See {doc_url('awslambda-python')}.
+        See {doc_url('docs/python/integrations/aws-lambda')}.
         """
     )
 

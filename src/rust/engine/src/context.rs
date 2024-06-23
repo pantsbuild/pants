@@ -10,7 +10,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::intrinsics::Intrinsics;
 use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult};
 use crate::python::{throw, Failure};
 use crate::session::{Session, Sessions};
@@ -35,8 +34,9 @@ use regex::Regex;
 use remote::remote_cache::{RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior};
 use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
-use store::{self, ImmutableInputs, RemoteStoreOptions, Store};
+use store::{self, ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store};
 use task_executor::Executor;
+use tokio::sync::RwLock;
 use watch::{Invalidatable, InvalidateCaller, InvalidationWatcher};
 use workunit_store::{Metric, RunningWorkunit};
 
@@ -61,7 +61,6 @@ pub struct Core {
     pub tasks: Tasks,
     pub rule_graph: RuleGraph<Rule>,
     pub types: Types,
-    pub intrinsics: Intrinsics,
     pub executor: Executor,
     store: Store,
     /// The CommandRunners to use for execution, in ascending order of reliability (for the purposes
@@ -83,6 +82,7 @@ pub struct Core {
 
 #[derive(Clone, Debug)]
 pub struct RemotingOptions {
+    pub provider: RemoteProvider,
     pub execution_enable: bool,
     pub store_address: Option<String>,
     pub execution_address: Option<String>,
@@ -119,6 +119,7 @@ impl RemotingOptions {
             .clone();
 
         Ok(RemoteStoreOptions {
+            provider: self.provider,
             store_address,
             instance_name: self.instance_name.clone(),
             tls_config,
@@ -199,6 +200,7 @@ impl Core {
         full_store: &Store,
         local_runner_store: &Store,
         executor: &Executor,
+        build_root: &Path,
         local_execution_root_dir: &Path,
         immutable_inputs: &ImmutableInputs,
         named_caches: &NamedCaches,
@@ -208,14 +210,38 @@ impl Core {
         exec_strategy_opts: &ExecutionStrategyOptions,
         remoting_opts: &RemotingOptions,
     ) -> Result<Arc<dyn CommandRunner>, String> {
-        let local_command_runner = local::CommandRunner::new(
+        // Lock shared between `local::CommandRunner` and `workspace::CommandRunner` to protect concurrent spawning
+        // of subprocesses.
+        let spawn_lock = Arc::new(RwLock::new(()));
+
+        let local_sandbox_command_runner = local::CommandRunner::new(
             local_runner_store.clone(),
             executor.clone(),
             local_execution_root_dir.to_path_buf(),
             named_caches.clone(),
             immutable_inputs.clone(),
             exec_strategy_opts.local_keep_sandboxes,
+            spawn_lock.clone(),
         );
+
+        // TODO: Consider whether to limit parallel execution and/or concurrency of in-workspace executions. (For example,
+        // wrapping in a `process_execution::bounded::CommandRunner` could be used to limit the number of concurrent
+        // workspace executions, but is not the only solution.)
+        let local_workspace_command_runner = process_execution::workspace::CommandRunner::new(
+            local_runner_store.clone(),
+            executor.clone(),
+            build_root.to_path_buf(),
+            local_execution_root_dir.to_path_buf(),
+            named_caches.clone(),
+            immutable_inputs.clone(),
+            spawn_lock,
+        );
+
+        let local_command_runner: Box<dyn CommandRunner> = Box::new(SwitchedCommandRunner::new(
+            local_workspace_command_runner,
+            local_sandbox_command_runner,
+            |req| req.execution_environment.strategy == ProcessExecutionStrategy::LocalInWorkspace,
+        ));
 
         let runner: Box<dyn CommandRunner> = if exec_strategy_opts.local_enable_nailgun {
             // We set the nailgun pool size to the number of instances that fit within the memory
@@ -379,6 +405,7 @@ impl Core {
         local_runner_store: &Store,
         executor: &Executor,
         local_cache: &PersistentCache,
+        build_root: &Path,
         local_execution_root_dir: &Path,
         immutable_inputs: &ImmutableInputs,
         named_caches: &NamedCaches,
@@ -392,6 +419,7 @@ impl Core {
             full_store,
             local_runner_store,
             executor,
+            build_root,
             local_execution_root_dir,
             immutable_inputs,
             named_caches,
@@ -489,7 +517,6 @@ impl Core {
         executor: Executor,
         tasks: Tasks,
         types: Types,
-        intrinsics: Intrinsics,
         build_root: PathBuf,
         ignore_patterns: Vec<String>,
         use_gitignore: bool,
@@ -599,6 +626,7 @@ impl Core {
             &store,
             &executor,
             &local_cache,
+            &build_root,
             &local_execution_root_dir,
             &immutable_inputs,
             &named_caches,
@@ -652,7 +680,6 @@ impl Core {
             tasks,
             rule_graph,
             types,
-            intrinsics,
             executor: executor.clone(),
             store,
             command_runners,

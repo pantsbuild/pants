@@ -40,12 +40,6 @@ def test_global_scope():
 
     do_test(["-f"], {"type": bool}, ["-f"], ["-f"])
     do_test(["--foo"], {"type": bool}, ["--[no-]foo"], ["--foo", "--no-foo"])
-    do_test(
-        ["--foo"],
-        {"type": bool, "implicit_value": False},
-        ["--[no-]foo"],
-        ["--foo", "--no-foo"],
-    )
     do_test(["-f", "--foo"], {"type": bool}, ["-f", "--[no-]foo"], ["-f", "--foo", "--no-foo"])
 
     do_test(["--foo"], {}, ["--foo=<str>"], ["--foo"])
@@ -98,13 +92,6 @@ def test_non_global_scope():
         ["--bar-baz-foo", "--no-bar-baz-foo"],
         ["--foo", "--no-foo"],
     )
-    do_test(
-        ["--foo"],
-        {"type": bool, "implicit_value": False},
-        ["--[no-]bar-baz-foo"],
-        ["--bar-baz-foo", "--no-bar-baz-foo"],
-        ["--foo", "--no-foo"],
-    )
 
 
 def test_default() -> None:
@@ -128,8 +115,6 @@ def test_default() -> None:
 
     do_test(["--foo"], {"type": bool}, "False")
     do_test(["--foo"], {"type": bool, "default": True}, "True")
-    do_test(["--foo"], {"type": bool, "implicit_value": False}, "True")
-    do_test(["--foo"], {"type": bool, "implicit_value": False, "default": False}, "False")
     do_test(["--foo"], {}, "None")
     do_test(["--foo"], {"type": int}, "None")
     do_test(["--foo"], {"type": int, "default": 42}, "42")
@@ -529,7 +514,7 @@ def test_get_all_help_info():
             "construct_scope_foo": {
                 "description": None,
                 "documentation": "A foo.",
-                "input_gets": ("Get(ScopedOptions, Scope, ..)",),
+                "awaitables": ("Get(ScopedOptions, Scope, ..)",),
                 "input_types": (),
                 "name": "construct_scope_foo",
                 "output_type": "Foo",
@@ -538,7 +523,7 @@ def test_get_all_help_info():
             "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test": {
                 "description": None,
                 "documentation": "This rule is for testing info extraction only.",
-                "input_gets": (),
+                "awaitables": (),
                 "input_types": ("Foo",),
                 "name": "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
                 "output_type": "Target",
@@ -546,21 +531,19 @@ def test_get_all_help_info():
             },
         },
         "name_to_api_type_info": {
-            "pants.help.help_info_extracter_test.Foo": {
-                "consumed_by_rules": (
-                    "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
-                ),
-                "dependents": ("help_info_extracter_test",),
-                "dependencies": ("pants.option.scope",),
-                "documentation": None,
+            "pants.option.scope.Scope": {
+                "consumed_by_rules": (),
+                "dependents": (),
+                "dependencies": (),
+                "documentation": "An options scope.",
                 "is_union": False,
-                "module": "pants.help.help_info_extracter_test",
-                "name": "Foo",
-                "provider": "help_info_extracter_test",
-                "returned_by_rules": ("construct_scope_foo",),
+                "module": "pants.option.scope",
+                "name": "Scope",
+                "provider": ("pants.option.scope",),
+                "returned_by_rules": (),
                 "union_members": (),
                 "union_type": None,
-                "used_in_rules": (),
+                "used_in_rules": ("construct_scope_foo",),
             },
             "pants.engine.target.Target": {
                 "consumed_by_rules": (),
@@ -576,7 +559,7 @@ def test_get_all_help_info():
                 "is_union": False,
                 "module": "pants.engine.target",
                 "name": "Target",
-                "provider": "help_info_extracter_test",
+                "provider": ("help_info_extracter_test",),
                 "returned_by_rules": (
                     "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
                 ),
@@ -584,19 +567,21 @@ def test_get_all_help_info():
                 "union_type": None,
                 "used_in_rules": (),
             },
-            "pants.option.scope.Scope": {
-                "consumed_by_rules": (),
-                "dependents": (),
-                "dependencies": (),
-                "documentation": "An options scope.",
+            "pants.help.help_info_extracter_test.test_get_all_help_info.<locals>.Foo": {
+                "consumed_by_rules": (
+                    "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
+                ),
+                "dependents": ("help_info_extracter_test",),
+                "dependencies": ("pants.option.scope",),
+                "documentation": None,
                 "is_union": False,
-                "module": "pants.option.scope",
-                "name": "Scope",
-                "provider": "pants.option.scope",
-                "returned_by_rules": (),
+                "module": "pants.help.help_info_extracter_test",
+                "name": "test_get_all_help_info.<locals>.Foo",
+                "provider": ("help_info_extracter_test",),
+                "returned_by_rules": ("construct_scope_foo",),
                 "union_members": (),
                 "union_type": None,
-                "used_in_rules": ("construct_scope_foo",),
+                "used_in_rules": (),
             },
         },
         "name_to_backend_help_info": {

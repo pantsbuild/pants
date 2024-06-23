@@ -1,0 +1,100 @@
+---
+    title: Release strategy
+    sidebar_position: 0
+---
+
+Our approach to semantic versioning + time-based releases.
+
+---
+
+Pants release cycles flow through:
+
+1. `dev` releases from the `main` branch,
+2. an `a` (alpha) release, which is the first on a stable branch,
+3. `rc` releases, which have begun to stabilize on a stable branch, and will become a stable release
+4. stable releases, which are our most trusted.
+
+Pants follows semantic versioning, along with using regular time-based dev releases. We follow a strict [Deprecation policy](../../releases/deprecation-policy.mdx).
+
+:::note Tip: join the mailing group for release announcements
+See [Community](/community/members).
+
+Also see [Upgrade tips](../../releases/upgrade-tips.mdx) for suggestions on how to effectively upgrade Pants versions.
+:::
+
+## Stable releases
+
+Stable releases occur roughly every six weeks. They have been vetted through at least one alpha and one release candidate.
+
+Stable releases are named with the major, minor, and patch version (with no suffix). For example, `2.1.0` or `2.2.1`.
+
+Any new patch versions will only include:
+
+- Backward-compatible bug fixes
+- Backward-compatible feature backports, as long as they:
+  1. Are requested by users
+  2. Are deemed low-risk and are easy to backport
+  3. Do not introduce new deprecations
+
+Patch versions after `*.0` (i.e.: `2.2.1`) must have also had at least one release candidate, but no alpha releases are required.
+
+:::caution Stable releases may still have bugs
+We try our best to write bug-free code, but, like everyone, we sometimes make mistakes.
+
+If you encounter a bug, please gently let us know by opening a GitHub issue or messaging us on Slack. See [Community](/community/members).
+:::
+
+### Stable release managers
+
+Our weekly [release process](./release-process.mdx) is executed by a rotating "maintainer of the week" (MOTW). But because the entire stable release process (through `dev`s, to an `a`, past `rc`s, etc) can take 8 to 12 weeks, we additionally assign a release manager per stable release to have an overarching view and drive the manual steps of a release that are not covered by the weekly process.
+
+The release manager for a stable release is a maintainer chosen informally in Slack to run the upcoming release. They create or are assigned a stable release ticket ([example](https://github.com/pantsbuild/pants/issues/20578)). A stable release has some additional requirements, most of which are listed in the weekly release process steps, but which can require time outside of the weekly process:
+1. Writing (or [automating!](https://github.com/pantsbuild/pants/discussions/19247)) the creation of a release blog ([example](https://www.pantsbuild.org/blog/2024/03/27/pants-2-20))
+2. Tracking/triaging issues which block finalizing the release, in [its milestone](https://github.com/pantsbuild/pants/milestones). This should include rejecting or postponing non-blocking bug-fixes and cherry-picks, if they might delay finalising a release inappropriately.
+3. Occasionally running `rc` releases outside of the weekly release process in order to get feedback more quickly.
+    * For example: if a release-blocking issue is fixed shortly after the weekly release (meaning that it might be e.g. 6 days until the next `rc` is cut by the weekly process), the release manager might decide to cut another `rc` immediately.
+4. Deciding when to cut the stable release for a release branch, when all blockers are fixed, and there's been sufficient testing. The release can be cut by either letting the MOTW know, or by executing the release themselves.
+
+## Release candidates
+
+`rc` releases are on track to being stable, but may still have some issues.
+
+Release candidates are named with the major, minor, and patch version, and end in `rc` and a number. For example, `2.1.0rc0` or `2.1.0rc1`.
+
+Release candidates are subject to the constraints on cherry-picks mentioned in the Stable releases section.
+
+:::note When is a release "stable" enough?
+A stable release should not be created until at least five business days have passed since the first `rc0` release. Typically, during this time, there will be multiple release candidates to fix any issues discovered.
+
+A stable release can be created two business days after the most recent release candidate if there are no more blockers.
+:::
+
+:::tip Help wanted: testing out release candidates
+We greatly appreciate when users test out release candidates. While we do our best to have comprehensive CI—and we "dogfood" release candidates—we are not able to test all the ways Pants is used in the wild.
+
+If you encounter a bug, please gently let us know by opening a GitHub issue or messaging us on Slack. See [Community](/community/members).
+:::
+
+## Alpha releases
+
+Alpha (`a`) releases are the first releases on a stable branch (after `dev` releases, and before `rc`s), and although they have not received any testing beyond what a `dev` release may have received, they are a particular focus for testing, because they represent code which will eventually become an `rc`.
+
+Alpha releases are named with the major, minor, and patch version, and end in `a` and a number. For example, `2.1.0a0`.
+
+Except in extenuating circumstances, there will usually only be a single alpha release per series.
+
+## Dev releases
+
+`dev` releases are weekly releases that occur directly from the `main` branch, without the additional vetting that is applied to stable releases, alpha releases, or release candidates. Usually, these are released on Friday or Monday.
+
+Dev releases help to ensure a steady release cadence from `main` by filling in the gaps between the more time consuming stable releases.
+
+Dev releases are named with the major, minor, and patch version, and end in `.dev` and a number. For example, `2.1.0.dev0` or `2.1.0.dev1`.
+
+Dev releases can include any changes, so long as they comply with the [Deprecation policy](../../releases/deprecation-policy.mdx).
+
+:::note How many dev releases until starting a release candidate?
+Usually, we release 3-4 dev releases before switching to the alpha release `a0`. This means we usually release `dev0`, `dev1`, `dev2`, sometimes `dev3`, and then `a0`.
+
+We try to limit the number of changes in each stable release to make it easier for users to upgrade. If the dev releases have been particularly disruptive, such as making major deprecations, we may start a release candidate sooner, such as after `dev1`.
+:::

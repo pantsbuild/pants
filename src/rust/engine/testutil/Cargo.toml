@@ -15,3 +15,6 @@ prost = { workspace = true }
 protos = { path = "../protos" }
 tempfile = { workspace = true }
 tokio = { workspace = true }
+
+[lints]
+workspace = true

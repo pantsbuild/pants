@@ -363,7 +363,7 @@ async fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
     let fs = new_posixfs(path);
     let stats = fs.scandir(Dir(PathBuf::from("."))).await.unwrap();
     assert_eq!(stats.0.len(), 1);
-    match stats.0.get(0).unwrap() {
+    match stats.0.first().unwrap() {
         &super::Stat::File(File {
             is_executable: got, ..
         }) => assert_eq!(want_is_executable, got),

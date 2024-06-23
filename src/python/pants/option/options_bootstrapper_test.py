@@ -146,14 +146,17 @@ class TestOptionsBootstrapper:
         assert "/qux/baz" == opts.for_scope("foo").bar
         assert "/pear/banana" == opts.for_scope("fruit").apple
 
-    def test_bootstrapped_options_ignore_irrelevant_env(self) -> None:
-        included = "PANTS_DISTDIR"
-        excluded = "NON_PANTS_ENV"
+    def test_bootstrapped_options_include_all_env(self) -> None:
+        pants_option = "PANTS_DISTDIR"
+        not_a_pants_option = "NON_PANTS_ENV"
         bootstrapper = OptionsBootstrapper.create(
-            env={excluded: "pear", included: "banana"}, args=[], allow_pantsrc=False
+            env={not_a_pants_option: "pear", pants_option: "banana"}, args=[], allow_pantsrc=False
         )
-        assert included in bootstrapper.env
-        assert excluded not in bootstrapper.env
+        assert pants_option in bootstrapper.env
+        # See https://github.com/pantsbuild/pants/pull/20956 for context.
+        # If we revisit and end up excluding env vars that aren't PANTS_* and aren't needed for
+        # interpolation in config, change this test to check that (and rename this test function).
+        assert not_a_pants_option in bootstrapper.env
 
     def test_create_bootstrapped_multiple_pants_config_files(self) -> None:
         """When given multiple config files, the later files should take precedence when options
@@ -193,7 +196,7 @@ class TestOptionsBootstrapper:
                 dedent(
                     """\
                     [compile_apt]
-                    worker_count = 1
+                    worker_count = "1"
 
                     [fruit]
                     apple = "red"
@@ -204,7 +207,7 @@ class TestOptionsBootstrapper:
                 dedent(
                     """\
                     [compile_apt]
-                    worker_count = 2
+                    worker_count = "2"
                     """
                 )
             )

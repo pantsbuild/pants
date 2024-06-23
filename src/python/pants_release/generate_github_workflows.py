@@ -37,11 +37,12 @@ class Platform(Enum):
     LINUX_X86_64 = "Linux-x86_64"
     LINUX_ARM64 = "Linux-ARM64"
     MACOS10_15_X86_64 = "macOS10-15-x86_64"
-    MACOS11_X86_64 = "macOS11-x86_64"
+    # the oldest version of macOS supported by GitHub self-hosted runners
+    MACOS12_X86_64 = "macOS12-x86_64"
     MACOS11_ARM64 = "macOS11-ARM64"
 
 
-GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS11_X86_64}
+GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS12_X86_64}
 SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
@@ -109,6 +110,7 @@ def classify_changes() -> Jobs:
                 "rust": gha_expr("steps.classify.outputs.rust"),
                 "release": gha_expr("steps.classify.outputs.release"),
                 "ci_config": gha_expr("steps.classify.outputs.ci_config"),
+                "notes": gha_expr("steps.classify.outputs.notes"),
                 "other": gha_expr("steps.classify.outputs.other"),
             },
             "steps": [
@@ -131,7 +133,7 @@ def classify_changes() -> Jobs:
 
                         affected=$(git diff --name-only "$comparison_sha" HEAD | python build-support/bin/classify_changed_files.py)
                         echo "Affected:"
-                        if [[ "${affected}" == "docs" ]]; then
+                        if [[ "${affected}" == "docs" || "${affected}" == "docs notes" ]]; then
                           echo "docs_only=true" | tee -a $GITHUB_OUTPUT
                         fi
                         for i in ${affected}; do
@@ -165,6 +167,41 @@ def ensure_category_label() -> Sequence[Step]:
                 ),
             },
         }
+    ]
+
+
+def ensure_release_notes() -> Sequence[Step]:
+    """Check that a PR either has release notes, or a category:internal or release-notes:not-
+    required label."""
+    return [
+        {
+            # If there's release note changes, then we're good to go and no need to check for one of
+            # the opt-out labels. If there's not, then we should check to see if a human has opted
+            # out via a label.
+            "if": "github.event_name == 'pull_request' && !needs.classify_changes.outputs.notes",
+            "name": "Ensure appropriate label",
+            "uses": "mheap/github-action-required-labels@v4.0.0",
+            "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
+            "with": {
+                "mode": "minimum",
+                "count": 1,
+                "labels": "release-notes:not-required, category:internal",
+                "message": dedent(
+                    """
+                    Please do one of:
+
+                    - add release notes to the appropriate file in `docs/notes`
+
+                    - label this PR with `release-notes:not-required` if it does not need them (for
+                      instance, if this is fixing a minor typo in documentation)
+
+                    - label this PR with `category:internal` if it's an internal change
+
+                    Feel free to ask a maintainer for help if you are not sure what is appropriate!
+                    """
+                ),
+            },
+        },
     ]
 
 
@@ -364,8 +401,8 @@ class Helper:
         # any platform-specific labels, so we don't run on future GH-hosted
         # platforms without realizing it.
         ret = ["self-hosted"] if self.platform in SELF_HOSTED else []
-        if self.platform == Platform.MACOS11_X86_64:
-            ret += ["macos-11"]
+        if self.platform == Platform.MACOS12_X86_64:
+            ret += ["macos-12"]
         elif self.platform == Platform.MACOS11_ARM64:
             ret += ["macOS-11-ARM64"]
         elif self.platform == Platform.MACOS10_15_X86_64:
@@ -380,7 +417,7 @@ class Helper:
 
     def platform_env(self):
         ret = {}
-        if self.platform in {Platform.MACOS10_15_X86_64, Platform.MACOS11_X86_64}:
+        if self.platform in {Platform.MACOS10_15_X86_64, Platform.MACOS12_X86_64}:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
             # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
             ret["ARCHFLAGS"] = "-arch x86_64"
@@ -773,8 +810,8 @@ def linux_arm64_test_jobs() -> Jobs:
     return jobs
 
 
-def macos11_x86_64_test_jobs() -> Jobs:
-    helper = Helper(Platform.MACOS11_X86_64)
+def macos12_x86_64_test_jobs() -> Jobs:
+    helper = Helper(Platform.MACOS12_X86_64)
     jobs = {
         helper.job_name("bootstrap_pants"): bootstrap_jobs(
             helper,
@@ -957,10 +994,17 @@ def test_workflow_jobs() -> Jobs:
             "if": IS_PANTS_OWNER,
             "steps": ensure_category_label(),
         },
+        "check_release_notes": {
+            "name": "Ensure PR has release notes",
+            "runs-on": linux_x86_64_helper.runs_on(),
+            "needs": ["classify_changes"],
+            "if": IS_PANTS_OWNER,
+            "steps": ensure_release_notes(),
+        },
     }
     jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
-    jobs.update(**macos11_x86_64_test_jobs())
+    jobs.update(**macos12_x86_64_test_jobs())
     jobs.update(**build_wheels_jobs())
     jobs.update(
         {
@@ -1256,6 +1300,20 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "run": dedent(
                         """\
                         gh api -X POST "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -F event_type=github-pages
+                        """
+                    ),
+                },
+                {
+                    "name": "Trigger docs sync",
+                    "if": "needs.release_info.outputs.is-release == 'true'",
+                    "env": {
+                        "GH_TOKEN": "${{ secrets.WORKER_PANTS_PANTSBUILD_ORG_TRIGGER_PAT }}",
+                    },
+                    "run": dedent(
+                        """\
+                        RELEASE_TAG=${{ needs.release_info.outputs.build-ref }}
+                        RELEASE_VERSION="${RELEASE_TAG#release_}"
+                        gh workflow run sync_docs.yml -F "version=$RELEASE_VERSION" -F "reviewer=${{ github.actor }}" -R pantsbuild/pantsbuild.org
                         """
                     ),
                 },
@@ -1556,6 +1614,42 @@ def public_repos() -> PublicReposOutput:
     return PublicReposOutput(jobs=jobs, inputs=inputs, run_name=run_name)
 
 
+def clear_self_hosted_persistent_caches_jobs() -> Jobs:
+    jobs = {}
+
+    for platform in sorted(SELF_HOSTED, key=lambda p: p.value):
+        helper = Helper(platform)
+
+        clear_steps = [
+            {
+                "name": f"Deleting {directory}",
+                # squash all errors: this is a best effort thing, so, for instance, it's fine if
+                # there's directories hanging around that this workflow doesn't have permission to
+                # delete
+                "run": f"du -sh {directory} || true; rm -rf {directory} || true",
+            }
+            for directory in [
+                # not all of these will necessarily exist (e.g. ~/Library/Caches is macOS-specific),
+                # but the script is resilient to this
+                "~/Library/Caches",
+                "~/.cache",
+                "~/.nce",
+                "~/.rustup",
+                "~/.pex",
+            ]
+        ]
+        jobs[helper.job_name("clean")] = {
+            "runs-on": helper.runs_on(),
+            "steps": [
+                {"name": "df before", "run": "df -h"},
+                *clear_steps,
+                {"name": "df after", "run": "df -h"},
+            ],
+        }
+
+    return jobs
+
+
 # ----------------------------------------------------------------------
 # Main file
 # ----------------------------------------------------------------------
@@ -1593,7 +1687,7 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
             # NB: This always() condition is critical, as it ensures that this job is run even if
             #   jobs it depends on are skipped.
             "if": "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
-            "needs": ["classify_changes", "check_labels"] + sorted(pr_jobs),
+            "needs": ["classify_changes", "check_labels", "check_release_notes"] + sorted(pr_jobs),
             "outputs": {"merge_ok": f"{gha_expr('steps.set_merge_ok.outputs.merge_ok')}"},
             "steps": [
                 {
@@ -1635,7 +1729,7 @@ def generate() -> dict[Path, str]:
     pr_jobs = test_workflow_jobs()
     pr_jobs.update(**classify_changes())
     for key, val in pr_jobs.items():
-        if key in {"check_labels", "classify_changes"}:
+        if key in {"check_labels", "classify_changes", "check_release_notes"}:
             continue
         needs = val.get("needs", [])
         if isinstance(needs, str):
@@ -1726,12 +1820,24 @@ def generate() -> dict[Path, str]:
         Dumper=NoAliasDumper,
     )
 
+    clear_self_hosted_persistent_caches = clear_self_hosted_persistent_caches_jobs()
+    clear_self_hosted_persistent_caches_yaml = yaml.dump(
+        {
+            "name": "Clear persistent caches on long-lived self-hosted runners",
+            "on": {"workflow_dispatch": {}},
+            "jobs": clear_self_hosted_persistent_caches,
+        }
+    )
+
     return {
         Path(".github/workflows/audit.yaml"): f"{HEADER}\n\n{audit_yaml}",
         Path(".github/workflows/cache_comparison.yaml"): f"{HEADER}\n\n{cache_comparison_yaml}",
         Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
         Path(".github/workflows/release.yaml"): f"{HEADER}\n\n{release_yaml}",
         Path(".github/workflows/public_repos.yaml"): f"{HEADER}\n\n{public_repos_yaml}",
+        Path(
+            ".github/workflows/clear_self_hosted_persistent_caches.yaml"
+        ): f"{HEADER}\n\n{clear_self_hosted_persistent_caches_yaml}",
     }
 
 

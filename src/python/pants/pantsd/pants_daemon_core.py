@@ -6,9 +6,7 @@ from __future__ import annotations
 import logging
 import threading
 from contextlib import contextmanager
-from typing import Iterator
-
-from typing_extensions import Protocol
+from typing import Iterator, Protocol
 
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.env_vars import CompleteEnvironmentVars
@@ -135,7 +133,7 @@ class PantsDaemonCore:
 
         scheduler_restart_explanation: str | None = None
 
-        # Because these options are computed dynamically via side-effects like reading from a file,
+        # Because these options are computed dynamically via side effects like reading from a file,
         # they need to be re-evaluated every run. We only reinitialize the scheduler if changes
         # were made, though.
         dynamic_remote_options, auth_plugin_result = DynamicRemoteOptions.from_options(

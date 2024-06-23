@@ -60,12 +60,59 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidTargetException,
     StringField,
+    StringSequenceField,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class PythonFaaSLayoutField(StringField):
+    alias = "layout"
+    valid_choices = PexVenvLayout
+    expected_type = str
+    default = PexVenvLayout.FLAT_ZIPPED.value
+    help = help_text(
+        """
+        Control the layout of the final artifact: `flat` creates a directory with the
+        source and requirements at the top level, as recommended by cloud vendors,
+        while `flat-zipped` (the default) wraps this up into a single zip file.
+        """
+    )
+
+
+class PythonFaaSPex3VenvCreateExtraArgsField(StringSequenceField):
+    alias = "pex3_venv_create_extra_args"
+    default = ()
+    help = help_text(
+        """
+        Any extra arguments to pass to the `pex3 venv create` invocation that is used to create the
+        final zip file or directory.
+
+        For example, `pex3_venv_create_extra_args=["--collisions-ok"]`, if using packages that have
+        colliding files that aren't required at runtime (errors like "Encountered collisions
+        populating ...").
+        """
+    )
+
+
+class PythonFaaSPexBuildExtraArgs(StringSequenceField):
+    alias = "pex_build_extra_args"
+    default = ()
+    help = help_text(
+        """
+        Additional arguments to pass to the `pex` invocation that is used to collect the requirements
+        and sources for packaging.
+
+        For example, `pex_build_extra_args=["--exclude=pypi-package-name"]` to force a package called
+        `pypi-package-name` isn't included in the artifact.
+
+        Note: Excluding dependencies currently causes Pex to throw an error. You can additionally pass
+        the `--ignore-errors` flag.
+        """
+    )
 
 
 class PythonFaaSHandlerField(StringField, AsyncFieldMixin):
@@ -405,6 +452,9 @@ class BuildPythonFaaSRequest:
     handler: None | PythonFaaSHandlerField
     output_path: OutputPathField
     runtime: PythonFaaSRuntimeField
+    pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
+    pex_build_extra_args: PythonFaaSPexBuildExtraArgs
+    layout: PythonFaaSLayoutField
 
     include_requirements: bool
     include_sources: bool
@@ -425,6 +475,8 @@ async def build_python_faas(
         # When we're executing Pex on Linux, allow a local interpreter to be resolved if
         # available and matching the AMI platform.
         "--resolve-local-platforms",
+        # Additional args from request
+        *(request.pex_build_extra_args.value or ()),
     )
 
     platforms_get = Get(
@@ -486,15 +538,20 @@ async def build_python_faas(
 
     pex_result = await Get(Pex, PexFromTargetsRequest, pex_request)
 
-    output_filename = request.output_path.value_or_default(file_ending="zip")
+    layout = PexVenvLayout(request.layout.value)
+
+    output_filename = request.output_path.value_or_default(
+        file_ending="zip" if layout is PexVenvLayout.FLAT_ZIPPED else None
+    )
 
     result = await Get(
         PexVenv,
         PexVenvRequest(
             pex=pex_result,
-            layout=PexVenvLayout.FLAT_ZIPPED,
+            layout=layout,
             platforms=platforms.pex_platforms,
             complete_platforms=platforms.complete_platforms,
+            extra_args=request.pex3_venv_create_extra_args.value or (),
             prefix=request.prefix_in_artifact,
             output_path=Path(output_filename),
             description=f"Build {request.target_name} artifact for {request.address}",

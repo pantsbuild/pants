@@ -33,11 +33,15 @@ async fn test_client_fingerprint_mismatch() {
     // Then connect with a different set of options (but with a matching `pants_subprocessdir`, so
     // that we find the relevant `.pants.d/pids` directory).
     let options_parser = OptionParser::new(
-        Env::new(HashMap::new()),
         Args::new(vec![format!(
             "--pants-subprocessdir={}",
             tmpdir.path().display()
         )]),
+        Env::new(HashMap::new()),
+        None,
+        true,
+        false,
+        None,
     )
     .unwrap();
     let error = pantsd::find_pantsd(&build_root, &options_parser)

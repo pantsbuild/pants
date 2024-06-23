@@ -12,3 +12,6 @@ hashing = { path = "../hashing" }
 protos = { path = "../protos" }
 sharded_lmdb = { path = "../sharded_lmdb" }
 task_executor = { path = "../task_executor" }
+
+[lints]
+workspace = true

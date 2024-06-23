@@ -27,8 +27,15 @@ from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.engine.addresses import Addresses
 from pants.engine.rules import QueryRule
-from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    GeneratedSources,
+    HydratedSources,
+    HydrateSourcesRequest,
+)
 from pants.jvm import classpath, testutil
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.jdk_rules import rules as jdk_rules
@@ -71,6 +78,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromThriftRequest]),
             QueryRule(RenderedClasspath, (CompileJavaSourceRequest,)),
+            QueryRule(Addresses, (DependenciesRequest,)),
         ],
         target_types=[
             JvmArtifactTarget,
@@ -129,6 +137,7 @@ def test_generates_java(rule_runner: RuleRunner, scrooge_lockfile: JVMLockfileFi
     #  * Thrift files can import other thrift files, and those can import others
     #    (transitive dependencies). We'll only generate the requested target, though.
     #  * We can handle multiple source roots, which need to be preserved in the final output.
+    #  * Dependency inference between Java and Thrift sources.
     rule_runner.write_files(
         {
             "src/thrift/dir1/f.thrift": dedent(
@@ -143,7 +152,7 @@ def test_generates_java(rule_runner: RuleRunner, scrooge_lockfile: JVMLockfileFi
             ),
             "src/thrift/dir1/f2.thrift": dedent(
                 """\
-                namespace java org.pantsbuild.example
+                namespace java org.pantsbuild.example.mngt
                 include "dir1/f.thrift"
                 struct ManagedPerson {
                   1: f.Person employee
@@ -154,7 +163,7 @@ def test_generates_java(rule_runner: RuleRunner, scrooge_lockfile: JVMLockfileFi
             "src/thrift/dir1/BUILD": "thrift_sources()",
             "src/thrift/dir2/g.thrift": dedent(
                 """\
-                namespace java org.pantsbuild.example
+                namespace java org.pantsbuild.example.wrapper
                 include "dir1/f2.thrift"
                 struct ManagedPersonWrapper {
                   1: f2.ManagedPerson managed_person
@@ -165,7 +174,7 @@ def test_generates_java(rule_runner: RuleRunner, scrooge_lockfile: JVMLockfileFi
             # Test another source root.
             "tests/thrift/test_thrifts/f.thrift": dedent(
                 """\
-                namespace java org.pantsbuild.example
+                namespace java org.pantsbuild.example.test
                 include "dir2/g.thrift"
                 struct Executive {
                   1: g.ManagedPersonWrapper managed_person_wrapper
@@ -175,7 +184,7 @@ def test_generates_java(rule_runner: RuleRunner, scrooge_lockfile: JVMLockfileFi
             "tests/thrift/test_thrifts/BUILD": "thrift_sources(dependencies=['src/thrift/dir2'])",
             "3rdparty/jvm/default.lock": scrooge_lockfile.serialized_lockfile,
             "3rdparty/jvm/BUILD": scrooge_lockfile.requirements_as_jvm_artifact_targets(),
-            "src/jvm/BUILD": "java_sources(dependencies=['src/thrift/dir1'])",
+            "src/jvm/BUILD": "java_sources()",
             "src/jvm/TestScroogeThriftJava.java": dedent(
                 """\
                 package org.pantsbuild.example;
@@ -204,21 +213,27 @@ def test_generates_java(rule_runner: RuleRunner, scrooge_lockfile: JVMLockfileFi
     assert_gen(
         Address("src/thrift/dir1", relative_file_path="f2.thrift"),
         [
-            "src/thrift/org/pantsbuild/example/ManagedPerson.java",
+            "src/thrift/org/pantsbuild/example/mngt/ManagedPerson.java",
         ],
     )
     assert_gen(
         Address("src/thrift/dir2", relative_file_path="g.thrift"),
         [
-            "src/thrift/org/pantsbuild/example/ManagedPersonWrapper.java",
+            "src/thrift/org/pantsbuild/example/wrapper/ManagedPersonWrapper.java",
         ],
     )
     assert_gen(
         Address("tests/thrift/test_thrifts", relative_file_path="f.thrift"),
         [
-            "tests/thrift/org/pantsbuild/example/Executive.java",
+            "tests/thrift/org/pantsbuild/example/test/Executive.java",
         ],
     )
+
+    tgt = rule_runner.get_target(
+        Address("src/jvm", relative_file_path="TestScroogeThriftJava.java")
+    )
+    dependencies = rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
+    assert Address("src/thrift/dir1", relative_file_path="f.thrift") in dependencies
 
     request = CompileJavaSourceRequest(
         component=expect_single_expanded_coarsened_target(

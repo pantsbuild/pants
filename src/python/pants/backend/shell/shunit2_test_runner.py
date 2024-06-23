@@ -41,10 +41,11 @@ from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import (
-    FallibleProcessResult,
     InteractiveProcess,
     Process,
     ProcessCacheScope,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField, Target, TransitiveTargets, TransitiveTargetsRequest
@@ -250,9 +251,11 @@ async def run_tests_with_shunit2(
     field_set = batch.single_element
 
     setup = await Get(TestSetup, TestSetupRequest(field_set))
-    result = await Get(FallibleProcessResult, Process, setup.process)
+    results = await Get(
+        ProcessResultWithRetries, ProcessWithRetries(setup.process, test_subsystem.attempts_default)
+    )
     return TestResult.from_fallible_process_result(
-        process_results=(result,),
+        process_results=results.results,
         address=field_set.address,
         output_setting=test_subsystem.output,
         output_simplifier=global_options.output_simplifier(),

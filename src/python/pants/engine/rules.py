@@ -16,6 +16,7 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
+    Protocol,
     Sequence,
     Tuple,
     Type,
@@ -26,9 +27,8 @@ from typing import (
     overload,
 )
 
-from typing_extensions import ParamSpec, Protocol
+from typing_extensions import ParamSpec
 
-from pants.base.deprecated import deprecated
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.goal import Goal
 from pants.engine.internals.rule_visitor import collect_awaitables
@@ -36,8 +36,10 @@ from pants.engine.internals.selectors import AwaitableConstraints, Call
 from pants.engine.internals.selectors import Effect as Effect  # noqa: F401
 from pants.engine.internals.selectors import Get as Get  # noqa: F401
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
+from pants.engine.internals.selectors import concurrently as concurrently  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
@@ -68,7 +70,7 @@ RuleDecorator = Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]
 def _rule_call_trampoline(rule_id: str, output_type: type, func: Callable[P, R]) -> Callable[P, R]:
     @functools.wraps(func)  # type: ignore
     async def wrapper(*args, __implicitly: Sequence[Any] = (), **kwargs):
-        call = Call(rule_id, output_type, *__implicitly)
+        call = Call(rule_id, output_type, args, *__implicitly)  # type: ignore[call-overload]
         return await call
 
     return cast(Callable[P, R], wrapper)
@@ -78,7 +80,7 @@ def _make_rule(
     func_id: str,
     rule_type: RuleType,
     return_type: Type,
-    parameter_types: Iterable[Type],
+    parameter_types: dict[str, Type],
     masked_types: Iterable[Type],
     *,
     cacheable: bool,
@@ -123,7 +125,7 @@ def _make_rule(
         # engine invokes a @rule under memoization.
         func.rule = TaskRule(
             return_type,
-            parameter_types,
+            FrozenDict(parameter_types),
             awaitables,
             masked_types,
             original_func,
@@ -202,9 +204,6 @@ def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs) -> AsyncRuleT:
     if not inspect.isfunction(func):
         raise ValueError("The @rule decorator expects to be placed on a function.")
 
-    if hasattr(func, "rule_helper"):
-        raise ValueError("Cannot use both @rule and @rule_helper")
-
     if (
         len(
             set(kwargs)
@@ -239,14 +238,14 @@ def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs) -> AsyncRuleT:
                 + f" Parameter names: '{', '.join(func_params)}'"
             )
 
-    parameter_types = tuple(
-        _ensure_type_annotation(
+    parameter_types = {
+        parameter: _ensure_type_annotation(
             type_annotation=param_type_overrides.get(parameter, type_hints.get(parameter)),
             name=f"{func_id} parameter {parameter}",
             raise_type=MissingParameterTypeAnnotation,
         )
         for parameter in func_params
-    )
+    }
     is_goal_cls = issubclass(return_type, Goal)
 
     # Set a default canonical name if one is not explicitly provided to the module and name of the
@@ -312,13 +311,13 @@ def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs) -> AsyncRuleT:
 
 def validate_requirements(
     func_id: str,
-    parameter_types: Tuple[Type, ...],
+    parameter_types: dict[str, Type],
     awaitables: Tuple[AwaitableConstraints, ...],
     cacheable: bool,
 ) -> None:
     # TODO: Technically this will also fire for an @_uncacheable_rule, but we don't expose those as
     # part of the API, so it's OK for these errors not to mention them.
-    for ty in parameter_types:
+    for ty in parameter_types.values():
         if cacheable and issubclass(ty, SideEffecting):
             raise ValueError(
                 f"A `@rule` that is not a @goal_rule ({func_id}) may not have "
@@ -406,88 +405,6 @@ def _uncacheable_rule(*args, **kwargs) -> AsyncRuleT | RuleDecorator:
     return inner_rule(*args, **kwargs, rule_type=RuleType.uncacheable_rule, cacheable=False)
 
 
-def _rule_helper_decorator(func: Callable[P, R], _public: bool = False) -> Callable[P, R]:
-    if not _public and not func.__name__.startswith("_"):
-        raise ValueError("@rule_helpers must be private. I.e. start with an underscore.")
-
-    if hasattr(func, "rule"):
-        raise ValueError("Cannot use both @rule and @rule_helper.")
-
-    if not inspect.iscoroutinefunction(func):
-        raise ValueError("@rule_helpers must be async.")
-
-    setattr(func, "rule_helper", func)
-    return func  # type: ignore[return-value]
-
-
-@overload
-def rule_helper(func: Callable[P, R]) -> Callable[P, R]:
-    ...
-
-
-@overload
-def rule_helper(func: None = None, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
-    ...
-
-
-@deprecated(
-    removal_version="2.20.0.dev0",
-    hint=softwrap(
-        """
-        The `@rule_helper` decorator is no longer needed. `@rule` methods may call any other
-        methods, and if they are `async` may also use `Get` and `MultiGet`.
-        """
-    ),
-)
-def rule_helper(
-    func: Callable[P, R] | None = None, **kwargs: Any
-) -> Callable[P, R] | Callable[[Callable[P, R]], Callable[P, R]]:
-    """Decorator which marks a function as a "rule helper".
-
-    This docstring is now deprecated. Any async method may now use `await Get/MultiGet`.
-
-    Functions marked as rule helpers are allowed to be called by rules and other rule helpers
-    and can `await Get/MultiGet`. The rule parser adds these functions' awaitables to the rule's
-    awaitables.
-
-    There are a few restrictions:
-        1. Rule helpers must be "private". I.e. start with an underscore.
-        2. Rule hlpers must be `async`
-        3. Rule helpers can't be rules
-        4. Rule helpers must be accessed by attributes chained from a module variable (see below)
-
-    To explain restriction 4, consider the following:
-    ```
-        from some_mod import helper_function, attribute
-
-        ...
-
-        some_instance = AClass()
-
-        @rule
-        async def my_rule(arg: RequestType) -> ReturnType
-            await helper_function()  # OK
-            await attribute.helper()  # OK (assuming `helper` is a @rule_helper)
-            await attribute.otherattr.helper()  # OK (assuming `helper` is a @rule_helper)
-            await some_instance.helper()  # OK (assuming `helper` is a @rule_helper)
-
-            await AClass().helper()  # Not OK, won't collect awaitables from `helper`
-
-            func_var = AClass()
-            await func_var.helper()  # Not OK, won't collect awaitables from `helper`
-            await arg.helper()  # Not OK, won't collect awaitables from `helper`
-    ```
-    """
-    if func is None:
-
-        def wrapper(func: Callable[P, R]) -> Callable[P, R]:
-            return _rule_helper_decorator(func, **kwargs)
-
-        return wrapper
-
-    return _rule_helper_decorator(func, **kwargs)
-
-
 class Rule(Protocol):
     """Rules declare how to produce products for the product graph.
 
@@ -523,7 +440,7 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
                     continue
                 rule = getattr(item, "rule", None)
                 if isinstance(rule, TaskRule):
-                    for input in rule.input_selectors:
+                    for input in rule.parameters.values():
                         if issubclass(input, Subsystem):
                             yield from input.rules()
                         if issubclass(input, Subsystem.EnvironmentAware):
@@ -544,8 +461,8 @@ class TaskRule:
     """
 
     output_type: Type
-    input_selectors: Tuple[Type, ...]
-    input_gets: Tuple[AwaitableConstraints, ...]
+    parameters: FrozenDict[str, Type]
+    awaitables: Tuple[AwaitableConstraints, ...]
     masked_types: Tuple[Type, ...]
     func: Callable
     canonical_name: str
@@ -557,9 +474,9 @@ class TaskRule:
         return "(name={}, {}, {!r}, {}, gets={})".format(
             getattr(self, "name", "<not defined>"),
             self.output_type.__name__,
-            self.input_selectors,
+            self.parameters.values(),
             self.func.__name__,
-            self.input_gets,
+            self.awaitables,
         )
 
 

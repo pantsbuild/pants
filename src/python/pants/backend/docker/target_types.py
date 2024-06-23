@@ -12,6 +12,7 @@ from typing import Callable, ClassVar, Iterator, Optional, cast
 from typing_extensions import final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
+from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.base.build_environment import get_buildroot
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
@@ -29,6 +30,7 @@ from pants.engine.target import (
     DictStringToStringField,
     Field,
     InvalidFieldException,
+    ListOfDictStringToStringField,
     OptionalSingleSourceField,
     StringField,
     StringSequenceField,
@@ -37,6 +39,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import union
 from pants.util.docutil import bin_name, doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import help_text, softwrap
 
 # Common help text to be applied to each field that supports value interpolation.
@@ -148,7 +151,7 @@ class DockerImageTagsField(StringSequenceField):
 
         {_interpolation_help.format(kind="tag")}
 
-        See {doc_url('tagging-docker-images')}.
+        See {doc_url('docs/docker/tagging-docker-images')}.
         """
     )
 
@@ -304,20 +307,53 @@ class DockerBuildOptionFieldMultiValueDictMixin(DictStringToStringField):
     docker_build_option: ClassVar[str]
 
     @final
-    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+    def options(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
         if self.value:
             yield f"{self.docker_build_option}=" + ",".join(
                 f"{key}={value_formatter(value)}" for key, value in self.value.items()
             )
 
 
+class DockerBuildOptionFieldListOfMultiValueDictMixin(ListOfDictStringToStringField):
+    """Inherit this mixin class to provide multiple key-value options to docker build:
+
+    `--flag=key1=value1,key2=value2 --flag=key3=value3,key4=value4`
+    """
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
+        if self.value:
+            for item in self.value:
+                yield f"{self.docker_build_option}=" + ",".join(
+                    f"{key}={value_formatter(value)}" for key, value in item.items()
+                )
+
+
+class DockerBuildKitOptionField:
+    """Mixin to indicate a BuildKit-specific option."""
+
+    @abstractmethod
+    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+        ...
+
+    required_help = "This option requires BuildKit to be enabled via the Docker subsystem options."
+
+
 class DockerImageBuildImageCacheToField(
-    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField
+    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
 ):
     alias = "cache_to"
     help = help_text(
         f"""
         Export image build cache to an external cache destination.
+
+        Note that Docker [supports](https://docs.docker.com/build/cache/backends/#multiple-caches)
+        multiple cache sources - Pants will pass these as multiple `--cache_from` arguments to the
+        Docker CLI. Docker will only use the first cache hit (i.e. the image exists) in the build.
+
+        {DockerBuildKitOptionField.required_help}
 
         Example:
 
@@ -327,10 +363,10 @@ class DockerImageBuildImageCacheToField(
                     "type": "local",
                     "dest": "/tmp/docker-cache/example"
                 }},
-                cache_from={{
+                cache_from=[{{
                     "type": "local",
                     "src": "/tmp/docker-cache/example"
-                }}
+                }}]
             )
 
         {_interpolation_help.format(kind="Values")}
@@ -340,12 +376,16 @@ class DockerImageBuildImageCacheToField(
 
 
 class DockerImageBuildImageCacheFromField(
-    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField
+    DockerBuildOptionFieldListOfMultiValueDictMixin,
+    ListOfDictStringToStringField,
+    DockerBuildKitOptionField,
 ):
     alias = "cache_from"
     help = help_text(
         f"""
-        Use an external cache source when building the image.
+        Use external cache sources when building the image.
+
+        {DockerBuildKitOptionField.required_help}
 
         Example:
 
@@ -353,18 +393,45 @@ class DockerImageBuildImageCacheFromField(
                 name="example-local-cache-backend",
                 cache_to={{
                     "type": "local",
-                    "dest": "/tmp/docker-cache/example"
+                    "dest": "/tmp/docker-cache/primary"
                 }},
-                cache_from={{
-                    "type": "local",
-                    "src": "/tmp/docker-cache/example"
-                }}
+                cache_from=[
+                    {{
+                        "type": "local",
+                        "src": "/tmp/docker-cache/primary"
+                    }},
+                    {{
+                        "type": "local",
+                        "src": "/tmp/docker-cache/secondary"
+                    }}
+                ]
             )
 
         {_interpolation_help.format(kind="Values")}
         """
     )
     docker_build_option = "--cache-from"
+
+
+class DockerImageBuildImageOutputField(
+    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
+):
+    alias = "output"
+    default = FrozenDict({"type": "docker"})
+    help = help_text(
+        f"""
+        Sets the export action for the build result.
+
+        {DockerBuildKitOptionField.required_help}
+
+        When using `pants publish` to publish Docker images to a registry, the output type
+        must be 'docker', as `publish` expects that the built images exist in the local
+        image store.
+
+        {_interpolation_help.format(kind="Values")}
+        """
+    )
+    docker_build_option = "--output"
 
 
 class DockerImageBuildSecretsOptionField(
@@ -441,7 +508,7 @@ class DockerBuildOptionFieldValueMixin(Field):
     docker_build_option: ClassVar[str]
 
     @final
-    def options(self) -> Iterator[str]:
+    def options(self, *args, **kwargs) -> Iterator[str]:
         if self.value is not None:
             yield f"{self.docker_build_option}={self.value}"
 
@@ -453,7 +520,7 @@ class DockerBuildOptionFieldMultiValueMixin(StringSequenceField):
     docker_build_option: ClassVar[str]
 
     @final
-    def options(self) -> Iterator[str]:
+    def options(self, *args, **kwargs) -> Iterator[str]:
         if self.value:
             yield f"{self.docker_build_option}={','.join(list(self.value))}"
 
@@ -479,7 +546,7 @@ class DockerBuildOptionFlagFieldMixin(BoolField, ABC):
     docker_build_option: ClassVar[str]
 
     @final
-    def options(self) -> Iterator[str]:
+    def options(self, *args, **kwargs) -> Iterator[str]:
         if self.value:
             yield f"{self.docker_build_option}"
 
@@ -523,6 +590,14 @@ class DockerImageBuildPlatformOptionField(
     docker_build_option = "--platform"
 
 
+class DockerImageRunExtraArgsField(StringSequenceField):
+    alias: ClassVar[str] = "extra_run_args"
+    default = ()
+    help = help_text(
+        lambda: f"Extra arguments to pass into the invocation of `docker run`. These are in addition to those at the `[{DockerOptions.options_scope}].run_args`"
+    )
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -547,6 +622,8 @@ class DockerImageTarget(Target):
         DockerImageBuildPlatformOptionField,
         DockerImageBuildImageCacheToField,
         DockerImageBuildImageCacheFromField,
+        DockerImageBuildImageOutputField,
+        DockerImageRunExtraArgsField,
         OutputPathField,
         RestartableField,
     )

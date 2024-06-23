@@ -16,7 +16,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
     find_jvm_artifacts_or_raise,
 )
-from pants.jvm.resolve.common import Coordinate
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 
@@ -55,8 +55,7 @@ async def resolve_scalapb_runtime_for_resolve(
     scalapb: ScalaPBSubsystem,
 ) -> ScalaPBRuntimeForResolve:
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
-    # TODO: Does not handle Scala 3 suffix which is just `_3` nor X.Y.Z versions.
-    scala_binary_version, _, _ = scala_version.rpartition(".")
+    scala_binary_version = scala_version.binary
     version = scalapb.version
 
     addresses = find_jvm_artifacts_or_raise(

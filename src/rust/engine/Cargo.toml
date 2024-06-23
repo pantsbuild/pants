@@ -100,7 +100,10 @@ fs = { path = "./fs" }
 env_logger = { workspace = true }
 
 [build-dependencies]
-pyo3-build-config = "0.18"
+pyo3-build-config = { workspace = true }
+
+[lints]
+workspace = true
 
 [workspace]
 resolver = "2"
@@ -116,11 +119,13 @@ members = [
   "cache",
   "client",
   "concrete_time",
+  "dep_inference",
   "fs",
   "fs/brfs",
   "fs/fs_util",
   "fs/store",
   "graph",
+  "grpc_util",
   "hashing",
   "stdio",
   "logging",
@@ -132,6 +137,7 @@ members = [
   "process_execution/pe_nailgun",
   "process_execution/remote",
   "process_executor",
+  "protos",
   "remote_provider",
   "remote_provider/remote_provider_opendal",
   "remote_provider/remote_provider_reapi",
@@ -170,6 +176,7 @@ default-members = [
   "fs/fs_util",
   "fs/store",
   "graph",
+  "grpc_util",
   "hashing",
   "stdio",
   "logging",
@@ -181,6 +188,11 @@ default-members = [
   "process_execution/pe_nailgun",
   "process_execution/remote",
   "process_executor",
+  "protos",
+  "remote_provider",
+  "remote_provider/remote_provider_opendal",
+  "remote_provider/remote_provider_reapi",
+  "remote_provider/remote_provider_traits",
   "rule_graph",
   "sharded_lmdb",
   "task_executor",
@@ -214,7 +226,7 @@ bytes = "1.5"
 chrono = "0.4.22"
 clap = "3"
 colored = "2.0.0"
-console = "0.15.7"
+console = "0.15.8"
 criterion = "0.4"
 crossbeam-channel = "0.5"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
@@ -233,7 +245,7 @@ fuser = "0.11.1"
 futures = "0.3"
 futures-core = "^0.3.23"
 generic-array = "0.14"
-glob = "0.3.0"
+glob = "0.3.1"
 hdrhistogram = "7.5"
 hex = "0.4.3"
 http = "0.2"
@@ -243,7 +255,7 @@ hyper = "0.14"
 hyper-rustls = "0.24"
 ignore = { git = "https://github.com/pantsbuild/ripgrep.git", rev = "0f7e0fdd00ae528745a7fea24a320cae98235341" }
 indexmap = "1.9"
-indicatif = "0.17"
+indicatif = "0.17.8"
 internment = "0.6"
 itertools = "0.10"
 lazy_static = "1"
@@ -274,10 +286,11 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messa
   "render-line",
   "render-line-termion",
 ] }
-prost = "0.11"
-prost-build = "0.11"
-prost-types = "0.11"
-pyo3 = "0.19"
+prost = "0.12"
+prost-build = "0.12"
+prost-types = "0.12"
+pyo3 = { version = "0.21", features = ["gil-refs"] }
+pyo3-build-config = "0.21"
 rand = "0.8"
 regex = "1"
 rlimit = "0.8"
@@ -288,10 +301,11 @@ serde = "1.0.160"
 serde_derive = "1.0.98"
 serde_json = "1.0"
 serde_test = "1.0"
+serde_yaml = "0.9"
 sha2 = "0.10"
 shell-quote = "0.3.0"
 shellexpand = "2.1"
-shlex = "1.1.0"
+shlex = "1.2.0"
 strum = "0.24"
 strum_macros = "0.24"
 sysinfo = "0.20.0"
@@ -304,16 +318,17 @@ tokio-rustls = "0.24"
 tokio-stream = "0.1"
 tokio-util = "0.7"
 toml = "0.5"
-tonic = "0.9"
-tonic-build = "0.9"
+tonic = "0.10"
+tonic-build = "0.10"
 tower = "0.4"
 tower-layer = "0.3"
 tower-service = "0.3"
 uname = "0.1.1"
-url = "2.4"
-uuid = "1.5.0"
+url = "2.5"
+uuid = "1.8.0"
 walkdir = "2"
 webpki = "0.22"
+whoami = "1.4.1"
 
 # NB: If a change to these versions requires cache busting, bump the version of
 # `src/rust/engine/dep_inference/Cargo.toml`.
@@ -321,5 +336,33 @@ tree-sitter = "0.20.10"
 tree-sitter-javascript = "0.20.1"
 tree-sitter-python = "0.20.4"
 
-[patch.crates-io]
-console = { version = "0.15.7", git = "https://github.com/tgolsson/console.git", rev = "5483880905f384679d322e83c37180f122951995" }
+# Default lints adopted by most crates in this workspace.
+
+[workspace.lints.rust]
+warnings = { level = "deny", priority = 0 }
+
+# Enable all clippy lints except for many of the pedantic ones.
+[workspace.lints.clippy]
+all = { level = "deny", priority = 0 }
+
+default_trait_access = { level = "deny", priority = 1 }
+expl_impl_clone_on_copy = { level = "deny", priority = 1 }
+if_not_else = { level = "deny", priority = 1 }
+needless_continue = { level = "deny", priority = 1 }
+unseparated_literal_suffix = { level = "deny", priority = 1 }
+used_underscore_binding = { level = "deny", priority = 1 }
+
+# It is often more clear to show that nothing is being moved.
+match_ref_pats = { level = "allow", priority = 1 }
+
+# Subjective style.
+len_without_is_empty = { level = "allow", priority = 1 }
+redundant_field_names = { level = "allow", priority = 1 }
+too_many_arguments = { level = "allow", priority = 1 }
+
+# Default isn't as big a deal as people seem to think it is.
+new_without_default = { level = "allow", priority = 1 }
+new_ret_no_self = { level = "allow", priority = 1 }
+
+# Arc<Mutex> can be more clear than needing to grok Orderings:
+mutex_atomic = { level = "allow", priority = 1 }

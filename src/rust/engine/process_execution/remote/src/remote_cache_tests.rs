@@ -16,7 +16,7 @@ use grpc_util::tls;
 use hashing::{Digest, EMPTY_DIGEST};
 use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use store::{RemoteStoreOptions, Store};
+use store::{RemoteProvider, RemoteStoreOptions, Store};
 use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
@@ -106,6 +106,7 @@ impl StoreSetup {
         let store = Store::local_only(executor.clone(), store_dir)
             .unwrap()
             .into_with_remote(RemoteStoreOptions {
+                provider: RemoteProvider::Reapi,
                 store_address: cas.address(),
                 instance_name: None,
                 tls_config: tls::Config::default(),
@@ -160,6 +161,7 @@ async fn create_cached_runner(
                 append_only_caches_base_path: None,
             },
             RemoteStoreOptions {
+                provider: RemoteProvider::Reapi,
                 instance_name: None,
                 store_address: store_setup.cas.address(),
                 tls_config: tls::Config::default(),
@@ -763,6 +765,7 @@ async fn make_action_result_basic() {
             append_only_caches_base_path: None,
         },
         RemoteStoreOptions {
+            provider: RemoteProvider::Reapi,
             instance_name: None,
             store_address: cas.address(),
             tls_config: tls::Config::default(),

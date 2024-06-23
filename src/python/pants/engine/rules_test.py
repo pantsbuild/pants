@@ -25,7 +25,6 @@ from pants.engine.rules import (
     UnrecognizedRuleArgument,
     goal_rule,
     rule,
-    rule_helper,
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
@@ -268,7 +267,7 @@ class Example(Goal):
 
 @goal_rule
 async def a_goal_rule_generator(console: Console) -> Example:
-    a = await Get(A, str("a str!"))
+    a = await Get(A, str, "a str!")
     console.print_stdout(str(a))
     return Example(exit_code=0)
 
@@ -474,8 +473,8 @@ class TestRuleGraph:
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
     @pytest.mark.no_error_if_skipped
     def test_not_fulfillable_duplicated_dependency(self) -> None:
-        # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable
-        # Only the unfulfillable one should be in the errors.
+        # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable,
+        # only the unfulfillable one should be in the errors.
 
         @rule
         def a_from_c(c: C) -> A:
@@ -1059,7 +1058,8 @@ def test_param_type_overrides() -> None:
     async def dont_injure_humans(param1: str, param2, param3: list) -> A:
         return A()
 
-    assert dont_injure_humans.rule.input_selectors == (int, dict, list)  # type: ignore[attr-defined]
+    dont_injure_humans_rule = dont_injure_humans.rule  # type: ignore[attr-defined]
+    assert tuple(dont_injure_humans_rule.parameters.values()) == (int, dict, list)
 
     with pytest.raises(ValueError, match="paramX"):
 
@@ -1071,40 +1071,4 @@ def test_param_type_overrides() -> None:
 
         @rule(_param_type_overrides={"param1": "A string"})
         async def protect_existence(param1) -> A:
-            return A()
-
-
-def test_invalid_rule_helper_name() -> None:
-    with pytest.raises(ValueError, match="must be private"):
-
-        @rule_helper
-        async def foo() -> A:
-            return A()
-
-    @rule_helper(_public=True)
-    async def bar() -> A:
-        return A()
-
-
-def test_cant_be_both_rule_and_rule_helper() -> None:
-    with pytest.raises(ValueError, match="Cannot use both @rule and @rule_helper"):
-
-        @rule_helper
-        @rule
-        async def _func1() -> A:
-            return A()
-
-    with pytest.raises(ValueError, match="Cannot use both @rule and @rule_helper"):
-
-        @rule
-        @rule_helper
-        async def _func2() -> A:
-            return A()
-
-
-def test_synchronous_rule_helper() -> None:
-    with pytest.raises(ValueError, match="must be async"):
-
-        @rule_helper
-        def _foo() -> A:
             return A()

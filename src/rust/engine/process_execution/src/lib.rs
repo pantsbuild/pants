@@ -1,29 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
-// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![deny(
-    clippy::all,
-    clippy::default_trait_access,
-    clippy::expl_impl_clone_on_copy,
-    clippy::if_not_else,
-    clippy::needless_continue,
-    clippy::unseparated_literal_suffix,
-    clippy::used_underscore_binding
-)]
-// It is often more clear to show that nothing is being moved.
-#![allow(clippy::match_ref_pats)]
-// Subjective style.
-#![allow(
-    clippy::len_without_is_empty,
-    clippy::redundant_field_names,
-    clippy::too_many_arguments
-)]
-// Default isn't as big a deal as people seem to think it is.
-#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
-#![allow(clippy::mutex_atomic)]
 #[macro_use]
 extern crate derivative;
 
@@ -81,6 +58,12 @@ pub mod local_tests;
 pub mod named_caches;
 #[cfg(test)]
 pub mod named_caches_tests;
+
+pub(crate) mod fork_exec;
+
+pub mod workspace;
+#[cfg(test)]
+pub mod workspace_tests;
 
 extern crate uname;
 
@@ -450,11 +433,16 @@ impl Default for InputDigests {
 }
 
 #[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize)]
+/// "Where" to run a `Process`. This is the Rust-side of the environments feature.
 pub enum ProcessExecutionStrategy {
+    /// Run the Process locally in an execution sandbox.
     Local,
-    /// Stores the platform_properties.
+    /// Run the Process locally in the workspace without an execution sandbox.
+    LocalInWorkspace,
+    /// Run the Process remotely using the Remote Execution API. The vector stores the platform_properties to pass
+    /// for that execution.
     RemoteExecution(Vec<(String, String)>),
-    /// Stores the image name.
+    /// Run the Process in a Docker container. The string stores the image name.
     Docker(String),
 }
 
@@ -464,6 +452,7 @@ impl ProcessExecutionStrategy {
     pub fn cache_value(&self) -> String {
         match self {
             Self::Local => "local_execution".to_string(),
+            Self::LocalInWorkspace => "workspace_execution".to_string(),
             Self::RemoteExecution(_) => "remote_execution".to_string(),
             // NB: this image will include the container ID, thanks to
             // https://github.com/pantsbuild/pants/pull/17101.
@@ -474,6 +463,7 @@ impl ProcessExecutionStrategy {
     pub fn strategy_type(&self) -> &'static str {
         match self {
             Self::Local => "local",
+            Self::LocalInWorkspace => "workspace",
             Self::RemoteExecution(_) => "remote",
             Self::Docker(_) => "docker",
         }

@@ -1,0 +1,54 @@
+---
+    title: SQL Overview
+    sidebar_position: 999
+---
+
+---
+
+:::caution SQL support is in alpha stage
+Pants is currently building support for SQL. Simple use cases might be
+supported, but many options are missing.
+
+Please share feedback for what you need to use Pants with your SQL queries by
+either [opening a GitHub
+issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our
+Slack](/community/getting-help)!
+:::
+
+## Initial setup
+
+First, activate the relevant backend in `pants.toml`:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages = [
+  ...
+  "pants.backend.experimental.sql",
+  ...
+]
+```
+
+The SQL backend adds [`sql_source`](../../reference/targets/sql_source.mdx) and
+[`sql_sources`](../../reference/targets/sql_sources.mdx) target types for SQL
+files. The [`sql_source`](../../reference/targets/sql_source.mdx) behaves like
+[`resource`](../../reference/targets/resource.mdx), so you can use it directly
+without wrappers. The `tailor` goal will automatically generate the targets for
+your .sql files.
+
+## Enable sqlfluff linter
+
+To enable the linter activate the relevant backend in `pants.toml`:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages = [
+  ...
+  "pants.backend.experimental.sql.lint.sqlfluff",
+  ...
+]
+```
+
+You can run the linter via `lint` goal:
+```
+pants lint --only=sqlfluff ::
+```

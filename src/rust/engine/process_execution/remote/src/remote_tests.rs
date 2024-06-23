@@ -14,7 +14,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::longrunning::Operation;
 use remexec::{execution_stage::Value as ExecutionStageValue, ExecutedActionMetadata};
-use store::{RemoteStoreOptions, SnapshotOps, Store, StoreError};
+use store::{RemoteProvider, RemoteStoreOptions, SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
@@ -1270,6 +1270,7 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
 
 fn remote_options_for_cas(cas: &mock::StubCAS) -> RemoteStoreOptions {
     RemoteStoreOptions {
+        provider: RemoteProvider::Reapi,
         store_address: cas.address(),
         instance_name: None,
         tls_config: tls::Config::default(),
@@ -2683,7 +2684,7 @@ async fn make_store(
 ) -> Store {
     Store::local_only(executor, store_dir)
         .unwrap()
-        .into_with_remote(remote_options_for_cas(&cas))
+        .into_with_remote(remote_options_for_cas(cas))
         .await
         .unwrap()
 }

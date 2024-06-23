@@ -7,6 +7,8 @@ import os
 import subprocess
 from io import BytesIO
 from textwrap import dedent
+from typing import Any
+from unittest.mock import Mock
 from zipfile import ZipFile
 
 import pytest
@@ -14,6 +16,9 @@ import pytest
 from pants.backend.awslambda.python.rules import (
     PythonAwsLambdaFieldSet,
     PythonAwsLambdaLayerFieldSet,
+    _BaseFieldSet,
+    package_python_aws_lambda_function,
+    package_python_aws_lambda_layer,
 )
 from pants.backend.awslambda.python.rules import rules as awslambda_python_rules
 from pants.backend.awslambda.python.target_types import PythonAWSLambda, PythonAWSLambdaLayer
@@ -26,6 +31,11 @@ from pants.backend.python.target_types import (
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
+from pants.backend.python.util_rules.faas import (
+    BuildPythonFaaSRequest,
+    PythonFaaSPex3VenvCreateExtraArgsField,
+    PythonFaaSPexBuildExtraArgs,
+)
 from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
@@ -40,7 +50,7 @@ from pants.engine.fs import DigestContents
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import FieldSet
 from pants.testutil.python_rule_runner import PythonRuleRunner
-from pants.testutil.rule_runner import QueryRule
+from pants.testutil.rule_runner import MockGet, QueryRule, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -342,3 +352,62 @@ def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
             expected_extra_log_lines=("    Runtime: python3.7",),
             layer=True,
         )
+
+
+@pytest.mark.parametrize(
+    ("rule", "field_set_ty", "extra_field_set_args"),
+    [
+        pytest.param(
+            package_python_aws_lambda_function, PythonAwsLambdaFieldSet, ["handler"], id="function"
+        ),
+        pytest.param(
+            package_python_aws_lambda_layer,
+            PythonAwsLambdaLayerFieldSet,
+            ["dependencies", "include_sources"],
+            id="layer",
+        ),
+    ],
+)
+def test_pex3_venv_create_extra_args_are_passed_through(
+    rule: Any, field_set_ty: type[_BaseFieldSet], extra_field_set_args: list[str]
+) -> None:
+    # Setup
+    addr = Address("addr")
+    extra_args = (
+        "--extra-args-for-test",
+        "distinctive-value-E40B861A-266B-4F37-8394-767840BE9E44",
+    )
+    extra_args_field = PythonFaaSPex3VenvCreateExtraArgsField(extra_args, addr)
+    field_set = field_set_ty(
+        address=addr,
+        include_requirements=Mock(),
+        runtime=Mock(),
+        complete_platforms=Mock(),
+        output_path=Mock(),
+        environment=Mock(),
+        layout=Mock(),
+        **{arg: Mock() for arg in extra_field_set_args},
+        pex3_venv_create_extra_args=extra_args_field,
+        pex_build_extra_args=PythonFaaSPexBuildExtraArgs(None, addr),
+    )
+
+    observed_calls = []
+
+    def mocked_build(request: BuildPythonFaaSRequest) -> BuiltPackage:
+        observed_calls.append(request.pex3_venv_create_extra_args)
+        return Mock()
+
+    # Exercise
+    run_rule_with_mocks(
+        rule,
+        rule_args=[field_set],
+        mock_gets=[
+            MockGet(
+                output_type=BuiltPackage, input_types=(BuildPythonFaaSRequest,), mock=mocked_build
+            )
+        ],
+    )
+
+    # Verify
+    assert len(observed_calls) == 1
+    assert observed_calls[0] is extra_args_field

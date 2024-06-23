@@ -39,7 +39,8 @@ use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
-use rule_graph::{self, DependencyKey, RuleGraph, RuleId};
+use rule_graph::{self, RuleGraph};
+use store::RemoteProvider;
 use task_executor::Executor;
 use workunit_store::{
     ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState, WorkunitStore,
@@ -48,18 +49,21 @@ use workunit_store::{
 
 use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
 use crate::externs::process::PyProcessExecutionEnvironment;
+use crate::intrinsics;
 use crate::{
     externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
-    Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions,
-    Rule, Scheduler, Session, SessionCore, Tasks, TypeId, Types, Value,
+    Failure, Function, Key, LocalStoreOptions, Params, RemotingOptions, Rule, Scheduler, Session,
+    SessionCore, Tasks, TypeId, Types, Value,
 };
 
 #[pymodule]
 fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
+    intrinsics::register(py, m)?;
     externs::register(py, m)?;
     externs::address::register(py, m)?;
     externs::fs::register(m)?;
     externs::nailgun::register(py, m)?;
+    externs::options::register(m)?;
     externs::process::register(m)?;
     externs::pantsd::register(py, m)?;
     externs::scheduler::register(m)?;
@@ -101,6 +105,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
     m.add_function(wrap_pyfunction!(tasks_task_begin, m)?)?;
     m.add_function(wrap_pyfunction!(tasks_task_end, m)?)?;
+    m.add_function(wrap_pyfunction!(tasks_add_call, m)?)?;
     m.add_function(wrap_pyfunction!(tasks_add_get, m)?)?;
     m.add_function(wrap_pyfunction!(tasks_add_get_union, m)?)?;
     m.add_function(wrap_pyfunction!(tasks_add_query, m)?)?;
@@ -123,6 +128,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
     m.add_function(wrap_pyfunction!(validate_reachability, m)?)?;
     m.add_function(wrap_pyfunction!(rule_graph_consumed_types, m)?)?;
+    m.add_function(wrap_pyfunction!(rule_graph_rule_gets, m)?)?;
     m.add_function(wrap_pyfunction!(rule_graph_visualize, m)?)?;
     m.add_function(wrap_pyfunction!(rule_subgraph_visualize, m)?)?;
 
@@ -174,6 +180,8 @@ impl PyTypes {
     #[new]
     fn __new__(
         paths: &PyType,
+        path_metadata_request: &PyType,
+        path_metadata_result: &PyType,
         file_content: &PyType,
         file_entry: &PyType,
         symlink_entry: &PyType,
@@ -205,6 +213,8 @@ impl PyTypes {
             file_digest: TypeId::new(py.get_type::<externs::fs::PyFileDigest>()),
             snapshot: TypeId::new(py.get_type::<externs::fs::PySnapshot>()),
             paths: TypeId::new(paths),
+            path_metadata_request: TypeId::new(path_metadata_request),
+            path_metadata_result: TypeId::new(path_metadata_result),
             file_content: TypeId::new(file_content),
             file_entry: TypeId::new(file_entry),
             symlink_entry: TypeId::new(symlink_entry),
@@ -299,6 +309,7 @@ struct PyRemotingOptions(RemotingOptions);
 impl PyRemotingOptions {
     #[new]
     fn __new__(
+        provider: String,
         execution_enable: bool,
         store_headers: BTreeMap<String, String>,
         store_chunk_bytes: usize,
@@ -323,6 +334,7 @@ impl PyRemotingOptions {
         append_only_caches_base_path: Option<String>,
     ) -> Self {
         Self(RemotingOptions {
+            provider: RemoteProvider::from_str(&provider).unwrap(),
             execution_enable,
             store_address,
             execution_address,
@@ -695,9 +707,7 @@ fn scheduler_create(
         .borrow_mut()
         .take()
         .ok_or_else(|| PyException::new_err("An instance of PyTypes may only be used once."))?;
-    let intrinsics = Intrinsics::new(&types);
-    let mut tasks = py_tasks.0.replace(Tasks::new());
-    tasks.intrinsics_set(&intrinsics);
+    let tasks = py_tasks.0.replace(Tasks::new());
 
     // NOTE: Enter the Tokio runtime so that libraries like Tonic (for gRPC) are able to
     // use `tokio::spawn` since Python does not setup Tokio for the main thread. This also
@@ -710,7 +720,6 @@ fn scheduler_create(
                     py_executor.0.clone(),
                     tasks,
                     types,
-                    intrinsics,
                     build_root,
                     ignore_patterns,
                     use_gitignore,
@@ -1016,21 +1025,11 @@ fn session_run_interactive_process(
     let interactive_process: Value = interactive_process.into();
     let process_config = Value::new(process_config_from_environment.into_py(py));
     py.allow_threads(|| {
-        core.executor.clone().block_on(nodes::maybe_side_effecting(
+        core.executor.clone().block_on(nodes::task_context(
+            context.clone(),
             true,
             &Arc::new(std::sync::atomic::AtomicBool::new(true)),
-            core.intrinsics.run(
-                &Intrinsic {
-                    id: RuleId::new("interactive_process"),
-                    product: core.types.interactive_process_result,
-                    inputs: vec![
-                        DependencyKey::new(core.types.interactive_process),
-                        DependencyKey::new(core.types.process_config_from_environment),
-                    ],
-                },
-                context,
-                vec![interactive_process, process_config],
-            ),
+            intrinsics::interactive_process_inner(&context, interactive_process, process_config),
         ))
     })
     .map(|v| v.into())
@@ -1134,7 +1133,7 @@ fn tasks_task_begin(
     py_tasks: &PyTasks,
     func: PyObject,
     output_type: &PyType,
-    arg_types: Vec<&PyType>,
+    arg_types: Vec<(String, &PyType)>,
     masked_types: Vec<&PyType>,
     side_effecting: bool,
     engine_aware_return_type: bool,
@@ -1148,7 +1147,10 @@ fn tasks_task_begin(
         .map_err(|e| PyException::new_err(format!("{e}")))?;
     let func = Function(Key::from_value(func.into())?);
     let output_type = TypeId::new(output_type);
-    let arg_types = arg_types.into_iter().map(TypeId::new).collect();
+    let arg_types = arg_types
+        .into_iter()
+        .map(|(name, typ)| (name, TypeId::new(typ)))
+        .collect();
     let masked_types = masked_types.into_iter().map(TypeId::new).collect();
     let mut tasks = py_tasks.0.borrow_mut();
     tasks.task_begin(
@@ -1173,16 +1175,25 @@ fn tasks_task_end(py_tasks: &PyTasks) {
 }
 
 #[pyfunction]
-fn tasks_add_get(
+fn tasks_add_call(
     py_tasks: &PyTasks,
     output: &PyType,
     inputs: Vec<&PyType>,
-    rule_id: Option<String>,
+    rule_id: String,
+    explicit_args_arity: u16,
 ) {
     let output = TypeId::new(output);
     let inputs = inputs.into_iter().map(TypeId::new).collect();
     let mut tasks = py_tasks.0.borrow_mut();
-    tasks.add_get(output, inputs, rule_id);
+    tasks.add_call(output, inputs, rule_id, explicit_args_arity);
+}
+
+#[pyfunction]
+fn tasks_add_get(py_tasks: &PyTasks, output: &PyType, inputs: Vec<&PyType>) {
+    let output = TypeId::new(output);
+    let inputs = inputs.into_iter().map(TypeId::new).collect();
+    let mut tasks = py_tasks.0.borrow_mut();
+    tasks.add_get(output, inputs);
 }
 
 #[pyfunction]
@@ -1380,6 +1391,47 @@ fn rule_graph_consumed_types<'py>(
             .into_iter()
             .map(|type_id| type_id.as_py_type(py))
             .collect())
+    })
+}
+
+#[pyfunction]
+fn rule_graph_rule_gets<'p>(py: Python<'p>, py_scheduler: &PyScheduler) -> PyO3Result<&'p PyDict> {
+    let core = &py_scheduler.0.core;
+    core.executor.enter(|| {
+        let result = PyDict::new(py);
+        for (rule, rule_dependencies) in core.rule_graph.rule_dependencies() {
+            let task = rule.0;
+            let function = &task.func;
+            let mut dependencies = Vec::new();
+            for (dependency_key, rule) in rule_dependencies {
+                // NB: We are only migrating non-union Gets, which are those in the `gets` list
+                // which do not have `in_scope_params` marking them as being for unions, or a call
+                // signature marking them as already being call-by-name.
+                if dependency_key.call_signature.is_some()
+                    || dependency_key.in_scope_params.is_some()
+                    || !task.gets.contains(dependency_key)
+                {
+                    continue;
+                }
+                let function = &rule.0.func;
+
+                let provided_params = dependency_key
+                    .provided_params
+                    .iter()
+                    .map(|p| p.as_py_type(py))
+                    .collect::<Vec<_>>();
+                dependencies.push((
+                    dependency_key.product.as_py_type(py),
+                    provided_params,
+                    function.0.value.into_py(py),
+                ));
+            }
+            if dependencies.is_empty() {
+                continue;
+            }
+            result.set_item(function.0.value.into_py(py), dependencies.into_py(py))?;
+        }
+        Ok(result)
     })
 }
 

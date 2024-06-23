@@ -81,7 +81,12 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, union
-from pants.source.source_root import SourceRootsRequest, SourceRootsResult
+from pants.source.source_root import (
+    OptionalSourceRoot,
+    SourceRootRequest,
+    SourceRootsRequest,
+    SourceRootsResult,
+)
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -94,7 +99,7 @@ logger = logging.getLogger(__name__)
 
 class SetupPyError(Exception):
     def __init__(self, msg: str):
-        super().__init__(f"{msg} See {doc_url('python-distributions')}.")
+        super().__init__(f"{msg} See {doc_url('docs/python/overview/building-distributions')}.")
 
 
 class InvalidSetupPyArgs(SetupPyError):
@@ -116,7 +121,7 @@ class OwnershipError(SetupPyError):
         super().__init__(
             softwrap(
                 f"""
-                {msg} See {doc_url('python-distributions')} for
+                {msg} See {doc_url('docs/python/overview/building-distributions')} for
                 how python_sources targets are mapped to distributions.
                 """
             )
@@ -151,7 +156,7 @@ class DependencyOwner:
 
     We need this type to prevent rule ambiguities when computing the list of targets owned by an
     ExportedTarget (which involves going from ExportedTarget -> dep -> owner (which is itself an
-    ExportedTarget) and checking if owner is the original ExportedTarget.
+    ExportedTarget) and checking if owner is the original ExportedTarget).
     """
 
     exported_target: ExportedTarget
@@ -324,7 +329,7 @@ def validate_commands(commands: tuple[str, ...]):
             )
         )
     # We don't allow publishing via setup.py, as we don't want the setup.py running rule,
-    # which is not a @goal_rule, to side-effect (plus, we'd need to ensure that publishing
+    # which is not a @goal_rule, to side effect (plus, we'd need to ensure that publishing
     # happens in dependency order).  Note that `upload` and `register` were removed in
     # setuptools 42.0.0, in favor of Twine, but we still check for them in case the user modified
     # the default version used by our Setuptools subsystem.
@@ -406,16 +411,25 @@ async def create_dist_build_request(
     )
 
     # Find the source roots for the build-time 1stparty deps (e.g., deps of setup.py).
-    source_roots_result = await Get(
-        SourceRootsResult,
-        SourceRootsRequest(
-            files=[],
-            dirs={
-                PurePath(tgt.address.spec_path)
-                for tgt in transitive_targets.closure
-                if tgt.has_field(PythonSourceField) or tgt.has_field(ResourceSourceField)
-            },
+    optional_dist_source_root, source_roots_result = await MultiGet(
+        Get(OptionalSourceRoot, SourceRootRequest.for_target(dist_tgt)),
+        Get(
+            SourceRootsResult,
+            SourceRootsRequest(
+                files=[],
+                dirs={
+                    PurePath(tgt.address.spec_path)
+                    for tgt in transitive_targets.closure
+                    if tgt.has_field(PythonSourceField) or tgt.has_field(ResourceSourceField)
+                },
+            ),
         ),
+    )
+
+    # We have to get `dist_source_root` independently from the other source roots because it is
+    # not a `python_source` target, and because `source_roots_result.path_to_root` is already sorted.
+    dist_source_root = (
+        optional_dist_source_root.source_root.path if optional_dist_source_root.source_root else "."
     )
     source_roots = tuple(sorted({sr.path for sr in source_roots_result.path_to_root.values()}))
 
@@ -467,6 +481,7 @@ async def create_dist_build_request(
         build_sdist=sdist,
         input=prefixed_input,
         working_directory=working_directory,
+        dist_source_root=dist_source_root,
         build_time_source_roots=source_roots,
         target_address_spec=exported_target.target.address.spec,
         wheel_config_settings=wheel_config_settings,
@@ -631,7 +646,7 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
         )
 
     # NB: We are careful to not overwrite these values, but we also don't expect them to have been
-    # set. The user must have have gone out of their way to use a `SetupKwargs` plugin, and to have
+    # set. The user must have gone out of their way to use a `SetupKwargs` plugin, and to have
     # specified `SetupKwargs(_allow_banned_keys=True)`.
     setup_kwargs.update(
         {
@@ -745,7 +760,7 @@ async def get_sources(
     file_targets = targets_with_sources_types(
         [FileSourceField], transitive_targets.closure, union_membership
     )
-    targets = Targets(itertools.chain((od.target for od in owned_deps), file_targets))
+    targets = Targets(sorted(itertools.chain((od.target for od in owned_deps), file_targets)))
 
     python_sources_request = PythonSourceFilesRequest(
         targets=targets, include_resources=False, include_files=False
@@ -971,7 +986,7 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
         or tgt.get(SourcesField).can_generate(ResourceSourceField, union_membership)
         # We also check for generating sources so that dependencies on `python_sources(sources=[])`
         # is included. Those won't generate any `python_source` targets, but still can be
-        # dependended upon.
+        # depended upon.
         or tgt.has_field(PythonGeneratingSourcesBase)
     )
 

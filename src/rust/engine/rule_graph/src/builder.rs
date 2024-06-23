@@ -1,11 +1,12 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::rules::{DependencyKey, ParamTypes, Query, Rule, RuleId};
+use crate::rules::{CallSignature, DependencyKey, ParamTypes, Query, Rule, RuleId};
 use crate::{
     params_str, Entry, EntryWithDeps, Reentry, RootEntry, RuleEdges, RuleEntry, RuleGraph,
 };
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, VecDeque};
 
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
@@ -21,7 +22,12 @@ enum Node<R: Rule> {
     // A root node in the rule graph.
     Query(Query<R::TypeId>),
     // An inner node in the rule graph.
-    Rule(R),
+    Rule {
+        rule: R,
+        // The number of explicit positional args that were passed (and thus don't need to be
+        // solved for in the rule graph).
+        explicit_args_arity: u16,
+    },
     // An inner node in the rule graph which must first locate its `in_scope_params`, and will then
     // execute the given Query.
     //
@@ -36,7 +42,17 @@ impl<R: Rule> std::fmt::Display for Node<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Node::Query(q) => write!(f, "{q}"),
-            Node::Rule(r) => write!(f, "{r}"),
+            Node::Rule {
+                rule,
+                explicit_args_arity,
+            } => {
+                let explicit_args_arity: Cow<str> = if *explicit_args_arity > 0 {
+                    format!(" <{}>", explicit_args_arity).into()
+                } else {
+                    "".into()
+                };
+                write!(f, "{rule}{explicit_args_arity}")
+            }
             Node::Param(p) => write!(f, "Param({p})"),
             Node::Reentry(q, in_scope) => {
                 write!(f, "Reentry({}, {})", q.product, params_str(in_scope))
@@ -49,7 +65,14 @@ impl<R: Rule> Node<R> {
     fn dependency_keys(&self) -> Vec<DependencyKey<R::TypeId>> {
         // TODO: Give Query an internal DependencyKey to avoid cloning here.
         match self {
-            Node::Rule(r) => r.dependency_keys().into_iter().cloned().collect(),
+            Node::Rule {
+                rule,
+                explicit_args_arity,
+            } => rule
+                .dependency_keys(*explicit_args_arity)
+                .into_iter()
+                .cloned()
+                .collect(),
             Node::Reentry(_, in_scope_params) => in_scope_params
                 .iter()
                 .cloned()
@@ -80,7 +103,7 @@ impl<R: Rule> Node<R> {
                 // Params are always leaves with an in-set of their own value, and no out-set.
                 in_set.insert(*p);
             }
-            Node::Rule(_) | Node::Query(_) => {
+            Node::Rule { .. } | Node::Query(_) => {
                 // Rules and Queries only have in_sets computed from their dependencies.
             }
         }
@@ -222,7 +245,7 @@ impl<R: Rule> Builder<R> {
     pub fn new(rules: IndexSet<R>, mut queries: IndexSet<Query<R::TypeId>>) -> Builder<R> {
         // Extend the Queries with those assumed by Reentry nodes.
         queries.extend(rules.iter().flat_map(|rule| {
-            rule.dependency_keys()
+            rule.dependency_keys(0)
                 .into_iter()
                 .filter_map(|dk| dk.as_reentry_query())
         }));
@@ -245,7 +268,7 @@ impl<R: Rule> Builder<R> {
                 rules_by_type
                     .values()
                     .flatten()
-                    .flat_map(|rule| rule.dependency_keys())
+                    .flat_map(|rule| rule.dependency_keys(0))
                     .flat_map(|dk| dk.provided_params.iter().cloned()),
             )
             .collect::<ParamTypes<_>>();
@@ -340,7 +363,8 @@ impl<R: Rule> Builder<R> {
             self.rules.values().flatten().map(|r| (r.id(), r)).collect();
 
         // Rules and Reentries are created on the fly based on the out_set of dependents.
-        let mut rules: HashMap<(R, ParamTypes<R::TypeId>), NodeIndex<u32>> = HashMap::default();
+        let mut rules: HashMap<(CallSignature, ParamTypes<R::TypeId>), NodeIndex<u32>> =
+            HashMap::default();
         #[allow(clippy::type_complexity)]
         let mut reentries: HashMap<
             (
@@ -393,14 +417,24 @@ impl<R: Rule> Builder<R> {
                     }
 
                     let mut candidates = Vec::new();
-                    if let Some(rule_id) = &dependency_key.rule_id {
+                    if let Some(call_signature) = &dependency_key.call_signature {
                         // New call-by-name semantics.
-                        candidates.extend(rules_by_id.get(rule_id).map(|&r| Node::Rule(r.clone())));
+                        candidates.extend(rules_by_id.get(&call_signature.rule_id).map(|&r| {
+                            Node::Rule {
+                                rule: r.clone(),
+                                explicit_args_arity: call_signature.explicit_args_arity,
+                            }
+                        }));
                         // TODO: Once we are entirely call-by-name, we can get rid of the entire edifice
                         // of multiple candidates and the unsatisfiable_nodes mechanism, and modify this
                         // function to return a Result, which will be Err if there is no rule with a
                         // matching RuleId for some node.
-                        assert!(candidates.len() < 2);
+                        assert!(
+                            candidates.len() < 2,
+                            "Had multiple candidates for rule id {}: {:?}",
+                            call_signature.rule_id,
+                            candidates
+                        );
                     } else {
                         // Old call-by-type semantics.
                         if dependency_key.provided_params.is_empty()
@@ -411,7 +445,10 @@ impl<R: Rule> Builder<R> {
                         }
 
                         if let Some(rules) = self.rules.get(&dependency_key.product()) {
-                            candidates.extend(rules.iter().map(|r| Node::Rule(r.clone())));
+                            candidates.extend(rules.iter().map(|r| Node::Rule {
+                                rule: r.clone(),
+                                explicit_args_arity: 0,
+                            }));
                         };
                     }
 
@@ -486,7 +523,10 @@ impl<R: Rule> Builder<R> {
                             graph.add_edge(node_id, *reentry_id, dependency_key.clone());
                             to_visit.push(*reentry_id);
                         }
-                        Node::Rule(rule) => {
+                        Node::Rule {
+                            rule,
+                            explicit_args_arity,
+                        } => {
                             // If the key provides a Param for the Rule to consume, include it in the out_set for
                             // the dependency node.
                             let out_set = {
@@ -495,9 +535,21 @@ impl<R: Rule> Builder<R> {
                                 out_set
                             };
                             let rule_id = rules
-                                .entry((rule.clone(), out_set.clone()))
+                                .entry((
+                                    CallSignature {
+                                        rule_id: rule.id().clone(),
+                                        explicit_args_arity,
+                                    },
+                                    out_set.clone(),
+                                ))
                                 .or_insert_with(|| {
-                                    graph.add_node((Node::Rule(rule.clone()), out_set))
+                                    graph.add_node((
+                                        Node::Rule {
+                                            rule: rule.clone(),
+                                            explicit_args_arity,
+                                        },
+                                        out_set,
+                                    ))
                                 });
                             graph.add_edge(node_id, *rule_id, dependency_key.clone());
                             to_visit.push(*rule_id);
@@ -631,7 +683,7 @@ impl<R: Rule> Builder<R> {
                 continue;
             };
             match node.node {
-                Node::Rule(_) | Node::Reentry { .. } => {
+                Node::Rule { .. } | Node::Reentry { .. } => {
                     // Fall through to visit the Rule or Reentry node.
                 }
                 Node::Param(_) => {
@@ -696,6 +748,8 @@ impl<R: Rule> Builder<R> {
                 minimal_in_set.insert(node_id);
 
                 // But we ensure that its out_set is accurate before continuing.
+                // Note: Clippy wants us to use `clone_from`, but doing so fails because `graph` is borrowed as mutable already.
+                #[allow(clippy::assigning_clones)]
                 if node.out_set != node.in_set {
                     graph.node_weight_mut(node_id).unwrap().0.out_set =
                         graph[node_id].0.in_set.clone();
@@ -1051,7 +1105,7 @@ impl<R: Rule> Builder<R> {
                             })
                             .collect()
                     }
-                    Node::Rule(_) | Node::Reentry { .. } => {
+                    Node::Rule { .. } | Node::Reentry { .. } => {
                         // If there is a provided param, only dependencies that consume it can be used.
                         edge_refs
                             .iter()
@@ -1170,7 +1224,7 @@ impl<R: Rule> Builder<R> {
             }
 
             // Validate masked params.
-            if let Node::Rule(rule) = &graph[node_id].0.node {
+            if let Node::Rule { rule, .. } = &graph[node_id].0.node {
                 for masked_param in rule.masked_params() {
                     if graph[node_id].0.in_set.contains(&masked_param) {
                         let in_set = params_str(&graph[node_id].0.in_set);
@@ -1332,9 +1386,13 @@ impl<R: Rule> Builder<R> {
         let entry_for = |node_id| -> Entry<R> {
             let (node, in_set): &(Node<R>, ParamTypes<_>) = &graph[node_id];
             match node {
-                Node::Rule(rule) => Entry::WithDeps(Intern::new(EntryWithDeps::Rule(RuleEntry {
+                Node::Rule {
+                    rule,
+                    explicit_args_arity,
+                } => Entry::WithDeps(Intern::new(EntryWithDeps::Rule(RuleEntry {
                     params: in_set.clone(),
                     rule: rule.clone(),
+                    explicit_args_arity: *explicit_args_arity,
                 }))),
                 Node::Query(q) => {
                     Entry::WithDeps(Intern::new(EntryWithDeps::Root(RootEntry(q.clone()))))

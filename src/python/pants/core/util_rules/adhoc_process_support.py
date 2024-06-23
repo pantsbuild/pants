@@ -14,10 +14,12 @@ from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -25,15 +27,23 @@ from pants.engine.fs import (
     Directory,
     FileContent,
     MergeDigests,
+    PathGlobs,
     Snapshot,
 )
-from pants.engine.internals.native_engine import RemovePrefix
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult, ProductDescription
+from pants.engine.internals.native_engine import AddressInput, RemovePrefix
+from pants.engine.process import (
+    FallibleProcessResult,
+    Process,
+    ProcessCacheScope,
+    ProcessResult,
+    ProductDescription,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     SourcesField,
+    Target,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -62,6 +72,8 @@ class AdhocProcessRequest:
     log_output: bool
     capture_stdout_file: str | None
     capture_stderr_file: str | None
+    workspace_invalidation_globs: PathGlobs | None
+    cache_scope: ProcessCacheScope | None = None
 
 
 @dataclass(frozen=True)
@@ -89,6 +101,25 @@ class RunnableDependencies:
     immutable_input_digests: Mapping[str, Digest]
     append_only_caches: Mapping[str, str]
     extra_env: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class ToolRunnerRequest:
+    runnable_address_str: str
+    args: tuple[str, ...]
+    execution_dependencies: tuple[str, ...]
+    runnable_dependencies: tuple[str, ...]
+    target: Target
+    named_caches: FrozenDict[str, str] | None = None
+
+
+@dataclass(frozen=True)
+class ToolRunner:
+    digest: Digest
+    args: tuple[str, ...]
+    extra_env: FrozenDict[str, str]
+    append_only_caches: FrozenDict[str, str]
+    immutable_input_digests: FrozenDict[str, Digest]
 
 
 #
@@ -147,7 +178,7 @@ async def merge_extra_sandbox_contents(request: MergeExtraSandboxContents) -> Ex
 
 
 @rule
-async def add_extra_contents_to_prcess(request: AddExtraSandboxContentsToProcess) -> Process:
+async def add_extra_contents_to_process(request: AddExtraSandboxContentsToProcess) -> Process:
     proc = request.process
     extras = request.contents
     new_digest = await Get(
@@ -361,6 +392,102 @@ def _runnable_dependency_shim(
 
 
 @rule
+async def create_tool_runner(
+    request: ToolRunnerRequest,
+) -> ToolRunner:
+    runnable_address = await Get(
+        Address,
+        AddressInput,
+        AddressInput.parse(
+            request.runnable_address_str,
+            relative_to=request.target.address.spec_path,
+            description_of_origin=f"Runnable target for {request.target.address.spec_path}",
+        ),
+    )
+
+    addresses = Addresses((runnable_address,))
+    addresses.expect_single()
+
+    runnable_targets = await Get(Targets, Addresses, addresses)
+
+    run_field_sets, environment_name, execution_environment = await MultiGet(
+        Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)),
+        Get(
+            EnvironmentName,
+            EnvironmentNameRequest,
+            EnvironmentNameRequest.from_target(request.target),
+        ),
+        Get(
+            ResolvedExecutionDependencies,
+            ResolveExecutionDependenciesRequest(
+                address=request.target.address,
+                execution_dependencies=request.execution_dependencies,
+                runnable_dependencies=request.runnable_dependencies,
+            ),
+        ),
+    )
+
+    run_field_set: RunFieldSet = run_field_sets.field_sets[0]
+
+    # Must be run in target environment so that the binaries/envvars match the execution
+    # environment when we actually run the process.
+    run_request = await Get(
+        RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
+    )
+
+    dependencies_digest = execution_environment.digest
+    runnable_dependencies = execution_environment.runnable_dependencies
+
+    extra_env: dict[str, str] = dict(run_request.extra_env or {})
+    extra_path = extra_env.pop("PATH", None)
+
+    extra_sandbox_contents = []
+
+    extra_sandbox_contents.append(
+        ExtraSandboxContents(
+            EMPTY_DIGEST,
+            extra_path,
+            run_request.immutable_input_digests or FrozenDict(),
+            run_request.append_only_caches or FrozenDict(),
+            run_request.extra_env or FrozenDict(),
+        )
+    )
+
+    if runnable_dependencies:
+        extra_sandbox_contents.append(
+            ExtraSandboxContents(
+                EMPTY_DIGEST,
+                f"{{chroot}}/{runnable_dependencies.path_component}",
+                runnable_dependencies.immutable_input_digests,
+                runnable_dependencies.append_only_caches,
+                runnable_dependencies.extra_env,
+            )
+        )
+
+    merged_extras, main_digest = await MultiGet(
+        Get(ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))),
+        Get(Digest, MergeDigests((dependencies_digest, run_request.digest))),
+    )
+
+    extra_env = dict(merged_extras.extra_env)
+    if merged_extras.path:
+        extra_env["PATH"] = merged_extras.path
+
+    append_only_caches = {
+        **merged_extras.append_only_caches,
+        **(request.named_caches or {}),
+    }
+
+    return ToolRunner(
+        digest=main_digest,
+        args=run_request.args + tuple(request.args),
+        extra_env=FrozenDict(extra_env),
+        append_only_caches=FrozenDict(append_only_caches),
+        immutable_input_digests=FrozenDict(merged_extras.immutable_input_digests),
+    )
+
+
+@rule
 async def run_adhoc_process(
     request: AdhocProcessRequest,
 ) -> AdhocProcessResult:
@@ -442,6 +569,15 @@ async def prepare_adhoc_process(
     if supplied_env_vars:
         command_env.update(supplied_env_vars)
 
+    # Compute the digest for any workspace invalidation sources and put the digest into the environment as a dummy variable
+    # so that the process produced by this rule will be invalidated if any of the referenced files change.
+    if request.workspace_invalidation_globs is not None:
+        workspace_invalidation_digest = await Get(
+            Digest, PathGlobs, request.workspace_invalidation_globs
+        )
+        digest_str = f"{workspace_invalidation_digest.fingerprint}-{workspace_invalidation_digest.serialized_bytes_length}"
+        command_env["__PANTS_WORKSPACE_INVALIDATION_SOURCES_DIGEST"] = digest_str
+
     input_snapshot = await Get(Snapshot, Digest, request.input_digest)
 
     if not working_directory or working_directory in input_snapshot.dirs:
@@ -463,6 +599,7 @@ async def prepare_adhoc_process(
         working_directory=working_directory,
         append_only_caches=append_only_caches,
         immutable_input_digests=immutable_input_digests,
+        cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
 
     return _output_at_build_root(proc, bash)

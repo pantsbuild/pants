@@ -1,30 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
-// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![deny(
-    clippy::all,
-    clippy::default_trait_access,
-    clippy::expl_impl_clone_on_copy,
-    clippy::if_not_else,
-    clippy::needless_continue,
-    clippy::unseparated_literal_suffix,
-    clippy::used_underscore_binding
-)]
-// It is often more clear to show that nothing is being moved.
-#![allow(clippy::match_ref_pats)]
-// Subjective style.
-#![allow(
-    clippy::len_without_is_empty,
-    clippy::redundant_field_names,
-    clippy::too_many_arguments
-)]
-// Default isn't as big a deal as people seem to think it is.
-#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
-#![allow(clippy::mutex_atomic)]
-
 use std::fmt;
 use std::io::{self, Error, Write};
 use std::pin::Pin;
@@ -375,13 +351,10 @@ impl<AW: ?Sized + AsyncWrite + Unpin> AsyncWrite for WriterHasher<&mut AW> {
 /// Copy the data from reader and hash the bytes in one pass.
 /// Use hash() to just hash without copying the data anywhere.
 ///
-pub fn sync_copy_and_hash<R: ?Sized, W: ?Sized>(
-    reader: &mut R,
-    writer: &mut W,
-) -> io::Result<Digest>
+pub fn sync_copy_and_hash<R, W>(reader: &mut R, writer: &mut W) -> io::Result<Digest>
 where
-    R: io::Read,
-    W: io::Write,
+    R: io::Read + ?Sized,
+    W: io::Write + ?Sized,
 {
     let mut hasher = WriterHasher::new(writer);
     let _ = io::copy(reader, &mut hasher)?;
@@ -391,15 +364,15 @@ where
 ///
 /// Copy from reader to writer and return whether the copied data matches expected_digest.
 ///
-pub fn sync_verified_copy<R: ?Sized, W: ?Sized>(
+pub fn sync_verified_copy<R, W>(
     expected_digest: Digest,
     data_is_immutable: bool,
     reader: &mut R,
     writer: &mut W,
 ) -> io::Result<bool>
 where
-    R: io::Read,
-    W: io::Write,
+    R: io::Read + ?Sized,
+    W: io::Write + ?Sized,
 {
     if data_is_immutable {
         // Trust that the data hasn't changed, and only validate its length.

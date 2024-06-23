@@ -7,7 +7,7 @@ from pants.backend.java.lint.google_java_format.skip_field import SkipGoogleJava
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.target_types import JavaSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
@@ -17,7 +17,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -41,19 +41,13 @@ class GoogleJavaFormatRequest(FmtTargetsRequest):
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
-class GoogleJavaFormatToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = GoogleJavaFormatSubsystem.options_scope
-
-
 @rule(desc="Format with Google Java Format", level=LogLevel.DEBUG)
 async def google_java_format_fmt(
     request: GoogleJavaFormatRequest.Batch,
     tool: GoogleJavaFormatSubsystem,
     jdk: InternalJdk,
 ) -> FmtResult:
-    lockfile_request = await Get(
-        GenerateJvmLockfileFromTool, GoogleJavaFormatToolLockfileSentinel()
-    )
+    lockfile_request = GenerateJvmLockfileFromTool.create(tool)
     tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
 
     toolcp_relpath = "__toolcp"
@@ -97,17 +91,10 @@ async def google_java_format_fmt(
     return await FmtResult.create(request, result)
 
 
-@rule
-def generate_google_java_format_lockfile_request(
-    _: GoogleJavaFormatToolLockfileSentinel, tool: GoogleJavaFormatSubsystem
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(tool)
-
-
 def rules():
     return [
         *collect_rules(),
         *jvm_tool.rules(),
         *GoogleJavaFormatRequest.rules(),
-        UnionRule(GenerateToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
+        UnionRule(ExportableTool, GoogleJavaFormatSubsystem),
     ]

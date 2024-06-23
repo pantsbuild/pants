@@ -8,6 +8,7 @@ from pants.backend.codegen.thrift.scrooge.rules import (
     GeneratedScroogeThriftSources,
     GenerateScroogeThriftSourcesRequest,
 )
+from pants.backend.codegen.thrift.scrooge.scala import symbol_mapper
 from pants.backend.codegen.thrift.target_types import (
     ThriftDependenciesField,
     ThriftSourceField,
@@ -103,7 +104,7 @@ async def resolve_scrooge_thrift_scala_runtime_for_resolve(
     scala_subsystem: ScalaSubsystem,
 ) -> ScroogeThriftScalaRuntimeForResolve:
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
-    scala_binary_version, _, _ = scala_version.rpartition(".")
+    scala_binary_version = scala_version.binary
     addresses = find_jvm_artifacts_or_raise(
         required_coordinates=[
             UnversionedCoordinate(
@@ -138,6 +139,7 @@ async def inject_scrooge_thrift_scala_dependencies(
 def rules():
     return (
         *collect_rules(),
+        *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromThriftRequest),
         UnionRule(InferDependenciesRequest, InferScroogeThriftScalaDependencies),
         ThriftSourceTarget.register_plugin_field(PrefixedJvmJdkField),

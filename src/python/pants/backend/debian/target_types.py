@@ -97,7 +97,7 @@ class DebianPackageDependencies(SpecialCasedDependencies):
         It will include the results in your Debian package using the same name they would normally have,
         but without the `--distdir` prefix (e.g. `dist/`).
 
-        You can include anything that can be uilt by `{bin_name()} package`, e.g. a `pex_binary`,
+        You can include anything that can be built by `{bin_name()} package`, e.g. a `pex_binary`,
         a `python_distribution`, or an `archive`.
         """
     )
@@ -114,12 +114,12 @@ class DebianPackage(Target):
         DebianPackageDependencies,
     )
     help = help_text(
-        f""""
+        f"""
         A Debian package containing an artifact.
 
-        This will not install the package, only create a .deb file
-        that you can then distribute and install, e.g. via dpkg.
+        This will not install the package, only create a `.deb` file
+        that you can then distribute and install, e.g. via `dpkg`.
 
-        "See {doc_url('debian-package')}.
+        See {doc_url('reference/targets/debian_package')}.
         """
     )

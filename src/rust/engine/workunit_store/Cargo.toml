@@ -24,3 +24,6 @@ tokio = { workspace = true, features = ["rt", "sync"] }
 futures = { workspace = true }
 internment = { workspace = true }
 tokio = { workspace = true, features = ["macros"] }
+
+[lints]
+workspace = true

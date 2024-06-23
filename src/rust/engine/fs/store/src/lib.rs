@@ -1,29 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
-// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![deny(
-    clippy::all,
-    clippy::default_trait_access,
-    clippy::expl_impl_clone_on_copy,
-    clippy::if_not_else,
-    clippy::needless_continue,
-    clippy::unseparated_literal_suffix,
-    clippy::used_underscore_binding
-)]
-// It is often more clear to show that nothing is being moved.
-#![allow(clippy::match_ref_pats)]
-// Subjective style.
-#![allow(
-    clippy::len_without_is_empty,
-    clippy::redundant_field_names,
-    clippy::too_many_arguments
-)]
-// Default isn't as big a deal as people seem to think it is.
-#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
-#![allow(clippy::mutex_atomic)]
 #![recursion_limit = "256"]
 
 mod immutable_inputs;
@@ -44,7 +21,7 @@ use std::fs::Permissions as FSPermissions;
 use std::future::Future;
 use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
@@ -89,7 +66,7 @@ mod remote_tests;
 
 // Consumers of this crate shouldn't need to worry about the exact crate structure that comes
 // together to make a store.
-pub use remote_provider::RemoteStoreOptions;
+pub use remote_provider::{RemoteProvider, RemoteStoreOptions};
 
 pub struct LocalOptions {
     pub files_max_size_bytes: usize,
@@ -1226,6 +1203,8 @@ impl Store {
             }
         });
 
+        let force_all_mutable =
+            force_mutable || mutable_paths.contains(&RelativePath::new(Component::CurDir).unwrap());
         let mut mutable_path_ancestors = BTreeSet::new();
         for relpath in mutable_paths {
             mutable_path_ancestors.extend(relpath.ancestors().map(|p| destination.join(p)));
@@ -1246,7 +1225,7 @@ impl Store {
         self.materialize_directory_children(
             destination,
             true,
-            force_mutable,
+            force_all_mutable,
             destination_is_hardlinkable,
             &parent_to_child,
             &mutable_path_ancestors,

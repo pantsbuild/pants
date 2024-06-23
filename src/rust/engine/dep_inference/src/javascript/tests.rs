@@ -77,11 +77,148 @@ fn ignore_imports() {
     assert_imports("require('f') // pants: no-infer-dep", &[]);
     assert_imports("import('e'); // pants: no-infer-dep", &[]);
     assert_imports("require('f'); // pants: no-infer-dep", &[]);
+
+    // multi-line
+    assert_imports(
+        "import {
+            a
+        } from 'ignored'; // pants: no-infer-dep",
+        &[],
+    );
+    // NB. the inference (and thus ignoring) is driven off the 'from'.
+    assert_imports(
+        "
+        import { // pants: no-infer-dep
+            a
+        } from 'b';
+        import {
+            c  // pants: no-infer-dep
+        } from 'd';",
+        &["b", "d"],
+    );
+
+    assert_imports(
+        "require(
+            'ignored'
+        ) // pants: no-infer-dep",
+        &[],
+    );
+    // as above, driven off the end of the require()
+    assert_imports(
+        "require( // pants: no-infer-dep
+            'a'
+        );
+        require(
+            'b' // pants: no-infer-dep
+        )",
+        &["a", "b"],
+    );
+
+    assert_imports(
+        "import(
+            'ignored'
+        ) // pants: no-infer-dep",
+        &[],
+    );
+    // as above, driven off the end of the import()
+    assert_imports(
+        "import( // pants: no-infer-dep
+            'a'
+        );
+        import(
+            'b' // pants: no-infer-dep
+        )",
+        &["a", "b"],
+    );
+}
+
+#[test]
+fn simple_exports() {
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/export
+    assert_imports(r#"export * from "module-name";"#, &["module-name"]);
+    assert_imports(r#"export * as name1 from "module-name";"#, &["module-name"]);
+    assert_imports(
+        r#"export { name1, /* …, */ nameN } from "module-name";"#,
+        &["module-name"],
+    );
+    assert_imports(
+        r#"export { import1 as name1, import2 as name2, /* …, */ nameN } from "module-name";"#,
+        &["module-name"],
+    );
+    assert_imports(
+        r#"export { default, /* …, */ } from "module-name";"#,
+        &["module-name"],
+    );
+    assert_imports(
+        r#"export { default as name1 } from "module-name";"#,
+        &["module-name"],
+    );
+    // just confirm a relative path is preserved
+    assert_imports("export * from './b/c'", &["./b/c"]);
+}
+
+#[test]
+fn export_without_from() {
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/export
+    assert_imports(
+        "
+// Exporting declarations
+export let name1, name2/*, … */; // also var
+export const name1 = 1, name2 = 2/*, … */; // also var, let
+export function functionName() { /* … */ }
+export class ClassName { /* … */ }
+export function* generatorFunctionName() { /* … */ }
+export const { name1, name2: bar } = o;
+export const [ name1, name2 ] = array;
+
+// Export list
+export { name1, /* …, */ nameN };
+export { variable1 as name1, variable2 as name2, /* …, */ nameN };
+export { variable1 as \"string name\" };
+export { name1 as default /*, … */ };
+
+// Default exports
+export default expression;
+export default function functionName() { /* … */ }
+export default class ClassName { /* … */ }
+export default function* generatorFunctionName() { /* … */ }
+export default function () { /* … */ }
+export default class { /* … */ }
+export default function* () { /* … */ }
+",
+        &[],
+    );
+}
+
+#[test]
+fn ignore_exports() {
+    assert_imports("export * from 'a'; // pants: no-infer-dep", &[]);
+    assert_imports("export * as x from './b' // pants: no-infer-dep", &[]);
+    assert_imports("export { y } from \"../c\"  // pants: no-infer-dep", &[]);
+
+    // multi-line
+    assert_imports(
+        "export {
+            a
+        } from 'ignored'; // pants: no-infer-dep",
+        &[],
+    );
+    // NB. the inference is driven off the 'from'.
+    assert_imports(
+        "export { // pants: no-infer-dep
+            a
+        } from 'b';
+        export {
+            c // pants: no-infer-dep
+        } from 'd';",
+        &["b", "d"],
+    );
 }
 
 #[test]
 fn still_parses_from_syntax_error() {
     assert_imports("import a from '.'; x=", &["."]);
+    assert_imports("export {some nonsense} from '.'", &["."]);
 }
 
 #[test]
@@ -118,7 +255,7 @@ fn dynamic_scope() {
 #[test]
 fn adds_dir_to_file_imports() -> Result<(), Box<dyn std::error::Error>> {
     let result = get_dependencies(
-        &"import a from './file.js'",
+        "import a from './file.js'",
         Path::new("dir/index.js").to_path_buf(),
         Default::default(),
     )?;
@@ -133,7 +270,7 @@ fn adds_dir_to_file_imports() -> Result<(), Box<dyn std::error::Error>> {
 fn root_level_files_have_no_dir() {
     assert_dependency_imports(
         "index.mjs",
-        &r#"import a from "./file.js""#,
+        r#"import a from "./file.js""#,
         ["file.js"],
         [],
         given_metadata(Default::default(), Default::default()),
@@ -144,7 +281,7 @@ fn root_level_files_have_no_dir() {
 fn only_walks_one_dir_level_for_curdir() {
     assert_dependency_imports(
         "src/js/index.mjs",
-        &r#"
+        r#"
     import fs from "fs";
     import { x } from "./xes.mjs";
   "#,
@@ -158,7 +295,7 @@ fn only_walks_one_dir_level_for_curdir() {
 fn walks_two_dir_levels_for_pardir() {
     assert_dependency_imports(
         "src/js/a/index.mjs",
-        &r#"
+        r#"
     import fs from "fs";
     import { x } from "../xes.mjs";
   "#,
@@ -172,7 +309,7 @@ fn walks_two_dir_levels_for_pardir() {
 fn silly_walking() {
     assert_dependency_imports(
         "src/js/a/index.mjs",
-        &r#"
+        r#"
     import { x } from "././///../../xes.mjs";
   "#,
         ["src/xes.mjs"],
@@ -185,7 +322,7 @@ fn silly_walking() {
 fn imports_outside_of_provided_source_root_are_unchanged() {
     assert_dependency_imports(
         "src/index.mjs",
-        &r#"
+        r#"
     import { x } from "../../xes.mjs";
   "#,
         ["../../xes.mjs"],
@@ -195,7 +332,7 @@ fn imports_outside_of_provided_source_root_are_unchanged() {
 
     assert_dependency_imports(
         "js/src/lib/index.mjs",
-        &r#"
+        r#"
     import { x } from "./../../../../lib2/xes.mjs";
   "#,
         ["./../../../../lib2/xes.mjs"],
@@ -208,7 +345,7 @@ fn imports_outside_of_provided_source_root_are_unchanged() {
 fn subpath_package_import() {
     assert_dependency_imports(
         "js/src/lib/index.mjs",
-        &r#"
+        r#"
     import chalk from '#myChalk';
     "#,
         [],
@@ -224,7 +361,7 @@ fn subpath_package_import() {
 fn subpath_file_import() {
     assert_dependency_imports(
         "js/src/lib/index.mjs",
-        &r#"
+        r#"
     import stuff from '#nested/stuff.mjs';
     "#,
         ["js/src/lib/nested/stuff.mjs"],
@@ -243,7 +380,7 @@ fn subpath_file_import() {
 fn polyfills() {
     assert_dependency_imports(
         "js/src/index.mjs",
-        &r#"
+        r#"
     import { ws } from '#websockets';
     "#,
         ["js/websockets-polyfill.js"],

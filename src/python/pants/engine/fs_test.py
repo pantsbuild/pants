@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Optional, Set, Union
+from typing import Any, Callable, Dict, Iterable, Optional, Set, Union
 
 import pytest
 
@@ -38,6 +38,8 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
+    PathMetadataRequest,
+    PathMetadataResult,
     RemovePrefix,
     Snapshot,
     SnapshotDiff,
@@ -45,6 +47,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.native_engine import PathMetadata, PathMetadataKind
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, goal_rule, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -64,6 +67,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(Snapshot, [CreateDigest]),
             QueryRule(Snapshot, [DigestSubset]),
             QueryRule(Snapshot, [PathGlobs]),
+            QueryRule(PathMetadataResult, [PathMetadataRequest]),
         ],
         isolated_local_store=True,
     )
@@ -140,6 +144,18 @@ def try_with_backoff(assertion_fn: Callable[[], bool], count: int = 4) -> bool:
         if assertion_fn():
             return True
     return False
+
+
+# -----------------------------------------------------------------------------------------------
+# `FileContent`
+# -----------------------------------------------------------------------------------------------
+
+
+def test_file_content_non_bytes():
+    with pytest.raises(TypeError) as exc:
+        FileContent(path="4.txt", content="four")
+
+    assert str(exc.value) == "Expected 'content' to be bytes, but got str"
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1304,7 +1320,7 @@ def test_invalidated_after_rewrite(rule_runner: RuleRunner) -> None:
 
 
 def test_invalidated_after_parent_deletion(rule_runner: RuleRunner) -> None:
-    """Test that FileContent is invalidated after deleting parent directory."""
+    """Test that FileContent is invalidated after deleting the parent directory."""
     setup_fs_test_tar(rule_runner)
 
     def read_file() -> Optional[str]:
@@ -1490,3 +1506,71 @@ def test_snapshot_diff(
     assert diff.their_unique_files == expected_diff.our_unique_files
     assert diff.their_unique_dirs == expected_diff.our_unique_dirs
     assert diff.changed_files == expected_diff.changed_files
+
+
+def retry_failed_assertions(
+    callable: Callable[[], Any], n: int, sleep_duration: float = 0.05
+) -> None:
+    """Retry the callable if any assertions failed.
+
+    This is used to handle any failures resulting from an external system not fully processing
+    certain events as expected.
+    """
+    last_exception: BaseException | None = None
+
+    while n > 0:
+        try:
+            callable()
+            return
+        except AssertionError as e:
+            last_exception = e
+            n -= 1
+            time.sleep(sleep_duration)
+            sleep_duration *= 2
+
+    assert last_exception is not None
+    raise last_exception
+
+
+def test_path_metadata_request(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo": b"xyzzy",
+            "sub-dir/bar": b"12345",
+        }
+    )
+    os.symlink("foo", os.path.join(rule_runner.build_root, "bar"))
+
+    def get_metadata(path: str) -> PathMetadata | None:
+        result = rule_runner.request(PathMetadataResult, [PathMetadataRequest(path)])
+        return result.metadata
+
+    m1 = get_metadata("foo")
+    assert m1 is not None
+    assert m1.path == "foo"
+    assert m1.kind == PathMetadataKind.FILE
+    assert m1.length == len(b"xyzzy")
+    assert m1.symlink_target is None
+
+    m2 = get_metadata("not-found")
+    assert m2 is None
+    (Path(rule_runner.build_root) / "not-found").write_bytes(b"is found")
+
+    def check_metadata_exists() -> None:
+        m3 = get_metadata("not-found")
+        assert m3 is not None
+
+    retry_failed_assertions(check_metadata_exists, 3)
+
+    m4 = get_metadata("bar")
+    assert m4 is not None
+    assert m4.path == "bar"
+    assert m4.kind == PathMetadataKind.SYMLINK
+    assert m4.length == 3
+    assert m4.symlink_target == "foo"
+
+    m5 = get_metadata("sub-dir")
+    assert m5 is not None
+    assert m5.path == "sub-dir"
+    assert m5.kind == PathMetadataKind.DIRECTORY
+    assert m5.symlink_target is None

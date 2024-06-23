@@ -138,7 +138,7 @@ async def package_deploy_jar(
                 (rule.pattern, rule.action)
                 for rule in field_set.duplicate_policy.value_or_default()
             ],
-            skip=field_set.exclude_files.value,
+            skip=[*(jvm.deploy_jar_exclude_files or []), *(field_set.exclude_files.value or [])],
             compress=True,
         ),
     )
@@ -155,6 +155,8 @@ async def package_deploy_jar(
             ),
         )
 
+    jar_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
+
     #
     # 4. Apply shading rules
     #
@@ -170,9 +172,8 @@ async def package_deploy_jar(
         )
         jar_digest = shaded_jar.digest
 
-    prefixed_output_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
-    return BuiltPackage(digest=prefixed_output_digest, artifacts=(artifact,))
+    return BuiltPackage(digest=jar_digest, artifacts=(artifact,))
 
 
 def rules():

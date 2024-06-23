@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.java.target_types import JavaSourceField
-from pants.backend.openapi.codegen.java import extra_fields
+from pants.backend.openapi.codegen.java import extra_fields, symbol_mapper
 from pants.backend.openapi.codegen.java.extra_fields import (
     OpenApiJavaApiPackageField,
     OpenApiJavaModelPackageField,
@@ -58,7 +58,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
     find_jvm_artifacts_or_raise,
 )
-from pants.jvm.resolve.common import Coordinate
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -263,6 +263,7 @@ def rules():
         *generator_process.rules(),
         *artifact_mapper.rules(),
         *pom_parser.rules(),
+        *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromOpenAPIRequest),
         UnionRule(InferDependenciesRequest, InferOpenApiJavaRuntimeDependencyRequest),
     ]

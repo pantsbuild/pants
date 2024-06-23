@@ -113,7 +113,7 @@ class InterpreterConstraintsField(StringSequenceField):
 
         If the field is not set, it will default to the option `[python].interpreter_constraints`.
 
-        See {doc_url('python-interpreter-compatibility')} for how these interpreter
+        See {doc_url('docs/python/overview/interpreter-compatibility')} for how these interpreter
         constraints are merged with the constraints of dependencies.
         """
     )
@@ -157,7 +157,8 @@ class PythonRunGoalUseSandboxField(TriBoolField):
     alias = "run_goal_use_sandbox"
     help = help_text(
         """
-        Whether to use a sandbox when `run`ning this target. Defaults to `[python].run_goal_use_sandbox`.
+        Whether to use a sandbox when `run`ning this target. Defaults to
+        `[python].default_run_goal_use_sandbox`.
 
         If true, runs of this target with the `run` goal will copy the needed first-party sources
         into a temporary sandbox and run from there.
@@ -296,6 +297,27 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
+@dataclass(frozen=True)
+class Executable(MainSpecification):
+    executable: str
+
+    @classmethod
+    def create(cls, address: Address, filename: str) -> Executable:
+        # spec_path is relative to the workspace. The rule is responsible for
+        # stripping the source root as needed.
+        return cls(os.path.join(address.spec_path, filename).lstrip(os.path.sep))
+
+    def iter_pex_args(self) -> Iterator[str]:
+        yield "--executable"
+        # We do NOT yield self.executable or self.spec
+        # as the path needs additional processing in the rule graph.
+        # see: build_pex in util_rules/pex
+
+    @property
+    def spec(self) -> str:
+        return self.executable
+
+
 class EntryPointField(AsyncFieldMixin, Field):
     alias = "entry_point"
     default = None
@@ -309,8 +331,8 @@ class EntryPointField(AsyncFieldMixin, Field):
           1) `'app.py'`, Pants will convert into the module `path.to.app`;
           2) `'app.py:func'`, Pants will convert into `path.to.app:func`.
 
-        You may either set this field or the `script` field, but not both. Leave off both fields
-        to have no entry point.
+        You may only set one of: this field, or the `script` field, or the `executable` field.
+        Leave off all three fields to have no entry point.
         """
     )
     value: EntryPoint | None
@@ -355,8 +377,8 @@ class PexScriptField(Field):
         Set the entry point, i.e. what gets run when executing `./my_app.pex`, to a script or
         console_script as defined by any of the distributions in the PEX.
 
-        You may either set this field or the `entry_point` field, but not both. Leave off both
-        fields to have no entry point.
+        You may only set one of: this field, or the `entry_point` field, or the `executable` field.
+        Leave off all three fields to have no entry point.
         """
     )
     value: ConsoleScript | None
@@ -371,12 +393,76 @@ class PexScriptField(Field):
         return ConsoleScript(value)
 
 
-class PexArgsField(StringSequenceField):
-    alias = "args"
+class PexExecutableField(Field):
+    alias = "executable"
+    default = None
     help = help_text(
         """
+        Set the entry point, i.e. what gets run when executing `./my_app.pex`, to an execuatble
+        local python script. This executable python script is typically something that cannot
+        be imported so it cannot be used via `script` or `entry_point`.
+
+        You may only set one of: this field, or the `entry_point` field, or the `script` field.
+        Leave off all three fields to have no entry point.
+        """
+    )
+    value: Executable | None
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[Executable]:
+        value = super().compute_value(raw_value, address)
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
+        return Executable.create(address, value)
+
+
+class PexArgsField(StringSequenceField):
+    alias: ClassVar[str] = "args"
+    help = help_text(
+        lambda: f"""
         Freeze these command-line args into the PEX. Allows you to run generic entry points
         on specific arguments without creating a shim file.
+
+        This is different to `{PexExtraBuildArgsField.alias}`: `{PexArgsField.alias}`
+        records arguments used by the packaged PEX when executed,
+        `{PexExtraBuildArgsField.alias}` passes arguments to the process that does the
+        packaging.
+        """
+    )
+
+
+class PexExtraBuildArgsField(StringSequenceField):
+    alias: ClassVar[str] = "extra_build_args"
+    default = ()
+    help = help_text(
+        lambda: f"""
+        Extra arguments to pass to the `pex` invocation used to build this PEX. These are
+        passed after all other arguments. This can be used to pass extra options that
+        Pants doesn't have built-in support for.
+
+        This is different to `{PexArgsField.alias}`: `{PexArgsField.alias}` records
+        arguments used by the packaged PEX when executed, `{PexExtraBuildArgsField.alias}`
+        passes arguments to the process that does the packaging.
+        """
+    )
+
+
+class PexCheckField(StringField):
+    alias = "check"
+    valid_choices = ("none", "warn", "error")
+    expected_type = str
+    default = "warn"
+    help = help_text(
+        """
+        Check that the built PEX is valid. Currently this only
+        applies to `--layout zipapp` where the PEX zip is
+        tested for importability of its `__main__` module by
+        the Python zipimport module. This check will fail for
+        PEX zips that use ZIP64 extensions since the Python
+        zipimport zipimporter only works with 32 bit zips. The
+        check no-ops for all other layouts.
         """
     )
 
@@ -387,47 +473,6 @@ class PexEnvField(DictStringToStringField):
         """
         Freeze these environment variables into the PEX. Allows you to run generic entry points
         on a specific environment without creating a shim file.
-        """
-    )
-
-
-class PexPlatformsField(StringSequenceField):
-    alias = "platforms"
-    removal_version = "2.22.0.dev0"
-    removal_hint = softwrap(
-        """\
-    The platforms field is a hack. The abbreviated information it provides is sometimes insufficient,
-    leading to hard-to-debug build issues. Use complete_platforms instead.
-    See {doc_url('pex')} for details.
-    """
-    )
-    help = help_text(
-        """
-        The abbreviated platforms the built PEX should be compatible with.
-
-        There must be built wheels available for all of the foreign platforms, rather than sdists.
-
-        You can give a list of multiple platforms to create a multiplatform PEX,
-        meaning that the PEX will be executable in all of the supported environments.
-
-        Platforms should be in the format defined by Pex
-        (https://pex.readthedocs.io/en/latest/buildingpex.html#platform), i.e.
-        PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-37-cp37m",
-        "macosx_10.12_x86_64-cp-310-cp310"):
-
-          - PLATFORM: the host platform, e.g. "linux-x86_64", "macosx-10.12-x86_64".
-          - IMPL: the Python implementation abbreviation, e.g. "cp" or "pp".
-          - PYVER: a two or more digit string representing the python major/minor version\
-            (e.g., "37" or "310") or else a component dotted version string (e.g., "3.7" or "3.10.1").
-          - ABI: the ABI tag, e.g. "cp37m", "cp310", "abi3", "none".
-
-        Note that using an abbreviated platform means that certain resolves will fail when they
-        encounter environment markers that cannot be deduced from the abbreviated platform
-        string. A common example of this is 'python_full_version' which requires knowing the
-        patch level version of the foreign Python interpreter. To remedy this you should use a
-        3-component dotted version for PYVER. If your resolves fail due to more esoteric
-        undefined environment markers, you should switch to specifying `complete_platforms`
-        instead.
         """
     )
 
@@ -447,7 +492,7 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
         complete platform JSON as described by Pex
         (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
 
-        See {doc_url('pex')} for details.
+        See {doc_url('docs/python/overview/pex')} for details.
         """
     )
 
@@ -496,6 +541,29 @@ class PexIgnoreErrorsField(BoolField):
     help = "Should PEX ignore errors when it cannot resolve dependencies?"
 
 
+class PexShBootField(BoolField):
+    alias = "sh_boot"
+    default = False
+    help = help_text(
+        """
+        Should PEX create a modified ZIPAPP that uses `/bin/sh` to boot?
+
+        If you know the machines that the PEX will be distributed to have
+        POSIX compliant `/bin/sh` (almost all do, see:
+        https://pubs.opengroup.org/onlinepubs/9699919799/utilities/sh.html);
+        then this is probably the way you want your PEX to boot. Instead of
+        launching via a Python shebang, the PEX will launch via a `#!/bin/sh`
+        shebang that executes a small script embedded in the head of the PEX
+        ZIPAPP that performs initial interpreter selection and re-execution of
+        the underlying PEX in a way that is often more robust than a Python
+        shebang and always faster on 2nd and subsequent runs since the sh
+        script has a constant overhead of O(1ms) whereas the Python overhead
+        to perform the same interpreter selection and re-execution is
+        O(100ms).
+        """
+    )
+
+
 class PexShebangField(StringField):
     alias = "shebang"
     help = help_text(
@@ -522,20 +590,21 @@ class PexEmitWarningsField(TriBoolField):
     def value_or_global_default(self, pex_binary_defaults: PexBinaryDefaults) -> bool:
         if self.value is None:
             return pex_binary_defaults.emit_warnings
+
         return self.value
 
 
 class PexResolveLocalPlatformsField(TriBoolField):
     alias = "resolve_local_platforms"
+    removal_version = "2.24.0.dev0"
+    removal_hint = softwrap(
+        f"""\
+        This {alias} field is no longer used now that the `platforms` field has been removed. Remove it.
+        """
+    )
     help = help_text(
-        f"""
-        For each of the `{PexPlatformsField.alias}` specified, attempt to find a local
-        interpreter that matches.
-
-        If a matching interpreter is found, use the interpreter to resolve distributions and build
-        any that are only available in source distribution form.
-        If no matching interpreter is found (or if this option is `False`), resolve for the
-        platform by accepting only pre-built binary distributions (wheels).
+        """
+        Now unused.
         """
     )
 
@@ -674,12 +743,13 @@ _PEX_BINARY_COMMON_FIELDS = (
     InterpreterConstraintsField,
     PythonResolveField,
     PexBinaryDependenciesField,
-    PexPlatformsField,
+    PexCheckField,
     PexCompletePlatformsField,
     PexResolveLocalPlatformsField,
     PexInheritPathField,
     PexStripEnvField,
     PexIgnoreErrorsField,
+    PexShBootField,
     PexShebangField,
     PexEmitWarningsField,
     PexLayoutField,
@@ -689,6 +759,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexIncludeToolsField,
     PexVenvSitePackagesCopies,
     PexVenvHermeticScripts,
+    PexExtraBuildArgsField,
     RestartableField,
 )
 
@@ -700,6 +771,7 @@ class PexBinary(Target):
         *_PEX_BINARY_COMMON_FIELDS,
         PexEntryPointField,
         PexScriptField,
+        PexExecutableField,
         PexArgsField,
         PexEnvField,
         OutputPathField,
@@ -709,18 +781,23 @@ class PexBinary(Target):
         A Python target that can be converted into an executable PEX file.
 
         PEX files are self-contained executable files that contain a complete Python environment
-        capable of running the target. For more information, see {doc_url('pex')}.
+        capable of running the target. For more information, see {doc_url('docs/python/overview/pex')}.
         """
     )
 
     def validate(self) -> None:
-        if self[PexEntryPointField].value is not None and self[PexScriptField].value is not None:
+        got_entry_point = self[PexEntryPointField].value is not None
+        got_script = self[PexScriptField].value is not None
+        got_executable = self[PexExecutableField].value is not None
+
+        if (got_entry_point + got_script + got_executable) > 1:
             raise InvalidTargetException(
                 softwrap(
                     f"""
-                    The `{self.alias}` target {self.address} cannot set both the
-                    `{self[PexEntryPointField].alias}` and `{self[PexScriptField].alias}` fields at
-                    the same time. To fix, please remove one.
+                    The `{self.alias}` target {self.address} cannot set more than one of the
+                    `{self[PexEntryPointField].alias}`, `{self[PexScriptField].alias}`, and
+                    `{self[PexExecutableField].alias}` fields at the same time.
+                    To fix, please remove all but one.
                     """
                 )
             )
@@ -818,14 +895,14 @@ class PexBinaryDefaults(Subsystem):
     resolve_local_platforms = BoolOption(
         default=False,
         help=softwrap(
-            f"""
-            For each of the `{PexPlatformsField.alias}` specified for a `{PexBinary.alias}`
-            target, attempt to find a local interpreter that matches.
-
-            If a matching interpreter is found, use the interpreter to resolve distributions and
-            build any that are only available in source distribution form. If no matching interpreter
-            is found (or if this option is `False`), resolve for the platform by accepting
-            only pre-built binary distributions (wheels).
+            """
+            Now unused.
+            """
+        ),
+        removal_version="2.24.0.dev0",
+        removal_hint=softwrap(
+            """\
+            This `resolve_local_platforms` option is no longer used now that the `platforms` field has been removed. You can safely delete this setting.
             """
         ),
         advanced=True,
@@ -861,6 +938,47 @@ class PythonTestSourceField(PythonSourceField):
 
 class PythonTestsDependenciesField(PythonDependenciesField):
     supports_transitive_excludes = True
+
+
+class PythonTestsEntryPointDependenciesField(DictStringToStringSequenceField):
+    alias = "entry_point_dependencies"
+    help = help_text(
+        lambda: f"""
+        Dependencies on entry point metadata of `{PythonDistribution.alias}` targets.
+
+        This is a dict where each key is a `{PythonDistribution.alias}` address
+        and the value is a list or tuple of entry point groups and/or entry points
+        on that target. The strings in the value list/tuple must be one of:
+        - "entry.point.group/entry-point-name" to depend on a named entry point
+        - "entry.point.group" (without a "/") to depend on an entry point group
+        - "*" to get all entry points on the target
+
+        For example:
+
+            {PythonTestsEntryPointDependenciesField.alias}={{
+                "//foo/address:dist_tgt": ["*"],  # all entry points
+                "bar:dist_tgt": ["console_scripts"],  # only from this group
+                "foo/bar/baz:dist_tgt": ["console_scripts/my-script"],  # a single entry point
+                "another:dist_tgt": [  # multiple entry points
+                    "console_scripts/my-script",
+                    "console_scripts/another-script",
+                    "entry.point.group/entry-point-name",
+                    "other.group",
+                    "gui_scripts",
+                ],
+            }}
+
+        Code for matching `entry_points` on `{PythonDistribution.alias}` targets
+        will be added as dependencies so that they are available on PYTHONPATH
+        during tests.
+
+        Plus, an `entry_points.txt` file will be generated in the sandbox so that
+        each of the `{PythonDistribution.alias}`s appear to be "installed". The
+        `entry_points.txt` file will only include the entry points requested on this
+        field. This allows the tests, or the code under test, to lookup entry points
+        metadata using something like `pkg_resources.iter_entry_points` from `setuptools`.
+        """
+    )
 
 
 # TODO This field class should extend from a core `TestTimeoutField` once the deprecated options in `pytest` get removed.
@@ -937,6 +1055,8 @@ class SkipPythonTestsField(BoolField):
 
 _PYTHON_TEST_MOVED_FIELDS = (
     PythonTestsDependenciesField,
+    # This field is registered in the experimental backend for now.
+    # PythonTestsEntryPointDependenciesField,
     PythonResolveField,
     PythonRunGoalUseSandboxField,
     PythonTestsTimeoutField,
@@ -966,7 +1086,7 @@ class PythonTestTarget(Target):
         target and then be included in the `dependencies` field. (You can use the
         `python_test_utils` target to generate these `python_source` targets.)
 
-        See {doc_url('python-test-goal')}
+        See {doc_url('docs/python/goals/test')}
         """
     )
 
@@ -1305,7 +1425,7 @@ class PythonRequirementTarget(Target):
         requirement into a `python_requirement` target automatically. For Poetry, use
         `poetry_requirements`.
 
-        See {doc_url('python-third-party-dependencies')}.
+        See {doc_url('docs/python/overview/third-party-dependencies')}.
         """
     )
 
@@ -1350,7 +1470,7 @@ class PythonProvidesField(ScalarField, AsyncFieldMixin):
         in the `setup()` function:
         (https://packaging.python.org/guides/distributing-packages-using-setuptools/#setup-args).
 
-        See {doc_url('plugins-setup-py')} for how to write a plugin to dynamically generate kwargs.
+        See {doc_url('docs/writing-plugins/common-plugin-tasks/custom-python-artifact-kwargs')} for how to write a plugin to dynamically generate kwargs.
         """
     )
 
@@ -1564,7 +1684,7 @@ class LongDescriptionPathField(StringField):
 
 
 class PythonDistribution(Target):
-    alias = "python_distribution"
+    alias: ClassVar[str] = "python_distribution"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
@@ -1584,7 +1704,7 @@ class PythonDistribution(Target):
         f"""
         A publishable Python setuptools distribution (e.g. an sdist or wheel).
 
-        See {doc_url('python-distributions')}.
+        See {doc_url('docs/python/overview/building-distributions')}.
         """
     )
 
@@ -1650,11 +1770,33 @@ class VersionTemplateField(StringField):
     )
 
 
+class VersionVersionSchemeField(StringField):
+    alias = "version_scheme"
+    help = help_text(
+        """
+        The version scheme to configure `setuptools_scm` to use.
+        See https://setuptools-scm.readthedocs.io/en/latest/extending/#available-implementations
+        """
+    )
+
+
+class VersionLocalSchemeField(StringField):
+    alias = "local_scheme"
+    help = help_text(
+        """
+        The local scheme to configure `setuptools_scm` to use.
+        See https://setuptools-scm.readthedocs.io/en/latest/extending/#available-implementations_1
+        """
+    )
+
+
 class VCSVersion(Target):
     alias = "vcs_version"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         VersionTagRegexField,
+        VersionVersionSchemeField,
+        VersionLocalSchemeField,
         VCSVersionDummySourceField,
         VersionGenerateToField,
         VersionTemplateField,
@@ -1671,6 +1813,6 @@ class VCSVersion(Target):
         a subset of that config in this target's fields.
 
         If you need functionality that is not currently exposed here, please reach out to us at
-        {doc_url("getting-help")}.
+        {doc_url("community/getting-help")}.
         """
     )

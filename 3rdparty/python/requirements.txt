@@ -8,10 +8,10 @@ ansicolors==1.1.8
 chevron==0.14.0
 fasteners==0.16.3
 freezegun==1.2.1
-ijson==3.1.4
+ijson==3.2.3
 packaging==21.3
-pex==2.1.148
-psutil==5.9.0
+pex==2.3.3
+psutil==5.9.8
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
 # Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most
@@ -30,7 +30,7 @@ types-PyYAML==6.0.3
 types-requests==2.28.1
 types-setuptools==62.6.1
 types-toml==0.10.8
-typing-extensions==4.3.0
+typing-extensions~=4.12
 mypy-typing-asserts==0.1.1
 node-semver==0.9.0
 

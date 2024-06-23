@@ -89,7 +89,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             and replacing '{os.path.sep}' with '.' in that path.
 
             Example:
-            An npm lockfile located at `src/js/package/package-lock.json'
+            An npm lockfile located at `src/js/package/package-lock.json`
             will result in a resolve named `js.package`, assuming src/
             is a source root.
 
@@ -287,9 +287,16 @@ class NodeJSProcessEnvironment:
 
     base_bin_dir: ClassVar[str] = "__node"
 
-    def to_env_dict(self) -> dict[str, str]:
+    def to_env_dict(self, extras: Mapping[str, str] | None = None) -> dict[str, str]:
+        extras = extras or {}
+        extra_path = extras.get("PATH", "")
+        path = [self.tool_binaries.path_component, self.corepack_shims, self.binary_directory]
+        if extra_path:
+            path.append(extra_path)
+
         return {
-            "PATH": f"{self.tool_binaries.path_component}:{self.corepack_shims}:{self.binary_directory}",
+            **extras,
+            "PATH": os.pathsep.join(path),
             "npm_config_cache": self.npm_config_cache,  # Normally stored at ~/.npm,
             "COREPACK_HOME": os.path.join("{chroot}", self.corepack_home),
             **self.corepack_env_vars,
@@ -530,8 +537,6 @@ async def determine_nodejs_binaries(
 @dataclass(frozen=True)
 class CorepackToolRequest:
     tool: str
-    input_digest: Digest
-    working_directory: str | None = None
     version: str | None = None
 
 
@@ -545,20 +550,16 @@ async def prepare_corepack_tool(
     request: CorepackToolRequest, environment: NodeJSProcessEnvironment, nodejs: NodeJS
 ) -> CorepackToolDigest:
     version = request.version or nodejs.package_managers.get(request.tool)
-    if not version and request.input_digest == EMPTY_DIGEST:
-        raise ValueError(f"Could not determine tool version for {request.tool}.")
     tool_spec = f"{request.tool}@{version}" if version else request.tool
     tool_description = tool_spec if version else f"default {tool_spec} version"
     result = await Get(
         ProcessResult,
         Process(
             argv=filter(
-                None, ("corepack", "prepare", tool_spec if version else None, "--activate")
+                None, ("corepack", "prepare", tool_spec if version else "--all", "--activate")
             ),
             description=f"Preparing configured {tool_description}.",
-            input_digest=request.input_digest,
             immutable_input_digests=environment.immutable_digest(),
-            working_directory=request.working_directory,
             level=LogLevel.DEBUG,
             env=environment.to_env_dict(),
             append_only_caches={**environment.append_only_caches},
@@ -576,12 +577,7 @@ async def setup_node_tool_process(
         tool_name = request.tool.replace("npx", "npm")
         corepack_tool = await Get(
             CorepackToolDigest,
-            CorepackToolRequest(
-                tool_name,
-                request.project_digest or EMPTY_DIGEST,
-                request.working_directory,
-                request.tool_version,
-            ),
+            CorepackToolRequest(tool_name, request.tool_version),
         )
         input_digest = await Get(Digest, MergeDigests([request.input_digest, corepack_tool.digest]))
     else:
@@ -594,7 +590,7 @@ async def setup_node_tool_process(
         output_directories=request.output_directories,
         description=request.description,
         level=request.level,
-        env={**request.extra_env, **environment.to_env_dict()},
+        env=environment.to_env_dict(request.extra_env),
         working_directory=request.working_directory,
         append_only_caches={**request.append_only_caches, **environment.append_only_caches},
         timeout_seconds=request.timeout_seconds,

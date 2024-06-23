@@ -19,3 +19,6 @@ pantsd = { path = "../pantsd" }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "io-std", "io-util"] }
+
+[lints]
+workspace = true

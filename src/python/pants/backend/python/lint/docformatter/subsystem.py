@@ -4,17 +4,19 @@
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.rules import collect_rules
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
 
 
 class Docformatter(PythonToolBase):
     options_scope = "docformatter"
     name = "docformatter"
-    help = "The Python docformatter tool (https://github.com/myint/docformatter)."
+    help_short = "The Python docformatter tool (https://github.com/myint/docformatter)."
 
     default_main = ConsoleScript("docformatter")
-    default_requirements = ["docformatter>=1.4,<1.6"]
+    default_requirements = ["docformatter>=1.4,<1.5"]
 
     register_interpreter_constraints = True
 
@@ -25,4 +27,7 @@ class Docformatter(PythonToolBase):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(ExportableTool, Docformatter),
+    ]

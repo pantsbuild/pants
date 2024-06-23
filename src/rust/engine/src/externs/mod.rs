@@ -9,6 +9,8 @@ use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
 
+use futures::future::{BoxFuture, Future};
+use futures::FutureExt;
 use lazy_static::lazy_static;
 use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -31,6 +33,7 @@ mod interface;
 #[cfg(test)]
 mod interface_tests;
 pub mod nailgun;
+mod options;
 mod pantsd;
 pub mod process;
 pub mod scheduler;
@@ -41,6 +44,7 @@ pub mod workunits;
 
 pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyFailure>()?;
+    m.add_class::<PyGeneratorResponseNativeCall>()?;
     m.add_class::<PyGeneratorResponseCall>()?;
     m.add_class::<PyGeneratorResponseGet>()?;
 
@@ -66,7 +70,7 @@ pub struct PyFailure(pub Failure);
 impl PyFailure {
     fn get_error(&self, py: Python) -> PyErr {
         match &self.0 {
-            Failure::Throw { val, .. } => val.into_py(py),
+            Failure::Throw { val, .. } => PyErr::from_value(val.as_ref().as_ref(py)),
             f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
                 EngineError::new_err(format!("{f}"))
             }
@@ -255,12 +259,6 @@ pub fn create_exception(py: Python, msg: String) -> Value {
     Value::new(IntrinsicError::new_err(msg).into_py(py))
 }
 
-pub fn call_function<'py>(func: &'py PyAny, args: &[Value]) -> PyResult<&'py PyAny> {
-    let args: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
-    let args_tuple = PyTuple::new(func.py(), &args);
-    func.call1(args_tuple)
-}
-
 pub(crate) enum GeneratorInput {
     Initial,
     Arg(Value),
@@ -339,6 +337,8 @@ pub(crate) fn generator_send(
         // It isn't necessary to differentiate between `Get` and `Effect` here, as the static
         // analysis of `@rule`s has already validated usage.
         Ok(GeneratorResponse::Get(get.take()?))
+    } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseNativeCall>>(py) {
+        Ok(GeneratorResponse::NativeCall(call.take()?))
     } else if let Ok(get_multi) = response.downcast::<PySequence>(py) {
         // Was an `All` or `MultiGet`.
         let gogs = get_multi
@@ -375,15 +375,15 @@ pub(crate) fn generator_send(
 /// those configured in types::Types.
 pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
     let py_type = type_id.as_py_type(py);
-    call_function(py_type, args)
-        .map(|obj| Value::new(obj.into_py(py)))
-        .unwrap_or_else(|e| {
-            panic!(
-                "Core type constructor `{}` failed: {:?}",
-                py_type.name().unwrap(),
-                e
-            );
-        })
+    let args_tuple = PyTuple::new(py, args.iter().map(|v| v.to_object(py)));
+    let res = py_type.call1(args_tuple).unwrap_or_else(|e| {
+        panic!(
+            "Core type constructor `{}` failed: {:?}",
+            py_type.name().unwrap(),
+            e
+        );
+    });
+    Value::new(res.into_py(py))
 }
 
 lazy_static! {
@@ -468,6 +468,43 @@ fn interpret_get_inputs(
     }
 }
 
+#[pyclass]
+pub struct PyGeneratorResponseNativeCall(RefCell<Option<NativeCall>>);
+
+impl PyGeneratorResponseNativeCall {
+    pub fn new(call: impl Future<Output = Result<Value, Failure>> + 'static + Send) -> Self {
+        Self(RefCell::new(Some(NativeCall { call: call.boxed() })))
+    }
+
+    fn take(&self) -> Result<NativeCall, String> {
+        self.0
+            .borrow_mut()
+            .take()
+            .ok_or_else(|| "A `NativeCall` may only be consumed once.".to_owned())
+    }
+}
+
+#[pymethods]
+impl PyGeneratorResponseNativeCall {
+    fn __await__(self_: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        self_
+    }
+
+    fn __iter__(self_: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        self_
+    }
+
+    fn __next__(self_: PyRef<'_, Self>) -> Option<PyRef<'_, Self>> {
+        Some(self_)
+    }
+
+    fn send(&self, py: Python, value: PyObject) -> PyResult<()> {
+        Err(PyStopIteration::new_err(
+            PyTuple::new(py, [value]).to_object(py),
+        ))
+    }
+}
+
 #[pyclass(subclass)]
 pub struct PyGeneratorResponseCall(RefCell<Option<Call>>);
 
@@ -478,15 +515,28 @@ impl PyGeneratorResponseCall {
         py: Python,
         rule_id: String,
         output_type: &PyType,
+        args: &PyTuple,
         input_arg0: Option<&PyAny>,
         input_arg1: Option<&PyAny>,
     ) -> PyResult<Self> {
         let output_type = TypeId::new(output_type);
+        let (args, args_arity) = if args.is_empty() {
+            (None, 0)
+        } else {
+            (
+                Some(args.extract::<Key>()?),
+                args.len().try_into().map_err(|e| {
+                    PyException::new_err(format!("Too many explicit arguments for {rule_id}: {e}"))
+                })?,
+            )
+        };
         let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
         Ok(Self(RefCell::new(Some(Call {
             rule_id: RuleId::from_string(rule_id),
             output_type,
+            args,
+            args_arity,
             input_types,
             inputs,
         }))))
@@ -606,10 +656,18 @@ impl PyGeneratorResponseGet {
     }
 }
 
+pub struct NativeCall {
+    pub call: BoxFuture<'static, Result<Value, Failure>>,
+}
+
 #[derive(Debug)]
 pub struct Call {
     pub rule_id: RuleId,
     pub output_type: TypeId,
+    // A tuple of positional arguments.
+    pub args: Option<Key>,
+    // The number of positional arguments which have been provided.
+    pub args_arity: u16,
     pub input_types: SmallVec<[TypeId; 2]>,
     pub inputs: SmallVec<[Key; 2]>,
 }
@@ -669,6 +727,8 @@ pub enum GetOrGenerator {
 pub enum GeneratorResponse {
     /// The generator has completed with the given value of the given type.
     Break(Value, TypeId),
+    /// The generator is awaiting a call to a unknown native function.
+    NativeCall(NativeCall),
     /// The generator is awaiting a call to a known rule.
     Call(Call),
     /// The generator is awaiting a call to an unknown rule.

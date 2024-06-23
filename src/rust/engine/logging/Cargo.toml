@@ -20,3 +20,6 @@ uuid = { workspace = true, features = ["v4"] }
 
 [build-dependencies]
 cargo_metadata = "0.15"
+
+[lints]
+workspace = true

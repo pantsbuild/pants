@@ -44,7 +44,7 @@ class LocalPantsRunner:
     """Handles a single pants invocation running in the process-local context.
 
     LocalPantsRunner is used both for single runs of Pants without `pantsd` (where a Scheduler is
-    created at the beginning of the run and destroyed at the end, and also for runs of Pants in
+    created at the beginning of the run and destroyed at the end), and also for runs of Pants in
     `pantsd` (where a Scheduler is borrowed from `pantsd` creation time, and left running at the
     end).
     """

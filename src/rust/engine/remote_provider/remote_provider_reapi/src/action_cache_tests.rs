@@ -5,12 +5,13 @@ use std::{collections::BTreeMap, time::Duration};
 use hashing::Digest;
 use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use remote_provider_traits::{ActionCacheProvider, RemoteStoreOptions};
+use remote_provider_traits::{ActionCacheProvider, RemoteProvider, RemoteStoreOptions};
 
 use super::action_cache::Provider;
 
 async fn new_provider(cas: &StubCAS) -> Provider {
     Provider::new(RemoteStoreOptions {
+        provider: RemoteProvider::Reapi,
         instance_name: None,
         store_address: cas.address(),
         tls_config: Default::default(),

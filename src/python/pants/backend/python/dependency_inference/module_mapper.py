@@ -20,6 +20,7 @@ from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_MODULE_MAPPING,
     DEFAULT_MODULE_PATTERN_MAPPING,
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
+    DEFAULT_TYPE_STUB_MODULE_PATTERN_MAPPING,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -92,7 +93,8 @@ def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
             first_party.append(tgt)
         if tgt.has_field(PythonRequirementsField):
             third_party.append(tgt)
-    return AllPythonTargets(tuple(first_party), tuple(third_party))
+
+    return AllPythonTargets(tuple(sorted(first_party)), tuple(sorted(third_party)))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -233,7 +235,10 @@ class FirstPartyPythonTargetsMappingMarker(FirstPartyPythonMappingImplMarker):
     pass
 
 
-@rule(desc="Creating map of first party Python targets to Python modules", level=LogLevel.DEBUG)
+@rule(
+    desc="Creating map of first party Python targets to Python modules",
+    level=LogLevel.DEBUG,
+)
 async def map_first_party_python_targets_to_modules(
     _: FirstPartyPythonTargetsMappingMarker,
     all_python_targets: AllPythonTargets,
@@ -312,35 +317,25 @@ class ThirdPartyPythonModuleMapping:
 
 
 @functools.cache
-def generate_mappings_from_pattern(proj_name: str) -> Iterable[str]:
-    """Generate an iterable of possible module mappings from a project name using a regex pattern.
+def generate_mappings_from_pattern(proj_name: str, is_type_stub: bool) -> Tuple[str, ...]:
+    """Generate a tuple of possible module mappings from a project name using a regex pattern.
 
     e.g. google-cloud-foo -> [google.cloud.foo, google.cloud.foo_v1, google.cloud.foo_v2]
     Should eliminate the need to "manually" add a mapping for every service
     proj_name: The project name to generate mappings for e.g google-cloud-datastream
     """
+    pattern_mappings = (
+        DEFAULT_TYPE_STUB_MODULE_PATTERN_MAPPING if is_type_stub else DEFAULT_MODULE_PATTERN_MAPPING
+    )
     pattern_values = []
-    for match_pattern, replace_patterns in DEFAULT_MODULE_PATTERN_MAPPING.items():
+    for match_pattern, replace_patterns in pattern_mappings.items():
         if match_pattern.match(proj_name) is not None:
             pattern_values = [
                 match_pattern.sub(replace_pattern, proj_name)
                 for replace_pattern in replace_patterns
             ]
             break  # stop after the first match in the rare chance that there are multiple matches
-    return pattern_values
-
-
-@functools.cache
-def generate_mappings(proj_name: str, fallback_value: str) -> Iterable[str]:
-    """Will try the default mapping first and if no mapping is found, try the pattern match.
-
-    If those fail, use the fallback_value
-    """
-    return (
-        DEFAULT_MODULE_MAPPING.get(proj_name)
-        or generate_mappings_from_pattern(proj_name)
-        or (fallback_value,)
-    )
+    return tuple(pattern_values)
 
 
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
@@ -355,23 +350,23 @@ async def map_third_party_modules_to_addresses(
     for tgt in all_python_targets.third_party:
         resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
 
-        def add_modules(modules: Iterable[str], *, type_stub: bool = False) -> None:
+        def add_modules(modules: Iterable[str], *, is_type_stub: bool) -> None:
             for module in modules:
                 resolves_to_modules_to_providers[resolve][module].append(
                     ModuleProvider(
                         tgt.address,
-                        ModuleProviderType.TYPE_STUB if type_stub else ModuleProviderType.IMPL,
+                        ModuleProviderType.TYPE_STUB if is_type_stub else ModuleProviderType.IMPL,
                     )
                 )
 
         explicit_modules = tgt.get(PythonRequirementModulesField).value
         if explicit_modules:
-            add_modules(explicit_modules)
+            add_modules(explicit_modules, is_type_stub=False)
             continue
 
         explicit_stub_modules = tgt.get(PythonRequirementTypeStubModulesField).value
         if explicit_stub_modules:
-            add_modules(explicit_stub_modules, type_stub=True)
+            add_modules(explicit_stub_modules, is_type_stub=True)
             continue
 
         # Else, fall back to defaults.
@@ -382,21 +377,24 @@ async def map_third_party_modules_to_addresses(
             proj_name = canonicalize_project_name(req.project_name)
             fallback_value = req.project_name.strip().lower().replace("-", "_")
 
-            in_stubs_map = proj_name in DEFAULT_TYPE_STUB_MODULE_MAPPING
-            starts_with_prefix = fallback_value.startswith(("types_", "stubs_"))
-            ends_with_prefix = fallback_value.endswith(("_types", "_stubs"))
-            if proj_name not in DEFAULT_MODULE_MAPPING and (
-                in_stubs_map or starts_with_prefix or ends_with_prefix
-            ):
-                if in_stubs_map:
-                    stub_modules = DEFAULT_TYPE_STUB_MODULE_MAPPING[proj_name]
-                else:
-                    stub_modules = (
-                        fallback_value[6:] if starts_with_prefix else fallback_value[:-6],
-                    )
-                add_modules(stub_modules, type_stub=True)
+            modules_to_add: Tuple[str, ...]
+            is_type_stub: bool
+            if proj_name in DEFAULT_MODULE_MAPPING:
+                modules_to_add = DEFAULT_MODULE_MAPPING[proj_name]
+                is_type_stub = False
+            elif proj_name in DEFAULT_TYPE_STUB_MODULE_MAPPING:
+                modules_to_add = DEFAULT_TYPE_STUB_MODULE_MAPPING[proj_name]
+                is_type_stub = True
+            # check for stubs first, since stub packages may also match impl package patterns
+            elif modules_to_add := generate_mappings_from_pattern(proj_name, is_type_stub=True):
+                is_type_stub = True
+            elif modules_to_add := generate_mappings_from_pattern(proj_name, is_type_stub=False):
+                is_type_stub = False
             else:
-                add_modules(generate_mappings(proj_name, fallback_value))
+                modules_to_add = (fallback_value,)
+                is_type_stub = False
+
+            add_modules(modules_to_add, is_type_stub=is_type_stub)
 
     return ThirdPartyPythonModuleMapping(
         FrozenDict(

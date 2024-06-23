@@ -22,8 +22,8 @@ use workunit_store::WorkunitStore;
 
 use crate::local::ByteStore;
 use crate::{
-    EntryType, FileContent, RemoteStoreOptions, Snapshot, Store, StoreError, StoreFileByDigest,
-    UploadSummary, MEGABYTES,
+    EntryType, FileContent, RemoteProvider, RemoteStoreOptions, Snapshot, Store, StoreError,
+    StoreFileByDigest, UploadSummary, MEGABYTES,
 };
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
@@ -64,6 +64,7 @@ fn remote_options(
     headers: BTreeMap<String, String>,
 ) -> RemoteStoreOptions {
     RemoteStoreOptions {
+        provider: RemoteProvider::Reapi,
         store_address,
         instance_name,
         tls_config: tls::Config::default(),
@@ -1529,7 +1530,7 @@ async fn returns_upload_summary_on_empty_cas() {
         .expect("Error uploading file");
 
     // We store all 3 files, and so we must sum their digests
-    let test_data = vec![
+    let test_data = [
         testdir.digest().size_bytes,
         testroland.digest().size_bytes,
         testcatnip.digest().size_bytes,
@@ -1753,4 +1754,70 @@ async fn big_file_immutable_link() {
     assert_is_linked(&input_file, true);
     assert_is_linked(&output_file, false);
     assert_is_linked(&nested_output_file, false);
+}
+
+#[tokio::test]
+async fn big_file_mutable_root_dir() {
+    let materialize_dir = TempDir::new().unwrap();
+    let testdata = TestData::double_all_the_henries();
+    let file_bytes = testdata.bytes();
+    let file_digest = testdata.digest();
+
+    let file_node = remexec::FileNode {
+        name: "file".to_owned(),
+        digest: Some(file_digest.into()),
+        is_executable: true,
+        ..remexec::FileNode::default()
+    };
+    let nested_directory = remexec::Directory {
+        files: vec![file_node.clone()],
+        ..remexec::Directory::default()
+    };
+    let directory = remexec::Directory {
+        directories: vec![remexec::DirectoryNode {
+            name: "nested".to_owned(),
+            digest: Some(hashing::Digest::of_bytes(&nested_directory.to_bytes()).into()),
+        }],
+        files: vec![file_node],
+        ..remexec::Directory::default()
+    };
+
+    let store_dir = TempDir::new().unwrap();
+    let store = new_local_store(store_dir.path());
+    store
+        .record_directory(&nested_directory, false)
+        .await
+        .expect("Error saving Directory");
+    store
+        .record_directory(&directory, false)
+        .await
+        .expect("Error saving Directory");
+    store
+        .store_file_bytes(file_bytes.clone(), false)
+        .await
+        .expect("Error saving bytes");
+    let directory_digest = fs::DirectoryDigest::from_persisted_digest(hashing::Digest::of_bytes(
+        &directory.to_bytes(),
+    ));
+
+    store
+        .materialize_directory(
+            materialize_dir.path().to_owned(),
+            materialize_dir.path(),
+            directory_digest,
+            false,
+            &BTreeSet::from([RelativePath::new(".").unwrap()]),
+            Permissions::Writable,
+        )
+        .await
+        .expect("Error materializing files");
+
+    let assert_path = |path: &PathBuf| {
+        assert_eq!(file_contents(path), file_bytes);
+        assert!(is_executable(path));
+        assert!(!path.metadata().unwrap().permissions().readonly());
+    };
+
+    assert_path(&materialize_dir.path().join("file"));
+    assert_path(&materialize_dir.path().join("nested").join("file"));
 }

@@ -188,7 +188,7 @@ def plugin_resolution(
         configpath = os.path.join(root_dir, "pants.toml")
         if create_artifacts:
             touch(configpath)
-        args = [f"--pants-config-files=['{configpath}']"]
+        args = ["pants", f"--pants-config-files=['{configpath}']"]
 
         options_bootstrapper = OptionsBootstrapper.create(env=env, args=args, allow_pantsrc=False)
         complete_env = CompleteEnvironmentVars(

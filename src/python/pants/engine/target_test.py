@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import re
 import string
 from collections import namedtuple
 from dataclasses import FrozenInstanceError, dataclass
@@ -11,6 +12,7 @@ import pytest
 
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.internals.target_adaptor import SourceBlock, SourceBlocks
 from pants.engine.target import (
     NO_VALUE,
     AsyncFieldMixin,
@@ -31,6 +33,7 @@ from pants.engine.target import (
     InvalidFieldTypeException,
     InvalidGeneratedTargetException,
     InvalidTargetException,
+    ListOfDictStringToStringField,
     MultipleSourcesField,
     NestedDictStringToStringField,
     OptionalSingleSourceField,
@@ -42,6 +45,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     ValidNumbers,
+    _validate_origin_sources_blocks,
     generate_file_based_overrides_field_help_message,
     get_shard,
     parse_shard_spec,
@@ -326,7 +330,7 @@ def test_override_preexisting_field_via_new_target() -> None:
     # that still works where the original target was expected.
     #
     # However, this means that we must ensure `Target.get()` and `Target.has_fields()` will work
-    # with subclasses of the original `Field`s.
+    # with subclasses of the original `Field`.
 
     class CustomFortranExtensions(FortranExtensions):
         banned_extensions = ("FortranBannedExt",)
@@ -526,7 +530,7 @@ def test_coarsened_target_closure() -> None:
 
 
 def test_generated_targets_address_validation() -> None:
-    """Ensure that all addresses are well formed."""
+    """Ensure that all addresses are well-formed."""
 
     class MockTarget(Target):
         alias = "tgt"
@@ -870,6 +874,34 @@ def test_dict_string_to_string_field() -> None:
     assert ExampleDefault(None, addr).value == FrozenDict({"default": "val"})
 
 
+def test_list_of_dict_string_to_string_field() -> None:
+    class Example(ListOfDictStringToStringField):
+        alias = "example"
+
+    addr = Address("", target_name="example")
+
+    assert Example(None, addr).value is None
+    assert Example([{}], addr).value == (FrozenDict(),)
+    assert Example([{"hello": "world"}], addr).value == (FrozenDict({"hello": "world"}),)
+    # Test support for single dict not passed in a list
+    assert Example({"hello": "world"}, addr).value == (FrozenDict({"hello": "world"}),)
+
+    def assert_invalid_type(raw_value: Any) -> None:
+        with pytest.raises(InvalidFieldTypeException):
+            Example(raw_value, addr)
+
+    for v in [0, [0], [object()], ["hello"], [["hello"]], [{"hello": 0}], [{0: "world"}]]:
+        assert_invalid_type(v)
+
+    # Test that a default can be set.
+    class ExampleDefault(ListOfDictStringToStringField):
+        alias = "example"
+        # Note that we use `FrozenDict` so that the object can be hashable.
+        default = [FrozenDict({"default": "val"})]
+
+    assert ExampleDefault(None, addr).value == (FrozenDict({"default": "val"}),)
+
+
 def test_nested_dict_string_to_string_field() -> None:
     class Example(NestedDictStringToStringField):
         alias = "example"
@@ -1032,7 +1064,7 @@ expected_path_globs = namedtuple(
                     "test/b",
                 ),
                 glob_match_error_behavior=GlobMatchErrorBehavior.warn,
-                conjunction=GlobExpansionConjunction.all_match,
+                conjunction=GlobExpansionConjunction.any_match,
                 description_of_origin="test:test's `sources` field",
             ),
             id="provided value warns on glob match error",
@@ -1079,7 +1111,7 @@ def test_multiple_sources_path_globs(
             expected_path_globs(
                 globs=("test/other_file",),
                 glob_match_error_behavior=GlobMatchErrorBehavior.warn,
-                conjunction=GlobExpansionConjunction.all_match,
+                conjunction=GlobExpansionConjunction.any_match,
                 description_of_origin="test:test's `source` field",
             ),
             id="provided value warns on glob match error",
@@ -1090,7 +1122,7 @@ def test_multiple_sources_path_globs(
             expected_path_globs(
                 globs=("test/life",),
                 glob_match_error_behavior=GlobMatchErrorBehavior.warn,
-                conjunction=GlobExpansionConjunction.all_match,
+                conjunction=GlobExpansionConjunction.any_match,
                 description_of_origin="test:test's `source` field",
             ),
             id="default glob conjunction",
@@ -1513,3 +1545,22 @@ def test_generate_file_based_overrides_field_help_message() -> None:
     assert "example:\n\n    overrides={\n" in message
     assert '\n        "bar.proto"' in message
     assert "\n    }\n\nFile" in message
+
+
+def test_validate_origin_sources_blocks():
+    with pytest.raises(ValueError, match=re.compile("^Expected .*`FrozenDict`, got .*list")):
+        _validate_origin_sources_blocks([SourceBlock(start=0, end=1)])
+    with pytest.raises(
+        ValueError,
+        match=re.compile(r"^Expected .*`SourceBlocks`, got .*SourceBlock"),
+    ):
+        _validate_origin_sources_blocks(FrozenDict([("file.txt", SourceBlock(start=0, end=1))]))
+    with pytest.raises(
+        ValueError,
+        match=re.compile(r"^Expected .*`SourceBlocks`, got .*tuple"),
+    ):
+        _validate_origin_sources_blocks(FrozenDict([("file.txt", ((0, 1),))]))
+
+    _validate_origin_sources_blocks(
+        FrozenDict([("file.txt", SourceBlocks([SourceBlock(start=0, end=1)]))])
+    )

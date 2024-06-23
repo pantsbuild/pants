@@ -23,8 +23,10 @@ from pants.backend.python.target_types import (
     VCSVersion,
     VCSVersionDummySourceField,
     VersionGenerateToField,
+    VersionLocalSchemeField,
     VersionTagRegexField,
     VersionTemplateField,
+    VersionVersionSchemeField,
 )
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
@@ -78,9 +80,12 @@ async def generate_python_from_setuptools_scm(
     # directory" and "where should I write output to".
     config: dict[str, dict[str, dict[str, str]]] = {}
     tool_config = config.setdefault("tool", {}).setdefault("setuptools_scm", {})
-    tag_regex = request.protocol_target[VersionTagRegexField].value
-    if tag_regex:
+    if tag_regex := request.protocol_target[VersionTagRegexField].value:
         tool_config["tag_regex"] = tag_regex
+    if version_scheme := request.protocol_target[VersionVersionSchemeField].value:
+        tool_config["version_scheme"] = version_scheme
+    if local_scheme := request.protocol_target[VersionLocalSchemeField].value:
+        tool_config["local_scheme"] = local_scheme
     config_path = "pyproject.synthetic.toml"
 
     input_digest_get = Get(

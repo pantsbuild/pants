@@ -192,7 +192,7 @@ jobs:
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.73.0-*
+        path: '~/.rustup/toolchains/1.78.0-*
 
           ~/.rustup/update-hashes
 
@@ -276,7 +276,7 @@ jobs:
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.73.0-*
+        path: '~/.rustup/toolchains/1.78.0-*
 
           ~/.rustup/update-hashes
 
@@ -367,7 +367,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.73.0-*
+        path: '~/.rustup/toolchains/1.78.0-*
 
           ~/.rustup/update-hashes
 
@@ -436,6 +436,18 @@ jobs:
       name: Trigger cheeseshop build
       run: 'gh api -X POST "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -F
         event_type=github-pages
+
+        '
+    - env:
+        GH_TOKEN: ${{ secrets.WORKER_PANTS_PANTSBUILD_ORG_TRIGGER_PAT }}
+      if: needs.release_info.outputs.is-release == 'true'
+      name: Trigger docs sync
+      run: 'RELEASE_TAG=${{ needs.release_info.outputs.build-ref }}
+
+        RELEASE_VERSION="${RELEASE_TAG#release_}"
+
+        gh workflow run sync_docs.yml -F "version=$RELEASE_VERSION" -F "reviewer=${{
+        github.actor }}" -R pantsbuild/pantsbuild.org
 
         '
   release_info:

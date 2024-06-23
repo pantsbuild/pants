@@ -101,7 +101,7 @@ async fn subset_symlink() {
     // Make the second snapshot with a symlink pointing to the file in the first snapshot.
     let (_store2, tempdir2, posix_fs2, digester2) = setup();
     create_dir_all(tempdir2.path().join("subdir")).unwrap();
-    symlink("./roland1", &tempdir2.path().join("subdir/roland2")).unwrap();
+    symlink("./roland1", tempdir2.path().join("subdir/roland2")).unwrap();
     let snapshot_with_symlink =
         Snapshot::from_path_stats(digester2, expand_all_sorted(posix_fs2).await)
             .await

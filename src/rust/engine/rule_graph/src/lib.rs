@@ -1,30 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
-// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![deny(
-    clippy::all,
-    clippy::default_trait_access,
-    clippy::expl_impl_clone_on_copy,
-    clippy::if_not_else,
-    clippy::needless_continue,
-    clippy::unseparated_literal_suffix,
-    clippy::used_underscore_binding
-)]
-// It is often more clear to show that nothing is being moved.
-#![allow(clippy::match_ref_pats)]
-// Subjective style.
-#![allow(
-    clippy::len_without_is_empty,
-    clippy::redundant_field_names,
-    clippy::too_many_arguments
-)]
-// Default isn't as big a deal as people seem to think it is.
-#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
-#![allow(clippy::mutex_atomic)]
-
 mod builder;
 mod rules;
 
@@ -103,6 +79,7 @@ pub struct Reentry<T: TypeId> {
 pub struct RuleEntry<R: Rule> {
     params: ParamTypes<R::TypeId>,
     rule: R,
+    explicit_args_arity: u16,
 }
 
 impl<R: Rule> RuleEntry<R> {
@@ -201,6 +178,7 @@ impl<R: Rule> DisplayForGraph for EntryWithDeps<R> {
             &EntryWithDeps::Rule(RuleEntry {
                 ref rule,
                 ref params,
+                ..
             }) => format!(
                 "{}{}for {}",
                 rule.fmt_for_graph(display_args),
@@ -327,6 +305,34 @@ impl<R: Rule> RuleGraph<R> {
                     .chain(edges.dependencies.keys().map(|k| k.product()))
             })
             .collect()
+    }
+
+    ///
+    /// Returns a mapping from a `Rule` to the dependencies it has that are themselves satisfied by
+    /// `Rule`s.
+    ///
+    #[allow(clippy::type_complexity)]
+    pub fn rule_dependencies(&self) -> HashMap<&R, Vec<(&DependencyKey<R::TypeId>, &R)>> {
+        let mut result = HashMap::default();
+        for (entry, rule_edges) in &self.rule_dependency_edges {
+            let EntryWithDeps::Rule(RuleEntry { rule, .. }) = entry.as_ref() else {
+                continue;
+            };
+
+            let mut function_satisfied_gets = Vec::new();
+            for (dependency, source) in &rule_edges.dependencies {
+                let Entry::WithDeps(entry_with_deps) = source.as_ref() else {
+                    continue;
+                };
+                let EntryWithDeps::Rule(RuleEntry { rule, .. }) = entry_with_deps.as_ref() else {
+                    continue;
+                };
+
+                function_satisfied_gets.push((dependency, rule));
+            }
+            result.insert(rule, function_satisfied_gets);
+        }
+        result
     }
 
     ///
@@ -470,8 +476,8 @@ impl<R: Rule> RuleGraph<R> {
                     dep_entries.sort();
                     let deps_with_attrs = dep_entries
                         .iter()
-                        .cloned()
                         .filter(|d| d.attrs_str.is_some())
+                        .cloned()
                         .map(|d| format!("\"{}\" {}", d.entry_str, d.attrs_str.unwrap()))
                         .collect::<Vec<String>>()
                         .join("\n");
@@ -508,8 +514,8 @@ impl<R: Rule> RuleGraph<R> {
                     dep_entries.sort();
                     let deps_with_attrs = dep_entries
                         .iter()
-                        .cloned()
                         .filter(|d| d.attrs_str.is_some())
+                        .cloned()
                         .map(|d| format!("\"{}\" {}", d.entry_str, d.attrs_str.unwrap()))
                         .collect::<Vec<String>>()
                         .join("\n");

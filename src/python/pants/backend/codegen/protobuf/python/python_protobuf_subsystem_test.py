@@ -110,3 +110,48 @@ def test_find_protobuf_python_requirement() -> None:
     assert rule_runner.request(InferredDependencies, [request]) == InferredDependencies(
         [Address("codegen/dir/grpc2"), Address("codegen/dir/proto2")]
     )
+
+
+def test_find_protobuf_grpclib_python_requirement() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *python_protobuf_subsystem.rules(),
+            *target_types.rules(),
+            *module_mapper.rules(),
+            *stripped_source_files.rules(),
+            *additional_fields.rules(),
+            QueryRule(InferredDependencies, (InferPythonProtobufDependencies,)),
+        ],
+        target_types=[ProtobufSourcesGeneratorTarget, PythonRequirementTarget],
+    )
+
+    rule_runner.write_files(
+        {"codegen/dir/f.proto": "", "codegen/dir/BUILD": "protobuf_sources(grpc=True)"}
+    )
+    rule_runner.set_options(
+        [
+            "--python-resolves={'python-default': ''}",
+            "--python-enable-resolves",
+            # Turn off python synthetic lockfile targets to make the test simpler.
+            "--no-python-enable-lockfile-targets",
+            "--python-protobuf-grpclib-plugin",
+            "--no-python-protobuf-grpcio-plugin",
+        ]
+    )
+
+    proto_tgt = rule_runner.get_target(Address("codegen/dir", relative_file_path="f.proto"))
+    request = InferPythonProtobufDependencies(
+        PythonProtobufDependenciesInferenceFieldSet.create(proto_tgt)
+    )
+
+    with engine_error(MissingPythonCodegenRuntimeLibrary, contains="protobuf"):
+        rule_runner.request(InferredDependencies, [request])
+    rule_runner.write_files({"proto/BUILD": "python_requirement(requirements=['protobuf'])"})
+    with engine_error(MissingPythonCodegenRuntimeLibrary, contains="grpclib"):
+        rule_runner.request(InferredDependencies, [request])
+    rule_runner.write_files(
+        {"proto/BUILD": "python_requirement(requirements=['grpclib[protobuf]', 'protobuf'])"}
+    )
+    assert rule_runner.request(InferredDependencies, [request]) == InferredDependencies(
+        [Address("proto")]
+    )
