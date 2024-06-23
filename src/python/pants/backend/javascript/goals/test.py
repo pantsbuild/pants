@@ -183,6 +183,7 @@ async def run_javascript_tests(
         return fast_relpath(file, installation.project_env.package_dir())
 
     test_script = installation.project_env.ensure_target()[NodePackageTestScriptField].value
+    package_manager = installation.project_env.project.package_manager
     entry_point = test_script.entry_point
 
     coverage_args: tuple[str, ...] = ()
@@ -212,7 +213,7 @@ async def run_javascript_tests(
             args=(
                 "run",
                 entry_point,
-                "--",
+                *(() if package_manager == "pnpm" else ("--",)),
                 *sorted(relative_package_dir(file) for file in field_set_source_files.files),
                 *coverage_args,
             ),
