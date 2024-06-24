@@ -7,6 +7,7 @@ import inspect
 import os
 import re
 import shlex
+from datetime import timedelta
 from enum import Enum
 from typing import Iterable, Pattern, Sequence
 
@@ -391,3 +392,22 @@ class DictValueComponent:
 
     def __repr__(self) -> str:
         return f"{self.action} {self.val}"
+
+
+def time_duration(value: str) -> timedelta:
+    """Parse human-readable time duration into a datetime.timedelta object."""
+    HUMAN_READABLE_TIME_DURATION_PATTERN = re.compile(
+        r"((?P<hours>\d+?)h)?((?P<minutes>\d+?)m)?((?P<seconds>\d+?)s)?"
+        r"((?P<milliseconds>\d+?)ms)?((?P<microseconds>\d+?)us)?"
+    )
+
+    groups = HUMAN_READABLE_TIME_DURATION_PATTERN.match(value)
+    if not groups:
+        return timedelta()
+
+    parts = groups.groupdict()
+    time_components = {}
+    for name, component in parts.items():
+        if component:
+            time_components[name] = int(component)
+    return timedelta(**time_components)
