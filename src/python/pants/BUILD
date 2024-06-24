@@ -56,6 +56,26 @@ pex_binary(
 # native code. This is just a dummy file.
 resources(name="resources", sources=["py.typed", "dummy.c"])
 
+PANTS_ARTIFACT_DEPENDENCIES = (
+    "3rdparty/python#ansicolors",
+    "3rdparty/python#chevron",
+    "3rdparty/python#fasteners",
+    "3rdparty/python#ijson",
+    "3rdparty/python#node-semver",
+    "3rdparty/python#packaging",
+    "3rdparty/python#pex",
+    "3rdparty/python#psutil",
+    "3rdparty/python#python-lsp-jsonrpc",
+    "3rdparty/python#PyYAML",
+    "3rdparty/python#setproctitle",
+    "3rdparty/python#setuptools",
+    "3rdparty/python#toml",
+    "3rdparty/python#types-PyYAML",
+    "3rdparty/python#types-setuptools",
+    "3rdparty/python#types-toml",
+    "3rdparty/python#typing-extensions",
+)
+
 __dependencies_rules__(
     (
         # test modules should not depend on other test modules
@@ -72,6 +92,17 @@ __dependencies_rules__(
         "<python_requirement>",
         "<python_requirements>",
         "?*",
+    ),
+    (
+        # source modules can only depend on a restricted subset of 3rd-party requirements that
+        # published Pants artifact will require; test modules do not have any restrictions and
+        # can depend on any 3rd party requirement as they aren't included in the final artifact
+        (
+            {"type": python_sources},
+            PANTS_ARTIFACT_DEPENDENCIES,
+            "?//3rdparty/python#*",
+            "*",
+        )
     ),
     ("*", "*"),
 )
