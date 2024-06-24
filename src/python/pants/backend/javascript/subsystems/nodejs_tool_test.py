@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 
@@ -81,6 +82,79 @@ def test_execute_process_with_package_manager(
 
 
 @pytest.mark.parametrize(
+    "package_manager, version",
+    [
+        pytest.param("yarn", "1.22.22", id="yarn"),
+        pytest.param("npm", "10.8.1", id="npm"),
+        pytest.param("pnpm", "8.15.8", id="pnpm"),
+    ],
+)
+def test_execute_process_with_package_manager_version_from_configuration(
+    rule_runner: RuleRunner,
+    package_manager: str,
+    version: str,
+):
+    rule_runner.set_options(
+        [
+            f"--nodejs-package-manager={package_manager}",
+            f"--nodejs-package-managers={{'{package_manager}': '{version}'}}",
+        ],
+        env_inherit={"PATH"},
+    )
+
+    tool = rule_runner.request(CowsayTool, [])
+
+    result = request_package_manager_version_for_tool(tool, package_manager, rule_runner)
+
+    assert result == version
+
+
+@pytest.mark.parametrize(
+    "lockfile_path, package_manager, version",
+    [
+        pytest.param(Path(__file__).parent / "yarn.lock", "yarn", "1.22.22", id="yarn_resolve"),
+        pytest.param(
+            Path(__file__).parent / "pnpm-lock.yaml", "pnpm", "8.15.8", id="pnpm_resolve"
+        ),
+        pytest.param(
+            Path(__file__).parent / "package-lock.json", "npm", "10.8.1", id="npm_resolve"
+        ),
+    ],
+)
+def test_execute_process_with_package_manager_version_from_resolve_package_manager(
+    rule_runner: RuleRunner,
+    lockfile_path: Path,
+    package_manager: str,
+    version: str,
+):
+    rule_runner.set_options(
+        [
+            "--nodejs-package-managers={}",
+            "--cowsay-install-from-resolve=nodejs-default",
+        ],
+        env_inherit={"PATH"},
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": "package_json(name='root_pkg')",
+            "package.json": json.dumps(
+                {
+                    "name": "@the-company/project",
+                    "devDependencies": {"cowsay": "^1.6.0"},
+                    "packageManager": f"{package_manager}@{version}",
+                }
+            ),
+            lockfile_path.name: lockfile_path.read_text(),
+        }
+    )
+    tool = rule_runner.request(CowsayTool, [])
+
+    result = request_package_manager_version_for_tool(tool, package_manager, rule_runner)
+
+    assert result == version
+
+
+@pytest.mark.parametrize(
     "lockfile_path, package_manager",
     [
         pytest.param(Path(__file__).parent / "yarn.lock", "yarn", id="yarn_resolve"),
@@ -117,3 +191,15 @@ def test_resolve_dictates_version(
     )
 
     assert result.stdout == b"1.6.0\n"
+
+
+def request_package_manager_version_for_tool(
+    tool: NodeJSToolBase, package_manager: str, rule_runner: RuleRunner
+) -> str:
+    request = tool.request((), EMPTY_DIGEST, "Inspect package manager version", LogLevel.DEBUG)
+    process = rule_runner.request(Process, [request])
+    result = rule_runner.request(
+        ProcessResult,
+        [dataclasses.replace(process, argv=(package_manager, "--version"))],
+    )
+    return result.stdout.decode().strip()

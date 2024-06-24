@@ -199,9 +199,7 @@ def test_generates_lockfile_for_npm_package_json_workspace(rule_runner: RuleRunn
     rule_runner.write_files(
         {
             "src/js/BUILD": "package_json()",
-            "src/js/package.json": given_package_with_workspaces(
-                "ham", "1.0.0", None, "a"
-            ),
+            "src/js/package.json": given_package_with_workspaces("ham", "1.0.0", None, "a"),
             "src/js/a/BUILD": "package_json()",
             "src/js/a/package.json": given_package_with_workspaces(
                 "spam",
