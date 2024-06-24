@@ -17,6 +17,7 @@ from pants.backend.go.target_types import (
     GoImportPathField,
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
+    GoVendoredPackageDependenciesField,
 )
 from pants.backend.go.util_rules import build_opts
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
@@ -266,7 +267,9 @@ async def setup_build_go_package_target_request(
             fortran_files = ()
             embed_config = _first_party_pkg_digest.xtest_embed_config
 
-    elif target.has_field(GoThirdPartyPackageDependenciesField):
+    elif target.has_field(GoThirdPartyPackageDependenciesField) or target.has_field(
+        GoVendoredPackageDependenciesField
+    ):
         import_path = target[GoImportPathField].value
         base_import_path = import_path
 
