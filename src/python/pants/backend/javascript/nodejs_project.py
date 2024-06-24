@@ -96,6 +96,20 @@ class NodeJSProject:
             return "workspace"
         return "--workspace"
 
+    @property
+    def args_separator(self) -> tuple[str, ...]:
+        # pnpm 7 changed the arguments to the `run` command - all other package managers
+        # accept an args separator --, but pnpm does not in versions 7 and above.
+        # > When using pnpm run <script>, all command line arguments after the script
+        # > name are now passed to the script's argv, even --.
+        if self.package_manager == "pnpm" and (
+            self.package_manager_version is None
+            or nodesemver.satisfies(self.package_manager_version, ">=7")
+        ):
+            return ()
+
+        return ("--",)
+
     def extra_env(self) -> dict[str, str]:
         if self.package_manager == "pnpm":
             return {"PNPM_HOME": "{chroot}/._pnpm_home"}
