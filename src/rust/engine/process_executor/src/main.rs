@@ -90,6 +90,10 @@ struct ActionDigestSpec {
     action_digest_length: Option<usize>,
 }
 
+fn parse_platform_from_str(s: &str) -> Result<Platform, String> {
+    Platform::try_from(s.to_string()).map_err(|e| e.to_string())
+}
+
 #[derive(StructOpt)]
 #[structopt(name = "process_executor", setting = clap::AppSettings::TrailingVarArg)]
 struct Opt {
@@ -131,7 +135,7 @@ struct Opt {
 
     /// The platform that the remote process will be executed on.
     /// MUST be set if executing remotely.
-    #[structopt(long, default_value = Platform::Linux_x86_64.as_ref())]
+    #[structopt(long, parse(try_from_str = parse_platform_from_str), default_value = Platform::Linux_x86_64.as_ref(), requires("server"))]
     remote_execution_platform: Platform,
 
     /// Path to file containing root certificate authority certificates for the execution server.
@@ -450,16 +454,9 @@ async fn make_request(
             args.command.extra_platform_property.iter(),
         ));
 
-        // Not sure if this is the best way to handle this - we could default to the remote platform
-        // being Linux_x86_64 as before.
-        let platform = args.remote_execution_platform.ok_or_else(|| {
-            "remote_execution_platform must be set when executing remotely".to_string()
-        })?;
-
-
         ProcessExecutionEnvironment {
             name: None,
-            platform,
+            platform: args.remote_execution_platform,
             strategy,
         }
     } else {
