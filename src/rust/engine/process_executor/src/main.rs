@@ -135,7 +135,7 @@ struct Opt {
 
     /// The platform that the remote process will be executed on.
     /// MUST be set if executing remotely.
-    #[structopt(long, parse(try_from_str = parse_platform_from_str), default_value = Platform::Linux_x86_64.as_ref(), requires("server"))]
+    #[structopt(long, parse(try_from_str = parse_platform_from_str), default_value = Platform::Linux_x86_64.as_ref())]
     remote_execution_platform: Platform,
 
     /// Path to file containing root certificate authority certificates for the execution server.
