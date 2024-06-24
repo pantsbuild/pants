@@ -28,7 +28,7 @@ class AWSCredentials:
 
 
 @rule
-async def access_aws_credentials() -> AWSCredentials:
+async def access_aws_credentials(subprocess_env: SubprocessEnvironmentVars) -> AWSCredentials:
     try:
         from botocore import credentials, session
     except ImportError:
@@ -47,7 +47,7 @@ async def access_aws_credentials() -> AWSCredentials:
         )
         raise
 
-    session = session.get_session()
+    session = session.get_session(env_vars=subprocess_env.vars)
     creds = credentials.create_credential_resolver(session).load_credentials()
 
     return AWSCredentials(creds)
@@ -106,12 +106,15 @@ async def download_from_s3(request: S3DownloadFile, aws_credentials: AWSCredenti
     )
 
 
+@union(in_scope_types=[EnvironmentName])
 class DownloadS3SchemeURL(URLDownloadHandler):
     match_scheme = "s3"
 
 
 @rule
-async def download_file_from_s3_scheme(request: DownloadS3SchemeURL) -> Digest:
+async def download_file_from_s3_scheme(
+    request: DownloadS3SchemeURL,
+) -> Digest:
     split = urlsplit(request.url)
     return await Get(
         Digest,
