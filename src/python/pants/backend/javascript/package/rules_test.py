@@ -28,14 +28,13 @@ from pants.engine.target import GeneratedSources
 from pants.testutil.rule_runner import RuleRunner
 
 
-@pytest.fixture(params=[("pnpm", "8.15.8"), ("npm", "10.8.1"), ("yarn", "1.22.22")])
-def package_manager_and_version(request) -> tuple[str, str]:
-    return cast(tuple[str, str], request.param)
+@pytest.fixture(params=["pnpm", "npm", "yarn"])
+def package_manager(request) -> str:
+    return cast(str, request.param)
 
 
 @pytest.fixture
-def rule_runner(package_manager_and_version: tuple[str, str]) -> RuleRunner:
-    package_manager, package_manager_version = package_manager_and_version
+def rule_runner(package_manager: str) -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *package_rules(),
@@ -53,16 +52,13 @@ def rule_runner(package_manager_and_version: tuple[str, str]) -> RuleRunner:
         objects=dict(package_json.build_file_aliases().objects),
     )
     rule_runner.set_options(
-        [f"--nodejs-package-manager={package_manager}@{package_manager_version}"],
+        [f"--nodejs-package-manager={package_manager}"],
         env_inherit={"PATH"},
     )
     return rule_runner
 
 
-def test_creates_tar_for_package_json(
-    rule_runner: RuleRunner, package_manager_and_version: tuple[str, str]
-) -> None:
-    package_manager, package_manager_version = package_manager_and_version
+def test_creates_tar_for_package_json(rule_runner: RuleRunner, package_manager: str) -> None:
     rule_runner.write_files(
         {
             "src/js/BUILD": dedent(
@@ -78,7 +74,6 @@ def test_creates_tar_for_package_json(
                     "name": "ham",
                     "version": "0.0.1",
                     "browser": "lib/index.mjs",
-                    "packageManager": f"{package_manager}@{package_manager_version}",
                 }
             ),
             "src/js/README.md": "",
@@ -154,8 +149,7 @@ def test_packages_files_as_resource(rule_runner: RuleRunner) -> None:
 
 
 @pytest.fixture
-def workspace_files(package_manager_and_version: tuple[str, str]) -> dict[str, str]:
-    package_manager, _ = package_manager_and_version
+def workspace_files(package_manager: str) -> dict[str, str]:
     if package_manager == "npm":
         return {
             "src/js/package-lock.json": json.dumps(
@@ -202,10 +196,8 @@ def workspace_files(package_manager_and_version: tuple[str, str]) -> dict[str, s
 
 def test_packages_files_as_resource_in_workspace(
     rule_runner: RuleRunner,
-    package_manager_and_version: tuple[str, str],
     workspace_files: dict[str, str],
 ) -> None:
-    package_manager, package_manager_version = package_manager_and_version
     rule_runner.write_files(
         {
             **workspace_files,
@@ -213,7 +205,6 @@ def test_packages_files_as_resource_in_workspace(
                 {
                     "name": "spam",
                     "version": "0.0.1",
-                    "packageManager": f"{package_manager}@{package_manager_version}",
                     "workspaces": ["a"],
                     "private": True,
                 }
@@ -232,7 +223,6 @@ def test_packages_files_as_resource_in_workspace(
                 {
                     "name": "ham",
                     "version": "0.0.1",
-                    "packageManager": f"{package_manager}@{package_manager_version}",
                     "browser": "lib/index.mjs",
                     "scripts": {"build": "mkdir dist && echo 'blarb' >> dist/index.cjs"},
                 }
@@ -255,8 +245,7 @@ def test_packages_files_as_resource_in_workspace(
         assert f.read() == "blarb\n"
 
 
-def test_extra_envs(rule_runner: RuleRunner, package_manager_and_version: tuple[str, str]) -> None:
-    package_manager, package_manager_version = package_manager_and_version
+def test_extra_envs(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/js/BUILD": dedent(
@@ -273,7 +262,6 @@ def test_extra_envs(rule_runner: RuleRunner, package_manager_and_version: tuple[
                     "name": "ham",
                     "version": "0.0.1",
                     "browser": "lib/index.mjs",
-                    "packageManager": f"{package_manager}@{package_manager_version}",
                     "scripts": {"build": "mkdir dist && echo $FOO >> dist/index.cjs"},
                 }
             ),
