@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-import textwrap
 from dataclasses import dataclass
+from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
@@ -18,6 +18,10 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+
+
+class UnsupportedFeature(Exception):
+    pass
 
 
 @dataclass(frozen=True)
@@ -76,14 +80,13 @@ async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved
     # from within the execution sandbox. Thus, this code uses a bash script to be able to resolve
     # absolute paths inside the sandbox.
-    go_run_script = FileContent(
-        "__run_go.sh",
-        textwrap.dedent(
-            f"""\
-            export GOROOT={goroot.path}
-            sandbox_root="$(/bin/pwd)"
+
+    script = dedent(
+        f"""\
+            export sandbox_root="$(/bin/pwd)"
             export GOPATH="${{sandbox_root}}/gopath"
             export GOCACHE="${{sandbox_root}}/cache"
+            export GOROOT="${{sandbox_root}}/{goroot.path}"
             /bin/mkdir -p "$GOPATH" "$GOCACHE"
             if [ -n "${GoSdkRunSetup.CHDIR_ENV}" ]; then
               cd "${GoSdkRunSetup.CHDIR_ENV}"
@@ -93,9 +96,14 @@ async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
               args=("${{@//__PANTS_SANDBOX_ROOT__/$sandbox_root}}")
               set -- "${{args[@]}}"
             fi
-            exec "{goroot.path}/bin/go" "$@"
+
+            exec "${{GOROOT}}/bin/go" "$@"
             """
-        ).encode("utf-8"),
+    )
+
+    go_run_script = FileContent(
+        "__run_go.sh",
+        script.encode("utf-8"),
     )
 
     digest = await Get(Digest, CreateDigest([go_run_script]))
@@ -125,11 +133,18 @@ async def setup_go_sdk_process(
         "__PANTS_GO_SDK_CACHE_KEY": f"{goroot.full_version}/{goroot.goos}/{goroot.goarch}",
     }
 
+    if "PATH" in env:
+        env["PATH"] = f"{goroot.path}/bin:{env['PATH']}"
+
     if request.replace_sandbox_root_in_args:
         env[GoSdkRunSetup.SANDBOX_ROOT_ENV] = "1"
 
     # Disable the "coverage redesign" experiment on Go v1.20+ for now since Pants does not yet support it.
     if goroot.is_compatible_version("1.20"):
+        if goroot.is_compatible_version("1.21"):
+            raise UnsupportedFeature(
+                "Pants currently does not support the redesigned coverage feature in Go v1.20+. In Go v.1.20, pants falls back to the old coverage feature. In later versions the coverage feature cannot be used. See https://github.com/pantsbuild/pants/issues/20689 for more information."
+            )
         exp_str = env.get("GOEXPERIMENT", "")
         exp_fields = exp_str.split(",") if exp_str != "" else []
         exp_fields = [exp for exp in exp_fields if exp != "coverageredesign"]
@@ -144,6 +159,7 @@ async def setup_go_sdk_process(
         description=request.description,
         output_files=request.output_files,
         output_directories=request.output_directories,
+        immutable_input_digests={".goroot": goroot.digest},
         level=LogLevel.DEBUG,
     )
 

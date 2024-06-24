@@ -752,10 +752,11 @@ async def build_go_package(
     # about the Go code that can be used by assembly files.
     asm_header_path: str | None = None
     if s_files:
-        if os.path.isabs(request.dir_path):
+        if request.dir_path.startswith(".goroot"):
             asm_header_path = "go_asm.h"
         else:
             asm_header_path = os.path.join(request.dir_path, "go_asm.h")
+
         compile_args.extend(["-asmhdr", asm_header_path])
 
     if embedcfg.digest != EMPTY_DIGEST:
@@ -812,6 +813,7 @@ async def build_go_package(
     # may end up to exceed those limits when compiling standard library packages where we append a very long GOROOT
     # path to each file name or in packages with large numbers of files.
     go_source_file_paths_config = "\n".join([*go_file_paths, *generated_cgo_file_paths])
+
     go_sources_file_paths_digest = await Get(
         Digest, CreateDigest([FileContent("__sources__.txt", go_source_file_paths_config.encode())])
     )

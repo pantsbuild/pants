@@ -510,7 +510,7 @@ def required_build_go_package_request(
         return fallible_request.request
     raise Exception(
         f"Failed to determine metadata to compile {fallible_request.import_path}:\n"
-        f"{fallible_request.stderr}"
+        f"{fallible_request.stderr}",
     )
 
 
@@ -555,6 +555,7 @@ class _ResolveStdlibEmbedConfigResult:
 @rule
 async def resolve_go_stdlib_embed_config(
     request: _ResolveStdlibEmbedConfigRequest,
+    goroot: GoRoot,
 ) -> _ResolveStdlibEmbedConfigResult:
     patterns_json = json.dumps(
         {
@@ -579,6 +580,7 @@ async def resolve_go_stdlib_embed_config(
             input_digest=input_digest,
             description=f"Create embed mapping for {request.package.import_path}",
             level=LogLevel.DEBUG,
+            immutable_input_digests={".goroot": goroot.digest},
         ),
     )
     if embed_result.exit_code != 0:

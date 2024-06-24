@@ -26,7 +26,9 @@ from pants.backend.go.util_rules.build_pkg import (
     BuiltGoPackage,
     FallibleBuiltGoPackage,
 )
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.fs import Snapshot
+from pants.engine.fs import rules as fs_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.strutil import path_safe
@@ -45,6 +47,8 @@ def rule_runner() -> RuleRunner:
             *link.rules(),
             *third_party_pkg.rules(),
             *target_type_rules.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(BuiltGoPackage, [BuildGoPackageRequest]),
             QueryRule(FallibleBuiltGoPackage, [BuildGoPackageRequest]),
         ],

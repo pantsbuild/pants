@@ -129,7 +129,7 @@ async def generate_go_assembly_symabisfile(
     #   that we don't need the actual definitions that would appear in go_asm.h.
     #
     # See https://go-review.googlesource.com/c/go/+/146999/8/src/cmd/go/internal/work/gc.go
-    if os.path.isabs(request.dir_path):
+    if request.dir_path.startswith(".goroot"):
         symabis_path = "symabis"
     else:
         symabis_path = os.path.join(request.dir_path, "symabis")
@@ -188,7 +188,7 @@ async def assemble_go_assembly_files(
     asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
 
     def obj_output_path(s_file: str) -> str:
-        if os.path.isabs(request.dir_path):
+        if request.dir_path.startswith(".goroot"):
             return str(PurePath(s_file).with_suffix(".o"))
         else:
             return str(request.dir_path / PurePath(s_file).with_suffix(".o"))

@@ -14,7 +14,9 @@ from pants.backend.go.util_rules.testutil import (
     EXPECTED_VERSION_NEXT_RELEASE,
     mock_go_binary,
 )
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.core.util_rules.system_binaries import BinaryNotFoundError
+from pants.engine.fs import rules as fs_rules
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -23,7 +25,7 @@ from pants.util.contextutil import temporary_dir
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[*goroot_rules(), QueryRule(GoRoot, [])])
+    return RuleRunner(rules=[*goroot_rules(), *fs_rules(), *archive_rules(), QueryRule(GoRoot, [])])
 
 
 def get_goroot(rule_runner: RuleRunner, binary_names_to_scripts: list[tuple[str, str]]) -> GoRoot:
@@ -42,6 +44,7 @@ def get_goroot(rule_runner: RuleRunner, binary_names_to_scripts: list[tuple[str,
             [
                 f"--golang-go-search-paths={repr(binary_dirs)}",
                 f"--golang-minimum-expected-version={EXPECTED_VERSION}",
+                "--go-toolchain-enabled=false",
             ],
             env_inherit={"PATH"},
         )
@@ -53,21 +56,19 @@ def test_find_valid_binary(rule_runner: RuleRunner) -> None:
         version_output=f"go version go{EXPECTED_VERSION} darwin/arm64",
         env_output={"GOROOT": "/valid/binary"},
     )
-    assert get_goroot(rule_runner, [("go", valid_without_patch)]).path == "/valid/binary"
+    assert get_goroot(rule_runner, [("go", valid_without_patch)]).path == ".goroot/go"
 
     valid_with_patch = mock_go_binary(
         version_output=f"go version go{EXPECTED_VERSION}.1 darwin/arm64",
         env_output={"GOROOT": "/valid/patch_binary"},
     )
-    assert get_goroot(rule_runner, [("go", valid_with_patch)]).path == "/valid/patch_binary"
+    assert get_goroot(rule_runner, [("go", valid_with_patch)]).path == ".goroot/go"
 
     valid_later_release = mock_go_binary(
         version_output=f"go version go{EXPECTED_VERSION_NEXT_RELEASE} darwin/arm64",
         env_output={"GOROOT": "/valid/subsequent_release"},
     )
-    assert (
-        get_goroot(rule_runner, [("go", valid_later_release)]).path == "/valid/subsequent_release"
-    )
+    assert get_goroot(rule_runner, [("go", valid_later_release)]).path == ".goroot/go"
 
     # Should still work even if there are other Go versions with an invalid version.
     invalid_version = mock_go_binary(
@@ -75,17 +76,17 @@ def test_find_valid_binary(rule_runner: RuleRunner) -> None:
     )
     assert (
         get_goroot(rule_runner, [("go", valid_without_patch), ("go", invalid_version)]).path
-        == "/valid/binary"
+        == ".goroot/go"
     )
 
     # Order of entries matters.
     assert (
         get_goroot(rule_runner, [("go", valid_without_patch), ("go", valid_with_patch)]).path
-        == "/valid/binary"
+        == ".goroot/go"
     )
     assert (
         get_goroot(rule_runner, [("go", valid_with_patch), ("go", valid_without_patch)]).path
-        == "/valid/patch_binary"
+        == ".goroot/go"
     )
 
 

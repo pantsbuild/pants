@@ -627,7 +627,7 @@ async def run_go_tests(
 
     # Add $GOROOT/bin to the PATH just as `go test` does.
     # See https://github.com/golang/go/blob/master/src/cmd/go/internal/test/test.go#L1384
-    goroot_bin_path = os.path.join(goroot.path, "bin")
+    goroot_bin_path = os.path.join("{CHROOT}", goroot.path, "bin")
     if "PATH" in extra_env:
         extra_env["PATH"] = f"{goroot_bin_path}:{extra_env['PATH']}"
     else:
@@ -689,6 +689,7 @@ async def run_go_tests(
         working_directory=working_dir,
         output_files=output_files,
         level=LogLevel.DEBUG,
+        immutable_input_digests={".goroot": goroot.digest},
     )
     results = await Get(
         ProcessResultWithRetries,
