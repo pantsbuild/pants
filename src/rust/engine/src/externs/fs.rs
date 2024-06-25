@@ -14,8 +14,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyIterator, PyString, PyTuple, PyType};
 
 use fs::{
-    DirectoryDigest, FilespecMatcher, GlobExpansionConjunction, PathGlobs, StrictGlobMatching,
-    EMPTY_DIRECTORY_DIGEST,
+    DirectoryDigest, FilespecMatcher, GlobExpansionConjunction, PathGlobs, PathMetadata,
+    StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
 };
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use store::Snapshot;
@@ -512,15 +512,35 @@ pub struct PyPathMetadata(pub fs::PathMetadata);
 
 #[pymethods]
 impl PyPathMetadata {
+    #[new]
+    pub fn new(
+        path: PathBuf,
+        kind: PyPathMetadataKind,
+        length: u64,
+        is_executable: bool,
+        unix_mode: Option<u32>,
+        accessed: Option<SystemTime>,
+        created: Option<SystemTime>,
+        modified: Option<SystemTime>,
+        symlink_target: Option<PathBuf>,
+    ) -> Self {
+        let this = PathMetadata {
+            path,
+            kind: kind.into(),
+            length,
+            is_executable,
+            unix_mode,
+            accessed,
+            created,
+            modified,
+            symlink_target,
+        };
+        PyPathMetadata(this)
+    }
+
     #[getter]
     pub fn path(&self) -> PyResult<PathBuf> {
         Ok(self.0.path.clone())
-    }
-
-    #[setter]
-    pub fn set_path(&mut self, path: PathBuf) -> PyResult<()> {
-        self.0.path = path;
-        Ok(())
     }
 
     #[getter]
@@ -528,21 +548,9 @@ impl PyPathMetadata {
         Ok(self.0.kind.into())
     }
 
-    #[setter]
-    pub fn set_kind(&mut self, kind: PyPathMetadataKind) -> PyResult<()> {
-        self.0.kind = kind.into();
-        Ok(())
-    }
-
     #[getter]
     pub fn length(&self) -> PyResult<u64> {
         Ok(self.0.length)
-    }
-
-    #[setter]
-    pub fn set_length(&mut self, length: u64) -> PyResult<()> {
-        self.0.length = length;
-        Ok(())
     }
 
     #[getter]
@@ -550,21 +558,9 @@ impl PyPathMetadata {
         Ok(self.0.is_executable)
     }
 
-    #[setter]
-    pub fn set_is_executable(&mut self, is_executable: bool) -> PyResult<()> {
-        self.0.is_executable = is_executable;
-        Ok(())
-    }
-
     #[getter]
     pub fn unix_mode(&self) -> PyResult<Option<u32>> {
         Ok(self.0.unix_mode)
-    }
-
-    #[setter]
-    pub fn set_unix_mode(&mut self, unix_mode: Option<u32>) -> PyResult<()> {
-        self.0.unix_mode = unix_mode;
-        Ok(())
     }
 
     #[getter]
@@ -572,21 +568,9 @@ impl PyPathMetadata {
         Ok(self.0.accessed)
     }
 
-    #[setter]
-    pub fn set_accessed(&mut self, accessed: Option<SystemTime>) -> PyResult<()> {
-        self.0.accessed = accessed;
-        Ok(())
-    }
-
     #[getter]
     pub fn created(&self) -> PyResult<Option<SystemTime>> {
         Ok(self.0.created)
-    }
-
-    #[setter]
-    pub fn set_created(&mut self, created: Option<SystemTime>) -> PyResult<()> {
-        self.0.created = created;
-        Ok(())
     }
 
     #[getter]
@@ -594,21 +578,9 @@ impl PyPathMetadata {
         Ok(self.0.modified)
     }
 
-    #[setter]
-    pub fn set_modified(&mut self, modified: Option<SystemTime>) -> PyResult<()> {
-        self.0.modified = modified;
-        Ok(())
-    }
-
     #[getter]
     pub fn symlink_target(&self) -> PyResult<Option<PathBuf>> {
         Ok(self.0.symlink_target.clone())
-    }
-
-    #[setter]
-    pub fn set_symlink_target(&mut self, symlink_target: Option<PathBuf>) -> PyResult<()> {
-        self.0.symlink_target = symlink_target;
-        Ok(())
     }
 
     pub fn copy(&self) -> PyResult<Self> {
