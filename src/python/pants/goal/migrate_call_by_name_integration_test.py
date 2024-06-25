@@ -14,7 +14,7 @@ REGISTER_FILE = dedent(
     from pants.engine.rules import collect_rules, Get, rule, goal_rule
     from pants.engine.goal import Goal, GoalSubsystem
 
-    from migrateme.rules1 import Bar, Baz, Foo, Thud, rules as rules1
+    from migrateme.rules1 import Bar, Foo, Thud, rules as rules1
     from migrateme.rules2 import Qux, rules as rules2
 
     class ContrivedGoalSubsystem(GoalSubsystem):
@@ -29,7 +29,6 @@ REGISTER_FILE = dedent(
     async def setup_migrateme(black: Black) -> ContrivedGoal:
         foo = await Get(Foo, Black, black)
         bar = await Get(Bar, Black, black)
-        baz = await Get(Baz, Black, black)
         qux = await Get(Qux, Black, black)
         thud = await Get(Thud, Black, black)
 
@@ -42,15 +41,14 @@ MIGRATED_REGISTER_FILE = dedent(
     """\
     from pants.backend.python.lint.black.subsystem import Black
     from pants.engine.rules import collect_rules, Get, rule, goal_rule
-    from migrateme.rules1 import embedded_comments
-    from migrateme.rules1 import multiget
-    from migrateme.rules1 import multiline
     from migrateme.rules1 import variants
+    from migrateme.rules1 import multiline
     from migrateme.rules2 import shadowed
+    from migrateme.rules1 import multiget
     from pants.engine.rules import implicitly
     from pants.engine.goal import Goal, GoalSubsystem
 
-    from migrateme.rules1 import Bar, Baz, Foo, Thud, rules as rules1
+    from migrateme.rules1 import Bar, Foo, Thud, rules as rules1
     from migrateme.rules2 import Qux, rules as rules2
 
     class ContrivedGoalSubsystem(GoalSubsystem):
@@ -65,7 +63,6 @@ MIGRATED_REGISTER_FILE = dedent(
     async def setup_migrateme(black: Black) -> ContrivedGoal:
         foo = await variants(**implicitly({black: Black}))
         bar = await multiline(**implicitly({black: Black}))
-        baz = await embedded_comments(**implicitly({black: Black}))
         qux = await shadowed(**implicitly({black: Black}))
         thud = await multiget(**implicitly({black: Black}))
 
@@ -86,6 +83,15 @@ RULES1_FILE = dedent(
     from pants.engine.rules import collect_rules, Get, MultiGet, rule
     from pants.engine.target import AllTargets
 
+    # TODO: Not handled by rule-graph
+    async def non_annotated_rule_helpers():
+        await Get(
+            VenvPex,
+            PexRequest,
+            # Some comment that the AST parse wipes out, but CST should keep
+            black.to_pex_request()
+        )
+
     class Foo:
         pass
 
@@ -94,7 +100,7 @@ RULES1_FILE = dedent(
         all_targets = await Get(AllTargets)
         pex = await Get(VenvPex, PexRequest, black.to_pex_request())
         digest = await Get(Digest, CreateArchive(EMPTY_SNAPSHOT))
-        paths = await Get(BinaryPaths, {{BinaryPathRequest(binary_name="time", search_path=("/usr/bin")): BinaryPathRequest, local_env.val: EnvironmentName}})
+        paths = await Get(BinaryPaths, {{BinaryPathRequest(binary_name='time', search_path=['/usr/bin']): BinaryPathRequest, local_env.val: EnvironmentName}})
         try:
             try_all_targets_try = await Get(AllTargets)
         except:
@@ -109,6 +115,7 @@ RULES1_FILE = dedent(
             conditional_all_targets_elif = await Get(AllTargets)
         else:
             conditional_all_targets_else = await Get(AllTargets)
+        await non_annotated_rule_helpers()
 
     class Bar:
         pass
@@ -118,18 +125,6 @@ RULES1_FILE = dedent(
         pex = await Get(
             VenvPex,
             PexRequest,
-            black.to_pex_request()
-        )
-
-    class Baz:
-        pass
-
-    @rule(desc="Ensure calls with embedded comments are ignored")
-    async def embedded_comments(black: Black) -> Baz:
-        pex = await Get(
-            VenvPex,
-            PexRequest,
-            # Some comment that the AST parse wipes out, so we can't migrate this call safely
             black.to_pex_request()
         )
 
@@ -149,6 +144,14 @@ RULES1_FILE = dedent(
                 black.to_pex_request()
             ),
             digest_get
+        )
+        multigot_sameline = await MultiGet(
+            Get(AllTargets), all_targets_get,
+            Get(
+                VenvPex,
+                PexRequest,
+                black.to_pex_request()
+            ), digest_get
         )
         multigot_forloop = await MultiGet(
             Get(Digest, CreateArchive(EMPTY_SNAPSHOT))
@@ -170,36 +173,46 @@ MIGRATED_RULES1_FILE = dedent(
     from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
     from pants.engine.fs import Digest, EMPTY_SNAPSHOT
     from pants.engine.rules import collect_rules, Get, concurrently, rule
+    from pants.engine.internals.graph import find_all_targets
     from pants.backend.python.util_rules.pex import create_venv_pex
     from pants.core.util_rules.archive import create_archive
     from pants.core.util_rules.system_binaries import find_binary
-    from pants.engine.internals.graph import find_all_targets
     from pants.engine.rules import implicitly
     from pants.engine.target import AllTargets
+
+    # TODO: Not handled by rule-graph
+    async def non_annotated_rule_helpers():
+        await Get(
+            VenvPex,
+            PexRequest,
+            # Some comment that the AST parse wipes out, but CST should keep
+            black.to_pex_request()
+        )
 
     class Foo:
         pass
 
     @rule
     async def variants(black: Black, local_env: ChosenLocalEnvironmentName) -> Foo:
-        all_targets = await find_all_targets(**implicitly())
+        all_targets = await find_all_targets()
         pex = await create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
         digest = await create_archive(CreateArchive(EMPTY_SNAPSHOT), **implicitly())
-        paths = await find_binary(**implicitly({BinaryPathRequest(binary_name='time', search_path='/usr/bin'): BinaryPathRequest, local_env.val: EnvironmentName}))
+        paths = await find_binary(**implicitly({BinaryPathRequest(binary_name='time', search_path=['/usr/bin']): BinaryPathRequest, local_env.val: EnvironmentName}))
         try:
-            try_all_targets_try = await find_all_targets(**implicitly())
+            try_all_targets_try = await find_all_targets()
         except:
-            try_all_targets_except = await find_all_targets(**implicitly())
+            try_all_targets_except = await find_all_targets()
         else:
-            try_all_targets_else = await find_all_targets(**implicitly())
+            try_all_targets_else = await find_all_targets()
         finally:
-            try_all_targets_finally = await find_all_targets(**implicitly())
+            try_all_targets_finally = await find_all_targets()
         if True:
-            conditional_all_targets_if = await find_all_targets(**implicitly())
+            conditional_all_targets_if = await find_all_targets()
         elif False:
-            conditional_all_targets_elif = await find_all_targets(**implicitly())
+            conditional_all_targets_elif = await find_all_targets()
         else:
-            conditional_all_targets_else = await find_all_targets(**implicitly())
+            conditional_all_targets_else = await find_all_targets()
+        await non_annotated_rule_helpers()
 
     class Bar:
         pass
@@ -208,30 +221,22 @@ MIGRATED_RULES1_FILE = dedent(
     async def multiline(black: Black) -> Bar:
         pex = await create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
 
-    class Baz:
-        pass
-
-    @rule(desc="Ensure calls with embedded comments are ignored")
-    async def embedded_comments(black: Black) -> Baz:
-        pex = await Get(
-            VenvPex,
-            PexRequest,
-            # Some comment that the AST parse wipes out, so we can't migrate this call safely
-            black.to_pex_request()
-        )
-
     class Thud:
         pass
 
     @rule(desc="Ensure calls used with multiget are migrated")
     async def multiget(black: Black) -> Thud:
-        all_targets_get = find_all_targets(**implicitly())
+        all_targets_get = find_all_targets()
         digest_get = create_archive(CreateArchive(EMPTY_SNAPSHOT), **implicitly())
         multigot = await concurrently(
-            find_all_targets(**implicitly()),
+            find_all_targets(),
             all_targets_get,
             create_venv_pex(**implicitly({black.to_pex_request(): PexRequest})),
             digest_get
+        )
+        multigot_sameline = await concurrently(
+            find_all_targets(), all_targets_get,
+            create_venv_pex(**implicitly({black.to_pex_request(): PexRequest})), digest_get
         )
         multigot_forloop = await concurrently(
             create_archive(CreateArchive(EMPTY_SNAPSHOT), **implicitly())
@@ -310,13 +315,6 @@ def test_migrate_call_by_name_syntax():
 
         # Ensure the JSON output contains the paths to the files we expect to migrate
         assert all(str(p) in result.stdout for p in [register_path, rules1_path, rules2_path])
-        # Ensure the warning for embedded comments is logged
-        # Note: This assertion is brittle - adding extra content to rules1.py will probably mean updating the range
-        assert (
-            f"Comments found in {tmpdir}/src/migrateme/rules1.py within replacement range: (51, 56)"
-            in result.stderr
-        )
-
         with open(register_path) as f:
             assert f.read() == MIGRATED_REGISTER_FILE
         with open(rules1_path) as f:
