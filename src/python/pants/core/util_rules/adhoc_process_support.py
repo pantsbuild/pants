@@ -584,7 +584,7 @@ async def compute_workspace_invalidation_hash(path_globs: PathGlobs) -> str:
     # when used outside the process (for example, in the cache). (The `__hash__` dunder method
     # computes an unstable hash which can and does vary across different process invocations.)
     #
-    # While it could be more of an intellectual correctness point than a necessity, tt does matter,
+    # While it could be more of an intellectual correctness point than a necessity, It does matter,
     # however, for a single user to see the same behavior across process invocations if pantsd restarts.
     #
     # Note: This could probbaly use a non-cryptographic hash (e.g., Murmur), but that would require
