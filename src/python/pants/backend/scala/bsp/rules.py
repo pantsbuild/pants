@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import dataclasses
 import logging
 import textwrap
 from dataclasses import dataclass
@@ -50,7 +51,7 @@ from pants.bsp.util_rules.targets import (
 )
 from pants.core.util_rules.system_binaries import BashBinary, ReadlinkBinary
 from pants.engine.addresses import Addresses
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, FileEntry, MergeDigests, Workspace
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
@@ -114,7 +115,7 @@ class ThirdpartyModulesRequest:
 @dataclass(frozen=True)
 class ThirdpartyModules:
     resolve: CoursierResolveKey
-    entries: dict[CoursierLockfileEntry, ClasspathEntry]
+    entries: dict[CoursierLockfileEntry, tuple[ClasspathEntry, list[CoursierLockfileEntry]]]
     merged_digest: Digest
 
 
@@ -128,6 +129,11 @@ async def collect_thirdparty_modules(
     lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, resolve)
 
     applicable_lockfile_entries: dict[CoursierLockfileEntry, CoarsenedTarget] = {}
+    applicable_lockfile_source_entries: dict[CoursierLockfileEntry, CoursierLockfileEntry] = {}
+    applicable_lockfile_source_entries_inverse: dict[
+        CoursierLockfileEntry, list[CoursierLockfileEntry]
+    ] = {}
+
     for ct in coarsened_targets.coarsened_closure():
         for tgt in ct.members:
             if not JvmArtifactFieldSet.is_applicable(tgt):
@@ -142,6 +148,21 @@ async def collect_thirdparty_modules(
                 continue
             applicable_lockfile_entries[entry] = ct
 
+            artifact_requirement_source = dataclasses.replace(
+                artifact_requirement,
+                coordinate=dataclasses.replace(
+                    artifact_requirement.coordinate, classifier="sources"
+                ),
+            )
+            entrySource = get_entry_for_coord(lockfile, artifact_requirement_source.coordinate)
+            if not entrySource:
+                _logger.warning(
+                    f"No lockfile source entry for {artifact_requirement_source.coordinate} in resolve {resolve.name}."
+                )
+                continue
+            applicable_lockfile_source_entries[entrySource] = entry
+            applicable_lockfile_source_entries_inverse[entry] = [entrySource]
+
     classpath_entries = await MultiGet(
         Get(
             ClasspathEntry,
@@ -151,11 +172,35 @@ async def collect_thirdparty_modules(
         for target in applicable_lockfile_entries.values()
     )
 
-    resolve_digest = await Get(Digest, MergeDigests(cpe.digest for cpe in classpath_entries))
+    digests = []
+    for cpe in classpath_entries:
+        digests.append(cpe.digest)
+    for alse in applicable_lockfile_source_entries:
+        new_file = FileEntry(alse.file_name, alse.file_digest)
+        digest = await Get(Digest, CreateDigest([new_file]))
+        digests.append(digest)
+
+        for dep in alse.dependencies:
+            coord = Coordinate.from_coord_str(dep.to_coord_str())
+            dep_artifact_requirement = ArtifactRequirement(coord)
+            dep_entry = get_entry_for_coord(lockfile, dep_artifact_requirement.coordinate)
+            dep_new_file = FileEntry(dep_entry.file_name, dep_entry.file_digest)
+            dep_digest = await Get(Digest, CreateDigest([dep_new_file]))
+            digests.append(dep_digest)
+            src_ent = applicable_lockfile_source_entries.get(alse)
+            applicable_lockfile_source_entries_inverse.get(src_ent).append(dep_entry)
+
+    resolve_digest = await Get(Digest, MergeDigests(digests))
+    inverse = dict(zip(classpath_entries, applicable_lockfile_entries))
+
+    s = map(
+        lambda x: (x, applicable_lockfile_source_entries_inverse.get(inverse.get(x))),
+        classpath_entries,
+    )
 
     return ThirdpartyModules(
         resolve,
-        dict(zip(applicable_lockfile_entries, classpath_entries)),
+        dict(zip(applicable_lockfile_entries, s)),
         resolve_digest,
     )
 
@@ -341,7 +386,8 @@ async def handle_bsp_scalac_options_request(
 ) -> HandleScalacOptionsResult:
     targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
     thirdparty_modules = await Get(
-        ThirdpartyModules, ThirdpartyModulesRequest(Addresses(tgt.address for tgt in targets))
+        ThirdpartyModules,
+        ThirdpartyModulesRequest(Addresses(tgt.address for tgt in targets)),
     )
     resolve = thirdparty_modules.resolve
 
@@ -352,12 +398,16 @@ async def handle_bsp_scalac_options_request(
 
     local_plugins_prefix = f"jvm/resolves/{resolve.name}/plugins"
     local_plugins = await Get(
-        ScalaPlugins, ScalaPluginsRequest.from_target_plugins(scalac_plugin_targets, resolve)
+        ScalaPlugins,
+        ScalaPluginsRequest.from_target_plugins(scalac_plugin_targets, resolve),
     )
 
     thirdparty_modules_prefix = f"jvm/resolves/{resolve.name}/lib"
     thirdparty_modules_digest, local_plugins_digest = await MultiGet(
-        Get(Digest, AddPrefix(thirdparty_modules.merged_digest, thirdparty_modules_prefix)),
+        Get(
+            Digest,
+            AddPrefix(thirdparty_modules.merged_digest, thirdparty_modules_prefix),
+        ),
         Get(Digest, AddPrefix(local_plugins.classpath.digest, local_plugins_prefix)),
     )
 
@@ -370,7 +420,7 @@ async def handle_bsp_scalac_options_request(
         build_root.pathlib_path.joinpath(
             f".pants.d/bsp/{thirdparty_modules_prefix}/{filename}"
         ).as_uri()
-        for cp_entry in thirdparty_modules.entries.values()
+        for cp_entry, _ in thirdparty_modules.entries.values()
         for filename in cp_entry.filenames
     )
 
@@ -437,6 +487,12 @@ async def bsp_scala_test_classes_request(request: ScalaTestClassesParams) -> Sca
 
 
 # -----------------------------------------------------------------------------------------------
+# Dependency Sources
+# -----------------------------------------------------------------------------------------------
+
+# TODO
+
+# -----------------------------------------------------------------------------------------------
 # Dependency Modules
 # -----------------------------------------------------------------------------------------------
 
@@ -464,33 +520,53 @@ async def scala_bsp_dependency_modules(
         ThirdpartyModules,
         ThirdpartyModulesRequest(Addresses(fs.address for fs in request.field_sets)),
     )
+
     resolve = thirdparty_modules.resolve
 
     resolve_digest = await Get(
-        Digest, AddPrefix(thirdparty_modules.merged_digest, f"jvm/resolves/{resolve.name}/lib")
+        Digest,
+        AddPrefix(thirdparty_modules.merged_digest, f"jvm/resolves/{resolve.name}/lib"),
     )
 
-    modules = [
-        DependencyModule(
-            name=f"{entry.coord.group}:{entry.coord.artifact}",
-            version=entry.coord.version,
-            data=MavenDependencyModule(
-                organization=entry.coord.group,
-                name=entry.coord.artifact,
+    modules = []
+
+    for entry, (cp_entry, source_entry) in thirdparty_modules.entries.items():
+        a1 = [
+            MavenDependencyModuleArtifact(
+                uri=build_root.pathlib_path.joinpath(
+                    f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{filename}"
+                ).as_uri(),
+            )
+            for filename in cp_entry.filenames
+        ]
+
+        a2 = None
+        if source_entry is not None:
+            a2 = [
+                MavenDependencyModuleArtifact(
+                    uri=build_root.pathlib_path.joinpath(
+                        f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{se.file_name}"
+                    ).as_uri(),
+                    classifier="sources",
+                )
+                for se in source_entry
+            ]
+        else:
+            a2 = []
+
+        modules.append(
+            DependencyModule(
+                name=f"{entry.coord.group}:{entry.coord.artifact}",
                 version=entry.coord.version,
-                scope=None,
-                artifacts=tuple(
-                    MavenDependencyModuleArtifact(
-                        uri=build_root.pathlib_path.joinpath(
-                            f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{filename}"
-                        ).as_uri()
-                    )
-                    for filename in cp_entry.filenames
+                data=MavenDependencyModule(
+                    organization=entry.coord.group,
+                    name=entry.coord.artifact,
+                    version=entry.coord.version,
+                    scope=None,
+                    artifacts=tuple(a1 + a2),
                 ),
-            ),
+            )
         )
-        for entry, cp_entry in thirdparty_modules.entries.items()
-    ]
 
     return BSPDependencyModulesResult(
         modules=tuple(modules),

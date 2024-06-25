@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+import typing
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,6 +58,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.jvm.bsp.spec import MavenDependencyModule, MavenDependencyModuleArtifact
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -397,6 +399,7 @@ async def generate_one_bsp_build_target_request(
     # directory or else be configurable by the user. It is used as a hint in IntelliJ for where to place the
     # corresponding IntelliJ module.
     source_info = await Get(BSPBuildTargetSourcesInfo, BSPBuildTargetInternal, request.bsp_target)
+
     if source_info.source_roots:
         roots = [build_root.pathlib_path.joinpath(p) for p in source_info.source_roots]
     else:
@@ -479,7 +482,6 @@ async def materialize_bsp_build_target_sources(
 ) -> MaterializeBuildTargetSourcesResult:
     bsp_target = await Get(BSPBuildTargetInternal, BuildTargetIdentifier, request.bsp_target_id)
     source_info = await Get(BSPBuildTargetSourcesInfo, BSPBuildTargetInternal, bsp_target)
-
     if source_info.source_roots:
         roots = [build_root.pathlib_path.joinpath(p) for p in source_info.source_roots]
     else:
@@ -516,6 +518,18 @@ async def bsp_build_target_sources(request: SourcesParams) -> SourcesResult:
 # -----------------------------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class BSPDependencySourcesRequest:
+    """Hook to allow language backends to provide dependency sources."""
+
+    params: DependencySourcesParams
+
+
+@dataclass(frozen=True)
+class BSPDependencyModulesResult:
+    result: DependencySourcesResult
+
+
 class DependencySourcesHandlerMapping(BSPHandlerMapping):
     method_name = "buildTarget/dependencySources"
     request_type = DependencySourcesParams
@@ -524,9 +538,22 @@ class DependencySourcesHandlerMapping(BSPHandlerMapping):
 
 @rule
 async def bsp_dependency_sources(request: DependencySourcesParams) -> DependencySourcesResult:
-    # TODO: This is a stub.
+    dependency_modules = await Get(
+        DependencyModulesResult, DependencyModulesParams, DependencyModulesParams(request.targets)
+    )
+
+    sources = {}
+    for i in dependency_modules.items:
+        for m in i.modules:
+            mavenmod: MavenDependencyModule = m.data
+            for x in mavenmod.artifacts:
+                if x.classifier == "sources":
+                    sources[x.uri] = x
+
+    files = sources.keys()
+
     return DependencySourcesResult(
-        tuple(DependencySourcesItem(target=tgt, sources=()) for tgt in request.targets)
+        tuple(DependencySourcesItem(target=tgt, sources=tuple(files)) for tgt in request.targets)
     )
 
 
