@@ -472,7 +472,7 @@ class SourceAnalysisTraverser extends Traverser {
     }
 
     case Pat.Typed((_name, decltpe)) =>
-      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+      extractNamesFromTypeTree(decltpe).iterator.foreach(recordConsumedSymbol(_))
 
     case node => super.apply(node)
   }
