@@ -14,8 +14,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyIterator, PyString, PyTuple, PyType};
 
 use fs::{
-    DirectoryDigest, FilespecMatcher, GlobExpansionConjunction, PathGlobs, StrictGlobMatching,
-    EMPTY_DIRECTORY_DIGEST,
+    DirectoryDigest, FilespecMatcher, GlobExpansionConjunction, PathGlobs, PathMetadata,
+    StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
 };
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use store::Snapshot;
@@ -495,6 +495,16 @@ impl From<fs::PathMetadataKind> for PyPathMetadataKind {
     }
 }
 
+impl From<PyPathMetadataKind> for fs::PathMetadataKind {
+    fn from(value: PyPathMetadataKind) -> Self {
+        match value {
+            PyPathMetadataKind::File => fs::PathMetadataKind::File,
+            PyPathMetadataKind::Directory => fs::PathMetadataKind::Directory,
+            PyPathMetadataKind::Symlink => fs::PathMetadataKind::Symlink,
+        }
+    }
+}
+
 /// Expanded version of `Stat` when access to additional filesystem attributes is necessary.
 #[pyclass(name = "PathMetadata")]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -502,6 +512,32 @@ pub struct PyPathMetadata(pub fs::PathMetadata);
 
 #[pymethods]
 impl PyPathMetadata {
+    #[new]
+    pub fn new(
+        path: PathBuf,
+        kind: PyPathMetadataKind,
+        length: u64,
+        is_executable: bool,
+        unix_mode: Option<u32>,
+        accessed: Option<SystemTime>,
+        created: Option<SystemTime>,
+        modified: Option<SystemTime>,
+        symlink_target: Option<PathBuf>,
+    ) -> Self {
+        let this = PathMetadata {
+            path,
+            kind: kind.into(),
+            length,
+            is_executable,
+            unix_mode,
+            accessed,
+            created,
+            modified,
+            symlink_target,
+        };
+        PyPathMetadata(this)
+    }
+
     #[getter]
     pub fn path(&self) -> PyResult<PathBuf> {
         Ok(self.0.path.clone())
@@ -509,7 +545,7 @@ impl PyPathMetadata {
 
     #[getter]
     pub fn kind(&self) -> PyResult<PyPathMetadataKind> {
-        Ok(PyPathMetadataKind::from(self.0.kind))
+        Ok(self.0.kind.into())
     }
 
     #[getter]
@@ -545,6 +581,10 @@ impl PyPathMetadata {
     #[getter]
     pub fn symlink_target(&self) -> PyResult<Option<PathBuf>> {
         Ok(self.0.symlink_target.clone())
+    }
+
+    pub fn copy(&self) -> PyResult<Self> {
+        Ok(self.clone())
     }
 
     fn __repr__(&self) -> String {

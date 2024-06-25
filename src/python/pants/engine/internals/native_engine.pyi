@@ -501,6 +501,18 @@ class PathMetadataKind:
     SYMLINK: PathMetadataKind = ...
 
 class PathMetadata:
+    def __new__(
+        cls,
+        path: str,
+        kind: PathMetadataKind,
+        length: int,
+        is_executable: bool,
+        unix_mode: int | None,
+        accessed: datetime | None,
+        created: datetime | None,
+        modified: datetime | None,
+        symlink_target: str | None,
+    ) -> PathMetadata: ...
     @property
     def path(self) -> str: ...
     @property
@@ -519,6 +531,7 @@ class PathMetadata:
     def modified(self) -> datetime | None: ...
     @property
     def symlink_target(self) -> str | None: ...
+    def copy(self) -> PathMetadata: ...
 
 # ------------------------------------------------------------------------------
 # Intrinsics
