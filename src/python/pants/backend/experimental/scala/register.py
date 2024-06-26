@@ -1,6 +1,5 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pants.backend.scala.bsp.rules import rules as bsp_rules
 from pants.backend.scala.compile import scalac
 from pants.backend.scala.dependency_inference import rules as dep_inf_rules
 from pants.backend.scala.goals import check, repl, tailor
@@ -50,7 +49,6 @@ def rules():
         *dep_inf_rules.rules(),
         *target_types_rules(),
         *scala_lockfile_rules(),
-        *bsp_rules(),
         *jvm_common.rules(),
         *wrap_scala.rules,
     ]
