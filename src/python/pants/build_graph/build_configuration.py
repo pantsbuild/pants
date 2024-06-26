@@ -270,7 +270,7 @@ class BuildConfiguration:
             self._remote_auth_plugin = remote_auth_plugin
 
         def register_daemon_goals(self, plugin_or_backend: str, daemon_goals: Iterable[type]):
-            """Registers the given builtin goals."""
+            """Registers the given daemon goals."""
             if not isinstance(daemon_goals, Iterable):
                 raise TypeError(
                     f"The entrypoint `daemon_goals` must return an iterable. "

@@ -12,16 +12,13 @@ from typing import Mapping
 
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
-from pants.base.specs import Specs
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection
 from pants.bsp.util_rules.lifecycle import BSP_VERSION, BSPLanguageSupport
-from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
-from pants.goal.builtin_goal import BuiltinGoal
-from pants.goal.daemon_goal import DaemonGoalContext
+from pants.goal.daemon_goal import DaemonGoal, DaemonGoalContext
 from pants.init.engine_initializer import GraphSession
 from pants.option.option_types import BoolOption, FileListOption, StrListOption
 from pants.option.option_value_container import OptionValueContainer

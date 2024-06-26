@@ -13,6 +13,7 @@ from pants.engine.goal import GoalSubsystem
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import GraphSession
 from pants.option.options import Options
+from pants.option.scope import ScopeInfo
 
 
 @dataclass
@@ -23,20 +24,24 @@ class DaemonGoalContext:
     options: Options
     specs: Specs
     union_membership: UnionMembership
-    
+
 
 class DaemonGoal(ABC, GoalSubsystem):
-    """Configure a "daemon" goal which allows rules to "take over" Pants client execution.
+    """Configure a "daemon" goal which allows rules to "take over" Pants client execution in lieu
+    of executing an ordnary goal.
 
     Only a single daemon goal is executed per run, any remaining goals/arguments are passed
-    unaltered to the builtin goal. Daemon goals have precedence over regular goals.
+    unaltered to the daemon goal. Daemon goals have precedence over regular goals.
 
-    When multiple daemon goals are presented, the first builtin goal will be used unless there is a
+    When multiple daemon goals are presented, the first daemon goal will be used unless there is a
     daemon goal that begin with a hyphen (`-`), in which case the last such "option goal" will be
     prioritized. This is to support things like `./pants some-builtin-goal --help`.
+
+    The intended use for this API is rule code which runs a server (for example, a BSP server)
+    which provides an alternate interface to the Pants rule engine.
     """
 
-    # Used by `pants.option.arg_splitter.ArgSplitter()` to optionally allow aliasing builtin goals.
+    # Used by `pants.option.arg_splitter.ArgSplitter()` to optionally allow aliasing daemon goals.
     aliases: ClassVar[tuple[str, ...]] = ()
 
     @classmethod
