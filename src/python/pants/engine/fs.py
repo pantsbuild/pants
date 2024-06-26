@@ -20,6 +20,7 @@ from pants.engine.internals.native_engine import AddPrefix as AddPrefix
 from pants.engine.internals.native_engine import Digest as Digest
 from pants.engine.internals.native_engine import FileDigest as FileDigest
 from pants.engine.internals.native_engine import MergeDigests as MergeDigests
+from pants.engine.internals.native_engine import PathMetadata
 from pants.engine.internals.native_engine import RemovePrefix as RemovePrefix
 from pants.engine.internals.native_engine import Snapshot as Snapshot
 from pants.engine.rules import QueryRule
@@ -328,6 +329,27 @@ class SnapshotDiff:
     @classmethod
     def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> SnapshotDiff:
         return cls(*ours._diff(theirs))
+
+
+@dataclass(frozen=True)
+class PathMetadataRequest:
+    """Request the full metadata of a single path in the filesystem.
+
+    Note: This API is symlink-aware and will distinguish between symlinks and regular files.
+    """
+
+    path: str
+
+
+@dataclass(frozen=True)
+class PathMetadataResult:
+    """Result of requesting the metadata for a path in the filesystem.
+
+    The `metadata` field will contain the metadata for the requested path, or else `None` if the
+    path does not exist.
+    """
+
+    metadata: PathMetadata | None
 
 
 def rules():
