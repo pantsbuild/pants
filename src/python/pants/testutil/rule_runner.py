@@ -310,17 +310,21 @@ class RuleRunner:
         self.build_config = build_config_builder.create()
 
         self.environment = CompleteEnvironmentVars({})
-        self.options_bootstrapper = self.create_options_bootstrapper(args=bootstrap_args, env=None)
         self.extra_session_values = extra_session_values or {}
         self.inherent_environment = inherent_environment
         self.max_workunit_verbosity = max_workunit_verbosity
-        options = self.options_bootstrapper.full_options(
-            self.build_config,
-            union_membership=UnionMembership.from_rules(
-                rule for rule in self.rules if isinstance(rule, UnionRule)
-            ),
-        )
-        global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
+
+        # Change cwd and add sentinel file (BUILDROOT) so NativeOptionParser can find build_root.
+        with pushd(self.build_root):
+            Path("BUILDROOT").touch()
+            self.options_bootstrapper = self.create_options_bootstrapper(args=bootstrap_args, env=None)
+            options = self.options_bootstrapper.full_options(
+                self.build_config,
+                union_membership=UnionMembership.from_rules(
+                    rule for rule in self.rules if isinstance(rule, UnionRule)
+                ),
+            )
+            global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
         dynamic_remote_options, _ = DynamicRemoteOptions.from_options(options, self.environment)
         local_store_options = LocalStoreOptions.from_options(global_options)
