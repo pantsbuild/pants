@@ -316,7 +316,7 @@ class NfpmContentFile(Target):
         or from any of the targets listed in the '{NfpmDependencies.alias}' field.
         The file may be a workspace file, a generated file, or even a package.
 
-        The '{NfpmContentSrcField}' field determines where the file is in the sandbox.
+        The '{NfpmContentSrcField}' field tells nFPM where the file is in the sandbox.
         The '{NfpmContentDstField}' field tells nFPM where the file should be installed
         by the nFPM-generated package.
         """
