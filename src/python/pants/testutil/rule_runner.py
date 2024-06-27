@@ -404,7 +404,8 @@ class RuleRunner:
             if self.inherent_environment
             else Params(*inputs)
         )
-        result = assert_single_element(self.scheduler.product_request(output_type, [params]))
+        with pushd(self.build_root):
+            result = assert_single_element(self.scheduler.product_request(output_type, [params]))
         return cast(_O, result)
 
     def run_goal_rule(
@@ -471,7 +472,8 @@ class RuleRunner:
             **{k: os.environ[k] for k in (env_inherit or set()) if k in os.environ},
             **(env or {}),
         }
-        self.options_bootstrapper = self.create_options_bootstrapper(args=args, env=env)
+        with pushd(self.build_root):
+            self.options_bootstrapper = self.create_options_bootstrapper(args=args, env=env)
         self.environment = CompleteEnvironmentVars(env)
         self._set_new_session(self.scheduler.scheduler)
 
