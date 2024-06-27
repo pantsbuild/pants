@@ -222,6 +222,8 @@ async def find_node_js_projects(
     nodejs: NodeJS,
     resolve_names: UserChosenNodeJSResolveAliases,
 ) -> AllNodeJSProjects:
+    # Note: If pnpm_workspace.yaml is present for an npm-managed project, it will override the package.json["workspaces"] setting, which is not intuitive
+    # Probably pnpm_workspace.yaml should only be used for pnpm projects.
     project_paths = (
         ProjectPaths(pkg.root_dir, ["", *pkg.workspaces])
         if pkg not in pnpm_workspaces

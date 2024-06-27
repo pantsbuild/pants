@@ -137,7 +137,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     )
 
     package_managers = DictOption[str](
-        default={"npm": "8.5.5"},
+        default={"npm": "8.5.5", "pnpm": "8.15.5"},
         help=help_text(
             """
             A mapping of package manager versions to semver releases.
@@ -563,6 +563,7 @@ async def prepare_corepack_tool(
             level=LogLevel.DEBUG,
             env=environment.to_env_dict(),
             append_only_caches={**environment.append_only_caches},
+            # Note this is a static value - '_.corepack_home'
             output_directories=[environment.corepack_home],
         ),
     )
