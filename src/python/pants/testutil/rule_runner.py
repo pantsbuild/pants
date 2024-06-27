@@ -31,6 +31,7 @@ from typing import (
     overload,
 )
 
+from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -420,10 +421,11 @@ class RuleRunner:
         merged_args = (*(global_args or []), goal.name, *(args or []))
         self.set_options(merged_args, env=env, env_inherit=env_inherit)
 
-        raw_specs = self.options_bootstrapper.full_options_for_scopes(
-            [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()],
-            self.union_membership,
-        ).specs
+        with pushd(self.build_root):
+            raw_specs = self.options_bootstrapper.full_options_for_scopes(
+                [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()],
+                self.union_membership,
+            ).specs
         specs = SpecsParser(root_dir=self.build_root).parse_specs(
             raw_specs, description_of_origin="RuleRunner.run_goal_rule()"
         )
@@ -431,15 +433,16 @@ class RuleRunner:
         stdout, stderr = StringIO(), StringIO()
         console = Console(stdout=stdout, stderr=stderr, use_colors=False, session=self.scheduler)
 
-        exit_code = self.scheduler.run_goal_rule(
-            goal,
-            Params(
-                specs,
-                console,
-                Workspace(self.scheduler),
-                *([self.inherent_environment] if self.inherent_environment else []),
-            ),
-        )
+        with pushd(self.build_root):
+            exit_code = self.scheduler.run_goal_rule(
+                goal,
+                Params(
+                    specs,
+                    console,
+                    Workspace(self.scheduler),
+                    *([self.inherent_environment] if self.inherent_environment else []),
+                ),
+            )
 
         console.flush()
         return GoalRuleResult(exit_code, stdout.getvalue(), stderr.getvalue())
@@ -786,14 +789,15 @@ def mock_console(
     *,
     stdin_content: bytes | str | None = None,
 ) -> Iterator[tuple[Console, StdioReader]]:
-    global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-    colors = (
-        options_bootstrapper.full_options_for_scopes(
-            [GlobalOptions.get_scope_info()], UnionMembership({}), allow_unknown_options=True
+    with pushd(get_buildroot()):
+        global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        colors = (
+            options_bootstrapper.full_options_for_scopes(
+                [GlobalOptions.get_scope_info()], UnionMembership({}), allow_unknown_options=True
+            )
+            .for_global_scope()
+            .colors
         )
-        .for_global_scope()
-        .colors
-    )
 
     with initialize_stdio(global_bootstrap_options), stdin_context(
         stdin_content
