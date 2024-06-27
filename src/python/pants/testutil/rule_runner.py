@@ -317,7 +317,9 @@ class RuleRunner:
         # Change cwd and add sentinel file (BUILDROOT) so NativeOptionParser can find build_root.
         with pushd(self.build_root):
             Path("BUILDROOT").touch()
-            self.options_bootstrapper = self.create_options_bootstrapper(args=bootstrap_args, env=None)
+            self.options_bootstrapper = self.create_options_bootstrapper(
+                args=bootstrap_args, env=None
+            )
             options = self.options_bootstrapper.full_options(
                 self.build_config,
                 union_membership=UnionMembership.from_rules(

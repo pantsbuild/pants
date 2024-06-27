@@ -10,7 +10,7 @@ python_tests(
         "build_root_test.py": dict(
             dependencies=["//BUILD_ROOT:files"],
         )
-    }
+    },
 )
 
 python_tests(
