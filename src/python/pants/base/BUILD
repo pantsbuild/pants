@@ -7,9 +7,7 @@ python_tests(
     name="tests",
     sources=["*_test.py", "!exception_sink_test.py", "!*_integration_test.py"],
     overrides={
-        "build_root_test.py": dict(
-            dependencies=["//BUILD_ROOT:files"],
-        )
+        "build_root_test.py": {"dependencies": ["//BUILD_ROOT:files"]},
     },
 )
 
