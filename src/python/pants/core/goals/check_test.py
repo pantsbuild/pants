@@ -31,7 +31,7 @@ from pants.engine.process import (
 )
 from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
 from pants.engine.unions import UnionMembership
-from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
