@@ -14,8 +14,8 @@ from pants.util.contextutil import temporary_dir
 
 
 @contextmanager
-def physical_workdir_base() -> Iterator[OptionValueContainer]:
-    with temporary_dir(cleanup=False) as physical_workdir_base:
+def physical_workdir_base(rule_runner: RuleRunner) -> Iterator[OptionValueContainer]:
+    with temporary_dir(cleanup=False) as physical_workdir_base, rule_runner.pushd():
         bootstrap_options = create_options_bootstrapper(
             [f"--pants-physical-workdir-base={physical_workdir_base}"]
         ).bootstrap_options.for_global_scope()
@@ -42,7 +42,7 @@ def physical_workdir(pants_workdir: str, bootstrap_options: OptionValueContainer
 
 def test_init_workdir() -> None:
     rule_runner = RuleRunner()
-    with physical_workdir_base() as bootstrap_options:
+    with physical_workdir_base(rule_runner) as bootstrap_options:
         # Assert pants_workdir exists
         assert_exists(rule_runner.pants_workdir)
 

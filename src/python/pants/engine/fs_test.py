@@ -112,6 +112,8 @@ def setup_fs_test_tar(rule_runner: RuleRunner) -> None:
             └── 2
         c.ln -> a/b
         d.ln -> a
+
+    NB: The RuleRunner injects a BUILDROOT file in the build_root.
     """
     data = pkgutil.get_data("pants.engine.internals", "fs_test_data/fs_test.tar")
     assert data is not None
@@ -123,6 +125,7 @@ def setup_fs_test_tar(rule_runner: RuleRunner) -> None:
 
 
 FS_TAR_ALL_FILES = (
+    "BUILDROOT",  # injected by RuleRunner, not present in tar
     "4.txt",
     "a/3.txt",
     "a/4.txt.ln",
@@ -221,7 +224,7 @@ def test_path_globs_glob_pattern(rule_runner: RuleRunner) -> None:
     )
     assert_path_globs(rule_runner, ["*/0.txt"], expected_files=[], expected_dirs=[])
     assert_path_globs(
-        rule_runner, ["*"], expected_files=["4.txt"], expected_dirs=["a", "c.ln", "d.ln"]
+        rule_runner, ["*"], expected_files=["BUILDROOT", "4.txt"], expected_dirs=["a", "c.ln", "d.ln"]
     )
     assert_path_globs(
         rule_runner,
@@ -302,7 +305,7 @@ def test_path_globs_ignore_pattern(rule_runner: RuleRunner) -> None:
     assert_path_globs(
         rule_runner,
         ["**", "!*.ln"],
-        expected_files=["4.txt", "a/3.txt", "a/b/1.txt", "a/b/2"],
+        expected_files=["BUILDROOT", "4.txt", "a/3.txt", "a/b/1.txt", "a/b/2"],
         expected_dirs=["a", "a/b"],
     )
 
@@ -318,7 +321,7 @@ def test_path_globs_ignore_sock(rule_runner: RuleRunner) -> None:
     assert_path_globs(
         rule_runner,
         ["**"],
-        expected_files=["non-sock.txt"],
+        expected_files=["BUILDROOT", "non-sock.txt"],
         expected_dirs=[],
     )
 
