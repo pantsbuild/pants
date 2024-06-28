@@ -800,7 +800,14 @@ def test_resolve_specs_paths(rule_runner: RuleRunner) -> None:
 
     assert_paths(
         ["::"],
-        {*all_expected_demo_files, "BUILDROOT", "demo/BUILD", "f.txt", "unowned/f.txt", "unowned/subdir/f.txt"},
+        {
+            *all_expected_demo_files,
+            "BUILDROOT",
+            "demo/BUILD",
+            "f.txt",
+            "unowned/f.txt",
+            "unowned/subdir/f.txt",
+        },
         {"demo", "unowned", "unowned/subdir"},
     )
     assert_paths(

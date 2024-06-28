@@ -224,7 +224,10 @@ def test_path_globs_glob_pattern(rule_runner: RuleRunner) -> None:
     )
     assert_path_globs(rule_runner, ["*/0.txt"], expected_files=[], expected_dirs=[])
     assert_path_globs(
-        rule_runner, ["*"], expected_files=["BUILDROOT", "4.txt"], expected_dirs=["a", "c.ln", "d.ln"]
+        rule_runner,
+        ["*"],
+        expected_files=["BUILDROOT", "4.txt"],
+        expected_dirs=["a", "c.ln", "d.ln"],
     )
     assert_path_globs(
         rule_runner,
