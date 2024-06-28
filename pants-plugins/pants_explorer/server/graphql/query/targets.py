@@ -18,8 +18,6 @@ from pants.engine.target import AllUnexpandedTargets, UnexpandedTargets
 from pants.help.help_info_extracter import TargetTypeHelpInfo
 from pants.util.strutil import softwrap
 
-specs_parser = SpecsParser()
-
 
 @strawberry.type(description="Describes a target field type.")
 class TargetTypeField:
@@ -165,7 +163,7 @@ class QueryTargetsMixin:
     async def targets(self, info: Info, query: Optional[TargetsQuery] = None) -> List[Target]:
         req = GraphQLContext.request_state_from_info(info).product_request
         specs = (
-            specs_parser.parse_specs(
+            SpecsParser().parse_specs(
                 query.specs, description_of_origin="GraphQL targets `query.specs`"
             )
             if query is not None and query.specs
