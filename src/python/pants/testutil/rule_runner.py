@@ -316,7 +316,7 @@ class RuleRunner:
         self.max_workunit_verbosity = max_workunit_verbosity
 
         # Change cwd and add sentinel file (BUILDROOT) so NativeOptionParser can find build_root.
-        with pushd(self.build_root):
+        with self.pushd():
             Path("BUILDROOT").touch()
             self.options_bootstrapper = self.create_options_bootstrapper(
                 args=bootstrap_args, env=None
@@ -405,7 +405,7 @@ class RuleRunner:
             if self.inherent_environment
             else Params(*inputs)
         )
-        with pushd(self.build_root):
+        with self.pushd():
             result = assert_single_element(self.scheduler.product_request(output_type, [params]))
         return cast(_O, result)
 
@@ -421,7 +421,7 @@ class RuleRunner:
         merged_args = (*(global_args or []), goal.name, *(args or []))
         self.set_options(merged_args, env=env, env_inherit=env_inherit)
 
-        with pushd(self.build_root):
+        with self.pushd():
             raw_specs = self.options_bootstrapper.full_options_for_scopes(
                 [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()],
                 self.union_membership,
@@ -433,7 +433,7 @@ class RuleRunner:
         stdout, stderr = StringIO(), StringIO()
         console = Console(stdout=stdout, stderr=stderr, use_colors=False, session=self.scheduler)
 
-        with pushd(self.build_root):
+        with self.pushd():
             exit_code = self.scheduler.run_goal_rule(
                 goal,
                 Params(
@@ -446,6 +446,11 @@ class RuleRunner:
 
         console.flush()
         return GoalRuleResult(exit_code, stdout.getvalue(), stderr.getvalue())
+
+    @contextmanager
+    def pushd(self):
+        with pushd(self.build_root):
+            yield
 
     def create_options_bootstrapper(
         self, args: Iterable[str], env: Mapping[str, str] | None
@@ -475,7 +480,7 @@ class RuleRunner:
             **{k: os.environ[k] for k in (env_inherit or set()) if k in os.environ},
             **(env or {}),
         }
-        with pushd(self.build_root):
+        with self.pushd():
             self.options_bootstrapper = self.create_options_bootstrapper(args=args, env=env)
         self.environment = CompleteEnvironmentVars(env)
         self._set_new_session(self.scheduler.scheduler)
@@ -616,7 +621,7 @@ class RuleRunner:
         )
 
     def run_interactive_process(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        with pushd(self.build_root):
+        with self.pushd():
             return native_engine.session_run_interactive_process(
                 self.scheduler.py_session,
                 request,
