@@ -49,7 +49,9 @@ def all_help_info(rule_runner: RuleRunner) -> AllHelpInfo:
             ),
             union_membership=rule_runner.union_membership,
             consumed_scopes_mapper=fake_consumed_scopes_mapper,
-            registered_target_types=RegisteredTargetTypes.create(rule_runner.build_config.target_types),
+            registered_target_types=RegisteredTargetTypes.create(
+                rule_runner.build_config.target_types
+            ),
             build_symbols=BuildFileSymbolsInfo.from_info(),
             build_configuration=rule_runner.build_config,
         )

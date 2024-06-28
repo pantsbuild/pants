@@ -41,7 +41,10 @@ async def test_targets_query(
     )
     with rule_runner.pushd():
         actual_result = await schema.execute(
-            queries, variable_values=variables, context_value=context, operation_name="TestTargetsQuery"
+            queries,
+            variable_values=variables,
+            context_value=context,
+            operation_name="TestTargetsQuery",
         )
     assert actual_result.errors is None
     assert actual_result.data == expected_data
