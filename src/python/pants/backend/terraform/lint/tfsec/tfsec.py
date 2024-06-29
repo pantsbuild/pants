@@ -22,12 +22,16 @@ class TFSec(ExternalTool):
     options_scope = "terraform-tfsec"
     name = "tfsec"
     help = "tfsec by Aqua Security"
-    default_version = "v1.28.1"
+    default_version = "1.28.6"
     default_known_versions = [
-        "v1.28.1|linux_x86_64|57b902b31da3eed12448a4e82a8aca30477e4bcd1bf99e3f65310eae0889f88d|26427634",
-        "v1.28.1|linux_arm64 |20daad803d2a7a781f2ef0ee72ba4ed4ae17dcb41a43a330ae7b98347762bec9|24299157",
-        "v1.28.1|macos_x86_64|6d9f5a747b1fcc1b6c314d30f4ff4d753371e5690309a99a5dd653d719d20d2d|27293876",
-        "v1.28.1|macos_arm64 |6d664dcdd37e2809d1b4f14b310ccda0973b4a29e4624e902286e4964d101e22|26478632",
+        "1.28.6|linux_x86_64|8cbd8d64cbd1f25b38f33fa04db602466dade79e99c99dc9da053b5962d34014|30175259",
+        "1.28.6|linux_arm64|4bc7b0f0592be4fa384cff52af5b1cdd2066ba7a06001bea98690340851c0bce|27577217",
+        "1.28.6|macos_x86_64|3b31e954819faa7d6151b999548cefb782f2f4dc64b355c8747e44d4b0b2faca|31168281",
+        "1.28.6|macos_arm64|aa132b7e0e69e16f1c9320257841751e52c42d9791b7f900de72cf0b06ffe74c|30083056",
+        "1.28.1|linux_x86_64|57b902b31da3eed12448a4e82a8aca30477e4bcd1bf99e3f65310eae0889f88d|26427634",
+        "1.28.1|linux_arm64 |20daad803d2a7a781f2ef0ee72ba4ed4ae17dcb41a43a330ae7b98347762bec9|24299157",
+        "1.28.1|macos_x86_64|6d9f5a747b1fcc1b6c314d30f4ff4d753371e5690309a99a5dd653d719d20d2d|27293876",
+        "1.28.1|macos_arm64 |6d664dcdd37e2809d1b4f14b310ccda0973b4a29e4624e902286e4964d101e22|26478632",
     ]
 
     skip = SkipOption("lint")
@@ -61,7 +65,7 @@ class TFSec(ExternalTool):
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
             discovery=self.config_discovery,
-            check_existence=[".tfsec/config.json", ".tfsec/config.yml"],
+            check_existence=[".tfsec/*.json", ".tfsec/*.yml", ".tfsec/*.yaml"],
         )
 
     def generate_url(self, plat: Platform) -> str:
@@ -71,7 +75,7 @@ class TFSec(ExternalTool):
             "linux_arm64": "linux_arm64",
             "linux_x86_64": "linux_amd64",
         }[plat.value]
-        return f"https://github.com/aquasecurity/tfsec/releases/download/{self.version}/tfsec_{self.version[1:]}_{plat_str}.tar.gz"
+        return f"https://github.com/aquasecurity/tfsec/releases/download/v{self.version}/tfsec_{self.version}_{plat_str}.tar.gz"
 
     def generate_exe(self, _: Platform) -> str:
         return "./tfsec"
