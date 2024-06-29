@@ -82,7 +82,7 @@ class NfpmPlatformField(StringField):
     # no valid_choices to support pass-through values.
     default = "linux"  # based on nFPM default
     help = help_text(
-        f"""
+        """
         The package platform or OS.
 
         You probably do not need to change the package's OS. nFPM is designed
