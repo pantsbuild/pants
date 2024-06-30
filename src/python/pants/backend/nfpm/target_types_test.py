@@ -44,3 +44,7 @@ def test_nfpm_content_file_validate() -> None:
 
     with pytest.raises(InvalidTargetException):
         create_tgt(source=None, src="some.file", dependencies=[])
+    with pytest.raises(InvalidTargetException):
+        create_tgt(source=None, src=None, dependencies=["foo"])
+    with pytest.raises(InvalidTargetException):
+        create_tgt(source=None, src=None, dependencies=[])
