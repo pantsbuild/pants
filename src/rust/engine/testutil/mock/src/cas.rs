@@ -1,14 +1,15 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::HashMap;
+use std::convert::Infallible;
 use std::net::SocketAddr;
+use std::net::TcpListener as StdTcpListener;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
 use futures::FutureExt;
-use grpc_util::hyper_util::AddrIncomingWithStream;
 use hashing::Fingerprint;
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -17,6 +18,8 @@ use remexec::action_cache_server::ActionCacheServer;
 use remexec::capabilities_server::CapabilitiesServer;
 use remexec::content_addressable_storage_server::ContentAddressableStorageServer;
 use testutil::data::{TestData, TestDirectory, TestTree};
+use tokio::net::{TcpListener as TokioTcpListener, TcpStream};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::transport::Server;
 
 use crate::action_cache_service::{ActionCacheHandle, ActionCacheResponder};
@@ -199,16 +202,25 @@ impl StubCASBuilder {
             write_delay: self.ac_write_delay,
         };
 
-        let addr = format!("127.0.0.1:{}", self.port.unwrap_or(0))
-            .parse()
-            .expect("failed to parse IP address");
-        let incoming = hyper::server::conn::AddrIncoming::bind(&addr).expect("failed to bind port");
-        let local_addr = incoming.local_addr();
-        let incoming = AddrIncomingWithStream(incoming);
+        let listener = StdTcpListener::bind("127.0.0.1:0").unwrap();
+        let local_addr = listener.local_addr().unwrap();
+        let listener = TokioTcpListener::from_std(listener).unwrap();
 
         let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel();
 
+        // Setup incoming connection stream.
+        let (incoming_sender, incoming_receiver) =
+            tokio::sync::mpsc::unbounded_channel::<Result<TcpStream, Infallible>>();
+
         tokio::spawn(async move {
+            loop {
+                let (socket, _remote_addr) = listener.accept().await.unwrap();
+                incoming_sender.send(Ok::<_, Infallible>(socket)).unwrap();
+            }
+        });
+
+        tokio::spawn(async move {
+            let incoming_stream = UnboundedReceiverStream::new(incoming_receiver);
             let mut server = Server::builder();
             let router = server
                 .add_service(ActionCacheServer::new(ac_responder.clone()))
@@ -217,7 +229,7 @@ impl StubCASBuilder {
                 .add_service(CapabilitiesServer::new(cas_responder));
 
             router
-                .serve_with_incoming_shutdown(incoming, shutdown_receiver.map(drop))
+                .serve_with_incoming_shutdown(incoming_stream, shutdown_receiver.map(drop))
                 .await
                 .unwrap();
         });

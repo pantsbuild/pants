@@ -29,7 +29,6 @@ use crate::metrics::{NetworkMetrics, NetworkMetricsLayer};
 
 pub mod channel;
 pub mod headers;
-pub mod hyper_util;
 pub mod metrics;
 pub mod prost;
 pub mod retry;
@@ -154,14 +153,17 @@ mod tests {
     }
 
     use std::collections::BTreeMap;
+    use std::convert::Infallible;
+    use std::net::TcpListener as StdTcpListener;
 
     use async_trait::async_trait;
     use futures::FutureExt;
+    use tokio::net::{TcpListener as TokioTcpListener, TcpStream};
     use tokio::sync::oneshot;
+    use tokio_stream::wrappers::UnboundedReceiverStream;
     use tonic::transport::Server;
     use tonic::{Request, Response, Status};
 
-    use crate::hyper_util::AddrIncomingWithStream;
     use crate::{headers_to_http_header_map, layered_service};
 
     #[tokio::test]
@@ -197,19 +199,30 @@ mod tests {
             }
         }
 
-        let addr = "127.0.0.1:0".parse().expect("failed to parse IP address");
-        let incoming = hyper::server::conn::AddrIncoming::bind(&addr).expect("failed to bind port");
-        let local_addr = incoming.local_addr();
-        let incoming = AddrIncomingWithStream(incoming);
+        let listener = StdTcpListener::bind("127.0.0.1:0").unwrap();
+        let local_addr = listener.local_addr().unwrap();
+        let listener = TokioTcpListener::from_std(listener).unwrap();
 
         // Setup shutdown signal handler.
         let (_shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
 
+        // Setup incoming connection stream.
+        let (incoming_sender, incoming_receiver) =
+            tokio::sync::mpsc::unbounded_channel::<Result<TcpStream, Infallible>>();
+
         tokio::spawn(async move {
+            loop {
+                let (socket, _remote_addr) = listener.accept().await.unwrap();
+                incoming_sender.send(Ok::<_, Infallible>(socket)).unwrap();
+            }
+        });
+
+        tokio::spawn(async move {
+            let incoming_stream = UnboundedReceiverStream::new(incoming_receiver);
             let mut server = Server::builder();
             let router = server.add_service(gen::test_server::TestServer::new(UserAgentResponder));
             router
-                .serve_with_incoming_shutdown(incoming, shutdown_receiver.map(drop))
+                .serve_with_incoming_shutdown(incoming_stream, shutdown_receiver.map(drop))
                 .await
                 .unwrap();
         });

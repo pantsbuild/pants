@@ -2,9 +2,11 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::any::type_name;
 use std::collections::VecDeque;
+use std::convert::Infallible;
 use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
+use std::net::TcpListener as StdTcpListener;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -12,7 +14,6 @@ use std::time::Duration;
 use std::time::Instant;
 
 use futures::{FutureExt, Stream};
-use grpc_util::hyper_util::AddrIncomingWithStream;
 use hashing::Digest;
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -30,6 +31,8 @@ use remexec::{
     CacheCapabilities, ExecuteRequest, ExecutionCapabilities, GetActionResultRequest,
     GetCapabilitiesRequest, ServerCapabilities, UpdateActionResultRequest, WaitExecutionRequest,
 };
+use tokio::net::{TcpListener as TokioTcpListener, TcpStream};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::metadata::MetadataMap;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
@@ -126,16 +129,26 @@ impl TestServer {
         let mock_responder = MockResponder::new(mock_execution);
         let mock_responder2 = mock_responder.clone();
 
-        let addr = format!("127.0.0.1:{}", port.unwrap_or(0))
-            .parse()
-            .expect("failed to parse IP address");
-        let incoming = hyper::server::conn::AddrIncoming::bind(&addr).expect("failed to bind port");
-        let local_addr = incoming.local_addr();
-        let incoming = AddrIncomingWithStream(incoming);
+        let addr_str = format!("127.0.0.1:{}", port.unwrap_or(0));
+        let listener = StdTcpListener::bind(&addr_str).unwrap();
+        let local_addr = listener.local_addr().unwrap();
+        let listener = TokioTcpListener::from_std(listener).unwrap();
 
         let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();
 
+        // Setup incoming connection stream.
+        let (incoming_sender, incoming_receiver) =
+            tokio::sync::mpsc::unbounded_channel::<Result<TcpStream, Infallible>>();
+
         tokio::spawn(async move {
+            loop {
+                let (socket, _remote_addr) = listener.accept().await.unwrap();
+                incoming_sender.send(Ok::<_, Infallible>(socket)).unwrap();
+            }
+        });
+
+        tokio::spawn(async move {
+            let incoming_stream = UnboundedReceiverStream::new(incoming_receiver);
             let mut server = Server::builder();
             let router = server
                 .add_service(ExecutionServer::new(mock_responder2.clone()))
@@ -144,7 +157,7 @@ impl TestServer {
                 .add_service(ActionCacheServer::new(mock_responder2));
 
             router
-                .serve_with_incoming_shutdown(incoming, shutdown_receiver.map(drop))
+                .serve_with_incoming_shutdown(incoming_stream, shutdown_receiver.map(drop))
                 .await
                 .unwrap();
         });
