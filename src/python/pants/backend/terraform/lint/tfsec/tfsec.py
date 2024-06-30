@@ -10,7 +10,7 @@ from pants.core.util_rules.external_tool import ExternalTool
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.platform import Platform
 from pants.engine.target import BoolField, Target
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption, DirOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -40,10 +40,21 @@ class TFSec(ExternalTool):
         default=None,
         advanced=True,
         help=lambda cls: softwrap(
-            f"""
+            """
             Path to the tfsec config file (https://aquasecurity.github.io/tfsec/latest/guides/configuration/config/)
 
-            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use this option if the config is located in a non-standard location.
+            Setting this option will disable config discovery for the config file. Use this option if the config is located in a non-standard location.
+            """
+        ),
+    )
+    custom_check_dir = DirOption(
+        default=None,
+        advanced=True,
+        help=lambda cls: softwrap(
+            """
+            Path to the directory containing custom checks (https://aquasecurity.github.io/tfsec/latest/guides/configuration/custom-checks/#overriding-check-directory)
+
+            Setting this option will disable config discovery for custom checks. Use this option if the custom checks dir is located in a non-standard location.
             """
         ),
     )
@@ -55,7 +66,7 @@ class TFSec(ExternalTool):
             If true, Pants will include all relevant config files during runs (`.tfsec/config.json` or `.tfsec/config.yml`).
             Note that you will have to tell Pants to include this file by adding `"!.tfsec/"` to `[global].pants_ignore.add`.
 
-            Use `[{cls.options_scope}].config` instead if your config is in a non-standard location.
+            Use `[{cls.options_scope}].config` and `[{cls.options_scope}].custom_check_dir` instead if your config is in a non-standard location.
             """
         ),
     )
@@ -64,6 +75,14 @@ class TFSec(ExternalTool):
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
+            discovery=self.config_discovery,
+            check_existence=[".tfsec/config.json", ".tfsec/config.yml", ".tfsec/config.yaml"],
+        )
+
+    def custom_checks_request(self) -> ConfigFilesRequest:
+        return ConfigFilesRequest(
+            specified=self.custom_check_dir,
+            specified_option_name=f"[{self.options_scope}].custom_check_dir",
             discovery=self.config_discovery,
             check_existence=[".tfsec/*.json", ".tfsec/*.yml", ".tfsec/*.yaml"],
         )
