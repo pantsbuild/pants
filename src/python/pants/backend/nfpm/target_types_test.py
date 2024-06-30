@@ -17,7 +17,7 @@ from pants.engine.target import InvalidTargetException
 
 def test_nfpm_content_file_validate() -> None:
     def create_tgt(
-            *, source: str | None, src: str | None, dependencies: list[str]
+        *, source: str | None, src: str | None, dependencies: list[str]
     ) -> NfpmContentFile:
         return NfpmContentFile(
             {

@@ -3,22 +3,15 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-import pytest
-
 from pants.backend.nfpm.field_sets import (
-    NFPM_PACKAGE_FIELD_SET_TYPES,
     NfpmApkPackageFieldSet,
     NfpmArchlinuxPackageFieldSet,
     NfpmDebPackageFieldSet,
-    NfpmPackageFieldSet,
     NfpmRpmPackageFieldSet,
 )
 from pants.backend.nfpm.fields.all import (
     NfpmHomepageField,
     NfpmLicenseField,
-    NfpmOutputPathField,
     NfpmPackageNameField,
 )
 from pants.backend.nfpm.fields.apk import (
@@ -52,6 +45,7 @@ from pants.backend.nfpm.target_types import (
     NfpmDebPackage,
     NfpmRpmPackage,
 )
+from pants.engine.addresses import Address
 from pants.engine.target import DescriptionField
 
 
@@ -81,7 +75,7 @@ def test_generate_nfpm_config_for_apk():
         "disable_globbing": True,
         "contents": [],
         "name": "treasure",
-        "arch": "amd64", # default
+        "arch": "amd64",  # default
         "version": "3.2.1",
         "version_scheme": "semver",  # default
         "release": 1,  # default
@@ -127,7 +121,7 @@ def test_generate_nfpm_config_for_archlinux():
         "disable_globbing": True,
         "contents": [],
         "name": "treasure",
-        "arch": "amd64", # default
+        "arch": "amd64",  # default
         "version": "3.2.1",
         "version_scheme": "semver",  # default
         "release": 1,  # default
@@ -176,7 +170,7 @@ def test_generate_nfpm_config_for_deb():
         "disable_globbing": True,
         "contents": [],
         "name": "treasure",
-        "arch": "amd64", # default
+        "arch": "amd64",  # default
         "version": "3.2.1",
         "version_scheme": "semver",  # default
         "release": 1,  # default
@@ -220,7 +214,7 @@ def test_generate_nfpm_config_for_rpm():
             NfpmHomepageField.alias: "https://jolly.roger.example.com",
             NfpmLicenseField.alias: "MIT",
             NfpmRpmDependsField.alias: depends,
-            NfpmRpmPrefixes.alias: ["/", "/usr", "/opt/treasure"],
+            NfpmRpmPrefixesField.alias: ["/", "/usr", "/opt/treasure"],
             NfpmRpmGhostContents.alias: ["/var/log/captains.log"],
         },
         Address("", target_name="t"),
@@ -231,7 +225,7 @@ def test_generate_nfpm_config_for_rpm():
             {"type": "ghost", "dst": "/var/log/captains.log"},
         ],
         "name": "treasure",
-        "arch": "amd64", # default
+        "arch": "amd64",  # default
         "version": "3.2.1",
         "version_scheme": "semver",  # default
         "release": 1,  # default
