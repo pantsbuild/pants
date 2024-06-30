@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import pytest
 
+from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.backend.nfpm.fields.contents import (
     NfpmContentDstField,
     NfpmContentFileSourceField,
     NfpmContentSrcField,
-    NfpmDependencies,
 )
 from pants.backend.nfpm.target_types import NfpmContentFile
 from pants.engine.addresses import Address
