@@ -213,6 +213,52 @@ def test_local_dist() -> None:
         assert result.stdout == "LOCAL DIST\n"
 
 
+def test_local_dist_with_executable_main() -> None:
+    sources = {
+        "foo/bar.py": "BAR = 'LOCAL DIST'",
+        "foo/setup.py": dedent(
+            """\
+            from setuptools import setup  # pants: no-infer-dep
+
+            # Double-brace the package_dir to avoid setup_tmpdir treating it as a format.
+            setup(name="foo", version="9.8.7", packages=["foo"], package_dir={{"foo": "."}},)
+            """
+        ),
+        "foo/foo-bar-main": "from foo.bar import BAR; print(BAR)",
+        "foo/BUILD": dedent(
+            """\
+            python_sources(name="lib", sources=["bar.py", "setup.py"])
+
+            python_sources(name="main_exe", sources=["foo-bar-main"])
+
+            python_distribution(
+                name="dist",
+                dependencies=[":lib"],
+                provides=python_artifact(name="foo", version="9.8.7"),
+                sdist=False,
+                generate_setup=False,
+            )
+
+            pex_binary(
+                name="bin",
+                executable="foo-bar-main",
+                # Force-exclude any dep on bar.py, so the only way to consume it is via the dist.
+                dependencies=[":main_exe", ":dist", "!!:lib"])
+            """
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.python",
+            f"--source-root-patterns=['/{tmpdir}']",
+            "run",
+            f"{tmpdir}/foo:bin",
+        ]
+        result = run_pants(args)
+        result.assert_success()
+        assert result.stdout == "LOCAL DIST\n"
+
+
 def test_run_script_from_3rdparty_dist_issue_13747() -> None:
     sources = {
         "src/BUILD": dedent(

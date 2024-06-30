@@ -37,7 +37,7 @@ def test_determine_renamed_fields() -> None:
         moved_fields = (DeprecatedField, OkayField)
 
     registered_targets = RegisteredTargetTypes.create([Tgt, TgtGenerator])
-    result = determine_renamed_field_types(registered_targets, UnionMembership({}))
+    result = determine_renamed_field_types.rule.func(registered_targets, UnionMembership({}))  # type: ignore[attr-defined]
     deprecated_fields = FrozenDict({DeprecatedField.deprecated_alias: DeprecatedField.alias})
     assert result.target_field_renames == FrozenDict(
         {k: deprecated_fields for k in (TgtGenerator.alias, Tgt.alias, Tgt.deprecated_alias)}
@@ -60,7 +60,7 @@ def test_determine_renamed_fields() -> None:
 )
 def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
     content = "\n".join(lines).encode("utf-8")
-    result = fix_single(
+    result = fix_single.rule.func(  # type: ignore[attr-defined]
         RenameFieldsInFileRequest("BUILD", content=content),
         RenamedFieldTypes.from_dict({"target": {"deprecated_name": "new_name"}}),
     )
@@ -77,7 +77,7 @@ def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
     ),
 )
 def test_rename_deprecated_field_types_rewrite(lines: list[str], expected: list[str]) -> None:
-    result = fix_single(
+    result = fix_single.rule.func(  # type: ignore[attr-defined]
         RenameFieldsInFileRequest("BUILD", content="\n".join(lines).encode("utf-8")),
         RenamedFieldTypes.from_dict({"tgt1": {"deprecated_name": "new_name"}}),
     )

@@ -8,7 +8,6 @@ import platform
 import socket
 import time
 import uuid
-from collections import OrderedDict
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -18,25 +17,11 @@ from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.engine.internals import native_engine
 from pants.option.errors import ConfigValidationError
 from pants.option.options import Options
-from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.util.osutil import getuser
 from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
-
-
-class RunTrackerOptionEncoder(CoercingOptionEncoder):
-    """Use the json encoder we use for making options hashable to support datatypes.
-
-    This encoder also explicitly allows OrderedDict inputs, as we accept more than just option
-    values when encoding stats to json.
-    """
-
-    def default(self, o):
-        if isinstance(o, OrderedDict):
-            return o
-        return super().default(o)
 
 
 class RunTracker:
@@ -49,7 +34,6 @@ class RunTracker:
         (
             "check",
             "count-loc",
-            "dependees",
             "dependents",
             "dependencies",
             "export-codegen",

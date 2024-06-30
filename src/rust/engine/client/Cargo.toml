@@ -11,18 +11,14 @@ path = "src/main.rs"
 
 [dependencies]
 env_logger = { workspace = true }
-futures = { workspace = true }
-libc = { workspace = true }
 log = { workspace = true }
 nailgun = { path = "../nailgun" }
 nix = { workspace = true }
 options = { path = "../options" }
-sha2 = { workspace = true }
+pantsd = { path = "../pantsd" }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-sysinfo = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "io-std", "io-util"] }
-uname = { workspace = true }
 
-[dev-dependencies]
-tempfile = { workspace = true }
+[lints]
+workspace = true

@@ -10,8 +10,10 @@ import re
 import shlex
 import textwrap
 from collections import abc
-from typing import Any, Callable, Iterable, TypeVar
+from logging import Logger
+from typing import Any, Callable, Iterable, Mapping, TypeVar
 
+import colors
 from typing_extensions import ParamSpec
 
 from pants.engine.internals.native_engine import Digest
@@ -68,33 +70,6 @@ def safe_shlex_join(arg_list: Iterable[str]) -> str:
     Shell-quotes each argument with `shell_quote()`.
     """
     return " ".join(shell_quote(arg) for arg in arg_list)
-
-
-def create_path_env_var(
-    new_entries: Iterable[str],
-    env: dict[str, str] | None = None,
-    env_var: str = "PATH",
-    delimiter: str = ":",
-    prepend: bool = False,
-):
-    """Join path entries, combining with an environment variable if specified."""
-    if env is None:
-        env = {}
-
-    prev_path = env.get(env_var, None)
-    if prev_path is None:
-        path_dirs: list[str] = []
-    else:
-        path_dirs = list(prev_path.split(delimiter))
-
-    new_entries_list = list(new_entries)
-
-    if prepend:
-        path_dirs = new_entries_list + path_dirs
-    else:
-        path_dirs += new_entries_list
-
-    return delimiter.join(path_dirs)
 
 
 def pluralize(count: int, item_type: str, include_count: bool = True) -> str:
@@ -165,6 +140,30 @@ def strip_v2_chroot_path(v: bytes | str) -> str:
     if isinstance(v, bytes):
         v = v.decode()
     return re.sub(r"/.*/pants-sandbox-[a-zA-Z0-9]+/", "", v)
+
+
+@dataclasses.dataclass(frozen=True)
+class Simplifier:
+    """Helper for options for conditionally simplifying a string."""
+
+    # it's only rarely useful to show a chroot path to a user, hence they're stripped by default
+    strip_chroot_path: bool = True
+    """remove all instances of the chroot tmpdir path"""
+    strip_formatting: bool = False
+    """remove ANSI formatting commands (colors, bold, etc)"""
+
+    def simplify(self, v: bytes | str) -> str:
+        chroot = (
+            strip_v2_chroot_path(v)
+            if self.strip_chroot_path
+            else v.decode()
+            if isinstance(v, bytes)
+            else v
+        )
+        formatting = colors.strip_color(chroot) if self.strip_formatting else chroot
+        assert isinstance(formatting, str)
+
+        return formatting
 
 
 def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> list[str]:
@@ -266,7 +265,7 @@ def softwrap(text: str) -> str:
     """
     if not text:
         return text
-    # If callers didn't use a leading "\" thats OK.
+    # If callers didn't use a leading "\" that's OK.
     if text[0] == "\n":
         text = text[1:]
 
@@ -381,3 +380,28 @@ def stable_hash(value: Any, *, name: str = "sha256") -> str:
             value, indent=None, separators=(",", ":"), sort_keys=True, cls=_JsonEncoder
         ).encode("utf-8"),
     ).hexdigest()
+
+
+# NB: If an OS string is not valid UTF-8, Python encodes the non-decodable bytes
+#  as lone surrogates (see https://peps.python.org/pep-0383/).
+#  However when we pass these to Rust, we will fail to decode as strict UTF-8.
+#  So we perform a lossy re-encoding to prevent this.
+def strict_utf8(s: str) -> str:
+    return s.encode("utf-8", "replace").decode("utf-8")
+
+
+def get_strict_env(env: Mapping[str, str], logger: Logger) -> Mapping[str, str]:
+    strict_env = {}
+    for key, val in sorted(env.items()):
+        strict_key = strict_utf8(key)
+        strict_val = strict_utf8(val)
+        if strict_key == key:
+            if strict_val == val:
+                strict_env[strict_key] = strict_val
+            else:
+                logger.warning(f"Environment variable with non-UTF-8 value ignored: {key}")
+        else:
+            # We can only log strict_key, because logging will choke on non-UTF-8.
+            # But the reader will know what we mean.
+            logger.warning(f"Environment variable with non-UTF-8 name ignored: {strict_key}")
+    return strict_env

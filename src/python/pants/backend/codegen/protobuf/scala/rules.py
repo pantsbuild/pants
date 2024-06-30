@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.backend.codegen.protobuf.scala import dependency_inference
+from pants.backend.codegen.protobuf.scala import dependency_inference, symbol_mapper
 from pants.backend.codegen.protobuf.scala.subsystem import PluginArtifactSpec, ScalaPBSubsystem
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
@@ -14,7 +14,12 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceTarget,
 )
 from pants.backend.scala.target_types import ScalaSourceField
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.backend.scala.util_rules.versions import (
+    ScalaArtifactsForVersionRequest,
+    ScalaArtifactsForVersionResult,
+    ScalaVersion,
+)
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import distdir
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -46,9 +51,9 @@ from pants.jvm.compile import ClasspathEntry
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
-from pants.jvm.resolve.common import ArtifactRequirements, Coordinate, GatherJvmCoordinatesRequest
+from pants.jvm.resolve.common import ArtifactRequirements, GatherJvmCoordinatesRequest
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
@@ -59,10 +64,6 @@ from pants.util.resources import read_resource
 class GenerateScalaFromProtobufRequest(GenerateSourcesRequest):
     input = ProtobufSourceField
     output = ScalaSourceField
-
-
-class ScalapbcToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = ScalaPBSubsystem.options_scope
 
 
 class ScalaPBShimCompiledClassfiles(ClasspathEntry):
@@ -113,7 +114,7 @@ async def generate_scala_from_protobuf(
     plugins_relpath = "__plugins"
     protoc_relpath = "__protoc"
 
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalapbcToolLockfileSentinel())
+    lockfile_request = GenerateJvmLockfileFromTool.create(scalapb)
     (
         downloaded_protoc_binary,
         tool_classpath,
@@ -234,7 +235,7 @@ async def materialize_jvm_plugins(
     return MaterializedJvmPlugins(merged_plugins_digest, materialized_plugins)
 
 
-SHIM_SCALA_VERSION = "2.13.7"
+SHIM_SCALA_VERSION = ScalaVersion.parse("2.13.7")
 
 
 # TODO(13879): Consolidate compilation of wrapper binaries to common rules.
@@ -253,30 +254,17 @@ async def setup_scalapb_shim_classfiles(
 
     scalapb_shim_source = FileContent("ScalaPBShim.scala", scalapb_shim_content)
 
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalapbcToolLockfileSentinel())
+    lockfile_request = GenerateJvmLockfileFromTool.create(scalapb)
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(SHIM_SCALA_VERSION)
+    )
     tool_classpath, shim_classpath, source_digest = await MultiGet(
         Get(
             ToolClasspath,
             ToolClasspathRequest(
                 prefix="__toolcp",
                 artifact_requirements=ArtifactRequirements.from_coordinates(
-                    [
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-compiler",
-                            version=SHIM_SCALA_VERSION,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-library",
-                            version=SHIM_SCALA_VERSION,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-reflect",
-                            version=SHIM_SCALA_VERSION,
-                        ),
-                    ]
+                    scala_artifacts.all_coordinates
                 ),
             ),
         ),
@@ -318,20 +306,14 @@ async def setup_scalapb_shim_classfiles(
     return ScalaPBShimCompiledClassfiles(digest=stripped_classfiles_digest)
 
 
-@rule
-def generate_scalapbc_lockfile_request(
-    _: ScalapbcToolLockfileSentinel, tool: ScalaPBSubsystem
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(tool)
-
-
 def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
         *dependency_inference.rules(),
+        *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromProtobufRequest),
-        UnionRule(GenerateToolLockfileSentinel, ScalapbcToolLockfileSentinel),
+        UnionRule(ExportableTool, ScalaPBSubsystem),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),

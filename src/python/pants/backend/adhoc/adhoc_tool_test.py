@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from textwrap import dedent
 
 import pytest
@@ -17,6 +18,7 @@ from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_type_rules
 from pants.core.util_rules import archive, source_files
 from pants.core.util_rules.adhoc_process_support import AdhocProcessRequest
+from pants.core.util_rules.environments import LocalWorkspaceEnvironmentTarget
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
@@ -52,10 +54,21 @@ def rule_runner() -> PythonRuleRunner:
             ArchiveTarget,
             FilesGeneratorTarget,
             PythonSourceTarget,
+            LocalWorkspaceEnvironmentTarget,
         ],
+        isolated_local_store=True,
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
+
+
+def execute_adhoc_tool(
+    rule_runner: PythonRuleRunner,
+    address: Address,
+) -> GeneratedSources:
+    generator_type: type[GenerateSourcesRequest] = GenerateFilesFromAdhocToolRequest
+    target = rule_runner.get_target(address)
+    return rule_runner.request(GeneratedSources, [generator_type(EMPTY_SNAPSHOT, target)])
 
 
 def assert_adhoc_tool_result(
@@ -63,9 +76,7 @@ def assert_adhoc_tool_result(
     address: Address,
     expected_contents: dict[str, str],
 ) -> None:
-    generator_type: type[GenerateSourcesRequest] = GenerateFilesFromAdhocToolRequest
-    target = rule_runner.get_target(address)
-    result = rule_runner.request(GeneratedSources, [generator_type(EMPTY_SNAPSHOT, target)])
+    result = execute_adhoc_tool(rule_runner, address)
     assert result.snapshot.files == tuple(expected_contents)
     contents = rule_runner.request(DigestContents, [result.snapshot.digest])
     for fc in contents:
@@ -268,3 +279,98 @@ def test_env_vars(rule_runner: PythonRuleRunner) -> None:
         Address("src", target_name="envvars"),
         expected_contents={"out.log": f"{envvar_value}\n"},
     )
+
+
+def test_execution_dependencies_and_runnable_dependencies(rule_runner: PythonRuleRunner) -> None:
+    file_contents = "example contents"
+
+    rule_runner.write_files(
+        {
+            # put the runnable in its own directory, so we're sure that the dependencies are
+            # resolved relative to the adhoc_tool target
+            "a/BUILD": """system_binary(name="bash", binary_name="bash")""",
+            "b/BUILD": dedent(
+                """
+                system_binary(name="renamed_cat", binary_name="cat")
+                files(name="f", sources=["f.txt"])
+
+                adhoc_tool(
+                  name="deps",
+                  runnable="a:bash",
+                  args=["-c", "renamed_cat f.txt"],
+                  execution_dependencies=[":f"],
+                  runnable_dependencies=[":renamed_cat"],
+                  stdout="stdout",
+                )
+                """
+            ),
+            "b/f.txt": file_contents,
+        }
+    )
+
+    assert_adhoc_tool_result(
+        rule_runner,
+        Address("b", target_name="deps"),
+        expected_contents={"b/stdout": file_contents},
+    )
+
+
+def test_adhoc_tool_with_workspace_execution(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+            system_binary(name="bash", binary_name="bash")
+            adhoc_tool(
+                name="make-file",
+                runnable=":bash",
+                args=["-c", "echo 'workspace' > ./foo.txt"],
+                environment="workspace",
+                stderr="stderr",
+            )
+            experimental_workspace_environment(name="workspace")
+            """
+            )
+        }
+    )
+    rule_runner.set_options(
+        ["--environments-preview-names={'workspace': '//:workspace'}"], env_inherit={"PATH"}
+    )
+
+    assert_adhoc_tool_result(rule_runner, Address("", target_name="make-file"), {"stderr": ""})
+
+    workspace_output_path = Path(rule_runner.build_root).joinpath("foo.txt")
+    assert workspace_output_path.exists()
+    assert workspace_output_path.read_text().strip() == "workspace"
+
+
+def test_adhoc_tool_workspace_invalidation_sources(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+            system_binary(name="bash", binary_name="bash")
+            adhoc_tool(
+              name="cmd",
+              runnable=":bash",
+              # Use a random value so we can detect when re-execution occurs.
+              args=["-c", "echo $RANDOM > out.log"],
+              output_files=["out.log"],
+              workspace_invalidation_sources=['a-file'],
+            )
+            """
+            ),
+            "src/a-file": "",
+        }
+    )
+    address = Address("src", target_name="cmd")
+
+    # Re-executing the initial execution should be cached.
+    result1 = execute_adhoc_tool(rule_runner, address)
+    result2 = execute_adhoc_tool(rule_runner, address)
+    assert result1.snapshot == result2.snapshot
+
+    # Update the hash-only source file's content. The adhoc_tool should be re-executed now.
+    (Path(rule_runner.build_root) / "src" / "a-file").write_text("xyzzy")
+    result3 = execute_adhoc_tool(rule_runner, address)
+    assert result1.snapshot != result3.snapshot

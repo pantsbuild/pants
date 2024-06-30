@@ -4,9 +4,6 @@ version = "0.0.1"
 edition = "2021"
 authors = ["Pants Build <pantsbuild@gmail.com>"]
 
-[lib]
-path = "src/console_ui.rs"
-
 [dependencies]
 console = { workspace = true }
 futures = { workspace = true }
@@ -21,3 +18,6 @@ terminal_size = { workspace = true }
 task_executor = { path = "../task_executor" }
 uuid = { workspace = true, features = ["v4"] }
 workunit_store = { path = "../workunit_store" }
+
+[lints]
+workspace = true

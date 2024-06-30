@@ -13,14 +13,19 @@ def main(args: list[str]):
 
     found_image_refs: dict[tuple[int, str], str] = {}
 
-    with open(input_filename, "r") as file:
+    with open(input_filename) as file:
         try:
             parsed_docs = load_full_yaml(stream=file)
-        except RuntimeError:
+        except RuntimeError as e:
+            # If we couldn't load any hikaru-model packages
+            e_str = str(e)
+            if "No release packages found" in e_str or "install a hikaru-module package" in e_str:
+                raise
+
             # Hikaru fails with a `RuntimeError` when it finds a K8S manifest for an
             # API version and kind that doesn't understand.
             #
-            # We exit the process early without giving any ouput.
+            # We exit the process early without giving any output.
             sys.exit(0)
 
     for idx, doc in enumerate(parsed_docs):

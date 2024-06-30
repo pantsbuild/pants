@@ -5,8 +5,14 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import operator
+from collections import abc, defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterator, cast
+from enum import Enum
+from functools import reduce
+from typing import Any, Iterator, Mapping, cast
+
+from typing_extensions import Self
 
 from pants.build_graph.address import BANNED_CHARS_IN_PARAMETERS
 from pants.engine.addresses import Address
@@ -20,7 +26,7 @@ from pants.engine.target import (
     TargetTypesToGenerateTargetsRequests,
 )
 from pants.util.frozendict import FrozenDict
-from pants.util.strutil import bullet_list, softwrap
+from pants.util.strutil import bullet_list, pluralize, softwrap
 
 
 def _named_args_explanation(arg: str) -> str:
@@ -38,12 +44,39 @@ class Parametrize:
     means that individual Field instances need not be aware of it.
     """
 
+    class _MergeBehaviour(Enum):
+        # Do not merge this parametrization.
+        never = "never"
+        # Discard this parametrization with `other`.
+        replace = "replace"
+
     args: tuple[str, ...]
     kwargs: FrozenDict[str, ImmutableValue]
+    is_group: bool
+    merge_behaviour: _MergeBehaviour = dataclasses.field(compare=False)
 
     def __init__(self, *args: str, **kwargs: Any) -> None:
         object.__setattr__(self, "args", args)
         object.__setattr__(self, "kwargs", FrozenDict.deep_freeze(kwargs))
+        object.__setattr__(self, "is_group", False)
+        object.__setattr__(self, "merge_behaviour", Parametrize._MergeBehaviour.never)
+
+    def keys(self) -> tuple[str]:
+        return (f"parametrize_{hash(self.args)}:{id(self)}",)
+
+    def __getitem__(self, key) -> Any:
+        if isinstance(key, str) and key.startswith("parametrize_"):
+            return self.to_group()
+        else:
+            raise KeyError(key)
+
+    def to_group(self) -> Self:
+        object.__setattr__(self, "is_group", True)
+        return self
+
+    def to_weak(self) -> Self:
+        object.__setattr__(self, "merge_behaviour", Parametrize._MergeBehaviour.replace)
+        return self
 
     def to_parameters(self) -> dict[str, Any]:
         """Validates and returns a mapping from aliases to parameter values.
@@ -74,51 +107,218 @@ class Parametrize:
             parameters[arg] = arg
         return parameters
 
+    @property
+    def group_name(self) -> str:
+        assert self.is_group
+        if len(self.args) == 1:
+            name = self.args[0]
+            banned_chars = BANNED_CHARS_IN_PARAMETERS & set(name)
+            if banned_chars:
+                raise Exception(
+                    f"In {self}:\n  Parametrization group name `{name}` contained separator characters "
+                    f"(`{'`,`'.join(banned_chars)}`)."
+                )
+            return name
+        else:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    A parametrize group must begin with the group name followed by the target field
+                    values for the group.
+
+                    Example:
+
+                        target(
+                            ...,
+                            **parametrize("group-a", field_a=1, field_b=True),
+                        )
+
+                    Got: `{self!r}`
+                    """
+                )
+            )
+
     @classmethod
     def expand(
-        cls, address: Address, fields: dict[str, Any | Parametrize]
-    ) -> Iterator[tuple[Address, dict[str, Any]]]:
+        cls,
+        address: Address,
+        fields: Mapping[str, Any | Parametrize],
+    ) -> Iterator[tuple[Address, Mapping[str, Any]]]:
         """Produces the cartesian product of fields for the given possibly-Parametrized fields.
 
         Only one level of expansion is performed: if individual field values might also contain
         Parametrize instances (in particular: an `overrides` field), expanding those will require
         separate calls.
+
+        Parametrized groups are expanded however (that is: any `parametrize` field values in a
+        `**parametrize()` group are also expanded).
         """
         try:
-            parametrized: list[list[tuple[str, str, Any]]] = [
-                [
-                    (field_name, alias, field_value)
-                    for alias, field_value in v.to_parameters().items()
-                ]
-                for field_name, v in fields.items()
-                if isinstance(v, Parametrize)
-            ]
+            yield from cls._expand(address, fields)
         except Exception as e:
-            raise Exception(f"Failed to parametrize `{address}`:\n{e}") from e
+            raise Exception(f"Failed to parametrize `{address}`:\n  {e}") from e
 
-        if not parametrized:
-            yield (address, fields)
-            return
-
+    @classmethod
+    def _expand(
+        cls,
+        address: Address,
+        fields: Mapping[str, Any | Parametrize],
+        _parametrization_group_prefix: str = "",
+    ) -> Iterator[tuple[Address, Mapping[str, Any]]]:
+        parametrizations = cls._collect_parametrizations(fields)
+        cls._check_parametrizations(parametrizations)
+        parametrized: list[list[tuple[str, str, Any]]] = [
+            [(field_name, alias, field_value) for alias, field_value in v.to_parameters().items()]
+            for field_name, v in parametrizations.get(None, ())
+        ]
+        parametrized_groups: list[tuple[str, str, Parametrize]] = [
+            ("parametrize", (_parametrization_group_prefix + group_name), vs[0][1])
+            for group_name, vs in parametrizations.items()
+            if group_name is not None
+        ]
+        parameters = address.parameters
         non_parametrized = tuple(
             (field_name, field_value)
             for field_name, field_value in fields.items()
             if not isinstance(field_value, Parametrize)
         )
+        if parametrized_groups:
+            # Add the groups as one vector for the cross-product.
+            parametrized.append(parametrized_groups)
+
+        unparametrize_keys = {k for k, _ in non_parametrized if k in parameters}
+
+        # Remove non-parametrized fields from the address parameters.
+        for k in unparametrize_keys:
+            parameters.pop(k, None)
+
+        if not parametrized:
+            if unparametrize_keys:
+                address = address.parametrize(parameters, replace=True)
+            yield (address, fields)
+            return
 
         for parametrized_args in itertools.product(*parametrized):
-            expanded_address = address.parametrize(
-                {field_name: alias for field_name, alias, _ in parametrized_args}
+            expanded_parameters = parameters | {
+                field_name: alias for field_name, alias, _ in parametrized_args
+            }
+            # There will be at most one group per cross product.
+            parametrize_group: Parametrize | None = next(
+                (
+                    field_value
+                    for _, _, field_value in parametrized_args
+                    if isinstance(field_value, Parametrize) and field_value.is_group
+                ),
+                None,
             )
+            if parametrize_group is not None:
+                # Exclude fields from parametrize group from address parameters.
+                for k in parametrize_group.kwargs.keys() & parameters.keys():
+                    expanded_parameters.pop(k, None)
+                expand_recursively = any(
+                    isinstance(group_value, Parametrize)
+                    for group_value in parametrize_group.kwargs.values()
+                )
+            else:
+                expand_recursively = False
+
             parametrized_args_fields = tuple(
-                (field_name, field_value) for field_name, _, field_value in parametrized_args
+                (field_name, field_value)
+                for field_name, _, field_value in parametrized_args
+                # Exclude any parametrize group
+                if not (isinstance(field_value, Parametrize) and field_value.is_group)
             )
             expanded_fields: dict[str, Any] = dict(non_parametrized + parametrized_args_fields)
-            yield expanded_address, expanded_fields
+            expanded_address = address.parametrize(expanded_parameters, replace=True)
+
+            if expand_recursively:
+                assert parametrize_group is not None  # Type narrowing to satisfy mypy.
+                # Expand nested parametrize within a parametrized group.
+                for grouped_address, grouped_fields in cls._expand(
+                    expanded_address,
+                    parametrize_group.kwargs,
+                    _parametrization_group_prefix=_parametrization_group_prefix
+                    + parametrize_group.group_name
+                    + "-",
+                ):
+                    cls._check_conflicting(
+                        {
+                            name
+                            for name in grouped_fields.keys()
+                            if isinstance(fields.get(name), Parametrize)
+                        }
+                    )
+                    yield expanded_address.parametrize(
+                        grouped_address.parameters
+                    ), expanded_fields | dict(grouped_fields)
+            else:
+                if parametrize_group is not None:
+                    expanded_fields |= dict(parametrize_group.kwargs)
+                yield expanded_address, expanded_fields
+
+    @staticmethod
+    def _collect_parametrizations(
+        fields: Mapping[str, Any | Parametrize]
+    ) -> Mapping[str | None, list[tuple[str, Parametrize]]]:
+        parametrizations = defaultdict(list)
+        for field_name, v in fields.items():
+            if not isinstance(v, Parametrize):
+                continue
+            group_name = None if not v.is_group else v.group_name
+            parametrizations[group_name].append((field_name, v))
+        return parametrizations
+
+    @staticmethod
+    def _check_parametrizations(
+        parametrizations: Mapping[str | None, list[tuple[str, Parametrize]]]
+    ) -> None:
+        for group_name, groups in parametrizations.items():
+            if group_name is not None and len(groups) > 1:
+                group = Parametrize._combine(*(group for _, group in groups))
+                groups.clear()
+                groups.append(("combined", group))
+
+        parametrize_field_names = {field_name for field_name, v in parametrizations.get(None, ())}
+        parametrize_field_names_from_groups = {
+            field_name
+            for group_name, groups in parametrizations.items()
+            if group_name is not None
+            for field_name in groups[0][1].kwargs.keys()
+        }
+        Parametrize._check_conflicting(
+            parametrize_field_names.intersection(parametrize_field_names_from_groups)
+        )
+
+    @staticmethod
+    def _check_conflicting(conflicting: abc.Collection[str]) -> None:
+        if conflicting:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    Conflicting parametrizations for {pluralize(len(conflicting), "field", include_count=False)}:
+                    {', '.join(map(repr, sorted(conflicting)))}
+                    """
+                )
+            )
+
+    @staticmethod
+    def _combine(head: Parametrize, *tail: Parametrize) -> Parametrize:
+        return reduce(operator.add, tail, head)
+
+    def __add__(self, other: Parametrize) -> Parametrize:
+        if not isinstance(other, Parametrize):
+            raise TypeError(f"Can not combine {self} with {other!r}")
+        if self.merge_behaviour is Parametrize._MergeBehaviour.replace:
+            return other
+        if other.merge_behaviour is Parametrize._MergeBehaviour.replace:
+            return self
+        if self.is_group and other.is_group:
+            raise ValueError(f"Parametrization group name is not unique: {self.group_name!r}")
+        raise ValueError(f"Can not combine parametrizations: {self} | {other}")
 
     def __repr__(self) -> str:
-        strs = [str(s) for s in self.args]
-        strs.extend(f"{alias}={value}" for alias, value in self.kwargs.items())
+        strs = [repr(s) for s in self.args]
+        strs.extend(f"{alias}={value!r}" for alias, value in self.kwargs.items())
         return f"parametrize({', '.join(strs)})"
 
 
@@ -284,12 +484,20 @@ class _TargetParametrizations(Collection[_TargetParametrization]):
             ):
                 return parametrization.original_target
 
-            # Else, see whether any of the generated targets match.
-            for candidate in parametrization.parametrization.values():
-                if address.is_parametrized_subset_of(candidate.address) and remaining_fields_match(
-                    candidate
-                ):
-                    return candidate
+        consumer_parametrize_group = consumer.address.parameters.get("parametrize")
+
+        def matching_parametrize_group(candidate: Target) -> bool:
+            return candidate.address.parameters.get("parametrize") == consumer_parametrize_group
+
+        for candidate in sorted(
+            self.parametrizations.values(), key=matching_parametrize_group, reverse=True
+        ):
+            # Else, see whether any of the generated targets match, preferring a matching
+            # parametrize group when available.
+            if address.is_parametrized_subset_of(candidate.address) and remaining_fields_match(
+                candidate
+            ):
+                return candidate
 
         raise ValueError(
             f"The explicit dependency `{address}` of the target at `{consumer.address}` does "

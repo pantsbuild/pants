@@ -35,6 +35,7 @@ from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     DeployJarDuplicatePolicyField,
+    DeployJarExcludeFilesField,
     DeployJarShadingRulesField,
     JvmDependenciesField,
     JvmJdkField,
@@ -60,6 +61,7 @@ class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     jdk_version: JvmJdkField
     duplicate_policy: DeployJarDuplicatePolicyField
     shading_rules: DeployJarShadingRulesField
+    exclude_files: DeployJarExcludeFilesField
 
 
 class DeployJarClasspathEntryRequest(ClasspathEntryRequest):
@@ -136,6 +138,7 @@ async def package_deploy_jar(
                 (rule.pattern, rule.action)
                 for rule in field_set.duplicate_policy.value_or_default()
             ],
+            skip=[*(jvm.deploy_jar_exclude_files or []), *(field_set.exclude_files.value or [])],
             compress=True,
         ),
     )
@@ -152,6 +155,8 @@ async def package_deploy_jar(
             ),
         )
 
+    jar_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
+
     #
     # 4. Apply shading rules
     #
@@ -167,9 +172,8 @@ async def package_deploy_jar(
         )
         jar_digest = shaded_jar.digest
 
-    prefixed_output_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
-    return BuiltPackage(digest=prefixed_output_digest, artifacts=(artifact,))
+    return BuiltPackage(digest=jar_digest, artifacts=(artifact,))
 
 
 def rules():

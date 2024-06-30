@@ -9,18 +9,19 @@ publish = false
 bytes = { workspace = true }
 either = { workspace = true }
 futures = { workspace = true }
-hyper = { workspace = true }
-hyper-rustls = { workspace = true, features = ["http2"] }
 http = { workspace = true }
 http-body = { workspace = true }
+hyper = { workspace = true }
+hyper-rustls = { workspace = true, features = ["http2"] }
 itertools = { workspace = true }
-rustls-native-certs = { workspace = true }
 lazy_static = { workspace = true }
+log = { workspace = true }
 pin-project = { workspace = true }
 pin-project-lite = { workspace = true }
 prost = { workspace = true }
 rand = { workspace = true }
 rustls = { workspace = true, features = ["dangerous_configuration", 'logging'] }
+rustls-native-certs = { workspace = true }
 rustls-pemfile = { workspace = true }
 tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = { workspace = true }
@@ -42,3 +43,6 @@ prost-types = { workspace = true }
 [build-dependencies]
 prost-build = { workspace = true }
 tonic-build = { workspace = true }
+
+[lints]
+workspace = true

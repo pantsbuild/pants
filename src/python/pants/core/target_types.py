@@ -94,7 +94,7 @@ class per_platform(Generic[_T]):
             address: Address,
         ) -> Optional[Union[str, per_platform[str]]]:
             if isinstance(raw_value, per_platform):
-                # NOTE: Ensure the values are homogenous
+                # NOTE: Ensure the values are homogeneous
                 raw_value.check_types(str)
 
             return raw_value
@@ -111,7 +111,7 @@ class per_platform(Generic[_T]):
         ...
     ```
 
-    NOTE: Support for this object should be heavily weighed, as it would be innaproriate to use in
+    NOTE: Support for this object should be heavily weighed, as it would be inappropriate to use in
     certain contexts (such as the `source` field in a `foo_source` target, where the intent is to
     support differing source files based on platform. The result would be that dependency inference
     (and therefore the dependencies field) wouldn't be knowable on the host, which is not something
@@ -732,12 +732,15 @@ class ArchivePackagesField(SpecialCasedDependencies):
     alias = "packages"
     help = help_text(
         f"""
-        Addresses to any targets that can be built with `{bin_name()} package`, e.g.
-        `["project:app"]`.\n\nPants will build the assets as if you had run `{bin_name()} package`.
-        It will include the results in your archive using the same name they would normally have,
-        but without the `--distdir` prefix (e.g. `dist/`).\n\nYou can include anything that can
-        be built by `{bin_name()} package`, e.g. a `pex_binary`, `python_aws_lambda_function`, or even another
-        `archive`.
+        Addresses to any targets that can be built with `{bin_name()} package`,
+        e.g. `["project:app"]`.
+
+        Pants will build the assets as if you had run `{bin_name()} package`.
+        It will include the results in your archive using the same name they
+        would normally have, but without the `--distdir` prefix (e.g. `dist/`).
+
+        You can include anything that can be built by `{bin_name()} package`,
+        e.g. a `pex_binary`, `python_awslambda`, or even another `archive`.
         """
     )
 

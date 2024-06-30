@@ -23,3 +23,6 @@ task_executor = { path = "../task_executor" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 workunit_store = { path = "../workunit_store" }
 remote = { path = "../process_execution/remote" }
+
+[lints]
+workspace = true

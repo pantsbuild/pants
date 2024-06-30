@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from io import RawIOBase
 from typing import (
     Any,
@@ -12,6 +13,8 @@ from typing import (
     Generic,
     Iterable,
     Mapping,
+    Optional,
+    Protocol,
     Sequence,
     TextIO,
     Tuple,
@@ -19,11 +22,32 @@ from typing import (
     overload,
 )
 
-from typing_extensions import Protocol, Self
+from typing_extensions import Self
 
+from pants.engine.fs import (
+    CreateDigest,
+    DigestContents,
+    DigestEntries,
+    DigestSubset,
+    NativeDownloadFile,
+    PathGlobs,
+    PathMetadataRequest,
+    PathMetadataResult,
+    Paths,
+)
+from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
+from pants.engine.internals.native_dep_inference import (
+    NativeParsedJavascriptDependencies,
+    NativeParsedPythonDependencies,
+)
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
-from pants.engine.internals.session import SessionValues
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.internals.session import RunId, SessionValues
+from pants.engine.process import (
+    FallibleProcessResult,
+    InteractiveProcess,
+    InteractiveProcessResult,
+    Process,
+)
 
 # TODO: black and flake8 disagree about the content of this file:
 #   see https://github.com/psf/black/issues/1548
@@ -222,8 +246,9 @@ class Address:
         ...
     @property
     def path_safe_spec(self) -> str: ...
-    def parametrize(self, parameters: Mapping[str, str]) -> Address:
-        """Creates a new Address with the given `parameters` merged over self.parameters."""
+    def parametrize(self, parameters: Mapping[str, str], replace: bool = False) -> Address:
+        """Creates a new Address with the given `parameters` merged or replaced over
+        self.parameters."""
         ...
     def maybe_convert_to_target_generator(self) -> Address:
         """If this address is generated or parametrized, convert it to its generator target.
@@ -470,6 +495,90 @@ EMPTY_SNAPSHOT: Snapshot
 
 def default_cache_path() -> str: ...
 
+class PathMetadataKind:
+    FILE: PathMetadataKind = ...
+    DIRECTORY: PathMetadataKind = ...
+    SYMLINK: PathMetadataKind = ...
+
+class PathMetadata:
+    def __new__(
+        cls,
+        path: str,
+        kind: PathMetadataKind,
+        length: int,
+        is_executable: bool,
+        unix_mode: int | None,
+        accessed: datetime | None,
+        created: datetime | None,
+        modified: datetime | None,
+        symlink_target: str | None,
+    ) -> PathMetadata: ...
+    @property
+    def path(self) -> str: ...
+    @property
+    def kind(self) -> PathMetadataKind: ...
+    @property
+    def length(self) -> int: ...
+    @property
+    def is_executable(self) -> bool: ...
+    @property
+    def unix_mode(self) -> int | None: ...
+    @property
+    def accessed(self) -> datetime | None: ...
+    @property
+    def created(self) -> datetime | None: ...
+    @property
+    def modified(self) -> datetime | None: ...
+    @property
+    def symlink_target(self) -> str | None: ...
+    def copy(self) -> PathMetadata: ...
+
+# ------------------------------------------------------------------------------
+# Intrinsics
+# ------------------------------------------------------------------------------
+
+async def create_digest_to_digest(
+    create_digest: CreateDigest,
+) -> Digest: ...
+async def path_globs_to_digest(
+    path_globs: PathGlobs,
+) -> Digest: ...
+async def path_globs_to_paths(
+    path_globs: PathGlobs,
+) -> Paths: ...
+async def download_file_to_digest(
+    native_download_file: NativeDownloadFile,
+) -> Digest: ...
+async def digest_to_snapshot(digest: Digest) -> Snapshot: ...
+async def directory_digest_to_digest_contents(digest: Digest) -> DigestContents: ...
+async def directory_digest_to_digest_entries(digest: Digest) -> DigestEntries: ...
+async def merge_digests_request_to_digest(merge_digests: MergeDigests) -> Digest: ...
+async def remove_prefix_request_to_digest(remove_prefix: RemovePrefix) -> Digest: ...
+async def add_prefix_request_to_digest(add_prefix: AddPrefix) -> Digest: ...
+async def process_request_to_process_result(
+    process: Process, process_execution_environment: ProcessExecutionEnvironment
+) -> FallibleProcessResult: ...
+async def digest_subset_to_digest(digest_subset: DigestSubset) -> Digest: ...
+async def session_values() -> SessionValues: ...
+async def run_id() -> RunId: ...
+async def interactive_process(
+    process: InteractiveProcess, process_execution_environment: ProcessExecutionEnvironment
+) -> InteractiveProcessResult: ...
+async def docker_resolve_image(request: DockerResolveImageRequest) -> DockerResolveImageResult: ...
+async def parse_python_deps(
+    deps_request: NativeDependenciesRequest,
+) -> NativeParsedPythonDependencies: ...
+async def parse_javascript_deps(
+    deps_request: NativeDependenciesRequest,
+) -> NativeParsedJavascriptDependencies: ...
+async def path_metadata_request(request: PathMetadataRequest) -> PathMetadataResult: ...
+
+# ------------------------------------------------------------------------------
+# `pantsd`
+# ------------------------------------------------------------------------------
+
+def pantsd_fingerprint_compute(expected_option_names: set[str]) -> str: ...
+
 # ------------------------------------------------------------------------------
 # Process
 # ------------------------------------------------------------------------------
@@ -489,6 +598,7 @@ class ProcessExecutionEnvironment:
         docker_image: str | None,
         remote_execution: bool,
         remote_execution_extra_platform_properties: Sequence[tuple[str, str]],
+        execute_in_workspace: bool,
     ) -> None: ...
     def __eq__(self, other: ProcessExecutionEnvironment | Any) -> bool: ...
     def __hash__(self) -> int: ...
@@ -525,6 +635,49 @@ class PantsdConnectionException(Exception):
 
 class PantsdClientException(Exception):
     pass
+
+# ------------------------------------------------------------------------------
+# Options
+# ------------------------------------------------------------------------------
+
+class PyOptionId:
+    def __init__(
+        self, *components: str, scope: str | None = None, switch: str | None = None
+    ) -> None: ...
+
+class PyConfigSource:
+    def __init__(self, path: str, content: bytes) -> None: ...
+
+T = TypeVar("T")
+# A pair of (option value, rank). See src/python/pants/option/ranked_value.py.
+OptionValue = Tuple[Optional[T], int]
+OptionListValue = Tuple[list[T], int]
+OptionDictValue = Tuple[dict[str, Any], int]
+
+class PyOptionParser:
+    def __init__(
+        self,
+        args: Optional[Sequence[str]],
+        env: dict[str, str],
+        configs: Optional[Sequence[PyConfigSource]],
+        allow_pantsrc: bool,
+    ) -> None: ...
+    def get_bool(self, option_id: PyOptionId, default: Optional[bool]) -> OptionValue[bool]: ...
+    def get_int(self, option_id: PyOptionId, default: Optional[int]) -> OptionValue[int]: ...
+    def get_float(self, option_id: PyOptionId, default: Optional[float]) -> OptionValue[float]: ...
+    def get_string(self, option_id: PyOptionId, default: Optional[str]) -> OptionValue[str]: ...
+    def get_bool_list(
+        self, option_id: PyOptionId, default: list[bool]
+    ) -> OptionListValue[bool]: ...
+    def get_int_list(self, option_id: PyOptionId, default: list[int]) -> OptionListValue[int]: ...
+    def get_float_list(
+        self, option_id: PyOptionId, default: list[float]
+    ) -> OptionListValue[float]: ...
+    def get_string_list(
+        self, option_id: PyOptionId, default: list[str]
+    ) -> OptionListValue[str]: ...
+    def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionDictValue: ...
+    def get_passthrough_args(self) -> Optional[list[str]]: ...
 
 # ------------------------------------------------------------------------------
 # Testutil
@@ -636,7 +789,7 @@ def tasks_task_begin(
     tasks: PyTasks,
     func: Any,
     return_type: type,
-    arg_types: Sequence[type],
+    arg_types: Sequence[tuple[str, type]],
     masked_types: Sequence[type],
     side_effecting: bool,
     engine_aware_return_type: bool,
@@ -646,6 +799,9 @@ def tasks_task_begin(
     level: int,
 ) -> None: ...
 def tasks_task_end(tasks: PyTasks) -> None: ...
+def tasks_add_call(
+    tasks: PyTasks, output: type, inputs: Sequence[type], rule_id: str, explicit_args_arity: int
+) -> None: ...
 def tasks_add_get(tasks: PyTasks, output: type, inputs: Sequence[type]) -> None: ...
 def tasks_add_get_union(
     tasks: PyTasks, output_type: type, input_types: Sequence[type], in_scope_types: Sequence[type]
@@ -712,6 +868,9 @@ def validate_reachability(scheduler: PyScheduler) -> None: ...
 def rule_graph_consumed_types(
     scheduler: PyScheduler, param_types: Sequence[type], product_type: type
 ) -> list[type]: ...
+def rule_graph_rule_gets(
+    scheduler: PyScheduler,
+) -> dict[Callable, list[tuple[type, list[type], Callable]]]: ...
 def rule_graph_visualize(scheduler: PyScheduler, path: str) -> None: ...
 def rule_subgraph_visualize(
     scheduler: PyScheduler, param_types: Sequence[type], product_type: type, path: str
@@ -727,11 +886,35 @@ def hash_prefix_zero_bits(item: str) -> int: ...
 # Selectors
 # ------------------------------------------------------------------------------
 
-class PyGeneratorResponseBreak:
-    def __init__(self, val: Any) -> None: ...
-
 _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
+
+class PyGeneratorResponseCall:
+    @overload
+    def __init__(
+        self,
+        output_type: type,
+        args: tuple[Any, ...],
+        input_arg0: dict[Any, type],
+    ) -> None: ...
+    @overload
+    def __init__(self, output_type: type, args: tuple[Any, ...], input_arg0: _Input) -> None: ...
+    @overload
+    def __init__(
+        self,
+        output_type: type,
+        args: tuple[Any, ...],
+        input_arg0: type[_Input],
+        input_arg1: _Input,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self,
+        output_type: type,
+        args: tuple[Any, ...],
+        input_arg0: type[_Input] | _Input,
+        input_arg1: _Input | None = None,
+    ) -> None: ...
 
 class PyGeneratorResponseGet(Generic[_Output]):
     output_type: type[_Output]
@@ -762,9 +945,6 @@ class PyGeneratorResponseGet(Generic[_Output]):
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None: ...
-
-class PyGeneratorResponseGetMulti:
-    def __init__(self, gets: tuple[PyGeneratorResponseGet, ...]) -> None: ...
 
 # ------------------------------------------------------------------------------
 # (uncategorized)

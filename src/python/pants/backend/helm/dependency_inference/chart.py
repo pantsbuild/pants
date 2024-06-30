@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.helm.resolve import artifacts
 from pants.backend.helm.resolve.artifacts import ThirdPartyHelmArtifactMapping
+from pants.backend.helm.resolve.remotes import HelmRemotes
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import (
     AllHelmChartTargets,
@@ -96,6 +98,16 @@ class InferHelmChartDependenciesRequest(InferDependenciesRequest):
     infer_from = HelmChartDependenciesInferenceFieldSet
 
 
+def resolve_dependency_url(remotes: HelmRemotes, dependency: HelmChartDependency) -> str | None:
+    if not dependency.repository:
+        registry = remotes.default_registry
+        if registry:
+            return os.path.join(registry.address, dependency.name)
+        return None
+    else:
+        return os.path.join(dependency.repository, dependency.name)
+
+
 @rule(desc="Inferring Helm chart dependencies", level=LogLevel.DEBUG)
 async def infer_chart_dependencies_via_metadata(
     request: InferHelmChartDependenciesRequest,
@@ -113,15 +125,6 @@ async def infer_chart_dependencies_via_metadata(
 
     remotes = subsystem.remotes()
 
-    def resolve_dependency_url(dependency: HelmChartDependency) -> str | None:
-        if not dependency.repository:
-            registry = remotes.default_registry
-            if registry:
-                return f"{registry.address}/{dependency.name}"
-            return None
-        else:
-            return f"{dependency.repository}/{dependency.name}"
-
     # Associate dependencies in Chart.yaml with addresses.
     dependencies: OrderedSet[Address] = OrderedSet()
     for chart_dep in metadata.dependencies:
@@ -131,7 +134,7 @@ async def infer_chart_dependencies_via_metadata(
         if first_party_dep:
             candidate_addrs.append(first_party_dep)
 
-        dependency_url = resolve_dependency_url(chart_dep)
+        dependency_url = resolve_dependency_url(remotes, chart_dep)
         third_party_dep = third_party_mapping.get(dependency_url) if dependency_url else None
         if third_party_dep:
             candidate_addrs.append(third_party_dep)

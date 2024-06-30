@@ -1,6 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -40,17 +41,17 @@ from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import (
-    FallibleProcessResult,
     InteractiveProcess,
     Process,
     ProcessCacheScope,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.option.global_options import GlobalOptions
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.strutil import create_path_env_var
 
 
 @dataclass(frozen=True)
@@ -161,7 +162,6 @@ async def setup_shunit2_for_target(
     shell_setup: ShellSetup.EnvironmentAware,
     test_subsystem: TestSubsystem,
     test_extra_env: TestExtraEnv,
-    global_options: GlobalOptions,
     shunit2: Shunit2,
     platform: Platform,
 ) -> TestSetup:
@@ -215,8 +215,10 @@ async def setup_shunit2_for_target(
     )
 
     env_dict = {
-        "PATH": create_path_env_var(shell_setup.executable_search_path),
-        "SHUNIT_COLOR": "always" if global_options.colors else "none",
+        "PATH": os.pathsep.join(shell_setup.executable_search_path),
+        # Always include colors and strip them out for display below (if required), for better cache
+        # hit rates
+        "SHUNIT_COLOR": "always",
         **test_extra_env.env,
     }
     argv = (
@@ -242,16 +244,21 @@ async def setup_shunit2_for_target(
 
 @rule(desc="Run tests with Shunit2", level=LogLevel.DEBUG)
 async def run_tests_with_shunit2(
-    batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any], test_subsystem: TestSubsystem
+    batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any],
+    test_subsystem: TestSubsystem,
+    global_options: GlobalOptions,
 ) -> TestResult:
     field_set = batch.single_element
 
     setup = await Get(TestSetup, TestSetupRequest(field_set))
-    result = await Get(FallibleProcessResult, Process, setup.process)
+    results = await Get(
+        ProcessResultWithRetries, ProcessWithRetries(setup.process, test_subsystem.attempts_default)
+    )
     return TestResult.from_fallible_process_result(
-        result,
+        process_results=results.results,
         address=field_set.address,
         output_setting=test_subsystem.output,
+        output_simplifier=global_options.output_simplifier(),
     )
 
 

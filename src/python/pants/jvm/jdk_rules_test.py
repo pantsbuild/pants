@@ -96,11 +96,8 @@ def test_java_binary_versions(rule_runner: RuleRunner) -> None:
     # default version is 1.11
     assert 'openjdk version "11.0' in run_javac_version(rule_runner)
 
-    rule_runner.set_options(["--jvm-tool-jdk=adopt:1.8"], env_inherit=PYTHON_BOOTSTRAP_ENV)
-    assert 'openjdk version "1.8' in run_javac_version(rule_runner)
-
-    rule_runner.set_options(["--jvm-tool-jdk=adopt:1.14"], env_inherit=PYTHON_BOOTSTRAP_ENV)
-    assert 'openjdk version "14"' in run_javac_version(rule_runner)
+    rule_runner.set_options(["--jvm-tool-jdk=temurin:1.17"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    assert 'openjdk version "17"' in run_javac_version(rule_runner)
 
     rule_runner.set_options(["--jvm-tool-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
@@ -130,13 +127,13 @@ def test_parse_java_version() -> None:
 
 
 @maybe_skip_jdk_test
-def test_inclue_default_heap_size_in_jvm_options(rule_runner: RuleRunner) -> None:
+def test_include_default_heap_size_in_jvm_options(rule_runner: RuleRunner) -> None:
     proc = javac_version_proc(rule_runner)
     assert "-Xmx512m" in proc.argv
 
 
 @maybe_skip_jdk_test
-def test_inclue_child_mem_constraint_in_jvm_options(rule_runner: RuleRunner) -> None:
+def test_include_child_mem_constraint_in_jvm_options(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         ["--process-per-child-memory-usage=1GiB"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
@@ -163,7 +160,7 @@ def test_pass_jvm_options_to_java_program(rule_runner: RuleRunner) -> None:
 
     # Rely on JEP-330 to run a Java file from source so we don´t need a compile step.
     rule_runner.set_options(
-        ["--jvm-tool-jdk=adopt:1.11", f"--jvm-global-options={repr(global_jvm_options)}"],
+        ["--jvm-tool-jdk=temurin:1.11.0.23", f"--jvm-global-options={repr(global_jvm_options)}"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
@@ -215,3 +212,34 @@ def test_pass_jvm_options_to_java_program(rule_runner: RuleRunner) -> None:
     assert "java.specification.version=11" in jvm_properties
     assert "pants.jvm.global=true" in jvm_properties
     assert "pants.jvm.extra=true" in jvm_properties
+
+
+@maybe_skip_jdk_test
+def test_jvm_not_found_when_empty_jvm_index(rule_runner: RuleRunner) -> None:
+    # Prepare empty JVM Index file
+    filename = "index.json"
+    file_content = textwrap.dedent(
+        """\
+        {}
+        """
+    )
+    rule_runner.write_files({filename: file_content})
+
+    jdk_release_version = "21"
+    jdk_binary = f"adoptium:1.{jdk_release_version}"
+
+    # Assert jdk_binary is found with default JVM Index
+    rule_runner.set_options([f"--jvm-tool-jdk={jdk_binary}"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    assert f'openjdk version "{jdk_release_version}' in run_javac_version(rule_runner)
+
+    # Assert jdk_binary is not found with empty JVM Index
+    rule_runner.set_options(
+        [
+            f"--coursier-jvm-index={rule_runner.build_root}/{filename}",
+            f"--jvm-tool-jdk={jdk_binary}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    expected_exception_msg = rf".*?JVM {jdk_binary} not found in index.*?"
+    with pytest.raises(ExecutionError, match=expected_exception_msg):
+        run_javac_version(rule_runner)

@@ -8,9 +8,7 @@ from __future__ import annotations
 import itertools
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generic, Iterable, TypeVar, overload
-
-from typing_extensions import Protocol
+from typing import Generic, Iterable, Protocol, TypeVar, overload
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.engine.collection import Collection
@@ -190,10 +188,11 @@ def _single_partition_field_set_rules(cls) -> Iterable:
     one partition."""
 
     @rule(
+        canonical_name_suffix=cls.__name__,
         _param_type_overrides={
             "request": cls.PartitionRequest,
             "subsystem": cls.tool_subsystem,
-        }
+        },
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
@@ -213,10 +212,11 @@ def _single_partition_file_rules(cls) -> Iterable:
     sources_field_name = _get_sources_field_name(cls.field_set_type)
 
     @rule(
+        canonical_name_suffix=cls.__name__,
         _param_type_overrides={
             "request": cls.PartitionRequest,
             "subsystem": cls.tool_subsystem,
-        }
+        },
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
@@ -246,10 +246,11 @@ def _partition_per_input_field_set_rules(cls) -> Iterable:
     a single-element partition per input."""
 
     @rule(
+        canonical_name_suffix=cls.__name__,
         _param_type_overrides={
             "request": cls.PartitionRequest,
             "subsystem": cls.tool_subsystem,
-        }
+        },
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
@@ -275,10 +276,11 @@ def _partition_per_input_file_rules(cls) -> Iterable:
     sources_field_name = _get_sources_field_name(cls.field_set_type)
 
     @rule(
+        canonical_name_suffix=cls.__name__,
         _param_type_overrides={
             "request": cls.PartitionRequest,
             "subsystem": cls.tool_subsystem,
-        }
+        },
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem

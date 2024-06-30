@@ -67,7 +67,7 @@ async def run_golangci_lint(
 ) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,
-        TransitiveTargetsRequest((field_set.address for field_set in request.elements)),
+        TransitiveTargetsRequest(field_set.address for field_set in request.elements),
     )
 
     all_source_files_request = Get(

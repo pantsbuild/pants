@@ -19,8 +19,20 @@ from pants.backend.scala.bsp.spec import (
     ScalaTestClassesParams,
     ScalaTestClassesResult,
 )
+from pants.backend.scala.compile.scalac_plugins import (
+    ScalaPlugins,
+    ScalaPluginsForTargetRequest,
+    ScalaPluginsRequest,
+    ScalaPluginTargetsForTarget,
+)
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
+from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaSourceField
+from pants.backend.scala.util_rules.versions import (
+    ScalaArtifactsForVersionRequest,
+    ScalaArtifactsForVersionResult,
+    ScalaVersion,
+)
 from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTargetIdentifier
@@ -52,7 +64,8 @@ from pants.jvm.bsp.resources import rules as jvm_resources_rules
 from pants.jvm.bsp.spec import JvmBuildTarget, MavenDependencyModule, MavenDependencyModuleArtifact
 from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, ClasspathEntryRequestFactory
 from pants.jvm.jdk_rules import DefaultJdk, JdkEnvironment, JdkRequest
-from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
@@ -147,23 +160,16 @@ async def collect_thirdparty_modules(
     )
 
 
-async def _materialize_scala_runtime_jars(scala_version: str) -> Snapshot:
+async def _materialize_scala_runtime_jars(scala_version: ScalaVersion) -> Snapshot:
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    )
+
     tool_classpath = await Get(
         ToolClasspath,
         ToolClasspathRequest(
             artifact_requirements=ArtifactRequirements.from_coordinates(
-                [
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-compiler",
-                        version=scala_version,
-                    ),
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-library",
-                        version=scala_version,
-                    ),
-                ]
+                scala_artifacts.all_coordinates
             ),
         ),
     )
@@ -269,7 +275,8 @@ async def bsp_resolve_scala_metadata(
         coursier_java_home = jdk_home
 
     scala_jar_uris = tuple(
-        build_root.pathlib_path.joinpath(".pants.d/bsp").joinpath(p).as_uri()
+        # TODO: Why is this hardcoded and not under pants_workdir?
+        build_root.pathlib_path.joinpath(".pants.d", "bsp", p).as_uri()
         for p in scala_runtime.files
     )
 
@@ -281,8 +288,8 @@ async def bsp_resolve_scala_metadata(
     return BSPBuildTargetsMetadataResult(
         metadata=ScalaBuildTarget(
             scala_organization="org.scala-lang",
-            scala_version=scala_version,
-            scala_binary_version=".".join(scala_version.split(".")[0:2]),
+            scala_version=str(scala_version),
+            scala_binary_version=scala_version.binary,
             platform=ScalaPlatform.JVM,
             jars=scala_jar_uris,
             jvm_build_target=jvm_build_target,
@@ -330,9 +337,7 @@ class HandleScalacOptionsResult:
 
 @_uncacheable_rule
 async def handle_bsp_scalac_options_request(
-    request: HandleScalacOptionsRequest,
-    build_root: BuildRoot,
-    workspace: Workspace,
+    request: HandleScalacOptionsRequest, build_root: BuildRoot, workspace: Workspace, scalac: Scalac
 ) -> HandleScalacOptionsResult:
     targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
     thirdparty_modules = await Get(
@@ -340,15 +345,30 @@ async def handle_bsp_scalac_options_request(
     )
     resolve = thirdparty_modules.resolve
 
-    resolve_digest = await Get(
-        Digest, AddPrefix(thirdparty_modules.merged_digest, f"jvm/resolves/{resolve.name}/lib")
+    scalac_plugin_targets = await MultiGet(
+        Get(ScalaPluginTargetsForTarget, ScalaPluginsForTargetRequest(tgt, resolve.name))
+        for tgt in targets
     )
 
+    local_plugins_prefix = f"jvm/resolves/{resolve.name}/plugins"
+    local_plugins = await Get(
+        ScalaPlugins, ScalaPluginsRequest.from_target_plugins(scalac_plugin_targets, resolve)
+    )
+
+    thirdparty_modules_prefix = f"jvm/resolves/{resolve.name}/lib"
+    thirdparty_modules_digest, local_plugins_digest = await MultiGet(
+        Get(Digest, AddPrefix(thirdparty_modules.merged_digest, thirdparty_modules_prefix)),
+        Get(Digest, AddPrefix(local_plugins.classpath.digest, local_plugins_prefix)),
+    )
+
+    resolve_digest = await Get(
+        Digest, MergeDigests([thirdparty_modules_digest, local_plugins_digest])
+    )
     workspace.write_digest(resolve_digest, path_prefix=".pants.d/bsp")
 
     classpath = tuple(
         build_root.pathlib_path.joinpath(
-            f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{filename}"
+            f".pants.d/bsp/{thirdparty_modules_prefix}/{filename}"
         ).as_uri()
         for cp_entry in thirdparty_modules.entries.values()
         for filename in cp_entry.filenames
@@ -357,7 +377,7 @@ async def handle_bsp_scalac_options_request(
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
             target=request.bsp_target_id,
-            options=(),
+            options=(*local_plugins.args(local_plugins_prefix), *scalac.args),
             classpath=classpath,
             class_directory=build_root.pathlib_path.joinpath(
                 f".pants.d/bsp/{jvm_classes_directory(request.bsp_target_id)}"

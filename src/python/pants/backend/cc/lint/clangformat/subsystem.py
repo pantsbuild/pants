@@ -8,6 +8,7 @@ from typing import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Rule, collect_rules
 from pants.engine.unions import UnionRule
@@ -18,7 +19,7 @@ from pants.util.strutil import help_text
 class ClangFormat(PythonToolBase):
     options_scope = "clang-format"
     name = "ClangFormat"
-    help = help_text(
+    help_short = help_text(
         """
         The clang-format utility for formatting C/C++ (and others) code
         (https://clang.llvm.org/docs/ClangFormat.html). The clang-format binaries
@@ -51,4 +52,7 @@ class ClangFormat(PythonToolBase):
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(ExportableTool, ClangFormat),
+    ]

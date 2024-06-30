@@ -32,11 +32,13 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: Linux-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.0-*
+        key: Linux-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.79.0-*
 
           ~/.rustup/update-hashes
 
@@ -82,7 +84,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-bootstrap-Linux-ARM64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
@@ -96,7 +98,7 @@ jobs:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
-      run: ./cargo test --tests -- --nocapture --test-threads=8
+      run: ./cargo test --locked --tests -- --nocapture --test-threads=8
     timeout-minutes: 60
   bootstrap_pants_linux_x86_64:
     env:
@@ -122,11 +124,13 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.0-*
+        key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.79.0-*
 
           ~/.rustup/update-hashes
 
@@ -172,7 +176,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-bootstrap-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
@@ -194,22 +198,20 @@ jobs:
 
         ./build-support/bin/check_rust_pre_commit.sh
 
-        ./cargo test --all --tests -- --nocapture
-
-        ./cargo check --benches
+        ./cargo test --locked --all --tests --benches -- --nocapture
 
         ./cargo doc'
     timeout-minutes: 60
-  bootstrap_pants_macos11_x86_64:
+  bootstrap_pants_macos12_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
-    name: Bootstrap Pants, test Rust (macOS11-x86_64)
+    name: Bootstrap Pants, test Rust (macOS12-x86_64)
     needs:
     - classify_changes
     runs-on:
-    - macos-11
+    - macos-12
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -224,11 +226,13 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.0-*
+        key: macOS12-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.79.0-*
 
           ~/.rustup/update-hashes
 
@@ -248,7 +252,7 @@ jobs:
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: macOS11-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
+        key: macOS12-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
@@ -273,12 +277,12 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-bootstrap-macOS11-x86_64
-        path: .pants.d/*.log
+        name: logs-bootstrap-macOS12-x86_64
+        path: .pants.d/workdir/*.log
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
-        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
+        name: native_binaries.${{ matrix.python-version }}.macOS12-x86_64
         path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
@@ -288,7 +292,7 @@ jobs:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
-      run: ./cargo test --tests -- --nocapture
+      run: ./cargo test --locked --tests -- --nocapture
     timeout-minutes: 60
   build_wheels_linux_arm64:
     container:
@@ -346,7 +350,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-Linux-ARM64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -406,7 +410,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -431,11 +435,13 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.0-*
+        key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.79.0-*
 
           ~/.rustup/update-hashes
 
@@ -471,7 +477,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-macOS10-15-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -496,11 +502,13 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.0-*
+        key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.79.0-*
 
           ~/.rustup/update-hashes
 
@@ -536,7 +544,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-macOS11-ARM64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   check_labels:
     if: github.repository_owner == 'pantsbuild'
@@ -554,6 +562,27 @@ jobs:
         labels: category:new feature, category:user api change, category:plugin api change, category:performance, category:bugfix,
           category:documentation, category:internal
         mode: exactly
+  check_release_notes:
+    if: github.repository_owner == 'pantsbuild'
+    name: Ensure PR has release notes
+    needs:
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: github.event_name == 'pull_request' && !needs.classify_changes.outputs.notes
+      name: Ensure appropriate label
+      uses: mheap/github-action-required-labels@v4.0.0
+      with:
+        count: 1
+        labels: release-notes:not-required, category:internal
+        message: "\nPlease do one of:\n\n- add release notes to the appropriate file in `docs/notes`\n\n- label this PR with\
+          \ `release-notes:not-required` if it does not need them (for\n  instance, if this is fixing a minor typo in documentation)\n\
+          \n- label this PR with `category:internal` if it's an internal change\n\nFeel free to ask a maintainer for help\
+          \ if you are not sure what is appropriate!\n"
+        mode: minimum
   classify_changes:
     if: github.repository_owner == 'pantsbuild'
     name: Classify changes
@@ -561,6 +590,7 @@ jobs:
       ci_config: ${{ steps.classify.outputs.ci_config }}
       docs: ${{ steps.classify.outputs.docs }}
       docs_only: ${{ steps.classify.outputs.docs_only }}
+      notes: ${{ steps.classify.outputs.notes }}
       other: ${{ steps.classify.outputs.other }}
       release: ${{ steps.classify.outputs.release }}
       rust: ${{ steps.classify.outputs.rust }}
@@ -578,8 +608,8 @@ jobs:
         \  # pull request: compare to the base branch, ensuring that commit exists\n  git fetch --depth=1 \"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\
         \n  comparison_sha=\"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\nfi\necho \"comparison_sha=$comparison_sha\"\n\naffected=$(git\
         \ diff --name-only \"$comparison_sha\" HEAD | python build-support/bin/classify_changed_files.py)\necho \"Affected:\"\
-        \nif [[ \"${affected}\" == \"docs\" ]]; then\n  echo \"docs_only=true\" | tee -a $GITHUB_OUTPUT\nfi\nfor i in ${affected};\
-        \ do\n  echo \"${i}=true\" | tee -a $GITHUB_OUTPUT\ndone\n"
+        \nif [[ \"${affected}\" == \"docs\" || \"${affected}\" == \"docs notes\" ]]; then\n  echo \"docs_only=true\" | tee\
+        \ -a $GITHUB_OUTPUT\nfi\nfor i in ${affected}; do\n  echo \"${i}=true\" | tee -a $GITHUB_OUTPUT\ndone\n"
   lint_python:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Lint Python and Shell
@@ -632,7 +662,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-lint-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 30
   merge_ok:
     if: always()
@@ -650,14 +680,16 @@ jobs:
     needs:
     - classify_changes
     - check_labels
+    - check_release_notes
     - bootstrap_pants_linux_arm64
     - bootstrap_pants_linux_x86_64
-    - bootstrap_pants_macos11_x86_64
+    - bootstrap_pants_macos12_x86_64
     - build_wheels_linux_arm64
     - build_wheels_linux_x86_64
     - build_wheels_macos10_15_x86_64
     - build_wheels_macos11_arm64
     - check_labels
+    - check_release_notes
     - classify_changes
     - lint_python
     - test_python_linux_arm64
@@ -671,7 +703,7 @@ jobs:
     - test_python_linux_x86_64_7
     - test_python_linux_x86_64_8
     - test_python_linux_x86_64_9
-    - test_python_macos11_x86_64
+    - test_python_macos12_x86_64
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
@@ -731,7 +763,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-Linux-ARM64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_0:
     env:
@@ -822,7 +854,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-0_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_1:
     env:
@@ -913,7 +945,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-1_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_2:
     env:
@@ -1004,7 +1036,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-2_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_3:
     env:
@@ -1095,7 +1127,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-3_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_4:
     env:
@@ -1186,7 +1218,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-4_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_5:
     env:
@@ -1277,7 +1309,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-5_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_6:
     env:
@@ -1368,7 +1400,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-6_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_7:
     env:
@@ -1459,7 +1491,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-7_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_8:
     env:
@@ -1550,7 +1582,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-8_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_9:
     env:
@@ -1641,18 +1673,18 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-9_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
-  test_python_macos11_x86_64:
+  test_python_macos12_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
-    name: Test Python (macOS11-x86_64)
+    name: Test Python (macOS12-x86_64)
     needs:
-    - bootstrap_pants_macos11_x86_64
+    - bootstrap_pants_macos12_x86_64
     - classify_changes
     runs-on:
-    - macos-11
+    - macos-12
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -1672,7 +1704,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
+        name: native_binaries.${{ matrix.python-version }}.macOS12-x86_64
         path: src/python/pants
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
@@ -1686,7 +1718,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/macOS11-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/macOS12-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
 
         echo "Uploading test reports to ${S3_DST}"
 
@@ -1698,8 +1730,8 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-python-test-macOS11-x86_64
-        path: .pants.d/*.log
+        name: logs-python-test-macOS12-x86_64
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
 name: Pull Request CI
 'on':

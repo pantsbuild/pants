@@ -72,19 +72,22 @@ class JarToolRequest:
         manifest: str | None = None,
         jars: Iterable[str] | None = None,
         file_mappings: Mapping[str, str] | None = None,
+        files: Iterable[str] | None = None,
         default_action: JarDuplicateAction | None = None,
         policies: Iterable[tuple[str, str | JarDuplicateAction]] | None = None,
         skip: Iterable[str] | None = None,
         compress: bool = False,
         update: bool = False,
     ) -> None:
+        _file_mappings = {**(file_mappings or {}), **({f: f for f in (files or [])})}
+
         object.__setattr__(self, "jar_name", jar_name)
         object.__setattr__(self, "digest", digest)
         object.__setattr__(self, "main_class", main_class)
         object.__setattr__(self, "manifest", manifest)
         object.__setattr__(self, "classpath_entries", tuple(classpath_entries or ()))
         object.__setattr__(self, "jars", tuple(jars or ()))
-        object.__setattr__(self, "file_mappings", FrozenDict(file_mappings or {}))
+        object.__setattr__(self, "file_mappings", FrozenDict(_file_mappings))
         object.__setattr__(self, "default_action", default_action)
         object.__setattr__(self, "policies", tuple(JarToolRequest.__parse_policies(policies or ())))
         object.__setattr__(self, "skip", tuple(skip or ()))

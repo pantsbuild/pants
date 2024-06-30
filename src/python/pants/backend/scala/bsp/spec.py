@@ -260,7 +260,7 @@ class ScalaTestClassesItem:
     # The build target that contains the test classes.
     target: BuildTargetIdentifier
 
-    # Name of the the framework to which classes belong.
+    # Name of the framework to which classes belong.
     # It's optional in order to maintain compatibility, however it is expected
     # from the newer implementations to not leave that field unspecified.
     framework: str | None

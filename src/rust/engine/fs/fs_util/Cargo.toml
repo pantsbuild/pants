@@ -25,3 +25,6 @@ store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 workunit_store = { path = "../../workunit_store" }
+
+[lints]
+workspace = true

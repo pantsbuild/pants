@@ -4,6 +4,9 @@
   */
 package org.pantsbuild.backend.scala.dependency_inference
 
+import cats.data.{Chain, NonEmptyChain}
+import cats.syntax.all._
+
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
@@ -17,26 +20,80 @@ import scala.collection.SortedSet
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 import scala.reflect.NameTransformer
 
-case class AnImport(
+object Constants {
+  // `_root_` is used in Scala as a marker for absolute qualified names
+  // https://docs.scala-lang.org/tour/packages-and-imports.html#imports
+  val RootPackageQualifier = "_root_"
+
+  val NameSeparator = '.'
+}
+
+case class QualifiedName(private val parts: NonEmptyChain[String]) {
+  def isAbsolute: Boolean = parts.head == Constants.RootPackageQualifier
+
+  def elements: Chain[String] =
+    if (isAbsolute) parts.tail
+    else parts.toChain
+
+  def parents: Chain[String] = {
+    elements.initLast.map(_._1).getOrElse(Chain.empty)
+  }
+
+  def simpleName: Option[String] = {
+    elements.lastOption
+  }
+
+  lazy val fullName: String =
+    elements.intercalate(Constants.NameSeparator.toString)
+
+  def qualify(name: String): QualifiedName =
+    QualifiedName.fromString(name).map(qualify(_)).getOrElse(this)
+
+  def qualify(other: QualifiedName): QualifiedName =
+    if (other.isAbsolute) other
+    else QualifiedName(parts ++ other.parts)
+
+}
+object QualifiedName {
+  val Root = QualifiedName(NonEmptyChain.one(Constants.RootPackageQualifier))
+
+  def of(name: String): QualifiedName =
+    QualifiedName(NonEmptyChain.one(name))
+
+  def fromString(str: String): Option[QualifiedName] = {
+    // This split shouldn't be necessary, it's just a fail-safe
+    val parts = str.split(Constants.NameSeparator)
+    NonEmptyChain.fromSeq(parts).map(QualifiedName(_))
+  }
+
+}
+
+case class AnImport[A](
     // The partially qualified input name for the import, which must be in scope at
     // the import site.
-    name: String,
+    name: A,
     // An optional single token alias for the import in this scope.
     alias: Option[String],
     // True if the import imports all symbols contained within the name.
     isWildcard: Boolean
-)
+) {
+  def map[B](f: A => B): AnImport[B] =
+    copy(name = f(name))
+}
 
 case class Analysis(
     providedSymbols: SortedSet[Analysis.ProvidedSymbol],
     providedSymbolsEncoded: SortedSet[Analysis.ProvidedSymbol],
-    importsByScope: HashMap[String, ArrayBuffer[AnImport]],
-    consumedSymbolsByScope: HashMap[String, HashSet[String]],
+    importsByScope: Map[String, List[AnImport[String]]],
+    consumedSymbolsByScope: Map[String, SortedSet[Analysis.ConsumedSymbol]],
     scopes: Vector[String]
 )
 object Analysis {
   case class ProvidedSymbol(name: String, recursive: Boolean)
+  case class ConsumedSymbol(name: String, isAbsolute: Boolean)
+
   implicit val providedSymbolOrdering: Ordering[ProvidedSymbol] = Ordering.by(_.name)
+  implicit val consumedSymbolOrdering: Ordering[ConsumedSymbol] = Ordering.by(_.name)
 }
 
 case class ProvidedSymbol(
@@ -45,90 +102,94 @@ case class ProvidedSymbol(
 )
 
 class SourceAnalysisTraverser extends Traverser {
-  val nameParts = ArrayBuffer[String]()
+  val nameParts = ArrayBuffer[String](Constants.RootPackageQualifier)
   var skipProvidedNames = false
 
-  val providedSymbolsByScope = HashMap[String, HashMap[String, ProvidedSymbol]]()
-  val importsByScope = HashMap[String, ArrayBuffer[AnImport]]()
-  val consumedSymbolsByScope = HashMap[String, HashSet[String]]()
-  val scopes = HashSet[String]()
+  val providedSymbolsByScope = HashMap[QualifiedName, HashMap[String, ProvidedSymbol]]()
+  val importsByScope = HashMap[QualifiedName, ArrayBuffer[AnImport[QualifiedName]]]()
+  val consumedSymbolsByScope = HashMap[QualifiedName, HashSet[QualifiedName]]()
+  val scopes = HashSet[QualifiedName]()
+
+  def currentScope: QualifiedName = {
+    // We know `nameParts` is always non-empty, so we can be unsafe here
+    QualifiedName(NonEmptyChain.fromChainUnsafe(Chain.fromSeq(nameParts.toVector)))
+  }
 
   // Extract a qualified name from a tree.
-  def extractName(tree: Tree): String = {
-    def extractNameSelect(qual: Tree, name: Tree): Option[String] =
+  def extractName(tree: Tree): Option[QualifiedName] = {
+    def extractNameSelect(qual: Tree, name: Tree): Option[QualifiedName] =
       (maybeExtractName(qual), maybeExtractName(name)) match {
-        case (Some(qual), Some(name)) => Some(s"$qual.$name")
+        case (Some(qual), Some(name)) => Some(qual.qualify(name))
         case (Some(qual), None)       => Some(qual)
         case (None, Some(name))       => Some(name)
         case (None, None)             => None
       }
 
-    def maybeExtractName(tree: Tree): Option[String] =
+    def maybeExtractName(tree: Tree): Option[QualifiedName] =
       tree match {
         case Term.Select(qual, name)  => extractNameSelect(qual, name)
         case Type.Select(qual, name)  => extractNameSelect(qual, name)
-        case Term.Name(name)          => Some(name)
-        case Type.Name(name)          => Some(name)
+        case Term.Name(name)          => QualifiedName.fromString(name)
+        case Type.Name(name)          => QualifiedName.fromString(name)
         case Pat.Var(node)            => maybeExtractName(node)
-        case Name.Indeterminate(name) => Some(name)
+        case Name.Indeterminate(name) => QualifiedName.fromString(name)
         case _                        => None
       }
 
-    maybeExtractName(tree).getOrElse("")
+    maybeExtractName(tree)
   }
 
-  def extractNamesFromTypeTree(tree: Tree): Vector[String] = {
+  def extractNamesFromTypeTree(tree: Tree): Chain[QualifiedName] = {
     tree match {
-      case Type.Name(name) => Vector(name)
+      case Type.Name(name) => Chain.one(QualifiedName.of(name))
       case Type.Select(qual, Type.Name(name)) => {
-        val qualName = extractName(qual)
-        Vector(qualifyName(qualName, name))
+        val symbol = extractName(qual).map(_.qualify(name)).getOrElse(QualifiedName.of(name))
+        Chain.one(symbol)
       }
       case Type.Apply(tpe, args) =>
-        extractNamesFromTypeTree(tpe) ++ args.toVector.flatMap(extractNamesFromTypeTree(_))
+        extractNamesFromTypeTree(tpe) ++ Chain.fromSeq(args).flatMap(extractNamesFromTypeTree(_))
       case Type.ApplyInfix(lhs, _op, rhs) =>
         extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
       case Type.Function(params, res) =>
-        params.toVector.flatMap(extractNamesFromTypeTree(_)) ++ extractNamesFromTypeTree(res)
+        Chain.fromSeq(params).flatMap(extractNamesFromTypeTree(_)) ++ extractNamesFromTypeTree(res)
       case Type.PolyFunction(_tparams, tpe) => extractNamesFromTypeTree(tpe)
       case Type.ContextFunction(params, res) =>
-        params.toVector.flatMap(extractNamesFromTypeTree(_)) ++ extractNamesFromTypeTree(res)
-      case Type.Tuple(args)    => args.toVector.flatMap(extractNamesFromTypeTree(_))
+        Chain.fromSeq(params).flatMap(extractNamesFromTypeTree(_)) ++ extractNamesFromTypeTree(res)
+      case Type.Tuple(args)    => Chain.fromSeq(args).flatMap(extractNamesFromTypeTree(_))
       case Type.With(lhs, rhs) => extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
       case Type.And(lhs, rhs)  => extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
       case Type.Or(lhs, rhs)   => extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
       // TODO: Recurse into `_stats` to find additional types.
       // A `Type.Refine` represents syntax: A { def f: Int }
-      case Type.Refine(typeOpt, _stats)  => typeOpt.toVector.flatMap(extractNamesFromTypeTree(_))
+      case Type.Refine(typeOpt, _stats)  => Chain.fromOption(typeOpt).flatMap(extractNamesFromTypeTree(_))
       case Type.Existential(tpe, _stats) => extractNamesFromTypeTree(tpe)
       case Type.Annotate(tpe, _annots)   => extractNamesFromTypeTree(tpe)
       case Type.Lambda(_tparams, tpe)    => extractNamesFromTypeTree(tpe)
       case Type.Bounds(loOpt, hiOpt) =>
-        loOpt.toVector.flatMap(extractNamesFromTypeTree(_)) ++ hiOpt.toVector.flatMap(
-          extractNamesFromTypeTree(_)
-        )
+        Chain.fromOption(loOpt).flatMap(extractNamesFromTypeTree(_)) ++ Chain.fromOption(hiOpt).flatMap(extractNamesFromTypeTree(_))
       case Type.ByName(tpe)   => extractNamesFromTypeTree(tpe)
       case Type.Repeated(tpe) => extractNamesFromTypeTree(tpe)
       // TODO: Should we extract a type from _tpe?
       // `Type.Match` represents this Scala 3 syntax: type T = match { case A => B }
-      case Type.Match(_tpe, cases) => cases.toVector.flatMap(extractNamesFromTypeTree(_))
+      case Type.Match(_tpe, cases) => Chain.fromSeq(cases).flatMap(extractNamesFromTypeTree(_))
       case TypeCase(pat, body) => extractNamesFromTypeTree(pat) ++ extractNamesFromTypeTree(body)
-      case _                   => Vector()
+      case _                   => Chain.empty
     }
   }
 
   def recordProvidedName(
-      symbolName: String,
+      symbolQName: QualifiedName,
       sawObject: Boolean = false,
       recursive: Boolean = false
   ): Unit = {
     if (!skipProvidedNames) {
-      val fullPackageName = nameParts.mkString(".")
+      val fullPackageName = currentScope
       if (!providedSymbolsByScope.contains(fullPackageName)) {
         providedSymbolsByScope(fullPackageName) = HashMap[String, ProvidedSymbol]()
       }
       val providedSymbols = providedSymbolsByScope(fullPackageName)
 
+      val symbolName = symbolQName.fullName
       if (providedSymbols.contains(symbolName)) {
         val existingSymbol = providedSymbols(symbolName)
         val newSymbol = ProvidedSymbol(
@@ -159,25 +220,28 @@ class SourceAnalysisTraverser extends Traverser {
     skipProvidedNames = origSkipProvidedNames
   }
 
-  def recordImport(name: String, alias: Option[String], isWildcard: Boolean): Unit = {
-    val fullPackageName = nameParts.mkString(".")
+  def recordImport(name: QualifiedName, alias: Option[String], isWildcard: Boolean): Unit = {
+    val fullPackageName = currentScope
     if (!importsByScope.contains(fullPackageName)) {
-      importsByScope(fullPackageName) = ArrayBuffer[AnImport]()
+      importsByScope(fullPackageName) = ArrayBuffer[AnImport[QualifiedName]]()
     }
     importsByScope(fullPackageName).append(AnImport(name, alias, isWildcard))
   }
 
-  def recordConsumedSymbol(name: String): Unit = {
-    val fullPackageName = nameParts.mkString(".")
+  def recordConsumedSymbol(name: QualifiedName): Unit = {
+    val fullPackageName = currentScope
     if (!consumedSymbolsByScope.contains(fullPackageName)) {
-      consumedSymbolsByScope(fullPackageName) = HashSet[String]()
+      consumedSymbolsByScope(fullPackageName) = HashSet[QualifiedName]()
     }
     consumedSymbolsByScope(fullPackageName).add(name)
   }
 
   def recordScope(name: String): Unit = {
-    val scopeName = (nameParts.toVector ++ Vector(name)).mkString(".")
-    scopes.add(scopeName)
+    QualifiedName.fromString(name).foreach(recordScope(_))
+  }
+
+  def recordScope(name: QualifiedName): Unit = {
+    scopes.add(currentScope.qualify(name))
   }
 
   def visitTemplate(templ: Template, name: String): Unit = {
@@ -185,6 +249,7 @@ class SourceAnalysisTraverser extends Traverser {
     withNamePart(
       name,
       () => {
+        apply(templ.self)
         apply(templ.early)
         apply(templ.stats)
       }
@@ -201,82 +266,94 @@ class SourceAnalysisTraverser extends Traverser {
 
   override def apply(tree: Tree): Unit = tree match {
     case Pkg(ref, stats) => {
-      val name = extractName(ref)
-      recordScope(name)
-      withNamePart(name, () => super.apply(stats))
+      extractName(ref).foreach { qname =>
+        recordScope(qname)
+        qname.parents.iterator.foreach(nameParts.append(_))
+        qname.simpleName.foreach { name =>
+          withNamePart(name, () => super.apply(stats))
+        }    
+      }
     }
 
     case Pkg.Object(mods, nameNode, templ) => {
       visitMods(mods)
-      val name = extractName(nameNode)
-      recordScope(name)
+      extractName(nameNode).foreach { qname =>
+        recordScope(qname)
 
-      // TODO: should object already be recursive?
-      // an object is recursive if extends another type because we cannot figure out the provided types
-      // in the parents, we just mark the object as recursive (which is indicated by non-empty inits)
-      val recursive = !templ.inits.isEmpty
-      recordProvidedName(name, sawObject = true, recursive = recursive)
+        // TODO: should object already be recursive?
+        // an object is recursive if extends another type because we cannot figure out the provided types
+        // in the parents, we just mark the object as recursive (which is indicated by non-empty inits)
+        val recursive = !templ.inits.isEmpty
+        recordProvidedName(qname, sawObject = true, recursive = recursive)
 
-      // visitTemplate visits the inits part of the template in the outer scope,
-      // however for a package object the inits part can actually be found both in the inner scope as well (package inner).
-      // therefore we are not calling visitTemplate, calling all the apply methods in the inner scope.
-      // issue https://github.com/pantsbuild/pants/issues/16259
-      withNamePart(
-        name,
-        () => {
-          templ.inits.foreach(init => apply(init))
-          apply(templ.early)
-          apply(templ.stats)
+        // visitTemplate visits the inits part of the template in the outer scope,
+        // however for a package object the inits part can actually be found both in the inner scope as well (package inner).
+        // therefore we are not calling visitTemplate, calling all the apply methods in the inner scope.
+        // issue https://github.com/pantsbuild/pants/issues/16259
+        qname.simpleName.foreach { name =>
+          withNamePart(
+            name,
+            () => {
+              templ.inits.foreach(init => apply(init))
+              apply(templ.early)
+              apply(templ.stats)
+            }
+          )
         }
-      )
+      }
     }
 
     case defn: Member.Type with WithMods with WithTParamClause with WithCtor with WithTemplate => // traits, enums and classes
       visitMods(defn.mods)
-      val name = extractName(defn.name)
-      recordProvidedName(name)
-      apply(defn.tparamClause)
-      apply(defn.ctor)
-      visitTemplate(defn.templ, name)
+      extractName(defn.name).foreach { name =>
+        recordProvidedName(name)
+        apply(defn.tparamClause)
+        apply(defn.ctor)
+        name.simpleName.foreach(visitTemplate(defn.templ, _))        
+      }
+
     case Defn.EnumCase.After_4_6_0(mods, nameNode, tparamClause, ctor, _) =>
       visitMods(mods)
-      val name = extractName(nameNode)
-      recordProvidedName(name)
-      apply(tparamClause)
-      apply(ctor)
+      extractName(nameNode).foreach { name =>
+        recordProvidedName(name)
+        apply(tparamClause)
+        apply(ctor)
+      }
 
     case Defn.Object(mods, nameNode, templ) => {
       visitMods(mods)
-      val name = extractName(nameNode)
+      extractName(nameNode).foreach { name =>
+        // TODO: should object already be recursive?
+        // an object is recursive if extends another type because we cannot figure out the provided types
+        // in the parents, we just mark the object as recursive (which is indicated by non-empty inits)
+        val recursive = !templ.inits.isEmpty
+        recordProvidedName(name, sawObject = true, recursive = recursive)
 
-      // TODO: should object already be recursive?
-      // an object is recursive if extends another type because we cannot figure out the provided types
-      // in the parents, we just mark the object as recursive (which is indicated by non-empty inits)
-      val recursive = !templ.inits.isEmpty
-      recordProvidedName(name, sawObject = true, recursive = recursive)
-
-      // If the object is recursive, no need to provide the symbols inside
-      if (recursive)
-        withSuppressProvidedNames(() => visitTemplate(templ, name))
-      else
-        visitTemplate(templ, name)
+        name.simpleName.foreach { templateName =>
+          // If the object is recursive, no need to provide the symbols inside
+          if (recursive)
+            withSuppressProvidedNames(() => visitTemplate(templ, templateName))
+          else
+            visitTemplate(templ, templateName)
+        }        
+      }
     }
 
     case Defn.Type(mods, nameNode, _tparams, body) => {
       visitMods(mods)
-      val name = extractName(nameNode)
-      recordProvidedName(name)
-      extractNamesFromTypeTree(body).foreach(recordConsumedSymbol(_))
+      extractName(nameNode).foreach { name =>
+        recordProvidedName(name)
+        extractNamesFromTypeTree(body).iterator.foreach(recordConsumedSymbol(_))
+      }
     }
 
     case Defn.Val(mods, pats, decltpe, rhs) => {
       visitMods(mods)
       pats.headOption.foreach(pat => {
-        val name = extractName(pat)
-        recordProvidedName(name)
+        extractName(pat).foreach(recordProvidedName(_))
       })
       decltpe.foreach(tpe => {
-        extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
+        extractNamesFromTypeTree(tpe).iterator.foreach(recordConsumedSymbol(_))
       })
       super.apply(rhs)
     }
@@ -284,22 +361,20 @@ class SourceAnalysisTraverser extends Traverser {
     case Defn.Var(mods, pats, decltpe, rhs) => {
       visitMods(mods)
       pats.headOption.foreach(pat => {
-        val name = extractName(pat)
-        recordProvidedName(name)
+        extractName(pat).foreach(recordProvidedName(_))
       })
       decltpe.foreach(tpe => {
-        extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
+        extractNamesFromTypeTree(tpe).iterator.foreach(recordConsumedSymbol(_))
       })
       super.apply(rhs)
     }
 
     case Defn.Def(mods, nameNode, tparams, params, decltpe, body) => {
       visitMods(mods)
-      val name = extractName(nameNode)
-      recordProvidedName(name)
+      extractName(nameNode).foreach(recordProvidedName(_))
 
       decltpe.foreach(tpe => {
-        extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
+        extractNamesFromTypeTree(tpe).iterator.foreach(recordConsumedSymbol(_))
       })
 
       apply(tparams)
@@ -310,39 +385,40 @@ class SourceAnalysisTraverser extends Traverser {
 
     case Decl.Def(mods, _nameNode, tparams, params, decltpe) => {
       visitMods(mods)
-      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+      extractNamesFromTypeTree(decltpe).iterator.foreach(recordConsumedSymbol(_))
       apply(tparams)
       params.foreach(param => apply(param))
     }
 
     case Decl.Val(mods, _pats, decltpe) => {
       visitMods(mods)
-      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+      extractNamesFromTypeTree(decltpe).iterator.foreach(recordConsumedSymbol(_))
     }
 
     case Decl.Var(mods, _pats, decltpe) => {
       visitMods(mods)
-      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+      extractNamesFromTypeTree(decltpe).iterator.foreach(recordConsumedSymbol(_))
     }
 
     case Import(importers) => {
       importers.foreach({ case Importer(ref, importees) =>
-        val baseName = extractName(ref)
+        // Importers will always have a named ref
+        val baseName = extractName(ref).getOrElse(QualifiedName.Root)
         importees.foreach(importee => {
           importee match {
             case Importee.Wildcard() => recordImport(baseName, None, true)
             case Importee.Name(nameNode) => {
-              recordImport(s"${baseName}.${extractName(nameNode)}", None, false)
+              extractName(nameNode).foreach { name =>
+                recordImport(baseName.qualify(name), None, false)
+              }
             }
             case Importee.Rename(nameNode, aliasNode) => {
-              // If a type is aliased to `_`, it is not brought into scope. We still record
-              // the import though, since compilation will fail if an import is not present.
-              val alias = extractName(aliasNode)
-              recordImport(
-                s"${baseName}.${extractName(nameNode)}",
-                if (alias == "_") None else Some(alias),
-                false
-              )
+              extractName(nameNode).foreach { name =>
+                // If a type is aliased to `_`, it is not brought into scope. We still record
+                // the import though, since compilation will fail if an import is not present.
+                val alias = extractName(aliasNode).map(_.fullName).filterNot(_ == "_")
+                recordImport(baseName.qualify(name), alias, false)
+              }
             }
             case _ =>
           }
@@ -351,21 +427,21 @@ class SourceAnalysisTraverser extends Traverser {
     }
 
     case Init(tpe, _name, argss) => {
-      extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
+      extractNamesFromTypeTree(tpe).iterator.foreach(recordConsumedSymbol(_))
       argss.foreach(_.foreach(apply))
     }
 
     case Term.Param(mods, _name, decltpe, _default) => {
       visitMods(mods)
       decltpe.foreach(tpe => {
-        extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
+        extractNamesFromTypeTree(tpe).iterator.foreach(recordConsumedSymbol(_))
       })
     }
 
     case Type.Param(mods, _name, _tparams, bounds, _vbounds, cbounds) => {
       visitMods(mods)
-      extractNamesFromTypeTree(bounds).foreach(recordConsumedSymbol(_))
-      cbounds.flatMap(extractNamesFromTypeTree(_)).foreach(recordConsumedSymbol(_))
+      extractNamesFromTypeTree(bounds).iterator.foreach(recordConsumedSymbol(_))
+      Chain.fromSeq(cbounds).flatMap(extractNamesFromTypeTree(_)).iterator.foreach(recordConsumedSymbol(_))
     }
 
     case Ctor.Primary(mods, _name, params_list) => {
@@ -383,16 +459,20 @@ class SourceAnalysisTraverser extends Traverser {
       init.argss.foreach(arg => apply(arg))
     }
 
+    case Self(_name, Some(decltpe)) =>
+      extractNamesFromTypeTree(decltpe).iterator.foreach(recordConsumedSymbol(_))
+
     case node @ Term.Select(_, _) => {
-      val name = extractName(node)
-      recordConsumedSymbol(name)
+      extractName(node).foreach(recordConsumedSymbol(_))
       apply(node.qual)
     }
 
     case node @ Term.Name(_) => {
-      val name = extractName(node)
-      recordConsumedSymbol(name)
+      extractName(node).foreach(recordConsumedSymbol(_))
     }
+
+    case Pat.Typed((_name, decltpe)) =>
+      extractNamesFromTypeTree(decltpe).iterator.foreach(recordConsumedSymbol(_))
 
     case node => super.apply(node)
   }
@@ -401,7 +481,7 @@ class SourceAnalysisTraverser extends Traverser {
     providedSymbolsByScope
       .flatMap({ case (scopeName, symbolsForScope) =>
         symbolsForScope.map { case (symbolName, symbol) =>
-          Analysis.ProvidedSymbol(qualifyName(scopeName, symbolName), symbol.recursive)
+          Analysis.ProvidedSymbol(scopeName.qualify(symbolName).fullName, symbol.recursive)
         }.toVector
       })
       .to(SortedSet)
@@ -426,24 +506,30 @@ class SourceAnalysisTraverser extends Traverser {
           }
         })
 
-        encodedSymbolsForScope.map(symbol => symbol.copy(name = qualifyName(scopeName, symbol.name)))
+        encodedSymbolsForScope.map(symbol => symbol.copy(name = scopeName.qualify(symbol.name).fullName))
       })
       .to(SortedSet)
+  }
+
+  def gatherImportsByScope(): Map[String, List[AnImport[String]]] =
+    importsByScope.toMap.map { case (scopeName, imports) =>
+      scopeName.fullName -> imports.toList.map(_.map(_.fullName))
+    }
+
+  def gatherConsumerSymbolsByScope(): Map[String, SortedSet[Analysis.ConsumedSymbol]] = {
+    consumedSymbolsByScope.toMap.map { case (scopeName, consumedSymbolNames) =>
+      scopeName.fullName -> consumedSymbolNames.map(qname => Analysis.ConsumedSymbol(qname.fullName, qname.isAbsolute)).to(SortedSet)
+    }
   }
 
   def toAnalysis: Analysis = {
     Analysis(
       providedSymbols = gatherProvidedSymbols(),
       providedSymbolsEncoded = gatherEncodedProvidedSymbols(),
-      importsByScope = importsByScope,
-      consumedSymbolsByScope = consumedSymbolsByScope,
-      scopes = scopes.toVector
+      importsByScope = gatherImportsByScope(),
+      consumedSymbolsByScope = gatherConsumerSymbolsByScope(),
+      scopes = scopes.map(_.fullName).toVector
     )
-  }
-
-  private def qualifyName(qualifier: String, name: String): String = {
-    if (qualifier.length > 0) s"$qualifier.$name"
-    else name
   }
 }
 

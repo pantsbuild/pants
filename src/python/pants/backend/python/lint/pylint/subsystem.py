@@ -7,7 +7,6 @@ import os.path
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.lint.pylint.skip_field import SkipPylintField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
@@ -22,11 +21,13 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.unions import UnionRule
 from pants.option.option_types import (
     ArgsListOption,
     BoolOption,
@@ -61,7 +62,7 @@ class PylintFieldSet(FieldSet):
 class Pylint(PythonToolBase):
     options_scope = "pylint"
     name = "Pylint"
-    help = "The Pylint linter for Python code (https://www.pylint.org/)."
+    help_short = "The Pylint linter for Python code (https://www.pylint.org/)."
 
     default_main = ConsoleScript("pylint")
     default_requirements = ["pylint>=2.13.0,<3"]
@@ -106,7 +107,7 @@ class Pylint(PythonToolBase):
             example, if your plugin is at `build-support/pylint/custom_plugin.py`, add
             `'build-support/pylint'` to `[source].root_patterns` in `pants.toml`. This is
             necessary for Pants to know how to tell Pylint to discover your plugin. See
-            {doc_url('source-roots')}
+            {doc_url('docs/using-pants/key-concepts/source-roots')}
 
             You must also set `load-plugins=$module_name` in your Pylint config file.
 
@@ -115,7 +116,7 @@ class Pylint(PythonToolBase):
             directory or a subdirectory.
 
             To instead load third-party plugins, add them to a custom resolve alongside
-            pylint itself, as described in {doc_url("python-lockfiles#lockfiles-for-tools")}.
+            pylint itself, as described in {doc_url("docs/python/overview/lockfiles#lockfiles-for-tools")}.
             """
         ),
     )
@@ -202,5 +203,5 @@ async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
+        UnionRule(ExportableTool, Pylint),
     )

@@ -12,7 +12,7 @@ from pants.backend.scala.target_types import (
     ScalatestTestSourceField,
     ScalatestTestTimeoutField,
 )
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
@@ -27,10 +27,11 @@ from pants.engine.addresses import Addresses
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import (
-    FallibleProcessResult,
     InteractiveProcess,
     Process,
     ProcessCacheScope,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField, TransitiveTargets, TransitiveTargetsRequest
@@ -39,7 +40,7 @@ from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmDependenciesField, JvmJdkField
 from pants.util.logging import LogLevel
@@ -67,10 +68,6 @@ class ScalatestTestRequest(TestRequest):
     supports_debug = True
 
 
-class ScalatestToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = Scalatest.options_scope
-
-
 @dataclass(frozen=True)
 class TestSetupRequest:
     field_set: ScalatestTestFieldSet
@@ -96,7 +93,7 @@ async def setup_scalatest_for_target(
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
     )
 
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalatestToolLockfileSentinel())
+    lockfile_request = GenerateJvmLockfileFromTool.create(scalatest)
     classpath, scalatest_classpath, files = await MultiGet(
         Get(Classpath, Addresses([request.field_set.address])),
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
@@ -176,16 +173,20 @@ async def run_scalatest_test(
     field_set = batch.single_element
 
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
-    process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
+    process = await Get(Process, JvmProcess, test_setup.process)
+    process_results = await Get(
+        ProcessResultWithRetries, ProcessWithRetries(process, test_subsystem.attempts_default)
+    )
     reports_dir_prefix = test_setup.reports_dir_prefix
 
     xml_result_subset = await Get(
-        Digest, DigestSubset(process_result.output_digest, PathGlobs([f"{reports_dir_prefix}/**"]))
+        Digest,
+        DigestSubset(process_results.last.output_digest, PathGlobs([f"{reports_dir_prefix}/**"])),
     )
     xml_results = await Get(Snapshot, RemovePrefix(xml_result_subset, reports_dir_prefix))
 
     return TestResult.from_fallible_process_result(
-        process_result,
+        process_results=process_results.results,
         address=field_set.address,
         output_setting=test_subsystem.output,
         xml_results=xml_results,
@@ -203,17 +204,10 @@ async def setup_scalatest_debug_request(
     )
 
 
-@rule
-def generate_scalatest_lockfile_request(
-    _: ScalatestToolLockfileSentinel, scalatest: Scalatest
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(scalatest)
-
-
 def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, ScalatestToolLockfileSentinel),
+        UnionRule(ExportableTool, Scalatest),
         *ScalatestTestRequest.rules(),
     ]

@@ -1,5 +1,14 @@
 [package]
-version = "0.0.2"
+# NB: The Major/Minor is loosely tied to Pants version of the latest breaking change.
+# The patch version should be incremented every time a breaking change is cherry-picked.
+# So when you're making a change on `main`:
+# - Set this to main's Major/Minor.0 if it isn't already
+# - Otherwise, increment the patch number
+# Then when/if you cherry-pick and it fails, simply increment the patch number on the target branch.
+#
+# (A "breaking change" is one that changes the behavior of dependency parsing. This version is
+# embedded in the local cache. Therefore if behavior changes, the cache should be busted)
+version = "2.18.0"
 edition = "2021"
 name = "dep_inference"
 authors = ["Pants Build <pantsbuild@gmail.com>"]
@@ -9,8 +18,6 @@ publish = false
 hex = { workspace = true }
 sha2 = { workspace = true }
 walkdir = { workspace = true }
-
-# NB: If a change to these versions requires cache busting, bump this package's version
 tree-sitter = { workspace = true }
 tree-sitter-javascript = { workspace = true }
 tree-sitter-python = { workspace = true }
@@ -21,8 +28,9 @@ protos = { path = "../protos" }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 itertools = { workspace = true }
-
-# NB: If a change to these versions requires cache busting, bump this package's version
 tree-sitter = { workspace = true }
 tree-sitter-javascript = { workspace = true }
 tree-sitter-python = { workspace = true }
+
+[lints]
+workspace = true

@@ -8,6 +8,8 @@ import os.path
 from fnmatch import fnmatch
 from typing import Callable, Iterable, Iterator, Sequence, TypeVar
 
+from typing_extensions import Self
+
 from pants.help.maybe_color import MaybeColor
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -51,6 +53,15 @@ class KeyValueSequenceUtil(FrozenOrderedSet[str]):
             entry_and_value[0] for entry_and_value in key_to_entry_and_value.values()
         )
         return cls(FrozenOrderedSet(deduped_entries))
+
+    @classmethod
+    def from_dict(cls, value: dict[str, str | None]) -> Self:
+        def encode_kv(k: str, v: str | None) -> str:
+            if v is None:
+                return k
+            return "=".join((k, v))
+
+        return cls(FrozenOrderedSet(sorted(encode_kv(k, v) for k, v in value.items())))
 
     def to_dict(
         self, default: Callable[[str], str | None] = lambda x: None

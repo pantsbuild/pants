@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.backend.java.subsystems.junit import JUnit
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
@@ -24,10 +24,11 @@ from pants.engine.addresses import Addresses
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import (
-    FallibleProcessResult,
     InteractiveProcess,
     Process,
     ProcessCacheScope,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField, TransitiveTargets, TransitiveTargetsRequest
@@ -36,7 +37,7 @@ from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     JunitTestSourceField,
@@ -69,10 +70,6 @@ class JunitTestRequest(TestRequest):
     supports_debug = True
 
 
-class JunitToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = JUnit.options_scope
-
-
 @dataclass(frozen=True)
 class TestSetupRequest:
     field_set: JunitTestFieldSet
@@ -98,7 +95,7 @@ async def setup_junit_for_target(
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
     )
 
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, JunitToolLockfileSentinel())
+    lockfile_request = GenerateJvmLockfileFromTool.create(junit)
     classpath, junit_classpath, files = await MultiGet(
         Get(Classpath, Addresses([request.field_set.address])),
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
@@ -175,16 +172,20 @@ async def run_junit_test(
     field_set = batch.single_element
 
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
-    process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
+    process = await Get(Process, JvmProcess, test_setup.process)
+    process_results = await Get(
+        ProcessResultWithRetries, ProcessWithRetries(process, test_subsystem.attempts_default)
+    )
     reports_dir_prefix = test_setup.reports_dir_prefix
 
     xml_result_subset = await Get(
-        Digest, DigestSubset(process_result.output_digest, PathGlobs([f"{reports_dir_prefix}/**"]))
+        Digest,
+        DigestSubset(process_results.last.output_digest, PathGlobs([f"{reports_dir_prefix}/**"])),
     )
     xml_results = await Get(Snapshot, RemovePrefix(xml_result_subset, reports_dir_prefix))
 
     return TestResult.from_fallible_process_result(
-        process_result,
+        process_results=process_results.results,
         address=field_set.address,
         output_setting=test_subsystem.output,
         xml_results=xml_results,
@@ -202,17 +203,10 @@ async def setup_junit_debug_request(
     )
 
 
-@rule
-def generate_junit_lockfile_request(
-    _: JunitToolLockfileSentinel, junit: JUnit
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(junit)
-
-
 def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, JunitToolLockfileSentinel),
+        UnionRule(ExportableTool, JUnit),
         *JunitTestRequest.rules(),
     ]

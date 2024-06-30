@@ -128,7 +128,7 @@ def test_simple_cue_fmt_issue(rule_runner: RuleRunner) -> None:
     assert_results(
         rule_runner,
         run_cue(rule_runner, ["src/example.cue"]),
-        # `cue fmt` does not output anything.. so we have only the formatted files to go on. :/
+        # `cue fmt` does not output anything. so we have only the formatted files to go on. :/
         ExpectedResult(
             files=[
                 (

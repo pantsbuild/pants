@@ -8,10 +8,11 @@ ansicolors==1.1.8
 chevron==0.14.0
 fasteners==0.16.3
 freezegun==1.2.1
-ijson==3.1.4
+ijson==3.2.3
+libcst==1.4.0
 packaging==21.3
-pex==2.1.137
-psutil==5.9.0
+pex==2.3.3
+psutil==5.9.8
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
 # Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most
@@ -30,13 +31,15 @@ types-PyYAML==6.0.3
 types-requests==2.28.1
 types-setuptools==62.6.1
 types-toml==0.10.8
-typing-extensions==4.3.0
+typing-extensions~=4.12
 mypy-typing-asserts==0.1.1
 node-semver==0.9.0
 
 
-# This dependency is only for debugging Pants itself, and should never be imported
+# These dependencies are only for debugging Pants itself (in VSCode/PyCharm respectively),
+# and should never be imported.
 debugpy==1.6.0
+pydevd-pycharm==203.5419.8
 
 # These dependencies must only be used from the explorer backend, and no code outside that backend
 # may import anything from it, so these libraries are not ending up as requirements of Pants itself.

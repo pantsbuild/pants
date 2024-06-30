@@ -10,6 +10,7 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
+    DictStringToStringField,
     IntField,
     MultipleSourcesField,
     SpecialCasedDependencies,
@@ -216,6 +217,25 @@ class AdhocToolWorkdirField(StringField):
     )
 
 
+class AdhocToolNamedCachesField(DictStringToStringField):
+    alias = "experimental_named_caches"
+    help = help_text(
+        """
+        Named caches to construct for the execution.
+        See https://www.pantsbuild.org/docs/reference-global#named_caches_dir.
+
+        The keys of the mapping are the directory name to be created in the named caches dir.
+        The values are the name of the symlink (relative to the sandbox root) in the sandbox which
+        points to the subdirectory in the named caches dir
+
+        NOTE: The named caches MUST be handled with great care. Processes accessing the named caches
+        can be run in parallel, and can be cancelled at any point in their execution (and
+        potentially restarted). That means that _every_ operation modifying the contents of the cache
+        MUST be concurrency and cancellation safe.
+        """
+    )
+
+
 class AdhocToolOutputRootDirField(StringField):
     alias: ClassVar[str] = "root_output_directory"
     default = "/"
@@ -229,6 +249,27 @@ class AdhocToolOutputRootDirField(StringField):
           * Values beginning with `./` are relative to the location of the `BUILD` file.
           * `/` or the empty string specifies the build root.
           * Values beginning with `/` are also relative to the build root.
+        """
+    )
+
+
+class AdhocToolWorkspaceInvalidationSourcesField(StringSequenceField):
+    alias: ClassVar[str] = "workspace_invalidation_sources"
+    help = help_text(
+        """
+        Path globs for source files on which this target depends and for which any changes should cause
+        this target's process to be re-executed. Unlike ordinary dependencies, the files referenced by
+        `workspace_invalidation_sources` globs are not materialized into any execution sandbox
+        and are referenced solely for cache invalidation purposes.
+
+        Note: This field is intended to work with the in-workspace execution environment configured by
+        the `workspace_environment` target type. It should only be used when the configured
+        environment for a target is a `workspace_environment`.
+
+        Implementation: Pants computes a digest of all of the files referenced by the provided globs
+        and injects that digest into the process as an environment variable. Since environment variables
+        are part of the cache key for a process's execution, any changes to the referenced files will
+        change the digest and thus force re-exection of the process.
         """
     )
 
@@ -252,6 +293,7 @@ class AdhocToolTarget(Target):
         AdhocToolOutputRootDirField,
         AdhocToolStdoutFilenameField,
         AdhocToolStderrFilenameField,
+        AdhocToolWorkspaceInvalidationSourcesField,
         EnvironmentField,
     )
     help = help_text(

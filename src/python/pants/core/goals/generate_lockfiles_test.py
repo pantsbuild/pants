@@ -36,8 +36,10 @@ from pants.core.goals.generate_lockfiles import (
     WrappedGenerateLockfile,
     _preferred_environment,
     determine_resolves_to_generate,
+    filter_lockfiles_for_unconfigured_exportable_tools,
     filter_tool_lockfile_requests,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.target import Dependencies, Target
@@ -116,7 +118,7 @@ def test_determine_tool_sentinels_to_generate() -> None:
         set(),
     ) == ([Lang1Requested(["ambiguous"])], [])
 
-    # Error if same resolve name used for multiple user lockfiles.
+    # Error if the same resolve name is used for multiple user lockfiles.
     with pytest.raises(AmbiguousResolveNamesError):
         determine_resolves_to_generate(
             [
@@ -406,3 +408,52 @@ def test_diff_printer(
         re.sub(" +\n", "\n", args[0])
     )
     assert actual_output == expect_output
+
+
+class TestExportableTool(ExportableTool):
+    options_scope = "test_exportable_tool"
+
+
+def test_filter_unconfigured_tools_configured():
+    """Test that a configured tool succeeds."""
+    resolve_name = "myresolve"
+    resolve_dest = "resolve.lock"
+
+    errs, results = filter_lockfiles_for_unconfigured_exportable_tools(
+        [GenerateLockfile(resolve_name=resolve_name, lockfile_dest=resolve_dest, diff=False)],
+        {resolve_name: TestExportableTool},
+        resolve_specified=True,
+    )
+
+    assert len(errs) == 0
+    assert len(results) == 1
+
+
+def test_filter_unconfigured_tools_not_configured():
+    """Test that a request for a tool using a default lockfiles results in an error."""
+    resolve_name = "myresolve"
+    resolve_dest = DEFAULT_TOOL_LOCKFILE
+
+    errs, results = filter_lockfiles_for_unconfigured_exportable_tools(
+        [GenerateLockfile(resolve_name=resolve_name, lockfile_dest=resolve_dest, diff=False)],
+        {resolve_name: TestExportableTool},
+        resolve_specified=True,
+    )
+
+    assert len(errs) == 1
+    assert len(results) == 0
+
+
+def test_filter_unconfigured_tools_all_excludes_internal():
+    """Test that when a user requests all lockfiles, we exclude unconfigured internal tools."""
+    resolve_name = "myresolve"
+    resolve_dest = DEFAULT_TOOL_LOCKFILE
+
+    errs, results = filter_lockfiles_for_unconfigured_exportable_tools(
+        [GenerateLockfile(resolve_name=resolve_name, lockfile_dest=resolve_dest, diff=False)],
+        {resolve_name: TestExportableTool},
+        resolve_specified=False,
+    )
+
+    assert len(errs) == 0
+    assert len(results) == 0

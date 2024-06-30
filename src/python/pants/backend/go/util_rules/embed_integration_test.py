@@ -114,7 +114,9 @@ def _assert_test_result_success(test_result: TestResult) -> None:
         f = f.f_back
         assert f is not None
         pytest.fail(
-            f"{f.f_code.co_filename}:{f.f_lineno}: test result error: stdout=`{test_result.stdout}`; stderr=`{test_result.stderr}`"
+            f"{f.f_code.co_filename}:{f.f_lineno}: test result error: "
+            f"stdout=`{test_result.stdout_bytes.decode()}`; "
+            f"stderr=`{test_result.stderr_bytes.decode()}`"
         )
 
 

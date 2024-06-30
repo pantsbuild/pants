@@ -2,13 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-import unittest
 from contextlib import contextmanager
 from pathlib import Path
 from textwrap import dedent
 from typing import Iterator
-
-import pytest
 
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.testutil.pants_integration_test import run_pants
@@ -18,16 +15,7 @@ _NO_BUILD_FILE_TARGET_BASE = "testprojects/src/python/no_build_file"
 _SOURCES_TARGET_BASE = "testprojects/src/python/sources"
 
 _ERR_TARGETS = {
-    "testprojects/src/python/sources:some-missing-some-not": [
-        "['*.txt', '*.rs']",
-        "Snapshot(PathGlobs(globs=('testprojects/src/python/sources/*.txt', 'testprojects/src/python/sources/*.rs'), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(value=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(value=all_match)))",
-        'Unmatched glob from testprojects/src/python/sources:some-missing-some-not\'s `sources` field: "testprojects/src/python/sources/*.rs"',
-    ],
-    "testprojects/src/python/sources:missing-sources": [
-        "*.scala",
-        "Snapshot(PathGlobs(globs=('testprojects/src/python/sources/*.scala', '!testprojects/src/python/sources/*Test.scala', '!testprojects/src/python/sources/*Spec.scala'), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(value=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(value=any_match)))",
-        'Unmatched glob from testprojects/src/python/sources:missing-sources\'s `sources` field:: "testprojects/src/python/sources/*.scala", excludes: ["testprojects/src/python/sources/*Test.scala", "testprojects/src/python/sources/*Spec.scala"]',
-    ],
+    "testprojects/src/python/sources:missing-sources": 'Unmatched glob from testprojects/src/python/sources:missing-sources\'s `sources` field: "testprojects/src/python/sources/*.scala", excludes: ["testprojects/src/python/sources/*Spec.scala", "testprojects/src/python/sources/*Suite.scala", "testprojects/src/python/sources/*Test.scala"]',
 }
 
 
@@ -37,7 +25,7 @@ def setup_sources_targets() -> Iterator[None]:
     original_content = build_path.read_text()
     new_content = dedent(
         """\
-        scala_library(
+        scala_sources(
           name='missing-sources',
         )
 
@@ -74,8 +62,16 @@ def setup_sources_targets() -> Iterator[None]:
         yield
 
 
-@unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/8520")
-@pytest.mark.no_error_if_skipped
+def _config(warn_on_unmatched_globs: bool) -> dict:
+    return {
+        GLOBAL_SCOPE_CONFIG_SECTION: {
+            "backend_packages": ["pants.backend.python", "pants.backend.experimental.scala"],
+            "unmatched_build_file_globs": "warn" if warn_on_unmatched_globs else "error",
+        }
+    }
+
+
+# See https://github.com/pantsbuild/pants/issues/8520 for past flakiness of this test.
 def test_missing_sources_warnings():
     target_to_unmatched_globs = {
         "missing-globs": ["*.a"],
@@ -87,7 +83,7 @@ def test_missing_sources_warnings():
             target_full = f"{_SOURCES_TARGET_BASE}:{target}"
             pants_run = run_pants(
                 ["filedeps", target_full],
-                config={GLOBAL_SCOPE_CONFIG_SECTION: {"unmatched_build_file_globs": "warn"}},
+                config=_config(warn_on_unmatched_globs=True),
             )
             pants_run.assert_success()
             unmatched_globs = target_to_unmatched_globs[target]
@@ -106,28 +102,25 @@ def test_missing_sources_warnings():
                 )
 
 
-@unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/8520")
-@pytest.mark.no_error_if_skipped
+# See https://github.com/pantsbuild/pants/issues/8520 for past flakiness of this test.
 def test_existing_sources():
     target_full = f"{_SOURCES_TARGET_BASE}:text"
     pants_run = run_pants(
         ["filedeps", target_full],
-        config={GLOBAL_SCOPE_CONFIG_SECTION: {"unmatched_build_file_globs": "warn"}},
+        config=_config(warn_on_unmatched_globs=True),
     )
     pants_run.assert_success()
     assert "[WARN] Unmatched glob" not in pants_run.stderr
 
 
-@unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6787")
-@pytest.mark.no_error_if_skipped
+# See https://github.com/pantsbuild/pants/issues/6787 for past flakiness of this test.
 def test_error_message():
     with setup_sources_targets():
         for target in _ERR_TARGETS:
-            expected_excerpts = _ERR_TARGETS[target]
+            expected_excerpt = _ERR_TARGETS[target]
             pants_run = run_pants(
                 ["filedeps", target],
-                config={GLOBAL_SCOPE_CONFIG_SECTION: {"unmatched_build_file_globs": "error"}},
+                config=_config(warn_on_unmatched_globs=False),
             )
             pants_run.assert_failure()
-            for excerpt in expected_excerpts:
-                assert excerpt in pants_run.stderr
+            assert expected_excerpt in pants_run.stderr

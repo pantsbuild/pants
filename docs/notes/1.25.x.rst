@@ -1,0 +1,668 @@
+1.25.x Stable Releases
+======================
+
+This document describes releases leading up to the ``1.25.x`` ``stable`` series.
+
+The ``1.25.x`` series brings two major changes to Pants:
+
+1. Deprecating ``globs()``, ``rglobs()``, and ``zglobs()`` in BUILD files.
+2. Adding file args.
+
+Please see https://groups.google.com/forum/#!topic/pants-devel/3nmdSeyvwU0 for more information.
+
+1.25.1rc1 (6/16/2020)
+---------------------
+
+N.B.: No further releases are expected in the ``1.25.x`` ``stable`` series. This ``.1rc1``
+release is for those upgrading through stable versions who wish to retain pytest console
+coverage support in Pants "v1".
+
+Bugfixes
+~~~~~~~~
+
+* Restore pytest coverage console report. (#10018)
+  `PR #10018 <https://github.com/pantsbuild/pants/pull/10018>`_
+
+1.25.1rc0 (03/20/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Zinc: Use an Array[PublishDiagnosticsParam] for LSP compliance (#9292)
+  `PR #9292 <https://github.com/pantsbuild/pants/pull/9292>`_
+
+* Enable zinc to log diagnostics for jvm languages (#9228)
+  `PR #9228 <https://github.com/pantsbuild/pants/pull/9228>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Report warnings and errors to reporting server for JVM targets (#9293)
+  `PR #9293 <https://github.com/pantsbuild/pants/pull/9293>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix relative path in Zinc compiler (#9261)
+  `PR #9261 <https://github.com/pantsbuild/pants/pull/9261>`_
+
+* Revert "Load the bootstrapped zinc compiler from the zinc server's classpath. (#8753)" (#9226)
+  `PR #9226 <https://github.com/pantsbuild/pants/pull/9226>`_
+
+* fixing scoverage sourcePath to be relative in OSS (#8132)
+  `PR #8132 <https://github.com/pantsbuild/pants/pull/8132>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix `PathGlobs` to be deterministic for more cache hits (#9347)
+  `PR #9347 <https://github.com/pantsbuild/pants/pull/9347>`_
+
+* Format zinc compiler with scalafmt (#9227)
+  `PR #9227 <https://github.com/pantsbuild/pants/pull/9227>`_
+
+1.25.0 (03/12/2020)
+-------------------
+
+The first stable release of the ``1.25.x`` series, with no changes since the previous `rc`!
+
+1.25.0rc1 (03/6/2020)
+---------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Add back `ignore` for `--files-not-found-behavior` (#9175)
+  `PR #9175 <https://github.com/pantsbuild/pants/pull/9175>`_
+
+* Remove pytest passthrough args deprecation. (#9126)
+  `PR #9126 <https://github.com/pantsbuild/pants/pull/9126>`_
+
+* Delay removing `--test-fast` from 1.27.0.dev0 to 1.28.0.dev0 (#9250)
+  `PR #9250 <https://github.com/pantsbuild/pants/pull/9250>`_
+
+Bugfixes
+~~~~~~~~
+
+* Compiler option sets can be lists or sets (#9182)
+  `PR #9182 <https://github.com/pantsbuild/pants/pull/9182>`_
+
+* Add non-jvm targets with classpath elements to exported modules as libraries. (#9084)
+  `PR #9084 <https://github.com/pantsbuild/pants/pull/9084>`_
+
+* Revert "Switch to dot idea project type (#8745)" (#9096)
+  `PR #9096 <https://github.com/pantsbuild/pants/pull/9096>`_
+
+* Re-pin pytest, and add a pin for zipp. (#9095)
+  `PR #9095 <https://github.com/pantsbuild/pants/pull/9095>`_
+
+* Fix deprecation warning for `--transitive` for goals that ignore the option (#9076)
+  `PR #9076 <https://github.com/pantsbuild/pants/pull/9076>`_
+
+* Trigger warning/error for deprecated Target method overrides. (#9073)
+  `PR #9073 <https://github.com/pantsbuild/pants/pull/9073>`_
+
+* Fix warnings filtering under pantsd. (#9121)
+  `PR #9121 <https://github.com/pantsbuild/pants/pull/9121>`_
+
+* Allow test specs to be used with --no-fast for junit (#9093)
+  `PR #9093 <https://github.com/pantsbuild/pants/pull/9093>`_
+
+1.25.0rc0 (02/4/2020)
+---------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate `globs`, `rglobs`, and `zglobs` (#9040)
+  `PR #9040 <https://github.com/pantsbuild/pants/pull/9040>`_
+
+* Deprecate `--owner-of` in favor of file arguments (#9050)
+  `PR #9050 <https://github.com/pantsbuild/pants/pull/9050>`_
+
+* Deprecate `--build-file-imports` defaulting to `warn` and having the option `allow` (#9047)
+  `PR #9047 <https://github.com/pantsbuild/pants/pull/9047>`_
+
+* Deprecate `--glob-expansion-failure` in favor of `--files-not-found-behavior` (#9022)
+  `PR #9022 <https://github.com/pantsbuild/pants/pull/9022>`_
+
+* [thrift linter] use non-zero exit on warning when strict and zero exit warning when not strict (#9051)
+  `PR #9051 <https://github.com/pantsbuild/pants/pull/9051>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow using file args with every goal (#9048)
+  `PR #9048 <https://github.com/pantsbuild/pants/pull/9048>`_
+
+* Add `--owners-not-found-behavior` option for when file args do not have any owning targets (#9068)
+  `PR #9068 <https://github.com/pantsbuild/pants/pull/9068>`_
+
+* Support python2 in the setup.py rule. (#8956)
+  `PR #8956 <https://github.com/pantsbuild/pants/pull/8956>`_
+
+* [IntelliJ] Add compiler options and plugins to the output of `export-dep-as-jar` (#9036)
+  `PR #9036 <https://github.com/pantsbuild/pants/pull/9036>`_
+
+* [IntelliJ] Add `javac_options` and `extra_jvm_options` to the output of `export-dep-as-jar` (#9053)
+  `PR #9053 <https://github.com/pantsbuild/pants/pull/9053>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix Python linters to work without `pants.backend.python` registered (#9059)
+  `PR #9059 <https://github.com/pantsbuild/pants/pull/9059>`_
+
+* Fix V2 `test` and `setup-py2` to work with file args (#9056)
+  `PR #9056 <https://github.com/pantsbuild/pants/pull/9056>`_
+
+* Split Zinc argfile by newline instead of space (#9065)
+  `PR #9065 <https://github.com/pantsbuild/pants/pull/9065>`_
+
+* Fix race condition with deprecation warnings (#9060)
+  `PR #9060 <https://github.com/pantsbuild/pants/pull/9060>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Change invalid file args to error instead of warn (#9041)
+  `PR #9041 <https://github.com/pantsbuild/pants/pull/9041>`_
+
+* Preserve the filesystem spec used to find owning targets (#9063)
+  `PR #9063 <https://github.com/pantsbuild/pants/pull/9063>`_
+
+* Decouple `--owner-of` implementation from `--changed-*` (#9046)
+  `PR #9046 <https://github.com/pantsbuild/pants/pull/9046>`_
+
+* Remove deps from the core into the Python backend's subsystems (#9049)
+  `PR #9049 <https://github.com/pantsbuild/pants/pull/9049>`_
+
+* Allow options to be registered passively. (#9061)
+  `PR #9061 <https://github.com/pantsbuild/pants/pull/9061>`_
+
+* Don't show core goals like `binary` and `test` when they have no implementation (#9002)
+  `PR #9002 <https://github.com/pantsbuild/pants/pull/9002>`_
+
+* Remove origin check from release.sh script (#9042)
+  `PR #9042 <https://github.com/pantsbuild/pants/pull/9042>`_
+
+* Snapshot subset intrinsic (#9006)
+  `PR #9006 <https://github.com/pantsbuild/pants/pull/9006>`_
+
+* No longer use `globs`, `rglobs`, and `zglobs` internally (#9029)
+  `PR #9029 <https://github.com/pantsbuild/pants/pull/9029>`_
+
+* Stop using `globs` in testprojects/ (#9039)
+  `PR #9039 <https://github.com/pantsbuild/pants/pull/9039>`_
+
+* Make `fix_deprecated_globs_usage.py` more robust (#9067)
+  `PR #9067 <https://github.com/pantsbuild/pants/pull/9067>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Update docs to use the new `!` exclude syntax for BUILD files (#9037)
+  `PR #9037 <https://github.com/pantsbuild/pants/pull/9037>`_
+
+1.25.0.dev3 (01/29/2020)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Remove the generate-pants-ini goal. (#8993)
+  `PR #8993 <https://github.com/pantsbuild/pants/pull/8993>`_
+
+* Deprecate `--fast` option (#8970)
+  `PR #8970 <https://github.com/pantsbuild/pants/pull/8970>`_
+
+* Switch to dot idea project type (#8745)
+  `PR #8745 <https://github.com/pantsbuild/pants/pull/8745>`_
+
+* Deprecate defaulting to `--transitive` (#8955)
+  `PR #8955 <https://github.com/pantsbuild/pants/pull/8955>`_
+
+* Add IPython subsystem and deprecate `--repl-py` options (#8996)
+  `PR #8996 <https://github.com/pantsbuild/pants/pull/8996>`_
+
+* Register certain optional conditionally on v1/v2 setup. (#8997)
+  `PR #8997 <https://github.com/pantsbuild/pants/pull/8997>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow filesystem specs with `cloc2` and `validate` (#8985)
+  `PR #8985 <https://github.com/pantsbuild/pants/pull/8985>`_
+
+* Allow excludes in BUILD files via new `!` syntax (#9025)
+  `PR #9025 <https://github.com/pantsbuild/pants/pull/9025>`_
+
+Bugfixes
+~~~~~~~~
+
+* Ensure that every filesystem spec is valid (#9009)
+  `PR #9009 <https://github.com/pantsbuild/pants/pull/9009>`_
+
+* remove custom NodeResolveFingerprintStrategy (#8398)
+  `PR #8398 <https://github.com/pantsbuild/pants/pull/8398>`_
+
+* Removing the exception when setup_py task has no work to do. (#8620)
+  `PR #8620 <https://github.com/pantsbuild/pants/pull/8620>`_
+
+* Resolve v2 plugins. (#9020)
+  `PR #9020 <https://github.com/pantsbuild/pants/pull/9020>`_
+
+* Fix `Outputting` mixin for V2 goals (#9011)
+  `PR #9011 <https://github.com/pantsbuild/pants/pull/9011>`_
+
+* Fix non-deterministic ConsolidateClasspath (#9001)
+  `PR #9001 <https://github.com/pantsbuild/pants/pull/9001>`_
+
+* Fix `validate` and `cloc2` breaking with targets with no sources (#9000)
+  `PR #9000 <https://github.com/pantsbuild/pants/pull/9000>`_
+
+* Fix rule type hint validation to work with `from __future__ import annotations` (#9004)
+  `PR #9004 <https://github.com/pantsbuild/pants/pull/9004>`_
+
+* correctly fingerprint scoverage options and copy output into dist/ (#8705)
+  `PR #8705 <https://github.com/pantsbuild/pants/pull/8705>`_
+
+* Restore support for `dependencies` outputting 3rdparty deps through new enum option (#8960)
+  `PR #8960 <https://github.com/pantsbuild/pants/pull/8960>`_
+
+* Set workunit parent IDs correctly (fixes #7969) (#8947)
+  `PR #8947 <https://github.com/pantsbuild/pants/pull/8947>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Modify options parser to allow `!` in file args (#9031)
+  `PR #9031 <https://github.com/pantsbuild/pants/pull/9031>`_
+
+* Refactor `PathGlobs` to support `!` ignore globs in its constructor (#9032)
+  `PR #9032 <https://github.com/pantsbuild/pants/pull/9032>`_
+
+* Fix some clippy errors which will appear in 1.41.0 (#9027)
+  `PR #9027 <https://github.com/pantsbuild/pants/pull/9027>`_
+
+* Expand `config_test.py` to better define the Config API (#9021)
+  `PR #9021 <https://github.com/pantsbuild/pants/pull/9021>`_
+
+* Refactor `engine/legacy/structs.py` (#9023)
+  `PR #9023 <https://github.com/pantsbuild/pants/pull/9023>`_
+
+* Describe the origin of failure when globs do not match (#9013)
+  `PR #9013 <https://github.com/pantsbuild/pants/pull/9013>`_
+
+* Small improvements to release script (#8964)
+  `PR #8964 <https://github.com/pantsbuild/pants/pull/8964>`_
+
+* First usage of async-await (#9018)
+  `PR #9018 <https://github.com/pantsbuild/pants/pull/9018>`_
+
+* Refactor `config.py` to allow supporting possible future config file formats (#9014)
+  `PR #9014 <https://github.com/pantsbuild/pants/pull/9014>`_
+
+* Bump to Rust 1.40 (#9017)
+  `PR #9017 <https://github.com/pantsbuild/pants/pull/9017>`_
+
+* Improve unmatched globs error message (#9010)
+  `PR #9010 <https://github.com/pantsbuild/pants/pull/9010>`_
+
+* Improve error messages for rule graph issues (#8998)
+  `PR #8998 <https://github.com/pantsbuild/pants/pull/8998>`_
+
+* Add type hints to `options.py`, `options_bootstrapper.py`, and `config.py` (#8990)
+  `PR #8990 <https://github.com/pantsbuild/pants/pull/8990>`_
+
+* Move intrinsics code into new module (#8999)
+  `PR #8999 <https://github.com/pantsbuild/pants/pull/8999>`_
+
+* Change distribution lookup for JvmTask subclasses to call into JvmTask (#8938)
+  `PR #8938 <https://github.com/pantsbuild/pants/pull/8938>`_
+
+* Refactor `--changed-include-dependees` to use an Enum option (#8995)
+  `PR #8995 <https://github.com/pantsbuild/pants/pull/8995>`_
+
+* Allow for deprecation of child scopes (#8984)
+  `PR #8984 <https://github.com/pantsbuild/pants/pull/8984>`_
+
+Testing
+~~~~~~~
+
+* Fix Zipp 2.0 release breaking Python 2 integration tests (#8994)
+  `PR #8994 <https://github.com/pantsbuild/pants/pull/8994>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Fix typo in in Python examples docs (#8987)
+  `PR #8987 <https://github.com/pantsbuild/pants/pull/8987>`_
+
+1.25.0.dev2 (01/17/2020)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add Bandit Python linter (#8929)
+  `PR #8929 <https://github.com/pantsbuild/pants/pull/8929>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate `--fmt-transitive` and `--lint-transitive` and switch defaults to False (#8969)
+  `PR #8969 <https://github.com/pantsbuild/pants/pull/8969>`_
+
+* Use Python 3.6+ by default for Python users (#8968)
+  `PR #8968 <https://github.com/pantsbuild/pants/pull/8968>`_
+
+* Remove `--cloc2-transitive` (#8957)
+  `PR #8957 <https://github.com/pantsbuild/pants/pull/8957>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Introduce `SourcesSnapshot` for goals that only need source files to operate (#8980)
+  `PR #8980 <https://github.com/pantsbuild/pants/pull/8980>`_
+
+* Tweak options parser to allow globs in filesystem specs (#8981)
+  `PR #8981 <https://github.com/pantsbuild/pants/pull/8981>`_
+
+* Gitignore the twine venv created when we run the release script. (#8966)
+  `PR #8966 <https://github.com/pantsbuild/pants/pull/8966>`_
+
+* Fix more typos (#8983)
+  `PR #8983 <https://github.com/pantsbuild/pants/pull/8983>`_
+
+* Add type hints to `source/` (#8977)
+  `PR #8977 <https://github.com/pantsbuild/pants/pull/8977>`_
+
+* Add type hints to `Address`, `Struct`, `TargetAdaptor`, `Parser`, and `HydratedTarget` (#8967)
+  `PR #8967 <https://github.com/pantsbuild/pants/pull/8967>`_
+
+* Stop requesting AddressSpecs in `@goal_rules` (#8972)
+  `PR #8972 <https://github.com/pantsbuild/pants/pull/8972>`_
+
+* update maven artifact url (#8975)
+  `PR #8975 <https://github.com/pantsbuild/pants/pull/8975>`_
+
+* Use daemon thread (#8959)
+  `PR #8959 <https://github.com/pantsbuild/pants/pull/8959>`_
+
+* Add type hints to the setup of target roots (#8965)
+  `PR #8965 <https://github.com/pantsbuild/pants/pull/8965>`_
+
+* Port V2 `python_test_runner.py` integration tests to V2 style (#8924)
+  `PR #8924 <https://github.com/pantsbuild/pants/pull/8924>`_
+
+1.25.0.dev1 (01/14/2020)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Mark certain types as "side-effecting" (#8922)
+  `PR #8922 <https://github.com/pantsbuild/pants/pull/8922>`_
+
+* Rename `@console_rule` to `@goal_rule` (#8942)
+  `PR #8942 <https://github.com/pantsbuild/pants/pull/8942>`_
+
+* Deprecate `--positional-arg-file` in favor of `--spec-file` (#8928)
+  `PR #8928 <https://github.com/pantsbuild/pants/pull/8928>`_
+
+* Rename `optionable_rule` to `subsystem_rule` (#8893)
+  `PR #8893 <https://github.com/pantsbuild/pants/pull/8893>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Make streaming workunits report interval a configurable option (#8946)
+  `PR #8946 <https://github.com/pantsbuild/pants/pull/8946>`_
+
+* A rule to topologically sort targets. (#8921)
+  `PR #8921 <https://github.com/pantsbuild/pants/pull/8921>`_
+
+* Add `--debug` option to run V2 tests interactively. (#8827)
+  `PR #8827 <https://github.com/pantsbuild/pants/pull/8827>`_
+
+* Rules to support running setup.py commands (#8882)
+  `PR #8882 <https://github.com/pantsbuild/pants/pull/8882>`_
+
+Bugfixes
+~~~~~~~~
+
+* Set V2 Pytest pex files as `--not-zip-safe` to fix occasional hanging (#8953)
+  `PR #8953 <https://github.com/pantsbuild/pants/pull/8953>`_
+
+* Fix _maybe_handle_help (#8945)
+  `PR #8945 <https://github.com/pantsbuild/pants/pull/8945>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use f-strings in `src/python/pants/pantsd/pailgun_server.py` + fix typos in comments. (#8949)
+  `PR #8949 <https://github.com/pantsbuild/pants/pull/8949>`_
+
+* Add some type annotations to `goal/` and `auth/` (#8934)
+  `PR #8934 <https://github.com/pantsbuild/pants/pull/8934>`_
+
+* Use f-strings on `src/python/pants/testutil` and `src/python/pants/util/` (#8950)
+  `PR #8950 <https://github.com/pantsbuild/pants/pull/8950>`_
+
+* Rename public Target methods to use `address_spec` instead of `spec` (#8944)
+  `PR #8944 <https://github.com/pantsbuild/pants/pull/8944>`_
+
+* Only compile non-module exports for `export-dep-as-jar` goal (#8914)
+  `PR #8914 <https://github.com/pantsbuild/pants/pull/8914>`_
+
+* Address some remaining issues with setup-py2. (#8927)
+  `PR #8927 <https://github.com/pantsbuild/pants/pull/8927>`_
+
+* Tweak the argument parser to allow file system specs (#8932)
+  `PR #8932 <https://github.com/pantsbuild/pants/pull/8932>`_
+
+* Share the local LMDB store to avoid creating one per test method. (#8933)
+  `PR #8933 <https://github.com/pantsbuild/pants/pull/8933>`_
+
+* Allow `python_test_runner.py` to get coverage for individual targets (#8910)
+  `PR #8910 <https://github.com/pantsbuild/pants/pull/8910>`_
+
+* Fix confusing error for an `@console_rule` not returning a `Goal` (#8931)
+  `PR #8931 <https://github.com/pantsbuild/pants/pull/8931>`_
+
+* Have handle_workunits callback use kwargs (#8918)
+  `PR #8918 <https://github.com/pantsbuild/pants/pull/8918>`_
+
+* Refactor `options_test.py` (#8906)
+  `PR #8906 <https://github.com/pantsbuild/pants/pull/8906>`_
+
+* Simplify `./pants test --debug` requesting one single address (#8925)
+  `PR #8925 <https://github.com/pantsbuild/pants/pull/8925>`_
+
+* Stop adding our own colors to V2 test output (#8926)
+  `PR #8926 <https://github.com/pantsbuild/pants/pull/8926>`_
+
+* Update core test model to include coverage results (#8851)
+  `PR #8851 <https://github.com/pantsbuild/pants/pull/8851>`_
+
+* Use color in v2 pytest (#8901)
+  `PR #8901 <https://github.com/pantsbuild/pants/pull/8901>`_
+
+* Hotfix Specs rename conflicting with setup-py2 change (#8920)
+  `PR #8920 <https://github.com/pantsbuild/pants/pull/8920>`_
+
+* Prepare 1.24.0rc1. (#8919)
+  `PR #8919 <https://github.com/pantsbuild/pants/pull/8919>`_
+
+* Rename `Spec` to `AddressSpec` (#8916)
+  `PR #8916 <https://github.com/pantsbuild/pants/pull/8916>`_
+
+* Bump up deprecations for the 1.26 series to earlier in the 1.26 dev series (#8908)
+  `PR #8908 <https://github.com/pantsbuild/pants/pull/8908>`_
+
+* Add type hints to `specs.py` (#8913)
+  `PR #8913 <https://github.com/pantsbuild/pants/pull/8913>`_
+
+* Add experimental --fmt-only flag (#8911)
+  `PR #8911 <https://github.com/pantsbuild/pants/pull/8911>`_
+
+* Extract rule for preparing chrooted python sources (#8899)
+  `PR #8899 <https://github.com/pantsbuild/pants/pull/8899>`_
+
+* Add `deprecated.resolve_conflicting_options` to facilitate moving options (#8903)
+  `PR #8903 <https://github.com/pantsbuild/pants/pull/8903>`_
+
+* Add `shell_str` type to improve `--args` option support (#8904)
+  `PR #8904 <https://github.com/pantsbuild/pants/pull/8904>`_
+
+Testing
+~~~~~~~
+
+* Skip hanging Pantsd integration test (#8961)
+  `PR #8961 <https://github.com/pantsbuild/pants/pull/8961>`_
+
+* Test multiple V2 formatters modifying the same files (#8850)
+  `PR #8850 <https://github.com/pantsbuild/pants/pull/8850>`_
+
+* Skip failing tests from #8943 (#8948)
+  `PR #8948 <https://github.com/pantsbuild/pants/pull/8948>`_
+
+* Add `create_options_bootstrapper()` test util for less boilerplate in V2 tests (#8943)
+  `PR #8943 <https://github.com/pantsbuild/pants/pull/8943>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Add helpful error message to rule authors when merging non-digests (#8962)
+  `PR #8962 <https://github.com/pantsbuild/pants/pull/8962>`_
+
+* Fix typo in export docs (#8936)
+  `PR #8936 <https://github.com/pantsbuild/pants/pull/8936>`_
+
+
+1.25.0.dev0 (01/06/2020)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate `--fmt-skip` and `--lint-skip` (#8900)
+  `Issue #8346 <https://github.com/pantsbuild/pants/issues/8346>`_
+  `PR #8900 <https://github.com/pantsbuild/pants/pull/8900>`_
+
+* Add `--skip` option to every linter/formatter subsystem (#8898)
+  `PR #8898 <https://github.com/pantsbuild/pants/pull/8898>`_
+
+* Add ESLint subsystem and deprecate `node-distribution` ESLint options (#8891)
+  `PR #8891 <https://github.com/pantsbuild/pants/pull/8891>`_
+
+* Add `--black-skip`, `--isort-skip`, and `--flake8-skip` (#8888)
+  `PR #8888 <https://github.com/pantsbuild/pants/pull/8888>`_
+
+* Deprecate running `python-eval` by default (#8889)
+  `PR #8889 <https://github.com/pantsbuild/pants/pull/8889>`_
+
+* Add `scrooge-linter` subsystem and deprecate `lint-thrift` options (#8894)
+  `PR #8894 <https://github.com/pantsbuild/pants/pull/8894>`_
+
+* Add `checkstyle` subsystem and deprecate `--lint-checkstyle-configuration` (#8896)
+  `PR #8896 <https://github.com/pantsbuild/pants/pull/8896>`_
+
+* Deprecate `option.custom_types.dict_option` and `list_option` (#8885)
+  `PR #8885 <https://github.com/pantsbuild/pants/pull/8885>`_
+
+* Add `scalafix`, `scalafmt`, and `scalastyle` subsystems and deprecate task-level config options (#8886)
+  `PR #8886 <https://github.com/pantsbuild/pants/pull/8886>`_
+
+* Stop using Java 6 and 7 internally (#8657)
+  `PR #8657 <https://github.com/pantsbuild/pants/pull/8657>`_
+
+* Bump default MyPy from 0.740 to 0.761 (#8866)
+  `PR #8866 <https://github.com/pantsbuild/pants/pull/8866>`_
+
+Bugfixes
+~~~~~~~~
+
+* Use absolute path when running interactive process in tempdir (#8895)
+  `PR #8895 <https://github.com/pantsbuild/pants/pull/8895>`_
+
+* Fix `./pants lint2` for Black and isort (#8877)
+  `PR #8877 <https://github.com/pantsbuild/pants/pull/8877>`_
+  `PR #8823 <https://github.com/pantsbuild/pants/pull/8823>`_
+
+* Provide input_files Digest to InteractiveRunner (#8855)
+  `PR #8855 <https://github.com/pantsbuild/pants/pull/8855>`_
+
+* Support enums when displaying option help choices (#8853)
+  `PR #8853 <https://github.com/pantsbuild/pants/pull/8853>`_
+
+* Hotfix MyPy not working on macOS due to type alias (#8887)
+  `PR #8887 <https://github.com/pantsbuild/pants/pull/8887>`_
+
+* Fix isort, Pytest, and MyPy options to be fingerprinted (#8871)
+  `PR #8871 <https://github.com/pantsbuild/pants/pull/8871>`_
+
+* Report a deprecation for the option name rather than for the dest. (#8856)
+  `PR #8856 <https://github.com/pantsbuild/pants/pull/8856>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use V2 isort internally (#8756)
+  `PR #8756 <https://github.com/pantsbuild/pants/pull/8756>`_
+
+* Refactor `python_test_runner` to use the new pex creation rule  (#8852)
+  `PR #8852 <https://github.com/pantsbuild/pants/pull/8852>`_
+
+* Add type hints to `option/` and `subsystem/` (#8878)
+  `PR #8878 <https://github.com/pantsbuild/pants/pull/8878>`_
+
+* Replace deprecated `assertRaisesRegexp` with `assertRaisesRegex` (#8879)
+  `PR #8879 <https://github.com/pantsbuild/pants/pull/8879>`_
+
+* Remove deprecated `--pytest-requirements`, `--pytest-timeout-requirements`, `--pytest-cov-requirements`, and `--pytest-unittest2-requirements` (#8876)
+  `PR #8876 <https://github.com/pantsbuild/pants/pull/8876>`_
+
+* Partially type check remaining 250 files (#8875)
+  `PR #8875 <https://github.com/pantsbuild/pants/pull/8875>`_
+
+* Stop referencing Python 4 in Python interpreter constraints (#8867)
+  `PR #8867 <https://github.com/pantsbuild/pants/pull/8867>`_
+
+* Partially type check `TestBase` and 235 test files (#8874)
+  `PR #8874 <https://github.com/pantsbuild/pants/pull/8874>`_
+
+* Finish partially type checking all `src` code (#8865)
+  `PR #8865 <https://github.com/pantsbuild/pants/pull/8865>`_
+
+* Refactor `option` and `subsystem` tests (#8872)
+  `PR #8872 <https://github.com/pantsbuild/pants/pull/8872>`_
+
+* Type check `build-support/bin/generate_travis_yml.py` (#8868)
+  `PR #8868 <https://github.com/pantsbuild/pants/pull/8868>`_
+
+* Move `option` and `subsystem` tests from `tests/python` to `src/python` (#8870)
+  `PR #8870 <https://github.com/pantsbuild/pants/pull/8870>`_
+
+* make match() on Enum into a top-level function in meta.py (#8504)
+  `PR #8504 <https://github.com/pantsbuild/pants/pull/8504>`_
+
+* add SingleFileExecutable to make it easier to consume Snapshots of executables (#8860)
+  `PR #8860 <https://github.com/pantsbuild/pants/pull/8860>`_
+
+* improve ergonomics of checking for @union types with new @decorated_type_checkable decorator (#8496)
+  `PR #8496 <https://github.com/pantsbuild/pants/pull/8496>`_
+
+* Partially type check `backend/native` and 100 more files (#8864)
+  `PR #8864 <https://github.com/pantsbuild/pants/pull/8864>`_
+
+* Fix type hints for decorators in `memo.py` and `meta.py` (#8863)
+  `PR #8863 <https://github.com/pantsbuild/pants/pull/8863>`_
+
+* [IntelliJ] Export only modulizable targets when in `export-dep-as-jar` (#8812)
+  `PR #8812 <https://github.com/pantsbuild/pants/pull/8812>`_
+
+* Use raw strings to fix regex deprecation warnings (#8880)
+  `PR #8880 <https://github.com/pantsbuild/pants/pull/8880>`_

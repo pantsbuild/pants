@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import re
-from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePath
@@ -134,7 +133,7 @@ async def _resolve_asdf_tool_paths(
         return ()
 
     asdf_paths: list[str] = []
-    asdf_versions: OrderedDict[str, str] = OrderedDict()
+    asdf_versions: dict[str, str] = {}
     tool_versions_file = None
 
     # Support "shell" based ASDF configuration
@@ -234,7 +233,7 @@ async def _resolve_asdf_tool_paths(
         return tuple(asdf_paths)
 
 
-# TODO: This rule is marked uncacheable because it directly accsses the filesystem to examine ASDF configuration.
+# TODO: This rule is marked uncacheable because it directly accesses the filesystem to examine ASDF configuration.
 # See https://github.com/pantsbuild/pants/issues/10842 for potential future support for capturing from absolute
 # paths that could allow this rule to be cached.
 @_uncacheable_rule

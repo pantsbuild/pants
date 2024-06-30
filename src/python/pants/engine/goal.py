@@ -79,7 +79,7 @@ class Goal:
     ```
 
     Since `@goal_rules` always run in order to produce side effects (generally: console output),
-    they are not cacheable, and the `Goal` product of a `@goal_rule` contains only a exit_code
+    they are not cacheable, and the `Goal` product of a `@goal_rule` contains only an exit_code
     value to indicate whether the rule exited cleanly.
     """
 
@@ -94,7 +94,7 @@ class Goal:
         f""" Indicates that the goal chooses the environments to use to execute rules within the goal.
 
         This requires migration work to be done by the goal author. See
-        {doc_url('plugin-upgrade-guide')}.
+        {doc_url('docs/writing-plugins/common-plugin-tasks/plugin-upgrade-guide')}.
         """
         USES_ENVIRONMENTS = 3
 
@@ -106,7 +106,7 @@ class Goal:
     All goals in `pantsbuild/pants` should be migrated before the 2.15.x branch is cut, but end
     user goals have until `2.17.0.dev4` to migrate.
 
-    See {doc_url('plugin-upgrade-guide')}.
+    See {doc_url('docs/writing-plugins/common-plugin-tasks/plugin-upgrade-guide')}.
     """
     environment_behavior: ClassVar[EnvironmentBehavior]
 
@@ -136,7 +136,7 @@ class Outputting:
 
     @final
     @contextmanager
-    def output(self, console: "Console") -> Iterator[Callable[[str], None]]:
+    def output(self, console: Console) -> Iterator[Callable[[str], None]]:
         """Given a Console, yields a function for writing data to stdout, or a file.
 
         The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
@@ -146,7 +146,7 @@ class Outputting:
 
     @final
     @contextmanager
-    def output_sink(self, console: "Console") -> Iterator:
+    def output_sink(self, console: Console) -> Iterator:
         stdout_file = None
         if self.output_file:
             stdout_file = open(self.output_file, "w")
@@ -170,7 +170,7 @@ class LineOriented(Outputting):
 
     @final
     @contextmanager
-    def line_oriented(self, console: "Console") -> Iterator[Callable[[str], None]]:
+    def line_oriented(self, console: Console) -> Iterator[Callable[[str], None]]:
         """Given a Console, yields a function for printing lines to stdout or a file.
 
         The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.

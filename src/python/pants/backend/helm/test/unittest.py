@@ -27,7 +27,6 @@ from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.sources import HelmChartRoot, HelmChartRootRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.generate_snapshots import GenerateSnapshotsFieldSet, GenerateSnapshotsResult
 from pants.core.goals.test import TestFieldSet, TestRequest, TestResult, TestSubsystem
 from pants.core.target_types import FileSourceField, ResourceSourceField
@@ -43,7 +42,13 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.process import FallibleProcessResult, ProcessCacheScope, ProcessResult
+from pants.engine.process import (
+    Process,
+    ProcessCacheScope,
+    ProcessResult,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
@@ -54,6 +59,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+from pants.util.strutil import Simplifier
 
 logger = logging.getLogger(__name__)
 
@@ -163,21 +169,12 @@ async def setup_helm_unittest(
     # Cache test runs only if they are successful, or not at all if `--test-force`.
     cache_scope = ProcessCacheScope.PER_SESSION if request.force else ProcessCacheScope.SUCCESSFUL
 
-    uses_legacy = unittest_subsystem._is_legacy
-    if uses_legacy:
-        warn_or_error(
-            "2.19.0.dev0",
-            f"[{unittest_subsystem.options_scope}].version < {unittest_subsystem.default_version}",
-            "You should upgrade your test suites to work with latest version.",
-            start_version="2.18.0.dev1",
-        )
-
     process = HelmProcess(
         argv=[
             unittest_subsystem.plugin_name,
-            # TODO remove this flag once support for legacy unittest tool is dropped.
-            *(("--helm3",) if uses_legacy else ()),
-            *(("--color",) if unittest_subsystem.color else ()),
+            # Always include colors and strip them out for display below (if required), for better cache
+            # hit rates
+            "--color",
             *(("--strict",) if field_set.strict.value else ()),
             *(("--update-snapshot",) if request.update_snapshots else ()),
             "--output-type",
@@ -206,6 +203,7 @@ async def setup_helm_unittest(
 async def run_helm_unittest(
     batch: HelmUnitTestRequest.Batch[HelmUnitTestFieldSet, Any],
     test_subsystem: TestSubsystem,
+    unittest_subsystem: HelmUnitTestSubsystem,
 ) -> TestResult:
     field_set = batch.single_element
 
@@ -219,22 +217,26 @@ async def run_helm_unittest(
             timeout_seconds=field_set.timeout.calculate_from_global_options(test_subsystem),
         ),
     )
-    process_result = await Get(FallibleProcessResult, HelmProcess, setup.process)
+    process = await Get(Process, HelmProcess, setup.process)
+    process_results = await Get(
+        ProcessResultWithRetries, ProcessWithRetries(process, test_subsystem.attempts_default)
+    )
 
     reports_digest = await Get(
         Digest,
         DigestSubset(
-            process_result.output_digest,
+            process_results.last.output_digest,
             PathGlobs([os.path.join(setup.reports_output_directory, "**")]),
         ),
     )
     reports = await Get(Snapshot, RemovePrefix(reports_digest, setup.reports_output_directory))
 
     return TestResult.from_fallible_process_result(
-        process_result,
+        process_results=process_results.results,
         address=field_set.address,
         output_setting=test_subsystem.output,
         xml_results=reports,
+        output_simplifier=Simplifier(strip_formatting=not unittest_subsystem.color),
     )
 
 

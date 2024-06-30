@@ -98,7 +98,7 @@ async def run_pep660_build(
 ) -> PEP660BuildResult:
     """Run our PEP 517 / PEP 660 wrapper script to generate an editable wheel.
 
-    The PEP 517 / PEP 660 wraper script is responsible for building the editable wheel.
+    The PEP 517 / PEP 660 wrapper script is responsible for building the editable wheel.
     The backend wrapper script, along with the commands that install the editable wheel,
     need to conform to the following specs so that Pants is a PEP 660 compliant frontend,
     a PEP 660 compliant backend, and that it builds a compliant wheel and install.
@@ -113,6 +113,12 @@ async def run_pep660_build(
       https://packaging.python.org/en/latest/specifications/direct-url-data-structure/
       https://packaging.python.org/en/latest/specifications/binary-distribution-format/
     """
+    dist_abs_path = (
+        build_root.path
+        if request.dist_source_root == "."
+        else str(build_root.pathlib_path / request.dist_source_root)
+    )
+    direct_url = "file://" + dist_abs_path.replace(os.path.sep, "/")
 
     # Create the .pth files to add the relevant source root to sys.path.
     # We cannot use the build backend to do this because we do not want to tell
@@ -123,15 +129,12 @@ async def run_pep660_build(
     #       supports python3.7+ (what pip supports as of April 2023).
     #       Or maybe do something like setuptools strict editable wheel.
     pth_file_contents = ""
-    direct_url = ""
-    for source_root in request.build_time_source_roots:
-        # can we use just the first one to only have the dist's source root?
+    for source_root in request.build_time_source_roots:  # NB: the roots are sorted
+        # Can we use just the dist_abs_path instead of including all source roots?
         abs_path = (
             build_root.path if source_root == "." else str(build_root.pathlib_path / source_root)
         )
         pth_file_contents += f"{abs_path}\n"
-        if not direct_url:  # use just the first source_root
-            direct_url = "file://" + abs_path.replace(os.path.sep, "/")
     pth_file_name = "__pants__.pth"
     pth_file_path = os.path.join(request.working_directory, pth_file_name)
 
@@ -263,7 +266,7 @@ async def isolate_local_dist_pep660_wheels(
         Snapshot, DigestSubset(pep660_result.output, PathGlobs(["**/*.whl"]))
     )
 
-    wheels = tuple(wheels_snapshot.files)
+    wheels = tuple(sorted(wheels_snapshot.files))
 
     if not wheels:
         tgt = await Get(
@@ -278,7 +281,7 @@ async def isolate_local_dist_pep660_wheels(
                 code will be used directly from sources, without a distribution being built,
                 and any native extensions in it will not be built.
 
-                See {doc_url('python-distributions')} for details on how to set up a
+                See {doc_url('docs/python/overview/building-distributions')} for details on how to set up a
                 {tgt.target.alias} target to produce a wheel.
                 """
             )
@@ -303,7 +306,7 @@ async def isolate_local_dist_pep660_wheels(
     )
     provided_files = set(wheels_listing_result.stdout.decode().splitlines())
 
-    return LocalDistPEP660Wheels(wheels, wheels_snapshot.digest, frozenset(provided_files))
+    return LocalDistPEP660Wheels(wheels, wheels_snapshot.digest, frozenset(sorted(provided_files)))
 
 
 @dataclass(frozen=True)
@@ -354,7 +357,7 @@ async def sort_all_python_distributions_by_resolve(
                 break
         dists[resolve].append(dist)
     return ResolveSortedPythonDistributionTargets(
-        FrozenDict({resolve: tuple(targets) for resolve, targets in dists.items()})
+        FrozenDict({resolve: tuple(sorted(targets)) for resolve, targets in dists.items()})
     )
 
 

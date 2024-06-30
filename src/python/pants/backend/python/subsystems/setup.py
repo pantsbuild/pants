@@ -60,6 +60,7 @@ class PythonSetup(Subsystem):
         "3.10",
         "3.11",
         "3.12",
+        "3.13",
     ]
 
     _interpreter_constraints = StrListOption(
@@ -106,7 +107,7 @@ class PythonSetup(Subsystem):
                     if different parts of your codebase run against different python interpreter
                     versions in a single repo.
 
-                    See {doc_url("python-interpreter-compatibility")} for details.
+                    See {doc_url("docs/python/overview/interpreter-compatibility")} for details.
                     """
                 ),
             )
@@ -126,7 +127,7 @@ class PythonSetup(Subsystem):
             interpreter constraints, update `[python].interpreter_constraints`, the
             `interpreter_constraints` field, and relevant tool options like
             `[isort].interpreter_constraints` to tell Pants which interpreters your code
-            actually uses. See {doc_url('python-interpreter-compatibility')}.
+            actually uses. See {doc_url('docs/python/overview/interpreter-compatibility')}.
 
             All elements must be the minor and major Python version, e.g. `'2.7'` or `'3.10'`. Do
             not include the patch version.
@@ -187,7 +188,7 @@ class PythonSetup(Subsystem):
                 resolve with the `resolve` field.
 
             If a target can work with multiple resolves, you can either use the `parametrize`
-            mechanism or manually create a distinct target per resolve. See {doc_url("targets")}
+            mechanism or manually create a distinct target per resolve. See {doc_url("docs/using-pants/key-concepts/targets-and-build-files")}
             for information about `parametrize`.
 
             For example:
@@ -225,13 +226,13 @@ class PythonSetup(Subsystem):
         ),
     )
     pip_version = StrOption(
-        default="23.1.2",
+        default="24.0",
         help=softwrap(
             f"""
             Use this version of Pip for resolving requirements and generating lockfiles.
 
             The value used here must be one of the Pip versions supported by the underlying PEX
-            version. See {doc_url("pex")} for details.
+            version. See {doc_url("docs/python/overview/pex")} for details.
 
             N.B.: The `latest` value selects the latest of the choices listed by PEX which is not
             necessarily the latest Pip version released on PyPI.
@@ -239,7 +240,7 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-    _resolves_to_interpreter_constraints = DictOption["list[str]"](
+    _resolves_to_interpreter_constraints = DictOption[List[str]](
         help=softwrap(
             """
             Override the interpreter constraints to use when generating a resolve's lockfile

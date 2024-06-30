@@ -19,6 +19,7 @@ from pants.engine.internals.native_engine import (
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
+from pants.util.strutil import get_strict_env
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,7 @@ class RemotePantsRunner:
         :param options_bootstrapper: The bootstrap options.
         """
         self._args = args
-        self._env = env
+        self._env = get_strict_env(env, logger)
         self._options_bootstrapper = options_bootstrapper
         self._bootstrap_options = options_bootstrapper.bootstrap_options
         self._client = PantsDaemonClient(self._bootstrap_options)
@@ -130,14 +131,14 @@ class RemotePantsRunner:
         executor: PyExecutor,
         start_time: float,
     ) -> ExitCode:
-        global_options = self._bootstrap_options.for_global_scope()
-
         try:
             # Merge the nailgun TTY capability environment variables with the passed environment dict.
             ng_env = ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
         except OSError as e:
             logger.debug("Failed to execute ttynames_to_env:  %s", e)
             ng_env = {}
+
+        global_options = self._bootstrap_options.for_global_scope()
         modified_env = {
             **self._env,
             **ng_env,
@@ -172,7 +173,7 @@ class RemotePantsRunner:
                     logger.warning(f"Pantsd was unresponsive on port {port}, retrying.")
                     time.sleep(1)
 
-                    # One possible cause of the daemon being non-responsive during an attempt might be if a
+                    # One possible cause of the daemon being non-responsive during an attempt might be if
                     # another lifecycle operation is happening concurrently (incl teardown). To account for
                     # this, we won't begin attempting restarts until at least 1 attempt has passed.
                     if attempt > 1:

@@ -18,12 +18,12 @@ class Shellcheck(TemplatedExternalTool):
     name = "Shellcheck"
     help = "A linter for shell scripts."
 
-    default_version = "v0.8.0"
+    default_version = "v0.10.0"
     default_known_versions = [
-        "v0.8.0|macos_arm64 |e065d4afb2620cc8c1d420a9b3e6243c84ff1a693c1ff0e38f279c8f31e86634|4049756",
-        "v0.8.0|macos_x86_64|e065d4afb2620cc8c1d420a9b3e6243c84ff1a693c1ff0e38f279c8f31e86634|4049756",
-        "v0.8.0|linux_arm64 |9f47bbff5624babfa712eb9d64ece14c6c46327122d0c54983f627ae3a30a4ac|2996468",
-        "v0.8.0|linux_x86_64|ab6ee1b178f014d1b86d1e24da20d1139656c8b0ed34d2867fbb834dad02bf0a|1403852",
+        "v0.10.0|macos_arm64 |bbd2f14826328eee7679da7221f2bc3afb011f6a928b848c80c321f6046ddf81|7205756",
+        "v0.10.0|macos_x86_64|ef27684f23279d112d8ad84e0823642e43f838993bbb8c0963db9b58a90464c2|4371632",
+        "v0.10.0|linux_arm64 |324a7e89de8fa2aed0d0c28f3dab59cf84c6d74264022c00c22af665ed1a09bb|4291764",
+        "v0.10.0|linux_x86_64|6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87|2404716",
     ]
 
     default_url_template = (
@@ -31,7 +31,7 @@ class Shellcheck(TemplatedExternalTool):
         "{version}.{platform}.tar.xz"
     )
     default_url_platform_mapping = {
-        "macos_arm64": "darwin.x86_64",
+        "macos_arm64": "darwin.aarch64",
         "macos_x86_64": "darwin.x86_64",
         "linux_arm64": "linux.aarch64",
         "linux_x86_64": "linux.x86_64",

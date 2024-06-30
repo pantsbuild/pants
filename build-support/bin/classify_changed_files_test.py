@@ -14,16 +14,23 @@ from classify_changed_files import Affected, classify
             {Affected.docs},
         ],
         [
-            ["src/python/pants/notes/2.16.x.md"],
-            {Affected.docs, Affected.release},
+            ["docs/notes/2.16.x.md"],
+            {Affected.docs, Affected.notes},
         ],
         [["src/rust/engine/path/to/file.rs"], {Affected.rust}],
         [["src/python/pants/VERSION"], {Affected.release}],
         [["src/python/pants_release/generate_github_workflows.py"], {Affected.ci_config}],
         [["src/python/pants/whatever.py"], {Affected.other}],
-        [["docs/path/to/some/doc", "rust-toolchain"], {Affected.docs, Affected.rust}],
         [
-            ["docs/path/to/some/doc", "rust-toolchain", "src/python/pants/whatever.py"],
+            ["docs/path/to/some/doc", "src/rust/engine/rust-toolchain"],
+            {Affected.docs, Affected.rust},
+        ],
+        [
+            [
+                "docs/path/to/some/doc",
+                "src/rust/engine/rust-toolchain",
+                "src/python/pants/whatever.py",
+            ],
             {Affected.docs, Affected.rust, Affected.other},
         ],
     ),

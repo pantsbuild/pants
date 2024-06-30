@@ -53,7 +53,7 @@ async def autoflake_fix(request: AutoflakeRequest.Batch, autoflake: Autoflake) -
             level=LogLevel.DEBUG,
         ),
     )
-    return await FixResult.create(request, result, strip_chroot_path=True)
+    return await FixResult.create(request, result)
 
 
 def rules():

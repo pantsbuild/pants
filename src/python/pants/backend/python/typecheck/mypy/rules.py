@@ -98,7 +98,7 @@ async def _generate_argv(
     mypy_info = mypy_pex_info.find("mypy")
     assert mypy_info is not None
     if mypy_info.version > packaging.version.Version("0.700") and python_version is not None:
-        # Skip mtime checks because we don't propogate mtime when materialzing the sandbox, so the
+        # Skip mtime checks because we don't propagate mtime when materializing the sandbox, so the
         # mtime checks will always fail otherwise.
         args.append("--skip-cache-mtime-check")
         # See "__run_wrapper.sh" below for explanation
@@ -294,6 +294,7 @@ async def mypy_typecheck_partition(
                             SANDBOX_CACHE_DIR="{run_cache_dir}/{py_version}"
                             SANDBOX_CACHE_DB="$SANDBOX_CACHE_DIR/cache.db"
 
+                            {mkdir.path} -p "$NAMED_CACHE_DIR" > /dev/null 2>&1
                             {mkdir.path} -p "$SANDBOX_CACHE_DIR" > /dev/null 2>&1
                             {cp.path} "$NAMED_CACHE_DB" "$SANDBOX_CACHE_DB" > /dev/null 2>&1
 
@@ -368,7 +369,7 @@ async def mypy_typecheck_partition(
         result,
         partition_description=partition.description(),
         report=report,
-        strip_formatting=not global_options.colors,
+        output_simplifier=global_options.output_simplifier(),
     )
 
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import re
 from textwrap import dedent
-from typing import cast
+from typing import Any, Mapping, cast
 
 import pytest
 
@@ -18,7 +18,9 @@ from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, Envi
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
+    BUILDFileEnvVarExtractor,
     BuildFileOptions,
+    BuildFileSyntaxError,
     OptionalAddressFamily,
     evaluate_preludes,
     parse_address_family,
@@ -38,10 +40,13 @@ from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRe
 from pants.engine.target import (
     Dependencies,
     MultipleSourcesField,
+    OverridesField,
     RegisteredTargetTypes,
+    SingleSourceField,
     StringField,
     Tags,
     Target,
+    TargetFilesGenerator,
 )
 from pants.engine.unions import UnionMembership
 from pants.init.bootstrap_scheduler import BootstrapStatus
@@ -310,7 +315,7 @@ def test_prelude_type_hint_code() -> None:
     assert 42 == ecr_docker_image.value()
 
 
-def test_prelude_docstrings() -> None:
+def test_prelude_docstring_on_function() -> None:
     macro_docstring = "This is the doc-string for `macro_func`."
     prelude_content = dedent(
         f"""
@@ -325,6 +330,42 @@ def test_prelude_docstrings() -> None:
     assert macro_docstring == info.help
     assert "(arg: int) -> str" == info.signature
     assert {"macro_func"} == set(result.info)
+
+
+def test_prelude_docstring_on_constant() -> None:
+    macro_docstring = """This is the doc-string for `MACRO_CONST`.
+
+    Use weird indentations.
+
+    On purpose.
+    """
+    prelude_content = dedent(
+        f"""
+        Number = NewType("Number", int)
+        MACRO_CONST: Annotated[str, Doc({macro_docstring!r})] = "value"
+        MULTI_HINTS: Annotated[Number, "unrelated", Doc("this is it"), 24] = 42
+        ANON: str = "undocumented"
+        _PRIVATE: int = 42
+        untyped = True
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    assert {"MACRO_CONST", "ANON", "Number", "MULTI_HINTS", "untyped"} == set(result.info)
+
+    info = result.info["MACRO_CONST"]
+    assert info.value == "value"
+    assert info.help == softwrap(macro_docstring)
+    assert info.signature == ": str"
+
+    multi = result.info["MULTI_HINTS"]
+    assert multi.value == 42
+    assert multi.help == "this is it"
+    assert multi.signature == ": Number"
+
+    anon = result.info["ANON"]
+    assert anon.value == "undocumented"
+    assert anon.help is None
+    assert anon.signature == ": str"
 
 
 def test_prelude_reference_env_vars() -> None:
@@ -353,6 +394,23 @@ class MockMultipleSourcesField(MultipleSourcesField):
 class MockTgt(Target):
     alias = "mock_tgt"
     core_fields = (MockDepsField, MockMultipleSourcesField, Tags, ResolveField)
+
+
+class MockSingleSourceField(SingleSourceField):
+    pass
+
+
+class MockGeneratedTarget(Target):
+    alias = "generated"
+    core_fields = (MockDepsField, Tags, MockSingleSourceField, ResolveField)
+
+
+class MockTargetGenerator(TargetFilesGenerator):
+    alias = "generator"
+    core_fields = (MockMultipleSourcesField, OverridesField)
+    generated_target_cls = MockGeneratedTarget
+    copied_fields = ()
+    moved_fields = (MockDepsField, Tags, ResolveField)
 
 
 def test_resolve_address() -> None:
@@ -405,7 +463,7 @@ def test_resolve_address() -> None:
 def target_adaptor_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[QueryRule(TargetAdaptor, (TargetAdaptorRequest,))],
-        target_types=[MockTgt],
+        target_types=[MockTgt, MockGeneratedTarget, MockTargetGenerator],
         objects={"parametrize": Parametrize},
     )
 
@@ -498,6 +556,35 @@ def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner)
     assert target_adaptor.kwargs["tags"] == ["24"]
 
 
+def test_generated_target_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                __defaults__({generated: dict(resolve="mock")}, all=dict(tags=["24"]))
+                generated(name="explicit", tags=["42"], source="e.txt")
+                generator(name='gen', sources=["g*.txt"])
+                """
+            ),
+            "e.txt": "",
+            "g1.txt": "",
+            "g2.txt": "",
+        }
+    )
+
+    explicit_target = target_adaptor_rule_runner.get_target(Address("", target_name="explicit"))
+    assert explicit_target.address.target_name == "explicit"
+    assert explicit_target.get(ResolveField).value == "mock"
+    assert explicit_target.get(Tags).value == ("42",)
+
+    implicit_target = target_adaptor_rule_runner.get_target(
+        Address("", target_name="gen", relative_file_path="g1.txt")
+    )
+    assert str(implicit_target.address) == "//g1.txt:gen"
+    assert implicit_target.get(ResolveField).value == "mock"
+    assert implicit_target.get(Tags).value == ("24",)
+
+
 def test_inherit_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
     target_adaptor_rule_runner.write_files(
         {
@@ -541,6 +628,134 @@ def test_parametrize_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
         [TargetAdaptorRequest(Address("helloworld/dir"), description_of_origin="tests")],
     )
     assert target_adaptor.kwargs["tags"] == ParametrizeDefault(a=("a", "root"), b=("non-root", "b"))
+
+
+def test_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> None:
+    def _determenistic_parametrize_group_keys(value: Mapping[str, Any]) -> dict[str, Any]:
+        # The `parametrize` object uses a unique generated field name when splatted onto a target
+        # (in order to provide a helpful error message in case of non-unique group names), but the
+        # part up until `:` is determenistic on the group name, which we need to exploit in the
+        # tests using parametrize groups.
+        return {key.rsplit(":", 1)[0]: val for key, val in value.items()}
+
+    target_adaptor_rule_runner.write_files(
+        {
+            "hello/BUILD": dedent(
+                """\
+                mock_tgt(
+                  description="desc for a and b",
+                  **parametrize("a", tags=["opt-a"], resolve="lock-a"),
+                  **parametrize("b", tags=["opt-b"], resolve="lock-b"),
+                )
+                """
+            ),
+        }
+    )
+
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("hello"), description_of_origin="tests")],
+    )
+    assert _determenistic_parametrize_group_keys(
+        target_adaptor.kwargs
+    ) == _determenistic_parametrize_group_keys(
+        dict(
+            description="desc for a and b",
+            **Parametrize("a", tags=["opt-a"], resolve="lock-a"),  # type: ignore[arg-type]
+            **Parametrize("b", tags=["opt-b"], resolve="lock-b"),
+        )
+    )
+
+
+def test_default_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "hello/BUILD": dedent(
+                """\
+                __defaults__({mock_tgt: dict(**parametrize("a", tags=["from default"]))})
+                mock_tgt(
+                  tags=["from target"],
+                  **parametrize("a"),
+                  **parametrize("b", tags=["from b"]),
+                )
+                """
+            ),
+        }
+    )
+    address = Address("hello")
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(address, description_of_origin="tests")],
+    )
+    targets = tuple(Parametrize.expand(address, target_adaptor.kwargs))
+    assert targets == (
+        (address.parametrize(dict(parametrize="a")), dict(tags=["from target"])),
+        (address.parametrize(dict(parametrize="b")), dict(tags=("from b",))),
+    )
+
+
+def test_default_parametrized_groups_with_parametrizations(
+    target_adaptor_rule_runner: RuleRunner,
+) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """
+                __defaults__({
+                  mock_tgt: dict(
+                    **parametrize(
+                      "py310-compat",
+                      resolve="service-a",
+                      tags=[
+                        "CPython == 3.9.*",
+                        "CPython == 3.10.*",
+                      ]
+                    ),
+                    **parametrize(
+                      "py39-compat",
+                      resolve=parametrize(
+                        "service-b",
+                        "service-c",
+                        "service-d",
+                      ),
+                      tags=[
+                        "CPython == 3.9.*",
+                      ]
+                    )
+                  )
+                })
+                mock_tgt()
+                """
+            ),
+        }
+    )
+    address = Address("src")
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(address, description_of_origin="tests")],
+    )
+    targets = tuple(Parametrize.expand(address, target_adaptor.kwargs))
+    assert targets == (
+        (
+            address.parametrize(dict(parametrize="py310-compat")),
+            dict(
+                tags=("CPython == 3.9.*", "CPython == 3.10.*"),
+                resolve="service-a",
+            ),
+        ),
+        (
+            address.parametrize(dict(parametrize="py39-compat", resolve="service-b")),
+            dict(tags=("CPython == 3.9.*",), resolve="service-b"),
+        ),
+        (
+            address.parametrize(dict(parametrize="py39-compat", resolve="service-c")),
+            dict(tags=("CPython == 3.9.*",), resolve="service-c"),
+        ),
+        (
+            address.parametrize(dict(parametrize="py39-compat", resolve="service-d")),
+            dict(tags=("CPython == 3.9.*",), resolve="service-d"),
+        ),
+    )
 
 
 def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -606,9 +821,9 @@ def test_build_file_address() -> None:
 def test_build_files_share_globals() -> None:
     """Test that a macro in a prelude can reference another macro in another prelude.
 
-    At some point a change was made to separate the globals/locals dict (uninentional) which has the
-    unintended side-effect of having the `__globals__` of a macro not contain references to every
-    other symbol in every other prelude.
+    At some point a change was made to separate the globals/locals dict (unintentional) which has
+    the unintended side effect of having the `__globals__` of a macro not contain references to
+    every other symbol in every other prelude.
     """
 
     symbols = run_rule_with_mocks(
@@ -709,6 +924,42 @@ def test_default_plugin_field_bootstrap() -> None:
     # Parse the root BUILD file.
     address_family = rule_runner.request(AddressFamily, [AddressFamilyDir("")])
     assert dict(tags=("ok",)) == dict(address_family.defaults["mock_tgt"])
+
+
+def test_environment_target_macro_field_value() -> None:
+    rule_runner = RuleRunner(
+        rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
+        target_types=[MockTgt],
+        is_bootstrap=True,
+    )
+    rule_runner.set_options(
+        args=("--build-file-prelude-globs=prelude.py",),
+    )
+    rule_runner.write_files(
+        {
+            "prelude.py": dedent(
+                """
+                def tags():
+                    return ["foo", "bar"]
+                """
+            ),
+            "BUILD": dedent(
+                """
+                mock_tgt(name="tgt", tags=tags())
+                """
+            ),
+        }
+    )
+
+    # Parse the root BUILD file.
+    address_family = rule_runner.request(AddressFamily, [AddressFamilyDir("")])
+    tgt = address_family.name_to_target_adaptors["tgt"][1]
+    # We're pretending that field values returned from a called macro function doesn't exist during
+    # bootstrap. This is to allow the semi-dubios use of macro calls for environment target field
+    # values that are not required, and depending on how they are used, it may work to only have
+    # those field values set during normal lookup.
+    assert not tgt.kwargs
+    assert tgt == TargetAdaptor("mock_tgt", "tgt", "BUILD:2")
 
 
 def test_build_file_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -844,3 +1095,39 @@ def test_build_file_description_of_origin(target_adaptor_rule_runner: RuleRunner
         [TargetAdaptorRequest(Address("src", target_name="foo"), description_of_origin="test")],
     )
     assert "src/BUILD:2" == target_adaptor.description_of_origin
+
+
+@pytest.mark.parametrize(
+    "filename, contents, expect_failure, expected_message",
+    [
+        ("BUILD", "data()", False, None),
+        (
+            "BUILD.qq",
+            "data()qq",
+            True,
+            "Error parsing BUILD file BUILD.qq:1: invalid syntax\n  data()qq\n        ^",
+        ),
+        (
+            "foo/BUILD",
+            "data()\nqwe asd",
+            True,
+            "Error parsing BUILD file foo/BUILD:2: invalid syntax\n  qwe asd\n      ^",
+        ),
+    ],
+)
+def test_build_file_syntax_error(filename, contents, expect_failure, expected_message):
+    class MockFileContent:
+        def __init__(self, path, content):
+            self.path = path
+            self.content = content
+
+    if expect_failure:
+        with pytest.raises(BuildFileSyntaxError) as e:
+            BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))
+
+        formatted = str(e.value)
+
+        assert formatted == expected_message
+
+    else:
+        BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))

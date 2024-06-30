@@ -59,7 +59,13 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Snapshot
-from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import (
+    Process,
+    ProcessCacheScope,
+    ProcessResult,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Target, Targets
 from pants.util.logging import LogLevel
@@ -210,13 +216,17 @@ def _lift_build_requests_with_coverage(
     result: list[BuildGoPackageRequest] = []
 
     queue: deque[BuildGoPackageRequest] = deque()
+    seen: set[BuildGoPackageRequest] = set()
     queue.extend(roots)
+    seen.update(roots)
 
     while queue:
         build_request = queue.popleft()
         if build_request.with_coverage:
             result.append(build_request)
-        queue.extend(build_request.direct_dependencies)
+        unseen = [dd for dd in build_request.direct_dependencies if dd not in seen]
+        queue.extend(unseen)
+        seen.update(unseen)
 
     return result
 
@@ -666,28 +676,29 @@ async def run_go_tests(
         maybe_profile_args.append("-test.trace=trace.out")
         output_files.append("trace.out")
 
-    result = await Get(
-        FallibleProcessResult,
-        Process(
-            argv=(
-                test_binary.test_binary_path,
-                *test_flags,
-                *maybe_profile_args,
-            ),
-            env=extra_env,
-            input_digest=test_input_digest,
-            description=f"Run Go tests: {field_set.address}",
-            cache_scope=cache_scope,
-            working_directory=working_dir,
-            output_files=output_files,
-            level=LogLevel.DEBUG,
+    go_test_process = Process(
+        argv=(
+            test_binary.test_binary_path,
+            *test_flags,
+            *maybe_profile_args,
         ),
+        env=extra_env,
+        input_digest=test_input_digest,
+        description=f"Run Go tests: {field_set.address}",
+        cache_scope=cache_scope,
+        working_directory=working_dir,
+        output_files=output_files,
+        level=LogLevel.DEBUG,
+    )
+    results = await Get(
+        ProcessResultWithRetries,
+        ProcessWithRetries(go_test_process, test_subsystem.attempts_default),
     )
 
     coverage_data: GoCoverageData | None = None
     if test_subsystem.use_coverage:
         coverage_data = GoCoverageData(
-            coverage_digest=result.output_digest,
+            coverage_digest=results.last.output_digest,
             import_path=test_binary.import_path,
             sources_digest=test_binary.pkg_digest.digest,
             sources_dir_path=test_binary.pkg_analysis.dir_path,
@@ -697,7 +708,7 @@ async def run_go_tests(
     output_files = [x for x in output_files if x != "cover.out"]
     extra_output: Snapshot | None = None
     if output_files or output_test_binary:
-        output_digest = result.output_digest
+        output_digest = results.last.output_digest
         if output_test_binary:
             output_digest = await Get(
                 Digest, MergeDigests([output_digest, test_binary.test_binary_digest])
@@ -705,7 +716,7 @@ async def run_go_tests(
         extra_output = await Get(Snapshot, Digest, output_digest)
 
     return TestResult.from_fallible_process_result(
-        process_result=result,
+        process_results=results.results,
         address=field_set.address,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,

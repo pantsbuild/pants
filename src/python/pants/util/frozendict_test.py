@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict
 
@@ -12,7 +12,6 @@ from pants.util.frozendict import FrozenDict, LazyFrozenDict
 
 def test_flexible_constructor() -> None:
     expected = FrozenDict({"a": 0, "b": 1})
-    assert FrozenDict(OrderedDict({"a": 0, "b": 1})) == expected
     assert FrozenDict([("a", 0), ("b", 1)]) == expected
     assert FrozenDict((("a", 0), ("b", 1))) == expected
     assert FrozenDict(a=0, b=1) == expected
@@ -93,24 +92,41 @@ def test_eq() -> None:
     fd1 = FrozenDict(d1)
     assert fd1 == fd1
     assert fd1 == FrozenDict(d1)
-    # Order matters.
-    assert fd1 != FrozenDict({"b": 1, "a": 0})
-    # Must be an instance of FrozenDict.
-    assert fd1 != d1
+    # Order doesn't matter.
+    assert fd1 == FrozenDict({"b": 1, "a": 0})
+    # A FrozenDict is equal to plain `dict`s with equivalent contents.
+    assert fd1 == d1
+    assert d1 == fd1
 
-
-@pytest.mark.xfail(reason="FrozenDict equality broken for different insertion orders.")
-def test_eq_different_orders() -> None:
-    fd1 = FrozenDict({"a": 0, "b": 1})
-    fd2 = FrozenDict({"b": 1, "a": 0})
-    assert fd1 == fd2
+    # A different dict is not equal.
+    d2 = {"a": 1, "b": 0}
+    fd2 = FrozenDict(d2)
+    assert fd2 != fd1
+    assert fd1 != d2
+    assert d2 != fd1
 
 
 def test_lt() -> None:
     d = {"a": 0, "b": 1}
-    assert FrozenDict(d) < FrozenDict({"a": 1, "b": 2})
-    # Order matters.
-    assert FrozenDict(d) < FrozenDict({"b": 1, "a": 0})
+
+    ordered = [
+        {"a": 0},
+        d,
+        {"a": 0, "b": 2},
+        {"a": 1},
+        {"a": 1, "b": 0},
+        {"b": -1},
+        {"c": -2},
+    ]
+    # Do all comparisions: the list is in order, so the comparisons of the dicts should match the
+    # comparison of indices.
+    for i, di in enumerate(ordered):
+        for j, dj in enumerate(ordered):
+            assert (FrozenDict(di) < FrozenDict(dj)) == (i < j)
+
+    # Order doesn't matter.
+    assert FrozenDict(d) < FrozenDict({"b": 2, "a": 0})
+
     # Must be an instance of FrozenDict.
     with pytest.raises(TypeError):
         FrozenDict(d) < d
@@ -119,8 +135,22 @@ def test_lt() -> None:
 def test_hash() -> None:
     d1 = {"a": 0, "b": 1}
     assert hash(FrozenDict(d1)) == hash(FrozenDict(d1))
-    # Order matters.
-    assert hash(FrozenDict(d1)) != hash(FrozenDict({"b": 1, "a": 0}))
+    # Order doesn't matters.
+    assert hash(FrozenDict(d1)) == hash(FrozenDict({"b": 1, "a": 0}))
+
+    # Confirm that `hash` is likely doing something "correct", and not just implemented as `return
+    # 0` or similar.
+    unique_hashes = set()
+    for i in range(1000):
+        unique_hashes.add(hash(FrozenDict({"a": i, "b": i})))
+
+    # It would be incredibly unlikely for 1000 different examples to have so many collisions that we
+    # saw fewer than 500 unique hash values. (It would be unlikely to see even one collision
+    # assuming `hash` acts like a uniform random variable: by
+    # https://en.wikipedia.org/wiki/Birthday_problem, the probability of seeing a single collision
+    # with m = 2**64 (the size of the output of hash) and n = 1000 is approximately n**2/(2*m) =
+    # 2.7e-14).
+    assert len(unique_hashes) >= 500
 
 
 def test_works_with_dataclasses() -> None:
@@ -176,3 +206,14 @@ def test_frozendict_dot_frozen() -> None:
 
     assert frozen_a == FrozenDict(a)
     assert frozen_b is b
+
+
+def test_merge_frozen_dicts() -> None:
+    a = FrozenDict({"A": 1})
+    b = FrozenDict({"B": 2})
+    c = {"C": 3, "B": 4}
+    assert a | b == FrozenDict({"A": 1, "B": 2})
+    assert a | c == FrozenDict({"A": 1, "B": 4, "C": 3})
+    assert b | c == FrozenDict({"B": 4, "C": 3})
+    assert c | a == FrozenDict({"A": 1, "B": 4, "C": 3})
+    assert c | b == FrozenDict({"B": 2, "C": 3})

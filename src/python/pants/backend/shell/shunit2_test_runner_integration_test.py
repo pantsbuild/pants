@@ -40,6 +40,8 @@ from pants.engine.target import Target
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule, mock_console
 
+ATTEMPTS_DEFAULT_OPTION = 2
+
 
 @pytest.fixture
 def rule_runner() -> PythonRuleRunner:
@@ -87,6 +89,7 @@ def run_shunit2(
     rule_runner.set_options(
         [
             "--backend-packages=pants.backend.shell",
+            f"--test-attempts-default={ATTEMPTS_DEFAULT_OPTION}",
             *(extra_args or ()),
         ],
         env=env,
@@ -109,7 +112,7 @@ def test_passing(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="tests.sh"))
     result = run_shunit2(rule_runner, tgt)
     assert result.exit_code == 0
-    assert "Ran 1 test.\n\nOK" in result.stdout
+    assert "Ran 1 test.\n\nOK" in result.stdout_simplified_str
 
 
 def test_failing(rule_runner: PythonRuleRunner) -> None:
@@ -130,7 +133,8 @@ def test_failing(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="tests.sh"))
     result = run_shunit2(rule_runner, tgt)
     assert result.exit_code == 1
-    assert "Ran 1 test.\n\nFAILED" in result.stdout
+    assert "Ran 1 test.\n\nFAILED" in result.stdout_simplified_str
+    assert len(result.process_results) == ATTEMPTS_DEFAULT_OPTION
 
 
 def test_dependencies(rule_runner: PythonRuleRunner) -> None:
@@ -177,7 +181,7 @@ def test_dependencies(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="tests.sh"))
     result = run_shunit2(rule_runner, tgt)
     assert result.exit_code == 0
-    assert "Ran 1 test.\n\nOK" in result.stdout
+    assert "Ran 1 test.\n\nOK" in result.stdout_simplified_str
 
 
 def test_subdirectories(rule_runner: PythonRuleRunner) -> None:
@@ -187,7 +191,7 @@ def test_subdirectories(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address("a/b/c", relative_file_path="tests.sh"))
     result = run_shunit2(rule_runner, tgt)
     assert result.exit_code == 0
-    assert "Ran 1 test.\n\nOK" in result.stdout
+    assert "Ran 1 test.\n\nOK" in result.stdout_simplified_str
 
 
 @pytest.mark.skip(
@@ -238,7 +242,7 @@ def test_extra_env_vars(rule_runner: PythonRuleRunner) -> None:
         env={"OTHER_VAR": "other_value"},
     )
     assert result.exit_code == 0
-    assert "Ran 1 test.\n\nOK" in result.stdout
+    assert "Ran 1 test.\n\nOK" in result.stdout_simplified_str
 
 
 def test_runtime_package_dependency(rule_runner: PythonRuleRunner) -> None:
@@ -268,7 +272,7 @@ def test_runtime_package_dependency(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="tests.sh"))
     result = run_shunit2(rule_runner, tgt)
     assert result.exit_code == 0
-    assert "Ran 1 test.\n\nOK" in result.stdout
+    assert "Ran 1 test.\n\nOK" in result.stdout_simplified_str
 
 
 def test_determine_shell_runner(rule_runner: PythonRuleRunner) -> None:

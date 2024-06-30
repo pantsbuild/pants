@@ -8,6 +8,7 @@ from typing import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.rules import Rule, collect_rules
 from pants.engine.target import Dependencies, FieldSet, SingleSourceField, Target
 from pants.engine.unions import UnionRule
@@ -30,7 +31,7 @@ class SemgrepFieldSet(FieldSet):
 class SemgrepSubsystem(PythonToolBase):
     name = "Semgrep"
     options_scope = "semgrep"
-    help = softwrap(
+    help_short = softwrap(
         """
         Lightweight static analysis for many languages. Find bug variants with patterns that look
         like source code. (https://semgrep.dev/)
@@ -45,6 +46,7 @@ class SemgrepSubsystem(PythonToolBase):
     default_requirements = ["semgrep>=1.20.0,<2"]
 
     register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.8,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.tools.semgrep", "semgrep.lock")
@@ -73,4 +75,7 @@ class SemgrepSubsystem(PythonToolBase):
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(ExportableTool, SemgrepSubsystem),
+    ]

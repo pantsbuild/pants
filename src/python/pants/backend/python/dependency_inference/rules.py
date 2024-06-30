@@ -346,7 +346,7 @@ async def _handle_unowned_imports(
 
         If you do not expect an import to be inferrable, add `# pants: no-infer-dep` to the
         import line. Otherwise, see
-        {doc_url('troubleshooting#import-errors-and-missing-dependencies')} for common problems.
+        {doc_url('docs/using-pants/troubleshooting-common-issues#import-errors-and-missing-dependencies')} for common problems.
         """
     )
     if unowned_dependency_behavior is UnownedDependencyUsage.LogWarning:
@@ -563,7 +563,7 @@ async def infer_python_conftest_dependencies(
     owners = await MultiGet(
         # NB: Because conftest.py files effectively always have content, we require an
         # owning target.
-        Get(Owners, OwnersRequest((f,), GlobMatchErrorBehavior.error))
+        Get(Owners, OwnersRequest((f,), owners_not_found_behavior=GlobMatchErrorBehavior.error))
         for f in conftest_files.snapshot.files
     )
 

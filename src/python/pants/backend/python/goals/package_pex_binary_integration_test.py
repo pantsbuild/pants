@@ -14,7 +14,10 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_dists, package_pex_binary
-from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
+from pants.backend.python.goals.package_pex_binary import (
+    PexBinaryFieldSet,
+    PexFromTargetsRequestForBuiltPackage,
+)
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
@@ -34,7 +37,7 @@ from pants.core.target_types import (
     ResourcesGeneratorTarget,
 )
 from pants.core.target_types import rules as core_target_types_rules
-from pants.testutil.python_interpreter_selection import skip_unless_python36_present
+from pants.testutil.python_interpreter_selection import skip_unless_python38_present
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
 
@@ -49,6 +52,7 @@ def rule_runner() -> PythonRuleRunner:
             *core_target_types_rules(),
             *package_dists.rules(),
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
+            QueryRule(PexFromTargetsRequestForBuiltPackage, [PexBinaryFieldSet]),
             QueryRule(BuiltPackage, [PythonDistributionFieldSet]),
         ],
         target_types=[
@@ -135,6 +139,7 @@ def test_include_sources_avoids_files_targets_warning(
                 """\
                 python_sources(
                     name='sources',
+                    interpreter_constraints=["CPython==3.10.*"]
                 )
 
                 python_distribution(
@@ -147,12 +152,14 @@ def test_include_sources_avoids_files_targets_warning(
                         name='my-dist',
                         version='1.2.3',
                     ),
+                    interpreter_constraints=["CPython==3.10.*"]
                 )
 
                 pex_binary(
                     dependencies=[':wheel'],
                     entry_point="none",
                     include_sources=False,
+                    interpreter_constraints=["CPython==3.10.*"]
                 )
                 """
             ),
@@ -283,21 +290,21 @@ def test_resolve_local_platforms(pex_executable: str, rule_runner: PythonRuleRun
     subprocess.run([executable], check=True)
 
 
-@skip_unless_python36_present
+@skip_unless_python38_present
 def test_complete_platforms(rule_runner: PythonRuleRunner) -> None:
-    linux_complete_platform = pkgutil.get_data(__name__, "platform-linux-py36.json")
+    linux_complete_platform = pkgutil.get_data(__name__, "platform-linux-py38.json")
     assert linux_complete_platform is not None
 
-    mac_complete_platform = pkgutil.get_data(__name__, "platform-mac-py36.json")
+    mac_complete_platform = pkgutil.get_data(__name__, "platform-mac-py38.json")
     assert mac_complete_platform is not None
 
     rule_runner.write_files(
         {
-            "src/py/project/platform-linux-py36.json": linux_complete_platform,
-            "src/py/project/platform-mac-py36.json": mac_complete_platform,
+            "src/py/project/platform-linux-py38.json": linux_complete_platform,
+            "src/py/project/platform-mac-py38.json": mac_complete_platform,
             "src/py/project/BUILD": dedent(
                 """\
-                python_requirement(name="p537", requirements=["p537==1.0.4"])
+                python_requirement(name="p537", requirements=["p537==1.0.6"])
                 files(name="platforms", sources=["platform*.json"])
                 pex_binary(
                     dependencies=[":p537"],
@@ -327,8 +334,8 @@ def test_complete_platforms(rule_runner: PythonRuleRunner) -> None:
     )
     assert sorted(
         [
-            "p537-1.0.4-cp36-cp36m-manylinux1_x86_64.whl",
-            "p537-1.0.4-cp36-cp36m-macosx_10_13_x86_64.whl",
+            "p537-1.0.6-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.whl",
+            "p537-1.0.6-cp38-cp38-macosx_10_15_x86_64.whl",
         ]
     ) == sorted(pex_info["distributions"])
 
@@ -418,3 +425,67 @@ def test_non_hermetic_venv_scripts(rule_runner: PythonRuleRunner) -> None:
     )
     assert "bob" == non_hermetic_results.pythonpath
     assert bob_sys_path_entry in non_hermetic_results.sys_path
+
+
+def test_sh_boot_plumb(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    sh_boot=True
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    assert len(result.artifacts) == 1
+    expected_pex_relpath = "src.py.project/project.pex"
+    assert expected_pex_relpath == result.artifacts[0].relpath
+
+    rule_runner.write_digest(result.digest)
+
+    executable = os.path.join(rule_runner.build_root, expected_pex_relpath)
+    with open(executable, "rb") as f:
+        shebang = f.readline().decode()
+        assert "#!/bin/sh" in shebang
+
+
+def test_extra_build_args(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    extra_build_args=["--example-extra-arg", "value-goes-here"]
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(PexFromTargetsRequestForBuiltPackage, [field_set])
+
+    additional_args = result.request.additional_args
+
+    assert additional_args[-2] == "--example-extra-arg"
+    assert additional_args[-1] == "value-goes-here"

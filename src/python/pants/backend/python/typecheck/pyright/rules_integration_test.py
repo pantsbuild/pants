@@ -31,6 +31,8 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import skip_unless_all_pythons_present
 from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_rmtree
 
 
 @pytest.fixture
@@ -90,29 +92,49 @@ UNDEFINED_VARIABLE_TOML_CONFIG = dedent(
     """
 )
 
+PYRIGHT_VERSION = "1.1.365"
+PYRIGHT_INTEGRITY_HASH = "sha512-A5RHXB782m2wCeazfrPGSvFUd1WAjpHrD83M/Umc/tcAhyC5pzhrh23US1yv9DH/GMilQeWdJ4W8pGxmgej4DQ=="
 PYRIGHT_LOCKFILE = json.dumps(
     {
         "name": "@the-company/project",
         "lockfileVersion": 2,
         "requires": True,
         "packages": {
-            "": {"name": "@the-company/project", "devDependencies": {"pyright": "1.1.316"}},
+            "": {"name": "@the-company/project", "devDependencies": {"pyright": PYRIGHT_VERSION}},
+            "node_modules/fsevents": {
+                "version": "2.3.3",
+                "resolved": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz",
+                "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==",
+                "dev": True,
+                "hasInstallScript": True,
+                "optional": True,
+                "engines": {"node": "^8.16.0 || ^10.6.0 || >=11.0.0"},
+            },
             "node_modules/pyright": {
-                "version": "1.1.316",
-                "resolved": "https://registry.npmjs.org/pyright/-/pyright-1.1.316.tgz",
-                "integrity": "sha512-Pdb9AwOO07uNOuEVtwCThyDpB0wigWmLjeCw5vdPG7gVbVYYgY2iw64kBdwTu78NrO0igVKzmoRuApMoL6ZE0w==",
+                "version": PYRIGHT_VERSION,
+                "resolved": f"https://registry.npmjs.org/pyright/-/pyright-{PYRIGHT_VERSION}.tgz",
+                "integrity": PYRIGHT_INTEGRITY_HASH,
                 "dev": True,
                 "bin": {"pyright": "index.js", "pyright-langserver": "langserver.index.js"},
-                "engines": {"node": ">=12.0.0"},
+                "engines": {"node": ">=14.0.0"},
+                "optionalDependencies": {"fsevents": "~2.3.3"},
             },
         },
         "dependencies": {
-            "pyright": {
-                "version": "1.1.316",
-                "resolved": "https://registry.npmjs.org/pyright/-/pyright-1.1.316.tgz",
-                "integrity": "sha512-Pdb9AwOO07uNOuEVtwCThyDpB0wigWmLjeCw5vdPG7gVbVYYgY2iw64kBdwTu78NrO0igVKzmoRuApMoL6ZE0w==",
+            "fsevents": {
+                "version": "2.3.3",
+                "resolved": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz",
+                "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==",
                 "dev": True,
-            }
+                "optional": True,
+            },
+            "pyright": {
+                "version": PYRIGHT_VERSION,
+                "resolved": f"https://registry.npmjs.org/pyright/-/pyright-{PYRIGHT_VERSION}.tgz",
+                "integrity": PYRIGHT_INTEGRITY_HASH,
+                "dev": True,
+                "requires": {"fsevents": "~2.3.3"},
+            },
         },
     }
 )
@@ -219,7 +241,7 @@ LIB_2_PACKAGE = f"{PACKAGE}/lib2"
                 f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
                 "src/js/lib3/BUILD": "package_json()",
                 "src/js/lib3/package.json": json.dumps(
-                    {"name": "@the-company/project", "dependencies": {"pyright": "1.1.316"}}
+                    {"name": "@the-company/project", "dependencies": {"pyright": PYRIGHT_VERSION}}
                 ),
                 "src/js/lib3/package-lock.json": PYRIGHT_LOCKFILE,
             },
@@ -237,7 +259,7 @@ LIB_2_PACKAGE = f"{PACKAGE}/lib2"
                 f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
                 "BUILD": "package_json(name='root_package')",
                 "package.json": json.dumps(
-                    {"name": "@the-company/project", "dependencies": {"pyright": "1.1.316"}}
+                    {"name": "@the-company/project", "dependencies": {"pyright": PYRIGHT_VERSION}}
                 ),
                 "package-lock.json": PYRIGHT_LOCKFILE,
             },
@@ -287,6 +309,43 @@ def test_skip(rule_runner: PythonRuleRunner) -> None:
     assert not result
 
 
+def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
+    # Ensure that the requirements venv must be created, by adding in a third-party
+    # requirement to the test code.
+    rule_runner.write_files(
+        {
+            "BUILD": "python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])",
+            f"{PACKAGE}/f.py": dedent(
+                """\
+            from more_itertools import is_sorted
+
+            assert is_sorted([1, 2, 3]) is True
+            """
+            ),
+            f"{PACKAGE}/BUILD": "python_sources()",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+
+    with temporary_dir() as cache_dir:
+        # On the first run, Pyright should work as the venv will be created from scratch.
+        result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={cache_dir}"])
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert "0 errors" in result[0].stdout
+        assert result[0].report == EMPTY_DIGEST
+
+        # Delete the cache directory containing the venv
+        safe_rmtree(cache_dir)
+
+        # Run again - should work as the venv will be created again from scratch.
+        result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={cache_dir}"])
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert "0 errors" in result[0].stdout
+        assert result[0].report == EMPTY_DIGEST
+
+
 @pytest.mark.parametrize(
     "files, extra_args",
     [
@@ -322,7 +381,7 @@ def test_skip(rule_runner: PythonRuleRunner) -> None:
                 f"{PACKAGE}/BUILD": "python_sources()",
                 "src/js/BUILD": "package_json()",
                 "src/js/package.json": json.dumps(
-                    {"name": "@the-company/project", "dependencies": {"pyright": "1.1.316"}}
+                    {"name": "@the-company/project", "dependencies": {"pyright": PYRIGHT_VERSION}}
                 ),
                 "src/js/package-lock.json": PYRIGHT_LOCKFILE,
             },

@@ -22,7 +22,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import create_path_env_var, softwrap
+from pants.util.strutil import softwrap
 
 
 class PexSubsystem(Subsystem):
@@ -80,6 +80,19 @@ class PexSubsystem(Subsystem):
             """
         ),
         advanced=True,
+    )
+    emit_warnings = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            If warnings from Pex should be logged by Pants to the console.
+
+            Note: Pants uses Pex internally in some ways that trigger some warnings at the moment,
+            so enabling this may result in warnings not related to your code. See
+            [#20577](https://github.com/pantsbuild/pants/issues/20577) and
+            [#20586](https://github.com/pantsbuild/pants/issues/20586).
+            """
+        ),
     )
 
     @property
@@ -215,20 +228,26 @@ class CompletePexEnvironment:
         If the Process is run with a pre-selected Python interpreter, set `python_configured=True`
         to avoid PEX from trying to find a new interpreter.
         """
+        path = os.pathsep.join(self._pex_environment.path)
+        subprocess_env_dict = dict(self._pex_environment.subprocess_environment_dict)
+
+        if "PATH" in self._pex_environment.subprocess_environment_dict:
+            path = os.pathsep.join([path, subprocess_env_dict.pop("PATH")])
+
         d = dict(
-            PATH=create_path_env_var(self._pex_environment.path),
+            PATH=path,
             PEX_IGNORE_RCFILES="true",
             PEX_ROOT=(
                 os.path.relpath(self.pex_root, self._working_directory)
                 if self._working_directory
                 else str(self.pex_root)
             ),
-            **self._pex_environment.subprocess_environment_dict,
+            **subprocess_env_dict,
         )
         if python:
             d["PEX_PYTHON"] = python.path
         else:
-            d["PEX_PYTHON_PATH"] = create_path_env_var(self.interpreter_search_paths)
+            d["PEX_PYTHON_PATH"] = os.pathsep.join(self.interpreter_search_paths)
         return d
 
 

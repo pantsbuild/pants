@@ -54,7 +54,7 @@ def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: Py
         raise NoCompatibleResolveException.bad_input_roots(
             root_targets,
             maybe_get_resolve=maybe_get_resolve,
-            doc_url_slug="python-third-party-dependencies#multiple-lockfiles",
+            doc_url_slug="docs/python/overview/lockfiles#multiple-lockfiles",
             workaround=softwrap(
                 f"""
                 To work around this, choose which resolve you want to use from above. Then, run
@@ -71,6 +71,7 @@ def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: Py
 
 class PythonRepl(ReplImplementation):
     name = "python"
+    supports_args = False
 
 
 @rule(level=LogLevel.DEBUG)
@@ -89,7 +90,6 @@ async def create_python_repl_request(
         LocalDistsPex,
         LocalDistsPexRequest(
             request.addresses,
-            internal_only=True,
             interpreter_constraints=interpreter_constraints,
         ),
     )
@@ -124,6 +124,7 @@ async def create_python_repl_request(
 
 class IPythonRepl(ReplImplementation):
     name = "ipython"
+    supports_args = True
 
 
 @rule(level=LogLevel.DEBUG)
@@ -154,7 +155,6 @@ async def create_ipython_repl_request(
         LocalDistsPex,
         LocalDistsPexRequest(
             request.addresses,
-            internal_only=True,
             interpreter_constraints=interpreter_constraints,
             sources=sources,
         ),

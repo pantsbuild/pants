@@ -13,8 +13,7 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
 )
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import path_globs_to_paths
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
@@ -38,13 +37,13 @@ async def find_putative_targets(
     req: PutativeCCTargetsRequest,
     all_owned_sources: AllOwnedSources,
 ) -> PutativeTargets:
-    all_cc_files = await Get(
-        Paths, PathGlobs, req.path_globs(*(f"*{ext}" for ext in CC_FILE_EXTENSIONS))
+    all_cc_files = await path_globs_to_paths(
+        req.path_globs(*(f"*{ext}" for ext in CC_FILE_EXTENSIONS))
     )
     unowned_cc_files = set(all_cc_files.files) - set(all_owned_sources)
     classified_unowned_kotlin_files = classify_source_files(unowned_cc_files)
 
-    putative_targets = []
+    putative_targets: list[PutativeTarget] = []
     for tgt_type, paths in classified_unowned_kotlin_files.items():
         for dirname, filenames in group_by_dir(paths).items():
             putative_targets.append(

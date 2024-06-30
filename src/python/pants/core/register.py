@@ -44,6 +44,7 @@ from pants.core.util_rules import (
     adhoc_binaries,
     archive,
     config_files,
+    environments,
     external_tool,
     source_files,
     stripped_source_files,
@@ -53,6 +54,7 @@ from pants.core.util_rules import (
 from pants.core.util_rules.environments import (
     DockerEnvironmentTarget,
     LocalEnvironmentTarget,
+    LocalWorkspaceEnvironmentTarget,
     RemoteEnvironmentTarget,
 )
 from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
@@ -90,6 +92,7 @@ def rules():
         *anonymous_telemetry.rules(),
         *archive.rules(),
         *config_files.rules(),
+        *environments.rules(),
         *external_tool.rules(),
         *git.rules(),
         *source_files.rules(),
@@ -111,6 +114,7 @@ def target_types():
         FileTarget,
         GenericTarget,
         LocalEnvironmentTarget,
+        LocalWorkspaceEnvironmentTarget,
         LockfilesGeneratorTarget,
         LockfileTarget,
         RelocatedFiles,

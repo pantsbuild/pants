@@ -26,7 +26,8 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import union
-from pants.util.strutil import pluralize
+from pants.option.option_types import BoolOption
+from pants.util.strutil import pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,25 @@ class DeployProcess:
 class DeploySubsystem(GoalSubsystem):
     name = "experimental-deploy"
     help = "Perform a deployment process."
+
+    dry_run = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            If true, perform a dry run without deploying anything.
+            For example, when deploying a terraform_deployment, a plan will be executed instead of an apply.
+            """
+        ),
+    )
+    publish_dependencies = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            If false, don't publish target dependencies before deploying the target.
+            For example, when deploying a helm_deployment, dependent docker images will not be published.
+            """
+        ),
+    )
 
     required_union_implementation = (DeployFieldSet,)
 
@@ -178,9 +198,12 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
         for field_set in target_roots_to_deploy_field_sets.field_sets
     )
 
-    publish_targets = set(
-        chain.from_iterable([deploy.publish_dependencies for deploy in deploy_processes])
+    publish_targets = (
+        set(chain.from_iterable([deploy.publish_dependencies for deploy in deploy_processes]))
+        if deploy_subsystem.publish_dependencies
+        else set()
     )
+
     logger.debug(f"Found {pluralize(len(publish_targets), 'dependency')}")
     publish_processes = await _all_publish_processes(publish_targets)
 

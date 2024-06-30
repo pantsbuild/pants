@@ -52,7 +52,12 @@ from pants.engine.fs import DigestSubset, GlobExpansionConjunction
 from pants.engine.internals import graph, platform_rules
 from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
+from pants.engine.process import (
+    Process,
+    ProcessCacheScope,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
+)
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -228,13 +233,15 @@ async def run_javascript_tests(
     if test.force:
         process = dataclasses.replace(process, cache_scope=ProcessCacheScope.PER_SESSION)
 
-    result = await Get(FallibleProcessResult, Process, process)
+    results = await Get(
+        ProcessResultWithRetries, ProcessWithRetries(process, test.attempts_default)
+    )
     coverage_data: JSCoverageData | None = None
     if test.use_coverage:
         coverage_snapshot = await Get(
             Snapshot,
             DigestSubset(
-                result.output_digest,
+                results.last.output_digest,
                 test_script.coverage_globs(installation.project_env.relative_workspace_directory()),
             ),
         )
@@ -247,7 +254,7 @@ async def run_javascript_tests(
         )
 
     return TestResult.from_batched_fallible_process_result(
-        result, batch, test.output, coverage_data=coverage_data
+        results.results, batch, test.output, coverage_data=coverage_data
     )
 
 

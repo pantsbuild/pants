@@ -5,10 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.scala.compile import scalac_plugins
-from pants.backend.scala.compile.scalac_plugins import (
-    ScalaPluginsForTargetWithoutResolveRequest,
-    ScalaPluginTargetsForTarget,
-)
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
@@ -28,8 +24,6 @@ from pants.engine.target import (
     FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
@@ -119,10 +113,6 @@ class ScalaPluginDependencyInferenceFieldSet(FieldSet):
     resolve: JvmResolveField
 
 
-class InferScalaPluginDependenciesRequest(InferDependenciesRequest):
-    infer_from = ScalaPluginDependencyInferenceFieldSet
-
-
 @dataclass(frozen=True)
 class ScalaRuntimeForResolveRequest:
     resolve_name: str
@@ -172,28 +162,6 @@ async def infer_scala_library_dependency(
     return InferredDependencies(scala_library_target_info.addresses)
 
 
-@rule(desc="Infer dependency on scala plugin artifacts for Scala target.")
-async def infer_scala_plugin_dependencies(
-    request: InferScalaPluginDependenciesRequest,
-) -> InferredDependencies:
-    """Adds dependencies on plugins for scala source files, so that they get included in the
-    target's resolve."""
-
-    wrapped_target = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(request.field_set.address, description_of_origin="<infallible>"),
-    )
-    target = wrapped_target.target
-
-    scala_plugins = await Get(
-        ScalaPluginTargetsForTarget, ScalaPluginsForTargetWithoutResolveRequest(target)
-    )
-
-    plugin_addresses = [target.address for target in scala_plugins.artifacts]
-
-    return InferredDependencies(plugin_addresses)
-
-
 def rules():
     return [
         *collect_rules(),
@@ -204,5 +172,4 @@ def rules():
         *versions.rules(),
         UnionRule(InferDependenciesRequest, InferScalaSourceDependencies),
         UnionRule(InferDependenciesRequest, InferScalaLibraryDependencyRequest),
-        UnionRule(InferDependenciesRequest, InferScalaPluginDependenciesRequest),
     ]

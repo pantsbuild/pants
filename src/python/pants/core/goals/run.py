@@ -7,7 +7,7 @@ import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar, Iterable, Mapping, Optional, Tuple, TypeVar, Union
+from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple, TypeVar, Union
 
 from typing_extensions import final
 
@@ -44,8 +44,8 @@ _T = TypeVar("_T")
 
 
 class RunInSandboxBehavior(Enum):
-    """Defines the behavhior of rules that act on a `RunFieldSet` subclass with regards to use in
-    the sandbox.
+    """Defines the behavior of rules that act on a `RunFieldSet` subclass with regards to use in the
+    sandbox.
 
     This is used to automatically generate rules used to fulfill `experimental_run_in_sandbox`
     targets.
@@ -53,7 +53,7 @@ class RunInSandboxBehavior(Enum):
     The behaviors are as follows:
 
     * `RUN_REQUEST_HERMETIC`: Use the existing `RunRequest`-generating rule, and enable cacheing.
-       Use this if you are confident the behaviour of the rule relies only on state that is
+       Use this if you are confident the behavior of the rule relies only on state that is
        captured by pants (e.g. binary paths are found using `EnvironmentVarsRequest`), and that
        the rule only refers to files in the sandbox.
     * `RUN_REQUEST_NOT_HERMETIC`: Use the existing `RunRequest`-generating rule, and do not
@@ -231,7 +231,7 @@ async def run(
     run_subsystem: RunSubsystem,
     debug_adapter: DebugAdapterSubsystem,
     global_options: GlobalOptions,
-    workspace: Workspace,  # Needed to enable sideeffecting.
+    workspace: Workspace,  # Needed to enable side-effecting.
     complete_env: CompleteEnvironmentVars,
 ) -> Run:
     field_set, target = await _find_what_to_run("the `run` goal")
@@ -275,7 +275,7 @@ async def run(
 def _unsupported_debug_adapter_rules(cls: type[RunFieldSet]) -> Iterable:
     """Returns a rule that implements DebugAdapterRequest by raising an error."""
 
-    @rule(_param_type_overrides={"request": cls})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
     async def get_run_debug_adapter_request(request: RunFieldSet) -> RunDebugAdapterRequest:
         raise NotImplementedError(
             "Running this target type with a debug adapter is not yet supported."
@@ -297,21 +297,21 @@ def _run_in_sandbox_behavior_rule(cls: type[RunFieldSet]) -> Iterable:
     a `RunInSandboxRequest`.
     """
 
-    @rule(_param_type_overrides={"request": cls})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
     async def not_supported(request: RunFieldSet) -> RunInSandboxRequest:
         raise NotImplementedError(
             "Running this target type within the sandbox is not yet supported."
         )
 
-    @rule(_param_type_overrides={"request": cls})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
     async def run_request_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
         return await _run_request(request)
 
-    @_uncacheable_rule(_param_type_overrides={"request": cls})
+    @_uncacheable_rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
     async def run_request_not_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
         return await _run_request(request)
 
-    default_rules = {
+    default_rules: dict[RunInSandboxBehavior, list[Any]] = {
         RunInSandboxBehavior.NOT_SUPPORTED: [not_supported],
         RunInSandboxBehavior.RUN_REQUEST_HERMETIC: [run_request_hermetic],
         RunInSandboxBehavior.RUN_REQUEST_NOT_HERMETIC: [run_request_not_hermetic],

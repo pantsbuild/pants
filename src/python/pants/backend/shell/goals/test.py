@@ -15,19 +15,28 @@ from pants.backend.shell.target_types import (
 from pants.backend.shell.util_rules import shell_command
 from pants.backend.shell.util_rules.shell_command import ShellCommandProcessFromTargetRequest
 from pants.core.goals.test import TestExtraEnv, TestFieldSet, TestRequest, TestResult, TestSubsystem
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.internals.selectors import Get
-from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
+from pants.engine.process import (
+    Process,
+    ProcessCacheScope,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
+)
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
+@dataclasses.dataclass(frozen=True)
 class TestShellCommandFieldSet(TestFieldSet):
     required_fields = (
         ShellCommandCommandField,
         ShellCommandTestDependenciesField,
     )
+
+    environment: EnvironmentField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -69,9 +78,11 @@ async def test_shell_command(
         ),
     )
 
-    shell_result = await Get(FallibleProcessResult, Process, shell_process)
+    shell_result = await Get(
+        ProcessResultWithRetries, ProcessWithRetries(shell_process, test_subsystem.attempts_default)
+    )
     return TestResult.from_fallible_process_result(
-        process_result=shell_result,
+        process_results=shell_result.results,
         address=field_set.address,
         output_setting=test_subsystem.output,
     )

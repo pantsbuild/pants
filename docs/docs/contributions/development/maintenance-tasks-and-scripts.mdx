@@ -1,0 +1,109 @@
+---
+    title: Maintenance tasks and scripts
+    sidebar_position: 6
+---
+
+There's a variety of maintenance tasks that happen on different frequencies.
+
+## Update the default/known versions of a built-in tool/subsystem
+
+### External tools (downloaded executables)
+
+Some tools use [the `ExternalTool` class](../../writing-plugins/the-rules-api/installing-tools#externaltool-install-pre-compiled-binaries) to download a binary from the internet, verify its size and hash, and then execute it.
+
+To update these:
+
+1. For each platform and version to add:
+   1. Download the archive/binary.
+   2. Verify it: check signatures and/or hashes if available.
+   3. Compute the sha256 hash and byte length. For example, if it's called `archive.zip`: `tee >(shasum -a 256) >(wc -c) > /dev/null < archive.zip`.
+2. Apply the new values:
+   1. Adjust `default_version` to the new version.
+   2. Add or replace to `default_known_versions` using the hashes and lengths above (for some tools we don't preserve older versions, especially if they have strong backwards compatibility guarantees, while for others we do retain older versions).
+
+Example: [#20469](https://github.com/pantsbuild/pants/pull/20469).
+
+#### PEX
+
+The PEX external tool is a bit special, because it also appears as a requirement of the Pants project itself in `3rdparty/python/requirements.txt`. To update pex, do both:
+
+1. Update the `pex-cli` subsystem, as above (in `src/python/pants/backend/python/util_rules/pex_cli.py`).
+2. Update the requirements file and run `pants generate-lockfiles --resolve=python-default` to update Pants' own lockfile.
+
+Example: [#20782](https://github.com/pantsbuild/pants/pull/20782).
+
+#### Terraform
+
+The `build-support/bin/terraform_tool_versions.py` script can help update Terraform versions.
+
+### Python tools
+
+Some tools use `PythonToolBase` to install executable PyPI packages, using a lockfile. Pants packages a default lockfile with a specific version of the package. To update these:
+
+1. Adjust `default_requirements` and/or `default_interpreter_constraints` as required.
+2. Run `build-support/bin/generate_builtin_lockfiles.py $scope`, where `$scope` is the `options_scope` of the subsystem class.
+
+Example: [#20924](https://github.com/pantsbuild/pants/pull/20924).
+
+### JVM tools
+
+Some tools use `JVMToolBase` to install executable JVM packages, using a lockfile. Pants packages a default lockfile with a specific version of the package. To update these:
+
+1. Adjust `default_version` and/or `default_artifacts` as required.
+2. Run `build-support/bin/generate_builtin_lockfiles.py $scope`, where `$scope` is the `options_scope` of the subsystem class.
+
+Example: none yet.
+
+### JS tools
+
+Some tools use `NodeJSToolBase` to install executable npm packages. To update these:
+
+1. Update `default_version`. That's all.
+
+Example: [#21007](https://github.com/pantsbuild/pants/pull/21007).
+
+## Update or create FaaS complete platforms files
+
+The function-as-a-service (FaaS) subsystems provide some built-in PEX complete platforms JSON files, for specific runtimes. To update or create these:
+
+### AWS Lambda
+
+1. Adjust `PythonAwsLambdaRuntime.known_runtimes` as required
+2. Run `build-support/bin/generate_faas_complete_platforms.py` to create any new files and update the existing ones, using AWS's published docker images
+
+Example: [#21004](https://github.com/pantsbuild/pants/pull/21004).
+
+### Google Cloud Functions
+
+Complete platforms are not provided for GCF yet: [#18195](https://github.com/pantsbuild/pants/issues/18195).
+
+## Cherry-pick a pull request to an older version
+
+We maintain multiple versions, with `main` being our development branch, and various `2.*.x` branches for the stable versions (see [Release strategy](../releases/release-strategy.mdx) for more details).
+
+### Cherry-picking a new pull request
+
+When a change needs to land in `main` but also one or more older versions, the usual process is:
+
+1. Create or review the pull request against `main` as usual
+2. Label it as `needs-cherrypick` and set milestone to the oldest release to which it should be cherry-picked
+3. Merge the pull request as normal
+4. At this point, automation kicks in and attempts to cherrypick the merged commit to the release in the milestone and any newer ones.
+5. The automation opens pull requests targeting each of the relevant `2.*.x` branches for which cherry-picking succeeds.
+6. If the automation fails to do a cherry-pick, it will mark the PR as `auto-cherry-picking-failed`
+7. In either case, the automation will add a comment describing what happened to the original pull request.
+
+For example, suppose `main` is for `2.23.x` and we're still maintaining `2.20.x`, `2.21.x` and `2.22.x`. If a pull request is labelled `needs-cherrypick` and has milestone `2.21.x`, then merging it will attempt to cherry pick to `2.21.x` and `2.22.x`.
+
+The process may fail in one of two ways:
+
+- The cherry-picking process failed, and tagged the PR with `auto-cherry-picking-failed`: follow the instructions in the comment on the pull request. (This likely means there are merge conflicts that require manual resolution.)
+- the cherry-pick hasn't (yet) run: trigger the automation manually by going to [the GitHub Action](https://github.com/pantsbuild/pants/actions/workflows/auto-cherry-picker.yaml), clicking on the "Run workflow" button, and providing the PR number.
+
+### Cherry-picking a merged pull request
+
+A pull request might merged without being configured for cherry-picking, and we decide later that it should be. To cherry-pick in this case:
+
+1. Label the pull request as `needs-cherrypick` and set milestone to the oldest release to which it should be cherry-picked
+2. Trigger the automation manually by going to [the GitHub Action](https://github.com/pantsbuild/pants/actions/workflows/auto-cherry-picker.yaml), clicking on the "Run workflow" button, and providing the PR number.
+3. As above, the automation may (partially) succeed or fail, and will leave a comment describing what happened.

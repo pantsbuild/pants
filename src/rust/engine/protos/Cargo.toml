@@ -15,4 +15,4 @@ tonic = { workspace = true, features = ["transport", "codegen", "tls", "tls-root
 
 [build-dependencies]
 prost-build = { workspace = true }
-tonic-build = { version = "0.9", features = ["prost"] }
+tonic-build = { workspace = true, features = ["prost"] }

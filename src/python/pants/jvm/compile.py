@@ -37,7 +37,7 @@ from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import strip_v2_chroot_path
+from pants.util.strutil import Simplifier
 
 logger = logging.getLogger(__name__)
 
@@ -138,8 +138,8 @@ class ClasspathEntryRequestFactory:
             if set(partial[0].field_sets).issubset(set(consume_only[0].field_sets_consume_only)):
                 return partial[0](component, resolve, consume_only[0](component, resolve, None))
 
-        impls_str = ", ".join(sorted(impl.__name__ for impl in impls))
         if compatible:
+            impls_str = ", ".join(sorted(impl.__name__ for impl in compatible))
             raise ClasspathSourceAmbiguity(
                 f"More than one JVM classpath provider ({impls_str}) was compatible with "
                 f"the inputs:\n{component.bullet_list()}"
@@ -148,6 +148,7 @@ class ClasspathEntryRequestFactory:
             # TODO: There is more subtlety of error messages possible here if there are multiple
             # partial providers, but can cross that bridge when we have them (multiple Scala or Java
             # compiler implementations, for example).
+            impls_str = ", ".join(sorted(impl.__name__ for impl in impls))
             raise ClasspathSourceMissing(
                 f"No JVM classpath providers (from: {impls_str}) were compatible with the "
                 f"combination of inputs:\n{component.bullet_list()}"
@@ -338,19 +339,16 @@ class FallibleClasspathEntry(EngineAwareReturnType):
         process_result: FallibleProcessResult,
         output: ClasspathEntry | None,
         *,
-        strip_chroot_path: bool = False,
+        output_simplifier: Simplifier = Simplifier(),
     ) -> FallibleClasspathEntry:
-        def prep_output(s: bytes) -> str:
-            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
-
         exit_code = process_result.exit_code
-        stderr = prep_output(process_result.stderr)
+        stderr = output_simplifier.simplify(process_result.stderr)
         return cls(
             description=description,
             result=(CompileResult.SUCCEEDED if exit_code == 0 else CompileResult.FAILED),
             output=output,
             exit_code=exit_code,
-            stdout=prep_output(process_result.stdout),
+            stdout=output_simplifier.simplify(process_result.stdout),
             stderr=stderr,
         )
 

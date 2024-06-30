@@ -28,12 +28,13 @@ def repo() -> Iterator[str]:
         _run_git(["init"])
         _run_git(["config", "user.email", "you@example.com"])
         _run_git(["config", "user.name", "Your Name"])
+        _run_git(["config", "commit.gpgsign", "false"])
 
         project = {
             ".gitignore": dedent(
                 f"""\
                 {Path(worktree).relative_to(get_buildroot())}
-                .pids
+                .pants.d/pids
                 __pycache__
                 .coverage.*  # For some reason, CI adds these files
                 """

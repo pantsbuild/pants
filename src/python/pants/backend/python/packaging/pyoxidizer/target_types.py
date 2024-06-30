@@ -78,14 +78,14 @@ class PyOxidizerDependenciesField(Dependencies):
 
         The distribution(s) must generate at least one wheel file. For example, if using
         `{GenerateSetupField.alias}=True`, then make sure `{WheelField.alias}=True`. See
-        {doc_url('python-distributions')}.
+        {doc_url('docs/python/overview/building-distributions')}.
 
         Usually, you only need to specify a single `python_distribution`. However, if
         that distribution depends on another first-party distribution in your repository, you
         must specify that dependency too, otherwise PyOxidizer would try installing the
         distribution from PyPI. Note that a `python_distribution` target might depend on
         another `python_distribution` target even if it is not included in its own `dependencies`
-        field, as explained at {doc_url('python-distributions')}; if code from one distribution
+        field, as explained at {doc_url('docs/python/overview/building-distributions')}; if code from one distribution
         imports code from another distribution, then there is a dependency and you must
         include both `python_distribution` targets in the `dependencies` field of this
         `pyoxidizer_binary` target.
@@ -146,7 +146,7 @@ class PyOxidizerTarget(Target):
         A single-file Python executable with a Python interpreter embedded, built via PyOxidizer.
 
         To use this target, first create a `python_distribution` target with the code you want
-        included in your binary, per {doc_url('python-distributions')}. Then add this
+        included in your binary, per {doc_url('docs/python/overview/building-distributions')}. Then add this
         `python_distribution` target to the `dependencies` field. See the `help` for
         `dependencies` for more information.
 

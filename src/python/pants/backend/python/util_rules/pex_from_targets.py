@@ -12,6 +12,7 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
+    Executable,
     MainSpecification,
     PexLayout,
     PythonRequirementsField,
@@ -49,6 +50,7 @@ from pants.core.target_types import FileSourceField
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, MergeDigests, PathGlobs
+from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Target,
@@ -269,7 +271,7 @@ async def choose_python_resolve(
             raise NoCompatibleResolveException.bad_input_roots(
                 transitive_targets.roots,
                 maybe_get_resolve=maybe_get_resolve,
-                doc_url_slug="python-third-party-dependencies#multiple-lockfiles",
+                doc_url_slug="docs/python/overview/lockfiles#multiple-lockfiles",
                 workaround=None,
             )
 
@@ -283,7 +285,7 @@ async def choose_python_resolve(
             ):
                 raise NoCompatibleResolveException.bad_dependencies(
                     maybe_get_resolve=maybe_get_resolve,
-                    doc_url_slug="python-third-party-dependencies#multiple-lockfiles",
+                    doc_url_slug="docs/python/overview/lockfiles#multiple-lockfiles",
                     root_resolve=chosen_resolve,
                     root_targets=transitive_targets.roots,
                     dependencies=transitive_targets.dependencies,
@@ -475,7 +477,7 @@ async def _determine_requirements_for_pex_from_targets(
                     f"""
                     [python].run_against_entire_lockfile was set, but could not find a
                     lockfile or constraints file for this target set. See
-                    {doc_url('python-third-party-dependencies')} for details.
+                    {doc_url('docs/python/overview/third-party-dependencies')} for details.
                     """
                 )
             )
@@ -554,6 +556,17 @@ async def create_pex_from_targets(
             await _warn_about_any_files_targets(
                 request.addresses, transitive_targets, union_membership
             )
+    elif isinstance(request.main, Executable):
+        # The source for an --executable main must be embedded in the pex even if request.include_source_files is False.
+        # If include_source_files is True, the executable source should be included in the (transitive) dependencies.
+        owners = await Get(
+            Owners,
+            OwnersRequest(
+                (request.main.spec,), owners_not_found_behavior=GlobMatchErrorBehavior.error
+            ),
+        )
+        owning_targets = await Get(Targets, Addresses(owners))
+        sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(owning_targets))
     else:
         sources = PythonSourceFiles.empty()
 
@@ -566,7 +579,6 @@ async def create_pex_from_targets(
             LocalDistsPex,
             LocalDistsPexRequest(
                 request.addresses,
-                internal_only=request.internal_only,
                 interpreter_constraints=interpreter_constraints,
                 sources=sources,
             ),

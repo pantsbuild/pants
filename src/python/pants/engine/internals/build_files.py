@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, Sequence, cast
 
+import typing_extensions
+
 from pants.build_graph.address import (
     Address,
     AddressInput,
@@ -59,6 +61,31 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
+class BuildFileSyntaxError(SyntaxError):
+    """An error parsing a BUILD file."""
+
+    def from_syntax_error(error: SyntaxError) -> BuildFileSyntaxError:
+        return BuildFileSyntaxError(
+            error.msg,
+            (
+                error.filename,
+                error.lineno,
+                error.offset,
+                error.text,
+            ),
+        )
+
+    def __str__(self) -> str:
+        first_line = f"Error parsing BUILD file {self.filename}:{self.lineno}: {self.msg}"
+        # These two fields are optional per the spec, so we can't rely on them being set.
+        if self.text is not None and self.offset is not None:
+            second_line = f"  {self.text.rstrip()}"
+            third_line = f"  {' ' * (self.offset - 1)}^"
+            return f"{first_line}\n{second_line}\n{third_line}"
+
+        return first_line
+
+
 @dataclass(frozen=True)
 class BuildFileOptions:
     patterns: tuple[str, ...]
@@ -93,8 +120,11 @@ async def evaluate_preludes(
         ),
     )
     globals: dict[str, Any] = {
-        **{name: getattr(builtins, name) for name in dir(builtins) if name.endswith("Error")},
+        # Later entries have precendence replacing conflicting keys from previous entries, so we
+        # start with typing_extensions as the lowest prio source for global values.
+        **{name: getattr(typing_extensions, name) for name in typing_extensions.__all__},
         **{name: getattr(typing, name) for name in typing.__all__},
+        **{name: getattr(builtins, name) for name in dir(builtins) if name.endswith("Error")},
         # Ensure the globals for each prelude includes the builtin symbols (E.g. `python_sources`)
         # and any build file aliases (e.g. from plugins)
         **parser.symbols,
@@ -112,7 +142,7 @@ async def evaluate_preludes(
         env_vars.update(BUILDFileEnvVarExtractor.get_env_vars(file_content))
     # __builtins__ is a dict, so isn't hashable, and can't be put in a FrozenDict.
     # Fortunately, we don't care about it - preludes should not be able to override builtins, so we just pop it out.
-    # TODO: Give a nice error message if a prelude tries to set a expose a non-hashable value.
+    # TODO: Give a nice error message if a prelude tries to set and expose a non-hashable value.
     locals.pop("__builtins__", None)
     # Ensure preludes can reference each other by populating the shared globals object with references
     # to the other symbols
@@ -204,7 +234,11 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
     @classmethod
     def get_env_vars(cls, file_content: FileContent) -> Sequence[str]:
         obj = cls(file_content.path)
-        obj.visit(ast.parse(file_content.content, file_content.path))
+        try:
+            obj.visit(ast.parse(file_content.content, file_content.path))
+        except SyntaxError as e:
+            raise BuildFileSyntaxError.from_syntax_error(e).with_traceback(e.__traceback__)
+
         return tuple(obj.env_vars)
 
     def visit_Call(self, node: ast.Call):

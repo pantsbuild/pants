@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
-from typing import Any, Dict, Iterable, NoReturn, Sequence, cast
+from typing import Any, Callable, Dict, Iterable, NoReturn, Sequence, cast
 
 from typing_extensions import TypedDict
 
@@ -28,6 +28,8 @@ from pants.engine.fs import (
     NativeDownloadFile,
     PathGlobs,
     PathGlobsAndRoot,
+    PathMetadataRequest,
+    PathMetadataResult,
     Paths,
     Snapshot,
     SymlinkEntry,
@@ -152,6 +154,8 @@ class Scheduler:
         # Create the native Scheduler and Session.
         types = PyTypes(
             paths=Paths,
+            path_metadata_request=PathMetadataRequest,
+            path_metadata_result=PathMetadataResult,
             file_content=FileContent,
             file_entry=FileEntry,
             symlink_entry=SymlinkEntry,
@@ -178,6 +182,7 @@ class Scheduler:
             parsed_javascript_deps_result=NativeParsedJavascriptDependencies,
         )
         remoting_options = PyRemotingOptions(
+            provider=execution_options.remote_provider.value,
             execution_enable=execution_options.remote_execution,
             store_headers=execution_options.remote_store_headers,
             store_chunk_bytes=execution_options.remote_store_chunk_bytes,
@@ -197,6 +202,8 @@ class Scheduler:
             execution_process_cache_namespace=execution_options.process_execution_cache_namespace,
             instance_name=execution_options.remote_instance_name,
             root_ca_certs_path=execution_options.remote_ca_certs_path,
+            client_certs_path=execution_options.remote_client_certs_path,
+            client_key_path=execution_options.remote_client_key_path,
             append_only_caches_base_path=execution_options.remote_execution_append_only_caches_base_path,
         )
         py_local_store_options = PyLocalStoreOptions(
@@ -207,7 +214,7 @@ class Scheduler:
             lease_time_millis=LOCAL_STORE_LEASE_TIME_SECS * 1000,
             shard_count=local_store_options.shard_count,
         )
-        exec_stategy_opts = PyExecutionStrategyOptions(
+        exec_strategy_opts = PyExecutionStrategyOptions(
             local_cache=execution_options.local_cache,
             remote_cache_read=execution_options.remote_cache_read,
             remote_cache_write=execution_options.remote_cache_write,
@@ -233,7 +240,7 @@ class Scheduler:
             watch_filesystem,
             remoting_options,
             py_local_store_options,
-            exec_stategy_opts,
+            exec_strategy_opts,
             ca_certs_path,
         )
 
@@ -401,6 +408,9 @@ class SchedulerSession:
 
     def visualize_rule_graph_to_file(self, filename: str) -> None:
         self._scheduler.visualize_rule_graph_to_file(filename)
+
+    def rule_graph_rule_gets(self) -> dict[Callable, list[tuple[type, list[type], Callable]]]:
+        return native_engine.rule_graph_rule_gets(self.py_scheduler)
 
     def execution_request(
         self,
@@ -660,9 +670,9 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             tasks,
             rule.func,
             rule.output_type,
-            rule.input_selectors,
+            tuple(rule.parameters.items()),
             rule.masked_types,
-            side_effecting=any(issubclass(t, SideEffecting) for t in rule.input_selectors),
+            side_effecting=any(issubclass(t, SideEffecting) for t in rule.parameters.values()),
             engine_aware_return_type=issubclass(rule.output_type, EngineAwareReturnType),
             cacheable=rule.cacheable,
             name=rule.canonical_name,
@@ -670,8 +680,8 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             level=rule.level.level,
         )
 
-        for the_get in rule.input_gets:
-            unions = [t for t in the_get.input_types if is_union(t)]
+        for awaitable in rule.awaitables:
+            unions = [t for t in awaitable.input_types if is_union(t)]
             if len(unions) == 1:
                 # Register the union by recording a copy of the Get for each union member.
                 union = unions[0]
@@ -680,17 +690,26 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                 for union_member in union_membership.get(union):
                     native_engine.tasks_add_get_union(
                         tasks,
-                        the_get.output_type,
-                        tuple(union_member if t == union else t for t in the_get.input_types),
+                        awaitable.output_type,
+                        tuple(union_member if t == union else t for t in awaitable.input_types),
                         in_scope_types,
                     )
             elif len(unions) > 1:
                 raise TypeError(
-                    "Only one @union may be used in a Get, but {the_get} used: {unions}."
+                    "Only one @union may be used in a Get, but {awaitable} used: {unions}."
+                )
+            elif awaitable.rule_id is not None:
+                # Is a call to a known rule.
+                native_engine.tasks_add_call(
+                    tasks,
+                    awaitable.output_type,
+                    awaitable.input_types,
+                    awaitable.rule_id,
+                    awaitable.explicit_args_arity,
                 )
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                native_engine.tasks_add_get(tasks, the_get.output_type, the_get.input_types)
+                native_engine.tasks_add_get(tasks, awaitable.output_type, awaitable.input_types)
 
         native_engine.tasks_task_end(tasks)
 

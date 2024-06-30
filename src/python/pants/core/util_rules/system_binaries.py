@@ -7,6 +7,7 @@ import dataclasses
 import hashlib
 import logging
 import os
+import shlex
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
@@ -25,19 +26,54 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.option.option_types import StrListOption
+from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import create_path_env_var, pluralize, softwrap
+from pants.util.strutil import pluralize, softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class SystemBinariesSubsystem(Subsystem):
+    options_scope = "system-binaries"
+    help = "System binaries related settings."
+
+    class EnvironmentAware(Subsystem.EnvironmentAware):
+        env_vars_used_by_options = ("PATH",)
+
+        _DEFAULT_SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
+
+        _system_binary_paths = StrListOption(
+            default=[*_DEFAULT_SEARCH_PATHS],
+            help=softwrap(
+                """
+                The PATH value that will searched for executables.
+
+                The special string `"<PATH>"` will expand to the contents of the PATH env var.
+                """
+            ),
+        )
+
+        @memoized_property
+        def system_binary_paths(self) -> SearchPath:
+            def iter_path_entries():
+                for entry in self._system_binary_paths:
+                    if entry == "<PATH>":
+                        path = self._options_env.get("PATH")
+                        if path:
+                            yield from path.split(os.pathsep)
+                    else:
+                        yield entry
+
+            return SearchPath(iter_path_entries())
+
 
 # -------------------------------------------------------------------------------------------
 # `BinaryPath` types
 # -------------------------------------------------------------------------------------------
-
-# TODO(#14492): This should be configurable via `[system-binaries]` subsystem, likely per-binary.
-SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
 
 
 @dataclass(frozen=True)
@@ -215,7 +251,7 @@ class BinaryShimsRequest:
 
 @dataclass(frozen=True)
 class BinaryShims:
-    """The shims created for a BinaryShimsRequest is placed in `bin_directory` of the `digest`.
+    """The shims created for a BinaryShimsRequest are placed in `bin_directory` of the `digest`.
 
     The purpose of these shims is so that a Process may be executed with `immutable_input_digests`
     provided to the `Process`, and `path_component` included in its `PATH` environment variable.
@@ -306,27 +342,23 @@ class TarBinary(BinaryPath):
         return (self.path, *prog_args, "-xf", archive_path, "-C", extract_path)
 
 
-class MkdirBinary(BinaryPath):
+class AwkBinary(BinaryPath):
     pass
 
 
-class MktempBinary(BinaryPath):
+class Base64Binary(BinaryPath):
     pass
 
 
-class TouchBinary(BinaryPath):
+class BasenameBinary(BinaryPath):
     pass
 
 
-class CpBinary(BinaryPath):
+class Bzip2Binary(BinaryPath):
     pass
 
 
-class MvBinary(BinaryPath):
-    pass
-
-
-class LnBinary(BinaryPath):
+class Bzip3Binary(BinaryPath):
     pass
 
 
@@ -338,7 +370,91 @@ class ChmodBinary(BinaryPath):
     pass
 
 
+class CksumBinary(BinaryPath):
+    pass
+
+
+class CpBinary(BinaryPath):
+    pass
+
+
+class CutBinary(BinaryPath):
+    pass
+
+
+class DateBinary(BinaryPath):
+    pass
+
+
+class DdBinary(BinaryPath):
+    pass
+
+
+class DfBinary(BinaryPath):
+    pass
+
+
 class DiffBinary(BinaryPath):
+    pass
+
+
+class DirnameBinary(BinaryPath):
+    pass
+
+
+class DuBinary(BinaryPath):
+    pass
+
+
+class ExprBinary(BinaryPath):
+    pass
+
+
+class FindBinary(BinaryPath):
+    pass
+
+
+class GpgBinary(BinaryPath):
+    pass
+
+
+class GzipBinary(BinaryPath):
+    pass
+
+
+class HeadBinary(BinaryPath):
+    pass
+
+
+class IdBinary(BinaryPath):
+    pass
+
+
+class LnBinary(BinaryPath):
+    pass
+
+
+class Lz4Binary(BinaryPath):
+    pass
+
+
+class LzopBinary(BinaryPath):
+    pass
+
+
+class Md5sumBinary(BinaryPath):
+    pass
+
+
+class MkdirBinary(BinaryPath):
+    pass
+
+
+class MktempBinary(BinaryPath):
+    pass
+
+
+class MvBinary(BinaryPath):
     pass
 
 
@@ -346,7 +462,63 @@ class OpenBinary(BinaryPath):
     pass
 
 
+class PwdBinary(BinaryPath):
+    pass
+
+
 class ReadlinkBinary(BinaryPath):
+    pass
+
+
+class RmBinary(BinaryPath):
+    pass
+
+
+class SedBinary(BinaryPath):
+    pass
+
+
+class ShBinary(BinaryPath):
+    pass
+
+
+class ShasumBinary(BinaryPath):
+    pass
+
+
+class SortBinary(BinaryPath):
+    pass
+
+
+class TailBinary(BinaryPath):
+    pass
+
+
+class TestBinary(BinaryPath):
+    pass
+
+
+class TouchBinary(BinaryPath):
+    pass
+
+
+class TrBinary(BinaryPath):
+    pass
+
+
+class WcBinary(BinaryPath):
+    pass
+
+
+class XargsBinary(BinaryPath):
+    pass
+
+
+class XzBinary(BinaryPath):
+    pass
+
+
+class ZstdBinary(BinaryPath):
     pass
 
 
@@ -369,7 +541,7 @@ class GitBinary(BinaryPath):
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except OSError as e:
             # Binary DNE or is not executable
-            cmd_str = " ".join(cmd)
+            cmd_str = shlex.join(cmd)
             raise GitBinaryException(f"Failed to execute command {cmd_str}: {e!r}")
         out, err = process.communicate()
 
@@ -377,11 +549,10 @@ class GitBinary(BinaryPath):
 
         return out.decode().strip()
 
-    def _check_result(
-        self, cmd: Iterable[str], result: int, failure_msg: str | None = None
-    ) -> None:
-        if result != 0:
-            cmd_str = " ".join(cmd)
+    def _check_result(self, cmd: list[str], result: int, failure_msg: str | None = None) -> None:
+        # git diff --exit-code exits with 1 if there were differences.
+        if result != 0 and (result != 1 or "diff" not in cmd):
+            cmd_str = shlex.join(cmd)
             raise GitBinaryException(failure_msg or f"{cmd_str} failed with exit code {result}")
 
     def _log_call(self, cmd: Iterable[str]) -> None:
@@ -440,10 +611,12 @@ def _create_shim(bash: str, binary: str) -> bytes:
 
 
 @rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
-async def get_bash() -> BashBinary:
+async def get_bash(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> BashBinary:
+    search_path = system_binaries.system_binary_paths
+
     request = BinaryPathRequest(
         binary_name="bash",
-        search_path=BashBinary.DEFAULT_SEARCH_PATH,
+        search_path=search_path,
         test=BinaryPathTest(args=["--version"]),
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
@@ -454,7 +627,10 @@ async def get_bash() -> BashBinary:
 
 
 @rule
-async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget) -> BinaryPaths:
+async def find_binary(
+    request: BinaryPathRequest,
+    env_target: EnvironmentTarget,
+) -> BinaryPaths:
     # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
     # our shebang. This avoids mixing locations that we would search for bash into the search paths
     # of the request we are servicing.
@@ -466,7 +642,15 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
         bash = await Get(BashBinary)
         shebang = f"#!{bash.path}"
 
-    script_path = "./find_binary.sh"
+    # HACK: For workspace environments, the `find_binary.sh` will be mounted in the "chroot" directory
+    # which is not the current directory (since the process will execute in the workspace). Thus,
+    # adjust the path used as argv[0] to find the script.
+    script_name = "find_binary.sh"
+    sandbox_base_path = env_target.sandbox_base_path()
+    script_exec_path = (
+        f"./{script_name}" if not sandbox_base_path else f"{sandbox_base_path}/{script_name}"
+    )
+
     script_header = dedent(
         f"""\
         {shebang}
@@ -498,21 +682,21 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
     script_content = script_header + script_body
     script_digest = await Get(
         Digest,
-        CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
+        CreateDigest([FileContent(script_name, script_content.encode(), is_executable=True)]),
     )
 
     # Some subtle notes about executing this script:
     #
     #  - We run the script with `ProcessResult` instead of `FallibleProcessResult` so that we
     #      can catch bugs in the script itself, given an earlier silent failure.
-    search_path = create_path_env_var(request.search_path)
+    search_path = os.pathsep.join(request.search_path)
     result = await Get(
         ProcessResult,
         Process(
             description=f"Searching for `{request.binary_name}` on PATH={search_path}",
             level=LogLevel.DEBUG,
             input_digest=script_digest,
-            argv=[script_path, request.binary_name],
+            argv=[script_exec_path, request.binary_name],
             env={"PATH": search_path},
             cache_scope=env_target.executable_search_path_cache_scope(),
         ),
@@ -551,32 +735,358 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
     )
 
 
-@rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
-async def find_zip() -> ZipBinary:
+@rule(desc="Finding the `awk` binary", level=LogLevel.DEBUG)
+async def find_awk(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> AwkBinary:
+    request = BinaryPathRequest(binary_name="awk", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="awk file")
+    return AwkBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `base64` binary", level=LogLevel.DEBUG)
+async def find_base64(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> Base64Binary:
     request = BinaryPathRequest(
-        binary_name="zip", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-v"])
+        binary_name="base64", search_path=system_binaries.system_binary_paths
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="create `.zip` archives")
-    return ZipBinary(first_path.path, first_path.fingerprint)
+    first_path = paths.first_path_or_raise(request, rationale="base64 file")
+    return Base64Binary(first_path.path, first_path.fingerprint)
 
 
-@rule(desc="Finding the `unzip` binary", level=LogLevel.DEBUG)
-async def find_unzip() -> UnzipBinary:
+@rule(desc="Finding the `basename` binary", level=LogLevel.DEBUG)
+async def find_basename(
+    system_binaries: SystemBinariesSubsystem.EnvironmentAware,
+) -> BasenameBinary:
     request = BinaryPathRequest(
-        binary_name="unzip", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-v"])
+        binary_name="basename", search_path=system_binaries.system_binary_paths
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="basename file")
+    return BasenameBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `bzip2` binary", level=LogLevel.DEBUG)
+async def find_bzip2(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> Bzip2Binary:
+    request = BinaryPathRequest(
+        binary_name="bzip2", search_path=system_binaries.system_binary_paths
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="bzip2 file")
+    return Bzip2Binary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `bzip3` binary", level=LogLevel.DEBUG)
+async def find_bzip3(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> Bzip3Binary:
+    request = BinaryPathRequest(
+        binary_name="bzip3", search_path=system_binaries.system_binary_paths
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="bzip3 file")
+    return Bzip3Binary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `cat` binary", level=LogLevel.DEBUG)
+async def find_cat(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> CatBinary:
+    request = BinaryPathRequest(binary_name="cat", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="outputting content from files")
+    return CatBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `chmod` binary", level=LogLevel.DEBUG)
+async def find_chmod(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> ChmodBinary:
+    request = BinaryPathRequest(
+        binary_name="chmod", search_path=system_binaries.system_binary_paths
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(
-        request, rationale="download the tools Pants needs to run"
+        request, rationale="change file modes or Access Control Lists"
     )
-    return UnzipBinary(first_path.path, first_path.fingerprint)
+    return ChmodBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `cksum` binary", level=LogLevel.DEBUG)
+async def find_cksum(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> CksumBinary:
+    request = BinaryPathRequest(
+        binary_name="cksum", search_path=system_binaries.system_binary_paths
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="cksum file")
+    return CksumBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `cp` binary", level=LogLevel.DEBUG)
+async def find_cp(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> CpBinary:
+    request = BinaryPathRequest(binary_name="cp", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="copy files")
+    return CpBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `cut` binary", level=LogLevel.DEBUG)
+async def find_cut(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> CutBinary:
+    request = BinaryPathRequest(binary_name="cut", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="cut file")
+    return CutBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `date` binary", level=LogLevel.DEBUG)
+async def find_date(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> DateBinary:
+    request = BinaryPathRequest(binary_name="date", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="date file")
+    return DateBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `dd` binary", level=LogLevel.DEBUG)
+async def find_dd(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> DdBinary:
+    request = BinaryPathRequest(binary_name="dd", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="dd file")
+    return DdBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `df` binary", level=LogLevel.DEBUG)
+async def find_df(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> DfBinary:
+    request = BinaryPathRequest(binary_name="df", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="df file")
+    return DfBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `diff` binary", level=LogLevel.DEBUG)
+async def find_diff(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> DiffBinary:
+    request = BinaryPathRequest(binary_name="diff", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="compare files line by line")
+    return DiffBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `dirname` binary", level=LogLevel.DEBUG)
+async def find_dirname(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> DirnameBinary:
+    request = BinaryPathRequest(
+        binary_name="dirname", search_path=system_binaries.system_binary_paths
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="dirname file")
+    return DirnameBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `du` binary", level=LogLevel.DEBUG)
+async def find_du(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> DuBinary:
+    request = BinaryPathRequest(binary_name="du", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="du file")
+    return DuBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `expr` binary", level=LogLevel.DEBUG)
+async def find_expr(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> ExprBinary:
+    request = BinaryPathRequest(binary_name="expr", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="expr file")
+    return ExprBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `find` binary", level=LogLevel.DEBUG)
+async def find_find(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> FindBinary:
+    request = BinaryPathRequest(binary_name="find", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="find file")
+    return FindBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `git` binary", level=LogLevel.DEBUG)
+async def find_git(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> GitBinary:
+    request = BinaryPathRequest(binary_name="git", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(
+        request, rationale="track changes to files in your build environment"
+    )
+    return GitBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `gpg` binary", level=LogLevel.DEBUG)
+async def find_gpg(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> GpgBinary:
+    request = BinaryPathRequest(binary_name="gpg", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="gpg file")
+    return GpgBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `gzip` binary", level=LogLevel.DEBUG)
+async def find_gzip(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> GzipBinary:
+    request = BinaryPathRequest(binary_name="gzip", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="gzip file")
+    return GzipBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `head` binary", level=LogLevel.DEBUG)
+async def find_head(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> HeadBinary:
+    request = BinaryPathRequest(binary_name="head", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="head file")
+    return HeadBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `id` binary", level=LogLevel.DEBUG)
+async def find_id(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> IdBinary:
+    request = BinaryPathRequest(binary_name="id", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="id file")
+    return IdBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `ln` binary", level=LogLevel.DEBUG)
+async def find_ln(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> LnBinary:
+    request = BinaryPathRequest(binary_name="ln", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="link files")
+    return LnBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `lz4` binary", level=LogLevel.DEBUG)
+async def find_lz4(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> Lz4Binary:
+    request = BinaryPathRequest(binary_name="lz4", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="lz4 file")
+    return Lz4Binary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `lzop` binary", level=LogLevel.DEBUG)
+async def find_lzop(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> LzopBinary:
+    request = BinaryPathRequest(binary_name="lzop", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="lzop file")
+    return LzopBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `md5sum` binary", level=LogLevel.DEBUG)
+async def find_md5sum(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> Md5sumBinary:
+    request = BinaryPathRequest(
+        binary_name="md5sum", search_path=system_binaries.system_binary_paths
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="md5sum file")
+    return Md5sumBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `mkdir` binary", level=LogLevel.DEBUG)
+async def find_mkdir(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> MkdirBinary:
+    request = BinaryPathRequest(
+        binary_name="mkdir", search_path=system_binaries.system_binary_paths
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="create directories")
+    return MkdirBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `mktempt` binary", level=LogLevel.DEBUG)
+async def find_mktemp(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> MktempBinary:
+    request = BinaryPathRequest(
+        binary_name="mktemp", search_path=system_binaries.system_binary_paths
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="create temporary files/directories")
+    return MktempBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `mv` binary", level=LogLevel.DEBUG)
+async def find_mv(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> MvBinary:
+    request = BinaryPathRequest(binary_name="mv", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="move files")
+    return MvBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `open` binary", level=LogLevel.DEBUG)
+async def find_open(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> OpenBinary:
+    request = BinaryPathRequest(binary_name="open", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="open URLs with default browser")
+    return OpenBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `pwd` binary", level=LogLevel.DEBUG)
+async def find_pwd(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> PwdBinary:
+    request = BinaryPathRequest(binary_name="pwd", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="pwd file")
+    return PwdBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `readlink` binary", level=LogLevel.DEBUG)
+async def find_readlink(
+    system_binaries: SystemBinariesSubsystem.EnvironmentAware,
+) -> ReadlinkBinary:
+    request = BinaryPathRequest(
+        binary_name="readlink", search_path=system_binaries.system_binary_paths
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="dereference symlinks")
+    return ReadlinkBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `rm` binary", level=LogLevel.DEBUG)
+async def find_rm(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> RmBinary:
+    request = BinaryPathRequest(binary_name="rm", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="rm file")
+    return RmBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `sed` binary", level=LogLevel.DEBUG)
+async def find_sed(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> SedBinary:
+    request = BinaryPathRequest(binary_name="sed", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="sed file")
+    return SedBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `sh` binary", level=LogLevel.DEBUG)
+async def find_sh(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> ShBinary:
+    request = BinaryPathRequest(binary_name="sh", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="sh file")
+    return ShBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `shasum` binary", level=LogLevel.DEBUG)
+async def find_shasum(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> ShasumBinary:
+    request = BinaryPathRequest(
+        binary_name="shasum", search_path=system_binaries.system_binary_paths
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="shasum file")
+    return ShasumBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `sort` binary", level=LogLevel.DEBUG)
+async def find_sort(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> SortBinary:
+    request = BinaryPathRequest(binary_name="sort", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="sort file")
+    return SortBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `tail` binary", level=LogLevel.DEBUG)
+async def find_tail(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> TailBinary:
+    request = BinaryPathRequest(binary_name="tail", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="tail file")
+    return TailBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
-async def find_tar(platform: Platform) -> TarBinary:
+async def find_tar(
+    platform: Platform, system_binaries: SystemBinariesSubsystem.EnvironmentAware
+) -> TarBinary:
     request = BinaryPathRequest(
-        binary_name="tar", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["--version"])
+        binary_name="tar",
+        search_path=system_binaries.system_binary_paths,
+        test=BinaryPathTest(args=["--version"]),
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(
@@ -585,104 +1095,90 @@ async def find_tar(platform: Platform) -> TarBinary:
     return TarBinary(first_path.path, first_path.fingerprint, platform)
 
 
-@rule(desc="Finding the `cat` binary", level=LogLevel.DEBUG)
-async def find_cat() -> CatBinary:
-    request = BinaryPathRequest(binary_name="cat", search_path=SEARCH_PATHS)
+@rule(desc="Finding the `test` binary", level=LogLevel.DEBUG)
+async def find_test(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> TestBinary:
+    request = BinaryPathRequest(binary_name="test", search_path=system_binaries.system_binary_paths)
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="outputing content from files")
-    return CatBinary(first_path.path, first_path.fingerprint)
-
-
-@rule(desc="Finding the `mkdir` binary", level=LogLevel.DEBUG)
-async def find_mkdir() -> MkdirBinary:
-    request = BinaryPathRequest(binary_name="mkdir", search_path=SEARCH_PATHS)
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="create directories")
-    return MkdirBinary(first_path.path, first_path.fingerprint)
-
-
-@rule(desc="Finding the `mktempt` binary", level=LogLevel.DEBUG)
-async def find_mktemp() -> MktempBinary:
-    request = BinaryPathRequest(binary_name="mktemp", search_path=SEARCH_PATHS)
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="create temporary files/directories")
-    return MktempBinary(first_path.path, first_path.fingerprint)
+    first_path = paths.first_path_or_raise(request, rationale="test file")
+    return TestBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `touch` binary", level=LogLevel.DEBUG)
-async def find_touch() -> TouchBinary:
-    request = BinaryPathRequest(binary_name="touch", search_path=SEARCH_PATHS)
+async def find_touch(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> TouchBinary:
+    request = BinaryPathRequest(
+        binary_name="touch", search_path=system_binaries.system_binary_paths
+    )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="touch file")
     return TouchBinary(first_path.path, first_path.fingerprint)
 
 
-@rule(desc="Finding the `cp` binary", level=LogLevel.DEBUG)
-async def find_cp() -> CpBinary:
-    request = BinaryPathRequest(binary_name="cp", search_path=SEARCH_PATHS)
+@rule(desc="Finding the `tr` binary", level=LogLevel.DEBUG)
+async def find_tr(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> TrBinary:
+    request = BinaryPathRequest(binary_name="tr", search_path=system_binaries.system_binary_paths)
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="copy files")
-    return CpBinary(first_path.path, first_path.fingerprint)
+    first_path = paths.first_path_or_raise(request, rationale="tr file")
+    return TrBinary(first_path.path, first_path.fingerprint)
 
 
-@rule(desc="Finding the `mv` binary", level=LogLevel.DEBUG)
-async def find_mv() -> MvBinary:
-    request = BinaryPathRequest(binary_name="mv", search_path=SEARCH_PATHS)
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="move files")
-    return MvBinary(first_path.path, first_path.fingerprint)
-
-
-@rule(desc="Finding the `ln` binary", level=LogLevel.DEBUG)
-async def find_ln() -> LnBinary:
-    request = BinaryPathRequest(binary_name="ln", search_path=SEARCH_PATHS)
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="link files")
-    return LnBinary(first_path.path, first_path.fingerprint)
-
-
-@rule(desc="Finding the `chmod` binary", level=LogLevel.DEBUG)
-async def find_chmod() -> ChmodBinary:
-    request = BinaryPathRequest(binary_name="chmod", search_path=SEARCH_PATHS)
+@rule(desc="Finding the `unzip` binary", level=LogLevel.DEBUG)
+async def find_unzip(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> UnzipBinary:
+    request = BinaryPathRequest(
+        binary_name="unzip",
+        search_path=system_binaries.system_binary_paths,
+        test=BinaryPathTest(args=["-v"]),
+    )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(
-        request, rationale="change file modes or Access Control Lists"
+        request, rationale="download the tools Pants needs to run"
     )
-    return ChmodBinary(first_path.path, first_path.fingerprint)
+    return UnzipBinary(first_path.path, first_path.fingerprint)
 
 
-@rule(desc="Finding the `diff` binary", level=LogLevel.DEBUG)
-async def find_diff() -> DiffBinary:
-    request = BinaryPathRequest(binary_name="diff", search_path=SEARCH_PATHS)
+@rule(desc="Finding the `wc` binary", level=LogLevel.DEBUG)
+async def find_wc(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> WcBinary:
+    request = BinaryPathRequest(binary_name="wc", search_path=system_binaries.system_binary_paths)
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="compare files line by line")
-    return DiffBinary(first_path.path, first_path.fingerprint)
+    first_path = paths.first_path_or_raise(request, rationale="wc file")
+    return WcBinary(first_path.path, first_path.fingerprint)
 
 
-@rule(desc="Finding the `open` binary", level=LogLevel.DEBUG)
-async def find_open() -> OpenBinary:
-    request = BinaryPathRequest(binary_name="open", search_path=SEARCH_PATHS)
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="open URLs with default browser")
-    return OpenBinary(first_path.path, first_path.fingerprint)
-
-
-@rule(desc="Finding the `readlink` binary", level=LogLevel.DEBUG)
-async def find_readlink() -> ReadlinkBinary:
-    request = BinaryPathRequest(binary_name="readlink", search_path=SEARCH_PATHS)
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="defererence symlinks")
-    return ReadlinkBinary(first_path.path, first_path.fingerprint)
-
-
-@rule(desc="Finding the `git` binary", level=LogLevel.DEBUG)
-async def find_git() -> GitBinary:
-    request = BinaryPathRequest(binary_name="git", search_path=SEARCH_PATHS)
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(
-        request, rationale="track changes to files in your build environment"
+@rule(desc="Finding the `xargs` binary", level=LogLevel.DEBUG)
+async def find_xargs(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> XargsBinary:
+    request = BinaryPathRequest(
+        binary_name="xargs", search_path=system_binaries.system_binary_paths
     )
-    return GitBinary(first_path.path, first_path.fingerprint)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="xargs file")
+    return XargsBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `xz` binary", level=LogLevel.DEBUG)
+async def find_xz(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> XzBinary:
+    request = BinaryPathRequest(binary_name="xz", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="xz file")
+    return XzBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
+async def find_zip(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> ZipBinary:
+    request = BinaryPathRequest(
+        binary_name="zip",
+        search_path=system_binaries.system_binary_paths,
+        test=BinaryPathTest(args=["-v"]),
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="create `.zip` archives")
+    return ZipBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `zstd` binary", level=LogLevel.DEBUG)
+async def find_zstd(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> ZstdBinary:
+    request = BinaryPathRequest(binary_name="zstd", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="zstd file")
+    return ZstdBinary(first_path.path, first_path.fingerprint)
 
 
 def rules():
@@ -700,8 +1196,10 @@ class MaybeGitBinary:
 
 
 @rule(desc="Finding the `git` binary", level=LogLevel.DEBUG)
-async def maybe_find_git() -> MaybeGitBinary:
-    request = BinaryPathRequest(binary_name="git", search_path=SEARCH_PATHS)
+async def maybe_find_git(
+    system_binaries: SystemBinariesSubsystem.EnvironmentAware,
+) -> MaybeGitBinary:
+    request = BinaryPathRequest(binary_name="git", search_path=system_binaries.system_binary_paths)
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path
     if not first_path:

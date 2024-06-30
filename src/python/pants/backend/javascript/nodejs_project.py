@@ -8,6 +8,8 @@ from dataclasses import dataclass, replace
 from pathlib import PurePath
 from typing import Iterable
 
+import nodesemver
+
 from pants.backend.javascript import package_json
 from pants.backend.javascript.package_json import (
     AllPackageJson,
@@ -78,7 +80,13 @@ class NodeJSProject:
     def immutable_install_args(self) -> tuple[str, ...]:
         if self.package_manager == "npm":
             return ("clean-install",)
-        return ("install", "--frozen-lockfile")
+        if self.package_manager == "pnpm":
+            return ("install", "--frozen-lockfile")
+        if self.package_manager == "yarn":
+            if nodesemver.satisfies(self.package_manager_version, "1.x"):
+                return ("install", "--frozen-lockfile")
+            return ("install", "--immutable")
+        raise ValueError(f"Unsupported package manager: {self.package_manager}")
 
     @property
     def workspace_specifier_arg(self) -> str:

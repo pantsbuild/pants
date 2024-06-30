@@ -30,5 +30,7 @@ workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
-testutil = { path = "../testutil" }
 tokio = { workspace = true, features = ["rt", "macros"] }
+
+[lints]
+workspace = true

@@ -29,7 +29,6 @@ from pants.backend.helm.util_rules.chart_metadata import (
     ParseHelmChartMetadataDigest,
 )
 from pants.build_graph.address import Address
-from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -301,9 +300,9 @@ def test_obtain_chart_from_deployment(rule_runner: RuleRunner) -> None:
             "src/foo/Chart.yaml": gen_chart_file("foo", version="1.0.0"),
             "src/deploy/BUILD": dedent(
                 """\
-                helm_deployment(name="first_party", dependencies=["//src/foo"])
+                helm_deployment(name="first_party", chart="//src/foo")
 
-                helm_deployment(name="3rd_party", dependencies=["//3rdparty/helm:cert-manager"])
+                helm_deployment(name="3rd_party", chart="//3rdparty/helm:cert-manager")
                 """
             ),
         }
@@ -325,40 +324,3 @@ def test_obtain_chart_from_deployment(rule_runner: RuleRunner) -> None:
     assert third_party_chart.info.name == "cert-manager"
     assert third_party_chart.info.version == "v1.7.1"
     assert third_party_chart.artifact
-
-
-def test_fail_when_no_chart_dependency_is_found_for_a_deployment(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"BUILD": """helm_deployment(name="foo")"""})
-
-    target = rule_runner.get_target(Address("", target_name="foo"))
-    field_set = HelmDeploymentFieldSet.create(target)
-
-    msg = f"The target '{field_set.address}' is missing a dependency on a `helm_chart` or a `helm_artifact` target."
-    with pytest.raises(ExecutionError, match=msg):
-        rule_runner.request(HelmChart, [FindHelmDeploymentChart(field_set)])
-
-
-def test_fail_when_more_than_one_chart_is_found_for_a_deployment(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "src/foo/BUILD": "helm_chart()",
-            "src/foo/Chart.yaml": gen_chart_file("foo", version="1.0.0"),
-            "src/bar/BUILD": "helm_chart()",
-            "src/bar/Chart.yaml": gen_chart_file("bar", version="1.0.3"),
-            "src/quxx/BUILD": dedent(
-                """\
-                helm_deployment(dependencies=["//src/foo", "//src/bar"])
-                """
-            ),
-        }
-    )
-
-    target = rule_runner.get_target(Address("src/quxx"))
-    field_set = HelmDeploymentFieldSet.create(target)
-
-    msg = (
-        f"The target '{field_set.address}' has more than one `helm_chart` "
-        "or `helm_artifact` addresses in its dependencies, it should have only one."
-    )
-    with pytest.raises(ExecutionError, match=msg):
-        rule_runner.request(HelmChart, [FindHelmDeploymentChart(field_set)])

@@ -33,8 +33,29 @@ def test_help_advanced_global() -> None:
 def test_help_targets() -> None:
     pants_run = run_pants(["help", "targets"])
     pants_run.assert_success()
-    lines = [" ".join(line.split()) for line in pants_run.stdout.splitlines()]
-    assert "archive A ZIP or TAR file containing loose files and code packages." in lines
+
+    # The target help text may be split over several lines depending on what targets there are
+    # and how Pants views the terminal size. Extract the full texts consistently to reduce this test's
+    # brittle nature.
+    target_help_texts: list[str] = []
+    current = ""
+    for line in pants_run.stdout.splitlines():
+        line = line.rstrip()
+        if not line:
+            continue
+
+        if not line[0:1].isspace():
+            target_help_texts.append(current)
+            current = ""
+
+        line = re.sub(r"\s+", " ", line.strip())
+        current += f" {line}"
+    if current:
+        target_help_texts.append(current)
+
+    assert (
+        " archive A ZIP or TAR file containing loose files and code packages." in target_help_texts
+    )
     assert "to get help for a specific target" in pants_run.stdout
 
 
@@ -176,7 +197,7 @@ def test_help_provided_target_plugin_field() -> None:
 
             A publishable Python setuptools distribution (e.g. an sdist or wheel).
 
-            See {doc_url("python-distributions")}.
+            See {doc_url("docs/python/overview/building-distributions")}.
 
 
             Activated by pants.backend.python

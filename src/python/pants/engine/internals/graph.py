@@ -9,9 +9,22 @@ import itertools
 import json
 import logging
 import os.path
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Type, cast
+from typing import (
+    Any,
+    DefaultDict,
+    FrozenSet,
+    Iterable,
+    Iterator,
+    Mapping,
+    NamedTuple,
+    Sequence,
+    Type,
+    TypeVar,
+    cast,
+)
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -27,7 +40,8 @@ from pants.engine.collection import Collection
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import EMPTY_SNAPSHOT, GlobMatchErrorBehavior, PathGlobs, Paths, Snapshot
 from pants.engine.internals import native_engine
-from pants.engine.internals.mapper import AddressFamilies
+from pants.engine.internals.build_files import AddressFamilyDir
+from pants.engine.internals.mapper import AddressFamilies, AddressFamily
 from pants.engine.internals.native_engine import AddressParseException
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
@@ -36,7 +50,7 @@ from pants.engine.internals.parametrize import (  # noqa: F401
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizationsRequest as _TargetParametrizationsRequest,
 )
-from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
+from pants.engine.internals.target_adaptor import SourceBlocks, TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
@@ -79,6 +93,8 @@ from pants.engine.target import (
     TargetGenerator,
     Targets,
     TargetTypesToGenerateTargetsRequests,
+    TransitivelyExcludeDependencies,
+    TransitivelyExcludeDependenciesRequest,
     TransitiveTargets,
     TransitiveTargetsRequest,
     UnexpandedTargets,
@@ -97,6 +113,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list, pluralize, softwrap
+from pants.vcs.hunk import TextBlocks
 
 logger = logging.getLogger(__name__)
 
@@ -253,6 +270,91 @@ async def resolve_all_generator_target_requests(
     )
 
 
+async def _parametrized_target_generators_with_templates(
+    address: Address,
+    target_adaptor: TargetAdaptor,
+    target_type: type[TargetGenerator],
+    generator_fields: dict[str, Any],
+    union_membership: UnionMembership,
+) -> list[tuple[TargetGenerator, Mapping[str, Any]]]:
+    # Pre-load field values from defaults for the target type being generated.
+    if hasattr(target_type, "generated_target_cls"):
+        family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
+        template_fields = dict(family.defaults.get(target_type.generated_target_cls.alias, {}))
+    else:
+        template_fields = {}
+
+    # Split out the `propagated_fields` before construction.
+    copied_fields = (
+        *target_type.copied_fields,
+        *target_type._find_copied_plugin_fields(union_membership),
+    )
+    moved_fields = (
+        *target_type.moved_fields,
+        *target_type._find_moved_plugin_fields(union_membership),
+    )
+    for field_type in copied_fields:
+        for alias in (field_type.deprecated_alias, field_type.alias):
+            if alias is None:
+                continue
+            # Any deprecated field use will be checked on the generator target.
+            field_value = generator_fields.get(alias, None)
+            if field_value is not None:
+                template_fields[alias] = field_value
+    for field_type in moved_fields:
+        # We must check for deprecated field usage here before passing the value to the generator.
+        if field_type.deprecated_alias is not None:
+            field_value = generator_fields.pop(field_type.deprecated_alias, None)
+            if field_value is not None:
+                warn_deprecated_field_type(field_type)
+                template_fields[field_type.deprecated_alias] = field_value
+        field_value = generator_fields.pop(field_type.alias, None)
+        if field_value is not None:
+            template_fields[field_type.alias] = field_value
+
+    # Move parametrize groups over to `template_fields` in order to expand them.
+    parametrize_group_field_names = [
+        name
+        for name, field in generator_fields.items()
+        if isinstance(field, Parametrize) and field.is_group
+    ]
+    for field_name in parametrize_group_field_names:
+        template_fields[field_name] = generator_fields.pop(field_name)
+
+    field_type_aliases = target_type._get_field_aliases_to_field_types(
+        target_type.class_field_types(union_membership)
+    ).keys()
+    generator_fields_parametrized = {
+        name
+        for name, field in generator_fields.items()
+        if isinstance(field, Parametrize) and name in field_type_aliases
+    }
+    if generator_fields_parametrized:
+        noun = pluralize(len(generator_fields_parametrized), "field", include_count=False)
+        generator_fields_parametrized_text = ", ".join(
+            repr(f) for f in generator_fields_parametrized
+        )
+        raise InvalidFieldException(
+            f"Only fields which will be moved to generated targets may be parametrized, "
+            f"so target generator {address} (with type {target_type.alias}) cannot "
+            f"parametrize the {generator_fields_parametrized_text} {noun}."
+        )
+    return [
+        (
+            _create_target(
+                address,
+                target_type,
+                target_adaptor,
+                generator_fields,
+                union_membership,
+                name_explicitly_set=target_adaptor.name is not None,
+            ),
+            template,
+        )
+        for address, template in Parametrize.expand(address, template_fields)
+    ]
+
+
 async def _target_generator_overrides(
     target_generator: TargetGenerator, unmatched_build_file_globs: UnmatchedBuildFileGlobs
 ) -> dict[str, dict[str, Any]]:
@@ -294,19 +396,19 @@ async def resolve_generator_target_requests(
     if not generate_request:
         return ResolvedTargetGeneratorRequests()
     generator_fields = dict(target_adaptor.kwargs)
-    generators = _parametrized_target_generators_with_templates(
+    generators = await _parametrized_target_generators_with_templates(
         req.address,
         target_adaptor,
         target_type,
         generator_fields,
         union_membership,
     )
-    base_generator = target_type(
-        generator_fields,
+    base_generator = _create_target(
         req.address,
-        name_explicitly_set=target_adaptor.name_explicitly_set,
-        union_membership=union_membership,
-        description_of_origin=target_adaptor.description_of_origin,
+        target_type,
+        target_adaptor,
+        generator_fields,
+        union_membership,
     )
     overrides = await _target_generator_overrides(base_generator, unmatched_build_file_globs)
     return ResolvedTargetGeneratorRequests(
@@ -360,99 +462,71 @@ async def resolve_target_parametrizations(
     return _TargetParametrizations(parametrizations)
 
 
+_TargetType = TypeVar("_TargetType", bound=Target)
+
+
+def _create_target(
+    address: Address,
+    target_type: type[_TargetType],
+    target_adaptor: TargetAdaptor,
+    field_values: Mapping[str, Any],
+    union_membership: UnionMembership,
+    name_explicitly_set: bool | None = None,
+) -> _TargetType:
+    target = target_type(
+        field_values,
+        address,
+        name_explicitly_set=(
+            target_adaptor.name_explicitly_set
+            if name_explicitly_set is None
+            else name_explicitly_set
+        ),
+        union_membership=union_membership,
+        description_of_origin=target_adaptor.description_of_origin,
+        origin_sources_blocks=target_adaptor.origin_sources_blocks,
+    )
+    # Check for any deprecated field usage.
+    for field_type in target.field_types:
+        if field_type.deprecated_alias is not None and field_type.deprecated_alias in field_values:
+            warn_deprecated_field_type(field_type)
+
+    return target
+
+
 def _target_parametrizations(
     address: Address,
     target_adaptor: TargetAdaptor,
     target_type: type[Target],
     union_membership: UnionMembership,
 ) -> _TargetParametrization:
-    first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
-    if rest:
+    expanded_parametrizations = tuple(Parametrize.expand(address, target_adaptor.kwargs))
+    first_address, first_kwargs = expanded_parametrizations[0]
+    if first_address is not address:
         # The target was parametrized, and so the original Target does not exist.
         generated = FrozenDict(
             (
                 parameterized_address,
-                target_type(
-                    parameterized_fields,
+                _create_target(
                     parameterized_address,
-                    name_explicitly_set=target_adaptor.name_explicitly_set,
-                    union_membership=union_membership,
-                    description_of_origin=target_adaptor.description_of_origin,
+                    target_type,
+                    target_adaptor,
+                    parameterized_fields,
+                    union_membership,
                 ),
             )
-            for parameterized_address, parameterized_fields in (first, *rest)
+            for parameterized_address, parameterized_fields in expanded_parametrizations
         )
         return _TargetParametrization(None, generated)
     else:
         # The target was not parametrized.
-        target = target_type(
-            target_adaptor.kwargs,
+        target = _create_target(
             address,
-            name_explicitly_set=target_adaptor.name_explicitly_set,
-            union_membership=union_membership,
-            description_of_origin=target_adaptor.description_of_origin,
+            target_type,
+            target_adaptor,
+            target_adaptor.kwargs,
+            union_membership,
         )
-        for field_type in target.field_types:
-            if (
-                field_type.deprecated_alias is not None
-                and field_type.deprecated_alias in target_adaptor.kwargs
-            ):
-                warn_deprecated_field_type(field_type)
         return _TargetParametrization(target, FrozenDict())
-
-
-def _parametrized_target_generators_with_templates(
-    address: Address,
-    target_adaptor: TargetAdaptor,
-    target_type: type[TargetGenerator],
-    generator_fields: dict[str, Any],
-    union_membership: UnionMembership,
-) -> list[tuple[TargetGenerator, dict[str, Any]]]:
-    # Split out the `propagated_fields` before construction.
-    template_fields = {}
-    copied_fields = (
-        *target_type.copied_fields,
-        *target_type._find_plugin_fields(union_membership),
-    )
-    for field_type in copied_fields:
-        field_value = generator_fields.get(field_type.alias, None)
-        if field_value is not None:
-            template_fields[field_type.alias] = field_value
-    for field_type in target_type.moved_fields:
-        field_value = generator_fields.pop(field_type.alias, None)
-        if field_value is not None:
-            template_fields[field_type.alias] = field_value
-    field_type_aliases = target_type._get_field_aliases_to_field_types(
-        target_type.class_field_types(union_membership)
-    ).keys()
-    generator_fields_parametrized = {
-        name
-        for name, field in generator_fields.items()
-        if isinstance(field, Parametrize) and name in field_type_aliases
-    }
-    if generator_fields_parametrized:
-        noun = pluralize(len(generator_fields_parametrized), "field", include_count=False)
-        generator_fields_parametrized_text = ", ".join(
-            repr(f) for f in generator_fields_parametrized
-        )
-        raise InvalidFieldException(
-            f"Only fields which will be moved to generated targets may be parametrized, "
-            f"so target generator {address} (with type {target_type.alias}) cannot "
-            f"parametrize the {generator_fields_parametrized_text} {noun}."
-        )
-    return [
-        (
-            target_type(
-                generator_fields,
-                address,
-                name_explicitly_set=target_adaptor.name is not None,
-                union_membership=union_membership,
-                description_of_origin=target_adaptor.description_of_origin,
-            ),
-            template,
-        )
-        for address, template in Parametrize.expand(address, template_fields)
-    ]
 
 
 @rule(_masked_types=[EnvironmentName])
@@ -522,6 +596,7 @@ async def resolve_target_for_bootstrapping(
         union_membership=union_membership,
         ignore_unrecognized_fields=True,
         description_of_origin=target_adaptor.description_of_origin,
+        origin_sources_blocks=target_adaptor.origin_sources_blocks,
     )
     return WrappedTargetForBootstrap(target)
 
@@ -576,7 +651,8 @@ async def find_all_targets() -> AllTargets:
     tgts = await Get(
         Targets,
         RawSpecsWithoutFileOwners(
-            recursive_globs=(RecursiveGlobSpec(""),), description_of_origin="the `AllTargets` rule"
+            recursive_globs=(RecursiveGlobSpec(""),),
+            description_of_origin="the `AllTargets` rule",
         ),
     )
     return AllTargets(tgts)
@@ -742,27 +818,65 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
 
 @rule(desc="Resolve transitive targets", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
 async def transitive_targets(
-    request: TransitiveTargetsRequest, local_environment_name: ChosenLocalEnvironmentName
+    request: TransitiveTargetsRequest,
+    local_environment_name: ChosenLocalEnvironmentName,
+    union_membership: UnionMembership,
 ) -> TransitiveTargets:
     """Find all the targets transitively depended upon by the target roots."""
+    environment_name = local_environment_name.val
 
     dependency_mapping = await Get(_DependencyMapping, _DependencyMappingRequest(request, True))
+    targets = (*dependency_mapping.roots_as_targets, *dependency_mapping.visited)
 
     # Apply any transitive excludes (`!!` ignores).
-    transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
     unevaluated_transitive_excludes = []
-    for t in (*dependency_mapping.roots_as_targets, *dependency_mapping.visited):
+    for t in targets:
         unparsed = t.get(Dependencies).unevaluated_transitive_excludes
         if unparsed.values:
             unevaluated_transitive_excludes.append(unparsed)
+
+    transitive_exclude_addresses = []
     if unevaluated_transitive_excludes:
-        nested_transitive_excludes = await MultiGet(
-            Get(Targets, UnparsedAddressInputs, unparsed)
+        all_transitive_exclude_addresses = await MultiGet(
+            Get(Addresses, UnparsedAddressInputs, unparsed)
             for unparsed in unevaluated_transitive_excludes
         )
-        transitive_excludes = FrozenOrderedSet(
-            itertools.chain.from_iterable(excludes for excludes in nested_transitive_excludes)
+        transitive_exclude_addresses = [
+            *itertools.chain.from_iterable(all_transitive_exclude_addresses)
+        ]
+
+    # Apply plugin-provided transitive excludes
+    if request_types := cast(
+        "Sequence[Type[TransitivelyExcludeDependenciesRequest]]",
+        union_membership.get(TransitivelyExcludeDependenciesRequest),
+    ):
+        tgts_to_request_types = {
+            tgt: [
+                inference_request_type
+                for inference_request_type in request_types
+                if inference_request_type.infer_from.is_applicable(tgt)
+            ]
+            for tgt in targets
+        }
+
+        results = await MultiGet(
+            Get(
+                TransitivelyExcludeDependencies,
+                {
+                    request_type(
+                        request_type.infer_from.create(tgt)
+                    ): TransitivelyExcludeDependenciesRequest,
+                    environment_name: EnvironmentName,
+                },
+            )
+            for tgt, request_types in tgts_to_request_types.items()
+            for request_type in request_types
         )
+        transitive_exclude_addresses.extend(
+            itertools.chain.from_iterable(addresses for addresses in results)
+        )
+
+    transitive_excludes = await Get(Targets, Addresses(transitive_exclude_addresses))
 
     return TransitiveTargets(
         tuple(dependency_mapping.roots_as_targets),
@@ -873,7 +987,7 @@ def _log_or_raise_unmatched_owners(
             f"target whose `sources` field includes the file."
         )
     msg = (
-        f"{prefix} See {doc_url('targets')} for more information on target definitions."
+        f"{prefix} See {doc_url('docs/using-pants/key-concepts/targets-and-build-files')} for more information on target definitions."
         f"\n\nYou may want to run `{bin_name()} tailor` to autogenerate your BUILD files. See "
         f"{doc_url('create-initial-build-files')}.{option_msg}"
     )
@@ -885,17 +999,86 @@ def _log_or_raise_unmatched_owners(
 
 
 @dataclass(frozen=True)
+class TargetSourceBlocks:
+    address: Address
+    source_blocks: SourceBlocks
+
+
+class FilenameTargetSourceBlocksMapping(FrozenDict[str, tuple[TargetSourceBlocks, ...]]):
+    """Map file paths to all TargetSourceBlocks owned by that file."""
+
+
+@dataclass(frozen=True)
+class TargetOriginSourcesBlocksOptions:
+    enable: bool
+
+
+@rule
+def extract_enable_target_origin_sources_blocks(
+    global_options: GlobalOptions,
+) -> TargetOriginSourcesBlocksOptions:
+    return TargetOriginSourcesBlocksOptions(
+        enable=global_options.enable_target_origin_sources_blocks
+    )
+
+
+@rule
+def calc_source_block_mapping(
+    targets: AllTargets,
+    options: TargetOriginSourcesBlocksOptions,
+) -> FilenameTargetSourceBlocksMapping:
+    if not options.enable:
+        return FilenameTargetSourceBlocksMapping()
+
+    result: DefaultDict[str, list[TargetSourceBlocks]] = defaultdict(list)
+    for target in targets:
+        for filename, sources_blocks in target.origin_sources_blocks.items():
+            result[filename].append(
+                TargetSourceBlocks(address=target.address, source_blocks=sources_blocks)
+            )
+
+    return FilenameTargetSourceBlocksMapping(
+        (filename, tuple(blocks)) for filename, blocks in result.items()
+    )
+
+
+class FilesWithSourceBlocks(FrozenSet[str]):
+    pass
+
+
+@rule
+def calc_files_with_sources_blocks(
+    mapping: FilenameTargetSourceBlocksMapping,
+) -> FilesWithSourceBlocks:
+    return FilesWithSourceBlocks(mapping.keys())
+
+
+@dataclass(frozen=True)
 class OwnersRequest:
     """A request for the owners of a set of file paths.
+
+    The resulting owners will be those identified for the sources as well as those
+    for sources_blocks. Do not include a source filename in sources if it is also
+    present in sources_blocks, as that will be redundant, and cancel the finer level
+    of detail gained by inspecting the originating text blocks.
 
     TODO: This is widely used as an effectively-public API. It should probably move to
     `pants.engine.target`.
     """
 
     sources: tuple[str, ...]
+    sources_blocks: FrozenDict[str, TextBlocks] = FrozenDict()
     owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
+
+
+@dataclass(frozen=True)
+class TextBlocksOwnersRequest:
+    """Request for file text block owners."""
+
+    filename: str
+    text_blocks: TextBlocks
 
 
 class Owners(FrozenOrderedSet[Address]):
@@ -907,6 +1090,15 @@ async def find_owners(
     owners_request: OwnersRequest,
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> Owners:
+    block_owners: tuple[Owners, ...] = (
+        await MultiGet(
+            Get(Owners, TextBlocksOwnersRequest(filename, blocks))
+            for filename, blocks in owners_request.sources_blocks.items()
+        )
+        if owners_request.sources_blocks
+        else ()
+    )
+
     # Determine which of the sources are live and which are deleted.
     sources_paths = await Get(Paths, PathGlobs(owners_request.sources))
 
@@ -996,7 +1188,34 @@ async def find_owners(
             [PurePath(path) for path in unmatched_sources], owners_request.owners_not_found_behavior
         )
 
-    return Owners(result)
+    return Owners(result.union(*block_owners))
+
+
+@rule
+def find_source_blocks_owners(
+    request: TextBlocksOwnersRequest, mapping: FilenameTargetSourceBlocksMapping
+) -> Owners:
+    file_blocks = mapping.get(request.filename)
+    if not file_blocks:
+        return Owners()
+
+    owners = set()
+
+    # Let's say the rule is called to figure out which targets has changed given the `git diff` output.
+    # Then `request.source_blocks` is populated with source blocks parsed from `git diff` output
+    # and `file_blocks` is holding the list of all source blocks for the given `request.filename`.
+    # In order to get an answer we need to find an intersection for all pairs of blocks and return
+    # the targets they correspond to.
+    #
+    # TODO Use interval tree?
+    for request_block, target_blocks in itertools.product(request.text_blocks, file_blocks):
+        for target_block in target_blocks.source_blocks:
+            if not target_block.is_touched_by(request_block):
+                continue
+            owners.add(target_blocks.address)
+            break  # continue outer loop
+
+    return Owners(owners)
 
 
 # -----------------------------------------------------------------------------------------------

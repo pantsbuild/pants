@@ -85,19 +85,41 @@ class FrozenDict(Mapping[K, V]):
     def __reversed__(self) -> Iterator[K]:
         return reversed(tuple(self._data))
 
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, FrozenDict):
-            return NotImplemented
-        return tuple(self.items()) == tuple(other.items())
+    def __eq__(self, other: Any) -> Any:
+        # defer to dict's __eq__
+        return self._data == other
 
     def __lt__(self, other: Any) -> bool:
         if not isinstance(other, FrozenDict):
             return NotImplemented
-        return tuple(self._data.items()) < tuple(other._data.items())
+        # If sorting each of these on every __lt__ call ends up being a problem we could consider
+        # optimising this, by, for instance, sorting on construction.
+        return sorted(self._data.items()) < sorted(other._data.items())
+
+    def __or__(self, other: Any) -> FrozenDict[K, V]:
+        if isinstance(other, FrozenDict):
+            other = other._data
+        elif not isinstance(other, Mapping):
+            return NotImplemented
+        return FrozenDict(self._data | other)
+
+    def __ror__(self, other: Any) -> FrozenDict[K, V]:
+        if isinstance(other, FrozenDict):
+            other = other._data
+        elif not isinstance(other, Mapping):
+            return NotImplemented
+        return FrozenDict(other | self._data)
 
     def _calculate_hash(self) -> int:
         try:
-            return hash(tuple(self._data.items()))
+            h = 0
+            for pair in self._data.items():
+                # xor is commutative, i.e. we get the same hash no matter the order of items. This
+                # "relies" on "hash" of the individual elements being unpredictable enough that such
+                # a naive aggregation is okay. In addition, the Python hash isn't / shouldn't be
+                # used for cryptographically sensitive purposes.
+                h ^= hash(pair)
+            return h
         except TypeError as e:
             raise TypeError(
                 softwrap(

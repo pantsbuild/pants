@@ -3,198 +3,201 @@
 
 # NB: The project names must follow the naming scheme at
 #  https://www.python.org/dev/peps/pep-0503/#normalized-names.
-DEFAULT_MODULE_MAPPING = {
+
+import re
+from enum import Enum
+from functools import partial
+from typing import Callable, Dict, List, Match, Tuple
+
+
+class PackageSeparator(Enum):
+    DOT = "."
+    UNDERSCORE = "_"
+    NONE = ""
+
+
+def all_hyphen_to_separator(m: Match[str], separator: PackageSeparator) -> str:
+    """Convert all hyphens to a package separator e.g. azure-foo-bar -> azure.foo.bar or
+    azure_foo_bar.
+
+    >>> all_hyphen_to_separator(re.match(r"^azure-.+", "azure-foo-bar"), PackageSeparator.DOT)
+    'azure.foo.bar'
+    >>> all_hyphen_to_separator(re.match(r"^azure-.+", "azure-foo-bar"), PackageSeparator.UNDERSCORE)
+    'azure_foo_bar'
+    >>> all_hyphen_to_separator(re.match(r"^azure-.+", "azure-foo-bar"), PackageSeparator.NONE)
+    'azurefoobar'
+    """
+    return m.string.replace("-", separator.value)
+
+
+def first_group_hyphen_to_separator(m: Match[str], separator: PackageSeparator) -> str:
+    """Convert the first group(regex match group) of hyphens to underscores. Only returns the first
+    group and must contain at least one group.
+
+    >>> first_group_hyphen_to_separator(re.match(r"^django-((.+(-.+)?))", "django-admin-cursor-paginator"), separator=PackageSeparator.UNDERSCORE)
+    'admin_cursor_paginator'
+    >>> first_group_hyphen_to_separator(re.match(r"^django-((.+(-.+)?))", "django-admin-cursor-paginator"), separator=PackageSeparator.DOT)
+    'admin.cursor.paginator'
+    >>> first_group_hyphen_to_separator(re.match(r"^django-((.+(-.+)?))", "django-admin-cursor-paginator"), separator=PackageSeparator.NONE)
+    'admincursorpaginator'
+    """
+    if m.re.groups == 0 or not m.groups():
+        raise ValueError(f"expected at least one group in the pattern{m.re.pattern} but got none.")
+    return str(m.groups()[0]).replace("-", separator.value)
+
+
+def two_groups_hyphens_two_replacements_with_suffix(
+    m: Match[str],
+    first_group_replacement: PackageSeparator = PackageSeparator.DOT,
+    second_group_replacement: PackageSeparator = PackageSeparator.NONE,
+    custom_suffix: str = "",
+) -> str:
+    """take two groups, and by default, the first will have '-' replaced with '.', the second will
+    have '-' replaced with '' e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)
+
+    >>> two_groups_hyphens_two_replacements_with_suffix(re.match(r"^(google-cloud-)([^.]+)", "google-cloud-foo-bar"))
+    'google.cloud.foobar'
+    >>> two_groups_hyphens_two_replacements_with_suffix(re.match(r"^(google-cloud-)([^.]+)", "google-cloud-foo-bar"), first_group_replacement=PackageSeparator.UNDERSCORE, second_group_replacement=PackageSeparator.DOT)
+    'google_cloud_foo.bar'
+    """
+    if m.re.groups < 2 or not m.groups():
+        raise ValueError(f"expected at least two groups in the pattern{m.re.pattern}.")
+    prefix = m.string[m.start(1) : m.end(1)].replace("-", first_group_replacement.value)
+    suffix = m.string[m.start(2) : m.end(2)].replace("-", second_group_replacement.value)
+    return f"{prefix}{suffix}{custom_suffix}"
+
+
+# common replacement methods
+all_hyphen_to_dot = partial(all_hyphen_to_separator, separator=PackageSeparator.DOT)
+all_hyphen_to_underscore = partial(all_hyphen_to_separator, separator=PackageSeparator.UNDERSCORE)
+first_group_hyphen_to_dot = partial(first_group_hyphen_to_separator, separator=PackageSeparator.DOT)
+first_group_hyphen_to_underscore = partial(
+    first_group_hyphen_to_separator, separator=PackageSeparator.UNDERSCORE
+)
+
+"""
+A mapping of Patterns and their replacements. will be used with `re.sub`.
+The match is either a string or a function`(str) -> str`; that takes a re.Match and returns
+the replacement. see re.sub for more information
+
+then if an import in the python code is google.cloud.foo, then the package of
+google-cloud-foo will be used.
+"""
+DEFAULT_MODULE_PATTERN_MAPPING: Dict[re.Pattern, List[Callable[[Match[str]], str]]] = {
+    re.compile(r"""^azure-.+"""): [all_hyphen_to_dot],
+    re.compile(r"""^django-((.+(-.+)?))"""): [first_group_hyphen_to_underscore],
+    # See https://github.com/googleapis/google-cloud-python#libraries for all Google cloud
+    # libraries. We only add libraries in GA, not beta.
+    re.compile(r"""^(google-cloud-)([^.]+)"""): [
+        partial(two_groups_hyphens_two_replacements_with_suffix, custom_suffix=custom_suffix)
+        for custom_suffix in ("", "_v1", "_v2", "_v3")
+    ],
+    re.compile(r"""^(opentelemetry-instrumentation-)([^.]+)"""): [
+        partial(
+            two_groups_hyphens_two_replacements_with_suffix,
+            second_group_replacement=PackageSeparator.UNDERSCORE,
+        ),
+    ],
+    re.compile(r"""^oslo-.+"""): [all_hyphen_to_underscore],
+    re.compile(r"""^python-(.+)"""): [first_group_hyphen_to_underscore],
+}
+
+DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
     "absl-py": ("absl",),
     "acryl-datahub": ("datahub",),
     "ansicolors": ("colors",),
+    "antlr4-python3-runtime": ("antlr4",),
     "apache-airflow": ("airflow",),
     "atlassian-python-api": ("atlassian",),
     "attrs": ("attr", "attrs"),
-    # Azure
-    "azure-common": ("azure.common",),
-    "azure-core": ("azure.core",),
-    "azure-cosmos": ("azure.cosmos",),
-    "azure-graphrbac": ("azure.graphrbac",),
-    "azure-identity": ("azure.identity",),
-    "azure-keyvault-certificates": ("azure.keyvault.certificates",),
-    "azure-keyvault-keys": ("azure.keyvault.keys",),
-    "azure-keyvault-secrets": ("azure.keyvault.secrets",),
-    "azure-keyvault": ("azure.keyvault",),
-    "azure-mgmt-apimanagement": ("azure.mgmt.apimanagement",),
-    "azure-mgmt-authorization": ("azure.mgmt.authorization",),
-    "azure-mgmt-automation": ("azure.mgmt.automation",),
-    "azure-mgmt-batch": ("azure.mgmt.batch",),
-    "azure-mgmt-compute": ("azure.mgmt.compute",),
-    "azure-mgmt-consumption": ("azure.mgmt.consumption",),
-    "azure-mgmt-containerinstance": ("azure.mgmt.containerinstance",),
-    "azure-mgmt-containerregistry": ("azure.mgmt.containerregistry",),
-    "azure-mgmt-containerservice": ("azure.mgmt.containerservice",),
-    "azure-mgmt-core": ("azure.mgmt.core",),
-    "azure-mgmt-cosmosdb": ("azure.mgmt.cosmosdb",),
-    "azure-mgmt-dns": ("azure.mgmt.dns",),
-    "azure-mgmt-eventgrid": ("azure.mgmt.eventgrid",),
-    "azure-mgmt-eventhub": ("azure.mgmt.eventhub",),
-    "azure-mgmt-frontdoor": ("azure.mgmt.frontdoor",),
-    "azure-mgmt-hybridkubernetes": ("azure.mgmt.hybridkubernetes",),
-    "azure-mgmt-iothub": ("azure.mgmt.iothub",),
-    "azure-mgmt-iothubprovisioningservices": ("azure.mgmt.iothubprovisioningservices",),
-    "azure-mgmt-keyvault": ("azure.mgmt.keyvault",),
-    "azure-mgmt-logic": ("azure.mgmt.logic",),
-    "azure-mgmt-managementgroups": ("azure.mgmt.managementgroups",),
-    "azure-mgmt-monitor": ("azure.mgmt.monitor",),
-    "azure-mgmt-msi": ("azure.mgmt.msi",),
-    "azure-mgmt-network": ("azure.mgmt.network",),
-    "azure-mgmt-privatedns": ("azure.mgmt.privatedns",),
-    "azure-mgmt-rdbms": ("azure.mgmt.rdbms",),
-    "azure-mgmt-redis": ("azure.mgmt.redis",),
-    "azure-mgmt-resource": ("azure.mgmt.resource",),
-    "azure-mgmt-resourcegraph": ("azure.mgmt.resourcegraph",),
-    "azure-mgmt-security": ("azure.mgmt.security",),
-    "azure-mgmt-servicebus": ("azure.mgmt.servicebus",),
-    "azure-mgmt-servicefabric": ("azure.mgmt.servicefabric",),
-    "azure-mgmt-sql": ("azure.mgmt.sql",),
-    "azure-mgmt-storage": ("azure.mgmt.storage",),
-    "azure-mgmt-subscription": ("azure.mgmt.subscription",),
-    "azure-mgmt-synapse": ("azure.mgmt.synapse",),
-    "azure-mgmt-trafficmanager": ("azure.mgmt.trafficmanager",),
-    "azure-mgmt-web": ("azure.mgmt.web",),
-    "azure-eventgrid": ("azure.eventgrid",),
-    "azure-eventhub": ("azure.eventhub",),
-    "azure-servicebus": ("azure.servicebus",),
-    "azure-storage-blob": ("azure.storage.blob",),
-    "azure-storage-queue": ("azure.storage.queue",),
-    "azure-synapse-accesscontrol": ("azure.synapse.accesscontrol",),
+    "auth0-python": ("auth0",),
     "beautifulsoup4": ("bs4",),
+    "biopython": ("Bio", "BioSQL"),
     "bitvector": ("BitVector",),
-    "cattrs": ("cattr",),
-    "django-admin-cursor-paginator": ("admin_cursor_paginator",),
+    "cattrs": ("cattr", "cattrs"),
+    "cloud-sql-python-connector": ("google.cloud.sql.connector",),
+    "coolprop": ("CoolProp",),
+    "databricks-sdk": ("databricks.sdk",),
+    "databricks-sql-connector": (
+        "databricks.sql",
+        "databricks.sqlalchemy",
+    ),
+    "delta-spark": ("delta",),
+    "django-activity-stream": ("actstream",),
     "django-cors-headers": ("corsheaders",),
-    "django-csp": ("csp",),
-    "django-debug-toolbar": ("debug_toolbar",),
-    "django-dotenv": ("dotenv",),
+    "django-countries": ("django_countries",),
     "django-filter": ("django_filters",),
-    "django-import-export": ("import_export",),
-    "django-ipware": ("ipware",),
-    "django-model-utils": ("model_utils",),
-    "django-ninja": ("ninja",),
-    "django-ninja-extra": ("ninja_extra",),
+    "django-fsm": ("django_fsm",),
+    "django-notifications-hq": ("notifications",),
+    "django-oauth-toolkit": ("oauth2_provider",),
+    "django-object-actions": ("django_object_actions",),
     "django-postgres-extra": ("psqlextra",),
-    "django-safedelete": ("safedelete",),
-    "django-simple-history": ("simple_history",),
-    "django-storages": ("storages",),
-    "django-taggit": ("taggit",),
-    "django-taggit-autosuggest": ("taggit_autosuggest",),
+    "django-redis": ("django_redis",),
+    "django-scim2": ("django_scim",),
+    "django-two-factor-auth": ("two_factor",),
     "djangorestframework": ("rest_framework",),
+    "djangorestframework-api-key": ("rest_framework_api_key",),
     "djangorestframework-dataclasses": ("rest_framework_dataclasses",),
+    "djangorestframework-jwt": ("rest_framework_jwt",),
+    "djangorestframework-queryfields": ("drf_queryfields",),
     "djangorestframework-simplejwt": ("rest_framework_simplejwt",),
+    "dnspython": ("dns",),
+    "drf-api-tracking": ("rest_framework_tracking",),
     "elastic-apm": ("elasticapm",),
     "enum34": ("enum",),
     "factory-boy": ("factory",),
+    "faiss-cpu": ("faiss",),
+    "faiss-gpu": ("faiss",),
     "fluent-logger": ("fluent",),
+    "fonttools": ("fontTools",),
     "gitpython": ("git",),
-    # See https://github.com/googleapis/google-cloud-python#libraries for all Google cloud
-    # libraries. We only add libraries in GA, not beta.
-    "google-cloud-aiplatform": ("google.cloud.aiplatform",),
-    "google-cloud-bigquery": ("google.cloud.bigquery",),
-    "google-cloud-bigtable": ("google.cloud.bigtable",),
-    "google-cloud-datastore": ("google.cloud.datastore",),
-    "google-cloud-datastream": ("google.cloud.datastream",),
-    "google-cloud-firestore": ("google.cloud.firestore",),
-    "google-cloud-functions": ("google.cloud.functions_v1", "google.cloud.functions"),
-    "google-cloud-iam": ("google.cloud.iam_credentials_v1",),
-    "google-cloud-iot": ("google.cloud.iot_v1",),
-    "google-cloud-logging": ("google.cloud.logging_v2", "google.cloud.logging"),
-    "google-cloud-pubsub": ("google.cloud.pubsub_v1", "google.cloud.pubsub"),
-    "google-cloud-secret-manager": ("google.cloud.secretmanager",),
-    "google-cloud-spanner": ("google.cloud.spanner",),
-    "google-cloud-storage": ("google.cloud.storage",),
+    "google-api-python-client": ("googleapiclient",),
+    "google-auth": (
+        "google.auth",
+        "google.oauth2",
+    ),
     "graphql-core": ("graphql",),
     "grpcio": ("grpc",),
+    "grpcio-health-checking": ("grpc_health",),
+    "grpcio-reflection": ("grpc_reflection",),
+    "grpcio-status": ("grpc_status",),
+    "grpcio-testing": ("grpc_testing",),
+    "honeycomb-opentelemetry": ("honeycomb.opentelemetry",),
     "ipython": ("IPython",),
     "jack-client": ("jack",),
     "kafka-python": ("kafka",),
     "lark-parser": ("lark",),
     "launchdarkly-server-sdk": ("ldclient",),
     "mail-parser": ("mailparser",),
+    "matplotlib": ("matplotlib", "mpl_toolkits"),
+    "matrix-nio": ("nio",),
     "mysql-connector-python": ("mysql.connector",),
+    "netcdf4": ("netCDF4",),
+    "o365": ("O365",),
     "opencv-python": ("cv2",),
+    "opencv-python-headless": ("cv2",),
     "opensearch-py": ("opensearchpy",),
     # opentelemetry
-    "opentelemetry-api": ("opentelemetry",),
-    "opentelemetry-exporter-otlp": ("opentelemetry.exporter",),
+    "opentelemetry-api": (
+        "opentelemetry._logs",
+        "opentelemetry.attributes",
+        "opentelemetry.baggage",
+        "opentelemetry.context",
+        "opentelemetry.environment_variables",
+        "opentelemetry.metrics",
+        "opentelemetry.propagate",
+        "opentelemetry.propagators",
+        "opentelemetry.trace",
+        "opentelemetry.util",
+        "opentelemetry.version",
+    ),
+    "opentelemetry-exporter-otlp": ("opentelemetry.exporter.otlp",),
     "opentelemetry-exporter-otlp-proto-grpc": ("opentelemetry.exporter.otlp.proto.grpc",),
     "opentelemetry-exporter-otlp-proto-http": ("opentelemetry.exporter.otlp.proto.http",),
-    "opentelemetry-instrumentation-aio-pika": ("opentelemetry.instrumentation.aio_pika",),
-    "opentelemetry-instrumentation-aiohttp-client": (
-        "opentelemetry.instrumentation.aiohttp_client",
-    ),
-    "opentelemetry-instrumentation-aiopg": ("opentelemetry.instrumentation.aiopg",),
-    "opentelemetry-instrumentation-asgi": ("opentelemetry.instrumentation.asgi",),
-    "opentelemetry-instrumentation-asyncpg": ("opentelemetry.instrumentation.asyncpg",),
-    "opentelemetry-instrumentation-aws-lambda": ("opentelemetry.instrumentation.aws_lambda",),
-    "opentelemetry-instrumentation-boto": ("opentelemetry.instrumentation.boto",),
-    "opentelemetry-instrumentation-boto3sqs": ("opentelemetry.instrumentation.boto3sqs",),
-    "opentelemetry-instrumentation-botocore": ("opentelemetry.instrumentation.botocore",),
-    "opentelemetry-instrumentation-celery": ("opentelemetry.instrumentation.celery",),
-    "opentelemetry-instrumentation-confluent-kafka": (
-        "opentelemetry.instrumentation.confluent_kafka",
-    ),
-    "opentelemetry-instrumentation-dbapi": ("opentelemetry.instrumentation.dbapi",),
-    "opentelemetry-instrumentation-django": ("opentelemetry.instrumentation.django",),
-    "opentelemetry-instrumentation-elasticsearch": ("opentelemetry.instrumentation.elasticsearch",),
-    "opentelemetry-instrumentation-falcon": ("opentelemetry.instrumentation.falcon",),
-    "opentelemetry-instrumentation-fastapi": ("opentelemetry.instrumentation.fastapi",),
-    "opentelemetry-instrumentation-flask": ("opentelemetry.instrumentation.flask",),
-    "opentelemetry-instrumentation-grpc": ("opentelemetry.instrumentation.grpc",),
-    "opentelemetry-instrumentation-httpx": ("opentelemetry.instrumentation.httpx",),
-    "opentelemetry-instrumentation-jinja2": ("opentelemetry.instrumentation.jinja2",),
     "opentelemetry-instrumentation-kafka-python": ("opentelemetry.instrumentation.kafka",),
-    "opentelemetry-instrumentation-logging": ("opentelemetry.instrumentation.logging",),
-    "opentelemetry-instrumentation-mysql": ("opentelemetry.instrumentation.mysql",),
-    "opentelemetry-instrumentation-pika": ("opentelemetry.instrumentation.pika",),
-    "opentelemetry-instrumentation-psycopg2": ("opentelemetry.instrumentation.psycopg2",),
-    "opentelemetry-instrumentation-pymemcache": ("opentelemetry.instrumentation.pymemcache",),
-    "opentelemetry-instrumentation-pymongo": ("opentelemetry.instrumentation.pymongo",),
-    "opentelemetry-instrumentation-pymysql": ("opentelemetry.instrumentation.pymysql",),
-    "opentelemetry-instrumentation-pyramid": ("opentelemetry.instrumentation.pyramid",),
-    "opentelemetry-instrumentation-redis": ("opentelemetry.instrumentation.redis",),
-    "opentelemetry-instrumentation-remoulade": ("opentelemetry.instrumentation.remoulade",),
-    "opentelemetry-instrumentation-requests": ("opentelemetry.instrumentation.requests",),
-    "opentelemetry-instrumentation-sklearn": ("opentelemetry.instrumentation.sklearn",),
-    "opentelemetry-instrumentation-sqlalchemy": ("opentelemetry.instrumentation.sqlalchemy",),
-    "opentelemetry-instrumentation-sqlite3": ("opentelemetry.instrumentation.sqlite3",),
-    "opentelemetry-instrumentation-starlette": ("opentelemetry.instrumentation.starlette",),
-    "opentelemetry-instrumentation-system-metrics": (
-        "opentelemetry.instrumentation.system_metrics",
-    ),
-    "opentelemetry-instrumentation-tornado": ("opentelemetry.instrumentation.tornado",),
-    "opentelemetry-instrumentation-tortoiseorm": ("opentelemetry.instrumentation.tortoiseorm",),
-    "opentelemetry-instrumentation-urllib": ("opentelemetry.instrumentation.urllib",),
-    "opentelemetry-instrumentation-urllib3": ("opentelemetry.instrumentation.urllib3",),
-    "opentelemetry-instrumentation-wsgi": ("opentelemetry.instrumentation.wsgi",),
     "opentelemetry-sdk": ("opentelemetry.sdk",),
+    "opentelemetry-semantic-conventions": ("opentelemetry.semconv",),
     "opentelemetry-test-utils": ("opentelemetry.test",),
-    "oslo-cache": ("oslo_cache",),
-    "oslo-concurrency": ("oslo_concurrency",),
-    "oslo-config": ("oslo_config",),
-    "oslo-context": ("oslo_context",),
-    "oslo-db": ("oslo_db",),
-    "oslo-i18n": ("oslo_i18n",),
-    "oslo-limit": ("oslo_limit",),
-    "oslo-log": ("oslo_log",),
-    "oslo-messaging": ("oslo_messaging",),
-    "oslo-metrics": ("oslo_metrics",),
-    "oslo-middleware": ("oslo_middleware",),
-    "oslo-policy": ("oslo_policy",),
-    "oslo-privsep": ("oslo_privsep",),
-    "oslo-reports": ("oslo_reports",),
-    "oslo-rootwrap": ("oslo_rootwrap",),
-    "oslo-serialization": ("oslo_serialization",),
-    "oslo-service": ("oslo_service",),
-    "oslo-upgradecheck": ("oslo_upgradecheck",),
-    "oslo-utils": ("oslo_utils",),
-    "oslo-versionedobjects": ("oslo_versionedobjects",),
-    "oslo-vmware": ("oslo_vmware",),
     "paho-mqtt": ("paho",),
     "phonenumberslite": ("phonenumbers",),
     "pillow": ("PIL",),
@@ -202,53 +205,57 @@ DEFAULT_MODULE_MAPPING = {
     "progressbar2": ("progressbar",),
     "protobuf": ("google.protobuf",),
     "psycopg2-binary": ("psycopg2",),
+    "py-healthcheck": ("healthcheck",),
     "pycrypto": ("Crypto",),
-    "pykube-ng": ("pykube",),
-    "pyhamcrest": ("hamcrest",),
+    "pycryptodome": ("Crypto",),
+    "pyerfa": ("erfa",),
     "pygithub": ("github",),
     "pygobject": ("gi",),
+    "pyhamcrest": ("hamcrest",),
     "pyjwt": ("jwt",),
+    "pykube-ng": ("pykube",),
+    "pymongo": ("bson", "gridfs", "pymongo"),
+    "pymupdf": ("fitz",),
+    "pynacl": ("nacl",),
     "pyopenssl": ("OpenSSL",),
     "pypdf2": ("PyPDF2",),
     "pypi-kenlm": ("kenlm",),
+    "pyshp": ("shapefile",),
     "pysocks": ("socks",),
     "pytest": ("pytest", "_pytest"),
-    "python-dateutil": ("dateutil",),
-    "python-docx": ("docx",),
-    "python-dotenv": ("dotenv",),
-    "python-editor": ("editor",),
-    "python-engineio": ("engineio",),
-    "python-hcl2": ("hcl2",),
-    "python-jose": ("jose",),
+    "pytest-runner": ("ptr",),
+    "python-sat": ("pysat",),
     "python-json-logger": ("pythonjsonlogger",),
     "python-levenshtein": ("Levenshtein",),
     "python-lsp-jsonrpc": ("pylsp_jsonrpc",),
-    "python-magic": ("magic",),
-    "python-pptx": ("pptx",),
-    "python-slugify": ("slugify",),
-    "python-socketio": ("socketio",),
-    "python-statsd": ("statsd",),
-    "pyyaml": ("yaml",),
-    "pymongo": ("bson", "gridfs", "pymongo"),
-    "pymupdf": ("fitz",),
-    "pytest-runner": ("ptr",),
     "pywinrm": ("winrm",),
+    "pywavelets": ("pywt",),
+    "pyyaml": ("yaml",),
     "randomwords": ("random_words",),
+    "robotraconteur": ("RobotRaconteur",),
     "scikit-image": ("skimage",),
     "scikit-learn": ("sklearn",),
     "scikit-video": ("skvideo",),
-    "sseclient-py": ("sseclient",),
+    "sisl": ("sisl", "sisl_toolbox"),
     "setuptools": ("easy_install", "pkg_resources", "setuptools"),
     "snowflake-connector-python": ("snowflake.connector",),
     "snowflake-snowpark-python": ("snowflake.snowpark",),
     "snowflake-sqlalchemy": ("snowflake.sqlalchemy",),
+    "sseclient-py": ("sseclient",),
     "strawberry-graphql": ("strawberry",),
     "streamlit-aggrid": ("st_aggrid",),
     "unleashclient": ("UnleashClient",),
     "websocket-client": ("websocket",),
 }
 
-DEFAULT_TYPE_STUB_MODULE_MAPPING = {
+DEFAULT_TYPE_STUB_MODULE_PATTERN_MAPPING: Dict[re.Pattern, List[Callable[[Match[str]], str]]] = {
+    re.compile(r"""^stubs[_-](.+)"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^types[_-](.+)"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^(.+)[_-]stubs"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^(.+)[_-]types"""): [first_group_hyphen_to_underscore],
+}
+
+DEFAULT_TYPE_STUB_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
     "djangorestframework-types": ("rest_framework",),
     "lark-stubs": ("lark",),
     "types-beautifulsoup4": ("bs4",),
@@ -261,3 +268,8 @@ DEFAULT_TYPE_STUB_MODULE_MAPPING = {
     "types-python-dateutil": ("dateutil",),
     "types-setuptools": ("easy_install", "pkg_resources", "setuptools"),
 }
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
