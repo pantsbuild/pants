@@ -313,6 +313,11 @@ class NfpmRpmCompressionField(StringField):
 
     @classmethod
     def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        if raw_value is None:
+            # valid_choices has only algorithms, not compression level.
+            # So, return default value, skipping check for default in valid_choices.
+            return cls.default
+
         # We only need to do custom computation if raw_value has the optional level.
         if not (isinstance(raw_value, cls.expected_type) and ":" in raw_value):
             # If defined, only algorithm was provided, not level.

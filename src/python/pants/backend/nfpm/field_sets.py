@@ -15,6 +15,7 @@ from pants.core.goals.package import PackageFieldSet
 from pants.engine.rules import collect_rules
 from pants.engine.target import DescriptionField, Target
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -46,6 +47,8 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
                 # "contents" gets added to the config based on the dependencies field.
                 cfg.setdefault(key, {})
                 cfg = cfg[key]
+            if isinstance(value, FrozenDict):
+                value = dict(value)
             cfg[keys[-1]] = value
 
         for field in self.required_fields:
@@ -106,7 +109,7 @@ class NfpmDebPackageFieldSet(NfpmPackageFieldSet):
 class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
     packager = "rpm"
     required_fields = RPM_FIELDS
-    ghost_contents = NfpmRpmGhostContents
+    ghost_contents: NfpmRpmGhostContents
 
     def nfpm_config(self, tgt: Target) -> dict[str, Any]:
         config = super().nfpm_config(tgt)

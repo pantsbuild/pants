@@ -68,12 +68,12 @@ def test_generate_nfpm_config_for_apk():
         "name": "treasure",
         "arch": "amd64",  # default
         "version": "3.2.1",
-        "version_scheme": "semver",  # default
+        "version_schema": "semver",  # default
         "release": 1,  # default
         "maintainer": "Black Beard <bb@jolly.roger.example.com",
         "homepage": "https://jolly.roger.example.com",
         "license": "MIT",
-        "depends": depends,
+        "depends": tuple(depends),
         "scripts": {"preinstall": "hornswaggle"},
         "apk": {
             "scripts": {"preupgrade": "plunder"},
@@ -114,11 +114,11 @@ def test_generate_nfpm_config_for_archlinux():
         "name": "treasure",
         "arch": "amd64",  # default
         "version": "3.2.1",
-        "version_scheme": "semver",  # default
+        "version_schema": "semver",  # default
         "release": 1,  # default
         "homepage": "https://jolly.roger.example.com",
         "license": "MIT",
-        "depends": depends,
+        "depends": tuple(depends),
         "scripts": {"preinstall": "hornswaggle"},
         "archlinux": {
             "packager": "Black Beard <bb@jolly.roger.example.com",
@@ -162,20 +162,21 @@ def test_generate_nfpm_config_for_deb():
         "contents": [],
         "name": "treasure",
         "arch": "amd64",  # default
+        "platform": "linux",  # default
         "version": "3.2.1",
-        "version_scheme": "semver",  # default
+        "version_schema": "semver",  # default
         "release": 1,  # default
         "priority": "optional",  # default
         "maintainer": "Black Beard <bb@jolly.roger.example.com",
         "homepage": "https://jolly.roger.example.com",
         "license": "MIT",
         "section": "miscellaneous",
-        "depends": depends,
+        "depends": tuple(depends),
         "scripts": {"preinstall": "hornswaggle"},
         "deb": {
             "compression": "gzip",  # default
             "fields": {"Urgency": "high (critical for landlubbers)"},
-            "triggers": {"interest_noawait": ["some-trigger", "other-trigger"]},
+            "triggers": {"interest_noawait": ("some-trigger", "other-trigger")},
             "scripts": {"templates": "plunder"},
         },
         "description": "Black Beard's buried treasure.",
@@ -217,17 +218,18 @@ def test_generate_nfpm_config_for_rpm():
         ],
         "name": "treasure",
         "arch": "amd64",  # default
+        "platform": "linux",  # default
         "version": "3.2.1",
-        "version_scheme": "semver",  # default
+        "version_schema": "semver",  # default
         "release": 1,  # default
         "homepage": "https://jolly.roger.example.com",
         "license": "MIT",
-        "depends": depends,
+        "depends": tuple(depends),
         "scripts": {"preinstall": "hornswaggle"},
         "rpm": {
             "compression": "gzip:-1",  # default
             "packager": "Black Beard <bb@jolly.roger.example.com",
-            "prefixes": ["/", "/usr", "/opt/treasure"],
+            "prefixes": ("/", "/usr", "/opt/treasure"),
             "scripts": {"pretrans": "plunder"},
         },
         "description": "Black Beard's buried treasure.",

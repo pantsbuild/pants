@@ -52,6 +52,7 @@ from pants.backend.nfpm.fields.deb import (
     NfpmDebCompressionField,
     NfpmDebConflictsField,
     NfpmDebDependsField,
+    NfpmDebFieldsField,
     NfpmDebMaintainerField,
     NfpmDebPreDependsField,
     NfpmDebPriorityField,
@@ -61,6 +62,7 @@ from pants.backend.nfpm.fields.deb import (
     NfpmDebScriptsField,
     NfpmDebSectionField,
     NfpmDebSuggestsField,
+    NfpmDebTriggersField,
 )
 from pants.backend.nfpm.fields.rpm import (
     NfpmRpmCompressionField,
@@ -205,6 +207,9 @@ DEB_FIELDS = (
     NfpmDebMaintainerField,
     NfpmDebSectionField,
     NfpmDebPriorityField,
+    # control files metadata
+    NfpmDebFieldsField,
+    NfpmDebTriggersField,
     # package relationships
     NfpmDebReplacesField,
     NfpmDebProvidesField,
