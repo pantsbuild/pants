@@ -12,6 +12,7 @@ from pants.backend.nfpm.fields.contents import (
     NfpmDependencies,
 )
 from pants.backend.nfpm.target_types import NfpmContentFile
+from pants.engine.addresses import Address
 from pants.engine.target import InvalidTargetException
 
 
