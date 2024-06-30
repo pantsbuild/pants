@@ -9,15 +9,8 @@ from pants.backend.nfpm.field_sets import (
     NfpmDebPackageFieldSet,
     NfpmRpmPackageFieldSet,
 )
-from pants.backend.nfpm.fields.all import (
-    NfpmHomepageField,
-    NfpmLicenseField,
-    NfpmPackageNameField,
-)
-from pants.backend.nfpm.fields.apk import (
-    NfpmApkDependsField,
-    NfpmApkMaintainerField,
-)
+from pants.backend.nfpm.fields.all import NfpmHomepageField, NfpmLicenseField, NfpmPackageNameField
+from pants.backend.nfpm.fields.apk import NfpmApkDependsField, NfpmApkMaintainerField
 from pants.backend.nfpm.fields.archlinux import (
     NfpmArchlinuxDependsField,
     NfpmArchlinuxPackagerField,
@@ -36,9 +29,7 @@ from pants.backend.nfpm.fields.rpm import (
     NfpmRpmPrefixesField,
 )
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
-from pants.backend.nfpm.fields.version import (
-    NfpmVersionField,
-)
+from pants.backend.nfpm.fields.version import NfpmVersionField
 from pants.backend.nfpm.target_types import (
     NfpmApkPackage,
     NfpmArchlinuxPackage,
