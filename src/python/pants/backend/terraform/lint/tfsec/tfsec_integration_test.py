@@ -27,6 +27,7 @@ def test_run_tfsec():
             *source_files.rules(),
             QueryRule(LintResult, (TfSecRequest.Batch,)),
         ],
+        bootstrap_args=["--pants-ignore=['!/.tfsec/']"],
     )
 
     rule_runner.set_options(
