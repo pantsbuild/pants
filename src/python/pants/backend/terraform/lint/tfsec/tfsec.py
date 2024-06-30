@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.terraform.target_types import TerraformFieldSet
+from pants.base.deprecated import deprecated_conditional
 from pants.core.goals.lint import LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import ExternalTool
@@ -88,13 +89,26 @@ class TFSec(ExternalTool):
         )
 
     def generate_url(self, plat: Platform) -> str:
+        deprecated_conditional(
+            lambda: self.version.startswith("v"),
+            removal_version="2.26.0.dev0",
+            entity="using a version beginning with 'v'",
+            hint=f"Remove the leading 'v' from `[{self.options_scope}].version` and from versions in `[{self.options_scope}].known_versions`",
+        )
+
         plat_str = {
             "macos_arm64": "darwin_arm64",
             "macos_x86_64": "darwin_amd64",
             "linux_arm64": "linux_arm64",
             "linux_x86_64": "linux_amd64",
         }[plat.value]
-        return f"https://github.com/aquasecurity/tfsec/releases/download/v{self.version}/tfsec_{self.version}_{plat_str}.tar.gz"
+
+        # backwards compatibility with version strings beginning with 'v'
+        version = self.version
+        if version.startswith("v"):
+            version = version[1:]
+
+        return f"https://github.com/aquasecurity/tfsec/releases/download/v{version}/tfsec_{version}_{plat_str}.tar.gz"
 
     def generate_exe(self, _: Platform) -> str:
         return "./tfsec"
