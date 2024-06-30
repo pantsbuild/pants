@@ -26,7 +26,7 @@ def test_nfpm_content_file_validate() -> None:
                 NfpmContentSrcField.alias: src,
                 NfpmDependencies.alias: dependencies,
                 # dst is always required
-                NfpmContentDstField: "/opt/destination",
+                NfpmContentDstField.alias: "/opt/destination",
             },
             Address("", target_name="t"),
         )
