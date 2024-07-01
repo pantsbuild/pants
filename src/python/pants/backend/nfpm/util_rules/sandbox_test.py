@@ -25,7 +25,8 @@ from pants.backend.nfpm.target_types import (
 )
 from pants.backend.nfpm.util_rules.sandbox import _DepCategory
 from pants.core.target_types import ArchiveTarget, FileTarget, GenericTarget, ResourceTarget
-
+from pants.engine.addresses import Address
+from pants.engine.target import Target
 
 # _NfpmSortedDeps.sort(...)
 
