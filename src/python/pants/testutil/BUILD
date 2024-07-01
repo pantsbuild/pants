@@ -24,7 +24,6 @@ python_sources(
         "pants_integration_test.py": {
             "dependencies": ["//BUILD_ROOT:files", "src/python/pants/__main__.py"]
         },
-        "rule_runner.py": {"dependencies": ["//BUILD_ROOT:files"]},
     },
 )
 

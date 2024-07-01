@@ -95,7 +95,7 @@ def setup_bsp_server(
     notification_names = notification_names or set()
     thread_locals = PyThreadLocals.get_for_current_thread()
 
-    with setup_pipes() as pipes:
+    with setup_pipes() as pipes, rule_runner.pushd():
         context = BSPContext()
         rule_runner.set_session_values({BSPContext: context})
         conn = BSPConnection(

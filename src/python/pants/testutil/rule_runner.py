@@ -31,6 +31,7 @@ from typing import (
     overload,
 )
 
+from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -310,17 +311,23 @@ class RuleRunner:
         self.build_config = build_config_builder.create()
 
         self.environment = CompleteEnvironmentVars({})
-        self.options_bootstrapper = self.create_options_bootstrapper(args=bootstrap_args, env=None)
         self.extra_session_values = extra_session_values or {}
         self.inherent_environment = inherent_environment
         self.max_workunit_verbosity = max_workunit_verbosity
-        options = self.options_bootstrapper.full_options(
-            self.build_config,
-            union_membership=UnionMembership.from_rules(
-                rule for rule in self.rules if isinstance(rule, UnionRule)
-            ),
-        )
-        global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
+
+        # Change cwd and add sentinel file (BUILDROOT) so NativeOptionParser can find build_root.
+        with self.pushd():
+            Path("BUILDROOT").touch()
+            self.options_bootstrapper = self.create_options_bootstrapper(
+                args=bootstrap_args, env=None
+            )
+            options = self.options_bootstrapper.full_options(
+                self.build_config,
+                union_membership=UnionMembership.from_rules(
+                    rule for rule in self.rules if isinstance(rule, UnionRule)
+                ),
+            )
+            global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
         dynamic_remote_options, _ = DynamicRemoteOptions.from_options(options, self.environment)
         local_store_options = LocalStoreOptions.from_options(global_options)
@@ -398,7 +405,8 @@ class RuleRunner:
             if self.inherent_environment
             else Params(*inputs)
         )
-        result = assert_single_element(self.scheduler.product_request(output_type, [params]))
+        with self.pushd():
+            result = assert_single_element(self.scheduler.product_request(output_type, [params]))
         return cast(_O, result)
 
     def run_goal_rule(
@@ -413,10 +421,11 @@ class RuleRunner:
         merged_args = (*(global_args or []), goal.name, *(args or []))
         self.set_options(merged_args, env=env, env_inherit=env_inherit)
 
-        raw_specs = self.options_bootstrapper.full_options_for_scopes(
-            [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()],
-            self.union_membership,
-        ).specs
+        with self.pushd():
+            raw_specs = self.options_bootstrapper.full_options_for_scopes(
+                [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()],
+                self.union_membership,
+            ).specs
         specs = SpecsParser(root_dir=self.build_root).parse_specs(
             raw_specs, description_of_origin="RuleRunner.run_goal_rule()"
         )
@@ -424,18 +433,24 @@ class RuleRunner:
         stdout, stderr = StringIO(), StringIO()
         console = Console(stdout=stdout, stderr=stderr, use_colors=False, session=self.scheduler)
 
-        exit_code = self.scheduler.run_goal_rule(
-            goal,
-            Params(
-                specs,
-                console,
-                Workspace(self.scheduler),
-                *([self.inherent_environment] if self.inherent_environment else []),
-            ),
-        )
+        with self.pushd():
+            exit_code = self.scheduler.run_goal_rule(
+                goal,
+                Params(
+                    specs,
+                    console,
+                    Workspace(self.scheduler),
+                    *([self.inherent_environment] if self.inherent_environment else []),
+                ),
+            )
 
         console.flush()
         return GoalRuleResult(exit_code, stdout.getvalue(), stderr.getvalue())
+
+    @contextmanager
+    def pushd(self):
+        with pushd(self.build_root):
+            yield
 
     def create_options_bootstrapper(
         self, args: Iterable[str], env: Mapping[str, str] | None
@@ -465,7 +480,8 @@ class RuleRunner:
             **{k: os.environ[k] for k in (env_inherit or set()) if k in os.environ},
             **(env or {}),
         }
-        self.options_bootstrapper = self.create_options_bootstrapper(args=args, env=env)
+        with self.pushd():
+            self.options_bootstrapper = self.create_options_bootstrapper(args=args, env=env)
         self.environment = CompleteEnvironmentVars(env)
         self._set_new_session(self.scheduler.scheduler)
 
@@ -605,7 +621,7 @@ class RuleRunner:
         )
 
     def run_interactive_process(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        with pushd(self.build_root):
+        with self.pushd():
             return native_engine.session_run_interactive_process(
                 self.scheduler.py_session,
                 request,
@@ -778,14 +794,15 @@ def mock_console(
     *,
     stdin_content: bytes | str | None = None,
 ) -> Iterator[tuple[Console, StdioReader]]:
-    global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-    colors = (
-        options_bootstrapper.full_options_for_scopes(
-            [GlobalOptions.get_scope_info()], UnionMembership({}), allow_unknown_options=True
+    with pushd(get_buildroot()):
+        global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        colors = (
+            options_bootstrapper.full_options_for_scopes(
+                [GlobalOptions.get_scope_info()], UnionMembership({}), allow_unknown_options=True
+            )
+            .for_global_scope()
+            .colors
         )
-        .for_global_scope()
-        .colors
-    )
 
     with initialize_stdio(global_bootstrap_options), stdin_context(
         stdin_content
