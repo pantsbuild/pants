@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
-from typing import cast
+from enum import Enum, auto
+from typing import Type, cast
 
 from pants.backend.nfpm.field_sets import NFPM_PACKAGE_FIELD_SET_TYPES, NfpmPackageFieldSet
 from pants.backend.nfpm.fields.contents import (
@@ -41,6 +42,47 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 
 
+class _DepCategory(Enum):
+    ignore = auto()
+    nfpm_content_from_dependency = auto()
+    nfpm_content_from_source = auto()
+    nfpm_package = auto()
+    remaining = auto()
+
+    @classmethod
+    def for_target(
+        cls,
+        tgt: Target,
+        field_set_type: Type[NfpmPackageFieldSet],
+    ) -> _DepCategory:
+        # Assumption: this gets called with atomic targets not target generators. For example,
+        # TransitiveTargets gets calculated AFTER target generation/expansion.
+        if tgt.has_field(NfpmContentDirDstField) or tgt.has_field(NfpmContentSymlinkDstField):
+            # NfpmContentDir and NfpmContentSymlink targets don't go in the sandbox.
+            # They're only registered in the nfpm config.
+            return _depCategory.ignore
+        if tgt.has_field(NfpmContentDstField):
+            # an NfpmContentFile DOES need something in the sandbox
+
+            # 'source' must be either None or a non-empty string.
+            # If 'source' is None, the file comes from dependencies.
+            if tgt[NfpmContentFileSourceField].value is None:
+                # The file must be hydrated from one of the dependencies.
+                return _depCategory.nfpm_content_from_dependency
+            # The file must be hydrated from the 'source' field
+            return _depCategory.nfpm_content_from_source
+
+        for pkg_field_set_type in NFPM_PACKAGE_FIELD_SET_TYPES:
+            if pkg_field_set_type.is_applicable(tgt):
+                # we only respect nfpm package deps for the same packager
+                # (For example, deb targets will ignore any deps on rpm targets)
+                if pkg_field_set_type == field_set_type:
+                    return _depCategory.nfpm_package
+                return _depCategory.ignore
+
+        return _depCategory.remaining
+
+
 @dataclass(frozen=True)
 class _NfpmSortedDeps:
     nfpm_content_from_dependency_targets: tuple[NfpmContentFile, ...]
@@ -66,48 +108,27 @@ class _NfpmSortedDeps:
         package_targets: list[Target] = []
         remaining_targets: list[Target] = []
 
-        # NB: TransitiveTargets is AFTER target generation/expansion (so there are no target generators)
         for tgt in transitive_targets.dependencies:
-            if tgt.has_field(NfpmContentDirDstField) or tgt.has_field(NfpmContentSymlinkDstField):
-                # NfpmContentDir and NfpmContentSymlink targets don't go in the sandbox.
-                # They're only registered in the nfpm config.
+            category = _DepCategory.for_target(tgt, type(field_set))
+            if category == _DepCategory.ignore:
                 continue
-            elif tgt.has_field(NfpmContentDstField):
-                # an NfpmContentFile DOES need something in the sandbox
-
-                # 'source' must be either None or a non-empty string.
-                # If 'source' is None, the file comes from dependencies.
-                if tgt[NfpmContentFileSourceField].value is None:
-                    # The file must be hydrated from one of the dependencies.
-                    nfpm_content_from_dependency_targets.append(cast(NfpmContentFile, tgt))
-                    continue
-                # The file must be hydrated from the 'source' field
+            elif category == _DepCategory.nfpm_content_from_dependency:
+                nfpm_content_from_dependency_targets.append(cast(NfpmContentFile, tgt))
+            elif category == _DepCategory.nfpm_content_from_source:
                 nfpm_content_from_source_targets.append(cast(NfpmContentFile, tgt))
-                continue
-
-            # This bool serves as a "continue" for the outer "for tgt" loop.
-            identified_target = False
-
-            for field_set_type in NFPM_PACKAGE_FIELD_SET_TYPES:
-                if field_set_type.is_applicable(tgt):
-                    identified_target = True
-                    # we only respect nfpm package deps for the same packager
-                    # (For example, deb targets will ignore any deps on rpm targets)
-                    if isinstance(field_set, field_set_type):
-                        nfpm_package_targets.append(cast(NfpmPackageTarget, tgt))
-                    break
-            if identified_target:
-                continue
-
-            for field_set_type in package_field_set_types:
-                if field_set_type.is_applicable(tgt):
-                    identified_target = True
-                    package_targets.append(tgt)
-                    break
-            if identified_target:
-                continue
-
-            remaining_targets.append(tgt)
+            elif category == _DepCategory.nfpm_package:
+                nfpm_package_targets.append(cast(NfpmPackageTarget, tgt))
+            elif category == _DepCategory.remaining:
+                is_package = False
+                for field_set_type in package_field_set_types:
+                    if field_set_type.is_applicable(tgt):
+                        is_package = True
+                        package_targets.append(tgt)
+                        break
+                if not is_package:
+                    remaining_targets.append(tgt)
+            else:
+                raise ValueError(f"Please file a bug report--got unknown _DepCategory: {category}")
 
         return cls(
             nfpm_content_from_dependency_targets=tuple(nfpm_content_from_dependency_targets),
