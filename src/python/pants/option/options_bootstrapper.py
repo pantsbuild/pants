@@ -100,6 +100,7 @@ class OptionsBootstrapper:
             # We ignore validation to ensure bootstrapping succeeds.
             # The bootstrap options will be validated anyway when we parse the full options.
             native_options_validation=NativeOptionsValidation.ignore,
+            native_options_config_discovery=False
         )
 
         for options_info in collect_options_info(BootstrapOptions):
