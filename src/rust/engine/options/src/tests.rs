@@ -10,6 +10,7 @@ use maplit::hashmap;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
+use itertools::Itertools;
 use tempfile::TempDir;
 
 fn config_source() -> Source {
@@ -554,4 +555,24 @@ fn test_parse_dict_options() {
         "",
         "",
     );
+}
+
+#[test]
+fn test_do_not_load_pantsrc_if_configs_passed() {
+    fn mk_args() -> Args {
+        Args::new(vec![])
+    }
+    fn mk_env() -> Env {
+        Env{ env: HashMap::new()}
+    }
+
+    let load_0 = OptionParser::new(
+        mk_args(),mk_env(),Some(vec![]),true, true,None
+    );
+
+    let found_sources = load_0.unwrap().sources;
+    println!("{:?}", found_sources.keys());
+    assert_eq!(
+        vec![Source::Env, Source::Flag] ,found_sources.keys().cloned().collect_vec()
+    )
 }
