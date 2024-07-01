@@ -36,7 +36,7 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target, Targets
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import (
     MockEffect,
     MockGet,
@@ -90,7 +90,7 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
     union_membership = UnionMembership({ExportRequest: [MockExportRequest]})
     with open(os.path.join(rule_runner.build_root, "somefile"), "wb") as fp:
         fp.write(b"SOMEFILE")
-    with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
+    with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         digest = rule_runner.request(Digest, [CreateDigest([FileContent("foo/bar", b"BAR")])])
         result: Export = run_rule_with_mocks(
             export,
@@ -223,7 +223,7 @@ def test_warnings_for_non_local_target_environments(
     union_membership = UnionMembership({ExportRequest: [MockExportRequest]})
     with open(os.path.join(rule_runner.build_root, "somefile"), "wb") as fp:
         fp.write(b"SOMEFILE")
-    with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
+    with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         digest = rule_runner.request(Digest, [CreateDigest([FileContent("foo/bar", b"BAR")])])
         run_rule_with_mocks(
             export,
