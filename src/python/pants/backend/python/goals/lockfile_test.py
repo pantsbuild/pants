@@ -256,10 +256,15 @@ def test_multiple_resolves() -> None:
 
 
 def test_empty_requirements(rule_runner: PythonRuleRunner) -> None:
-    with pytest.raises(ExecutionError):
+    with pytest.raises(ExecutionError) as excinfo:
         json.loads(
             _generate(
                 rule_runner=rule_runner,
                 requirements_string="",
             )
         )
+
+    assert (
+        "Cannot generate lockfile with no requirements. Please add some requirements to test."
+        in str(excinfo.value)
+    )
