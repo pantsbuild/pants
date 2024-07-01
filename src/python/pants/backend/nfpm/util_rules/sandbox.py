@@ -60,7 +60,7 @@ class _DepCategory(Enum):
         if tgt.has_field(NfpmContentDirDstField) or tgt.has_field(NfpmContentSymlinkDstField):
             # NfpmContentDir and NfpmContentSymlink targets don't go in the sandbox.
             # They're only registered in the nfpm config.
-            return _depCategory.ignore
+            return _DepCategory.ignore
         if tgt.has_field(NfpmContentDstField):
             # an NfpmContentFile DOES need something in the sandbox
 
@@ -68,19 +68,19 @@ class _DepCategory(Enum):
             # If 'source' is None, the file comes from dependencies.
             if tgt[NfpmContentFileSourceField].value is None:
                 # The file must be hydrated from one of the dependencies.
-                return _depCategory.nfpm_content_from_dependency
+                return _DepCategory.nfpm_content_from_dependency
             # The file must be hydrated from the 'source' field
-            return _depCategory.nfpm_content_from_source
+            return _DepCategory.nfpm_content_from_source
 
         for pkg_field_set_type in NFPM_PACKAGE_FIELD_SET_TYPES:
             if pkg_field_set_type.is_applicable(tgt):
                 # we only respect nfpm package deps for the same packager
                 # (For example, deb targets will ignore any deps on rpm targets)
                 if pkg_field_set_type == field_set_type:
-                    return _depCategory.nfpm_package
-                return _depCategory.ignore
+                    return _DepCategory.nfpm_package
+                return _DepCategory.ignore
 
-        return _depCategory.remaining
+        return _DepCategory.remaining
 
 
 @dataclass(frozen=True)
