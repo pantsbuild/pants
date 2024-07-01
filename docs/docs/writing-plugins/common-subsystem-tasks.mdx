@@ -78,3 +78,97 @@ Only some language backends support `pants export`. These include the Python and
             UnionRule(ExportableTool, FortranLint)
         ]
     ```
+
+## Loading config files
+
+1. Add an option to toggle config discovery:
+
+    ```python
+    from pants.option.subsystem import Subsystem
+    from pants.option.option_types import BoolOption
+    from pants.util.strutil import softwrap
+
+    class FortranLint(Subsystem):
+        config_discovery = BoolOption(
+            default=True,
+            advanced=True,
+            help=lambda cls: softwrap(
+                f"""
+                If true, Pants will include all relevant config files during runs.
+
+                Use `[{cls.options_scope}].config` and `[{cls.options_scope}].custom_check_dir` instead if your config is in a non-standard location.
+                """
+            ),
+        )
+    ```
+
+2. Add an option for the configuration file itself. Several options are useful depending on what types of config files you need: `FileOption`, `FileListOption`, `DirOption`, `DirListOption`.
+
+    ```python
+    from pants.option.subsystem import Subsystem
+    from pants.option.option_types import FileOption
+    from pants.util.strutil import softwrap
+
+    class FortranLint(Subsystem):
+        config = FileOption(
+            default=None,
+            advanced=True,
+            help=lambda cls: softwrap(
+                """
+                Path to the fortran-lint config file.
+
+                Setting this option will disable config discovery for the config file. Use this option if the config is located in a non-standard location.
+                """
+            ),
+        )
+    ```
+
+3. Add a helper function to generate the `ConfigFilesRequest`. The `check_existence` field is used for config discovery. `specified` can also be a list for using one of the list options.
+
+    ```python
+    from pants.core.util_rules.config_files import ConfigFilesRequest
+    from pants.option.subsystem import Subsystem
+
+    class FortranLint(Subsystem):
+        def config_request(self) -> ConfigFilesRequest:
+            return ConfigFilesRequest(
+                specified=self.config,
+                specified_option_name=f"[{self.options_scope}].config",
+                discovery=self.config_discovery,
+                check_existence=["fortran_lint.ini"],
+            )
+    ```
+
+4. Make a request for the config files in a rule for running the tool. Use a `Get(ConfigFiles, ConfigFilesRequest)` to get the config files. This has a snapshot that contains the config files (or will be empty if none are found). You can merge these with the other digests to pass the files to your `Process`. If a custom value was provided for the config file, you may need to pass that as an argument to the `Process`. You may also need to register rules from `pants.core.util_rules.config_files`.
+
+    ```python
+    from pants.core.goals.lint import LintResult
+    from pants.core.util_rules import config_files
+    from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+    from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+    from pants.engine.fs import Digest, MergeDigests
+    from pants.engine.rules import Get, MultiGet, collect_rules, rule
+
+    @rule
+    async def run_fortran_lint(request: FortranlintRequest.Batch, subsystem: FortranLint) -> LintResult:
+        sources, config_file = await MultiGet(
+            Get(SourceFiles, SourceFilesRequest(fs.sources for fs in request.elements)),
+            Get(ConfigFiles, ConfigFilesRequest, subsystem.config_request()),
+        )
+
+        input_digest = await Get(
+            Digest, MergeDigests((sources.snapshot.digest, config_file.snapshot.digest))
+        )
+
+        args = []
+        if subsystem.config_request:
+            args.append(f"--config-file={subsystem.config}")
+
+        # run your process with the digest and args
+
+    def rules():
+        return [
+            *collect_rules(),
+            *config_files.rules(),
+        ]
+    ```

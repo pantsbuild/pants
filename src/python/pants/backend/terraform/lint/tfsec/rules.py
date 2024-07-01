@@ -17,10 +17,11 @@ from pants.util.strutil import pluralize
 
 @rule
 async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platform) -> LintResult:
-    downloaded_tfsec, sources, config_file = await MultiGet(
+    downloaded_tfsec, sources, config_file, custom_checks = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, tfsec.get_request(platform)),
         Get(SourceFiles, SourceFilesRequest(fs.sources for fs in request.elements)),
         Get(ConfigFiles, ConfigFilesRequest, tfsec.config_request()),
+        Get(ConfigFiles, ConfigFilesRequest, tfsec.custom_checks_request()),
     )
 
     input_digest = await Get(
@@ -30,6 +31,7 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platfor
                 downloaded_tfsec.digest,
                 sources.snapshot.digest,
                 config_file.snapshot.digest,
+                custom_checks.snapshot.digest,
             )
         ),
     )
@@ -37,6 +39,8 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platfor
     computed_args = []
     if tfsec.config:
         computed_args = [f"--config-file={tfsec.config}"]
+    if tfsec.custom_check_dir:
+        computed_args = [f"--custom-check-dir={tfsec.custom_check_dir}"]
 
     argv = [
         downloaded_tfsec.exe,
