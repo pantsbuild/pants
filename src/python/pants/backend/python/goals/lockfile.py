@@ -98,13 +98,12 @@ async def generate_lockfile(
     python_setup: PythonSetup,
     pex_subsystem: PexSubsystem,
 ) -> GenerateLockfileResult:
-    pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
-
     if not req.requirements:
         raise ValueError(
             f"Cannot generate lockfile with no requirements. Please add some requirements to {req.resolve_name}."
         )
 
+    pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
     header_delimiter = "//"
     result = await Get(
         ProcessResult,
