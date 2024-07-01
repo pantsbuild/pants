@@ -6,6 +6,12 @@ from pants.backend.nfpm.rules import rules as nfpm_rules
 from pants.backend.nfpm.target_types import (
     NfpmApkPackage,
     NfpmArchlinuxPackage,
+    NfpmContentDir,
+    NfpmContentDirs,
+    NfpmContentFile,
+    NfpmContentFiles,
+    NfpmContentSymlink,
+    NfpmContentSymlinks,
     NfpmDebPackage,
     NfpmRpmPackage,
 )
@@ -18,6 +24,12 @@ def target_types():
         NfpmArchlinuxPackage,
         NfpmDebPackage,
         NfpmRpmPackage,
+        NfpmContentFile,
+        NfpmContentFiles,
+        NfpmContentSymlink,
+        NfpmContentSymlinks,
+        NfpmContentDir,
+        NfpmContentDirs,
     ]
 
 
