@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 
+from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
 
@@ -47,3 +48,7 @@ class NfpmSubsystem(TemplatedExternalTool):
 
     def generate_exe(self, plat: Platform) -> str:
         return "./nfpm"
+
+
+def rules():
+    return external_tool.rules()
