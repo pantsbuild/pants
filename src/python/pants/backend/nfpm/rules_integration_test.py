@@ -12,7 +12,6 @@ from pants.backend.nfpm.rules import rules as nfpm_rules
 from pants.backend.nfpm.target_types import target_types as nfpm_target_types
 from pants.backend.nfpm.target_types_rules import rules as nfpm_target_types_rules
 from pants.core.goals.package import BuiltPackage
-from pants.core.target_types import rules as core_target_types_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
