@@ -90,6 +90,10 @@ struct ActionDigestSpec {
     action_digest_length: Option<usize>,
 }
 
+fn parse_platform_from_str(s: &str) -> Result<Platform, String> {
+    Platform::try_from(s.to_string()).map_err(|e| e.to_string())
+}
+
 #[derive(StructOpt)]
 #[structopt(name = "process_executor", setting = clap::AppSettings::TrailingVarArg)]
 struct Opt {
@@ -128,6 +132,11 @@ struct Opt {
     /// If unspecified, local execution will be performed.
     #[structopt(long)]
     server: Option<String>,
+
+    /// The platform that the remote process will be executed on.
+    /// MUST be set if executing remotely.
+    #[structopt(long, parse(try_from_str = parse_platform_from_str), default_value = Platform::Linux_x86_64.as_ref())]
+    remote_execution_platform: Platform,
 
     /// Path to file containing root certificate authority certificates for the execution server.
     /// If not set, TLS will not be used when connecting to the execution server.
@@ -444,10 +453,10 @@ async fn make_request(
         let strategy = ProcessExecutionStrategy::RemoteExecution(collection_from_keyvalues(
             args.command.extra_platform_property.iter(),
         ));
+
         ProcessExecutionEnvironment {
             name: None,
-            // TODO: Make configurable.
-            platform: Platform::Linux_x86_64,
+            platform: args.remote_execution_platform,
             strategy,
         }
     } else {
