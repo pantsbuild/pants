@@ -353,6 +353,7 @@ class InteractiveProcess(SideEffecting):
         argv: Iterable[str],
         *,
         env: Mapping[str, str] | None = None,
+        description: str = "Interactive process",
         input_digest: Digest = EMPTY_DIGEST,
         run_in_workspace: bool = False,
         forward_signals_to_process: bool = True,
@@ -377,7 +378,7 @@ class InteractiveProcess(SideEffecting):
             "process",
             Process(
                 argv,
-                description="Interactive process",
+                description=description,
                 env=env,
                 input_digest=input_digest,
                 append_only_caches=append_only_caches,
@@ -401,6 +402,7 @@ class InteractiveProcess(SideEffecting):
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
+            description=process.description,
             input_digest=process.input_digest,
             forward_signals_to_process=forward_signals_to_process,
             restartable=restartable,
