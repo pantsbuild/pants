@@ -24,8 +24,9 @@ from pants.core.goals.package import (
     TraverseIfNotPackageTarget,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.fs import CreateDigest, DigestEntries, Directory, FileEntry, SymlinkEntry
-from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
+from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -197,7 +198,7 @@ async def populate_nfpm_content_sandbox(
         for field, _ in nfpm_content_source_fields_to_relocate
     )
     relocated_source_entries = await MultiGet(
-        Get(DigestEntries, Snapshot, hydrated.snapshot) for hydrated in hydrated_sources_to_relocate
+        Get(DigestEntries, Digest, hydrated.snapshot.digest) for hydrated in hydrated_sources_to_relocate
     )
     moved_entries: list[FileEntry | SymlinkEntry | Directory] = []
     digest_entries: DigestEntries
@@ -276,4 +277,7 @@ async def populate_nfpm_content_sandbox(
 
 
 def rules():
-    return [*collect_rules()]
+    return [
+        *source_files_rules(),
+        *collect_rules(),
+    ]

@@ -8,8 +8,8 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.nfpm.field_sets import NFPM_PACKAGE_FIELD_SET_TYPES
-from pants.backend.nfpm.subsystem import rules as nfpm_subsystem_rules
 from pants.backend.nfpm.rules import rules as nfpm_rules
+from pants.backend.nfpm.subsystem import rules as nfpm_subsystem_rules
 from pants.backend.nfpm.target_types import target_types as nfpm_target_types
 from pants.backend.nfpm.target_types_rules import rules as nfpm_target_types_rules
 from pants.core.goals.package import BuiltPackage

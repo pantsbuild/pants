@@ -24,7 +24,6 @@ from pants.backend.nfpm.util_rules.sandbox import rules as sandbox_rules
 from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.engine import process
 from pants.engine.fs import CreateDigest, Directory, MergeDigests
 from pants.engine.internals.native_engine import AddPrefix, Digest, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
@@ -139,7 +138,6 @@ async def package_nfpm_rpm_package(field_set: NfpmRpmPackageFieldSet) -> BuiltPa
 
 def rules():
     return [
-        *process.rules(),
         *package.rules(),
         *field_sets_rules(),
         *generate_config_rules(),
