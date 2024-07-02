@@ -445,3 +445,18 @@ class NfpmContentDirs(TargetGenerator):
         Multiple directories in an nFPM package (created on package install).
         """
     )
+
+
+def target_types():
+    return [
+        NfpmApkPackage,
+        NfpmArchlinuxPackage,
+        NfpmDebPackage,
+        NfpmRpmPackage,
+        NfpmContentFile,
+        NfpmContentFiles,
+        NfpmContentSymlink,
+        NfpmContentSymlinks,
+        NfpmContentDir,
+        NfpmContentDirs,
+    ]
