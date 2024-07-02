@@ -396,6 +396,7 @@ class InteractiveProcess(SideEffecting):
         *,
         forward_signals_to_process: bool = True,
         restartable: bool = False,
+        keep_sandboxes: KeepSandboxes = KeepSandboxes.never,
     ) -> InteractiveProcess:
         return InteractiveProcess(
             argv=process.argv,
@@ -405,6 +406,7 @@ class InteractiveProcess(SideEffecting):
             restartable=restartable,
             append_only_caches=process.append_only_caches,
             immutable_input_digests=process.immutable_input_digests,
+            keep_sandboxes=keep_sandboxes,
         )
 
 
