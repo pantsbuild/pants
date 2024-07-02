@@ -65,7 +65,10 @@ def given_package_with_name(name: str) -> str:
 
 
 def given_package_with_workspaces(
-    name: str, version: str, dependencies: dict[str, str] | None = None, *workspaces: str
+    name: str,
+    version: str,
+    dependencies: dict[str, str] | None = None,
+    *workspaces: str,
 ) -> str:
     return json.dumps(
         {
@@ -185,19 +188,23 @@ def test_generates_lockfile_for_package_json_project(rule_runner: RuleRunner) ->
     assert json.loads(digest_contents[0].content) == {
         "name": "ham",
         "version": "0.0.1",
-        "lockfileVersion": 2,
+        "lockfileVersion": 3,
         "requires": True,
         "packages": {"": {"name": "ham", "version": "0.0.1"}},
     }
 
 
 def test_generates_lockfile_for_npm_package_json_workspace(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--nodejs-package-manager=npm"], env_inherit={"PATH"})
     rule_runner.write_files(
         {
             "src/js/BUILD": "package_json()",
             "src/js/package.json": given_package_with_workspaces("ham", "1.0.0", None, "a"),
             "src/js/a/BUILD": "package_json()",
-            "src/js/a/package.json": given_package_with_workspaces("spam", "0.1.0"),
+            "src/js/a/package.json": given_package_with_workspaces(
+                "spam",
+                "0.1.0",
+            ),
         }
     )
     [project] = rule_runner.request(AllNodeJSProjects, [])
@@ -219,9 +226,8 @@ def test_generates_lockfile_for_npm_package_json_workspace(rule_runner: RuleRunn
     assert json.loads(digest_contents[0].content) == {
         "name": "ham",
         "version": "1.0.0",
-        "lockfileVersion": 2,
+        "lockfileVersion": 3,
         "requires": True,
-        "dependencies": {"spam": {"version": "file:a"}},
         "packages": {
             "": {"name": "ham", "version": "1.0.0", "workspaces": ["a"]},
             "a": {"name": "spam", "version": "0.1.0"},
@@ -261,10 +267,14 @@ def test_generates_lockfile_for_pnpm_package_json_workspace(rule_runner: RuleRun
 
     assert yaml.safe_load(digest_contents[0].content) == {
         "importers": {
-            ".": {"dependencies": {"spam": "link:a"}, "specifiers": {"spam": "workspace:*"}},
-            "a": {"specifiers": {}},
+            ".": {"dependencies": {"spam": {"specifier": "workspace:*", "version": "link:a"}}},
+            "a": {},
         },
-        "lockfileVersion": 5.3,
+        "lockfileVersion": "6.0",
+        "settings": {
+            "autoInstallPeers": True,
+            "excludeLinksFromLockfile": False,
+        },
     }
 
 
