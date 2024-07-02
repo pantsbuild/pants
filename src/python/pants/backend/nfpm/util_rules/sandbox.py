@@ -198,7 +198,8 @@ async def populate_nfpm_content_sandbox(
         for field, _ in nfpm_content_source_fields_to_relocate
     )
     relocated_source_entries = await MultiGet(
-        Get(DigestEntries, Digest, hydrated.snapshot.digest) for hydrated in hydrated_sources_to_relocate
+        Get(DigestEntries, Digest, hydrated.snapshot.digest)
+        for hydrated in hydrated_sources_to_relocate
     )
     moved_entries: list[FileEntry | SymlinkEntry | Directory] = []
     digest_entries: DigestEntries
