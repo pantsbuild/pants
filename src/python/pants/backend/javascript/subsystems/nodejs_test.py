@@ -77,7 +77,7 @@ def test_corepack_without_explicit_version_contains_installation(
 
     snapshot = get_snapshot(rule_runner, result.digest)
 
-    assert f"._corepack_home/{package_manager}" in snapshot.dirs
+    assert f"._corepack_home/v1/{package_manager}" in snapshot.dirs
 
 
 @pytest.mark.parametrize("package_manager", ["npm@7.0.0", "pnpm@2.0.0", "yarn@1.0.0"])
@@ -89,7 +89,7 @@ def test_corepack_with_explicit_version_contains_requested_installation(
     result = rule_runner.request(CorepackToolDigest, [CorepackToolRequest(binary, version)])
     snapshot = get_snapshot(rule_runner, result.digest)
 
-    assert f"._corepack_home/{binary}/{version}" in snapshot.dirs
+    assert f"._corepack_home/v1/{binary}/{version}" in snapshot.dirs
 
 
 def test_npm_process(rule_runner: RuleRunner):
@@ -337,7 +337,7 @@ def test_get_nvm_root(env: dict[str, str], expected_directory: str | None) -> No
             None,
             {
                 "COREPACK_HOME": "{chroot}/._corepack_home",
-                "PATH": "{chroot}/shim_cache:._corepack:__node/v16",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v18",
                 "npm_config_cache": "npm_cache",
             },
             id="no_extra_environment",
@@ -346,7 +346,7 @@ def test_get_nvm_root(env: dict[str, str], expected_directory: str | None) -> No
             {},
             {
                 "COREPACK_HOME": "{chroot}/._corepack_home",
-                "PATH": "{chroot}/shim_cache:._corepack:__node/v16",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v18",
                 "npm_config_cache": "npm_cache",
             },
             id="empty_extra_environment",
@@ -355,7 +355,7 @@ def test_get_nvm_root(env: dict[str, str], expected_directory: str | None) -> No
             {"PATH": "/usr/bin/"},
             {
                 "COREPACK_HOME": "{chroot}/._corepack_home",
-                "PATH": "{chroot}/shim_cache:._corepack:__node/v16:/usr/bin/",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v18:/usr/bin/",
                 "npm_config_cache": "npm_cache",
             },
             id="extra_environment_extends_path",
@@ -364,7 +364,7 @@ def test_get_nvm_root(env: dict[str, str], expected_directory: str | None) -> No
             {"PATH": "/usr/bin/", "SOME_VAR": "VAR"},
             {
                 "COREPACK_HOME": "{chroot}/._corepack_home",
-                "PATH": "{chroot}/shim_cache:._corepack:__node/v16:/usr/bin/",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v18:/usr/bin/",
                 "npm_config_cache": "npm_cache",
                 "SOME_VAR": "VAR",
             },
@@ -374,7 +374,7 @@ def test_get_nvm_root(env: dict[str, str], expected_directory: str | None) -> No
             {"npm_config_cache": "I am ignored"},
             {
                 "COREPACK_HOME": "{chroot}/._corepack_home",
-                "PATH": "{chroot}/shim_cache:._corepack:__node/v16",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v18",
                 "npm_config_cache": "npm_cache",
             },
             id="extra_environment_cannot_override_some_vars",
@@ -385,7 +385,7 @@ def test_process_environment_variables_are_merged(
     extra_environment: dict[str, str] | None, expected: dict[str, str]
 ) -> None:
     environment = NodeJSProcessEnvironment(
-        NodeJSBinaries("__node/v16"),
+        NodeJSBinaries("__node/v18"),
         "npm_cache",
         BinaryShims(EMPTY_DIGEST, "shim_cache"),
         "._corepack_home",

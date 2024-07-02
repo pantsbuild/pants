@@ -101,7 +101,11 @@ def make_source_to_test(passing: bool = True):
     )
 
 
-def given_package_json(*, test_script: dict[str, str], runner: dict[str, str]) -> str:
+def given_package_json(
+    *,
+    test_script: dict[str, str],
+    runner: dict[str, str],
+) -> str:
     return json.dumps(
         {
             "name": "pkg",
@@ -143,7 +147,8 @@ def test_jest_tests_are_successful(
         {
             "foo/BUILD": package_json_target,
             "foo/package.json": given_package_json(
-                test_script=test_script, runner={"jest": "^29.5"}
+                test_script=test_script,
+                runner={"jest": "^29.7.0"},
             ),
             **{f"foo/{key}": value for key, value in jest_lockfile.items()},
             "foo/src/BUILD": "javascript_sources()",
@@ -178,14 +183,15 @@ def test_jest_tests_are_successful(
 
 
 def test_batched_jest_tests_are_successful(
-    rule_runner: RuleRunner, jest_lockfile: dict[str, str]
+    rule_runner: RuleRunner,
+    jest_lockfile: dict[str, str],
 ) -> None:
     rule_runner.write_files(
         {
             "foo/BUILD": "package_json()",
             "foo/package.json": given_package_json(
                 test_script={"test": "NODE_OPTIONS=--experimental-vm-modules jest"},
-                runner={"jest": "^29.5"},
+                runner={"jest": "^29.7.0"},
             ),
             **{f"foo/{key}": value for key, value in jest_lockfile.items()},
             "foo/src/BUILD": "javascript_sources()",
@@ -233,13 +239,16 @@ def test_batched_jest_tests_are_successful(
 
 @pytest.mark.parametrize("passing", [True, False])
 def test_mocha_tests(
-    passing: bool, mocha_lockfile: dict[str, str], rule_runner: RuleRunner
+    passing: bool,
+    mocha_lockfile: dict[str, str],
+    rule_runner: RuleRunner,
 ) -> None:
     rule_runner.write_files(
         {
             "foo/BUILD": "package_json()",
             "foo/package.json": given_package_json(
-                test_script={"test": "mocha"}, runner={"mocha": "^10.2.0"}
+                test_script={"test": "mocha"},
+                runner={"mocha": "^10.4.0"},
             ),
             **{f"foo/{key}": value for key, value in mocha_lockfile.items()},
             "foo/src/BUILD": "javascript_sources()",
@@ -270,7 +279,9 @@ def test_mocha_tests(
 
 
 def test_jest_test_with_coverage_reporting(
-    package_manager: str, rule_runner: RuleRunner, jest_lockfile: dict[str, str]
+    package_manager: str,
+    rule_runner: RuleRunner,
+    jest_lockfile: dict[str, str],
 ) -> None:
     rule_runner.set_options(
         args=[f"--nodejs-package-manager={package_manager}", "--test-use-coverage", "True"],
@@ -292,7 +303,7 @@ def test_jest_test_with_coverage_reporting(
             ),
             "foo/package.json": given_package_json(
                 test_script={"test": "NODE_OPTIONS=--experimental-vm-modules jest"},
-                runner={"jest": "^29.5"},
+                runner={"jest": "^29.7.0"},
             ),
             **{f"foo/{key}": value for key, value in jest_lockfile.items()},
             "foo/src/BUILD": "javascript_sources()",
