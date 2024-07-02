@@ -130,7 +130,7 @@ python_sources(name="lib")
 
 You can install third-party type stubs (for example, `types-requests`) like [normal Python requirements](../overview/third-party-dependencies.mdx). Pants will infer a dependency on both the type stub and the actual dependency, for example, both `types-requests` and `requests`, which you can confirm by running `pants dependencies path/to/f.py`.
 
-Type stubs must be installed in the same resolve as the code being checked, and not in the same resolve as MyPy itself.
+Third-party type stubs must be installed in the same resolve as the third-party code they provide types for.
 
 ### Add a third-party plugin
 
