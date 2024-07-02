@@ -5,7 +5,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.nfpm.field_sets import NfpmPackageFieldSet
+from pants.backend.nfpm.field_sets import (
+    NfpmApkPackageFieldSet,
+    NfpmArchlinuxPackageFieldSet,
+    NfpmDebPackageFieldSet,
+    NfpmPackageFieldSet,
+    NfpmRpmPackageFieldSet,
+)
 from pants.backend.nfpm.field_sets import rules as field_sets_rules
 from pants.backend.nfpm.subsystem import NfpmSubsystem
 from pants.backend.nfpm.util_rules.generate_config import (
@@ -40,13 +46,20 @@ class BuiltNfpmPackageArtifact(BuiltPackageArtifact):
         )
 
 
+@dataclass(frozen=True)
+class NfpmPackageRequest:
+    field_set: NfpmPackageFieldSet
+
+
 @rule(level=LogLevel.INFO)
 async def package_nfpm_package(
-    field_set: NfpmPackageFieldSet,
+    request: NfpmPackageRequest,
     nfpm_subsystem: NfpmSubsystem,
     platform: Platform,
 ) -> BuiltPackage:
     output_dir = "__out"
+
+    field_set = request.field_set
 
     nfpm_content_sandbox = await Get(NfpmContentSandbox, NfpmContentSandboxRequest(field_set))
 
@@ -101,6 +114,26 @@ async def package_nfpm_package(
         final_snapshot.digest,
         artifacts=(BuiltNfpmPackageArtifact.create(conventional_file_name, field_set.packager),),
     )
+
+
+@rule
+async def package_nfpm_apk_package(field_set: NfpmApkPackageFieldSet) -> BuiltPackage:
+    return await Get(BuiltPackage, NfpmPackageRequest(field_set))
+
+
+@rule
+async def package_nfpm_archlinux_package(field_set: NfpmArchlinuxPackageFieldSet) -> BuiltPackage:
+    return await Get(BuiltPackage, NfpmPackageRequest(field_set))
+
+
+@rule
+async def package_nfpm_deb_package(field_set: NfpmDebPackageFieldSet) -> BuiltPackage:
+    return await Get(BuiltPackage, NfpmPackageRequest(field_set))
+
+
+@rule
+async def package_nfpm_rpm_package(field_set: NfpmRpmPackageFieldSet) -> BuiltPackage:
+    return await Get(BuiltPackage, NfpmPackageRequest(field_set))
 
 
 def rules():
