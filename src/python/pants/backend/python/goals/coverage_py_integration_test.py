@@ -421,3 +421,71 @@ def test_default_coverage_issues_12390() -> None:
         )
         in result.stderr
     ), result.stderr
+
+
+def test_coverage_filter_issue_18057() -> None:
+    files = {
+        # Coverage report should include all the files.
+        "minimalcov/minimalcov/tests/BUILD": "python_tests()",
+        "minimalcov/minimalcov/__init__.py": "",
+        "minimalcov/minimalcov/src/__init__.py": "",
+        "minimalcov/minimalcov/src/foo.py": 'print("In the foo module!")',
+        "minimalcov/minimalcov/src/foo_not_covered.py": 'print("No test coverage!")',
+        "minimalcov/minimalcov/src/BUILD": "python_sources()",
+        "minimalcov/minimalcov/tests/test_foo.py": dedent(
+            """\
+            import minimalcov.src.foo
+
+            def test_1():
+                assert True
+            """
+        ),
+        "minimalcov/minimalcov/tests/BUILD": "python_tests()",
+        # Coverage report should only include those files which are imported in a test module.
+        "minimalcov/minimalcov2/__init__.py": "",
+        "minimalcov/minimalcov2/src/__init__.py": "",
+        "minimalcov/minimalcov2/src/foo.py": 'print("In the foo module!")',
+        "minimalcov/minimalcov2/src/foo_not_covered.py": 'print("No test coverage!")',
+        "minimalcov/minimalcov2/src/BUILD": "python_sources()",
+        "minimalcov/minimalcov2/tests/test_foo.py": dedent(
+            """\
+            import minimalcov2.src.foo
+
+            def test_2():
+                assert True
+            """
+        ),
+        "minimalcov/minimalcov2/tests/BUILD": "python_tests()",
+    }
+
+    with setup_tmpdir(files) as tmpdir:
+        command = [
+            "--backend-packages=pants.backend.python",
+            "test",
+            "--use-coverage",
+            "::",
+            f"--source-root-patterns=['/{tmpdir}/minimalcov']",
+            f"--coverage-py-filter=['{tmpdir}/minimalcov/minimalcov', 'minimalcov2']",
+            "--coverage-py-report=raw",
+        ]
+        result = run_pants(command)
+        result.assert_success()
+    assert (
+        dedent(
+            f"""\
+            Name                                                       Stmts   Miss  Cover
+            ------------------------------------------------------------------------------
+            {tmpdir}/minimalcov/minimalcov2/__init__.py                 0      0   100%
+            {tmpdir}/minimalcov/minimalcov2/src/__init__.py             0      0   100%
+            {tmpdir}/minimalcov/minimalcov2/src/foo.py                  1      0   100%
+            {tmpdir}/minimalcov/minimalcov/__init__.py                  0      0   100%
+            {tmpdir}/minimalcov/minimalcov/src/__init__.py              0      0   100%
+            {tmpdir}/minimalcov/minimalcov/src/foo.py                   1      0   100%
+            {tmpdir}/minimalcov/minimalcov/src/foo_not_covered.py       1      1     0%
+            {tmpdir}/minimalcov/minimalcov/tests/test_foo.py            3      0   100%
+            ------------------------------------------------------------------------------
+            TOTAL                                                          6      1    83%
+            """
+        )
+        in result.stderr
+    ), result.stderr
