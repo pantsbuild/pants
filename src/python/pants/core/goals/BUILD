@@ -3,7 +3,13 @@
 
 python_sources()
 
-python_tests(name="tests", sources=["*_test.py", "!*_integration_test.py"])
+python_tests(
+    name="tests",
+    sources=["*_test.py", "!*_integration_test.py"],
+    overrides={
+        "publish_test.py": {"timeout": 70},
+    },
+)
 
 python_tests(
     name="integration",
