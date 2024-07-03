@@ -355,6 +355,7 @@ class NfpmRpmScriptsField(NfpmPackageScriptsField):
             **NfpmPackageScriptsField.nfpm_aliases,
             "pretrans": "rpm.scripts.pretrans",
             "posttrans": "rpm.scripts.posttrans",
+            "verify": "rpm.scripts.verify",
         }
     )
     help = help_text(
@@ -375,6 +376,7 @@ class NfpmRpmScriptsField(NfpmPackageScriptsField):
             | postremove  | %postun       | uninstall   |
             | pretrans    | %pretrans     | transaction |
             | posttrans   | %posttrans    | transaction |
+            | verify      | %verifyscript | verify      |
 
         Please consult the RPM docs to understand what is required of these scripts.
 
