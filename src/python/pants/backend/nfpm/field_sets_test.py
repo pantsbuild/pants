@@ -15,6 +15,7 @@ from pants.backend.nfpm.fields.archlinux import (
     NfpmArchlinuxDependsField,
     NfpmArchlinuxPackagerField,
 )
+from pants.backend.nfpm.fields.contents import NfpmContentFileMtimeField
 from pants.backend.nfpm.fields.deb import (
     NfpmDebDependsField,
     NfpmDebFieldsField,
@@ -38,6 +39,8 @@ from pants.backend.nfpm.target_types import (
 )
 from pants.engine.addresses import Address
 from pants.engine.target import DescriptionField
+
+mtime = NfpmContentFileMtimeField.default
 
 
 def test_generate_nfpm_config_for_apk():
@@ -65,6 +68,7 @@ def test_generate_nfpm_config_for_apk():
     expected_nfpm_config = {
         "disable_globbing": True,
         "contents": [],
+        "mtime": mtime,
         "name": "treasure",
         "arch": "amd64",  # default
         "version": "3.2.1",
@@ -82,7 +86,7 @@ def test_generate_nfpm_config_for_apk():
     }
 
     field_set = NfpmApkPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt)
+    nfpm_config = field_set.nfpm_config(tgt, mtime=mtime)
     assert nfpm_config == expected_nfpm_config
 
 
@@ -111,6 +115,7 @@ def test_generate_nfpm_config_for_archlinux():
     expected_nfpm_config = {
         "disable_globbing": True,
         "contents": [],
+        "mtime": mtime,
         "name": "treasure",
         "arch": "amd64",  # default
         "version": "3.2.1",
@@ -128,7 +133,7 @@ def test_generate_nfpm_config_for_archlinux():
     }
 
     field_set = NfpmArchlinuxPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt)
+    nfpm_config = field_set.nfpm_config(tgt, mtime=mtime)
     assert nfpm_config == expected_nfpm_config
 
 
@@ -160,6 +165,7 @@ def test_generate_nfpm_config_for_deb():
     expected_nfpm_config = {
         "disable_globbing": True,
         "contents": [],
+        "mtime": mtime,
         "name": "treasure",
         "arch": "amd64",  # default
         "platform": "linux",  # default
@@ -183,7 +189,7 @@ def test_generate_nfpm_config_for_deb():
     }
 
     field_set = NfpmDebPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt)
+    nfpm_config = field_set.nfpm_config(tgt, mtime=mtime)
     assert nfpm_config == expected_nfpm_config
 
 
@@ -216,6 +222,7 @@ def test_generate_nfpm_config_for_rpm():
         "contents": [
             {"type": "ghost", "dst": "/var/log/captains.log"},
         ],
+        "mtime": mtime,
         "name": "treasure",
         "arch": "amd64",  # default
         "platform": "linux",  # default
@@ -236,5 +243,5 @@ def test_generate_nfpm_config_for_rpm():
     }
 
     field_set = NfpmRpmPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt)
+    nfpm_config = field_set.nfpm_config(tgt, mtime=mtime)
     assert nfpm_config == expected_nfpm_config

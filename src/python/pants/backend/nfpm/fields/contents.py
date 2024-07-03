@@ -180,14 +180,10 @@ class NfpmContentFileMtimeField(StringField):
     nfpm_alias = "contents.[].file_info.mtime"
     alias: ClassVar[str] = "file_mtime"
     # Default copied from PEX (which uses zipfile standard MS-DOS epoch).
-    # https://github.com/pantsbuild/pex/blob/v2.1.137/pex/common.py#L39-L45
+    # https://github.com/pex-tool/pex/blob/v2.1.137/pex/common.py#L39-L45
     default = "1980-01-01T00:00:00"
-    # TODO: override default with SOURCE_DATE_EPOCH env var if defined
-    # TODO: there are many things in nFPM that use time.Now(), so upstream nFPM work
-    #       is required so pants can use SOURCE_DATE_EPOCH to overwrite that.
-    #       https://github.com/goreleaser/nfpm/issues/734
     help = help_text(
-        """
+        lambda: f"""
         The file modification time as an RFC 3339 formatted string.
 
         For example: 2008-01-02T15:04:05Z
@@ -201,6 +197,9 @@ class NfpmContentFileMtimeField(StringField):
         include: git does not track mtime, timestamps like mtime cause many issues
         for reproducible packaging builds, and reproducible builds are required
         for pants to provide its fine-grained caches.
+
+        The default value is {repr(NfpmContentFileMtimeField.default)}. You may also
+        set the SOURCE_DATE_EPOCH environment variable to override this default.
 
         See also: https://reproducible-builds.org/docs/timestamps/
         """

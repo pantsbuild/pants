@@ -27,11 +27,12 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     description: DescriptionField
     scripts: NfpmPackageScriptsField
 
-    def nfpm_config(self, tgt: Target) -> dict[str, Any]:
+    def nfpm_config(self, tgt: Target, *, mtime: str) -> dict[str, Any]:
         config: dict[str, Any] = {
             # pants handles any globbing before passing contents to nFPM.
             "disable_globbing": True,
             "contents": [],
+            "mtime": mtime,
         }
 
         def fill_nested(_nfpm_alias: str, value: Any) -> None:
@@ -111,8 +112,8 @@ class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
     required_fields = RPM_FIELDS
     ghost_contents: NfpmRpmGhostContents
 
-    def nfpm_config(self, tgt: Target) -> dict[str, Any]:
-        config = super().nfpm_config(tgt)
+    def nfpm_config(self, tgt: Target, *, mtime: str) -> dict[str, Any]:
+        config = super().nfpm_config(tgt, mtime=mtime)
         config["contents"].extend(self.ghost_contents.nfpm_contents)
         return config
 
