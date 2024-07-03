@@ -15,6 +15,8 @@ from pants.core.goals.tailor import (
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
+from pants.engine.intrinsics import path_globs_to_paths
+from pants.engine.rules import implicitly
 from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
@@ -29,7 +31,7 @@ class PutativeSqlTargetsRequest(PutativeTargetsRequest):
 async def find_putative_targets(
     req: PutativeSqlTargetsRequest, all_owned_sources: AllOwnedSources
 ) -> PutativeTargets:
-    all_sql_files = await Get(Paths, PathGlobs, req.path_globs("*.sql"))
+    all_sql_files = await path_globs_to_paths(req.path_globs("*.sql"))
     unowned_sql_files = set(all_sql_files.files) - set(all_owned_sources)
     targets = PutativeTargets(
         [

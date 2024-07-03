@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Tuple
+from typing import Any, Iterable, Tuple
 
 from typing_extensions import assert_never
 
@@ -19,7 +19,13 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, Rule, concurrently, collect_rules, rule
+from pants.backend.python.util_rules.pex import create_venv_pex
+from pants.core.util_rules.config_files import find_config_file
+from pants.engine.intrinsics import merge_digests_request_to_digest
+from pants.engine.intrinsics import process_request_to_process_result
+from pants.core.util_rules.source_files import determine_source_files
+from pants.engine.rules import implicitly
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
@@ -61,23 +67,14 @@ class _RunSqlfluffRequest:
     mode: SqlfluffMode
 
 
-@rule(level=LogLevel.DEBUG)
 async def run_sqlfluff(
     request: _RunSqlfluffRequest,
     sqlfluff: Sqlfluff,
 ) -> FallibleProcessResult:
-    sqlfluff_pex_get = Get(VenvPex, PexRequest, sqlfluff.to_pex_request())
-
-    config_files_get = Get(
-        ConfigFiles, ConfigFilesRequest, sqlfluff.config_request(request.snapshot.dirs)
-    )
-
-    sqlfluff_pex, config_files = await MultiGet(sqlfluff_pex_get, config_files_get)
-
-    input_digest = await Get(
-        Digest,
-        MergeDigests((request.snapshot.digest, config_files.snapshot.digest)),
-    )
+    sqlfluff_pex_get = create_venv_pex(**implicitly({sqlfluff.to_pex_request(): PexRequest}))
+    config_files_get = find_config_file(sqlfluff.config_request(request.snapshot.dirs))
+    sqlfluff_pex, config_files = await concurrently(sqlfluff_pex_get, config_files_get)
+    input_digest = await merge_digests_request_to_digest(MergeDigests((request.snapshot.digest, config_files.snapshot.digest)))
 
     initial_args: Tuple[str, ...] = ()
     if request.mode is SqlfluffMode.FMT:
@@ -91,54 +88,42 @@ async def run_sqlfluff(
 
     conf_args = ["--config", sqlfluff.config] if sqlfluff.config else []
 
-    result = await Get(
-        FallibleProcessResult,
-        VenvPexProcess(
+    result = await process_request_to_process_result(
+        **implicitly(VenvPexProcess(
             sqlfluff_pex,
             argv=(*initial_args, *conf_args, *sqlfluff.args, *request.snapshot.files),
             input_digest=input_digest,
             output_files=request.snapshot.files,
             description=f"Run sqlfluff {' '.join(initial_args)} on {pluralize(len(request.snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
-        ),
-    )
+        )))
     return result
 
 
 @rule(desc="Fix with sqlfluff fix", level=LogLevel.DEBUG)
 async def sqlfluff_fix(request: SqlfluffFixRequest.Batch, sqlfluff: Sqlfluff) -> FixResult:
-    result = await Get(
-        FallibleProcessResult, _RunSqlfluffRequest(snapshot=request.snapshot, mode=SqlfluffMode.FIX)
-    )
+    result = await run_sqlfluff(_RunSqlfluffRequest(snapshot=request.snapshot, mode=SqlfluffMode.FIX), sqlfluff)
     return await FixResult.create(request, result)
 
 
 @rule(desc="Lint with sqlfluff lint", level=LogLevel.DEBUG)
-async def sqlfluff_lint(request: SqlfluffLintRequest.Batch[SqlfluffFieldSet, Any]) -> LintResult:
-    source_files = await Get(
-        SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
-    )
-    result = await Get(
-        FallibleProcessResult,
-        _RunSqlfluffRequest(snapshot=source_files.snapshot, mode=SqlfluffMode.LINT),
-    )
+async def sqlfluff_lint(request: SqlfluffLintRequest.Batch[SqlfluffFieldSet, Any], sqlfluff: Sqlfluff) -> LintResult:
+    source_files = await determine_source_files(SourceFilesRequest(field_set.source for field_set in request.elements))
+    result = await run_sqlfluff(_RunSqlfluffRequest(snapshot=source_files.snapshot, mode=SqlfluffMode.LINT), sqlfluff)
     return LintResult.create(request, result)
 
 
 @rule(desc="Format with sqlfluff format", level=LogLevel.DEBUG)
 async def sqlfluff_fmt(request: SqlfluffFormatRequest.Batch, sqlfluff: Sqlfluff) -> FmtResult:
-    result = await Get(
-        FallibleProcessResult,
-        _RunSqlfluffRequest(snapshot=request.snapshot, mode=SqlfluffMode.FMT),
-    )
+    result = await run_sqlfluff(_RunSqlfluffRequest(snapshot=request.snapshot, mode=SqlfluffMode.FMT), sqlfluff)
     return await FmtResult.create(request, result)
 
 
-def rules():
-    return [
+def rules() -> Iterable[Rule]:
+    return (
         *collect_rules(),
         *SqlfluffLintRequest.rules(),
         *SqlfluffFixRequest.rules(),
         *SqlfluffFormatRequest.rules(),
         *pex.rules(),
-    ]
+    )
