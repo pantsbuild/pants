@@ -18,18 +18,18 @@ class NfpmSubsystem(TemplatedExternalTool):
     help = "The nFPM deb, rpm, and apk packager (https://nfpm.goreleaser.com)."
 
     # The version WITHOUT the 'v' prefix which we add as needed in the url_template.
-    default_version = "2.34.0"  # released 28 Oct 2023
+    default_version = "2.37.1"  # released 09 May 2024
     # v2.35.0 added SOURCE_DATE_EPOCH support
     # v2.36.0 added rpm.scripts.verify
     # v2.37.0 added support for IPK packaging (TODO: add IPK package target+fields+rules)
     default_known_versions = [
-        # checksums from https://github.com/goreleaser/nfpm/releases/download/v2.34.0/checksums.txt
-        "2.34.0|linux_arm64 |9b4fe0e650bbbc9d27456290b2eeb0719472519593d98bf1a4ba152022a4e872|4659916",
-        "2.34.0|linux_x86_64|1c97da72c055e3ddedf80bcfac155ccb008a99a55e59b3561c16ec4c6ce7e2c7|5067985",
-        "2.34.0|macos_arm64 |75985dc7660b9de2462d2aa6027c40c2cb116248b9340f70a83e9441488369ab|5041781",
-        "2.34.0|macos_x86_64|c5a7bd5fba2c9ba0b84a515439ecc5e61278c11643f99d577988bfe542f504be|5267411",
-        "2.34.0|win_arm64   |9586a2a772b82c1c603df4f14de8434d48adcdba80ced2d83adda31f04ea1745|4757387",
-        "2.34.0|win_x86_64  |72d1a774271bbfab3fa72b90fa5579c40a35d2536ca6782c86964064df9191d3|5252379",
+        # checksums from https://github.com/goreleaser/nfpm/releases/download/v2.37.1/checksums.txt
+        "2.37.1|linux_arm64 |df8f272195b7ddb09af9575673a9b8111f9eb7529cdd0a3fac4d44b52513a1e1|4780446",
+        "2.37.1|linux_x86_64|3e1fe85c9a224a221c64cf72fc19e7cd6a0a51a5c4f4b336e3b8eccd417116a3|5195594",
+        "2.37.1|macos_arm64 |5162ce5a59fe8d3b511583cb604c34d08bd2bcced87d9159c7005fc35287b9cd|4976450",
+        "2.37.1|macos_x86_64|0213fa5d5af6f209d953c963103f9b6aec8a0e89d4bf0ab3d531f5f8b20b8eeb|5293359",
+        "2.37.1|win_arm64   |d6edb839381d29ee1eb5eaa1a9443cf8d90f16e686a80b2245d650ed61268573|4884573",
+        "2.37.1|win_x86_64  |2cc80804188048a577dd940a7a7cf04e2c57304fdf339c8692e50b43d3bc3bd4|5386526",
     ]
 
     default_url_template = (
