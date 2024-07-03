@@ -10,11 +10,9 @@ from pants.backend.makeself.goals.package import MakeselfArchiveFieldSet, packag
 from pants.backend.makeself.subsystem import RunMakeselfArchive
 from pants.backend.makeself.system_binaries import MakeselfBinaryShimsRequest
 from pants.core.goals.run import RunRequest
-
-from pants.engine.process import Process
-from pants.engine.rules import Rule, collect_rules, rule
 from pants.core.util_rules.system_binaries import create_binary_shims
-from pants.engine.rules import implicitly
+from pants.engine.process import Process
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 
 
@@ -45,6 +43,7 @@ async def run_makeself_archive(request: RunMakeselfArchive) -> Process:
         env={"PATH": shims.path_component},
     )
 
+
 @rule
 async def create_makeself_archive_run_request(field_set: MakeselfArchiveFieldSet) -> RunRequest:
     package = await package_makeself_binary(field_set)
@@ -53,12 +52,14 @@ async def create_makeself_archive_run_request(field_set: MakeselfArchiveFieldSet
     if exe is None:
         raise RuntimeError(f"Invalid package artifact: {package}")
 
-    process = await run_makeself_archive(RunMakeselfArchive(
+    process = await run_makeself_archive(
+        RunMakeselfArchive(
             exe=exe,
             input_digest=package.digest,
             description="Run makeself archive",
             extra_tools=field_set.tools.value or (),
-    ))
+        )
+    )
 
     return RunRequest(
         digest=process.input_digest,

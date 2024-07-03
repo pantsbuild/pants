@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from typing import Iterable
+
 from pants.backend.sql.target_types import SqlSourcesGeneratorTarget, SqlSourceTarget
 from pants.engine.target import BoolField
 from pants.engine.unions import UnionRule

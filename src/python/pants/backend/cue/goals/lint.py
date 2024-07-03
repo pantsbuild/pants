@@ -10,10 +10,9 @@ from pants.backend.cue.subsystem import Cue
 from pants.backend.cue.target_types import CueFieldSet
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.core.util_rules.source_files import SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.platform import Platform
 from pants.engine.rules import Rule, collect_rules, rule
-from pants.core.util_rules.source_files import determine_source_files
 from pants.util.logging import LogLevel
 
 
@@ -29,7 +28,9 @@ async def run_cue_vet(
     cue: Cue,
     platform: Platform,
 ) -> LintResult:
-    sources = await determine_source_files(SourceFilesRequest(sources_fields=[field_set.sources for field_set in request.elements]))
+    sources = await determine_source_files(
+        SourceFilesRequest(sources_fields=[field_set.sources for field_set in request.elements])
+    )
     process_result = await _run_cue("vet", cue=cue, snapshot=sources.snapshot, platform=platform)
     return LintResult.create(request, process_result)
 

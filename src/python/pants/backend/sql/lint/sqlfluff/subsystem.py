@@ -101,6 +101,5 @@ class Sqlfluff(PythonToolBase):
         )
 
 
-
 def rules() -> Iterable[Rule]:
     return collect_rules()

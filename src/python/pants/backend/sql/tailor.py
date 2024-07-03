@@ -12,11 +12,8 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
 )
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
 from pants.engine.intrinsics import path_globs_to_paths
-from pants.engine.rules import implicitly
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel

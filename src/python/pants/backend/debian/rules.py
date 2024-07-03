@@ -18,15 +18,12 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
-from pants.core.util_rules.system_binaries import BinaryPathRequest, TarBinary
+from pants.core.util_rules.system_binaries import BinaryPathRequest, TarBinary, find_binary
 from pants.engine.fs import CreateDigest, FileEntry
-from pants.engine.process import Process
-from pants.engine.rules import Rule, collect_rules, rule, implicitly
-from pants.core.util_rules.system_binaries import find_binary
 from pants.engine.internals.graph import hydrate_sources
-from pants.engine.process import fallible_to_exec_result_or_raise
-from pants.engine.intrinsics import directory_digest_to_digest_entries
-from pants.engine.intrinsics import create_digest_to_digest
+from pants.engine.intrinsics import create_digest_to_digest, directory_digest_to_digest_entries
+from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import HydrateSourcesRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -46,14 +43,19 @@ class DebianPackageFieldSet(PackageFieldSet):
 async def package_debian_package(
     field_set: DebianPackageFieldSet, tar_binary_path: TarBinary
 ) -> BuiltPackage:
-    dpkg_deb_path = await find_binary(BinaryPathRequest(
+    dpkg_deb_path = await find_binary(
+        BinaryPathRequest(
             binary_name="dpkg-deb",
             search_path=["/usr/bin"],
-        ), **implicitly())
+        ),
+        **implicitly(),
+    )
     if not dpkg_deb_path.first_path:
         raise OSError(f"Could not find the `{dpkg_deb_path.binary_name}` program in `/usr/bin`.")
 
-    hydrated_sources = await hydrate_sources(HydrateSourcesRequest(field_set.sources_dir), **implicitly())
+    hydrated_sources = await hydrate_sources(
+        HydrateSourcesRequest(field_set.sources_dir), **implicitly()
+    )
 
     # Since all the sources are coming only from a single directory, it is
     # safe to pick an arbitrary file and get its root directory name.
