@@ -43,6 +43,15 @@ def configs(strs: dict[str, set[str]]) -> AllSemgrepConfigs:
         ),
         pytest.param(
             (
+                "foo/bar/.semgrep/.semgrep.yml",
+                "foo/bar/.semgrep/baz1.yml",
+                "foo/bar/.semgrep/quz/baz2.yml",
+            ),
+            configs({"foo/bar": {"foo/bar/.semgrep/.semgrep.yml", "foo/bar/.semgrep/baz1.yml", "foo/bar/.semgrep/quz/baz2.yml"}}),
+            id="recursively_find_yamls",
+        ),
+        pytest.param(
+            (
                 "foo/.semgrep/baz.yml",
                 "foo/bar/.semgrep.yml",
                 "foo/bar/qux/.semgrep.yml",
@@ -66,7 +75,7 @@ def configs(strs: dict[str, set[str]]) -> AllSemgrepConfigs:
 )
 def test_group_by_group_by_semgrep_dir(paths: tuple[str, ...], expected: AllSemgrepConfigs):
     input = Paths(files=paths, dirs=())
-    result = rules._group_by_semgrep_dir(input)
+    result = rules._group_by_semgrep_dir(".semgrep", input)
     assert result == expected
 
 

@@ -12,7 +12,7 @@ from pants.core.goals.resolves import ExportableTool
 from pants.engine.rules import Rule, collect_rules
 from pants.engine.target import Dependencies, FieldSet, SingleSourceField, Target
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption, SkipOption, StrOption
 from pants.util.strutil import softwrap
 
 
@@ -50,6 +50,21 @@ class SemgrepSubsystem(PythonToolBase):
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.tools.semgrep", "semgrep.lock")
+
+    config_dir = StrOption(
+        default=".semgrep",
+        help=softwrap(
+            """
+            The directory name with semgrep rules, which is searched recursively for YAML files, and
+            can be present at any level, with rules applying to all levels below it.
+            """
+        ),
+    )
+
+    ignore_config_path = StrOption(
+        default=".semgrepignore",
+        help="The path to the semgrepignore file",
+    )
 
     args = ArgsListOption(
         example="--verbose",

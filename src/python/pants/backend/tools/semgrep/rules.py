@@ -44,27 +44,10 @@ class SemgrepLintRequest(LintTargetsRequest):
 @dataclass(frozen=True)
 class PartitionMetadata:
     config_files: frozenset[PurePath]
-    ignore_files: Snapshot
 
     @property
     def description(self) -> str:
         return ", ".join(sorted(str(path) for path in self.config_files))
-
-
-_IGNORE_FILE_NAME = ".semgrepignore"
-
-_RULES_DIR_NAME = ".semgrep"
-_RULES_FILES_GLOBS = (
-    ".semgrep.yml",
-    ".semgrep.yaml",
-    f"{_RULES_DIR_NAME}/*.yml",
-    f"{_RULES_DIR_NAME}/*.yaml",
-)
-
-
-@dataclass
-class SemgrepIgnoreFiles:
-    snapshot: Snapshot
 
 
 @dataclass
@@ -85,24 +68,33 @@ class AllSemgrepConfigs:
             yield from self.configs_by_dir.get(ancestor, [])
 
 
-def _group_by_semgrep_dir(all_paths: Paths) -> AllSemgrepConfigs:
+def _group_by_semgrep_dir(config_dir: str, all_paths: Paths) -> AllSemgrepConfigs:
     configs_by_dir = defaultdict(set)
     for path_ in all_paths.files:
         path = PurePath(path_)
-        # A rule like foo/bar/.semgrep/baz.yaml should behave like it's in in foo/bar, not
-        # foo/bar/.semgrep
-        parent = path.parent
-        config_directory = parent.parent if parent.name == _RULES_DIR_NAME else parent
-
+        # Rules like foo/bar/.semgrep/baz.yaml and foo/bar/.semgrep/baz/qux.yaml should apply to the
+        # project at foo/bar
+        config_directory = (
+            PurePath(*path.parts[:path.parts.index(config_dir)])
+            if config_dir in path.parts
+            else path.parent
+        )
         configs_by_dir[config_directory].add(path)
 
     return AllSemgrepConfigs(configs_by_dir)
 
 
 @rule
-async def find_all_semgrep_configs() -> AllSemgrepConfigs:
-    all_paths = await Get(Paths, PathGlobs([f"**/{file_glob}" for file_glob in _RULES_FILES_GLOBS]))
-    return _group_by_semgrep_dir(all_paths)
+async def find_all_semgrep_configs(semgrep: SemgrepSubsystem) -> AllSemgrepConfigs:
+    rules_files_globs = (
+        f"{semgrep.config_dir}/**/*.yml",
+        f"{semgrep.config_dir}/**/*.yaml",
+        ".semgrep.yml",
+        ".semgrep.yaml",
+    )
+
+    all_paths = await Get(Paths, PathGlobs([f"**/{file_glob}" for file_glob in rules_files_globs]))
+    return _group_by_semgrep_dir(semgrep.config_dir, all_paths)
 
 
 @dataclass(frozen=True)
@@ -122,16 +114,9 @@ async def infer_relevant_semgrep_configs(
 
 
 @rule
-async def all_semgrep_ignore_files() -> SemgrepIgnoreFiles:
-    snapshot = await Get(Snapshot, PathGlobs([f"**/{_IGNORE_FILE_NAME}"]))
-    return SemgrepIgnoreFiles(snapshot)
-
-
-@rule
 async def partition(
     request: SemgrepLintRequest.PartitionRequest[SemgrepFieldSet],
     semgrep: SemgrepSubsystem,
-    ignore_files: SemgrepIgnoreFiles,
 ) -> Partitions:
     if semgrep.skip:
         return Partitions()
@@ -148,7 +133,7 @@ async def partition(
             by_config[configs].append(field_set)
 
     return Partitions(
-        Partition(tuple(field_sets), PartitionMetadata(configs, ignore_files.snapshot))
+        Partition(tuple(field_sets), PartitionMetadata(configs))
         for configs, field_sets in by_config.items()
     )
 
@@ -175,6 +160,8 @@ async def lint(
         Get(Digest, CreateDigest([_DEFAULT_SETTINGS])),
     )
 
+    ignore_files = await Get(Snapshot, PathGlobs([semgrep.ignore_config_path]))
+
     input_digest = await Get(
         Digest,
         MergeDigests(
@@ -182,7 +169,7 @@ async def lint(
                 input_files.snapshot.digest,
                 config_files.digest,
                 settings,
-                request.partition_metadata.ignore_files.digest,
+                ignore_files.digest,
             )
         ),
     )
