@@ -7,9 +7,17 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Optional, Tuple
 
-from pants.backend.makeself.goals.run import MakeselfArchiveFieldSet
 from pants.backend.makeself.subsystem import MakeselfTool
 from pants.backend.makeself.system_binaries import MakeselfBinaryShimsRequest
+from pants.backend.makeself.target_types import (
+    MakeselfArchiveArgsField,
+    MakeselfArchiveFilesField,
+    MakeselfArchiveOutputPathField,
+    MakeselfArchivePackagesField,
+    MakeselfArchiveStartupScriptField,
+    MakeselfArchiveToolsField,
+    MakeselfArthiveLabelField,
+)
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals import package
 from pants.core.goals.package import (
@@ -18,14 +26,14 @@ from pants.core.goals.package import (
     EnvironmentAwarePackageRequest,
     PackageFieldSet,
 )
+from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules import source_files
-from pants.core.util_rules.system_binaries import BinaryShims
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import AddPrefix, Snapshot
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, concurrently, collect_rules, rule
+from pants.engine.internals.native_engine import AddPrefix
+from pants.engine.process import Process, ProcessCacheScope
+from pants.engine.rules import concurrently, collect_rules, rule
 from pants.core.util_rules.system_binaries import create_binary_shims
 from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.graph import find_valid_field_sets
@@ -37,18 +45,28 @@ from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.rules import implicitly
 from pants.engine.target import (
-    FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
-    HydratedSources,
     HydrateSourcesRequest,
     SourcesField,
-    Targets,
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
+
+@dataclass(frozen=True)
+class MakeselfArchiveFieldSet(PackageFieldSet, RunFieldSet):
+    required_fields = (MakeselfArchiveStartupScriptField,)
+    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
+
+    startup_script: MakeselfArchiveStartupScriptField
+    label: MakeselfArthiveLabelField
+    files: MakeselfArchiveFilesField
+    packages: MakeselfArchivePackagesField
+    output_path: MakeselfArchiveOutputPathField
+    args: MakeselfArchiveArgsField
+    tools: MakeselfArchiveToolsField
 
 @dataclass(frozen=True)
 class CreateMakeselfArchive:

@@ -4,39 +4,18 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Tuple
 
+from pants.backend.makeself.goals.package import MakeselfArchiveFieldSet, package_makeself_binary
+from pants.backend.makeself.subsystem import RunMakeselfArchive
 from pants.backend.makeself.system_binaries import MakeselfBinaryShimsRequest
-from pants.backend.makeself.target_types import (
-    MakeselfArchiveArgsField,
-    MakeselfArchiveFilesField,
-    MakeselfArchiveOutputPathField,
-    MakeselfArchivePackagesField,
-    MakeselfArchiveStartupScriptField,
-    MakeselfArchiveToolsField,
-    MakeselfArthiveLabelField,
-)
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
-from pants.core.util_rules.system_binaries import BinaryShims
-from pants.engine.fs import Digest
+from pants.core.goals.run import RunRequest
+
 from pants.engine.process import Process
-from pants.engine.rules import Get, Rule, collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.core.util_rules.system_binaries import create_binary_shims
 from pants.engine.rules import implicitly
 from pants.util.logging import LogLevel
-
-
-@dataclass(frozen=True)
-class RunMakeselfArchive:
-    exe: str
-    input_digest: Digest
-    description: str
-    level: LogLevel = LogLevel.INFO
-    output_directory: Optional[str] = None
-    extra_args: Optional[Tuple[str, ...]] = None
-    extra_tools: Tuple[str, ...] = ()
 
 
 @rule(desc="Run makeself archive", level=LogLevel.DEBUG)
@@ -66,24 +45,9 @@ async def run_makeself_archive(request: RunMakeselfArchive) -> Process:
         env={"PATH": shims.path_component},
     )
 
-
-@dataclass(frozen=True)
-class MakeselfArchiveFieldSet(PackageFieldSet, RunFieldSet):
-    required_fields = (MakeselfArchiveStartupScriptField,)
-    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
-
-    startup_script: MakeselfArchiveStartupScriptField
-    label: MakeselfArthiveLabelField
-    files: MakeselfArchiveFilesField
-    packages: MakeselfArchivePackagesField
-    output_path: MakeselfArchiveOutputPathField
-    args: MakeselfArchiveArgsField
-    tools: MakeselfArchiveToolsField
-
-
 @rule
 async def create_makeself_archive_run_request(field_set: MakeselfArchiveFieldSet) -> RunRequest:
-    package = await Get(BuiltPackage, PackageFieldSet, field_set)
+    package = await package_makeself_binary(field_set)
 
     exe = package.artifacts[0].relpath
     if exe is None:

@@ -1,19 +1,19 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import logging
-from typing import Iterable
 
-from pants.backend.makeself.goals.run import RunMakeselfArchive
+from dataclasses import dataclass
+import logging
+from typing import Iterable, Optional
+
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
-    ExternalToolRequest,
     TemplatedExternalTool,
 )
-from pants.engine.fs import Digest, RemovePrefix
+from pants.engine.fs import Digest
+from pants.engine.fs import RemovePrefix
 from pants.engine.platform import Platform
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, Rule, collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.intrinsics import remove_prefix_request_to_digest
@@ -66,6 +66,16 @@ async def download_makeself_distribution(
 
 class MakeselfTool(DownloadedExternalTool):
     """The Makeself tool."""
+
+@dataclass(frozen=True)
+class RunMakeselfArchive:
+    exe: str
+    input_digest: Digest
+    description: str
+    level: LogLevel = LogLevel.INFO
+    output_directory: Optional[str] = None
+    extra_args: Optional[tuple[str, ...]] = None
+    extra_tools: tuple[str, ...] = ()
 
 
 @rule(desc="Extract makeself distribution", level=LogLevel.DEBUG)
