@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import ClassVar, Dict, Iterable, Optional, Tuple
+from typing import ClassVar, Iterable, Optional
 
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
 from pants.backend.nfpm.fields.all import NfpmDependencies
@@ -154,8 +154,8 @@ class NfpmDebTriggersField(DictStringToStringSequenceField):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Dict[str, Iterable[str]]], address: Address
-    ) -> Optional[FrozenDict[str, Tuple[str, ...]]]:
+        cls, raw_value: Optional[dict[str, Iterable[str]]], address: Address
+    ) -> Optional[FrozenDict[str, tuple[str, ...]]]:
         value_or_default = super().compute_value(raw_value, address)
         # only certain keys are allowed in this dictionary.
         if value_or_default and not cls.valid_keys.issuperset(value_or_default.keys()):

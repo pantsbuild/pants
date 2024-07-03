@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import stat
 from enum import Enum
-from typing import Any, ClassVar, Iterable, Optional
+from typing import Any, ClassVar, Iterable, Optional, Union
 
 from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.core.target_types import RelocatedFiles
@@ -150,7 +150,7 @@ class NfpmContentFileModeField(IntField):
     valid_numbers = ValidNumbers.positive_only
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[int | str], address: Address) -> Optional[int]:
+    def compute_value(cls, raw_value: Optional[Union[int, str]], address: Address) -> Optional[int]:
         if isinstance(raw_value, str):
             try:
                 octal_value = int(raw_value, 8)
@@ -255,7 +255,7 @@ class _NfpmContentOverridesField(OverridesField):
     @classmethod
     def compute_value(
         cls,
-        raw_value: Optional[dict[str | tuple[str, ...], dict[str, Any]]],
+        raw_value: Optional[dict[Union[str, tuple[str, ...]], dict[str, Any]]],
         address: Address,
     ) -> Optional[FrozenDict[tuple[str, ...], FrozenDict[str, ImmutableValue]]]:
         value = super().compute_value(raw_value, address)
