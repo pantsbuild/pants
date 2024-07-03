@@ -1,11 +1,14 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import dataclasses
 import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional, Tuple
+from typing import Iterable, Optional, Tuple
 
 from pants.backend.makeself.subsystem import MakeselfTool
 from pants.backend.makeself.system_binaries import MakeselfBinaryShimsRequest
@@ -41,7 +44,7 @@ from pants.engine.intrinsics import (
     merge_digests_request_to_digest,
 )
 from pants.engine.process import Process, ProcessCacheScope, fallible_to_exec_result_or_raise
-from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSetsPerTargetRequest, HydrateSourcesRequest, SourcesField
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -129,7 +132,7 @@ async def create_makeself_archive(
 @dataclass(frozen=True)
 class BuiltMakeselfArchiveArtifact(BuiltPackageArtifact):
     @classmethod
-    def create(cls, relpath: str) -> "BuiltMakeselfArchiveArtifact":
+    def create(cls, relpath: str) -> BuiltMakeselfArchiveArtifact:
         return cls(
             relpath=relpath,
             extra_log_lines=(f"Built Makeself binary: {relpath}",),
@@ -209,7 +212,7 @@ async def package_makeself_binary(field_set: MakeselfArchiveFieldSet) -> BuiltPa
     )
 
 
-def rules():
+def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         *package.rules(),
