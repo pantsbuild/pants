@@ -25,7 +25,17 @@ from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import AddPrefix, Snapshot
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, concurrently, collect_rules, rule
+from pants.core.util_rules.system_binaries import create_binary_shims
+from pants.engine.internals.graph import resolve_targets
+from pants.engine.internals.graph import find_valid_field_sets
+from pants.core.goals.package import environment_aware_package
+from pants.engine.internals.graph import hydrate_sources
+from pants.engine.intrinsics import merge_digests_request_to_digest
+from pants.engine.intrinsics import add_prefix_request_to_digest
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import implicitly
 from pants.engine.target import (
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
@@ -66,12 +76,13 @@ async def create_makeself_archive(
     request: CreateMakeselfArchive,
     makeself: MakeselfTool,
 ) -> Process:
-    shims = await Get(
-        BinaryShims,
-        MakeselfBinaryShimsRequest(
-            extra_tools=request.extra_tools or (),
-            rationale="create makeself archive",
-        ),
+    shims = await create_binary_shims(
+        **implicitly(
+            MakeselfBinaryShimsRequest(
+                extra_tools=request.extra_tools or (),
+                rationale="create makeself archive",
+            )
+        )
     )
 
     tooldir = "__makeself"
@@ -116,61 +127,54 @@ class BuiltMakeselfArchiveArtifact(BuiltPackageArtifact):
 async def package_makeself_binary(field_set: MakeselfArchiveFieldSet) -> BuiltPackage:
     archive_dir = "__archive"
 
-    package_targets, file_targets = await MultiGet(
-        Get(Targets, UnparsedAddressInputs, field_set.packages.to_unparsed_address_inputs()),
-        Get(Targets, UnparsedAddressInputs, field_set.files.to_unparsed_address_inputs()),
+    package_targets, file_targets = await concurrently(
+        resolve_targets(**implicitly({field_set.packages.to_unparsed_address_inputs(): UnparsedAddressInputs})),
+        resolve_targets(**implicitly({field_set.files.to_unparsed_address_inputs(): UnparsedAddressInputs})),
     )
 
-    package_field_sets_per_target = await Get(
-        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, package_targets)
-    )
-    packages = await MultiGet(
-        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+    package_field_sets_per_target = await find_valid_field_sets(FieldSetsPerTargetRequest(PackageFieldSet, package_targets), **implicitly())
+    packages = await concurrently(
+        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
         for field_set in package_field_sets_per_target.field_sets
     )
 
-    file_sources = await MultiGet(
-        Get(
-            HydratedSources,
-            HydrateSourcesRequest(
+    file_sources = await concurrently(
+        hydrate_sources(HydrateSourcesRequest(
                 tgt.get(SourcesField),
                 for_sources_types=(FileSourceField, ShellSourceField),
                 enable_codegen=True,
-            ),
-        )
+            ), **implicitly())
         for tgt in file_targets
     )
 
-    input_digest = await Get(
-        Digest,
-        MergeDigests(
+    input_digest = await merge_digests_request_to_digest(MergeDigests(
             (
                 *(package.digest for package in packages),
                 *(sources.snapshot.digest for sources in file_sources),
             )
-        ),
-    )
-    input_digest = await Get(Digest, AddPrefix(input_digest, archive_dir))
+        ))
+    input_digest = await add_prefix_request_to_digest(AddPrefix(input_digest, archive_dir))
 
     output_path = PurePath(field_set.output_path.value_or_default(file_ending="run"))
     output_filename = output_path.name
-    result = await Get(
-        ProcessResult,
-        CreateMakeselfArchive(
-            archive_dir=archive_dir,
-            file_name=output_filename,
-            label=field_set.label.value or output_filename,
-            startup_script=field_set.startup_script.value or (),
-            args=field_set.args.value or (),
-            input_digest=input_digest,
-            output_filename=output_filename,
-            extra_tools=field_set.tools.value or (),
-            description=f"Packaging makeself archive: {field_set.address}",
-            level=LogLevel.DEBUG,
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            CreateMakeselfArchive(
+                archive_dir=archive_dir,
+                file_name=output_filename,
+                label=field_set.label.value or output_filename,
+                startup_script=field_set.startup_script.value or (),
+                args=field_set.args.value or (),
+                input_digest=input_digest,
+                output_filename=output_filename,
+                extra_tools=field_set.tools.value or (),
+                description=f"Packaging makeself archive: {field_set.address}",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
-    digest = await Get(Digest, AddPrefix(result.output_digest, str(output_path.parent)))
-    snapshot = await Get(Snapshot, Digest, digest)
+    digest = await add_prefix_request_to_digest(AddPrefix(result.output_digest, str(output_path.parent)))
+    snapshot = await digest_to_snapshot(digest)
     assert len(snapshot.files) == 1, snapshot
 
     return BuiltPackage(
@@ -180,10 +184,10 @@ async def package_makeself_binary(field_set: MakeselfArchiveFieldSet) -> BuiltPa
 
 
 def rules():
-    return [
+    return (
         *collect_rules(),
         *package.rules(),
         *source_files.rules(),
         *MakeselfArchiveFieldSet.rules(),
         UnionRule(PackageFieldSet, MakeselfArchiveFieldSet),
-    ]
+    )

@@ -1,6 +1,7 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import logging
+from typing import Iterable
 
 from pants.backend.makeself.goals.run import RunMakeselfArchive
 from pants.core.util_rules import external_tool
@@ -12,7 +13,11 @@ from pants.core.util_rules.external_tool import (
 from pants.engine.fs import Digest, RemovePrefix
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, Rule, collect_rules, rule
+from pants.core.util_rules.external_tool import download_external_tool
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.intrinsics import remove_prefix_request_to_digest
+from pants.engine.rules import implicitly
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
@@ -54,11 +59,7 @@ async def download_makeself_distribution(
     options: MakeselfSubsystem,
     platform: Platform,
 ) -> MakeselfDistribution:
-    tool = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        options.get_request(platform),
-    )
+    tool = await download_external_tool(options.get_request(platform))
     logger.debug("makeself external tool: %s", tool)
     return MakeselfDistribution(digest=tool.digest, exe=tool.exe)
 
@@ -72,31 +73,32 @@ async def extract_makeself_distribution(
     dist: MakeselfDistribution,
 ) -> MakeselfTool:
     out = "__makeself"
-    result = await Get(
-        ProcessResult,
-        RunMakeselfArchive(
-            exe=dist.exe,
-            extra_args=(
-                "--keep",
-                "--accept",
-                "--noprogress",
-                "--nox11",
-                "--nochown",
-                "--nodiskspace",
-                "--quiet",
-            ),
-            input_digest=dist.digest,
-            output_directory=out,
-            description=f"Extracting Makeself archive: {out}",
-            level=LogLevel.DEBUG,
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            RunMakeselfArchive(
+                exe=dist.exe,
+                extra_args=(
+                    "--keep",
+                    "--accept",
+                    "--noprogress",
+                    "--nox11",
+                    "--nochown",
+                    "--nodiskspace",
+                    "--quiet",
+                ),
+                input_digest=dist.digest,
+                output_directory=out,
+                description=f"Extracting Makeself archive: {out}",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
-    digest = await Get(Digest, RemovePrefix(result.output_digest, out))
+    digest = await remove_prefix_request_to_digest(RemovePrefix(result.output_digest, out))
     return MakeselfTool(digest=digest, exe="makeself.sh")
 
 
-def rules():
-    return [
+def rules() -> Iterable[Rule]:
+    return (
         *collect_rules(),
         *external_tool.rules(),
-    ]
+    )

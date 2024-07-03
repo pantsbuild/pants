@@ -1,8 +1,11 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Iterable, Optional, Tuple
 
 from pants.backend.makeself.system_binaries import MakeselfBinaryShimsRequest
 from pants.backend.makeself.target_types import (
@@ -19,7 +22,9 @@ from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.system_binaries import BinaryShims
 from pants.engine.fs import Digest
 from pants.engine.process import Process
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, Rule, collect_rules, rule
+from pants.core.util_rules.system_binaries import create_binary_shims
+from pants.engine.rules import implicitly
 from pants.util.logging import LogLevel
 
 
@@ -36,12 +41,13 @@ class RunMakeselfArchive:
 
 @rule(desc="Run makeself archive", level=LogLevel.DEBUG)
 async def run_makeself_archive(request: RunMakeselfArchive) -> Process:
-    shims = await Get(
-        BinaryShims,
-        MakeselfBinaryShimsRequest(
-            extra_tools=request.extra_tools or (),
-            rationale="run makeself archive",
-        ),
+    shims = await create_binary_shims(
+        **implicitly(
+            MakeselfBinaryShimsRequest(
+                extra_tools=request.extra_tools or (),
+                rationale="run makeself archive",
+            )
+        )
     )
     output_directories = []
     argv: Tuple[str, ...] = (request.exe,)
@@ -83,15 +89,12 @@ async def create_makeself_archive_run_request(field_set: MakeselfArchiveFieldSet
     if exe is None:
         raise RuntimeError(f"Invalid package artifact: {package}")
 
-    process = await Get(
-        Process,
-        RunMakeselfArchive(
+    process = await run_makeself_archive(RunMakeselfArchive(
             exe=exe,
             input_digest=package.digest,
             description="Run makeself archive",
             extra_tools=field_set.tools.value or (),
-        ),
-    )
+    ))
 
     return RunRequest(
         digest=process.input_digest,
@@ -101,5 +104,5 @@ async def create_makeself_archive_run_request(field_set: MakeselfArchiveFieldSet
     )
 
 
-def rules():
+def rules() -> Iterable[Rule]:
     return collect_rules()
