@@ -21,6 +21,7 @@ class NfpmSubsystem(TemplatedExternalTool):
     default_version = "2.34.0"  # released 28 Oct 2023
     # v2.35.0 added SOURCE_DATE_EPOCH support
     # v2.36.0 added rpm.scripts.verify
+    # v2.37.0 added support for IPK packaging (TODO: add IPK package target+fields+rules)
     default_known_versions = [
         # checksums from https://github.com/goreleaser/nfpm/releases/download/v2.34.0/checksums.txt
         "2.34.0|linux_arm64 |9b4fe0e650bbbc9d27456290b2eeb0719472519593d98bf1a4ba152022a4e872|4659916",

@@ -274,6 +274,11 @@ RPM_FIELDS = (
 )
 
 
+# TODO: Add support for IPK packages (new in nfpm 2.37.0)
+# class NfpmIpkPackage(NfpmPackageTarget):
+#    alias = "nfpm_ipk_package"
+
+
 class NfpmRpmPackage(NfpmPackageTarget):
     alias = "nfpm_rpm_package"
     core_fields = (
