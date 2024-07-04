@@ -270,7 +270,7 @@ def test_generates_lockfile_for_pnpm_package_json_workspace(rule_runner: RuleRun
             ".": {"dependencies": {"spam": {"specifier": "workspace:*", "version": "link:a"}}},
             "a": {},
         },
-        "lockfileVersion": "6.0",
+        "lockfileVersion": "9.0",
         "settings": {
             "autoInstallPeers": True,
             "excludeLinksFromLockfile": False,
