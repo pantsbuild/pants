@@ -68,17 +68,19 @@ class AllSemgrepConfigs:
             yield from self.configs_by_dir.get(ancestor, [])
 
 
-def _group_by_semgrep_dir(config_dir: str, all_paths: Paths) -> AllSemgrepConfigs:
+def _group_by_semgrep_dir(config_paths: tuple[str, ...], all_paths: Paths) -> AllSemgrepConfigs:
     configs_by_dir = defaultdict(set)
     for path_ in all_paths.files:
         path = PurePath(path_)
         # Rules like foo/bar/.semgrep/baz.yaml and foo/bar/.semgrep/baz/qux.yaml should apply to the
         # project at foo/bar
-        config_directory = (
-            PurePath(*path.parts[: path.parts.index(config_dir)])
-            if config_dir in path.parts
-            else path.parent
-        )
+        config_directory = path.parent
+        for config_path in config_paths:
+            if config_path not in path.parts:
+                continue
+            config_directory = PurePath(*path.parts[: path.parts.index(config_path)])
+            break
+
         configs_by_dir[config_directory].add(path)
 
     return AllSemgrepConfigs(configs_by_dir)
@@ -87,14 +89,14 @@ def _group_by_semgrep_dir(config_dir: str, all_paths: Paths) -> AllSemgrepConfig
 @rule
 async def find_all_semgrep_configs(semgrep: SemgrepSubsystem) -> AllSemgrepConfigs:
     rules_files_globs = (
-        f"{semgrep.config_dir}/**/*.yml",
-        f"{semgrep.config_dir}/**/*.yaml",
+        *(f"{config_path}/**/*.yml" for config_path in semgrep.config_paths),
+        *(f"{config_path}/**/*.yaml" for config_path in semgrep.config_paths),
         ".semgrep.yml",
         ".semgrep.yaml",
     )
 
     all_paths = await Get(Paths, PathGlobs([f"**/{file_glob}" for file_glob in rules_files_globs]))
-    return _group_by_semgrep_dir(semgrep.config_dir, all_paths)
+    return _group_by_semgrep_dir(semgrep.config_paths, all_paths)
 
 
 @dataclass(frozen=True)

@@ -222,6 +222,15 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
             },
             id="via .semgrep directory",
         ),
+        pytest.param(
+            {
+                f"{DIR}/bad.txt": BAD_FILE,
+                f"{DIR}/BUILD": """file(name="f", source="bad.txt")""",
+                ".semgrep/one.yml": RULES,
+                ".semgrep/vendored/two.yml": RULES2,
+            },
+            id="via recursive .semgrep directory",
+        ),
     ],
 )
 def test_multiple_configs(rule_runner: RuleRunner, files: dict[str, str]) -> None:

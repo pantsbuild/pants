@@ -83,7 +83,7 @@ def configs(strs: dict[str, set[str]]) -> AllSemgrepConfigs:
 )
 def test_group_by_group_by_semgrep_dir(paths: tuple[str, ...], expected: AllSemgrepConfigs):
     input = Paths(files=paths, dirs=())
-    result = rules._group_by_semgrep_dir(".semgrep", input)
+    result = rules._group_by_semgrep_dir((".semgrep",), input)
     assert result == expected
 
 
