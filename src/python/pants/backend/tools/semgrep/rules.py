@@ -75,7 +75,7 @@ def _group_by_semgrep_dir(config_dir: str, all_paths: Paths) -> AllSemgrepConfig
         # Rules like foo/bar/.semgrep/baz.yaml and foo/bar/.semgrep/baz/qux.yaml should apply to the
         # project at foo/bar
         config_directory = (
-            PurePath(*path.parts[:path.parts.index(config_dir)])
+            PurePath(*path.parts[: path.parts.index(config_dir)])
             if config_dir in path.parts
             else path.parent
         )

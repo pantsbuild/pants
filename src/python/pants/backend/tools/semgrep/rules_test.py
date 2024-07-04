@@ -47,7 +47,15 @@ def configs(strs: dict[str, set[str]]) -> AllSemgrepConfigs:
                 "foo/bar/.semgrep/baz1.yml",
                 "foo/bar/.semgrep/quz/baz2.yml",
             ),
-            configs({"foo/bar": {"foo/bar/.semgrep/.semgrep.yml", "foo/bar/.semgrep/baz1.yml", "foo/bar/.semgrep/quz/baz2.yml"}}),
+            configs(
+                {
+                    "foo/bar": {
+                        "foo/bar/.semgrep/.semgrep.yml",
+                        "foo/bar/.semgrep/baz1.yml",
+                        "foo/bar/.semgrep/quz/baz2.yml",
+                    }
+                }
+            ),
             id="recursively_find_yamls",
         ),
         pytest.param(
