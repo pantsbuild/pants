@@ -70,13 +70,7 @@ def test_creates_tar_for_package_json(rule_runner: RuleRunner, package_manager: 
                 """
             ),
             "src/js/package.json": json.dumps(
-                {
-                    "name": "ham",
-                    "version": "0.0.1",
-                    "browser": "lib/index.mjs",
-                    "workspaces": ["./"],
-                    "private": True
-                }
+                {"name": "ham", "version": "0.0.1", "browser": "lib/index.mjs"}
             ),
             "src/js/README.md": "",
             "src/js/package-lock.json": json.dumps(

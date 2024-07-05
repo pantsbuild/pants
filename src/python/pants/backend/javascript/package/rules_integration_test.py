@@ -18,11 +18,11 @@ from pants.backend.javascript.package.rules import rules as package_rules
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSourceTarget
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
-from pants.core.target_types import FileTarget, ResourceTarget  
+from pants.core.target_types import FileTarget, ResourceTarget
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources
-from pants.testutil.rule_runner import RuleRunner, logging
+from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.fixture
@@ -43,7 +43,6 @@ def rule_runner() -> RuleRunner:
             FileTarget,
         ],
         objects=dict(package_json.build_file_aliases().objects),
-        preserve_tmpdirs=True,
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -60,10 +59,7 @@ def rule_runner() -> RuleRunner:
 def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRunner:
     lockfile, package_manager = request.param
     rule_runner.set_options(
-        [
-            f"--nodejs-package-manager={package_manager}",
-            "--nodejs-package-managers={'pnpm': '8.15.5', 'npm': '8.5.5'}",
-        ],
+        [f"--nodejs-package-manager={package_manager}"],
         env_inherit={"PATH"},
     )
     rule_runner.write_files(
@@ -104,21 +100,9 @@ def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRu
                         )
                     ],
                 )
-                file(name="npmrc", source=".npmrc")
+                javascript_sources(name="hamjs", dependencies=[":style"])
+                resource(name="style", source="style.css")
                 """
-            ),
-            "src/js/package.json": json.dumps(
-                {
-                    "name": "ham",
-                    "version": "0.0.1",
-                    "source": "lib/index.mjs",
-                    "scripts": {
-                        "build": "parcel build lib/index.mjs --dist-dir=dist --cache-dir=.parcel-cache"
-                    },
-                    "devDependencies": {"parcel": "^2.12.0"},
-                    "workspaces": ["./"],
-                    "private": True
-                }
             ),
             "src/js/.npmrc": "strict-peer-dependencies=false",
             f"src/js/{lockfile.name}": lockfile.read_text(),
@@ -137,7 +121,7 @@ def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRu
                         "build": "parcel build index.mjs --dist-dir=dist --cache-dir=.parcel-cache"
                     },
                     "dependencies": {"child-lib": "*"},
-                    "devDependencies": {"parcel": "2.6.2"},
+                    "devDependencies": {"parcel": "^2.12.0"},
                     "private": True,
                 }
             ),
@@ -158,7 +142,6 @@ def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRu
     return rule_runner
 
 
-@logging()
 def test_packages_sources_as_resource_using_build_tool(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("src/js/ham", generated_name="build"))
     snapshot = rule_runner.request(Snapshot, (EMPTY_DIGEST,))
