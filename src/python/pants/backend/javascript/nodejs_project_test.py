@@ -76,7 +76,7 @@ def test_parses_projects(rule_runner: RuleRunner) -> None:
     [
         (None, ("clean-install",)),
         ("npm@10.2.4", ("clean-install",)),
-        ("pnpm@7.5.0", ("install", "--frozen-lockfile")),
+        ("pnpm@9.4.0", ("install", "--frozen-lockfile")),
         ("yarn@1.22.19", ("install", "--frozen-lockfile")),
         ("yarn@2.4.3", ("install", "--immutable")),
         ("yarn@3.6.4", ("install", "--immutable")),
