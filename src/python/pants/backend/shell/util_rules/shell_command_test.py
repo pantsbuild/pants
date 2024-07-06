@@ -911,3 +911,40 @@ def test_shell_command_workspace_invalidation_sources(rule_runner: RuleRunner) -
     time.sleep(0.100)
     result3 = execute_shell_command(rule_runner, address)
     assert result1.snapshot != result3.snapshot
+
+
+def test_shell_command_include_shims_on_path(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({
+        "src/BUILD": dedent(
+            """\
+            shell_command(
+                name="shims_true",
+                tools=["echo"],
+                command="echo $PATH > path.txt",
+                extra_env_vars=["PATH=/bin:/usr/bin"],
+                output_files=["path.txt"],
+                include_shims_on_path=True,
+            )
+            shell_command(
+                name="shims_false",
+                tools=["echo"],
+                command="echo $PATH > path.txt",
+                extra_env_vars=["PATH=/bin:/usr/bin"],
+                output_files=["path.txt"],
+                include_shims_on_path=False,
+            )
+            """
+        )
+    })
+
+    def run(target_name: str) -> str:
+        result = execute_shell_command(rule_runner, Address("src", target_name=target_name))
+        contents = rule_runner.request(DigestContents, [result.snapshot.digest])
+        assert len(contents) == 1
+        return contents[0].content.decode().strip()
+
+    path_true = run("shims_true")
+    assert "/bin:/usr/bin" not in path_true
+
+    path_false = run("shims_false")
+    assert path_false == "/bin:/usr/bin"

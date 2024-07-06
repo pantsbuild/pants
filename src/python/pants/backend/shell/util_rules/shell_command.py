@@ -14,6 +14,7 @@ from pants.backend.shell.target_types import (
     ShellCommandCommandField,
     ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
+    ShellCommandIncludeShimsOnPathField,
     ShellCommandLogOutputField,
     ShellCommandNamedCachesField,
     ShellCommandOutputDirectoriesField,
@@ -138,6 +139,18 @@ async def _prepare_process_request_from_target(
                 extra_env=runnable_dependencies.extra_env,
             )
         )
+
+        runnable_dependencies = execution_environment.runnable_dependencies
+        if runnable_dependencies:
+            extra_sandbox_contents.append(
+                ExtraSandboxContents(
+                    EMPTY_DIGEST,
+                    f"{{chroot}}/{runnable_dependencies.path_component}",
+                    runnable_dependencies.immutable_input_digests,
+                    runnable_dependencies.append_only_caches,
+                    runnable_dependencies.extra_env,
+                )
+            )
 
     merged_extras = await Get(
         ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))
