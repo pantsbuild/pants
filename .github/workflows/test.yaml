@@ -24,7 +24,7 @@ jobs:
     - ARM64
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - name: Install Protoc
@@ -35,7 +35,7 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.79.0-*
@@ -56,7 +56,7 @@ jobs:
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: Linux-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: 'src/python/pants/bin/native_client
@@ -112,11 +112,11 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Install Protoc
@@ -127,7 +127,7 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.79.0-*
@@ -148,7 +148,7 @@ jobs:
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: 'src/python/pants/bin/native_client
@@ -214,11 +214,11 @@ jobs:
     - macos-12
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Install Protoc
@@ -229,7 +229,7 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: macOS12-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.79.0-*
@@ -250,7 +250,7 @@ jobs:
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: macOS12-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: 'src/python/pants/bin/native_client
@@ -312,7 +312,7 @@ jobs:
     - ARM64
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -368,7 +368,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -393,7 +393,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - env:
@@ -427,7 +427,7 @@ jobs:
     - macOS-10.15-X64
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - name: Install Protoc
@@ -438,7 +438,7 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.79.0-*
@@ -460,7 +460,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - env:
@@ -494,7 +494,7 @@ jobs:
     - macOS-11-ARM64
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - name: Install Protoc
@@ -505,7 +505,7 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.79.0-*
@@ -527,7 +527,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - env:
@@ -598,7 +598,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - id: classify
@@ -620,7 +620,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - env:
@@ -642,7 +642,7 @@ jobs:
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Download native binaries
@@ -725,11 +725,11 @@ jobs:
     - ARM64
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - name: Install AdoptJDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: adopt
         java-version: '11'
@@ -777,7 +777,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - env:
@@ -799,12 +799,12 @@ jobs:
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -819,7 +819,7 @@ jobs:
 
         '
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Expose Pythons
@@ -868,7 +868,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - env:
@@ -890,12 +890,12 @@ jobs:
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -910,7 +910,7 @@ jobs:
 
         '
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Expose Pythons
@@ -959,7 +959,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - env:
@@ -981,12 +981,12 @@ jobs:
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1001,7 +1001,7 @@ jobs:
 
         '
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Expose Pythons
@@ -1050,7 +1050,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - env:
@@ -1072,12 +1072,12 @@ jobs:
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1092,7 +1092,7 @@ jobs:
 
         '
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Expose Pythons
@@ -1141,7 +1141,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - env:
@@ -1163,12 +1163,12 @@ jobs:
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1183,7 +1183,7 @@ jobs:
 
         '
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Expose Pythons
@@ -1232,7 +1232,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - env:
@@ -1254,12 +1254,12 @@ jobs:
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1274,7 +1274,7 @@ jobs:
 
         '
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Expose Pythons
@@ -1323,7 +1323,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - env:
@@ -1345,12 +1345,12 @@ jobs:
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1365,7 +1365,7 @@ jobs:
 
         '
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Expose Pythons
@@ -1414,7 +1414,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - env:
@@ -1436,12 +1436,12 @@ jobs:
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1456,7 +1456,7 @@ jobs:
 
         '
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Expose Pythons
@@ -1505,7 +1505,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - env:
@@ -1527,12 +1527,12 @@ jobs:
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1547,7 +1547,7 @@ jobs:
 
         '
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Expose Pythons
@@ -1596,7 +1596,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - env:
@@ -1618,12 +1618,12 @@ jobs:
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1638,7 +1638,7 @@ jobs:
 
         '
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Expose Pythons
@@ -1687,16 +1687,16 @@ jobs:
     - macos-12
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - name: Install AdoptJDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: adopt
         java-version: '11'
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Expose Pythons

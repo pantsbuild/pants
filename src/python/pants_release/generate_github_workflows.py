@@ -21,17 +21,17 @@ from pants.util.strutil import softwrap
 
 ACTION = {
     "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
-    "cache": "actions/cache@v3",
-    "checkout": "actions/checkout@v3",
+    "cache": "actions/cache@v4",
+    "checkout": "actions/checkout@v4",
     "download-artifact": "actions/download-artifact@v3",
     "expose-pythons": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
     "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
     "rust-cache": "benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1",
-    "setup-go": "actions/setup-go@v3",
-    "setup-java": "actions/setup-java@v3",
-    "setup-node": "actions/setup-node@v3",
+    "setup-go": "actions/setup-go@v5",
+    "setup-java": "actions/setup-java@v4",
+    "setup-node": "actions/setup-node@v4",
     "setup-protoc": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
-    "setup-python": "actions/setup-python@v4",
+    "setup-python": "actions/setup-python@v5",
     "slack-github-action": "slackapi/slack-github-action@v1.24.0",
     "upload-artifact": "actions/upload-artifact@v3",
 }
