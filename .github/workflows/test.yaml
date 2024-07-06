@@ -81,12 +81,13 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-bootstrap-Linux-ARM64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
         path: 'src/python/pants/bin/native_client
@@ -173,12 +174,13 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-bootstrap-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: 'src/python/pants/bin/native_client
@@ -275,12 +277,13 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-bootstrap-macOS12-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS12-x86_64
         path: 'src/python/pants/bin/native_client
@@ -347,9 +350,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-Linux-ARM64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   build_wheels_linux_x86_64:
@@ -407,9 +411,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
@@ -474,9 +479,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-macOS10-15-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   build_wheels_macos11_arm64:
@@ -541,9 +547,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-macOS11-ARM64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   check_labels:
@@ -646,7 +653,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Download native binaries
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -659,9 +666,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-lint-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 30
   merge_ok:
@@ -734,7 +742,7 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Download native binaries
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
         path: src/python/pants
@@ -760,9 +768,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-python-test-Linux-ARM64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_0:
@@ -825,7 +834,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -851,9 +860,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-python-test-0_10-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_1:
@@ -916,7 +926,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -942,9 +952,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-python-test-1_10-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_2:
@@ -1007,7 +1018,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1033,9 +1044,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-python-test-2_10-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_3:
@@ -1098,7 +1110,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1124,9 +1136,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-python-test-3_10-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_4:
@@ -1189,7 +1202,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1215,9 +1228,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-python-test-4_10-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_5:
@@ -1280,7 +1294,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1306,9 +1320,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-python-test-5_10-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_6:
@@ -1371,7 +1386,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1397,9 +1412,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-python-test-6_10-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_7:
@@ -1462,7 +1478,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1488,9 +1504,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-python-test-7_10-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_8:
@@ -1553,7 +1570,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1579,9 +1596,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-python-test-8_10-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_9:
@@ -1644,7 +1662,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1670,9 +1688,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-python-test-9_10-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_macos12_x86_64:
@@ -1702,7 +1721,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS12-x86_64
         path: src/python/pants
@@ -1728,9 +1747,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-python-test-macOS12-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
 name: Pull Request CI

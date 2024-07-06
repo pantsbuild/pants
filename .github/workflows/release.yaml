@@ -57,9 +57,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-Linux-ARM64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
@@ -134,9 +135,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
@@ -225,9 +227,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-macOS10-15-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
@@ -309,9 +312,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-macOS11-ARM64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex

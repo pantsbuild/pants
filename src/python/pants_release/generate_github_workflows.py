@@ -23,7 +23,7 @@ ACTION = {
     "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
     "cache": "actions/cache@v4",
     "checkout": "actions/checkout@v4",
-    "download-artifact": "actions/download-artifact@v3",
+    "download-artifact": "actions/download-artifact@v4",
     "expose-pythons": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
     "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
     "rust-cache": "benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1",
@@ -33,7 +33,7 @@ ACTION = {
     "setup-protoc": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
     "setup-python": "actions/setup-python@v5",
     "slack-github-action": "slackapi/slack-github-action@v1.24.0",
-    "upload-artifact": "actions/upload-artifact@v3",
+    "upload-artifact": "actions/upload-artifact@v4",
 }
 
 HEADER = dedent(
@@ -607,6 +607,7 @@ class Helper:
             "with": {
                 "name": f"logs-{name.replace('/', '_')}-{self.platform_name()}",
                 "path": ".pants.d/workdir/*.log",
+                "overwrite": "true",
             },
         }
 
