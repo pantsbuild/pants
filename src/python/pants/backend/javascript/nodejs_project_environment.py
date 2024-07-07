@@ -125,6 +125,12 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
         args = tuple(req.args)
     output_files = req.output_files
     output_directories = req.output_directories
+    per_package_caches = FrozenDict(
+        {
+            key: os.path.join(req.env.package_dir(), value)
+            for key, value in req.per_package_caches.items()
+        }
+    )
     return await Get(
         Process,
         NodeJSToolProcess,
@@ -138,7 +144,7 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
             working_directory=req.env.root_dir,
             output_files=output_files,
             output_directories=output_directories,
-            append_only_caches=FrozenDict(**req.env.project.extra_caches()),
+            append_only_caches=FrozenDict(**per_package_caches, **req.env.project.extra_caches()),
             timeout_seconds=req.timeout_seconds,
             project_digest=project_digest,
             extra_env=FrozenDict(**req.extra_env, **req.env.project.extra_env()),
