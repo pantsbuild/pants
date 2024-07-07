@@ -274,20 +274,6 @@ class AdhocToolWorkspaceInvalidationSourcesField(StringSequenceField):
     )
 
 
-class AdhocToolIncludeShimsOnPathField(BoolField):
-    alias: ClassVar[str] = "include_shims_on_path"
-    default = True
-    help = help_text(
-        """
-        If True, then modify the `PATH` of the invoked process to include binary shims for the
-        `tools` configured for the target and also any runnable dependencies.
-
-        Set this to False when using in-workspace execution if you want to preserve the
-        configured `PATH` value.
-        """
-    )
-
-
 class AdhocToolTarget(Target):
     alias: ClassVar[str] = "adhoc_tool"
     core_fields = (
@@ -308,7 +294,6 @@ class AdhocToolTarget(Target):
         AdhocToolStdoutFilenameField,
         AdhocToolStderrFilenameField,
         AdhocToolWorkspaceInvalidationSourcesField,
-        AdhocToolIncludeShimsOnPathField,
         EnvironmentField,
     )
     help = help_text(

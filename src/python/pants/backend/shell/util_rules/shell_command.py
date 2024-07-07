@@ -10,16 +10,17 @@ from dataclasses import dataclass
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
+    PathShimsMode,
     RunShellCommandWorkdirField,
     ShellCommandCommandField,
     ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
-    ShellCommandIncludeShimsOnPathField,
     ShellCommandLogOutputField,
     ShellCommandNamedCachesField,
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
+    ShellCommandPathShimsModeField,
     ShellCommandRunnableDependenciesField,
     ShellCommandSourcesField,
     ShellCommandTarget,
@@ -140,18 +141,6 @@ async def _prepare_process_request_from_target(
             )
         )
 
-        runnable_dependencies = execution_environment.runnable_dependencies
-        if runnable_dependencies:
-            extra_sandbox_contents.append(
-                ExtraSandboxContents(
-                    EMPTY_DIGEST,
-                    f"{{chroot}}/{runnable_dependencies.path_component}",
-                    runnable_dependencies.immutable_input_digests,
-                    runnable_dependencies.append_only_caches,
-                    runnable_dependencies.extra_env,
-                )
-            )
-
     merged_extras = await Get(
         ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))
     )
@@ -162,6 +151,22 @@ async def _prepare_process_request_from_target(
         extra_paths=merged_extras.paths,
         description_of_origin=f"`{ShellCommandExtraEnvVarsField.alias}` for `shell_command` target at `{shell_command.address}`",
     )
+
+    def path_cat(left: str | None, right: str | None) -> str:
+        if left and not right:
+            return left
+        if not left and right:
+            return right
+        return f"{left}:{right}"
+
+    extra_env = dict(merged_extras.extra_env)
+    if merged_extras.path:
+        path_shims_mode = shell_command.get(ShellCommandPathShimsModeField).value
+        raise ValueError(f"path_shims_mode={path_shims_mode}, env={extra_env}, extra={merged_extras.path}, existing={extra_env.get('PATH')}")
+        if path_shims_mode == PathShimsMode.PREPEND.value:
+            extra_env["PATH"] = path_cat(merged_extras.path, extra_env.get("PATH"))
+        elif path_shims_mode == PathShimsMode.APPEND.value:
+            extra_env["PATH"] = path_cat(extra_env.get("PATH"), merged_extras.path)
 
     append_only_caches = {
         **merged_extras.append_only_caches,

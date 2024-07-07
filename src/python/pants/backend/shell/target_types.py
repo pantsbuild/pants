@@ -10,7 +10,6 @@ from pants.backend.adhoc.target_types import (
     AdhocToolDependenciesField,
     AdhocToolExecutionDependenciesField,
     AdhocToolExtraEnvVarsField,
-    AdhocToolIncludeShimsOnPathField,
     AdhocToolLogOutputField,
     AdhocToolNamedCachesField,
     AdhocToolOutputDependenciesField,
@@ -385,8 +384,27 @@ class ShellCommandWorkspaceInvalidationSourcesField(AdhocToolWorkspaceInvalidati
     pass
 
 
-class ShellCommandIncludeShimsOnPathField(AdhocToolIncludeShimsOnPathField):
-    pass
+class PathShimsMode(Enum):
+    PREPEND = "prepend"
+    APPEND = "append"
+    OFF = "off"
+
+
+class ShellCommandPathShimsModeField(StringField):
+    alias = "path_shims_mode"
+    default = PathShimsMode.PREPEND.value
+    help = help_text(
+        """
+        When executing the command of a `shell_command`, Pants will augment the `PATH` environment variable
+        with the location of any binary shims created for `tools` and for any runnable dependencies.
+
+        Modification of the `PATH` environment variable can be configured as follows:
+        - `prepend`: Prepend the binary shim paths to any existing `PATH` value.
+        - `append`: Append the binary shim paths to any existing `PATH` value.
+        - `off`: Do not modify the existing `PATH` value.
+        """
+    )
+    valid_choices = PathShimsMode
 
 
 class SkipShellCommandTestsField(BoolField):
@@ -414,7 +432,7 @@ class ShellCommandTarget(Target):
         ShellCommandNamedCachesField,
         ShellCommandOutputRootDirField,
         ShellCommandWorkspaceInvalidationSourcesField,
-        ShellCommandIncludeShimsOnPathField,
+        ShellCommandPathShimsModeField,
         EnvironmentField,
     )
     help = help_text(

@@ -913,29 +913,40 @@ def test_shell_command_workspace_invalidation_sources(rule_runner: RuleRunner) -
     assert result1.snapshot != result3.snapshot
 
 
-def test_shell_command_include_shims_on_path(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({
-        "src/BUILD": dedent(
-            """\
+def test_shell_command_path_shims_mode(rule_runner: RuleRunner) -> None:
+    expected_path = "/bin:/usr/bin"
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                f"""\
             shell_command(
-                name="shims_true",
+                name="shims_prepend",
                 tools=["echo"],
                 command="echo $PATH > path.txt",
-                extra_env_vars=["PATH=/bin:/usr/bin"],
+                extra_env_vars=["PATH={expected_path}"],
                 output_files=["path.txt"],
-                include_shims_on_path=True,
+                path_shims_mode="prepend",
             )
             shell_command(
-                name="shims_false",
+                name="shims_append",
                 tools=["echo"],
                 command="echo $PATH > path.txt",
-                extra_env_vars=["PATH=/bin:/usr/bin"],
+                extra_env_vars=["PATH={expected_path}"],
                 output_files=["path.txt"],
-                include_shims_on_path=False,
+                path_shims_mode="append",
+            )
+            shell_command(
+                name="shims_off",
+                tools=["echo"],
+                command="echo $PATH > path.txt",
+                extra_env_vars=["PATH={expected_path}"],
+                output_files=["path.txt"],
+                path_shims_mode="off",
             )
             """
-        )
-    })
+            )
+        }
+    )
 
     def run(target_name: str) -> str:
         result = execute_shell_command(rule_runner, Address("src", target_name=target_name))
@@ -943,8 +954,13 @@ def test_shell_command_include_shims_on_path(rule_runner: RuleRunner) -> None:
         assert len(contents) == 1
         return contents[0].content.decode().strip()
 
-    path_true = run("shims_true")
-    assert "/bin:/usr/bin" not in path_true
+    path_prepend = run("shims_prepend")
+    assert path_prepend.endswith(expected_path)
+    assert len(path_prepend) > len(expected_path)
 
-    path_false = run("shims_false")
-    assert path_false == "/bin:/usr/bin"
+    path_append = run("shims_false")
+    assert path_append.startswith(expected_path)
+    assert len(path_append) > len(expected_path)
+
+    path_off = run("shims_off")
+    assert path_off == expected_path
