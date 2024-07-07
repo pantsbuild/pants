@@ -46,6 +46,7 @@ from pants.core.util_rules.adhoc_process_support import (
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.internals.native_engine import EMPTY_DIGEST
@@ -161,12 +162,23 @@ async def _prepare_process_request_from_target(
 
     extra_env = dict(merged_extras.extra_env)
     if merged_extras.path:
+        extra_env_vars = shell_command.get(ShellCommandExtraEnvVarsField).value or ()
+        existing_path = ""
+        if "PATH" in extra_env_vars:
+            fetched_env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
+            existing_path = fetched_env_vars.get("PATH", "")
+        else:
+            for env_var in extra_env_vars:
+                if env_var.startswith("PATH="):
+                    existing_path = env_var[len("PATH=") :]
+                    break
+
         path_shims_mode = shell_command.get(ShellCommandPathShimsModeField).value
-        raise ValueError(f"path_shims_mode={path_shims_mode}, env={extra_env}, extra={merged_extras.path}, existing={extra_env.get('PATH')}")
+        # raise ValueError(f"path_shims_mode={path_shims_mode}, env={extra_env}, extra={merged_extras.path}, existing={existing_path}")
         if path_shims_mode == PathShimsMode.PREPEND.value:
-            extra_env["PATH"] = path_cat(merged_extras.path, extra_env.get("PATH"))
+            extra_env["PATH"] = path_cat(merged_extras.path, existing_path)
         elif path_shims_mode == PathShimsMode.APPEND.value:
-            extra_env["PATH"] = path_cat(extra_env.get("PATH"), merged_extras.path)
+            extra_env["PATH"] = path_cat(existing_path, merged_extras.path)
 
     append_only_caches = {
         **merged_extras.append_only_caches,

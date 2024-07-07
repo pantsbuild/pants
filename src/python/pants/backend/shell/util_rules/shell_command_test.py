@@ -958,7 +958,7 @@ def test_shell_command_path_shims_mode(rule_runner: RuleRunner) -> None:
     assert path_prepend.endswith(expected_path)
     assert len(path_prepend) > len(expected_path)
 
-    path_append = run("shims_false")
+    path_append = run("shims_append")
     assert path_append.startswith(expected_path)
     assert len(path_append) > len(expected_path)
 
