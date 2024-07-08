@@ -24,7 +24,7 @@ backend_packages = [
 ]
 ```
 
-Pants use [`package_json`](../../../reference/targets/package_json.mdx) targets to model a Nodejs package.
+Pants uses [`package_json`](../../../reference/targets/package_json.mdx) targets to model a NodeJS package.
 Further, [`javascript_source`](../../../reference/targets/javascript_source.mdx) and
 [`javascript_tests`](../../../reference/targets/javascript_test.mdx) targets are used to know which Javascript files to
 run on and to set any metadata.
@@ -46,7 +46,7 @@ Pants will by default download a distribution of `node` according to the
 
 ```toml tab={"label": "pants.toml"}
 [nodejs]
-known_versions = [] # Assign this to the empty list to ensure pants never downloads.
+known_versions = [] # Assign this to the empty list to ensure Pants never downloads.
 version = "v18.0.0"
 search_path = ["<NVM_LOCAL>"]
 
@@ -67,5 +67,5 @@ package_manager = "pnpm" # or yarn, or npm.
 ```
 
 you can instead opt to use the [`package.json#packageManager`](./package.mdx#package-manager) field for this setting.
-Regardless of setting, pants uses the [`corepack`](https://github.com/nodejs/corepack) version distributed with the node
+Regardless of setting, pants uses the [`corepack`](https://github.com/nodejs/corepack) version distributed with the Node
 version you have chosen to install and manage package managers.

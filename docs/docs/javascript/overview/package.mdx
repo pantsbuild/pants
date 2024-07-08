@@ -7,14 +7,14 @@ package.json parsing and scripts integration
 
 ---
 
-As mentioned in the [overview introduction](./index.mdx), pants approach to enable support for Javascript is to
+As mentioned in the [overview introduction](./index.mdx), Pants's approach to enable support for Javascript is to
 be a thin caching layer on top of your current tooling.
 
 Refer to the [example repository](https://github.com/pantsbuild/example-javascript) for example usage.
 
 ### Package manager
 
-Pants uses `corepack` to manage package manager versions and installation. Like `corepack`, pants respects
+Pants uses `corepack` to manage package manager versions and installation. Like `corepack`, Pants respects
 the experimental "packageManager" feature in `package.json` files.
 
 ```json title="package.json"
@@ -30,14 +30,14 @@ It can be more convenient to define a project level
 [package manager](./enable-javascript-support.mdx#setting-up-a-package-manager).
 
 :::tip Choosing between `pants.toml` or `package.json` for package manager version configuration
-In general, if your team runs all tooling via pants, using `pants.toml` reduces boilerplate in cases where you maintain
-multiple packages. If your team mixes usage of pants and "bare" package manager invocations, package.json#packageManager
+In general, if your team runs all tooling via Pants, using `pants.toml` reduces boilerplate in cases where you maintain
+multiple packages. If your team mixes usage of Pants and "bare" package manager invocations, package.json#packageManager
 is the safer option.
 :::
 
 ### Testing
 
-By default pants assumes a `package_json` target mapping a `package.json` includes a test script, e.g.
+By default Pants assumes a `package_json` target mapping a `package.json` includes a test script, e.g.
 
 ```json title="package.json"
 {
@@ -60,7 +60,7 @@ contains options for changing the entry point from "test", and to enable coverag
 
 ### Packaging
 
-Similarly, build scripts can be introduced to pants via the
+Similarly, build scripts can be introduced to Pants via the
 [`node_build_script`](../../../reference/build-file-symbols/node_build_script) build symbol. This is intended to be used
 as a way to introduce artifacts generated via bundlers and/or compilers installed and ran via your package manager.
 The result can the be consumed by other targets as either `resource`-targets that can be depended on,
