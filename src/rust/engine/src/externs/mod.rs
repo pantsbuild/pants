@@ -541,6 +541,62 @@ impl PyGeneratorResponseCall {
             inputs,
         }))))
     }
+
+    #[getter]
+    fn output_type<'p>(&'p self, py: Python<'p>) -> PyResult<&'p PyType> {
+        Ok(self
+            .0
+            .borrow()
+            .as_ref()
+            .ok_or_else(|| {
+                PyException::new_err(
+                    "A `Call` may not be consumed after being provided to the @rule engine.",
+                )
+            })?
+            .output_type
+            .as_py_type(py))
+    }
+
+    #[getter]
+    fn input_types<'p>(&'p self, py: Python<'p>) -> PyResult<Vec<&'p PyType>> {
+        Ok(self
+            .0
+            .borrow()
+            .as_ref()
+            .ok_or_else(|| {
+                PyException::new_err(
+                    "A `Call` may not be consumed after being provided to the @rule engine.",
+                )
+            })?
+            .input_types
+            .iter()
+            .map(|t| t.as_py_type(py))
+            .collect())
+    }
+
+    #[getter]
+    fn inputs<'p>(&'p self, py: Python<'p>) -> PyResult<Vec<PyObject>> {
+        let inner = self.0.borrow();
+        let inner = inner.as_ref().ok_or_else(|| {
+            PyException::new_err(
+                "A `Call` may not be consumed after being provided to the @rule engine.",
+            )
+        })?;
+        let args: Vec<PyObject> = inner.args.as_ref().map_or_else(
+            || Ok(Vec::default()),
+            |args| {
+                let pyo: PyObject = args.value.clone().into();
+                pyo.extract(py)
+            },
+        )?;
+        Ok(args
+            .into_iter()
+            .chain(inner.inputs.iter().map(|k| {
+                let pyo: PyObject = k.value.clone().into();
+                pyo
+            }))
+            .collect())
+    }
 }
 
 impl PyGeneratorResponseCall {

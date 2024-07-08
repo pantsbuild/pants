@@ -41,10 +41,11 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, DownloadFile
 from pants.engine.internals.native_engine import FileDigest, MergeDigests
+from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, Rule, collect_rules, rule
+from pants.engine.rules import Get, Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import DictOption, ShellStrListOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -390,7 +391,11 @@ class NodeJSBootstrap:
 async def _get_nvm_root() -> str | None:
     """See https://github.com/nvm-sh/nvm#installing-and-updating."""
 
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")))
+    env = await environment_vars_subset(
+        **implicitly(
+            {EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")): EnvironmentVarsRequest}
+        )
+    )
     nvm_dir = env.get("NVM_DIR")
     default_dir = env.get("XDG_CONFIG_HOME", env.get("HOME"))
     if nvm_dir:
