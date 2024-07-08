@@ -167,10 +167,7 @@ def test_resolve_dictates_version(
         {
             "BUILD": "package_json(name='root_pkg')",
             "package.json": json.dumps(
-                {
-                    "name": "@the-company/project",
-                    "devDependencies": {"cowsay": "^1.6.0"},
-                },
+                {"name": "@the-company/project", "devDependencies": {"cowsay": "^1.6.0"}}
             ),
             lockfile_path.name: lockfile_path.read_text(),
         }
