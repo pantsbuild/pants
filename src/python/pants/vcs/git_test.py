@@ -464,6 +464,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 QueryRule(str, []),
             ]
         )
+        rule_runner.build_root = origin.as_posix()
 
         rule_runner.set_options([], env_inherit={"PATH"})
         worktree_id_1 = rule_runner.request(str, [])

@@ -51,7 +51,10 @@ def rule_runner(package_manager: str) -> RuleRunner:
         ],
         objects=dict(package_json.build_file_aliases().objects),
     )
-    rule_runner.set_options([f"--nodejs-package-manager={package_manager}"], env_inherit={"PATH"})
+    rule_runner.set_options(
+        [f"--nodejs-package-manager={package_manager}"],
+        env_inherit={"PATH"},
+    )
     return rule_runner
 
 
@@ -162,18 +165,14 @@ def workspace_files(package_manager: str) -> dict[str, str]:
         }
     if package_manager == "pnpm":
         return {
-            "src/js/pnpm-workspace.yaml": textwrap.dedent(
-                """\
-                packages:
-                """
-            ),
+            "src/js/pnpm-workspace.yaml": "",
             "src/js/pnpm-lock.yaml": json.dumps(
                 {
                     "importers": {
-                        ".": {"specifiers": {}},
-                        "a": {"specifiers": {}},
+                        ".": {},
+                        "a": {},
                     },
-                    "lockfileVersion": 5.3,
+                    "lockfileVersion": "6.0",
                 }
             ),
         }
@@ -192,13 +191,19 @@ def workspace_files(package_manager: str) -> dict[str, str]:
 
 
 def test_packages_files_as_resource_in_workspace(
-    rule_runner: RuleRunner, workspace_files: dict[str, str]
+    rule_runner: RuleRunner,
+    workspace_files: dict[str, str],
 ) -> None:
     rule_runner.write_files(
         {
             **workspace_files,
             "src/js/package.json": json.dumps(
-                {"name": "spam", "version": "0.0.1", "workspaces": ["a"], "private": True}
+                {
+                    "name": "spam",
+                    "version": "0.0.1",
+                    "workspaces": ["a"],
+                    "private": True,
+                }
             ),
             "src/js/BUILD": "package_json()",
             "src/js/a/BUILD": dedent(
