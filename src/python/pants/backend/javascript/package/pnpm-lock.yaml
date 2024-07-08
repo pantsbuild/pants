@@ -4,10 +4,21 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-devDependencies:
-  parcel:
-    specifier: ^2.12.0
-    version: 2.12.0
+importers:
+
+  .: {}
+
+  child-lib: {}
+
+  ham:
+    dependencies:
+      child-lib:
+        specifier: '*'
+        version: link:../child-lib
+    devDependencies:
+      parcel:
+        specifier: ^2.12.0
+        version: 2.12.0
 
 packages:
 
