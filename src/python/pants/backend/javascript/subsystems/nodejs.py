@@ -137,7 +137,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     )
 
     package_managers = DictOption[str](
-        default={"npm": "10.8.1", "yarn": "1.22.22", "pnpm": "8.15.8"},
+        default={"npm": "10.8.1", "yarn": "1.22.22", "pnpm": "9.5.0"},
         help=help_text(
             """
             A mapping of package manager versions to semver releases.

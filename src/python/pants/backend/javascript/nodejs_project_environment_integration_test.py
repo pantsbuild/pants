@@ -52,7 +52,7 @@ def test_pnpm_project_sandbox_provides_append_only_cache_at_expected_location(
                 {
                     "name": "ham",
                     "version": "0.0.1",
-                    "packageManager": "pnpm@7.5.0",
+                    "packageManager": "pnpm@9.5.0",
                     "scripts": {"pretend": "touch $PNPM_HOME/marker.txt"},
                 }
             ),
