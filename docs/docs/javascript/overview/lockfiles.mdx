@@ -1,0 +1,65 @@
+---
+    title: Lockfiles
+    sidebar_position: 2
+---
+
+Package manager lockfile integration
+
+---
+
+Third-party dependencies are specified in the package.json fields.
+All package managers vendors a lockfile format specific for the package manager you are using. Pants knows of this
+lockfile and models it as a "resolve".
+
+Resolves is the only way to deal with dependencies within pants, and no extra configuration is required.
+
+You can however name your resolves/lockfiles. The resolve name is otherwise auto-generated.
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages.add = [
+    "pants.backend.experimental.javascript"
+]
+
+[nodejs.resolves]
+package-lock.json = "my-lock"
+
+```
+
+You generate the lockfile as follows:
+
+```shell title="Bash"
+$ pants generate-lockfiles
+19:00:39.26 [INFO] Completed: Generate lockfile for my-lock
+19:00:39.29 [INFO] Wrote lockfile for the resolve `my-lock` to package-lock.json
+```
+
+
+## Using lockfiles for tools
+
+To ensure that the same version of tooling you have specified in `package.json` is used with a nodejs powered tool,
+specify the resolve name for the tool.
+E.g. prettier linter:
+
+```toml tab={"label": "pants.toml"}
+[GLOBAL]
+backend_packages.add = [
+    "pants.backend.experimental.javascript",
+    "pants.backend.experimental.javascript.lint.prettier",
+]
+
+[prettier]
+install_from_resolve = "nodejs-default"
+
+```
+```json tab={"label": "package.json"}
+{
+    "name": "@my-company/pkg",
+    "devDependencies": {
+        "prettier": "^2.6.2"
+    }
+}
+```
+```python tab={"label": "BUILD"}
+    package_json(name="pkg")
+```

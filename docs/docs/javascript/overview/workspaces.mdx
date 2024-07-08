@@ -1,0 +1,22 @@
+---
+    title: Monorepo workspaces
+    sidebar_position: 1
+---
+Package manager workspace management
+
+---
+
+Modern versions of package managers introduce similar
+concepts of "workspaces", a list of Nodejs packages all contained within the same code repository.
+
+Pants support all three flavors of package managers and understands the configuration
+settings specific for each tool:
+
+- [pnpm](https://pnpm.io/workspaces) pnpm-workspaces.yaml
+- [yarn](https://yarnpkg.com/features/workspaces) and [npm](https://docs.npmjs.com/cli/v10/using-npm/workspaces)
+    "workspaces" setting in package.json
+
+:::tip Use workspaces!
+It is encouraged by the pants team to utilize this project setup to only have to deal with and maintain
+one [resolve](./lockfiles.mdx). Pants aims to provide full integration with these monorepo settings.
+:::

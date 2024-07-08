@@ -1,0 +1,29 @@
+---
+    title: Javascript overview
+    sidebar_position: 0
+---
+
+Pants's support for Javascript.
+
+:::caution Javascript support is beta stage
+We are done implementing most functionality for Pants's Javascript support
+([tracked here](https://github.com/pantsbuild/pants/labels/backend%3A%20javascript)).
+However, there may be use cases that we aren't yet handling.
+:::
+
+The Javascript and NodeJS ecosystem has a seemingly endless amounts of frameworks and tooling,
+all orchestrated via package managers.
+
+Pants employs a wrapping approach with a thin caching layer applied on top of current supported package managers:
+`npm`, `pnpm` and `yarn`.
+
+Features for Javascript:
+
+- Caching the results of your test scripts and build scripts,
+ making the latter available in your pants workflows as [`resources`](../../reference/targets/resource) and
+ package artifacts.
+- A consistent interface for all languages/tools in your repository,
+ such as being able to run `pants fmt lint check test package`.
+- [Remote execution and remote caching](../../using-pants/remote-caching-and-execution/index.mdx).
+- [Advanced project introspection](../../using-pants/project-introspection.mdx),
+ such as finding all code that transitively depends on a certain package.
