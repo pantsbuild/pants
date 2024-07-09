@@ -10,22 +10,31 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import Partition, Partitions
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import (
+    SourceFilesRequest,
+    determine_source_files,
+)
 from pants.engine.addresses import Address
 from pants.engine.fs import (
     CreateDigest,
-    Digest,
     FileContent,
     MergeDigests,
     PathGlobs,
     Paths,
     Snapshot,
 )
-from pants.engine.process import FallibleProcessResult, ProcessCacheScope
-from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
+from pants.engine.intrinsics import (
+    create_digest_to_digest,
+    digest_to_snapshot,
+    merge_digests_request_to_digest,
+    path_globs_to_paths,
+    process_request_to_process_result,
+)
+from pants.engine.process import ProcessCacheScope
+from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
@@ -112,8 +121,8 @@ async def find_all_semgrep_configs(semgrep: SemgrepSubsystem) -> AllSemgrepConfi
             f"**/{semgrep.config_name}/**/*.yml",
         )
 
-    all_config_files = await Get(Paths, PathGlobs(config_file_globs))
-    all_config_dir_files = await Get(Paths, PathGlobs(config_dir_globs))
+    all_config_files = await path_globs_to_paths(config_file_globs)
+    all_config_dir_files = await path_globs_to_paths(config_dir_globs)
     return _group_by_semgrep_dir(
         all_config_files,
         all_config_dir_files,
@@ -147,8 +156,10 @@ async def partition(
     if semgrep.skip:
         return Partitions()
 
-    all_configs = await MultiGet(
-        Get(RelevantSemgrepConfigs, RelevantSemgrepConfigsRequest(field_set))
+    all_configs = await concurrently(
+        infer_relevant_semgrep_configs(
+            RelevantSemgrepConfigsRequest(field_set), **implicitly()
+        )
         for field_set in request.field_sets
     )
 
@@ -179,22 +190,21 @@ async def lint(
     semgrep: SemgrepSubsystem,
     global_options: GlobalOptions,
 ) -> LintResult:
-    config_files, semgrep_pex, input_files, settings = await MultiGet(
-        Get(
-            Snapshot, PathGlobs(str(s) for s in request.partition_metadata.config_files)
+    config_files, semgrep_pex, input_files, settings = await concurrently(
+        digest_to_snapshot(
+            **implicitly(
+                PathGlobs(str(s) for s in request.partition_metadata.config_files)
+            )
         ),
-        Get(VenvPex, PexRequest, semgrep.to_pex_request()),
-        Get(
-            SourceFiles,
-            SourceFilesRequest(field_set.source for field_set in request.elements),
+        create_venv_pex(**implicitly(semgrep.to_pex_request())),
+        determine_source_files(
+            SourceFilesRequest(field_set.source for field_set in request.elements)
         ),
-        Get(Digest, CreateDigest([_DEFAULT_SETTINGS])),
+        create_digest_to_digest(CreateDigest([_DEFAULT_SETTINGS])),
     )
-
     ignore_files = await Get(Snapshot, PathGlobs([_SEMGREPIGNORE_FILE_NAME]))
 
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests_request_to_digest(
         MergeDigests(
             (
                 input_files.snapshot.digest,
@@ -202,7 +212,7 @@ async def lint(
                 settings,
                 ignore_files.digest,
             )
-        ),
+        )
     )
 
     cache_scope = (
@@ -212,38 +222,39 @@ async def lint(
     # TODO: https://github.com/pantsbuild/pants/issues/18430 support running this with --autofix
     # under the fix goal... but not all rules have fixes, so we need to be running with
     # --error/checking exit codes, which FixResult doesn't currently support.
-    result = await Get(
-        FallibleProcessResult,
-        VenvPexProcess(
-            semgrep_pex,
-            argv=(
-                "scan",
-                *(f"--config={f}" for f in config_files.files),
-                "--jobs={pants_concurrency}",
-                "--error",
-                *semgrep.args,
-                # we don't pass the target files directly because that overrides .semgrepignore
-                # (https://github.com/returntocorp/semgrep/issues/4978), so instead we just tell its
-                # traversal to include all the source files in this partition. Unfortunately this
-                # include is implicitly unrooted (i.e. as if it was **/path/to/file), and so may
-                # pick up other files if the names match. The highest risk of this is within the
-                # semgrep PEX.
-                *(f"--include={f}" for f in input_files.files),
-                f"--exclude={semgrep_pex.pex_filename}",
-            ),
-            extra_env={
-                "SEMGREP_FORCE_COLOR": "true",
-                # disable various global state/network requests
-                "SEMGREP_SETTINGS_FILE": _DEFAULT_SETTINGS.path,
-                "SEMGREP_ENABLE_VERSION_CHECK": "0",
-                "SEMGREP_SEND_METRICS": "off",
-            },
-            input_digest=input_digest,
-            concurrency_available=len(input_files.files),
-            description=f"Run Semgrep on {pluralize(len(input_files.files), 'file')}.",
-            level=LogLevel.DEBUG,
-            cache_scope=cache_scope,
-        ),
+    result = await process_request_to_process_result(
+        **implicitly(
+            VenvPexProcess(
+                semgrep_pex,
+                argv=(
+                    "scan",
+                    *(f"--config={f}" for f in config_files.files),
+                    "--jobs={pants_concurrency}",
+                    "--error",
+                    *semgrep.args,
+                    # we don't pass the target files directly because that overrides .semgrepignore
+                    # (https://github.com/returntocorp/semgrep/issues/4978), so instead we just tell its
+                    # traversal to include all the source files in this partition. Unfortunately this
+                    # include is implicitly unrooted (i.e. as if it was **/path/to/file), and so may
+                    # pick up other files if the names match. The highest risk of this is within the
+                    # semgrep PEX.
+                    *(f"--include={f}" for f in input_files.files),
+                    f"--exclude={semgrep_pex.pex_filename}",
+                ),
+                extra_env={
+                    "SEMGREP_FORCE_COLOR": "true",
+                    # disable various global state/network requests
+                    "SEMGREP_SETTINGS_FILE": _DEFAULT_SETTINGS.path,
+                    "SEMGREP_ENABLE_VERSION_CHECK": "0",
+                    "SEMGREP_SEND_METRICS": "off",
+                },
+                input_digest=input_digest,
+                concurrency_available=len(input_files.files),
+                description=f"Run Semgrep on {pluralize(len(input_files.files), 'file')}.",
+                level=LogLevel.DEBUG,
+                cache_scope=cache_scope,
+            )
+        )
     )
 
     return LintResult.create(
