@@ -572,17 +572,11 @@ impl PyGeneratorResponseCall {
         let inner = self.borrow_inner()?;
         let args: Vec<PyObject> = inner.args.as_ref().map_or_else(
             || Ok(Vec::default()),
-            |args| {
-                let pyo: PyObject = args.value.clone().into();
-                pyo.extract(py)
-            },
+            |args| args.to_py_object().extract(py),
         )?;
         Ok(args
             .into_iter()
-            .chain(inner.inputs.iter().map(|k| {
-                let pyo: PyObject = k.value.clone().into();
-                pyo
-            }))
+            .chain(inner.inputs.iter().map(Key::to_py_object))
             .collect())
     }
 }
@@ -681,10 +675,7 @@ impl PyGeneratorResponseGet {
             })?
             .inputs
             .iter()
-            .map(|k| {
-                let pyo: PyObject = k.value.clone().into();
-                pyo
-            })
+            .map(Key::to_py_object)
             .collect())
     }
 

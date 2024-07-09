@@ -279,6 +279,10 @@ impl Key {
     pub fn to_value(&self) -> Value {
         self.value.clone()
     }
+
+    pub fn to_py_object(&self) -> PyObject {
+        self.to_value().into()
+    }
 }
 
 // NB: Although `PyObject` (aka `Py<PyAny>`) directly implements `Clone`, it's ~4% faster to wrap
