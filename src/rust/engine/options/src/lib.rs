@@ -381,7 +381,10 @@ impl OptionParser {
             passthrough_args: None,
         };
 
-        if allow_pantsrc && parser.parse_bool(&option_id!("pantsrc"), true)?.value && !has_provided_configs {
+        if allow_pantsrc
+            && parser.parse_bool(&option_id!("pantsrc"), true)?.value
+            && !has_provided_configs
+        {
             for rcfile in parser
                 .parse_string_list(
                     &option_id!("pantsrc", "files"),

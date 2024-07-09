@@ -166,7 +166,9 @@ class Options:
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
 
         config_to_pass = None if native_options_config_discovery else config.sources()
-        native_parser = NativeOptionParser(args, env, config_sources=config_to_pass, allow_pantsrc=True)
+        native_parser = NativeOptionParser(
+            args, env, config_sources=config_to_pass, allow_pantsrc=True
+        )
 
         return cls(
             builtin_goal=split_args.builtin_goal,
