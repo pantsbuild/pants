@@ -50,5 +50,7 @@ def extract_functiondef_from_module(module: str, func: str) -> cst.FunctionDef |
     with open(spec.origin) as f:
         source_code = f.read()
         tree = cst.parse_module(source_code)
-        results = m.findall(tree, matcher=m.FunctionDef(m.Name(func), asynchronous=m.Asynchronous()))
+        results = m.findall(
+            tree, matcher=m.FunctionDef(m.Name(func), asynchronous=m.Asynchronous())
+        )
         return cst.ensure_type(results[0], cst.FunctionDef) if results else None
