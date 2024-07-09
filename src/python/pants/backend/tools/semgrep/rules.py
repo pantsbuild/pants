@@ -13,19 +13,9 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import Partition, Partitions
-from pants.core.util_rules.source_files import (
-    SourceFilesRequest,
-    determine_source_files,
-)
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Address
-from pants.engine.fs import (
-    CreateDigest,
-    FileContent,
-    MergeDigests,
-    PathGlobs,
-    Paths,
-    Snapshot,
-)
+from pants.engine.fs import CreateDigest, FileContent, MergeDigests, PathGlobs, Paths, Snapshot
 from pants.engine.intrinsics import (
     create_digest_to_digest,
     digest_to_snapshot,
@@ -143,9 +133,7 @@ class RelevantSemgrepConfigs(frozenset[PurePath]):
 async def infer_relevant_semgrep_configs(
     request: RelevantSemgrepConfigsRequest, all_semgrep: AllSemgrepConfigs
 ) -> RelevantSemgrepConfigs:
-    return RelevantSemgrepConfigs(
-        all_semgrep.ancestor_configs(request.field_set.address)
-    )
+    return RelevantSemgrepConfigs(all_semgrep.ancestor_configs(request.field_set.address))
 
 
 @rule
@@ -157,9 +145,7 @@ async def partition(
         return Partitions()
 
     all_configs = await concurrently(
-        infer_relevant_semgrep_configs(
-            RelevantSemgrepConfigsRequest(field_set), **implicitly()
-        )
+        infer_relevant_semgrep_configs(RelevantSemgrepConfigsRequest(field_set), **implicitly())
         for field_set in request.field_sets
     )
 
@@ -190,19 +176,17 @@ async def lint(
     semgrep: SemgrepSubsystem,
     global_options: GlobalOptions,
 ) -> LintResult:
-    config_files, semgrep_pex, input_files, settings = await concurrently(
+    config_files, ignore_files, semgrep_pex, input_files, settings = await concurrently(
         digest_to_snapshot(
-            **implicitly(
-                PathGlobs(str(s) for s in request.partition_metadata.config_files)
-            )
+            **implicitly(PathGlobs(str(s) for s in request.partition_metadata.config_files))
         ),
+        digest_to_snapshot(**implicitly(PathGlobs([_SEMGREPIGNORE_FILE_NAME]))),
         create_venv_pex(**implicitly(semgrep.to_pex_request())),
         determine_source_files(
             SourceFilesRequest(field_set.source for field_set in request.elements)
         ),
         create_digest_to_digest(CreateDigest([_DEFAULT_SETTINGS])),
     )
-    ignore_files = await Get(Snapshot, PathGlobs([_SEMGREPIGNORE_FILE_NAME]))
 
     input_digest = await merge_digests_request_to_digest(
         MergeDigests(
@@ -215,9 +199,7 @@ async def lint(
         )
     )
 
-    cache_scope = (
-        ProcessCacheScope.PER_SESSION if semgrep.force else ProcessCacheScope.SUCCESSFUL
-    )
+    cache_scope = ProcessCacheScope.PER_SESSION if semgrep.force else ProcessCacheScope.SUCCESSFUL
 
     # TODO: https://github.com/pantsbuild/pants/issues/18430 support running this with --autofix
     # under the fix goal... but not all rules have fixes, so we need to be running with
@@ -257,9 +239,7 @@ async def lint(
         )
     )
 
-    return LintResult.create(
-        request, result, output_simplifier=global_options.output_simplifier()
-    )
+    return LintResult.create(request, result, output_simplifier=global_options.output_simplifier())
 
 
 def rules() -> Iterable[Rule | UnionRule]:

@@ -32,9 +32,7 @@ def configs(strs: dict[str, set[str]]) -> AllSemgrepConfigs:
         pytest.param(
             (),
             ("foo/bar/.semgrep/baz.yml", "foo/bar/.semgrep/qux.yml"),
-            configs(
-                {"foo/bar": {"foo/bar/.semgrep/baz.yml", "foo/bar/.semgrep/qux.yml"}}
-            ),
+            configs({"foo/bar": {"foo/bar/.semgrep/baz.yml", "foo/bar/.semgrep/qux.yml"}}),
             id="semgrep_dir",
         ),
         pytest.param(
@@ -92,9 +90,7 @@ def test_group_by_group_by_semgrep_dir(
 ):
     config_file_paths = Paths(files=config_files, dirs=())
     config_dir_file_paths = Paths(files=config_dir_files, dirs=())
-    result = rules._group_by_semgrep_dir(
-        config_file_paths, config_dir_file_paths, ".semgrep"
-    )
+    result = rules._group_by_semgrep_dir(config_file_paths, config_dir_file_paths, ".semgrep")
     assert result == expected
 
 

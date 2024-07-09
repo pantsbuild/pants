@@ -158,9 +158,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     assert_success(
         rule_runner,
         tgt,
-        extra_args=[
-            f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']"
-        ],
+        extra_args=[f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
 
 
@@ -192,9 +190,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         }
     )
 
-    tgts = [
-        rule_runner.get_target(Address(DIR, target_name=name)) for name in ["g", "b"]
-    ]
+    tgts = [rule_runner.get_target(Address(DIR, target_name=name)) for name in ["g", "b"]]
 
     results = run_semgrep(
         rule_runner,
