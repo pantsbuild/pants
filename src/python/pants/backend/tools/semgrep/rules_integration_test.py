@@ -128,7 +128,8 @@ def run_semgrep(
 
     return tuple(
         rule_runner.request(
-            LintResult, [SemgrepLintRequest.Batch("", partition.elements, partition.metadata)]
+            LintResult,
+            [SemgrepLintRequest.Batch("", partition.elements, partition.metadata)],
         )
         for partition in partitions
     )
@@ -157,7 +158,9 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     assert_success(
         rule_runner,
         tgt,
-        extra_args=[f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+        extra_args=[
+            f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']"
+        ],
     )
 
 
@@ -189,7 +192,9 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         }
     )
 
-    tgts = [rule_runner.get_target(Address(DIR, target_name=name)) for name in ["g", "b"]]
+    tgts = [
+        rule_runner.get_target(Address(DIR, target_name=name)) for name in ["g", "b"]
+    ]
 
     results = run_semgrep(
         rule_runner,
@@ -218,7 +223,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
                 f"{DIR}/bad.txt": BAD_FILE,
                 f"{DIR}/BUILD": """file(name="f", source="bad.txt")""",
                 ".semgrep/one.yml": RULES,
-                ".semgrep/two.yml": RULES2,
+                ".semgrep/vendored/two.yml": RULES2,
             },
             id="via .semgrep directory",
         ),
