@@ -414,7 +414,7 @@ def test_docstring_decorator() -> None:
     assert document_me.__doc__ == "calc 1 + 1 = 2"
 
     def show_why_this_is_needed() -> None:
-        f"""calc 1 + 1 = {1 + 1}"""
+        f"""calc 1 + 1 = {1 + 1}"""  # noqa: B021
 
     with pytest.raises(AssertionError):
         assert show_why_this_is_needed.__doc__ == "calc 1 + 1 = 2"
