@@ -4,11 +4,6 @@
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
 
-use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::convert::TryInto;
-use std::fmt;
-
 use futures::future::{BoxFuture, Future};
 use futures::FutureExt;
 use lazy_static::lazy_static;
@@ -18,6 +13,11 @@ use pyo3::types::{PyBytes, PyDict, PySequence, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
 use pyo3::{FromPyObject, ToPyObject};
 use smallvec::{smallvec, SmallVec};
+use std::cell::{Ref, RefCell};
+use std::collections::BTreeMap;
+use std::convert::TryInto;
+use std::fmt;
+use std::ops::Deref;
 
 use logging::PythonLogLevel;
 use rule_graph::RuleId;
@@ -508,6 +508,16 @@ impl PyGeneratorResponseNativeCall {
 #[pyclass(subclass)]
 pub struct PyGeneratorResponseCall(RefCell<Option<Call>>);
 
+impl PyGeneratorResponseCall {
+    fn borrow_inner(&self) -> PyResult<impl Deref<Target = Call> + '_> {
+        Ref::filter_map(self.0.borrow(), |inner| inner.as_ref()).map_err(|_| {
+            PyException::new_err(
+                "A `Call` may not be consumed after being provided to the @rule engine.",
+            )
+        })
+    }
+}
+
 #[pymethods]
 impl PyGeneratorResponseCall {
     #[new]
@@ -544,30 +554,13 @@ impl PyGeneratorResponseCall {
 
     #[getter]
     fn output_type<'p>(&'p self, py: Python<'p>) -> PyResult<&'p PyType> {
-        Ok(self
-            .0
-            .borrow()
-            .as_ref()
-            .ok_or_else(|| {
-                PyException::new_err(
-                    "A `Call` may not be consumed after being provided to the @rule engine.",
-                )
-            })?
-            .output_type
-            .as_py_type(py))
+        Ok(self.borrow_inner()?.output_type.as_py_type(py))
     }
 
     #[getter]
     fn input_types<'p>(&'p self, py: Python<'p>) -> PyResult<Vec<&'p PyType>> {
         Ok(self
-            .0
-            .borrow()
-            .as_ref()
-            .ok_or_else(|| {
-                PyException::new_err(
-                    "A `Call` may not be consumed after being provided to the @rule engine.",
-                )
-            })?
+            .borrow_inner()?
             .input_types
             .iter()
             .map(|t| t.as_py_type(py))
@@ -576,12 +569,7 @@ impl PyGeneratorResponseCall {
 
     #[getter]
     fn inputs<'p>(&'p self, py: Python<'p>) -> PyResult<Vec<PyObject>> {
-        let inner = self.0.borrow();
-        let inner = inner.as_ref().ok_or_else(|| {
-            PyException::new_err(
-                "A `Call` may not be consumed after being provided to the @rule engine.",
-            )
-        })?;
+        let inner = self.borrow_inner()?;
         let args: Vec<PyObject> = inner.args.as_ref().map_or_else(
             || Ok(Vec::default()),
             |args| {
