@@ -79,10 +79,6 @@ class AwaitableConstraints:
 
 
 class Call(PyGeneratorResponseCall):
-    output_type: type
-    input_types: Sequence[type]
-    inputs: Sequence[Any]
-
     def __await__(
         self,
     ) -> Generator[Any, None, Any]:
