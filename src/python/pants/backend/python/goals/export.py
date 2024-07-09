@@ -136,15 +136,15 @@ class ExportPluginOptions:
         advanced=True,
     )
 
-    py_generated_sources = BoolOption(
-        default=False,
+    py_generated_sources_in_resolve = StrListOption(
         help=softwrap(
             """
-            When exporting a mutable virtualenv for a resolve, generate any sources
-            which result from code generation (for example, the `protobuf_sources` and `thrift_sources` targets)
-            and place the generated files under the site-packages directory of the virtualenv.
+            When exporting a mutable virtualenv for a resolve listed in this option, generate sources which result from
+            code generation (for example, the `protobuf_sources` and `thrift_sources` target types) into the mutable
+            virtualenv exported for that resolve. Generated sources will be placed in the appropriate location within
+            the site-packages directory of the mutable virtualenv.
             """
-        ),
+        )
     )
 
 
@@ -558,9 +558,9 @@ async def export_virtualenv_for_resolve(
         ),
     )
 
-    # Add generated Python sources from codegen targets to the virtualenv.
+    # Add generated Python sources from codegen targets to the mutable virtualenv.
     if (
-        export_subsys.options.py_generated_sources
+        resolve in export_subsys.options.py_generated_sources_in_resolve
         and export_subsys.options.py_resolve_format == PythonResolveExportFormat.mutable_virtualenv
     ):
         export_result = await add_codegen_to_export_result(
