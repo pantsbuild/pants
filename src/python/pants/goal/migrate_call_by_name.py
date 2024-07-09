@@ -571,10 +571,12 @@ def fix_implicitly_usage(call: cst.Call, target_func: cst.FunctionDef) -> cst.Ca
     """The CallByNameSyntaxMapper aggressively adds `implicitly` for safety. This function removes
     unnecessary ones, and attempts to cleanup usage.
 
-    The following cases are handled:
-    - The called function takes no arguments
-    - TODO: The called function takes the same number of arguments that are passed to it
-    - TODO: Check the types of the passed in parameters, if they don't match, they need to be implicitly passed
+    Examples:
+        find_all_targets(**implicitly()) -> find_all_targets()
+        create_pex(**implicitly({req: PexRequest})) -> create_pex(req)
+        create_venv_pex(**implicitly({req: PexRequest})) -> create_venv_pex(**implicitly(req))
+
+    Refer to `migrate_call_by_name_test.py` for more examples.
 
     Parameters:
         call: The replaced `Get` which now uses the migrated call-by-name syntax
