@@ -513,9 +513,7 @@ async def export_virtualenv_for_resolve(
             lockfile = None
 
     if not lockfile:
-        raise ExportError(
-            f"No resolve named {resolve} found in [{python_setup.options_scope}].resolves."
-        )
+        return MaybeExportResult(None)
 
     interpreter_constraints = InterpreterConstraints(
         python_setup.resolves_to_interpreter_constraints.get(
@@ -575,10 +573,6 @@ async def export_virtualenvs(
     request: ExportVenvsRequest,
     export_subsys: ExportSubsystem,
 ) -> ExportResults:
-    if not export_subsys.options.resolve:
-        raise ExportError("Must specify at least one --resolve to export")
-    if request.targets:
-        raise ExportError("The `export` goal does not take target specs.")
     maybe_venvs = await MultiGet(
         Get(MaybeExportResult, _ExportVenvForResolveRequest(resolve))
         for resolve in export_subsys.options.resolve
