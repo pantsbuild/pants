@@ -61,10 +61,10 @@ MIGRATED_REGISTER_FILE = dedent(
 
     @goal_rule
     async def setup_migrateme(black: Black) -> ContrivedGoal:
-        foo = await variants(**implicitly({black: Black}))
-        bar = await multiline(**implicitly({black: Black}))
-        qux = await shadowed(**implicitly({black: Black}))
-        thud = await multiget(**implicitly({black: Black}))
+        foo = await variants(black)
+        bar = await multiline(black)
+        qux = await shadowed(black)
+        thud = await multiget(black)
 
     def rules():
         return [*collect_rules(), *rules1(), *rules2()]
@@ -195,7 +195,7 @@ MIGRATED_RULES1_FILE = dedent(
     @rule
     async def variants(black: Black, local_env: ChosenLocalEnvironmentName) -> Foo:
         all_targets = await find_all_targets()
-        pex = await create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
+        pex = await create_venv_pex(**implicitly(black.to_pex_request()))
         digest = await create_archive(CreateArchive(EMPTY_SNAPSHOT), **implicitly())
         paths = await find_binary(**implicitly({BinaryPathRequest(binary_name='time', search_path=['/usr/bin']): BinaryPathRequest, local_env.val: EnvironmentName}))
         try:
@@ -219,7 +219,7 @@ MIGRATED_RULES1_FILE = dedent(
 
     @rule(desc="Ensure multi-line calls are migrated")
     async def multiline(black: Black) -> Bar:
-        pex = await create_venv_pex(**implicitly({black.to_pex_request(): PexRequest}))
+        pex = await create_venv_pex(**implicitly(black.to_pex_request()))
 
     class Thud:
         pass
@@ -231,12 +231,12 @@ MIGRATED_RULES1_FILE = dedent(
         multigot = await concurrently(
             find_all_targets(),
             all_targets_get,
-            create_venv_pex(**implicitly({black.to_pex_request(): PexRequest})),
+            create_venv_pex(**implicitly(black.to_pex_request())),
             digest_get
         )
         multigot_sameline = await concurrently(
             find_all_targets(), all_targets_get,
-            create_venv_pex(**implicitly({black.to_pex_request(): PexRequest})), digest_get
+            create_venv_pex(**implicitly(black.to_pex_request())), digest_get
         )
         multigot_forloop = await concurrently(
             create_archive(CreateArchive(EMPTY_SNAPSHOT), **implicitly())
@@ -279,7 +279,7 @@ MIGRATED_RULES2_FILE = dedent(
 
     @rule(desc="Ensure assignment name is not shadowed by new syntax")
     async def shadowed(black: Black) -> Qux:
-        create_venv_pex = await create_venv_pex_get(**implicitly({black.to_pex_request(): PexRequest}))
+        create_venv_pex = await create_venv_pex_get(**implicitly(black.to_pex_request()))
 
     def rules():
         return collect_rules()

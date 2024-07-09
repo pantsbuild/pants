@@ -604,9 +604,7 @@ def fix_implicitly_usage(call: cst.Call, target_func: cst.FunctionDef) -> cst.Ca
         for a in m.findall(target_func.params, m.Annotation())
     ]
     target_types = [
-        target_type
-        for a in target_annotations
-        if (target_type := h.get_full_name_for_node(a))
+        target_type for a in target_annotations if (target_type := h.get_full_name_for_node(a))
     ]
 
     # Positionally compare the target function's annotations with the call's arguments
@@ -640,9 +638,7 @@ def fix_implicitly_usage(call: cst.Call, target_func: cst.FunctionDef) -> cst.Ca
             return call.with_changes(args=[new_arg])
         else:
             # If arg and target don't match, keep `implicitly` call
-            new_arg = cst.Arg(
-                cst.Call(cst.Name("implicitly"), args=[new_arg]), star="**"
-            )
+            new_arg = cst.Arg(cst.Call(cst.Name("implicitly"), args=[new_arg]), star="**")
             return call.with_changes(args=[new_arg])
 
     # If the target function takes in more arguments than we've passed in, then we need to pass in `implicitly`
@@ -653,9 +649,7 @@ def fix_implicitly_usage(call: cst.Call, target_func: cst.FunctionDef) -> cst.Ca
             return call
         else:
             new_arg = call.args[0].with_changes(comma=cst.MaybeSentinel.DEFAULT)
-            new_arg = cst.Arg(
-                cst.Call(cst.Name("implicitly"), args=[new_arg]), star="**"
-            )
+            new_arg = cst.Arg(cst.Call(cst.Name("implicitly"), args=[new_arg]), star="**")
             return call.with_changes(args=[new_arg])
 
     return call
