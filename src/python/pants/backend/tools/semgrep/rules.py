@@ -15,7 +15,7 @@ from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, FileContent, MergeDigests, PathGlobs, Paths, Snapshot
+from pants.engine.fs import CreateDigest, FileContent, MergeDigests, PathGlobs, Paths
 from pants.engine.intrinsics import (
     create_digest_to_digest,
     digest_to_snapshot,
@@ -111,8 +111,8 @@ async def find_all_semgrep_configs(semgrep: SemgrepSubsystem) -> AllSemgrepConfi
             f"**/{semgrep.config_name}/**/*.yml",
         )
 
-    all_config_files = await path_globs_to_paths(config_file_globs)
-    all_config_dir_files = await path_globs_to_paths(config_dir_globs)
+    all_config_files = await path_globs_to_paths(PathGlobs(config_file_globs))
+    all_config_dir_files = await path_globs_to_paths(PathGlobs(config_dir_globs))
     return _group_by_semgrep_dir(
         all_config_files,
         all_config_dir_files,
