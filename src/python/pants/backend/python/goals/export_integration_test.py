@@ -54,7 +54,7 @@ def build_config(
         },
         "export": {
             "py_resolve_format": py_resolve_format.value,
-            "py_hermetic_scripts": py_hermetic_scripts,
+            "py_non_hermetic_scripts_in_resolve": [] if py_hermetic_scripts else ["a", "b"],
         },
     }
 
