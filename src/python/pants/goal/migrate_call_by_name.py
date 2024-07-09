@@ -12,6 +12,7 @@ from pathlib import Path, PurePath
 from typing import Callable, Iterable, TypedDict
 
 import libcst as cst
+import libcst.helpers as h
 import libcst.matchers as m
 import libcst.metadata
 from libcst.display import dump
@@ -439,7 +440,7 @@ class CallByNameSyntaxMapper:
             args=[cst.Arg(value=cst.Call(cst.Name("implicitly")), star="**")],
         )
         if called_funcdef := cstutil.extract_functiondef_from_module(module, new_function):
-            new_call = remove_unused_implicitly(new_call, called_funcdef)
+            new_call = fix_implicitly_usage(new_call, called_funcdef)
 
         imports = [cstutil.make_importfrom(module, new_function)]
         return new_call, imports
@@ -484,6 +485,9 @@ class CallByNameSyntaxMapper:
             ],
         )
 
+        if called_funcdef := cstutil.extract_functiondef_from_module(module, new_function):
+            new_call = fix_implicitly_usage(new_call, called_funcdef)
+
         imports = [cstutil.make_importfrom(module, new_function)]
         return new_call, imports
 
@@ -512,6 +516,10 @@ class CallByNameSyntaxMapper:
                 cst.Arg(value=cst.Call(cst.Name("implicitly")), star="**"),
             ],
         )
+
+        if called_funcdef := cstutil.extract_functiondef_from_module(module, new_function):
+            new_call = fix_implicitly_usage(new_call, called_funcdef)
+
         imports = [cstutil.make_importfrom(module, new_function)]
         return new_call, imports
 
@@ -547,6 +555,9 @@ class CallByNameSyntaxMapper:
             ],
         )
 
+        if called_funcdef := cstutil.extract_functiondef_from_module(module, new_function):
+            new_call = fix_implicitly_usage(new_call, called_funcdef)
+
         imports = [cstutil.make_importfrom(module, new_function)]
         return new_call, imports
 
@@ -556,20 +567,95 @@ class CallByNameSyntaxMapper:
 # ------------------------------------------------------------------------------------------
 
 
-def remove_unused_implicitly(call: cst.Call, called_func: cst.FunctionDef) -> cst.Call:
+def fix_implicitly_usage(call: cst.Call, target_func: cst.FunctionDef) -> cst.Call:
     """The CallByNameSyntaxMapper aggressively adds `implicitly` for safety. This function removes
-    unnecessary ones.
+    unnecessary ones, and attempts to cleanup usage.
 
     The following cases are handled:
     - The called function takes no arguments
     - TODO: The called function takes the same number of arguments that are passed to it
     - TODO: Check the types of the passed in parameters, if they don't match, they need to be implicitly passed
+
+    Parameters:
+        call: The replaced `Get` which now uses the migrated call-by-name syntax
+        target_func: The target called-by-name function
     """
     call_func_name = cst.ensure_type(call.func, cst.Name).value
-    if call_func_name != called_func.name.value:
+    if call_func_name != target_func.name.value:
         return call
 
-    called_params = len(called_func.params.params)
-    if called_params == 0:
+    # If there are no `implicitly`s, there is nothing to do
+    implicit_calls = m.findall(call, m.Call(func=m.Name("implicitly")))
+    if not implicit_calls:
+        return call
+
+    # Only handling the 1-arg case (plus implicitly) for now, which is the overwhelming majority of usage
+    number_of_call_args = len(call.args)
+    if number_of_call_args > 2:
+        return call
+
+    # If the target function takes no arguments, then there is nothing to `implicit`
+    number_of_target_args = len(target_func.params.params)
+    if number_of_target_args == 0:
         return call.with_changes(args=[])
+
+    target_annotations = [
+        cst.ensure_type(a, cst.Annotation).annotation
+        for a in m.findall(target_func.params, m.Annotation())
+    ]
+    target_types = [
+        target_type
+        for a in target_annotations
+        if (target_type := h.get_full_name_for_node(a))
+    ]
+
+    # Positionally compare the target function's annotations with the call's arguments
+    # If they match, then there is no need for `implicitly`
+
+    # Check if `implicitly` contains dict - as that needs special handling
+    implicit_call = cst.ensure_type(implicit_calls[0], cst.Call)
+    if implicit_call.args and isinstance(d := implicit_call.args[0].value, cst.Dict):
+        if len(d.elements) > 1:
+            # Not handling cases with larger than 1 element
+            return call
+
+        element = cst.ensure_type(d.elements[0], cst.DictElement)
+        if h.get_full_name_for_node(element.value) == target_types[0]:
+            # If arg and target match, we can strip `implicitly` call
+            return call.with_changes(args=[cst.Arg(element.key)])
+        else:
+            # If arg and target don't match, keep `implicitly` call, but remove dict for normal call
+            new_arg = cst.Arg(
+                cst.Call(cst.Name("implicitly"), args=[cst.Arg(element.key)]), star="**"
+            )
+            return call.with_changes(args=[new_arg])
+
+    # If the target function takes in the same number of arguments as we've already passed in,
+    # and they are of the same type, then we don't need to pass in `implicitly`
+    if number_of_call_args - 1 == len(target_types):
+        arg = cst.ensure_type(call.args[0].value, cst.Call)
+        new_arg = call.args[0].with_changes(comma=cst.MaybeSentinel.DEFAULT)
+        if h.get_full_name_for_node(arg.func) == target_types[0]:
+            # If arg and target match, we can strip `implicitly` call
+            return call.with_changes(args=[new_arg])
+        else:
+            # If arg and target don't match, keep `implicitly` call
+            new_arg = cst.Arg(
+                cst.Call(cst.Name("implicitly"), args=[new_arg]), star="**"
+            )
+            return call.with_changes(args=[new_arg])
+
+    # If the target function takes in more arguments than we've passed in, then we need to pass in `implicitly`
+    # This checks if it should be a trailing implicitly, or if we should wrap the first arg
+    if number_of_call_args - 1 < len(target_types):
+        arg = cst.ensure_type(call.args[0].value, cst.Call)
+        if h.get_full_name_for_node(arg.func) == target_types[0]:
+            return call
+        else:
+            new_arg = call.args[0].with_changes(comma=cst.MaybeSentinel.DEFAULT)
+            new_arg = cst.Arg(
+                cst.Call(cst.Name("implicitly"), args=[new_arg]), star="**"
+            )
+            return call.with_changes(args=[new_arg])
+
     return call
