@@ -260,6 +260,7 @@ class OptionsBootstrapper:
             bootstrap_option_values=bootstrap_option_values,
             allow_unknown_options=allow_unknown_options,
             native_options_validation=bootstrap_option_values.native_options_validation,
+            native_options_config_discovery=False,
         )
 
         distinct_subsystem_classes: set[type[Subsystem]] = set()
