@@ -62,8 +62,11 @@ def run_run_request(
         return mocked_console[1].get_stdout().strip()
 
 
-@pytest.mark.parametrize("py_version", ["2.7", "3.9"])
-def test_using_pyenv(rule_runner, py_version):
+@pytest.mark.parametrize(
+    "interpreter_constraints, expected_version_substring",
+    [("2.7.*", "2.7"), ("3.9.*", "3.9"), ("3.10.4", "3.10.4")],
+)
+def test_using_pyenv(rule_runner, interpreter_constraints, expected_version_substring):
     rule_runner.write_files(
         {
             "src/app.py": dedent(
@@ -76,7 +79,7 @@ def test_using_pyenv(rule_runner, py_version):
                 print(sys.version.replace("\\n", " "))
                 """
             ),
-            "src/BUILD": f"python_sources(interpreter_constraints=['=={py_version}.*'])",
+            "src/BUILD": f"python_sources(interpreter_constraints=['=={interpreter_constraints}'])",
         }
     )
 
@@ -87,7 +90,7 @@ def test_using_pyenv(rule_runner, py_version):
     )
     prefix_dir, version = stdout.splitlines()
     assert prefix_dir.startswith(f"{named_caches_dir}/pyenv")
-    assert py_version in version
+    assert expected_version_substring in version
 
 
 def test_venv_pex_reconstruction(rule_runner):
