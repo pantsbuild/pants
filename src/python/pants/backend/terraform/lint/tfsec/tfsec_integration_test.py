@@ -66,17 +66,11 @@ def test_run_tfsec():
 
     result = rule_runner.request(
         LintResult,
-        [
-            TfSecRequest.Batch(
-                "tfsec", (TerraformFieldSet.create(target),), PartitionMetadata("")
-            )
-        ],
+        [TfSecRequest.Batch("tfsec", (TerraformFieldSet.create(target),), PartitionMetadata(""))],
     )
 
     assert result.exit_code == 1
-    assert (
-        "1 ignored" in result.stdout
-    ), "Error wasn't ignored, did we pull in the config file?"
+    assert "1 ignored" in result.stdout, "Error wasn't ignored, did we pull in the config file?"
     assert (
         "\x1b[1m" not in result.stdout
     ), "Found colour control code in ouput, are extra-args being passed?"
@@ -89,11 +83,7 @@ async def test_run_tfsec_with_report():
 
     result = rule_runner.request(
         LintResult,
-        [
-            TfSecRequest.Batch(
-                "tfsec", (TerraformFieldSet.create(target),), PartitionMetadata("")
-            )
-        ],
+        [TfSecRequest.Batch("tfsec", (TerraformFieldSet.create(target),), PartitionMetadata(""))],
     )
 
     assert result.exit_code == 1
@@ -101,9 +91,7 @@ async def test_run_tfsec_with_report():
     assert (
         "1 file(s) written: reports/tfsec.txt" in result.stderr
     ), "No file was written, are extra args being passed?"
-    assert (
-        "1 ignored" in result.stdout
-    ), "Error wasn't ignored, did we pull in the config file?"
+    assert "1 ignored" in result.stdout, "Error wasn't ignored, did we pull in the config file?"
     assert (
         "\x1b[1m" not in result.stdout
     ), "Found colour control code in ouput, are extra-args being passed?"
