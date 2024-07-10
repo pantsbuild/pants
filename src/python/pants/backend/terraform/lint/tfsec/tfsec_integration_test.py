@@ -13,12 +13,12 @@ from pants.backend.terraform.target_types import (
 )
 from pants.core.goals.lint import LintResult
 from pants.core.util_rules import source_files
-from pants.engine.internals.native_engine import Address
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
 
-def test_run_tfsec():
+def set_up_rule_runner(tfsec_args: list[str]) -> RuleRunner:
     rule_runner = RuleRunner(
         target_types=[TerraformModuleTarget, TerraformDeploymentTarget],
         rules=[
@@ -31,7 +31,7 @@ def test_run_tfsec():
 
     rule_runner.set_options(
         [
-            "--terraform-tfsec-args='--no-colour'",
+            *(f"--terraform-tfsec-args='{tfsec_arg}'" for tfsec_arg in tfsec_args),
             "--terraform-tfsec-config=.tfsec_config.json",  # changing the config since changing pants_ignore isn't possible with the rule_runner
         ]
     )
@@ -56,15 +56,54 @@ def test_run_tfsec():
         }
     )
 
+    return rule_runner
+
+
+def test_run_tfsec():
+    rule_runner = set_up_rule_runner(["--no-color"])
+
     target = rule_runner.get_target(Address("", target_name="good"))
 
     result = rule_runner.request(
         LintResult,
-        [TfSecRequest.Batch("tfsec", (TerraformFieldSet.create(target),), PartitionMetadata(""))],
+        [
+            TfSecRequest.Batch(
+                "tfsec", (TerraformFieldSet.create(target),), PartitionMetadata("")
+            )
+        ],
     )
 
     assert result.exit_code == 1
-    assert "1 ignored" in result.stdout, "Error wasn't ignored, did we pull in the config file?"
+    assert (
+        "1 ignored" in result.stdout
+    ), "Error wasn't ignored, did we pull in the config file?"
+    assert (
+        "\x1b[1m" not in result.stdout
+    ), "Found colour control code in ouput, are extra-args being passed?"
+
+
+async def test_run_tfsec_with_report():
+    rule_runner = set_up_rule_runner(["--no-color", "--out=reports/tfsec.txt"])
+
+    target = rule_runner.get_target(Address("", target_name="good"))
+
+    result = rule_runner.request(
+        LintResult,
+        [
+            TfSecRequest.Batch(
+                "tfsec", (TerraformFieldSet.create(target),), PartitionMetadata("")
+            )
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert result.report != EMPTY_DIGEST
+    assert (
+        "1 file(s) written: reports/tfsec.txt" in result.stderr
+    ), "No file was written, are extra args being passed?"
+    assert (
+        "1 ignored" in result.stdout
+    ), "Error wasn't ignored, did we pull in the config file?"
     assert (
         "\x1b[1m" not in result.stdout
     ), "Found colour control code in ouput, are extra-args being passed?"
