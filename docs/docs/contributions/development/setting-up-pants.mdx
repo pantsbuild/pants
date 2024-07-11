@@ -16,9 +16,9 @@ Pants requires a more modern OpenSSL version than the one that comes with macOS.
 
 ```bash
 $ brew install openssl
-$ echo 'export PATH="/usr/local/opt/openssl/bin:$PATH"' >> ~/.bashrc
-$ echo 'export LDFLAGS="-L/usr/local/opt/openssl/lib"' >> ~/.bashrc
-$ echo 'export CPPFLAGS="-I/usr/local/opt/openssl/include"' >> ~/.bashrc
+$ echo 'export PATH="$(brew --prefix)/opt/openssl/bin:$PATH"' >> ~/.bashrc
+$ echo 'export LDFLAGS="-L$(brew --prefix)/opt/openssl/lib"' >> ~/.bashrc
+$ echo 'export CPPFLAGS="-I$(brew --prefix)/opt/openssl/include"' >> ~/.bashrc
 ```
 
 (If you don't have `brew` installed, see [https://brew.sh](https://brew.sh))
