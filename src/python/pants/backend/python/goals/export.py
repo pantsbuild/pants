@@ -143,7 +143,7 @@ class ExportPluginOptions:
     )
 
     py_hermetic_scripts_in_resolve = StrListOption(
-        default=True,
+        default=[],
         help=softwrap(
             """
             When exporting a mutable virtualenv for a resolve listed in this option, by default
