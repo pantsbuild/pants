@@ -31,7 +31,7 @@ def set_up_rule_runner(tfsec_args: list[str]) -> RuleRunner:
 
     rule_runner.set_options(
         [
-            "--terraform-tfsec-args='--no-color'",
+            "--terraform-tfsec-args='--no-colour'",
             "--terraform-tfsec-config=.tfsec_config.json",  # changing the config since changing pants_ignore isn't possible with the rule_runner
             *tfsec_args,
         ]
