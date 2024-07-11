@@ -139,7 +139,7 @@ class ExportPluginOptions:
             """
             Use `--export-py-hermetic-in-resolve` instead.
             """
-        )
+        ),
     )
 
     py_hermetic_scripts_in_resolve = StrListOption(
@@ -171,7 +171,7 @@ class ExportPluginOptions:
             """
             Use `--export-py-hermetic-in-resolve` instead.
             """
-        )
+        ),
     )
 
     py_generated_sources_in_resolve = StrListOption(
