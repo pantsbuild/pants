@@ -44,7 +44,10 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platfor
 
     computed_args = []
     if tfsec.config:
-        computed_args = [f"--config-file={tfsec.config}"]
+        computed_args.append(f"--config-file={tfsec.config}")
+
+    if tfsec.report_name:
+        computed_args.append(f"--out=reports/{tfsec.report_name}")
 
     argv = [
         downloaded_tfsec.exe,

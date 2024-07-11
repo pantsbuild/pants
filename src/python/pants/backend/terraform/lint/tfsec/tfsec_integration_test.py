@@ -31,8 +31,9 @@ def set_up_rule_runner(tfsec_args: list[str]) -> RuleRunner:
 
     rule_runner.set_options(
         [
-            *(f"--terraform-tfsec-args='{tfsec_arg}'" for tfsec_arg in tfsec_args),
+            "--terraform-tfsec-args='--no-color'",
             "--terraform-tfsec-config=.tfsec_config.json",  # changing the config since changing pants_ignore isn't possible with the rule_runner
+            *tfsec_args,
         ]
     )
 
@@ -60,7 +61,7 @@ def set_up_rule_runner(tfsec_args: list[str]) -> RuleRunner:
 
 
 def test_run_tfsec():
-    rule_runner = set_up_rule_runner(["--no-color"])
+    rule_runner = set_up_rule_runner([])
 
     target = rule_runner.get_target(Address("", target_name="good"))
 
@@ -77,7 +78,11 @@ def test_run_tfsec():
 
 
 async def test_run_tfsec_with_report():
-    rule_runner = set_up_rule_runner(["--no-color", "--out=reports/tfsec.txt"])
+    rule_runner = set_up_rule_runner(
+        [
+            "--terraform-tfsec-report-name=tfsec.txt",
+        ]
+    )
 
     target = rule_runner.get_target(Address("", target_name="good"))
 
@@ -87,10 +92,10 @@ async def test_run_tfsec_with_report():
     )
 
     assert result.exit_code == 1
-    assert result.report != EMPTY_DIGEST
     assert (
         "1 file(s) written: reports/tfsec.txt" in result.stderr
     ), "No file was written, are extra args being passed?"
+    assert result.report != EMPTY_DIGEST
     assert "1 ignored" in result.stdout, "Error wasn't ignored, did we pull in the config file?"
     assert (
         "\x1b[1m" not in result.stdout

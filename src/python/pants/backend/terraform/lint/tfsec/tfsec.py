@@ -10,7 +10,7 @@ from pants.core.util_rules.external_tool import ExternalTool
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.platform import Platform
 from pants.engine.target import BoolField, Target
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption, StrOption
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,10 @@ class TFSec(ExternalTool):
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--minimum-severity=MEDIUM")
+    report_name = StrOption(
+        default=None,
+        help="If specified, will redirect the output to a file(s) under dist/lint/terraform-tfsec/ with the given name",
+    )
     config = FileOption(
         default=None,
         advanced=True,
