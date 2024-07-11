@@ -23,10 +23,10 @@ from pants.core.goals.generate_lockfiles import (
 )
 from pants.engine.addresses import Addresses
 from pants.engine.fs import PathGlobs
-from pants.engine.internals.mapper_test import TargetAdaptor
 from pants.engine.internals.native_engine import Address, AddressInput, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, Targets
