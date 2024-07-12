@@ -7,6 +7,7 @@ import os
 import subprocess
 from io import BytesIO
 from textwrap import dedent
+from typing import Literal
 from unittest.mock import Mock
 from zipfile import ZipFile
 
@@ -191,15 +192,36 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
 
 
 @pytest.mark.parametrize(
-    ("ics", "runtime"),
+    ("ics", "runtime", "complete_platforms_target_type"),
     [
-        pytest.param(["==3.7.*"], None, id="runtime inferred from ICs"),
-        pytest.param(None, "python37", id="runtime explicitly set"),
+        pytest.param(["==3.7.*"], None, None, id="runtime inferred from ICs"),
+        pytest.param(None, "python37", None, id="runtime explicitly set"),
+        pytest.param(["==3.7.*"], None, "file", id="complete platforms with file target"),
+        pytest.param(["==3.7.*"], None, "resource", id="complete platforms with resource target"),
     ],
 )
 def test_create_hello_world_gcf(
-    ics: list[str] | None, runtime: None | str, rule_runner: PythonRuleRunner
+    ics: list[str] | None,
+    runtime: None | str,
+    complete_platforms_target_type: Literal["file", "resource"] | None,
+    rule_runner: PythonRuleRunner,
+    complete_platform: bytes,
 ) -> None:
+    if runtime:
+        assert complete_platforms_target_type is None, "Cannot set both runtime and complete platforms!"
+
+    complete_platforms_target_name = f"complete_platforms_{complete_platforms_target_type}" if complete_platforms_target_type else ""
+    complete_platforms_target_declaration = (
+        f'''{complete_platforms_target_type}(
+            name="{complete_platforms_target_name}",
+            source="complete_platforms.json"
+        )\n''' if complete_platforms_target_type else ''
+    )
+    runtime_declaration = (
+        "runtime={runtime!r}" if runtime is not None
+        else f"complete_platforms=:{complete_platforms_target_name}"
+    )
+
     rule_runner.write_files(
         {
             "src/python/foo/bar/hello_world.py": dedent(
@@ -210,15 +232,17 @@ def test_create_hello_world_gcf(
                     print('Hello, World!')
                 """
             ),
+            "src/python/foo/bar/complete_platforms.json": complete_platform.decode(),
             "src/python/foo/bar/BUILD": dedent(
                 f"""
                 python_requirement(name="mureq", requirements=["mureq==0.2"])
                 python_sources(interpreter_constraints={ics!r})
+                {complete_platforms_target_declaration}
 
                 python_google_cloud_function(
                     name='gcf',
                     handler='foo.bar.hello_world:handler',
-                    runtime={runtime!r},
+                    {runtime_declaration},
                     type='event',
                 )
                 """
