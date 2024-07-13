@@ -40,8 +40,8 @@ from pants.core.target_types import (
     FilesGeneratorTarget,
     FileTarget,
     RelocatedFiles,
-    ResourceTarget,
     ResourcesGeneratorTarget,
+    ResourceTarget,
 )
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
@@ -260,13 +260,18 @@ def test_create_hello_world_gcf(
         }
     )
 
+    expected_extra_log_lines = (
+        ()
+        if complete_platforms_target_type
+        else (
+            "    Runtime: python37",
+            "    Handler: handler",
+        )
+    )
     zip_file_relpath, content = create_python_google_cloud_function(
         rule_runner,
         Address("src/python/foo/bar", target_name="gcf"),
-        expected_extra_log_lines=(
-            "    Runtime: python37",
-            "    Handler: handler",
-        ),
+        expected_extra_log_lines=expected_extra_log_lines,
     )
     assert "src.python.foo.bar/gcf.zip" == zip_file_relpath
 
