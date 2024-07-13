@@ -136,7 +136,13 @@ async def digest_complete_platform_addresses(
     original_files_sources = await MultiGet(
         Get(
             HydratedSources,
-            HydrateSourcesRequest(tgt.get(SourcesField), for_sources_types=(FileSourceField, ResourceSourceField,)),
+            HydrateSourcesRequest(
+                tgt.get(SourcesField),
+                for_sources_types=(
+                    FileSourceField,
+                    ResourceSourceField,
+                ),
+            ),
         )
         for tgt in original_file_targets
     )

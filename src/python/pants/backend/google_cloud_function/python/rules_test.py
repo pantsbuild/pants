@@ -208,24 +208,30 @@ def test_create_hello_world_gcf(
     complete_platform: bytes,
 ) -> None:
     if runtime:
-        assert complete_platforms_target_type is None, "Cannot set both runtime and complete platforms!"
+        assert (
+            complete_platforms_target_type is None
+        ), "Cannot set both runtime and complete platforms!"
 
-    complete_platforms_target_name = f"complete_platforms_{complete_platforms_target_type}" if complete_platforms_target_type else ""
+    complete_platforms_target_name = (
+        f"complete_platforms_{complete_platforms_target_type}"
+        if complete_platforms_target_type
+        else ""
+    )
     complete_platforms_target_declaration = (
-        f'''{complete_platforms_target_type}(
-            name="{complete_platforms_target_name}",
-            source="complete_platforms.json"
-        )\n''' if complete_platforms_target_type else ''
+        f"""{complete_platforms_target_type}(name="{complete_platforms_target_name}", source="complete_platforms.json")\n"""
+        if complete_platforms_target_type
+        else ""
     )
     runtime_declaration = (
-        "runtime={runtime!r}" if runtime is not None
-        else f"complete_platforms=:{complete_platforms_target_name}"
+        f'complete_platforms=":{complete_platforms_target_name}"'
+        if complete_platforms_target_type
+        else f"runtime={runtime!r}"
     )
 
     rule_runner.write_files(
         {
             "src/python/foo/bar/hello_world.py": dedent(
-                """
+                """\
                 import mureq
 
                 def handler(event, context):
@@ -234,9 +240,11 @@ def test_create_hello_world_gcf(
             ),
             "src/python/foo/bar/complete_platforms.json": complete_platform.decode(),
             "src/python/foo/bar/BUILD": dedent(
-                f"""
+                f"""\
                 python_requirement(name="mureq", requirements=["mureq==0.2"])
+
                 python_sources(interpreter_constraints={ics!r})
+
                 {complete_platforms_target_declaration}
 
                 python_google_cloud_function(
