@@ -40,6 +40,7 @@ from pants.core.target_types import (
     FilesGeneratorTarget,
     FileTarget,
     RelocatedFiles,
+    ResourceTarget,
     ResourcesGeneratorTarget,
 )
 from pants.core.target_types import rules as core_target_types_rules
@@ -69,6 +70,7 @@ def rule_runner() -> PythonRuleRunner:
             PythonRequirementTarget,
             PythonSourcesGeneratorTarget,
             RelocatedFiles,
+            ResourceTarget,
             ResourcesGeneratorTarget,
         ],
     )
@@ -223,7 +225,7 @@ def test_create_hello_world_gcf(
         else ""
     )
     runtime_declaration = (
-        f'complete_platforms=":{complete_platforms_target_name}"'
+        f'complete_platforms=[":{complete_platforms_target_name}"]'
         if complete_platforms_target_type
         else f"runtime={runtime!r}"
     )
