@@ -23,7 +23,7 @@ from pants.backend.javascript.package_json import (
 )
 from pants.backend.javascript.subsystems.nodejstest import NodeJSTest
 from pants.backend.javascript.target_types import (
-    JSSourceField,
+    JSRuntimeSourceField,
     JSTestBatchCompatibilityTagField,
     JSTestExtraEnvVarsField,
     JSTestSourceField,
@@ -174,7 +174,7 @@ async def run_javascript_tests(
         SourceFilesRequest(
             (tgt.get(SourcesField) for tgt in transitive_tgts.closure),
             enable_codegen=True,
-            for_sources_types=[JSSourceField, AssetSourceField],
+            for_sources_types=[JSRuntimeSourceField, AssetSourceField],
         ),
     )
     merged_digest = await Get(Digest, MergeDigests([sources.snapshot.digest, installation.digest]))

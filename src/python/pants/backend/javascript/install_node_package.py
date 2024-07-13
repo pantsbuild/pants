@@ -19,7 +19,7 @@ from pants.backend.javascript.package_json import (
     PackageJsonSourceField,
 )
 from pants.backend.javascript.subsystems import nodejs
-from pants.backend.javascript.target_types import JSSourceField
+from pants.backend.javascript.target_types import JSRuntimeSourceField
 from pants.build_graph.address import Address
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -66,7 +66,7 @@ async def _get_relevant_source_files(
         SourceFilesRequest(
             sources,
             for_sources_types=(PackageJsonSourceField, FileSourceField)
-            + ((ResourceSourceField, JSSourceField) if with_js else ()),
+            + ((ResourceSourceField, JSRuntimeSourceField) if with_js else ()),
             enable_codegen=True,
         ),
     )

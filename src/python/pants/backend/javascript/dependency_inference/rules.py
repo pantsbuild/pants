@@ -19,7 +19,11 @@ from pants.backend.javascript.package_json import (
     PackageJsonSourceField,
 )
 from pants.backend.javascript.subsystems.nodejs_infer import NodeJSInfer
-from pants.backend.javascript.target_types import JSDependenciesField, JSSourceField
+from pants.backend.javascript.target_types import (
+    JSDependenciesField,
+    JSRuntimeDependenciesField,
+    JSRuntimeSourceField,
+)
 from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
@@ -54,9 +58,9 @@ class InferNodePackageDependenciesRequest(InferDependenciesRequest):
 
 @dataclass(frozen=True)
 class JSSourceInferenceFieldSet(FieldSet):
-    required_fields = (JSSourceField, JSDependenciesField)
+    required_fields = (JSRuntimeSourceField, JSRuntimeDependenciesField)
 
-    source: JSSourceField
+    source: JSRuntimeSourceField
     dependencies: JSDependenciesField
 
 
@@ -76,7 +80,9 @@ async def infer_node_package_dependencies(
     )
     candidate_js_files = await Get(Owners, OwnersRequest(tuple(entry_points.globs_from_root())))
     js_targets = await Get(Targets, Addresses(candidate_js_files))
-    return InferredDependencies(tgt.address for tgt in js_targets if tgt.has_field(JSSourceField))
+    return InferredDependencies(
+        tgt.address for tgt in js_targets if tgt.has_field(JSRuntimeSourceField)
+    )
 
 
 class NodePackageCandidateMap(FrozenDict[str, Address]):
@@ -123,12 +129,12 @@ async def infer_js_source_dependencies(
     request: InferJSDependenciesRequest,
     nodejs_infer: NodeJSInfer,
 ) -> InferredDependencies:
-    source: JSSourceField = request.field_set.source
+    source: JSRuntimeSourceField = request.field_set.source
     if not nodejs_infer.imports:
         return InferredDependencies(())
 
     sources = await Get(
-        HydratedSources, HydrateSourcesRequest(source, for_sources_types=[JSSourceField])
+        HydratedSources, HydrateSourcesRequest(source, for_sources_types=[JSRuntimeSourceField])
     )
     metadata = await _prepare_inference_metadata(request.field_set.address)
 
@@ -156,7 +162,7 @@ async def infer_js_source_dependencies(
     return InferredDependencies(
         itertools.chain(
             pkg_addresses,
-            (tgt.address for tgt in owning_targets if tgt.has_field(JSSourceField)),
+            (tgt.address for tgt in owning_targets if tgt.has_field(JSRuntimeSourceField)),
         )
     )
 
