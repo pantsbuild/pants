@@ -262,7 +262,6 @@ def test_create_hello_world_gcf(
 
     extra_log_lines_base = tuple() if complete_platforms_target_type else ("    Runtime: python37",)
     expected_extra_log_lines = extra_log_lines_base + ("    Handler: handler",)
-    print("Expected extra log lines: ", expected_extra_log_lines)
     zip_file_relpath, content = create_python_google_cloud_function(
         rule_runner,
         Address("src/python/foo/bar", target_name="gcf"),
