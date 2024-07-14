@@ -904,6 +904,7 @@ def build_wheels_job(
             **({"needs": needs} if needs else {}),
             "timeout-minutes": 90,
             "env": {
+                "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION": "true",
                 **DISABLE_REMOTE_CACHE_ENV,
                 # If we're not deploying these wheels, build in debug mode, which allows for
                 # incremental compilation across wheels. If this becomes too slow in CI, most likely

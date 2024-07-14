@@ -8,6 +8,7 @@ jobs:
     container:
       image: ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf
     env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -84,6 +85,7 @@ jobs:
     container:
       image: quay.io/pypa/manylinux2014_x86_64:latest
     env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -167,6 +169,7 @@ jobs:
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -252,6 +255,7 @@ jobs:
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
