@@ -299,9 +299,10 @@ class _AwaitableCollector(ast.NodeVisitor):
                 self.awaitables.append(
                     self._get_legacy_awaitable(call_node, is_effect=issubclass(func, Effect))
                 )
-            elif inspect.isfunction(func) and (rule := getattr(func, "rule", None)) is not None:
+            elif (
+                inspect.isfunction(func) and (rule_id := getattr(func, "rule_id", None)) is not None
+            ):
                 # Is a direct `@rule` call.
-                rule_id = rule.canonical_name
                 self.awaitables.append(self._get_byname_awaitable(rule_id, func, call_node))
             elif inspect.iscoroutinefunction(func) or _returns_awaitable(func):
                 # Is a call to a "rule helper".
