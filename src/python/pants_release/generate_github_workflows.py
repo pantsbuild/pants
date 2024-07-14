@@ -21,6 +21,9 @@ from pants.util.strutil import softwrap
 
 
 def action(name: str, node16_compat: bool = False) -> str:
+    # Versions of actions compatible with node16 and the `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` setting.
+    # glibc 2.17 is required to build manylinux_2014 wheels, but node.js does do not ship glibc 2.17 compatible
+    # binaries for node >= v17.
     if node16_compat:
         return {
             "checkout": "actions/checkout@v3",
