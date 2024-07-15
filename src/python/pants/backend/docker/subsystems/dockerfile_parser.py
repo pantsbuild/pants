@@ -53,8 +53,8 @@ class DockerfileParser(PythonToolRequirementsBase):
             Use the new Rust-based, multithreaded, in-process dependency parser.
 
             If you think the new behaviour is causing problems, it is recommended that you run
-            `{bin_name()} peek :: > before.json` and then
-            `{bin_name()} --dockerfile-parser-use-rust-parser=False peek :: > after.json` and compare the
+            `{bin_name()} --dockerfile-parser-use-rust-parser=True peek :: > new-parser.json` and then
+            `{bin_name()} --dockerfile-parser-use-rust-parser=False peek :: > old-parser.json` and compare the
             two results.
 
             If you think there is a bug, please file an issue:
