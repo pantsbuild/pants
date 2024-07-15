@@ -81,6 +81,28 @@ fn from_instructions() {
 }
 
 #[test]
+fn from_instructions_multiple_stages() {
+    assert_from_tags(
+        r"
+FROM untagged
+FROM tagged:v1.2
+FROM digest@sha256:d1f0463b35135852308ea815c2ae54c1734b876d90288ce35828aeeff9899f9d
+FROM gcr.io/tekton-releases/github.com/tektoncd/operator/cmd/kubernetes/operator:v0.54.0@sha256:d1f0463b35135852308ea815c2ae54c1734b876d90288ce35828aeeff9899f9d
+FROM $PYTHON_VERSION AS python
+FROM python:$VERSION
+",
+        [
+            ("stage0", "latest"),
+            ("stage1", "v1.2"),
+            // Stage 2 is not pinned with a tag.
+            ("stage3", "v0.54.0"),
+            ("python", "build-arg:PYTHON_VERSION"), // Parse tag from build arg.
+            ("stage5", "$VERSION"),
+        ],
+    )
+}
+
+#[test]
 fn arg_instructions() {
     assert_build_args(r#"ARG VAR="value""#, [r#"VAR="value""#]);
     assert_build_args("ARG VAR=value", ["VAR=value"]);
