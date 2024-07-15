@@ -19,6 +19,23 @@ from pants_release.common import die
 
 from pants.util.strutil import softwrap
 
+ACTION = {
+    "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
+    "cache": "actions/cache@v4",
+    "checkout": "actions/checkout@v4",
+    "download-artifact": "actions/download-artifact@v4",
+    "expose-pythons": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
+    "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
+    "rust-cache": "benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1",
+    "setup-go": "actions/setup-go@v5",
+    "setup-java": "actions/setup-java@v4",
+    "setup-node": "actions/setup-node@v4",
+    "setup-protoc": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
+    "setup-python": "actions/setup-python@v5",
+    "slack-github-action": "slackapi/slack-github-action@v1.24.0",
+    "upload-artifact": "actions/upload-artifact@v4",
+}
+
 HEADER = dedent(
     """\
     # GENERATED, DO NOT EDIT!
@@ -153,7 +170,7 @@ def ensure_category_label() -> Sequence[Step]:
         {
             "if": "github.event_name == 'pull_request'",
             "name": "Ensure category label",
-            "uses": "mheap/github-action-required-labels@v4.0.0",
+            "uses": ACTION["github-action-required-labels"],
             "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
             "with": {
                 "mode": "exactly",
@@ -180,7 +197,7 @@ def ensure_release_notes() -> Sequence[Step]:
             # out via a label.
             "if": "github.event_name == 'pull_request' && !needs.classify_changes.outputs.notes",
             "name": "Ensure appropriate label",
-            "uses": "mheap/github-action-required-labels@v4.0.0",
+            "uses": ACTION["github-action-required-labels"],
             "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
             "with": {
                 "mode": "minimum",
@@ -220,7 +237,7 @@ def checkout(
         # We need to fetch a few commits back, to be able to access HEAD^2 in the PR case.
         {
             "name": "Check out code",
-            "uses": "actions/checkout@v3",
+            "uses": ACTION["checkout"],
             "with": {
                 **fetch_depth_opt,
                 **({"ref": ref} if ref else {}),
@@ -322,7 +339,7 @@ def install_rustup() -> Step:
 def install_python(version: str) -> Step:
     return {
         "name": f"Set up Python {version}",
-        "uses": "actions/setup-python@v4",
+        "uses": ACTION["setup-python"],
         "with": {"python-version": version},
     }
 
@@ -330,7 +347,7 @@ def install_python(version: str) -> Step:
 def install_node(version: str) -> Step:
     return {
         "name": f"Set up Node {version}",
-        "uses": "actions/setup-node@v3",
+        "uses": ACTION["setup-node"],
         "with": {"node-version": version},
     }
 
@@ -338,7 +355,7 @@ def install_node(version: str) -> Step:
 def install_jdk() -> Step:
     return {
         "name": "Install AdoptJDK",
-        "uses": "actions/setup-java@v3",
+        "uses": ACTION["setup-java"],
         "with": {
             "distribution": "adopt",
             "java-version": "11",
@@ -349,7 +366,7 @@ def install_jdk() -> Step:
 def install_go() -> Step:
     return {
         "name": "Install Go",
-        "uses": "actions/setup-go@v3",
+        "uses": ACTION["setup-go"],
         "with": {"go-version": "1.19.5"},
     }
 
@@ -360,7 +377,7 @@ def install_go() -> Step:
 def install_protoc() -> Step:
     return {
         "name": "Install Protoc",
-        "uses": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
+        "uses": ACTION["setup-protoc"],
         "with": {
             "version": "23.x",
             "repo-token": "${{ secrets.GITHUB_TOKEN }}",
@@ -453,7 +470,7 @@ class Helper:
     def native_binaries_upload(self) -> Step:
         return {
             "name": "Upload native binaries",
-            "uses": "actions/upload-artifact@v3",
+            "uses": ACTION["upload-artifact"],
             "with": {
                 "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
                 "path": "\n".join(NATIVE_FILES),
@@ -464,7 +481,7 @@ class Helper:
         return [
             {
                 "name": "Download native binaries",
-                "uses": "actions/download-artifact@v3",
+                "uses": ACTION["download-artifact"],
                 "with": {
                     "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
                     "path": NATIVE_FILES_COMMON_PREFIX,
@@ -485,7 +502,7 @@ class Helper:
             },
             {
                 "name": "Cache Rust toolchain",
-                "uses": "actions/cache@v3",
+                "uses": ACTION["cache"],
                 "with": {
                     "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
                     "key": f"{self.platform_name()}-rustup-{hash_files('src/rust/engine/rust-toolchain')}-v2",
@@ -493,7 +510,7 @@ class Helper:
             },
             {
                 "name": "Cache Cargo",
-                "uses": "benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1",
+                "uses": ACTION["rust-cache"],
                 "with": {
                     # If set, replaces the job id in the cache key, so that the cache is stable across jobs.
                     # If we don't set this, each job may restore from a previous job's cache entry (via a
@@ -523,7 +540,7 @@ class Helper:
             },
             {
                 "name": "Cache native engine",
-                "uses": "actions/cache@v3",
+                "uses": ACTION["cache"],
                 "with": {
                     "path": "\n".join(NATIVE_FILES),
                     "key": f"{self.platform_name()}-engine-{gha_expr('steps.get-engine-hash.outputs.hash')}-v1",
@@ -547,7 +564,7 @@ class Helper:
             ret.append(
                 {
                     "name": "Expose Pythons",
-                    "uses": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
+                    "uses": ACTION["expose-pythons"],
                 }
             )
         return ret
@@ -584,12 +601,13 @@ class Helper:
     def upload_log_artifacts(self, name: str) -> Step:
         return {
             "name": "Upload pants.log",
-            "uses": "actions/upload-artifact@v3",
+            "uses": ACTION["upload-artifact"],
             "if": "always()",
             "continue-on-error": True,
             "with": {
                 "name": f"logs-{name.replace('/', '_')}-{self.platform_name()}",
                 "path": ".pants.d/workdir/*.log",
+                "overwrite": "true",
             },
         }
 
@@ -1218,7 +1236,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             "steps": [
                 {
                     "name": "Checkout Pants at Release Tag",
-                    "uses": "actions/checkout@v3",
+                    "uses": ACTION["checkout"],
                     "with": {
                         # N.B.: We need the last few edits to VERSION. Instead of guessing, just
                         # clone the repo, we're not so big as to need to optimize this.
@@ -1241,7 +1259,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 },
                 {
                     "name": "Announce to Slack",
-                    "uses": "slackapi/slack-github-action@v1.24.0",
+                    "uses": ACTION["slack-github-action"],
                     "with": {
                         "channel-id": "C18RRR4JK",
                         "payload-file-path": "${{ runner.temp }}/slack_announcement.json",
@@ -1250,7 +1268,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 },
                 {
                     "name": "Announce to pants-devel",
-                    "uses": "dawidd6/action-send-mail@v3.8.0",
+                    "uses": ACTION["action-send-mail"],
                     "with": {
                         # Note: Email is sent from the dedicated account pants.announce@gmail.com.
                         # The EMAIL_CONNECTION_URL should be of the form:
