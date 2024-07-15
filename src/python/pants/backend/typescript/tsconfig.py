@@ -9,7 +9,7 @@ from typing import Iterable
 
 from pants.engine.collection import Collection
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
-from pants.engine.internals.selectors import concurrently
+from pants.engine.internals.selectors import concurrently, Get
 from pants.engine.intrinsics import directory_digest_to_digest_contents, path_globs_to_digest
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.util.frozendict import FrozenDict
@@ -65,7 +65,9 @@ async def _read_parent_config(
         raise ValueError(
             f"pants could not locate {child_path}'s parent at {relative}. Found: {[other.path for other in others]}."
         )
-    return await parse_extended_ts_config(ParseTSConfigRequest(parent, others))
+    return await Get(  # Must be a Get until https://github.com/pantsbuild/pants/pull/21174 lands
+        TSConfig, ParseTSConfigRequest(parent, others)
+    )
 
 
 @rule
