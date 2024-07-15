@@ -56,7 +56,18 @@ impl Visitor for CopyFileCollector<'_> {
 }
 
 impl CopyFileCollector<'_> {
-    /// Because a variable "ARG" is always wrapped in a path "$ARG".
+    /// A variable "VAR" is always wrapped in a path "$VAR".
+    /// This method replaces the latest encountered path
+    /// with the next seen variable, assuming it is the variable inside the path.
+    ///
+    /// E.g.
+    /// ```dockerfile
+    /// ARG VAR
+    /// COPY $VAR to/here
+    ///       |--> variable
+    ///      |---> path
+    ///
+    /// ```
     fn replace_last_path_with_encountered_variable_name(&mut self, node: Node) -> ChildBehavior {
         self.files.pop();
         self.files.push(CopiedFile::Arg(code::at(self.code, node)));
