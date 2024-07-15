@@ -237,7 +237,8 @@ async def generate_package_artifact_from_node_build_script(
     request = NodeBuildScriptRequest.from_package_request(req)
     result = await Get(NodeBuildScriptResult, NodeBuildScriptRequest, request)
     if req.output_path.value:
-        digest = await Get(Digest, AddPrefix(result.process.output_digest, req.output_path.value))
+        output_path = req.output_path.value_or_default(file_ending=None)
+        digest = await Get(Digest, AddPrefix(result.process.output_digest, output_path))
     else:
         digest = result.process.output_digest
     artifacts = tuple(BuiltPackageArtifact(path) for path in request.get_paths())
