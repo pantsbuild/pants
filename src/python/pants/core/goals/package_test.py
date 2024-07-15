@@ -256,17 +256,19 @@ def test_transitive_targets_without_traversing_packages(rule_runner: RuleRunner)
 
 
 def test_output_path_template_behavior(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({
-        "src/foo/BUILD": dedent(
-            """\
+    rule_runner.write_files(
+        {
+            "src/foo/BUILD": dedent(
+                """\
             mock(name="default")
             mock(name="no-template", output_path="foo/bar")
             mock(name="with-spec-path", output_path="{normalized_spec_path}/xyzzy")
             mock(name="with-spec-path-and-ext", output_path="{normalized_spec_path}/xyzzy{file_suffix}")
             mock(name="with-address-and-ext", output_path="xyzzy/{normalized_address}{file_suffix}")
             """
-        )
-    })
+            )
+        }
+    )
 
     def get_output_path(target_name: str, *, file_ending: str | None = None) -> str:
         tgt = rule_runner.get_target(Address("src/foo", target_name=target_name))
