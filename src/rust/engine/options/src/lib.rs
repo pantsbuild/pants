@@ -281,6 +281,8 @@ impl OptionParser {
         include_derivation: bool,
         buildroot: Option<BuildRoot>,
     ) -> Result<OptionParser, String> {
+        let has_provided_configs = config_sources.is_some();
+
         let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
         let buildroot_string = buildroot.convert_to_string()?;
         let fromfile_expander = FromfileExpander::relative_to(buildroot);
@@ -379,7 +381,10 @@ impl OptionParser {
             passthrough_args: None,
         };
 
-        if allow_pantsrc && parser.parse_bool(&option_id!("pantsrc"), true)?.value {
+        if allow_pantsrc
+            && parser.parse_bool(&option_id!("pantsrc"), true)?.value
+            && !has_provided_configs
+        {
             for rcfile in parser
                 .parse_string_list(
                     &option_id!("pantsrc", "files"),

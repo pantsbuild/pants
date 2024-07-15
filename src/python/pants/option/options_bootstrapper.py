@@ -100,6 +100,7 @@ class OptionsBootstrapper:
             # We ignore validation to ensure bootstrapping succeeds.
             # The bootstrap options will be validated anyway when we parse the full options.
             native_options_validation=NativeOptionsValidation.ignore,
+            native_options_config_discovery=False,
         )
 
         for options_info in collect_options_info(BootstrapOptions):
@@ -259,6 +260,7 @@ class OptionsBootstrapper:
             bootstrap_option_values=bootstrap_option_values,
             allow_unknown_options=allow_unknown_options,
             native_options_validation=bootstrap_option_values.native_options_validation,
+            native_options_config_discovery=False,
         )
 
         distinct_subsystem_classes: set[type[Subsystem]] = set()
