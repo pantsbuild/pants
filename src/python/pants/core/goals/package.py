@@ -122,7 +122,8 @@ class OutputPathField(StringField, AsyncFieldMixin):
         template = self.value
         assert template is not None
         params = self.parameters(file_ending=file_ending)
-        return template.format(**params)
+        result = template.format(**params)
+        return os.path.normpath(result)
 
 
 @dataclass(frozen=True)
