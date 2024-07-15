@@ -25,13 +25,13 @@ def action(name: str, node16_compat: bool = False) -> str:
     # glibc 2.17 is required to build manylinux_2014 wheels, but node.js does do not ship glibc 2.17 compatible
     # binaries for node >= v17.
     if node16_compat:
-        return {
+        version_map = {
             "checkout": "actions/checkout@v3",
             "upload-artifact": "actions/upload-artifact@v3",
             "setup-go": "actions/setup-go@v4",
-        }[name]
+        }
     else:
-        return {
+        version_map = {
             "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
             "cache": "actions/cache@v4",
             "checkout": "actions/checkout@v4",
@@ -46,7 +46,17 @@ def action(name: str, node16_compat: bool = False) -> str:
             "setup-python": "actions/setup-python@v5",
             "slack-github-action": "slackapi/slack-github-action@v1.24.0",
             "upload-artifact": "actions/upload-artifact@v4",
-        }[name]
+        }
+    try:
+        return version_map[name]
+    except KeyError as e:
+        configured_version = (
+            "Node 16 compatible version configured" if node16_compat else "version configured"
+        )
+        raise ValueError(
+            f"Requested github action '{name}' does not have a {configured_version}.\n"
+            f"Current known versions: {version_map}"
+        ) from e
 
 
 HEADER = dedent(
