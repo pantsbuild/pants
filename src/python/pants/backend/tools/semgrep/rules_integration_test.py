@@ -162,11 +162,30 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     )
 
 
-def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(BAD_FILE_LAYOUT)
+@pytest.mark.parametrize(
+    "files,config_name",
+    [
+        pytest.param(
+            BAD_FILE_LAYOUT,
+            None,
+        ),
+        pytest.param(
+            {
+                f"{DIR}/bad.txt": BAD_FILE,
+                f"{DIR}/BUILD": """file(name="f", source="bad.txt")""",
+                ".custom_semgrep_file.yml": RULES,
+            },
+            ".custom_semgrep_file.yml",
+            id="via custom config file",
+        ),
+    ],
+)
+def test_failing(rule_runner: RuleRunner, files: dict[str, str], config_name: str | None) -> None:
+    rule_runner.write_files(files)
     tgt = rule_runner.get_target(Address(DIR, target_name="f"))
 
-    results = run_semgrep(rule_runner, [tgt])
+    extra_args = [f"--semgrep-config-name={config_name}"] if config_name else []
+    results = run_semgrep(rule_runner, [tgt], extra_args=extra_args)
     assert len(results) == 1
     result = results[0]
     assert "find-bad-pattern" in result.stdout
@@ -205,13 +224,14 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.parametrize(
-    "files",
+    "files,config_name",
     [
         pytest.param(
             {
                 **BAD_FILE_LAYOUT,
                 ".semgrep.yml": RULES2,
             },
+            None,
             id="via nesting",
         ),
         pytest.param(
@@ -221,6 +241,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
                 ".semgrep/one.yml": RULES,
                 ".semgrep/vendored/two.yml": RULES2,
             },
+            None,
             id="via .semgrep directory",
         ),
         pytest.param(
@@ -230,15 +251,29 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
                 ".semgrep/one.yml": RULES,
                 ".semgrep/vendored/two.yml": RULES2,
             },
+            None,
             id="via recursive .semgrep directory",
+        ),
+        pytest.param(
+            {
+                f"{DIR}/bad.txt": BAD_FILE,
+                f"{DIR}/BUILD": """file(name="f", source="bad.txt")""",
+                "custom_semgrep_dir/one.yml": RULES,
+                "custom_semgrep_dir/vendored/two.yml": RULES2,
+            },
+            "custom_semgrep_dir",
+            id="via custom recursive config directory",
         ),
     ],
 )
-def test_multiple_configs(rule_runner: RuleRunner, files: dict[str, str]) -> None:
+def test_multiple_configs(
+    rule_runner: RuleRunner, files: dict[str, str], config_name: str | None
+) -> None:
     rule_runner.write_files(files)
 
     tgt = rule_runner.get_target(Address(DIR, target_name="f"))
-    results = run_semgrep(rule_runner, [tgt])
+    extra_args = [f"--semgrep-config-name={config_name}"] if config_name else []
+    results = run_semgrep(rule_runner, [tgt], extra_args=extra_args)
 
     assert len(results) == 1
     result = results[0]
