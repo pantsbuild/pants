@@ -95,6 +95,10 @@ class OutputPathField(StringField, AsyncFieldMixin):
     )
 
     def parameters(self, *, file_ending: str | None) -> dict[str, str]:
+        normalized_spec_path = self.address.spec_path.replace(os.sep, ".")
+        if not normalized_spec_path:
+            normalized_spec_path = "."
+
         target_name_part = (
             self.address.generated_name.replace(".", "_")
             if self.address.generated_name
@@ -109,7 +113,7 @@ class OutputPathField(StringField, AsyncFieldMixin):
             file_suffix = f".{file_ending}"
 
         return dict(
-            normalized_spec_path=self.address.spec_path.replace(os.sep, "."),
+            normalized_spec_path=normalized_spec_path,
             normalized_address=normalized_address,
             file_suffix=file_suffix,
         )
