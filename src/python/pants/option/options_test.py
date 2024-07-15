@@ -81,6 +81,7 @@ def create_options(
         env=env or {},
         config=Config.load([FileContent("pants.toml", toml.dumps(config or {}).encode())]),
         known_scope_infos=[*(ScopeInfo(scope) for scope in scopes), *(extra_scope_infos or ())],
+        native_options_config_discovery=False,
         args=["./pants", *(args or ())],
     )
     register_fn(options)
@@ -487,6 +488,7 @@ def _parse(
     options = Options.create(
         env=env or {},
         config=_create_config(config, config2),
+        native_options_config_discovery=False,
         known_scope_infos=_known_scope_infos,
         args=args,
         bootstrap_option_values=bootstrap_option_values,
@@ -1122,6 +1124,7 @@ def test_passthru_args_not_interpreted():
         config=_create_config(
             {"consumer": {"shlexed": ["from config"], "string": ["from config"]}}
         ),
+        native_options_config_discovery=False,
         known_scope_infos=[global_scope(), task("test"), subsystem("consumer")],
         args=[
             "./pants",
