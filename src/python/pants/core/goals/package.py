@@ -66,13 +66,24 @@ class BuiltPackage:
 
 
 class OutputPathField(StringField, AsyncFieldMixin):
+    DEFAULT = "{normalized_spec_path}/{normalized_address}{file_suffix}"
+
     alias = "output_path"
+    default = DEFAULT
+
     help = help_text(
         f"""
         Where the built asset should be located.
 
+        This field supports the following template replacements:
+        - `{{normalized_spec_path}}`: The path to the target's directory ("spec path") with forward slashes replaced by dots.
+        - `{{normalized_address}}`: The target's name with paramaterizations escaped byreplacing dots with underscores.
+        - `{{file_suffix}}`: For target's which produce single file artifacts, this is the file type suffix to use with a leading dot,
+          and is empty otherwise when not applicable.
+
         If undefined, this will use the path to the BUILD file, followed by the target name.
-        For example, `src/python/project:app` would be `src.python.project/app.ext`.
+        For example, `src/python/project:app` would be `src.python.project/app.ext`. This behavior corresponds to
+        the default template: `{DEFAULT}`
 
         When running `{bin_name()} package`, this path will be prefixed by `--distdir` (e.g. `dist/`).
 
@@ -80,23 +91,31 @@ class OutputPathField(StringField, AsyncFieldMixin):
         """
     )
 
-    def value_or_default(self, *, file_ending: str | None) -> str:
-        if self.value:
-            return self.value
+    def parameters(self, *, file_ending: str | None) -> dict[str, str]:
         target_name_part = (
             self.address.generated_name.replace(".", "_")
             if self.address.generated_name
             else self.address.target_name
         )
-        params_sanitized = self.address.parameters_repr.replace(".", "_")
-        file_prefix = f"{target_name_part}{params_sanitized}"
+        target_params_sanitized = self.address.parameters_repr.replace(".", "_")
+        normalized_address = f"{target_name_part}{target_params_sanitized}"
 
-        if file_ending is None:
-            file_name = file_prefix
-        else:
+        file_suffix = ""
+        if file_ending:
             assert not file_ending.startswith("."), "`file_ending` should not start with `.`"
-            file_name = f"{file_prefix}.{file_ending}"
-        return os.path.join(self.address.spec_path.replace(os.sep, "."), file_name)
+            file_suffix = f".{file_ending}"
+
+        return dict(
+            normalized_spec_path=self.address.spec_path.replace(os.sep, "."),
+            normalized_address=normalized_address,
+            file_suffix=file_suffix,
+        )
+
+    def value_or_default(self, *, file_ending: str | None) -> str:
+        template = self.value
+        assert template is not None
+        params = self.parameters(file_ending=file_ending)
+        return template.format(**params)
 
 
 @dataclass(frozen=True)

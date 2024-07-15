@@ -42,7 +42,6 @@ class PyOxidizerOutputPathField(OutputPathField):
 
 class PyOxidizerBinaryNameField(OutputPathField):
     alias = "binary_name"
-    default = None
     help = help_text(
         """
         The name of the binary that will be output by PyOxidizer. If not set, this will default
