@@ -106,7 +106,8 @@ async def pack_node_package_into_tgz_for_publication(
         ),
     )
     if field_set.output_path.value:
-        digest = await Get(Digest, AddPrefix(result.output_digest, field_set.output_path.value))
+        output_path = field_set.output_path.value_or_default(file_ending=None)
+        digest = await Get(Digest, AddPrefix(result.output_digest, output_path))
     else:
         digest = result.output_digest
 
