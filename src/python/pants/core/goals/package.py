@@ -76,8 +76,11 @@ class OutputPathField(StringField, AsyncFieldMixin):
         Where the built asset should be located.
 
         This field supports the following template replacements:
+
         - `{{normalized_spec_path}}`: The path to the target's directory ("spec path") with forward slashes replaced by dots.
-        - `{{normalized_address}}`: The target's name with paramaterizations escaped byreplacing dots with underscores.
+
+        - `{{normalized_address}}`: The target's name with paramaterizations escaped by replacing dots with underscores.
+
         - `{{file_suffix}}`: For target's which produce single file artifacts, this is the file type suffix to use with a leading dot,
           and is empty otherwise when not applicable.
 

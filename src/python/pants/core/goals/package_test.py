@@ -13,6 +13,7 @@ from pants.core.goals import package
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
+    OutputPathField,
     Package,
     PackageFieldSet,
     TraverseIfNotPackageTarget,
@@ -74,7 +75,7 @@ class MockDependenciesField(Dependencies):
 
 class MockTarget(Target):
     alias = "mock"
-    core_fields = (MockTypeField, MockDependenciesField)
+    core_fields = (MockTypeField, MockDependenciesField, OutputPathField)
 
 
 @dataclass(frozen=True)
@@ -252,3 +253,52 @@ def test_transitive_targets_without_traversing_packages(rule_runner: RuleRunner)
     assert x not in transitive_targets.closure
     assert transitive_targets.dependencies == FrozenOrderedSet([y])
     assert transitive_targets.closure == FrozenOrderedSet([z, y])
+
+
+def test_output_path_template_behavior(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({
+        "src/foo/BUILD": dedent(
+            """\
+            mock(name="default")
+            mock(name="no-template", output_path="foo/bar")
+            mock(name="with-spec-path", output_path="{normalized_spec_path}/xyzzy")
+            mock(name="with-spec-path-and-ext", output_path="{normalized_spec_path}/xyzzy{file_suffix}")
+            mock(name="with-address-and-ext", output_path="xyzzy/{normalized_address}{file_suffix}")
+            """
+        )
+    })
+
+    def get_output_path(target_name: str, *, file_ending: str | None = None) -> str:
+        tgt = rule_runner.get_target(Address("src/foo", target_name=target_name))
+        output_path_field = tgt.get(OutputPathField)
+        return output_path_field.value_or_default(file_ending=file_ending)
+
+    output_path_default = get_output_path("default")
+    assert output_path_default == "src.foo/default"
+
+    output_path_default_ext = get_output_path("default", file_ending="ext")
+    assert output_path_default_ext == "src.foo/default.ext"
+
+    output_path_no_template = get_output_path("no-template")
+    assert output_path_no_template == "foo/bar"
+
+    output_path_no_template_ext = get_output_path("no-template", file_ending="ext")
+    assert output_path_no_template_ext == "foo/bar"
+
+    output_path_spec_path = get_output_path("with-spec-path")
+    assert output_path_spec_path == "src.foo/xyzzy"
+
+    output_path_spec_path_ext = get_output_path("with-spec-path", file_ending="ext")
+    assert output_path_spec_path_ext == "src.foo/xyzzy"
+
+    output_path_spec_path_and_ext_1 = get_output_path("with-spec-path-and-ext")
+    assert output_path_spec_path_and_ext_1 == "src.foo/xyzzy"
+
+    output_path_spec_path_and_ext_2 = get_output_path("with-spec-path-and-ext", file_ending="ext")
+    assert output_path_spec_path_and_ext_2 == "src.foo/xyzzy.ext"
+
+    output_path_address_and_ext_1 = get_output_path("with-address-and-ext")
+    assert output_path_address_and_ext_1 == "xyzzy/with-address-and-ext"
+
+    output_path_address_and_ext_2 = get_output_path("with-address-and-ext", file_ending="ext")
+    assert output_path_address_and_ext_2 == "xyzzy/with-address-and-ext.ext"
