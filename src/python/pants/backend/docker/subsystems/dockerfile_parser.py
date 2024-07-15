@@ -50,7 +50,7 @@ class DockerfileParser(PythonToolRequirementsBase):
         default=False,
         help=softwrap(
             f"""
-            Use the new Rust-based, multithreaded, in-process dependency parser.
+            Use the new experimental Rust-based, multithreaded, in-process dependency parser.
 
             If you think the new behaviour is causing problems, it is recommended that you run
             `{bin_name()} --dockerfile-parser-use-rust-parser=True peek :: > new-parser.json` and then
