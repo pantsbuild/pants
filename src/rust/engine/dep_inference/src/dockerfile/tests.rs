@@ -117,6 +117,7 @@ fn copy_source_file_path_instructions() {
     assert_copy_from_source_path("COPY a b c to/here", ["a", "b", "c"]);
     assert_copy_from_source_path("ARG MY_ARG=value\nCOPY $MY_ARG $ARG", []);
     assert_copy_from_source_path("COPY my/file $ARG", ["my/file"]);
+    assert_copy_from_source_path("ARG MY_ARG=value\nCOPY some/dir/$MY_ARG w/e", []);
 }
 
 #[test]
@@ -125,6 +126,10 @@ fn copy_build_args_instructions() {
     assert_copy_build_args("ARG MY_ARG=\'value\'\nCOPY $MY_ARG $ARG", ["MY_ARG=value"]);
     assert_copy_build_args("ARG MY_ARG=\"value\"\nCOPY $MY_ARG $ARG", ["MY_ARG=value"]);
     assert_copy_build_args("ARG MY_ARG\nCOPY $MY_ARG $ARG", []);
+    assert_copy_build_args(
+        "ARG MY_ARG=value\nCOPY some/dir/$MY_ARG w/e",
+        ["MY_ARG=value"],
+    );
 }
 
 #[test]
