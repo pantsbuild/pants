@@ -1,6 +1,7 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::iter::once;
+use std::iter::{once, Once};
+use std::ops::Deref;
 use std::option::Option;
 use std::path::Path;
 
@@ -49,9 +50,9 @@ impl<'a> Pattern<'a> {
         };
         match (prefix, suffix) {
             (Some(specifier), None) if specifier == import => Self::from_prefix(import),
-            (None, _) | (Some(""), _) => Self::NoMatch, // "*<postfix>" isn't valid, or pattern is empty string which is also not interesting.
+            (None, _) => Self::NoMatch, // pattern is empty string.
             (Some(prefix), Some("")) => {
-                // "<prefix>*"
+                // "<prefix>*", note that a single "*" also matches here.
                 if let Some(star_match) = import.strip_prefix(prefix) {
                     Self::from_prefix_match(prefix, star_match)
                 } else {
@@ -74,27 +75,54 @@ impl<'a> Pattern<'a> {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub(crate) enum Import {
+    Matched(String),
+    UnMatched(String),
+}
+
+impl Deref for Import {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Matched(string) | Self::UnMatched(string) => string,
+        }
+    }
+}
+
+impl IntoIterator for Import {
+    type Item = String;
+    type IntoIter = Once<String>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        once(match self {
+            Self::Matched(string) | Self::UnMatched(string) => string,
+        })
+    }
+}
+
 /// Replaces patterns provided on the form outlined in
 /// [NodeJS subpath patterns](https://nodejs.org/api/packages.html#subpath-patterns).
 /// If no pattern matches, the import string is returned unchanged.
 pub fn imports_from_patterns(
     root: &str,
     patterns: &HashMap<String, Vec<String>>,
-    import: String,
-) -> HashSet<String> {
-    if let Some((star_match, pattern)) = find_best_match(patterns, &import) {
+    import: &str,
+) -> HashSet<Import> {
+    if let Some((star_match, pattern)) = find_best_match(patterns, import) {
         let mut matches = patterns[pattern]
             .iter()
             .filter_map(move |replacement| apply_replacements_to_match(&star_match, replacement))
             .map(|new_import| add_root_dir_to_dot_slash(root, new_import))
             .peekable();
         if matches.peek().is_some() {
-            Either::Right(matches)
+            Either::Right(matches.map(Import::Matched))
         } else {
-            Either::Left(once(import))
+            Either::Left(once(import.to_string()).map(Import::UnMatched))
         }
     } else {
-        Either::Left(once(import))
+        Either::Left(once(import.to_string()).map(Import::UnMatched))
     }
     .collect()
 }

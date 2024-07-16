@@ -106,13 +106,15 @@ async def prepare_inference_metadata(imports: PackageJsonImports) -> InferenceMe
     return InferenceMetadata.javascript(
         imports.root_dir,
         {pattern: list(replacements) for pattern, replacements in imports.imports.items()},
+        None,
+        {}
     )
 
 
 async def _prepare_inference_metadata(address: Address) -> InferenceMetadata:
     owning_pkg = await Get(OwningNodePackage, OwningNodePackageRequest(address))
     if not owning_pkg.target:
-        return InferenceMetadata.javascript(address.spec_path, {})
+        return InferenceMetadata.javascript(address.spec_path, {}, None, {})
     return await Get(
         InferenceMetadata, PackageJsonSourceField, owning_pkg.target[PackageJsonSourceField]
     )

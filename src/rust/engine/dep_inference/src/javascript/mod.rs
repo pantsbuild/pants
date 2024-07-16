@@ -1,13 +1,19 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::iter::{once, Once};
 use std::path::{Path, PathBuf};
 
-use fnv::FnvHashSet as HashSet;
+use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
+use itertools::Either;
 use serde_derive::{Deserialize, Serialize};
 use tree_sitter::{Node, Parser};
 
 use crate::code;
-use crate::javascript::import_pattern::imports_from_patterns;
+use protos::gen::pants::cache::{
+    javascript_inference_metadata::ImportPattern, JavascriptInferenceMetadata,
+};
+
+use crate::javascript::import_pattern::{imports_from_patterns, Import};
 use crate::javascript::util::normalize_path;
 use protos::gen::pants::cache::JavascriptInferenceMetadata;
 
@@ -24,26 +30,60 @@ pub struct ParsedJavascriptDependencies {
     pub package_imports: HashSet<String>,
 }
 
+fn patterns_as_lookup(patterns: Vec<ImportPattern>) -> HashMap<String, Vec<String>> {
+    patterns
+        .into_iter()
+        .map(|pattern| (pattern.pattern, pattern.replacements))
+        .collect()
+}
+
+fn placed_at_root(package_root: &str, string: &str) -> bool {
+    !package_root.is_empty() && string.starts_with(package_root)
+}
+
+fn is_relative_specifier(string: &str) -> bool {
+    ['.', '/'].into_iter().any(|p| string.starts_with(p))
+}
+
+fn match_and_extend_with_config_candidates(
+    string: String,
+    paths: &HashMap<String, Vec<String>>,
+    config_root: Option<&str>,
+) -> Either<Once<Import>, impl Iterator<Item = Import>> {
+    if let Some(imports) = config_root.map(|root| imports_from_patterns(root, paths, &string)) {
+        Either::Right(imports.into_iter().chain(once(Import::UnMatched(string))))
+    } else {
+        Either::Left(once(Import::UnMatched(string)))
+    }
+}
+
 pub fn get_dependencies(
     contents: &str,
     filepath: PathBuf,
     metadata: JavascriptInferenceMetadata,
 ) -> Result<ParsedJavascriptDependencies, String> {
-    let patterns = metadata
-        .import_patterns
-        .into_iter()
-        .map(|pattern| (pattern.pattern, pattern.replacements))
-        .collect();
+    let import_patterns = patterns_as_lookup(metadata.import_patterns);
+    let paths = patterns_as_lookup(metadata.paths);
+
     let mut collector = ImportCollector::new(contents);
     collector.collect();
     let (relative_files, packages): (HashSet<String>, HashSet<String>) = collector
         .imports
         .into_iter()
-        .flat_map(|import| imports_from_patterns(&metadata.package_root, &patterns, import))
+        .flat_map(|import| imports_from_patterns(&metadata.package_root, &import_patterns, &import))
+        .flat_map(|import| match import {
+            Import::UnMatched(string) if !is_relative_specifier(&string) => {
+                match_and_extend_with_config_candidates(
+                    string,
+                    &paths,
+                    metadata.config_root.as_deref(),
+                )
+            }
+            matched => Either::Left(once(matched)),
+        })
+        .flatten()
         .partition(|import| {
-            import.starts_with('.')
-                || import.starts_with('/')
-                || (!metadata.package_root.is_empty() && import.starts_with(&metadata.package_root))
+            is_relative_specifier(import) || placed_at_root(&metadata.package_root, import)
         });
     Ok(ParsedJavascriptDependencies {
         file_imports: normalize_from_path(&metadata.package_root, filepath, relative_files),
@@ -63,7 +103,7 @@ fn normalize_from_path(
             let path = Path::new(&string);
             if path.has_root() {
                 string
-            } else if path.starts_with(root) && !root.is_empty() {
+            } else if placed_at_root(root, &string) {
                 normalize_path(path).map_or(string, |path| path.to_string_lossy().to_string())
             } else {
                 normalize_path(&directory.join(path))

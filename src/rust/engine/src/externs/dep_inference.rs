@@ -24,24 +24,37 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PyInferenceMetadata(pub dependency_inference_request::Metadata);
 
+fn as_import_patterns(
+    dict: &PyDict,
+) -> PyResult<Vec<javascript_inference_metadata::ImportPattern>> {
+    dict.iter()
+        .map(|(key, value)| {
+            Ok(javascript_inference_metadata::ImportPattern {
+                pattern: key.extract()?,
+                replacements: value.extract()?,
+            })
+        })
+        .collect()
+}
+
 #[pymethods]
 impl PyInferenceMetadata {
     #[staticmethod]
-    fn javascript(package_root: String, import_patterns: &PyDict) -> PyResult<Self> {
-        use javascript_inference_metadata::ImportPattern;
-        let import_patterns: PyResult<Vec<ImportPattern>> = import_patterns
-            .iter()
-            .map(|(key, value)| {
-                Ok(ImportPattern {
-                    pattern: key.extract()?,
-                    replacements: value.extract()?,
-                })
-            })
-            .collect();
+    #[pyo3(signature = (package_root, import_patterns, config_root, paths))]
+    fn javascript(
+        package_root: String,
+        import_patterns: &PyDict,
+        config_root: Option<String>,
+        paths: &PyDict,
+    ) -> PyResult<Self> {
+        let import_patterns = as_import_patterns(import_patterns)?;
+        let paths = as_import_patterns(paths)?;
         Ok(Self(dependency_inference_request::Metadata::Js(
             JavascriptInferenceMetadata {
                 package_root,
-                import_patterns: import_patterns?,
+                import_patterns: import_patterns,
+                config_root,
+                paths,
             },
         )))
     }
