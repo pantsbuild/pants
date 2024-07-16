@@ -103,9 +103,7 @@ class TSConfigsRequest:
 
 @rule
 async def construct_effective_ts_configs(req: TSConfigsRequest) -> AllTSConfigs:
-    all_files = await path_globs_to_digest(
-        PathGlobs([f"**/{req.target_file}"])
-    )  # should be configurable
+    all_files = await path_globs_to_digest(PathGlobs([f"**/{req.target_file}"]))
     digest_contents = await directory_digest_to_digest_contents(all_files)
 
     return AllTSConfigs(
