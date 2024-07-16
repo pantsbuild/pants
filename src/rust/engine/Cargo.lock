@@ -872,12 +872,16 @@ version = "2.18.0"
 dependencies = [
  "fnv",
  "hex",
+ "indexmap 1.9.3",
  "itertools",
+ "lazy_static",
  "protos",
+ "regex",
  "serde",
  "serde_derive",
  "sha2",
  "tree-sitter",
+ "tree-sitter-dockerfile",
  "tree-sitter-javascript",
  "tree-sitter-python",
  "walkdir",
@@ -4156,6 +4160,15 @@ checksum = "e747b1f9b7b931ed39a548c1fae149101497de3c1fc8d9e18c62c1a66c683d3d"
 dependencies = [
  "cc",
  "regex",
+]
+
+[[package]]
+name = "tree-sitter-dockerfile"
+version = "0.2.0"
+source = "git+https://github.com/tobni/tree-sitter-dockerfile.git?rev=ce1cbc3537995f0d968c8bc6315b6a62d6faacde#ce1cbc3537995f0d968c8bc6315b6a62d6faacde"
+dependencies = [
+ "cc",
+ "tree-sitter",
 ]
 
 [[package]]
