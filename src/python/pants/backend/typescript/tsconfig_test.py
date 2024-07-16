@@ -8,7 +8,7 @@ import pytest
 
 from pants.backend.typescript import tsconfig
 from pants.backend.typescript.target_types import TypeScriptSourceTarget
-from pants.backend.typescript.tsconfig import AllTSConfigs, TSConfig
+from pants.backend.typescript.tsconfig import AllTSConfigs, TSConfig, TSConfigsRequest
 from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -17,7 +17,7 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[*tsconfig.rules(), QueryRule(AllTSConfigs, ())],
+        rules=[*tsconfig.rules(), QueryRule(AllTSConfigs, (TSConfigsRequest,))],
         target_types=[TypeScriptSourceTarget, TargetGeneratorSourcesHelperTarget],
     )
 
@@ -30,7 +30,7 @@ def test_parses_tsconfig(rule_runner: RuleRunner) -> None:
             "project/tsconfig.json": "{}",
         }
     )
-    [ts_config] = rule_runner.request(AllTSConfigs, [])
+    [ts_config] = rule_runner.request(AllTSConfigs, [TSConfigsRequest("tsconfig.json")])
     assert ts_config == TSConfig("project/tsconfig.json")
 
 
@@ -43,7 +43,7 @@ def test_parses_extended_tsconfig(rule_runner: RuleRunner) -> None:
             "project/lib/tsconfig.json": json.dumps({"compilerOptions": {"extends": ".."}}),
         }
     )
-    configs = rule_runner.request(AllTSConfigs, [])
+    configs = rule_runner.request(AllTSConfigs, [TSConfigsRequest("tsconfig.json")])
     assert set(configs) == {
         TSConfig("project/tsconfig.json", base_url="./"),
         TSConfig("project/lib/tsconfig.json", base_url="./", extends=".."),
@@ -59,7 +59,7 @@ def test_parses_extended_tsconfig_with_overrides(rule_runner: RuleRunner) -> Non
             "project/lib/tsconfig.json": json.dumps({"compilerOptions": {"baseUrl": "./src", "extends": ".."}}),
         }
     )
-    configs = rule_runner.request(AllTSConfigs, [])
+    configs = rule_runner.request(AllTSConfigs, [TSConfigsRequest("tsconfig.json")])
     assert set(configs) == {
         TSConfig("project/tsconfig.json", base_url="./"),
         TSConfig("project/lib/tsconfig.json", base_url="./src", extends=".."),

@@ -29,7 +29,6 @@ from pants.util.ordered_set import FrozenOrderedSet
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *package_json.rules(),
             *dependency_inference_rules(),
             QueryRule(AllPackageJson, ()),
             QueryRule(Owners, (OwnersRequest,)),
@@ -128,6 +127,36 @@ def test_infers_commonjs_js_dependencies_from_ancestor_files(rule_runner: RuleRu
     ).include
 
     assert set(addresses) == {Address("src/js", relative_file_path="xes.cjs")}
+
+
+def test_infers_js_dependencies_via_config(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "root/project/BUILD": "package_json()",
+            "root/project/package.json": given_package("ham", "0.0.1", main="./src/index.js"),
+            "root/project/jsconfig.json": json.dumps(
+                {"compilerOptions": {"paths": {"*": ["./src/*"]}}}
+            ),
+            "root/project/src/BUILD": "javascript_sources()",
+            "root/project/src/index.js": dedent(
+                """\
+                import button from "components/button.js";
+                """
+            ),
+            "root/project/src/components/BUILD": "javascript_sources()",
+            "root/project/src/components/button.js": "",
+        }
+    )
+
+    index_tgt = rule_runner.get_target(Address("root/project/src", relative_file_path="index.js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(index_tgt))],
+    ).include
+
+    assert set(addresses) == {
+        Address("root/project/src/components", relative_file_path="button.js")
+    }
 
 
 def test_infers_main_package_json_field_js_source_dependency(rule_runner: RuleRunner) -> None:
