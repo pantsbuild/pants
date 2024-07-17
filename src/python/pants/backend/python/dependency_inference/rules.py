@@ -29,7 +29,6 @@ from pants.backend.python.dependency_inference.subsystem import (
     AmbiguityResolution,
     InitFilesInference,
     PythonInferSubsystem,
-    UnownedDependencyUsage,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -46,6 +45,7 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core import target_types
 from pants.core.target_types import AllAssetTargetsByPath
 from pants.core.util_rules import stripped_source_files
+from pants.core.util_rules.unowned_dependency_behavior import UnownedDependencyUsage
 from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, rule
