@@ -59,6 +59,12 @@ class _TypeStack:
         self.root = sys.modules[func.__module__]
         self.push(self.root)
         self._push_function_closures(func)
+        # To support recursive rules.
+        # TODO: This will not allow mutually recursive rules defined in the same module.
+        #  Doing so will require changes to the @rule decorator implementation so that we
+        #  gather all rules in a module and assign them ids, and only then run
+        #  collect_awaitables() on those rules.
+        self.push({func.__name__: func})
 
     def __getitem__(self, name: str) -> Any:
         for ns in reversed(self._stack):
