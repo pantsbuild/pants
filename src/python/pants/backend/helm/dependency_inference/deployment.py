@@ -15,7 +15,7 @@ from pants.backend.docker.utils import image_ref_regexp
 from pants.backend.helm.dependency_inference.subsystem import (
     HelmInferSubsystem,
     UnownedDependencyError,
-    UnownedDependencyUsage,
+    UnownedHelmDependencyUsage,
 )
 from pants.backend.helm.subsystems import k8s_parser
 from pants.backend.helm.subsystems.k8s_parser import ParsedKubeManifest, ParseKubeManifestRequest
@@ -257,9 +257,9 @@ class ImageReferenceResolver:
                 f"The behavior for unowned imports can also be set with the `[{HelmInferSubsystem.options_scope}].unowned_dependency_behavior`",
             ]
         )
-        if self.helm_infer.unowned_dependency_behavior == UnownedDependencyUsage.RaiseError:
+        if self.helm_infer.unowned_dependency_behavior == UnownedHelmDependencyUsage.RaiseError:
             raise UnownedDependencyError(message)
-        elif self.helm_infer.unowned_dependency_behavior == UnownedDependencyUsage.LogWarning:
+        elif self.helm_infer.unowned_dependency_behavior == UnownedHelmDependencyUsage.LogWarning:
             logging.warning(message)
         else:
             return

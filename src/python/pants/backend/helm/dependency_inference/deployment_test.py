@@ -21,7 +21,7 @@ from pants.backend.helm.dependency_inference.deployment import (
 from pants.backend.helm.dependency_inference.subsystem import (
     HelmInferSubsystem,
     UnownedDependencyError,
-    UnownedDependencyUsage,
+    UnownedHelmDependencyUsage,
 )
 from pants.backend.helm.target_types import (
     HelmChartTarget,
@@ -256,7 +256,7 @@ def test_resolving_docker_image() -> None:
     resolver = ImageReferenceResolver(
         create_subsystem(
             HelmInferSubsystem,
-            unowned_dependency_behavior=UnownedDependencyUsage.RaiseError,
+            unowned_dependency_behavior=UnownedHelmDependencyUsage.RaiseError,
             external_docker_images=["busybox", "quay.io/kiwigrid/k8s-sidecar"],
         ),
         {
@@ -280,7 +280,7 @@ def test_resolving_docker_image() -> None:
         },
     )
 
-    def do_Resolve(image_ref):
+    def do_resolve(image_ref):
         """Perform the image resolution, raise any errors, and reset the resolver."""
         try:
             res = resolver.image_ref_to_actual_address(image_ref)
@@ -290,32 +290,32 @@ def test_resolving_docker_image() -> None:
             resolver.errors = []
 
     assert (
-        do_Resolve("busybox:latest") is None
+        do_resolve("busybox:latest") is None
     ), "image in known 3rd party should have no resolution"
 
     with pytest.raises(UnownedDependencyError):
         # image not in known 3rd party should have no resolution
-        do_Resolve("python:latest")
+        do_resolve("python:latest")
 
-    assert do_Resolve(valid_target) == (
+    assert do_resolve(valid_target) == (
         valid_target,
         Address("testprojects/src/helm/deployment", target_name="myapp"),
     ), "A valid target should resolve correctly"
 
     with pytest.raises(UnownedDependencyError):
         # an invalid target that looks like a normal target should not resolve
-        do_Resolve(image_with_target_name)
+        do_resolve(image_with_target_name)
 
     with pytest.raises(UnownedDependencyError):
         # something that is obviously a Pants target that isn't found should not resolve
-        do_Resolve(target_not_found)
+        do_resolve(target_not_found)
 
     with pytest.raises(UnownedDependencyError):
         # a target which is not a docker_image should not resolve
-        do_Resolve(target_wrong_type)
+        do_resolve(target_wrong_type)
 
     assert (
-        do_Resolve(docker_with_registry) is None
+        do_resolve(docker_with_registry) is None
     ), "image with registry in known 3rd party should have no resolution"
 
 

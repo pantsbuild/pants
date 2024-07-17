@@ -10,7 +10,7 @@ from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
 
-class UnownedDependencyUsage(Enum):
+class UnownedHelmDependencyUsage(Enum):
     """What action to take when an inferred dependency is unowned."""
 
     RaiseError = "error"
@@ -27,7 +27,7 @@ class HelmInferSubsystem(Subsystem):
     help = "Options controlling which dependencies will be inferred for Helm targets."
 
     unowned_dependency_behavior = EnumOption(
-        default=UnownedDependencyUsage.RaiseError,
+        default=UnownedHelmDependencyUsage.RaiseError,
         help=softwrap(
             """
             How to handle inferred dependencies that don't have an inferrable owner.
