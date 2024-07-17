@@ -685,18 +685,18 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
-    report_test_result_source = BoolOption(
+    experimental_report_test_result_info = BoolOption(
         default=False,
         advanced=True,
         help=softwrap(
             """
-            Report the source from where the test results were fetched.
+            Report information about the test results.
 
-            When running tests, they may be executed locally or remotely, but if there are results
-            of previous runs available, they may be retrieved from the local or remote cache, or be memoized.
-            Knowing where the test results come from might be useful when evaluating the efficiency of the
-            cache and the nature of the changes in the source code that may lead to frequent cache
-            invalidations.
+            For now, it reports only the source from where the test results were fetched. When running tests,
+            they may be executed locally or remotely, but if there are results of previous runs available,
+            they may be retrieved from the local or remote cache, or be memoized. Knowing where the test
+            results come from might be useful when evaluating the efficiency of the cache and the nature of
+            the changes in the source code that may lead to frequent cache invalidations.
             """
         ),
     )
@@ -887,11 +887,11 @@ async def _run_debug_tests(
     return Test(exit_code)
 
 
-def save_test_result_source_report_file(run_id: RunId, results: dict[str, str]) -> None:
-    """Save a JSON file with the information about the source of test result."""
+def _save_test_result_info_report_file(run_id: RunId, results: dict[str, dict]) -> None:
+    """Save a JSON file with the information about the test results."""
     timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    obj = json.dumps({"timestamp": timestamp, "run_id": run_id, "sources": results})
-    with safe_open(f"test_result_source_report_runid{run_id}_{timestamp}.json", "w") as fh:
+    obj = json.dumps({"timestamp": timestamp, "run_id": run_id, "info": results})
+    with safe_open(f"test_result_info_report_runid{run_id}_{timestamp}.json", "w") as fh:
         fh.write(obj)
 
 
@@ -966,8 +966,8 @@ async def run_tests(
     exit_code = 0
     if results:
         console.print_stderr("")
-    if test_subsystem.report_test_result_source:
-        test_result_sources = {}
+    if test_subsystem.experimental_report_test_result_info:
+        test_result_info = {}
     for result in sorted(results):
         if result.exit_code is None:
             # We end up here, e.g., if we implemented test discovery and found no tests.
@@ -977,10 +977,10 @@ async def run_tests(
         if result.result_metadata is None:
             # We end up here, e.g., if compilation failed during self-implemented test discovery.
             continue
-        if test_subsystem.report_test_result_source:
-            test_result_sources[result.addresses[0].spec] = result.result_metadata.source(
-                run_id
-            ).value
+        if test_subsystem.experimental_report_test_result_info:
+            test_result_info[result.addresses[0].spec] = {
+                "source": result.result_metadata.source(run_id).value
+            }
         console.print_stderr(_format_test_summary(result, run_id, console))
 
         if result.extra_output and result.extra_output.files:
@@ -1064,8 +1064,8 @@ async def run_tests(
                 # We may as well follow suit in the general case, for all languages.
                 exit_code = 2
 
-    if test_subsystem.report_test_result_source:
-        save_test_result_source_report_file(run_id, test_result_sources)
+    if test_subsystem.experimental_report_test_result_info:
+        _save_test_result_info_report_file(run_id, test_result_info)
 
     return Test(exit_code)
 

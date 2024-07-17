@@ -51,7 +51,7 @@ def test_environment_usage() -> None:
         assert "Only local environments support running processes interactively" in debug_run.stderr
 
 
-def test_report_test_result_source_usage() -> None:
+def test_report_test_result_info_usage() -> None:
     files = {
         "project/tests.py": dedent(
             """\
@@ -70,7 +70,7 @@ def test_report_test_result_source_usage() -> None:
                 [
                     "--backend-packages=['pants.backend.python']",
                     "test",
-                    "--report-test-result-source",
+                    "--experimental-report-test-result-info",
                     *extra_test_args,
                     f"{dirname}/project:",
                 ],
@@ -78,9 +78,9 @@ def test_report_test_result_source_usage() -> None:
 
         result = run()
         result.assert_success()
-        with open(glob.glob("test_result_source_report_runid*.json")[0]) as fh:
+        with open(glob.glob("test_result_info_report_runid*.json")[0]) as fh:
             report = json.load(fh)
         assert (
-            report["sources"][f"{dirname}/project/tests.py"]
+            report["info"][f"{dirname}/project/tests.py"]["source"]
             == ProcessResultMetadata.Source.RAN.value
         )
