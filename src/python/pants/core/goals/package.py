@@ -66,7 +66,7 @@ class BuiltPackage:
 
 
 class OutputPathField(StringField, AsyncFieldMixin):
-    DEFAULT = "{normalized_spec_path}/{normalized_address}{file_suffix}"
+    DEFAULT = "{spec_path_normalized}/{target_name_normalized}{file_suffix}"
 
     alias = "output_path"
     default = DEFAULT
@@ -77,9 +77,9 @@ class OutputPathField(StringField, AsyncFieldMixin):
 
         This field supports the following template replacements:
 
-        - `{{normalized_spec_path}}`: The path to the target's directory ("spec path") with forward slashes replaced by dots.
+        - `{{spec_path_normalized}}`: The path to the target's directory ("spec path") with forward slashes replaced by dots.
 
-        - `{{normalized_address}}`: The target's name with paramaterizations escaped by replacing dots with underscores.
+        - `{{target_name_normalized}}`: The target's name with paramaterizations escaped by replacing dots with underscores.
 
         - `{{file_suffix}}`: For target's which produce single file artifacts, this is the file type suffix to use with a leading dot,
           and is empty otherwise when not applicable.
@@ -95,9 +95,9 @@ class OutputPathField(StringField, AsyncFieldMixin):
     )
 
     def parameters(self, *, file_ending: str | None) -> dict[str, str]:
-        normalized_spec_path = self.address.spec_path.replace(os.sep, ".")
-        if not normalized_spec_path:
-            normalized_spec_path = "."
+        spec_path_normalized = self.address.spec_path.replace(os.sep, ".")
+        if not spec_path_normalized:
+            spec_path_normalized = "."
 
         target_name_part = (
             self.address.generated_name.replace(".", "_")
@@ -105,7 +105,7 @@ class OutputPathField(StringField, AsyncFieldMixin):
             else self.address.target_name
         )
         target_params_sanitized = self.address.parameters_repr.replace(".", "_")
-        normalized_address = f"{target_name_part}{target_params_sanitized}"
+        target_name_normalized = f"{target_name_part}{target_params_sanitized}"
 
         file_suffix = ""
         if file_ending:
@@ -113,8 +113,8 @@ class OutputPathField(StringField, AsyncFieldMixin):
             file_suffix = f".{file_ending}"
 
         return dict(
-            normalized_spec_path=normalized_spec_path,
-            normalized_address=normalized_address,
+            spec_path_normalized=spec_path_normalized,
+            target_name_normalized=target_name_normalized,
             file_suffix=file_suffix,
         )
 

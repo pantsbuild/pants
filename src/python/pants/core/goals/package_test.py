@@ -262,9 +262,9 @@ def test_output_path_template_behavior(rule_runner: RuleRunner) -> None:
                 """\
             mock(name="default")
             mock(name="no-template", output_path="foo/bar")
-            mock(name="with-spec-path", output_path="{normalized_spec_path}/xyzzy")
-            mock(name="with-spec-path-and-ext", output_path="{normalized_spec_path}/xyzzy{file_suffix}")
-            mock(name="with-address-and-ext", output_path="xyzzy/{normalized_address}{file_suffix}")
+            mock(name="with-spec-path", output_path="{spec_path_normalized}/xyzzy")
+            mock(name="with-spec-path-and-ext", output_path="{spec_path_normalized}/xyzzy{file_suffix}")
+            mock(name="with-address-and-ext", output_path="xyzzy/{target_name_normalized}{file_suffix}")
             """
             )
         }
