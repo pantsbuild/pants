@@ -7,6 +7,7 @@ import logging
 import os
 from abc import ABCMeta
 from dataclasses import dataclass
+from string import Template
 from typing import Iterable
 
 from pants.core.util_rules import distdir
@@ -66,7 +67,7 @@ class BuiltPackage:
 
 
 class OutputPathField(StringField, AsyncFieldMixin):
-    DEFAULT = "{spec_path_normalized}/{target_name_normalized}{file_suffix}"
+    DEFAULT = "${spec_path_normalized}/${target_name_normalized}${file_suffix}"
 
     alias = "output_path"
     default = DEFAULT
@@ -77,11 +78,11 @@ class OutputPathField(StringField, AsyncFieldMixin):
 
         This field supports the following template replacements:
 
-        - `{{spec_path_normalized}}`: The path to the target's directory ("spec path") with forward slashes replaced by dots.
+        - `${{spec_path_normalized}}`: The path to the target's directory ("spec path") with forward slashes replaced by dots.
 
-        - `{{target_name_normalized}}`: The target's name with paramaterizations escaped by replacing dots with underscores.
+        - `${{target_name_normalized}}`: The target's name with paramaterizations escaped by replacing dots with underscores.
 
-        - `{{file_suffix}}`: For target's which produce single file artifacts, this is the file type suffix to use with a leading dot,
+        - `${{file_suffix}}`: For target's which produce single file artifacts, this is the file type suffix to use with a leading dot,
           and is empty otherwise when not applicable.
 
         If undefined, this will use the path to the BUILD file, followed by the target name.
@@ -119,10 +120,12 @@ class OutputPathField(StringField, AsyncFieldMixin):
         )
 
     def value_or_default(self, *, file_ending: str | None) -> str:
-        template = self.value
-        assert template is not None
+        template_string = self.value
+        assert template_string is not None
+        template = Template(template_string)
+
         params = self.parameters(file_ending=file_ending)
-        result = template.format(**params)
+        result = template.safe_substitute(params)
         return os.path.normpath(result)
 
 
