@@ -6,10 +6,10 @@ use fnv::FnvHashSet as HashSet;
 use serde_derive::{Deserialize, Serialize};
 use tree_sitter::{Node, Parser};
 
-use protos::gen::pants::cache::JavascriptInferenceMetadata;
-
+use crate::code;
 use crate::javascript::import_pattern::imports_from_patterns;
 use crate::javascript::util::normalize_path;
+use protos::gen::pants::cache::JavascriptInferenceMetadata;
 
 mod import_pattern;
 mod util;
@@ -99,7 +99,7 @@ impl ImportCollector<'_> {
     }
 
     fn code_at(&self, range: tree_sitter::Range) -> &str {
-        &self.code[range.start_byte..range.end_byte]
+        code::at_range(self.code, range)
     }
 
     fn is_pragma_ignored(&self, node: Node) -> bool {

@@ -5,9 +5,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use bytes::Bytes;
+use dep_inference::dockerfile::ParsedDockerfileDependencies;
 use dep_inference::javascript::ParsedJavascriptDependencies;
 use dep_inference::python::ParsedPythonDependencies;
-use dep_inference::{javascript, python};
+use dep_inference::{dockerfile, javascript, python};
 use fs::{DirectoryDigest, Entry, SymlinkBehavior};
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
@@ -25,6 +26,7 @@ use crate::python::{Failure, Value};
 use crate::{externs, Core};
 
 pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(parse_dockerfile_info, m)?)?;
     m.add_function(wrap_pyfunction!(parse_python_deps, m)?)?;
     m.add_function(wrap_pyfunction!(parse_javascript_deps, m)?)?;
 
@@ -107,6 +109,66 @@ impl PreparedInferenceRequest {
             digest: Some(Digest::of_bytes(&self.inner.to_bytes()).into()),
         }
     }
+}
+
+#[pyfunction]
+fn parse_dockerfile_info(deps_request: Value) -> PyGeneratorResponseNativeCall {
+    PyGeneratorResponseNativeCall::new(async move {
+        let context = task_get_context();
+
+        let core = &context.core;
+        let store = core.store();
+        let prepared_inference_request = PreparedInferenceRequest::prepare(
+            deps_request,
+            &store,
+            "Dockerfile",
+            dockerfile::IMPL_HASH,
+        )
+        .await?;
+        in_workunit!(
+            "parse_dockerfile_info",
+            Level::Debug,
+            desc = Some(format!(
+                "Determine Dockerfile info for {:?}",
+                &prepared_inference_request.inner.input_file_path
+            )),
+            |_workunit| async move {
+                let result: ParsedDockerfileDependencies = get_or_create_inferred_dependencies(
+                    core,
+                    &store,
+                    prepared_inference_request,
+                    |content, request| {
+                        dockerfile::get_info(content, request.inner.input_file_path.into())
+                    },
+                )
+                .await?;
+
+                let result = Python::with_gil(|py| {
+                    externs::unsafe_call(
+                        py,
+                        core.types.parsed_dockerfile_info_result,
+                        &[
+                            result.path.to_object(py).into(),
+                            result.build_args.to_object(py).into(),
+                            result.copy_source_paths.to_object(py).into(),
+                            result.copy_build_args.to_object(py).into(),
+                            result.from_image_build_args.to_object(py).into(),
+                            result
+                                .version_tags
+                                .into_iter()
+                                .map(|(stage, tag)| format!("{stage} {tag}"))
+                                .collect::<Vec<_>>()
+                                .to_object(py)
+                                .into(),
+                        ],
+                    )
+                });
+
+                Ok::<_, Failure>(result)
+            }
+        )
+        .await
+    })
 }
 
 #[pyfunction]

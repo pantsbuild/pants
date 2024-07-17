@@ -37,6 +37,7 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
+    NativeParsedDockerfileInfo,
     NativeParsedJavascriptDependencies,
     NativeParsedPythonDependencies,
 )
@@ -565,6 +566,9 @@ async def interactive_process(
     process: InteractiveProcess, process_execution_environment: ProcessExecutionEnvironment
 ) -> InteractiveProcessResult: ...
 async def docker_resolve_image(request: DockerResolveImageRequest) -> DockerResolveImageResult: ...
+async def parse_dockerfile_info(
+    deps_request: NativeDependenciesRequest,
+) -> NativeParsedDockerfileInfo: ...
 async def parse_python_deps(
     deps_request: NativeDependenciesRequest,
 ) -> NativeParsedPythonDependencies: ...
