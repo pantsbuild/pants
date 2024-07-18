@@ -26,3 +26,13 @@ class NativeParsedJavascriptDependencies:
     def __init__(self, file_imports: set[str], package_imports: set[str]):
         object.__setattr__(self, "file_imports", file_imports)
         object.__setattr__(self, "package_imports", package_imports)
+
+
+@dataclass(frozen=True)
+class NativeParsedDockerfileInfo:
+    source: str
+    build_args: tuple[str, ...]  # "ARG_NAME=VALUE", ...
+    copy_source_paths: tuple[str, ...]
+    copy_build_args: tuple[str, ...]  # "ARG_NAME=UPSTREAM_TARGET_ADDRESS", ...
+    from_image_build_args: tuple[str, ...]  # "ARG_NAME=UPSTREAM_TARGET_ADDRESS", ...
+    version_tags: tuple[str, ...]  # "STAGE TAG", ...
