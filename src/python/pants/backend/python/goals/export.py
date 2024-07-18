@@ -284,8 +284,8 @@ async def do_export(
             output_path,
         ]
         if (
-            not export_subsys.options.py_hermetic_scripts
-            or req.resolve_name in export_subsys.options.py_non_hermetic_scripts_in_resolve
+            req.resolve_name in export_subsys.options.py_non_hermetic_scripts_in_resolve
+            or not export_subsys.options.py_hermetic_scripts
         ):
             pex_args.insert(-1, "--non-hermetic-scripts")
 
