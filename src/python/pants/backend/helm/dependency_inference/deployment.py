@@ -180,7 +180,8 @@ async def first_party_helm_deployment_mapping(
 class ImageReferenceResolver:
     """Attempt to resolve images to their references.
 
-    Errors are stored internally and are surfaced by a call to `report_errors`
+    Errors are stored internally and are surfaced by a call to `report_errors`, so we can report all
+    problems and avoid only raising 1 per run.
     """
 
     helm_infer: HelmInferSubsystem
@@ -190,6 +191,7 @@ class ImageReferenceResolver:
     errors: list[str] = field(default_factory=list)
 
     def image_ref_to_actual_address(self, image_ref: str) -> tuple[str, Address] | None:
+        """Attempt to resolve an image reference to its Pants Address or the docker image."""
         maybe_addr = self.maybe_addresses_by_ref.get(image_ref)
         if not maybe_addr:
             return None
@@ -247,6 +249,10 @@ class ImageReferenceResolver:
         self.errors.append(message)
 
     def report_errors(self):
+        """Raise all gathered errors.
+
+        Invoke this method after all resolving is done.
+        """
         if not self.errors:
             return
 

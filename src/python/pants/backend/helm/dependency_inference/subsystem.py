@@ -23,6 +23,14 @@ class UnownedDependencyError(Exception):
 
 
 class HelmInferSubsystem(Subsystem):
+    """Settings controlling the dependency inference behaviour of the Helm backend.
+
+    Adding "*" to `external_docker_images` is different from setting `unowned_dependency_behavior`
+    to something other than "error". The key is that `external_docker_images` with "*" will only
+    allow anything that could be a docker image, but will still raise errors for other inference
+    problems.
+    """
+
     options_scope = "helm-infer"
     help = "Options controlling which dependencies will be inferred for Helm targets."
 
