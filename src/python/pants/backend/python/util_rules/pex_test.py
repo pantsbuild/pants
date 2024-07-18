@@ -6,9 +6,11 @@ from __future__ import annotations
 import os.path
 import re
 import shutil
+import subprocess
 import textwrap
 import zipfile
 from pathlib import Path
+from typing import Literal
 
 import pytest
 import requests
@@ -18,6 +20,8 @@ from pkg_resources import Requirement
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
+from pants.backend.python.goals.package_pex_binary import rules as package_pex_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex_test_utils
@@ -58,6 +62,7 @@ from pants.backend.python.util_rules.pex_test_utils import (
     parse_requirements,
 )
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult
+from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules.lockfile_metadata import InvalidLockfileError
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -67,6 +72,7 @@ from pants.engine.fs import (
     Directory,
     FileContent,
 )
+from pants.engine.internals.native_engine import Address
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_subsystem
@@ -90,12 +96,38 @@ def rule_runner() -> RuleRunner:
         rules=[
             *pex_test_utils.rules(),
             *pex_rules(),
+            *package_pex_rules(),
             QueryRule(GlobalOptions, []),
             QueryRule(ProcessResult, (Process,)),
             QueryRule(PexResolveInfo, (Pex,)),
             QueryRule(PexResolveInfo, (VenvPex,)),
         ],
     )
+
+
+@pytest.fixture
+def complete_platform(rule_runner: RuleRunner) -> bytes:
+    rule_runner.write_files(
+        {
+            "pex_exe/BUILD": textwrap.dedent(
+                """\
+                python_requirement(name="req", requirements=["pex==2.11.0"])
+                pex_binary(dependencies=[":req"], script="pex")
+                """
+            ),
+        }
+    )
+    result = rule_runner.request(
+        BuiltPackage, [PexBinaryFieldSet.create(rule_runner.get_target(Address("pex_exe")))]
+    )
+    rule_runner.write_digest(result.digest)
+    pex_executable = os.path.join(rule_runner.build_root, "pex_exe/pex_exe.pex")
+    return subprocess.run(
+        args=[pex_executable, "interpreter", "inspect", "-mt"],
+        env=dict(PEX_MODULE="pex.cli", **os.environ),
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout
 
 
 @pytest.mark.parametrize("pex_type", [Pex, VenvPex])
@@ -880,6 +912,62 @@ def test_build_pex_description(rule_runner: RuleRunner) -> None:
             )
         ),
         expected="Building new.pex from lock.txt",
+    )
+
+
+@pytest.mark.parametrize(
+    ("ics", "complete_platforms_target_type"),
+    [
+        pytest.param(["==3.10.*"], "file", id="complete platforms with file target"),
+        pytest.param(["==3.10.*"], "resource", id="complete platforms with resource target"),
+    ],
+)
+def test_create_pex_binary_with_complete_platforms(
+    ics: list[str] | None,
+    complete_platforms_target_type: Literal["file", "resource"] | None,
+    rule_runner: RuleRunner,
+    complete_platform: bytes,
+) -> None:
+    complete_platforms_target_name = (
+        f"complete_platforms_{complete_platforms_target_type}"
+        if complete_platforms_target_type
+        else ""
+    )
+    complete_platforms_target_declaration = (
+        f"""{complete_platforms_target_type}(name="{complete_platforms_target_name}", source="complete_platforms.json")\n"""
+        if complete_platforms_target_type
+        else ""
+    )
+    runtime_declaration = f'complete_platforms=[":{complete_platforms_target_name}"]'
+
+    rule_runner.write_files(
+        {
+            "src/python/foo/bar/hello_world.py": textwrap.dedent(
+                """\
+                import mureq
+
+                def handler(event, context):
+                    print('Hello, World!')
+                """
+            ),
+            "src/python/foo/bar/complete_platforms.json": complete_platform.decode(),
+            "src/python/foo/bar/BUILD": textwrap.dedent(
+                f"""\
+                python_requirement(name="mureq", requirements=["mureq==0.2"])
+
+                python_sources(name="lib", interpreter_constraints={ics!r})
+
+                {complete_platforms_target_declaration}
+
+                pex_binary(
+                    name='gcf',
+                    dependencies=[":lib"],
+                    entry_point='foo.bar.hello_world:handler',
+                    {runtime_declaration},
+                )
+                """
+            ),
+        }
     )
 
 
