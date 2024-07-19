@@ -10,6 +10,7 @@ import os
 import shlex
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, TypeVar, Union
 
@@ -614,11 +615,20 @@ async def prepare_adhoc_process(
     return _output_at_build_root(proc, bash)
 
 
+class PathEnvModifyMode(Enum):
+    """How the PATH environment variable should be augmented with extra path elements."""
+
+    PREPEND = "prepend"
+    APPEND = "append"
+    OFF = "off"
+
+
 async def prepare_env_vars(
     existing_env_vars: Mapping[str, str],
     env_vars_templates: tuple[str, ...],
     *,
     extra_paths: tuple[str, ...] = (),
+    path_env_modify_mode: PathEnvModifyMode = PathEnvModifyMode.PREPEND,
     description_of_origin: str,
 ) -> FrozenDict[str, str]:
     env_vars: dict[str, str] = dict(existing_env_vars)
@@ -647,20 +657,25 @@ async def prepare_env_vars(
         )
         env_vars.update(fetched_env_vars)
 
+    def path_env_join(left: str | None, right: str | None) -> str | None:
+        if not left and not right:
+            return None
+        if left and not right:
+            return left
+        if not left and right:
+            return right
+        return f"{left}:{right}"
+
     if extra_paths:
-
-        def path_env_join(left: str | None, right: str | None) -> str | None:
-            if not left and not right:
-                return None
-            if left and not right:
-                return left
-            if not left and right:
-                return right
-            return f"{left}:{right}"
-
         existing_path_env = env_vars.get("PATH")
         extra_paths_as_str = ":".join(extra_paths)
-        new_path_env = path_env_join(extra_paths_as_str, existing_path_env)
+
+        new_path_env: str | None = None
+        if path_env_modify_mode == PathEnvModifyMode.PREPEND:
+            new_path_env = path_env_join(extra_paths_as_str, existing_path_env)
+        elif path_env_modify_mode == PathEnvModifyMode.APPEND:
+            new_path_env = path_env_join(existing_path_env, extra_paths_as_str)
+
         if new_path_env:
             env_vars["PATH"] = new_path_env
 

@@ -913,7 +913,7 @@ def test_shell_command_workspace_invalidation_sources(rule_runner: RuleRunner) -
     assert result1.snapshot != result3.snapshot
 
 
-def test_shell_command_path_shims_mode(rule_runner: RuleRunner) -> None:
+def test_shell_command_path_env_modify_mode(rule_runner: RuleRunner) -> None:
     expected_path = "/bin:/usr/bin"
     rule_runner.write_files(
         {
@@ -925,7 +925,7 @@ def test_shell_command_path_shims_mode(rule_runner: RuleRunner) -> None:
                 command="echo $PATH > path.txt",
                 extra_env_vars=["PATH={expected_path}"],
                 output_files=["path.txt"],
-                path_shims_mode="prepend",
+                path_env_modify="prepend",
             )
             shell_command(
                 name="shims_append",
@@ -933,7 +933,7 @@ def test_shell_command_path_shims_mode(rule_runner: RuleRunner) -> None:
                 command="echo $PATH > path.txt",
                 extra_env_vars=["PATH={expected_path}"],
                 output_files=["path.txt"],
-                path_shims_mode="append",
+                path_env_modify="append",
             )
             shell_command(
                 name="shims_off",
@@ -941,7 +941,7 @@ def test_shell_command_path_shims_mode(rule_runner: RuleRunner) -> None:
                 command="echo $PATH > path.txt",
                 extra_env_vars=["PATH={expected_path}"],
                 output_files=["path.txt"],
-                path_shims_mode="off",
+                path_env_modify="off",
             )
             """
             )

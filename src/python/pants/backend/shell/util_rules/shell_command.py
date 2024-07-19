@@ -10,7 +10,6 @@ from dataclasses import dataclass
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
-    PathShimsMode,
     RunShellCommandWorkdirField,
     ShellCommandCommandField,
     ShellCommandExecutionDependenciesField,
@@ -20,7 +19,7 @@ from pants.backend.shell.target_types import (
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
-    ShellCommandPathShimsModeField,
+    ShellCommandPathEnvModifyModeField,
     ShellCommandRunnableDependenciesField,
     ShellCommandSourcesField,
     ShellCommandTarget,
@@ -46,7 +45,6 @@ from pants.core.util_rules.adhoc_process_support import (
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.internals.native_engine import EMPTY_DIGEST
@@ -150,35 +148,9 @@ async def _prepare_process_request_from_target(
         merged_extras.extra_env,
         shell_command.get(ShellCommandExtraEnvVarsField).value or (),
         extra_paths=merged_extras.paths,
+        path_env_modify_mode=shell_command.get(ShellCommandPathEnvModifyModeField).as_enum(),
         description_of_origin=f"`{ShellCommandExtraEnvVarsField.alias}` for `shell_command` target at `{shell_command.address}`",
     )
-
-    def path_cat(left: str | None, right: str | None) -> str:
-        if left and not right:
-            return left
-        if not left and right:
-            return right
-        return f"{left}:{right}"
-
-    extra_env = dict(merged_extras.extra_env)
-    if merged_extras.path:
-        extra_env_vars = shell_command.get(ShellCommandExtraEnvVarsField).value or ()
-        existing_path = ""
-        if "PATH" in extra_env_vars:
-            fetched_env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
-            existing_path = fetched_env_vars.get("PATH", "")
-        else:
-            for env_var in extra_env_vars:
-                if env_var.startswith("PATH="):
-                    existing_path = env_var[len("PATH=") :]
-                    break
-
-        path_shims_mode = shell_command.get(ShellCommandPathShimsModeField).value
-        # raise ValueError(f"path_shims_mode={path_shims_mode}, env={extra_env}, extra={merged_extras.path}, existing={existing_path}")
-        if path_shims_mode == PathShimsMode.PREPEND.value:
-            extra_env["PATH"] = path_cat(merged_extras.path, existing_path)
-        elif path_shims_mode == PathShimsMode.APPEND.value:
-            extra_env["PATH"] = path_cat(existing_path, merged_extras.path)
 
     append_only_caches = {
         **merged_extras.append_only_caches,

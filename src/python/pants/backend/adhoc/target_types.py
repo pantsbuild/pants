@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import ClassVar
 
+from pants.core.util_rules.adhoc_process_support import PathEnvModifyMode
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -274,6 +275,35 @@ class AdhocToolWorkspaceInvalidationSourcesField(StringSequenceField):
     )
 
 
+class AdhocToolPathEnvModifyModeField(StringField):
+    alias = "path_env_modify"
+    default = PathEnvModifyMode.PREPEND.value
+    help = help_text(
+        """
+        When executing the command of an `adhoc_tool` or `shell_command` target, Pants will augment the `PATH`
+        environment variable with the location of any binary shims created for `tools` and for
+        any runnable dependencies.
+
+        Modification of the `PATH` environment variable can be configured as follows:
+        - `prepend`: Prepend the extra path components to any existing `PATH` value.
+        - `append`: Append the extra path componenets to any existing `PATH` value.
+        - `off`: Do not modify the existing `PATH` value.
+        """
+    )
+    valid_choices = PathEnvModifyMode
+
+    def as_enum(self) -> PathEnvModifyMode:
+        value = self.value
+        if value == PathEnvModifyMode.PREPEND.value:
+            return PathEnvModifyMode.PREPEND
+        elif value == PathEnvModifyMode.APPEND.value:
+            return PathEnvModifyMode.APPEND
+        elif value == PathEnvModifyMode.OFF.value:
+            return PathEnvModifyMode.OFF
+        else:
+            raise AssertionError(f"Invalid value for {self.alias} field: {value}")
+
+
 class AdhocToolTarget(Target):
     alias: ClassVar[str] = "adhoc_tool"
     core_fields = (
@@ -294,6 +324,7 @@ class AdhocToolTarget(Target):
         AdhocToolStdoutFilenameField,
         AdhocToolStderrFilenameField,
         AdhocToolWorkspaceInvalidationSourcesField,
+        AdhocToolPathEnvModifyModeField,
         EnvironmentField,
     )
     help = help_text(
