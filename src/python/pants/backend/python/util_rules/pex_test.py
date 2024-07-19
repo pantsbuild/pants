@@ -6,7 +6,6 @@ from __future__ import annotations
 import os.path
 import re
 import shutil
-import subprocess
 import textwrap
 import zipfile
 from pathlib import Path
@@ -19,8 +18,6 @@ from pkg_resources import Requirement
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
-from pants.backend.python.goals.package_pex_binary import rules as package_pex_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex_test_utils
@@ -61,7 +58,6 @@ from pants.backend.python.util_rules.pex_test_utils import (
     parse_requirements,
 )
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult
-from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules.lockfile_metadata import InvalidLockfileError
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -71,7 +67,6 @@ from pants.engine.fs import (
     Directory,
     FileContent,
 )
-from pants.engine.internals.native_engine import Address
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_subsystem
@@ -95,38 +90,12 @@ def rule_runner() -> RuleRunner:
         rules=[
             *pex_test_utils.rules(),
             *pex_rules(),
-            *package_pex_rules(),
             QueryRule(GlobalOptions, []),
             QueryRule(ProcessResult, (Process,)),
             QueryRule(PexResolveInfo, (Pex,)),
             QueryRule(PexResolveInfo, (VenvPex,)),
         ],
     )
-
-
-@pytest.fixture
-def complete_platform(rule_runner: RuleRunner) -> bytes:
-    rule_runner.write_files(
-        {
-            "pex_exe/BUILD": textwrap.dedent(
-                """\
-                python_requirement(name="req", requirements=["pex==2.11.0"])
-                pex_binary(dependencies=[":req"], script="pex")
-                """
-            ),
-        }
-    )
-    result = rule_runner.request(
-        BuiltPackage, [PexBinaryFieldSet.create(rule_runner.get_target(Address("pex_exe")))]
-    )
-    rule_runner.write_digest(result.digest)
-    pex_executable = os.path.join(rule_runner.build_root, "pex_exe/pex_exe.pex")
-    return subprocess.run(
-        args=[pex_executable, "interpreter", "inspect", "-mt"],
-        env=dict(PEX_MODULE="pex.cli", **os.environ),
-        check=True,
-        stdout=subprocess.PIPE,
-    ).stdout
 
 
 @pytest.mark.parametrize("pex_type", [Pex, VenvPex])
