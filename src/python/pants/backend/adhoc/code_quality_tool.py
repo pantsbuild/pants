@@ -6,7 +6,11 @@ from typing import ClassVar, Iterable
 from pants.core.goals.fix import Fix, FixFilesRequest, FixResult
 from pants.core.goals.fmt import Fmt, FmtFilesRequest, FmtResult
 from pants.core.goals.lint import Lint, LintFilesRequest, LintResult
-from pants.core.util_rules.adhoc_process_support import ToolRunner, ToolRunnerRequest
+from pants.core.util_rules.adhoc_process_support import (
+    ToolRunner,
+    ToolRunnerRequest,
+    prepare_env_vars,
+)
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.partitions import Partitions
 from pants.engine.addresses import Addresses
@@ -201,6 +205,14 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
 
     input_digest = await Get(Digest, MergeDigests((runner.digest, batch.sources_snapshot.digest)))
 
+    env_vars: dict[str, str] = dict(runner.extra_env)
+    user_env_vars = await prepare_env_vars(
+        (),
+        extra_paths=runner.extra_paths,
+        description_of_origin="code quality tool",
+    )
+    env_vars.update(user_env_vars)
+
     result = await Get(
         FallibleProcessResult,
         Process(
@@ -209,7 +221,7 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
             input_digest=input_digest,
             append_only_caches=runner.append_only_caches,
             immutable_input_digests=FrozenDict.frozen(runner.immutable_input_digests),
-            env=FrozenDict(runner.extra_env),
+            env=FrozenDict(env_vars),
             output_files=batch.output_files,
         ),
     )
