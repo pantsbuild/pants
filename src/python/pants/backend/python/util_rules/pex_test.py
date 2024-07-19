@@ -915,62 +915,6 @@ def test_build_pex_description(rule_runner: RuleRunner) -> None:
     )
 
 
-@pytest.mark.parametrize(
-    ("ics", "complete_platforms_target_type"),
-    [
-        pytest.param(["==3.10.*"], "file", id="complete platforms with file target"),
-        pytest.param(["==3.10.*"], "resource", id="complete platforms with resource target"),
-    ],
-)
-def test_create_pex_binary_with_complete_platforms(
-    ics: list[str] | None,
-    complete_platforms_target_type: Literal["file", "resource"] | None,
-    rule_runner: RuleRunner,
-    complete_platform: bytes,
-) -> None:
-    complete_platforms_target_name = (
-        f"complete_platforms_{complete_platforms_target_type}"
-        if complete_platforms_target_type
-        else ""
-    )
-    complete_platforms_target_declaration = (
-        f"""{complete_platforms_target_type}(name="{complete_platforms_target_name}", source="complete_platforms.json")\n"""
-        if complete_platforms_target_type
-        else ""
-    )
-    runtime_declaration = f'complete_platforms=[":{complete_platforms_target_name}"]'
-
-    rule_runner.write_files(
-        {
-            "src/python/foo/bar/hello_world.py": textwrap.dedent(
-                """\
-                import mureq
-
-                def handler(event, context):
-                    print('Hello, World!')
-                """
-            ),
-            "src/python/foo/bar/complete_platforms.json": complete_platform.decode(),
-            "src/python/foo/bar/BUILD": textwrap.dedent(
-                f"""\
-                python_requirement(name="mureq", requirements=["mureq==0.2"])
-
-                python_sources(name="lib", interpreter_constraints={ics!r})
-
-                {complete_platforms_target_declaration}
-
-                pex_binary(
-                    name='gcf',
-                    dependencies=[":lib"],
-                    entry_point='foo.bar.hello_world:handler',
-                    {runtime_declaration},
-                )
-                """
-            ),
-        }
-    )
-
-
 def test_lockfile_validation(rule_runner: RuleRunner) -> None:
     """Check that we properly load and validate lockfile metadata for both types of locks.
 
