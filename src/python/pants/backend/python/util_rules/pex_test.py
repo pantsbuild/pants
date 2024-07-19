@@ -10,7 +10,6 @@ import subprocess
 import textwrap
 import zipfile
 from pathlib import Path
-from typing import Literal
 
 import pytest
 import requests
