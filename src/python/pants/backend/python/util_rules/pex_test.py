@@ -924,7 +924,7 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
 @pytest.mark.parametrize("target_type", ["file", "resource"])
 def test_digest_complete_platforms(rule_runner: RuleRunner, target_type: str) -> None:
     # Read the complete_platforms content using pkgutil
-    complete_platforms_content = pkgutil.get_data(__name__, "complete_platform_pex_test_amd.json")
+    complete_platforms_content = pkgutil.get_data(__name__, "complete_platform_pex_test.json")
     assert complete_platforms_content is not None
 
     # Create a target with the complete platforms file
