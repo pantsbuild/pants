@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os.path
+import pkgutil
 import re
 import shutil
 import textwrap
@@ -19,7 +20,7 @@ from pkg_resources import Requirement
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import EntryPoint
+from pants.backend.python.target_types import EntryPoint, PexCompletePlatformsField
 from pants.backend.python.util_rules import pex_test_utils
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
@@ -58,6 +59,7 @@ from pants.backend.python.util_rules.pex_test_utils import (
     parse_requirements,
 )
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult
+from pants.core.target_types import FileTarget, ResourceTarget
 from pants.core.util_rules.lockfile_metadata import InvalidLockfileError
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -67,6 +69,7 @@ from pants.engine.fs import (
     Directory,
     FileContent,
 )
+from pants.engine.internals.native_engine import Address
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_subsystem
@@ -94,7 +97,12 @@ def rule_runner() -> RuleRunner:
             QueryRule(ProcessResult, (Process,)),
             QueryRule(PexResolveInfo, (Pex,)),
             QueryRule(PexResolveInfo, (VenvPex,)),
+            QueryRule(CompletePlatforms, (PexCompletePlatformsField,))
         ],
+        target_types=[
+            ResourceTarget,
+            FileTarget,
+        ]
     )
 
 
@@ -911,3 +919,29 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
         create_pex_and_get_all_data(
             rule_runner, requirements=EntireLockfile(_lockfile, ("ansicolors",))
         )
+
+
+@pytest.mark.parametrize("target_type", ["file", "resource"])
+def test_digest_complete_platforms(rule_runner: RuleRunner, target_type: str) -> None:
+    # Read the complete_platforms content using pkgutil
+    complete_platforms_content = pkgutil.get_data(__name__, "complete_platform_pex_test_amd.json")
+    assert complete_platforms_content is not None
+
+    # Create a target with the complete platforms file
+    rule_runner.write_files(
+        {
+            "BUILD": f"{target_type}(name='complete_platforms', source='complete_platforms.json')",
+            "complete_platforms.json": complete_platforms_content,
+        }
+    )
+
+    # Get the CompletePlatforms object
+    target = rule_runner.get_target(Address("", target_name="complete_platforms"))
+    complete_platforms = rule_runner.request(
+        CompletePlatforms,
+        [PexCompletePlatformsField([":complete_platforms"], target.address)],
+    )
+
+    # Verify the result
+    assert len(complete_platforms) == 1
+    assert complete_platforms.digest != EMPTY_DIGEST
