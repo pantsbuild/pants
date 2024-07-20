@@ -97,12 +97,12 @@ def rule_runner() -> RuleRunner:
             QueryRule(ProcessResult, (Process,)),
             QueryRule(PexResolveInfo, (Pex,)),
             QueryRule(PexResolveInfo, (VenvPex,)),
-            QueryRule(CompletePlatforms, (PexCompletePlatformsField,))
+            QueryRule(CompletePlatforms, (PexCompletePlatformsField,)),
         ],
         target_types=[
             ResourceTarget,
             FileTarget,
-        ]
+        ],
     )
 
 
