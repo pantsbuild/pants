@@ -369,7 +369,7 @@ To set options, call `rule_runer.set_options()` with a list of the arguments, e.
 You can also set the keyword argument `env: dict[str, str]`. If the option starts with `PANTS_`, it will change which options Pants uses. You can include any arbitrary environment variable here; some rules use the parent Pants process to read arbitrary env vars, e.g. the `--test-extra-env-vars` option, so this allows you to mock the environment in your test. Alternatively, use the keyword argument `env_inherit: set[str]` to set the specified environment variables using the test runner's environment, which is useful to set values like `PATH` which may vary across machines.
 
 :::caution Calling `rule_runner.set_options()` will override any options that were previously set.
-you will need to register everything you want in a single call.
+You will need to register everything you want in a single call.
 :::
 
 ### Running your rules
