@@ -8,6 +8,7 @@ from pants.core.goals.package import OutputPathField
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
     Dependencies,
     OptionalSingleSourceField,
     StringField,
@@ -40,15 +41,22 @@ class PyOxidizerOutputPathField(OutputPathField):
     )
 
 
-class PyOxidizerBinaryNameField(OutputPathField):
+class PyOxidizerBinaryNameField(StringField, AsyncFieldMixin):
     alias = "binary_name"
-    default = None
     help = help_text(
         """
         The name of the binary that will be output by PyOxidizer. If not set, this will default
         to the name of this target.
         """
     )
+
+    def value_or_default(self) -> str:
+        if self.value:
+            return self.value
+
+        return (
+            self.address.generated_name if self.address.generated_name else self.address.target_name
+        )
 
 
 class PyOxidizerEntryPointField(StringField):

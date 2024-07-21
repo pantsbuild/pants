@@ -364,11 +364,13 @@ def test_example() -> None:
 
 Often, you will want to set Pants options, such as activating a certain backend or setting a `--config` option.
 
-To set options, call `rule_runer.set_options()` with a list of the arguments, e.g. `rule_runner.set_options(["--pytest-version=pytest>=6.0"])`.
+To set options, call `rule_runer.set_options()` with a list of the arguments, e.g. `rule_runner.set_options(["--pytest-version=pytest>=6.0"])`. Global options will need to be set when constructing the `rule_runner` using the `bootstrap_args` parameter. For example, `bootstrap_args=["--pants-ignore=['!/.normally_ignored/']"]` will allow a test to read from a normally ignored directory, which can be useful for reading config files.
 
 You can also set the keyword argument `env: dict[str, str]`. If the option starts with `PANTS_`, it will change which options Pants uses. You can include any arbitrary environment variable here; some rules use the parent Pants process to read arbitrary env vars, e.g. the `--test-extra-env-vars` option, so this allows you to mock the environment in your test. Alternatively, use the keyword argument `env_inherit: set[str]` to set the specified environment variables using the test runner's environment, which is useful to set values like `PATH` which may vary across machines.
 
-Warning: calling `rule_runner.set_options()` will override any options that were previously set, so you will need to register everything you want in a single call.
+:::caution Calling `rule_runner.set_options()` will override any options that were previously set.
+You will need to register everything you want in a single call.
+:::
 
 ### Running your rules
 

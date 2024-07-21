@@ -21,11 +21,13 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platfor
         downloaded_tfsec,
         sources,
         config_file,
+        custom_checks,
         report_directory,
     ) = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, tfsec.get_request(platform)),
         Get(SourceFiles, SourceFilesRequest(fs.sources for fs in request.elements)),
         Get(ConfigFiles, ConfigFilesRequest, tfsec.config_request()),
+        Get(ConfigFiles, ConfigFilesRequest, tfsec.custom_checks_request()),
         # Ensure that the empty report dir exists.
         Get(Digest, CreateDigest([Directory(REPORT_DIR)])),
     )
@@ -37,6 +39,7 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platfor
                 downloaded_tfsec.digest,
                 sources.snapshot.digest,
                 config_file.snapshot.digest,
+                custom_checks.snapshot.digest,
                 report_directory,
             )
         ),
@@ -45,6 +48,8 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platfor
     computed_args = []
     if tfsec.config:
         computed_args.append(f"--config-file={tfsec.config}")
+    if tfsec.custom_check_dir:
+        computed_args.append(f"--custom-check-dir={tfsec.custom_check_dir}")
 
     if tfsec.report_name:
         computed_args.append(f"--out={REPORT_DIR}/{tfsec.report_name}")

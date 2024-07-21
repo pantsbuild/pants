@@ -95,7 +95,9 @@ def test_creates_tar_for_package_json(rule_runner: RuleRunner, package_manager: 
     rule_runner.write_digest(result.digest)
 
     archive_name = "ham-v0.0.1.tgz" if package_manager == "yarn" else "ham-0.0.1.tgz"
-    with tarfile.open(os.path.join(rule_runner.build_root, archive_name)) as tar:
+    with tarfile.open(
+        os.path.join(rule_runner.build_root, "src.js", "ham-dist", archive_name)
+    ) as tar:
         assert {member.name for member in tar.getmembers()}.issuperset(
             {
                 "package/package.json",

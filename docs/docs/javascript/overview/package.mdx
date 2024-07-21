@@ -1,0 +1,67 @@
+---
+    title: package.json
+    sidebar_position: 3
+---
+
+package.json parsing and scripts integration
+
+---
+
+As mentioned in the [overview introduction](./index.mdx), Pants's approach to enable support for Javascript is to
+be a thin caching layer on top of your current tooling.
+
+Refer to the [example repository](https://github.com/pantsbuild/example-javascript) for example usage.
+
+### Package manager
+
+Pants uses `corepack` to manage package manager versions and installation. Like `corepack`, Pants respects
+the experimental "packageManager" feature in `package.json` files.
+
+```json title="package.json"
+{
+    "name": "@my-company/pkg",
+    "packageManager": "yarn@1.22.22"
+}
+```
+
+this setting will ensure that all scripts invoked for this package.json, and any
+[workspaces managed by this package.json](./workspaces.mdx) will use this particular version of `yarn`.
+It can be more convenient to define a project level
+[package manager](./enable-javascript-support.mdx#setting-up-a-package-manager).
+
+:::tip Choosing between `pants.toml` or `package.json` for package manager version configuration
+In general, if your team runs all tooling via Pants, using `pants.toml` reduces boilerplate in cases where you maintain
+multiple packages. If your team mixes usage of Pants and "bare" package manager invocations, package.json#packageManager
+is the safer option.
+:::
+
+### Testing
+
+By default Pants assumes a `package_json` target mapping a `package.json` includes a test script, e.g.
+
+```json title="package.json"
+{
+    "name": "@my-company/pkg",
+    "scripts": {
+        "test": "jest"
+    },
+    "devDependencies": {
+        "jest": "^29.5.0"
+    }
+}
+```
+
+and will use this script to execute your tests when running `pants test ::`.
+See [Goal arguments](../../using-pants/key-concepts/goals.mdx#goal-arguments) for the normal techniques for telling Pants what to
+run on.
+
+To enable configurability, the build symbol [`node_test_script`](../../../reference/build-file-symbols/node_test_script)
+contains options for changing the entry point from "test", and to enable coverage reporting.
+
+### Packaging
+
+Similarly, build scripts can be introduced to Pants via the
+[`node_build_script`](../../../reference/build-file-symbols/node_build_script) build symbol. This is intended to be used
+as a way to introduce artifacts generated via bundlers and/or compilers installed and ran via your package manager.
+The result can the be consumed by other targets as either `resource`-targets that can be depended on,
+or as a package for the [docker backend](../../docker/index.mdx).
