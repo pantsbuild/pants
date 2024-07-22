@@ -615,14 +615,16 @@ async def prepare_adhoc_process(
 
 
 async def prepare_env_vars(
+    existing_env_vars: Mapping[str, str],
     env_vars_templates: tuple[str, ...],
     *,
     extra_paths: tuple[str, ...] = (),
     description_of_origin: str,
 ) -> FrozenDict[str, str]:
+    env_vars: dict[str, str] = dict(existing_env_vars)
+
     to_fetch: set[str] = set()
     duplicate_keys: set[str] = set()
-    env_vars: dict[str, str] = {}
     for env_var in env_vars_templates:
         parts = env_var.split("=", 1)
         if parts[0] in env_vars:

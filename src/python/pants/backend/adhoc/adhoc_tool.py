@@ -97,13 +97,12 @@ async def run_in_sandbox_request(
             description_of_origin=f"`{AdhocToolWorkspaceInvalidationSourcesField.alias}` for `adhoc_tool` target at `{target.address}`",
         )
 
-    env_vars: dict[str, str] = dict(tool_runner.extra_env)
-    user_env_vars = await prepare_env_vars(
+    env_vars = await prepare_env_vars(
+        tool_runner.extra_env,
         target.get(AdhocToolExtraEnvVarsField).value or (),
         extra_paths=tool_runner.extra_paths,
         description_of_origin=f"`{AdhocToolExtraEnvVarsField.alias}` for `adhoc_tool` target at `{target.address}`",
     )
-    env_vars.update(user_env_vars)
 
     process_request = AdhocProcessRequest(
         description=description,
@@ -117,7 +116,7 @@ async def run_in_sandbox_request(
         append_only_caches=FrozenDict(tool_runner.append_only_caches),
         output_files=output_files,
         output_directories=output_directories,
-        env_vars=FrozenDict(env_vars),
+        env_vars=env_vars,
         log_on_process_errors=None,
         log_output=target[AdhocToolLogOutputField].value,
         capture_stderr_file=target[AdhocToolStderrFilenameField].value,

@@ -143,13 +143,12 @@ async def _prepare_process_request_from_target(
         ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))
     )
 
-    env_vars: dict[str, str] = dict(merged_extras.extra_env)
-    user_env_vars = await prepare_env_vars(
+    env_vars = await prepare_env_vars(
+        merged_extras.extra_env,
         shell_command.get(ShellCommandExtraEnvVarsField).value or (),
         extra_paths=merged_extras.paths,
         description_of_origin=f"`{ShellCommandExtraEnvVarsField.alias}` for `shell_command` target at `{shell_command.address}`",
     )
-    env_vars.update(user_env_vars)
 
     append_only_caches = {
         **merged_extras.append_only_caches,
@@ -181,7 +180,7 @@ async def _prepare_process_request_from_target(
         output_files=output_files,
         output_directories=output_directories,
         append_only_caches=FrozenDict(append_only_caches),
-        env_vars=FrozenDict(env_vars),
+        env_vars=env_vars,
         immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
         log_on_process_errors=_LOG_ON_PROCESS_ERRORS,
         log_output=shell_command[ShellCommandLogOutputField].value,

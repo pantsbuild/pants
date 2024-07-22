@@ -205,13 +205,12 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
 
     input_digest = await Get(Digest, MergeDigests((runner.digest, batch.sources_snapshot.digest)))
 
-    env_vars: dict[str, str] = dict(runner.extra_env)
-    user_env_vars = await prepare_env_vars(
+    env_vars = await prepare_env_vars(
+        runner.extra_env,
         (),
         extra_paths=runner.extra_paths,
         description_of_origin="code quality tool",
     )
-    env_vars.update(user_env_vars)
 
     result = await Get(
         FallibleProcessResult,
@@ -221,7 +220,7 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
             input_digest=input_digest,
             append_only_caches=runner.append_only_caches,
             immutable_input_digests=FrozenDict.frozen(runner.immutable_input_digests),
-            env=FrozenDict(env_vars),
+            env=env_vars,
             output_files=batch.output_files,
         ),
     )
