@@ -18,10 +18,11 @@ from pants.backend.javascript.dependency_inference.rules import rules as depende
 from pants.backend.javascript.package_json import AllPackageJson
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSourceTarget
 from pants.build_graph.address import Address
+from pants.core.util_rules.unowned_dependency_behavior import UnownedDependencyError
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import QueryRule
 from pants.engine.target import InferredDependencies, Target
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -37,7 +38,6 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[*package_json.target_types(), JSSourceTarget, JSSourcesGeneratorTarget],
     )
-    rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
 
 
@@ -157,6 +157,105 @@ def test_infers_js_dependencies_via_config(rule_runner: RuleRunner) -> None:
     assert set(addresses) == {
         Address("root/project/src/components", relative_file_path="button.js")
     }
+
+
+def test_infers_js_dependencies_via_config_and_extension_less_imports(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "root/project/BUILD": "package_json()",
+            "root/project/package.json": given_package("ham", "0.0.1", main="./src/index.js"),
+            "root/project/jsconfig.json": json.dumps(
+                {"compilerOptions": {"paths": {"*": ["./src/*"]}}}
+            ),
+            "root/project/src/BUILD": "javascript_sources()",
+            "root/project/src/index.js": dedent(
+                """\
+                import { Button } from "components";
+                """
+            ),
+            "root/project/src/components/BUILD": "javascript_sources()",
+            "root/project/src/components/index.js": "export { Button } from 'components/button'",
+            "root/project/src/components/button.js": "",
+        }
+    )
+
+    root_index_tgt = rule_runner.get_target(
+        Address("root/project/src", relative_file_path="index.js")
+    )
+
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(root_index_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("root/project/src/components", relative_file_path="index.js")}
+
+
+def test_unmatched_js_dependencies_and_error_unowned_behaviour(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--nodejs-infer-unowned-dependency-behavior=error"])
+    rule_runner.write_files(
+        {
+            "root/project/BUILD": "package_json()",
+            "root/project/package.json": given_package("ham", "0.0.1", main="./src/index.js"),
+            "root/project/jsconfig.json": json.dumps(
+                {"compilerOptions": {"paths": {"*": ["./src/*"]}}}
+            ),
+            "root/project/src/BUILD": "javascript_sources()",
+            "root/project/src/index.js": dedent(
+                """\
+                import { Button } from "components";
+                """
+            ),
+            "root/project/src/components/BUILD": "javascript_sources()",
+            "root/project/src/components/button.js": "",
+        }
+    )
+
+    root_index_tgt = rule_runner.get_target(
+        Address("root/project/src", relative_file_path="index.js")
+    )
+
+    with engine_error(UnownedDependencyError, contains="components"):
+        rule_runner.request(
+            InferredDependencies,
+            [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(root_index_tgt))],
+        )
+
+
+def test_unmatched_local_js_dependencies_fulfilled_with_third_party_package(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.set_options(["--nodejs-infer-unowned-dependency-behavior=error"])
+    rule_runner.write_files(
+        {
+            "root/project/BUILD": "package_json()",
+            "root/project/package.json": given_package(
+                "ham", "0.0.1", main="./src/index.js", dependencies={"components": "*"}
+            ),
+            "root/project/jsconfig.json": json.dumps(
+                {"compilerOptions": {"paths": {"*": ["./src/*"]}}}
+            ),
+            "root/project/src/BUILD": "javascript_sources()",
+            "root/project/src/index.js": dedent(
+                """\
+                import { Button } from "components";
+                """
+            ),
+        }
+    )
+
+    root_index_tgt = rule_runner.get_target(
+        Address("root/project/src", relative_file_path="index.js")
+    )
+
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(root_index_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("root/project", generated_name="components")}
 
 
 def test_infers_main_package_json_field_js_source_dependency(rule_runner: RuleRunner) -> None:

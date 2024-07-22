@@ -24,13 +24,17 @@ class UnownedDependencyUsageOption(EnumOption[UnownedDependencyUsage, UnownedDep
             help=softwrap(
                 f"""
                 How to handle imports that don't have an inferrable owner.
-    
+
                 Usually when an import cannot be inferred, it represents an issue like Pants not being
                 properly configured, e.g. targets not set up. Often, missing dependencies will result
                 in confusing runtime errors like {example_runtime_issue}, so this option can be helpful
                 to error more eagerly.
-    
+
                 To ignore any false positives, {how_to_ignore}
             """
             ),
         )
+
+
+class UnownedDependencyError(Exception):
+    """The inferred dependency does not have any owner."""

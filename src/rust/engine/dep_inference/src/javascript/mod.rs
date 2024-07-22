@@ -41,7 +41,7 @@ impl JavascriptImportInfo {
             package_imports,
         }
     }
-    
+
     #[cfg(test)]
     fn new<F: AsRef<str>, T: AsRef<str>>(
         file_imports: impl IntoIterator<Item = F>,

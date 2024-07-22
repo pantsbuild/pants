@@ -23,7 +23,6 @@ from pants.backend.python.dependency_inference.rules import (
     InferPythonImportDependencies,
     InitDependenciesInferenceFieldSet,
     PythonImportDependenciesInferenceFieldSet,
-    UnownedDependencyError,
     UnownedImportsPossibleOwners,
     UnownedImportsPossibleOwnersRequest,
     _find_other_owners_for_unowned_imports,
@@ -48,7 +47,10 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import ancestor_files
 from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
-from pants.core.util_rules.unowned_dependency_behavior import UnownedDependencyUsage
+from pants.core.util_rules.unowned_dependency_behavior import (
+    UnownedDependencyError,
+    UnownedDependencyUsage,
+)
 from pants.engine.addresses import Address
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.rules import rule
