@@ -38,6 +38,11 @@ Created project/BUILD:
   - Add javascript_tests target tests
 ```
 
+:::tip Improved inference and introspection for bundled projects
+For [dependency inference](../../introduction/how-does-pants-work.mdx#dependency-inference), pants reads both your
+projects package.json sections and additionally
+supports [jsconfig.json](https://code.visualstudio.com/docs/languages/jsconfig), if one is present.
+:::
 
 ### Setting up node
 Pants will by default download a distribution of `node` according to the
