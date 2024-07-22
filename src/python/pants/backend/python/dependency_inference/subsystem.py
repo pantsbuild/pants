@@ -5,10 +5,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pants.core.util_rules.unowned_dependency_behavior import (
-    UnownedDependencyUsage,
-    UnownedDependencyUsageOption,
-)
+from pants.core.util_rules.unowned_dependency_behavior import UnownedDependencyUsageOption
 from pants.option.option_types import BoolOption, EnumOption, IntOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name

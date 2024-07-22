@@ -3,7 +3,7 @@
 use std::iter::{once, Once};
 use std::path::{Path, PathBuf};
 
-use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
+use fnv::{FnvBuildHasher, FnvHashMap as HashMap, FnvHashSet as HashSet};
 use itertools::Either;
 use serde_derive::{Deserialize, Serialize};
 use tree_sitter::{Node, Parser};
@@ -15,7 +15,6 @@ use protos::gen::pants::cache::{
 
 use crate::javascript::import_pattern::{imports_from_patterns, Import};
 use crate::javascript::util::normalize_path;
-use protos::gen::pants::cache::JavascriptInferenceMetadata;
 
 mod import_pattern;
 mod util;
@@ -24,10 +23,41 @@ include!(concat!(env!("OUT_DIR"), "/javascript/constants.rs"));
 include!(concat!(env!("OUT_DIR"), "/javascript/visitor.rs"));
 include!(concat!(env!("OUT_DIR"), "/javascript_impl_hash.rs"));
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ParsedJavascriptDependencies {
+    pub imports: HashMap<String, JavascriptImportInfo>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct JavascriptImportInfo {
     pub file_imports: HashSet<String>,
     pub package_imports: HashSet<String>,
+}
+
+impl JavascriptImportInfo {
+    fn from_sets(file_imports: HashSet<String>, package_imports: HashSet<String>) -> Self {
+        JavascriptImportInfo {
+            file_imports,
+            package_imports,
+        }
+    }
+    
+    #[cfg(test)]
+    fn new<F: AsRef<str>, T: AsRef<str>>(
+        file_imports: impl IntoIterator<Item = F>,
+        package_imports: impl IntoIterator<Item = T>,
+    ) -> Self {
+        JavascriptImportInfo::from_sets(
+            file_imports
+                .into_iter()
+                .map(|s| s.as_ref().to_string())
+                .collect(),
+            package_imports
+                .into_iter()
+                .map(|s| s.as_ref().to_string())
+                .collect(),
+        )
+    }
 }
 
 fn patterns_as_lookup(patterns: Vec<ImportPattern>) -> HashMap<String, Vec<String>> {
@@ -67,33 +97,41 @@ pub fn get_dependencies(
 
     let mut collector = ImportCollector::new(contents);
     collector.collect();
-    let (relative_files, packages): (HashSet<String>, HashSet<String>) = collector
-        .imports
-        .into_iter()
-        .flat_map(|import| imports_from_patterns(&metadata.package_root, &import_patterns, &import))
-        .flat_map(|import| match import {
-            Import::UnMatched(string) if !is_relative_specifier(&string) => {
-                match_and_extend_with_config_candidates(
-                    string,
-                    &paths,
-                    metadata.config_root.as_deref(),
-                )
-            }
-            matched => Either::Left(once(matched)),
-        })
-        .flatten()
-        .partition(|import| {
-            is_relative_specifier(import) || placed_at_root(&metadata.package_root, import)
-        });
-    Ok(ParsedJavascriptDependencies {
-        file_imports: normalize_from_path(&metadata.package_root, filepath, relative_files),
-        package_imports: packages,
-    })
+    let mut imports =
+        HashMap::with_capacity_and_hasher(collector.imports.len(), FnvBuildHasher::default());
+    for import in collector.imports {
+        let (relative_files, packages) =
+            imports_from_patterns(&metadata.package_root, &import_patterns, &import)
+                .into_iter()
+                .flat_map(|import| match import {
+                    Import::UnMatched(string) if !is_relative_specifier(&string) => {
+                        match_and_extend_with_config_candidates(
+                            string,
+                            &paths,
+                            metadata.config_root.as_deref(),
+                        )
+                    }
+                    matched => Either::Left(once(matched)),
+                })
+                .flatten()
+                .partition(|import| {
+                    is_relative_specifier(import) || placed_at_root(&metadata.package_root, import)
+                });
+        imports.insert(
+            import,
+            JavascriptImportInfo::from_sets(
+                normalize_from_path(&metadata.package_root, &filepath, relative_files),
+                packages,
+            ),
+        );
+    }
+
+    Ok(ParsedJavascriptDependencies { imports })
 }
 
 fn normalize_from_path(
     root: &str,
-    filepath: PathBuf,
+    filepath: &Path,
     file_imports: HashSet<String>,
 ) -> HashSet<String> {
     let directory = filepath.parent().unwrap_or(Path::new(""));

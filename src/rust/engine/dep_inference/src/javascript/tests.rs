@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::javascript::import_pattern::{imports_from_patterns, Import, Pattern, StarMatch};
-use crate::javascript::{get_dependencies, ImportCollector};
+use crate::javascript::{get_dependencies, ImportCollector, JavascriptImportInfo};
 use javascript_inference_metadata::ImportPattern;
 use protos::gen::pants::cache::{javascript_inference_metadata, JavascriptInferenceMetadata};
 
@@ -56,12 +56,38 @@ fn assert_dependency_imports<'a>(
     let result = get_dependencies(code, PathBuf::from(file_path), metadata).unwrap();
     assert_eq!(
         HashSet::from_iter(file_imports.into_iter().map(|s| s.to_string())),
-        result.file_imports,
+        result
+            .imports
+            .values()
+            .flat_map(|val| val.file_imports.clone())
+            .collect::<HashSet<String>>(),
     );
     assert_eq!(
         HashSet::from_iter(package_imports.into_iter().map(|s| s.to_string())),
-        result.package_imports,
+        result
+            .imports
+            .into_values()
+            .flat_map(|val| val.package_imports)
+            .collect::<HashSet<String>>(),
     );
+}
+
+fn assert_dependency_candidates<'a>(
+    file_path: &str,
+    code: &str,
+    expected: impl IntoIterator<Item = (&'a str, JavascriptImportInfo)>,
+    metadata: JavascriptInferenceMetadata,
+) {
+    let result = get_dependencies(code, PathBuf::from(file_path), metadata).unwrap();
+
+    assert_eq!(
+        HashMap::from_iter(
+            expected
+                .into_iter()
+                .map(|(import, candidates)| (import.to_string(), candidates))
+        ),
+        result.imports
+    )
 }
 
 #[test]
@@ -271,7 +297,11 @@ fn adds_dir_to_file_imports() -> Result<(), Box<dyn std::error::Error>> {
         Default::default(),
     )?;
     assert_eq!(
-        result.file_imports,
+        result
+            .imports
+            .into_values()
+            .flat_map(|info| info.file_imports)
+            .collect::<HashSet<String>>(),
         HashSet::from_iter(["dir/file.js".to_string()])
     );
     Ok(())
@@ -649,4 +679,34 @@ fn longest_prefix_wins() {
         imports,
         HashSet::from_iter([Import::Matched("dir/src/stuff/index.js".to_string())])
     )
+}
+
+#[test]
+fn candidate_imports_from_config_and_imports() {
+    assert_dependency_candidates(
+        "js/project/src/lib/index.js",
+        r#"
+    import { relative, or, package } from 'lib/stuff';
+    import { subpath } from '#nested/index.js';
+    "#,
+        [
+            (
+                "lib/stuff",
+                JavascriptImportInfo::new(["js/project/src/lib/stuff"], ["lib/stuff"]),
+            ),
+            (
+                "#nested/index.js",
+                JavascriptImportInfo::new(["js/project/src/lib/nested/index.js"], [] as [&str; 0]),
+            ),
+        ],
+        given_metadata(
+            "js/project",
+            HashMap::from_iter([(
+                "#nested/*".to_string(),
+                vec!["./src/lib/nested/*".to_string()],
+            )]),
+            Some("js/project"),
+            HashMap::from_iter([("*".to_string(), vec!["./src/*".to_string()])]),
+        ),
+    );
 }

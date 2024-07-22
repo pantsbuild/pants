@@ -17,11 +17,9 @@ class UnownedDependencyUsage(Enum):
 
 
 class UnownedDependencyUsageOption(EnumOption[UnownedDependencyUsage, UnownedDependencyUsage]):
-    def __new__(
-        cls, example_runtime_issue: str, how_to_ignore: str
-    ) -> UnownedDependencyUsageOption:
+    def __new__(cls, example_runtime_issue: str, how_to_ignore: str):
         return super().__new__(
-            cls,
+            cls,  # type: ignore[arg-type] # Expects the base class due to super
             default=UnownedDependencyUsage.LogWarning,
             help=softwrap(
                 f"""
