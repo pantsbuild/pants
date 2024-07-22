@@ -405,7 +405,18 @@ def test_adhoc_tool_path_env_modify_mode(rule_runner: PythonRuleRunner) -> None:
             adhoc_tool(
                 name="shims_off",
                 runnable=":bash",
-                args=["-c", "echo $PATH > foo.txt && renamed_cat foo.txt > path.txt"],
+                args=[
+                    "-c",
+                    '''
+                    echo $PATH > path.txt
+                    for dir in $( echo "$PATH" | tr ':' '\\n' ) ; do
+                      if [ -e "$dir/renamed_cat" ]; then
+                        echo "ERROR: Did not expect to find renamed_cat on PATH, but did find it."
+                        exit 1
+                      fi
+                    done
+                    '''
+                ],
                 extra_env_vars=["PATH={expected_path}"],
                 output_files=["path.txt"],
                 runnable_dependencies=[":renamed_cat"],
@@ -430,4 +441,5 @@ def test_adhoc_tool_path_env_modify_mode(rule_runner: PythonRuleRunner) -> None:
     assert path_append.startswith(expected_path)
     assert len(path_append) > len(expected_path)
 
-    # TODO: shims_off will fail due to `renamed_cat` not being on the PATH. How do we obtain FailableProcessResult here?
+    path_off = run("shims_off")
+    assert path_off == expected_path
