@@ -484,6 +484,7 @@ class ShellCommandTestTarget(Target):
         ShellCommandTimeoutField,
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
+        ShellCommandPathEnvModifyModeField,
         EnvironmentField,
         SkipShellCommandTestsField,
         ShellCommandWorkdirField,
