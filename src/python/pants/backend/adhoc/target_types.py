@@ -280,7 +280,7 @@ class AdhocToolPathEnvModifyModeField(StringField):
     default = PathEnvModifyMode.PREPEND.value
     help = help_text(
         """
-        When executing the command of an `adhoc_tool` or `shell_command` target, Pants will augment the `PATH`
+        When executing the command of an `adhoc_tool` or `shell_command` target, Pants may augment the `PATH`
         environment variable with the location of any binary shims created for `tools` and for
         any runnable dependencies.
 
@@ -292,16 +292,9 @@ class AdhocToolPathEnvModifyModeField(StringField):
     )
     valid_choices = PathEnvModifyMode
 
-    def as_enum(self) -> PathEnvModifyMode:
-        value = self.value
-        if value == PathEnvModifyMode.PREPEND.value:
-            return PathEnvModifyMode.PREPEND
-        elif value == PathEnvModifyMode.APPEND.value:
-            return PathEnvModifyMode.APPEND
-        elif value == PathEnvModifyMode.OFF.value:
-            return PathEnvModifyMode.OFF
-        else:
-            raise AssertionError(f"Invalid value for {self.alias} field: {value}")
+    @property
+    def enum_value(self) -> PathEnvModifyMode:
+        return PathEnvModifyMode(self.value)
 
 
 class AdhocToolTarget(Target):

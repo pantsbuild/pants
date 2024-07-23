@@ -102,7 +102,7 @@ async def run_in_sandbox_request(
         tool_runner.extra_env,
         target.get(AdhocToolExtraEnvVarsField).value or (),
         extra_paths=tool_runner.extra_paths,
-        path_env_modify_mode=target.get(AdhocToolPathEnvModifyModeField).as_enum(),
+        path_env_modify_mode=target.get(AdhocToolPathEnvModifyModeField).enum_value,
         description_of_origin=f"`{AdhocToolExtraEnvVarsField.alias}` for `adhoc_tool` target at `{target.address}`",
     )
 

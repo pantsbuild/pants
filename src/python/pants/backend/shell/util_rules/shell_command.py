@@ -148,7 +148,7 @@ async def _prepare_process_request_from_target(
         merged_extras.extra_env,
         shell_command.get(ShellCommandExtraEnvVarsField).value or (),
         extra_paths=merged_extras.paths,
-        path_env_modify_mode=shell_command.get(ShellCommandPathEnvModifyModeField).as_enum(),
+        path_env_modify_mode=shell_command.get(ShellCommandPathEnvModifyModeField).enum_value,
         description_of_origin=f"`{ShellCommandExtraEnvVarsField.alias}` for `shell_command` target at `{shell_command.address}`",
     )
 
