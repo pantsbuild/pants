@@ -197,7 +197,7 @@ class LocalWorkspaceEnvironmentTarget(Target):
         LocalWorkspaceCompatiblePlatformsField,
     )
     help = help_text(
-        """
+        f"""
         Configuration of a "workspace" execution environment for specific platforms.
 
         A "workspace" environment is a local environment which executes build processes within
