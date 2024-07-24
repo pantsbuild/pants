@@ -14,6 +14,7 @@ from enum import Enum
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, TypeVar, Union
 
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior, GlobExpansionConjunction
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
@@ -28,8 +29,10 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
     Digest,
+    DigestSubset,
     Directory,
     FileContent,
+    GlobExpansionConjunction,
     MergeDigests,
     PathGlobs,
     PathMetadataRequest,
@@ -81,6 +84,8 @@ class AdhocProcessRequest:
     workspace_invalidation_globs: PathGlobs | None
     cache_scope: ProcessCacheScope | None = None
     use_working_directory_as_base_for_output_captures: bool = True
+    outputs_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error
+    outputs_match_mode: GlobExpansionConjunction = GlobExpansionConjunction.AllMatch
 
 
 @dataclass(frozen=True)
@@ -502,6 +507,7 @@ async def run_adhoc_process(
     extra_contents = {i: j for i, j in extras if i}
 
     output_digest = result.output_digest
+    await check_outputs(request, output_digest)
 
     if extra_contents:
         if request.use_working_directory_as_base_for_output_captures:
@@ -748,6 +754,35 @@ def _parse_relative_file(file_in: str, relative_to: str) -> str:
         return file_in[1:]
 
     return os.path.join(relative_to, file_in)
+
+
+async def check_outputs(request: AdhocProcessRequest, output_digest: Digest) -> None:
+    _filtered_for_output_files, _filtered_for_output_directories = await MultiGet(
+        Get(
+            Digest,
+            DigestSubset(
+                output_digest,
+                PathGlobs(
+                    request.output_files,
+                    glob_match_error_behavior=request.outputs_match_error_behavior,
+                    conjunction=request.outputs_match_mode,
+                    description_of_origin=f"the `output_files` field at `{request.address}`",
+                ),
+            ),
+        ),
+        Get(
+            Digest,
+            DigestSubset(
+                output_digest,
+                PathGlobs(
+                    request.output_directories,
+                    glob_match_error_behavior=request.outputs_match_error_behavior,
+                    conjunction=request.outputs_match_mode,
+                    description_of_origin=f"output_directories field at `{request.address}`",
+                ),
+            ),
+        ),
+    )
 
 
 def rules():
