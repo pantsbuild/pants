@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import ClassVar
 
-from pants.core.util_rules.adhoc_process_support import PathEnvModifyMode
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.core.util_rules.adhoc_process_support import OutputsMatchMode, PathEnvModifyMode
 from pants.core.util_rules.environments import EnvironmentField
+from pants.engine.fs import GlobExpansionConjunction
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
@@ -297,6 +300,63 @@ class AdhocToolPathEnvModifyModeField(StringField):
         return PathEnvModifyMode(self.value)
 
 
+class AdhocToolOutputsMatchErrorBehavior(StringField):
+    alias = "outputs_match_error_behavior"
+    default = GlobMatchErrorBehavior.error.value
+    help = help_text(
+        """
+        Configure whether to check the outputs expected to be captured by this `adhoc_tool` were
+        in fact actually captured.
+
+        Valid values are:
+
+        - `error`: Raise an error if none of the proided globs matched.
+        - `warning`: Log a warning if none of the provided globs matched.
+        - `ignore`: Ignore any lack of a matches for the provided globs.
+        """
+    )
+    valid_choices = GlobMatchErrorBehavior
+
+    @property
+    def enum_value(self) -> GlobMatchErrorBehavior:
+        return GlobMatchErrorBehavior(self.value)
+
+
+class AdhocToolOutputsMatchMode(StringField):
+    alias = "outputs_match_mode"
+    default = "all_match"
+    help = help_text(
+        """
+        Configure whether all globs referencing files or directory outputs to be captured must match.
+
+        Valid values are:
+
+        - `all`: All globs provided in the `output_files` and `output_directories` fields must match or else Pants
+        will error.
+
+        - `any`: At least one glob provided in the `output_files` and `output_directories` fields must match or 
+        else Pants will error.
+
+        - `allow_empty`: Allow empty digests (which means nothing was captured)
+        """
+    )
+    valid_choices = ("all_match", "any_match", "allow_empty")
+
+    @property
+    def conjunction_enum_value(self) -> GlobExpansionConjunction | None:
+        value = self.value
+        if value == "all_match":
+            return GlobExpansionConjunction.all_match
+        elif value == "any_match":
+            return GlobExpansionConjunction.any_match
+        else:
+            return None
+
+    @property
+    def allow_empty(self) -> bool:
+        return self.value == "allow_empty"
+
+
 class AdhocToolTarget(Target):
     alias: ClassVar[str] = "adhoc_tool"
     core_fields = (
@@ -318,6 +378,8 @@ class AdhocToolTarget(Target):
         AdhocToolStderrFilenameField,
         AdhocToolWorkspaceInvalidationSourcesField,
         AdhocToolPathEnvModifyModeField,
+        AdhocToolOutputsMatchErrorBehavior,
+        AdhocToolOutputsMatchMode,
         EnvironmentField,
     )
     help = help_text(

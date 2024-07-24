@@ -19,6 +19,8 @@ from pants.backend.shell.target_types import (
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
+    ShellCommandOutputsMatchErrorBehavior,
+    ShellCommandOutputsMatchMode,
     ShellCommandPathEnvModifyModeField,
     ShellCommandRunnableDependenciesField,
     ShellCommandSourcesField,
@@ -191,6 +193,8 @@ async def _prepare_process_request_from_target(
         workspace_invalidation_globs=workspace_invalidation_globs,
         cache_scope=cache_scope,
         use_working_directory_as_base_for_output_captures=env_target.use_working_directory_as_base_for_output_captures,
+        outputs_match_error_behavior=shell_command.get(ShellCommandOutputsMatchErrorBehavior).enum_value,
+        outputs_match_mode=shell_command.get(ShellCommandOutputsMatchMode).conjunction_enum_value,
     )
 
 
