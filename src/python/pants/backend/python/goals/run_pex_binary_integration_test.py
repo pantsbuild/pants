@@ -281,3 +281,31 @@ def test_run_script_from_3rdparty_dist_issue_13747() -> None:
         result = run_pants(args)
         result.assert_success()
         assert SAY in result.stdout.strip()
+
+
+def test_pass_extra_pex_cli_subsystem_args() -> None:
+    """Test that extra args passed to the pex-cli subsystem propagate to the actual pex
+    invocation."""
+    sources = {
+        "src/BUILD": dedent(
+            """\
+            python_requirement(name="cowsay", requirements=["cowsay==4.0"])
+            pex_binary(name="test", script="cowsay", dependencies=[":cowsay"])
+            """
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.python",
+            "--pex-cli-args='--non-existing-flag-name=some-value'",
+            f"--source-root-patterns=['/{tmpdir}/src']",
+            "run",
+            f"{tmpdir}/src:test",
+            "--",
+            "moooo",
+        ]
+        result = run_pants(args)
+        result.assert_failure()
+        stderr = result.stderr.strip()
+        assert "unrecognized arguments" in stderr
+        assert "non-existing-flag-name" in stderr
