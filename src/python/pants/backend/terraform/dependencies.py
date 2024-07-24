@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
 import os.path
 from dataclasses import dataclass
 from typing import Optional
@@ -14,7 +15,7 @@ from pants.backend.terraform.target_types import (
     TerraformDependenciesField,
     TerraformRootModuleField,
 )
-from pants.backend.terraform.tool import TerraformProcess
+from pants.backend.terraform.tool import TerraformProcess, TerraformTool
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -50,9 +51,54 @@ class TerraformDependenciesResponse:
     digest: Digest
 
 
+async def _download_providers(
+    req: TerraformDependenciesRequest,
+    terraform: TerraformTool,
+    tf_init_output: Digest,
+    keep_sandboxes: KeepSandboxes,
+):
+    """Download the Terraform providers using `providers mirror`
+
+    This is one way to cache providers. The advantage of this is that we don't have symlinks
+    pointing into a sandbox, which don't work across sandboxes.
+    """
+    all_terraform_files = await Get(
+        Digest,
+        MergeDigests(
+            [
+                req.dependencies_files,
+                tf_init_output,
+            ]
+        ),
+    )
+
+    # Terraform will be acting like its cwd is inside the folder,
+    # so we need to find the path up to the root and then into our cache
+    relpath_to_cache = os.path.join(os.path.relpath(".", req.chdir), terraform.plugin_cache_dir)
+    args = ["providers", "mirror", relpath_to_cache]
+
+    download_providers_description = "download terraform providers"
+    downloaded_providers = await Get(
+        FallibleProcessResult,
+        TerraformProcess(
+            args=tuple(args),
+            input_digest=all_terraform_files,
+            description=download_providers_description,
+            chdir=req.chdir,
+        ),
+    )
+    if downloaded_providers.exit_code != 0:
+        raise ProcessExecutionFailure.from_result(
+            downloaded_providers,
+            download_providers_description,
+            keep_sandboxes,
+        )
+
+
 @rule
 async def get_terraform_providers(
     req: TerraformDependenciesRequest,
+    terraform: TerraformTool,
     keep_sandboxes: KeepSandboxes,
 ) -> TerraformDependenciesResponse:
     args = ["init"]
@@ -88,13 +134,12 @@ async def get_terraform_providers(
         ),
     )
     if fetched_deps.exit_code != 0:
-        raise ProcessExecutionFailure(
-            fetched_deps.exit_code,
-            fetched_deps.stdout,
-            fetched_deps.stderr,
-            init_process_description,
-            keep_sandboxes=keep_sandboxes,
+        raise ProcessExecutionFailure.from_result(
+            fetched_deps, init_process_description, keep_sandboxes
         )
+
+    # can only download providers after initialising
+    await _download_providers(req, terraform, fetched_deps.output_digest, keep_sandboxes)
 
     return TerraformDependenciesResponse(fetched_deps.output_digest)
 
