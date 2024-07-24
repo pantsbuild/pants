@@ -13,6 +13,7 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
+from pants.core.util_rules.system_binaries import BinaryShims, BinaryShimsRequest, GetentBinary
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get
@@ -374,6 +375,14 @@ class TerraformTool(TemplatedExternalTool):
         advanced=True,
     )
 
+    @property
+    def plugin_cache_dir(self) -> str:
+        return "__terraform_filesystem_mirror"
+
+    @property
+    def append_only_caches(self) -> dict[str, str]:
+        return {"terraform_plugins": self.plugin_cache_dir}
+
 
 @dataclass(frozen=True)
 class TerraformProcess:
@@ -389,7 +398,10 @@ class TerraformProcess:
 
 @rule
 async def setup_terraform_process(
-    request: TerraformProcess, terraform: TerraformTool, platform: Platform
+    request: TerraformProcess,
+    terraform: TerraformTool,
+    getent_binary: GetentBinary,
+    platform: Platform,
 ) -> Process:
     downloaded_terraform = await Get(
         DownloadedExternalTool,
@@ -398,7 +410,27 @@ async def setup_terraform_process(
     )
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(terraform.extra_env_vars))
 
-    immutable_input_digests = {"__terraform": downloaded_terraform.digest}
+    extra_bins = await Get(
+        BinaryShims,
+        BinaryShimsRequest,
+        BinaryShimsRequest.for_paths(getent_binary, rationale="download terraform providers"),
+    )
+
+    path = []
+    user_path = env.get("PATH")
+    if user_path is not None:
+        path.append(user_path)
+    path.append(extra_bins.path_component)
+
+    env = {
+        **env,
+        "PATH": ":".join(path),
+    }
+
+    immutable_input_digests = {
+        "__terraform": downloaded_terraform.digest,
+        **extra_bins.immutable_input_digests,
+    }
 
     def prepend_paths(paths: Tuple[str, ...]) -> Tuple[str, ...]:
         return tuple((Path(request.chdir) / path).as_posix() for path in paths)
@@ -409,6 +441,7 @@ async def setup_terraform_process(
         immutable_input_digests=immutable_input_digests,
         output_files=prepend_paths(request.output_files),
         output_directories=prepend_paths(request.output_directories),
+        append_only_caches=terraform.append_only_caches,
         env=env,
         description=request.description,
         level=LogLevel.DEBUG,

@@ -414,6 +414,10 @@ class FindBinary(BinaryPath):
     pass
 
 
+class GetentBinary(BinaryPath):
+    pass
+
+
 class GpgBinary(BinaryPath):
     pass
 
@@ -905,6 +909,16 @@ async def find_git(system_binaries: SystemBinariesSubsystem.EnvironmentAware) ->
         request, rationale="track changes to files in your build environment"
     )
     return GitBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `getent` binary", level=LogLevel.DEBUG)
+async def find_getent(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> GetentBinary:
+    request = BinaryPathRequest(
+        binary_name="getent", search_path=system_binaries.system_binary_paths
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="getent file")
+    return GetentBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `gpg` binary", level=LogLevel.DEBUG)
