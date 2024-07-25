@@ -426,7 +426,7 @@ async def setup_terraform_process(
     env = {
         **env,
         "PATH": ":".join(path),
-        "TF_PLUGIN_CACHE_DIR": (os.path.join("{chroot}", terraform.plugin_cache_dir))
+        "TF_PLUGIN_CACHE_DIR": (os.path.join("{chroot}", terraform.plugin_cache_dir)),
     }
 
     immutable_input_digests = {

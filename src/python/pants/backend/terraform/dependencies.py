@@ -15,7 +15,7 @@ from pants.backend.terraform.target_types import (
     TerraformDependenciesField,
     TerraformRootModuleField,
 )
-from pants.backend.terraform.tool import TerraformProcess, TerraformTool
+from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -54,7 +54,6 @@ class TerraformDependenciesResponse:
 @rule
 async def get_terraform_providers(
     req: TerraformDependenciesRequest,
-    terraform: TerraformTool,
     keep_sandboxes: KeepSandboxes,
 ) -> TerraformDependenciesResponse:
     args = ["init"]
