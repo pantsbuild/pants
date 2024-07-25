@@ -107,9 +107,9 @@ def load_plugins(
                 f"register remote auth function {remote_auth_func.__module__}.{remote_auth_func.__name__} from plugin: {plugin}"
             )
             build_configuration.register_remote_auth_plugin(remote_auth_func)
-        if "daemon_goals" in entries:
-            daemon_goals = entries["daemon_goals"].load()()
-            build_configuration.register_daemon_goals(req.key, daemon_goals)
+        if "auxillary_goals" in entries:
+            auxillary_goals = entries["auxillary_goals"].load()()
+            build_configuration.register_auxillary_goals(req.key, auxillary_goals)
 
         loaded[dist.as_requirement().key] = dist
 
@@ -171,6 +171,6 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
             f"register remote auth function {remote_auth_func.__module__}.{remote_auth_func.__name__} from backend: {backend_package}"
         )
         build_configuration.register_remote_auth_plugin(remote_auth_func)
-    daemon_goals = getattr(module, "daemon_goals", None)
-    if daemon_goals:
-        build_configuration.register_daemon_goals(backend_package, daemon_goals)
+    auxillary_goals = invoke_entrypoint("auxillary_goals")
+    if auxillary_goals:
+        build_configuration.register_auxillary_goals(backend_package, auxillary_goals)

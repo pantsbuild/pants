@@ -54,16 +54,16 @@ def assert_valid_split(
     assert expected_passthru == split_args.passthru
 
     assert expected_is_help == (
-        split_args.builtin_or_daemon_goal
+        split_args.builtin_or_auxillary_goal
         in ("help", "help-advanced", "help-all", UNKNOWN_GOAL_NAME, NO_GOAL_NAME)
     )
-    assert expected_help_advanced == ("help-advanced" == split_args.builtin_or_daemon_goal)
-    assert expected_help_all == ("help-all" == split_args.builtin_or_daemon_goal)
+    assert expected_help_advanced == ("help-advanced" == split_args.builtin_or_auxillary_goal)
+    assert expected_help_all == ("help-all" == split_args.builtin_or_auxillary_goal)
 
 
 def assert_unknown_goal(splitter: ArgSplitter, args_str: str, unknown_goals: list[str]) -> None:
     split_args = splitter.split_args(shlex.split(args_str))
-    assert UNKNOWN_GOAL_NAME == split_args.builtin_or_daemon_goal
+    assert UNKNOWN_GOAL_NAME == split_args.builtin_or_auxillary_goal
     assert set(unknown_goals) == set(split_args.unknown_goals)
 
 
@@ -424,7 +424,7 @@ def test_help_detection(splitter: ArgSplitter, command_line: str, expected: dict
 def test_version_request_detection(splitter: ArgSplitter) -> None:
     def assert_version_request(args_str: str) -> None:
         split_args = splitter.split_args(shlex.split(args_str))
-        assert "version" == split_args.builtin_or_daemon_goal
+        assert "version" == split_args.builtin_or_auxillary_goal
 
     assert_version_request("./pants -v")
     assert_version_request("./pants -V")
@@ -452,7 +452,7 @@ def test_unknown_goal_detection(
 @pytest.mark.parametrize("extra_args", ("", "foo/bar:baz", "f.ext", "-linfo", "--arg"))
 def test_no_goal_detection(extra_args: str, splitter: ArgSplitter) -> None:
     split_args = splitter.split_args(shlex.split(f"./pants {extra_args}"))
-    assert NO_GOAL_NAME == split_args.builtin_or_daemon_goal
+    assert NO_GOAL_NAME == split_args.builtin_or_auxillary_goal
 
 
 def test_subsystem_scope_is_unknown_goal(splitter: ArgSplitter) -> None:

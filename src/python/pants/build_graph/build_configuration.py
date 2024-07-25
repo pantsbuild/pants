@@ -269,23 +269,23 @@ class BuildConfiguration:
         def register_remote_auth_plugin(self, remote_auth_plugin: Callable) -> None:
             self._remote_auth_plugin = remote_auth_plugin
 
-        def register_daemon_goals(self, plugin_or_backend: str, daemon_goals: Iterable[type]):
+        def register_auxillary_goals(self, plugin_or_backend: str, auxillary_goals: Iterable[type]):
             """Registers the given daemon goals."""
-            if not isinstance(daemon_goals, Iterable):
+            if not isinstance(auxillary_goals, Iterable):
                 raise TypeError(
-                    f"The entrypoint `daemon_goals` must return an iterable. "
-                    f"Given {repr(daemon_goals)}"
+                    f"The entrypoint `auxillary_goals` must return an iterable. "
+                    f"Given {repr(auxillary_goals)}"
                 )
-            # Import `DaemonGoal` here to avoid import cycle.
-            from pants.goal.daemon_goal import DaemonGoal
+            # Import `AuxillaryGoal` here to avoid import cycle.
+            from pants.goal.auxillary_goal import AuxillaryGoal
 
-            bad_elements = [goal for goal in daemon_goals if not issubclass(goal, DaemonGoal)]
+            bad_elements = [goal for goal in auxillary_goals if not issubclass(goal, AuxillaryGoal)]
             if bad_elements:
                 raise TypeError(
-                    "Every element of the entrypoint `daemon_goals` must be a subclass of "
-                    f"{DaemonGoal.__name__}. Bad elements: {bad_elements}."
+                    "Every element of the entrypoint `auxillary_goals` must be a subclass of "
+                    f"{AuxillaryGoal.__name__}. Bad elements: {bad_elements}."
                 )
-            self.register_subsystems(plugin_or_backend, daemon_goals)
+            self.register_subsystems(plugin_or_backend, auxillary_goals)
 
         def allow_unknown_options(self, allow: bool = True) -> None:
             """Allows overriding whether Options parsing will fail for unrecognized Options.

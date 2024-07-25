@@ -17,8 +17,9 @@ from pants.option.scope import ScopeInfo
 
 
 @dataclass
-class DaemonGoalContext:
-    """Context passed to a `DaemonGoal.run` implementation."""
+class AuxillaryGoalContext:
+    """Context passed to a `AuxillaryGoal.run` implementation."""
+
     build_config: BuildConfiguration
     graph_session: GraphSession
     options: Options
@@ -26,19 +27,20 @@ class DaemonGoalContext:
     union_membership: UnionMembership
 
 
-class DaemonGoal(ABC, GoalSubsystem):
-    """Configure a "daemon" goal which allows rules to "take over" Pants client execution in lieu
+class AuxillaryGoal(ABC, GoalSubsystem):
+    """Configure a "auxillary" goal which allows rules to "take over" Pants client execution in lieu
     of executing an ordnary goal.
 
-    Only a single daemon goal is executed per run, any remaining goals/arguments are passed
-    unaltered to the daemon goal. Daemon goals have precedence over regular goals.
+    Only a single auxillary goal is executed per run, any remaining goals/arguments are passed
+    unaltered to the auxillary goal. Auxillary goals have precedence over regular goals.
 
-    When multiple daemon goals are presented, the first daemon goal will be used unless there is a
-    daemon goal that begin with a hyphen (`-`), in which case the last such "option goal" will be
+    When multiple auxillary goals are presented, the first auxillary goal will be used unless there is a
+    auxillary goal that begin with a hyphen (`-`), in which case the last such "option goal" will be
     prioritized. This is to support things like `./pants some-builtin-goal --help`.
 
     The intended use for this API is rule code which runs a server (for example, a BSP server)
-    which provides an alternate interface to the Pants rule engine.
+    which provides an alternate interface to the Pants rule engine, or other kinds of goals
+    which must run "outside" of the usual engine processing to function.
     """
 
     # Used by `pants.option.arg_splitter.ArgSplitter()` to optionally allow aliasing daemon goals.
@@ -46,11 +48,11 @@ class DaemonGoal(ABC, GoalSubsystem):
 
     @classmethod
     def create_scope_info(cls, **scope_info_kwargs) -> ScopeInfo:
-        return super().create_scope_info(is_daemon=True, **scope_info_kwargs)
+        return super().create_scope_info(is_auxillary=True, **scope_info_kwargs)
 
     @abstractmethod
     def run(
         self,
-        context: DaemonGoalContext,
+        context: AuxillaryGoalContext,
     ) -> ExitCode:
         pass
