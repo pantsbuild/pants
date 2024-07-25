@@ -188,14 +188,20 @@ impl Platform {
     }
 }
 
+impl AsRef<str> for Platform {
+    fn as_ref(&self) -> &str {
+        match self {
+            Platform::Linux_x86_64 => "linux_x86_64",
+            Platform::Linux_arm64 => "linux_arm64",
+            Platform::Macos_arm64 => "macos_arm64",
+            Platform::Macos_x86_64 => "macos_x86_64",
+        }
+    }
+}
+
 impl From<Platform> for String {
     fn from(platform: Platform) -> String {
-        match platform {
-            Platform::Linux_x86_64 => "linux_x86_64".to_string(),
-            Platform::Linux_arm64 => "linux_arm64".to_string(),
-            Platform::Macos_arm64 => "macos_arm64".to_string(),
-            Platform::Macos_x86_64 => "macos_x86_64".to_string(),
-        }
+        platform.as_ref().to_string()
     }
 }
 
