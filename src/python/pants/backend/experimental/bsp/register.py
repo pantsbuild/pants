@@ -5,7 +5,7 @@ from pants.bsp.goal import BSPGoal
 from pants.bsp.rules import rules as bsp_rules
 
 
-def auxillary_goals():
+def auxiliary_goals():
     return (BSPGoal,)
 
 

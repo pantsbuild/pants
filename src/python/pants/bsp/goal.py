@@ -18,7 +18,7 @@ from pants.bsp.util_rules.lifecycle import BSP_VERSION, BSPLanguageSupport
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
-from pants.goal.auxillary_goal import AuxillaryGoal, AuxillaryGoalContext
+from pants.goal.auxiliary_goal import AuxiliaryGoal, AuxiliaryGoalContext
 from pants.init.engine_initializer import GraphSession
 from pants.option.option_types import BoolOption, FileListOption, StrListOption
 from pants.option.option_value_container import OptionValueContainer
@@ -29,7 +29,7 @@ from pants.version import VERSION
 _logger = logging.getLogger(__name__)
 
 
-class BSPGoal(AuxillaryGoal):
+class BSPGoal(AuxiliaryGoal):
     name = "experimental-bsp"
     help = "Setup repository for Build Server Protocol (https://build-server-protocol.github.io/)."
 
@@ -99,7 +99,7 @@ class BSPGoal(AuxillaryGoal):
 
     def run(
         self,
-        context: AuxillaryGoalContext,
+        context: AuxiliaryGoalContext,
     ) -> ExitCode:
         goal_options = context.options.for_scope(self.name)
         if goal_options.server:

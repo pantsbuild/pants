@@ -39,8 +39,8 @@ class ScopeInfo:
     # Builtin goals, such as `help` and `version` etc.
     is_builtin: bool = False
 
-    # Auxillary goals, such as the `experimental-bsp` goal.
-    is_auxillary: bool = False
+    # Auxiliary goals, such as the `experimental-bsp` goal.
+    is_auxiliary: bool = False
 
     @property
     def description(self) -> str:

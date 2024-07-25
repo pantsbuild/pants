@@ -171,7 +171,7 @@ class Options:
         )
 
         return cls(
-            builtin_goal=split_args.builtin_or_auxillary_goal,
+            builtin_goal=split_args.builtin_or_auxiliary_goal,
             goals=split_args.goals,
             unknown_goals=split_args.unknown_goals,
             scope_to_flags=split_args.scope_to_flags,

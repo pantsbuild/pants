@@ -17,8 +17,8 @@ from pants.option.scope import ScopeInfo
 
 
 @dataclass
-class AuxillaryGoalContext:
-    """Context passed to a `AuxillaryGoal.run` implementation."""
+class AuxiliaryGoalContext:
+    """Context passed to a `AuxiliaryGoal.run` implementation."""
 
     build_config: BuildConfiguration
     graph_session: GraphSession
@@ -27,15 +27,15 @@ class AuxillaryGoalContext:
     union_membership: UnionMembership
 
 
-class AuxillaryGoal(ABC, GoalSubsystem):
-    """Configure a "auxillary" goal which allows rules to "take over" Pants client execution in lieu
+class AuxiliaryGoal(ABC, GoalSubsystem):
+    """Configure a "auxiliary" goal which allows rules to "take over" Pants client execution in lieu
     of executing an ordnary goal.
 
-    Only a single auxillary goal is executed per run, any remaining goals/arguments are passed
-    unaltered to the auxillary goal. Auxillary goals have precedence over regular goals.
+    Only a single auxiliary goal is executed per run, any remaining goals/arguments are passed
+    unaltered to the auxiliary goal. Auxiliary goals have precedence over regular goals.
 
-    When multiple auxillary goals are presented, the first auxillary goal will be used unless there is a
-    auxillary goal that begin with a hyphen (`-`), in which case the last such "option goal" will be
+    When multiple auxiliary goals are presented, the first auxiliary goal will be used unless there is a
+    auxiliary goal that begin with a hyphen (`-`), in which case the last such "option goal" will be
     prioritized. This is to support things like `./pants some-builtin-goal --help`.
 
     The intended use for this API is rule code which runs a server (for example, a BSP server)
@@ -48,11 +48,11 @@ class AuxillaryGoal(ABC, GoalSubsystem):
 
     @classmethod
     def create_scope_info(cls, **scope_info_kwargs) -> ScopeInfo:
-        return super().create_scope_info(is_auxillary=True, **scope_info_kwargs)
+        return super().create_scope_info(is_auxiliary=True, **scope_info_kwargs)
 
     @abstractmethod
     def run(
         self,
-        context: AuxillaryGoalContext,
+        context: AuxiliaryGoalContext,
     ) -> ExitCode:
         pass
