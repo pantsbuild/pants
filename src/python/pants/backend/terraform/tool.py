@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
@@ -425,6 +426,7 @@ async def setup_terraform_process(
     env = {
         **env,
         "PATH": ":".join(path),
+        "TF_PLUGIN_CACHE_DIR": (os.path.join("{chroot}", terraform.plugin_cache_dir))
     }
 
     immutable_input_digests = {
