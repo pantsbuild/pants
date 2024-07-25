@@ -13,9 +13,11 @@ from pants.backend.terraform.dependency_inference import (
     TerraformHcl2Parser,
     TerraformModuleDependenciesInferenceFieldSet,
 )
+from pants.backend.terraform.goals.lockfiles import rules as terraform_lockfile_rules
 from pants.backend.terraform.target_types import (
     TerraformBackendTarget,
     TerraformDeploymentTarget,
+    TerraformLockfileTarget,
     TerraformModuleTarget,
     TerraformVarFileTarget,
 )
@@ -43,10 +45,12 @@ def rule_runner() -> RuleRunner:
             TerraformDeploymentTarget,
             TerraformBackendTarget,
             TerraformVarFileTarget,
+            TerraformLockfileTarget,
         ],
         rules=[
             *external_tool.rules(),
             *source_files.rules(),
+            *terraform_lockfile_rules(),
             *dependency_inference.rules(),
             QueryRule(InferredDependencies, [InferTerraformModuleDependenciesRequest]),
             QueryRule(InferredDependencies, [InferTerraformDeploymentDependenciesRequest]),
@@ -68,6 +72,7 @@ def test_dependency_inference_module(rule_runner: RuleRunner) -> None:
             "src/tf/modules/foo/versions.tf": "",
             "src/tf/modules/foo/bar/BUILD": "terraform_module()\n",
             "src/tf/modules/foo/bar/versions.tf": "",
+            "src/tf/resources/grok/.terraform.lock.hcl": "",
             "src/tf/resources/grok/subdir/BUILD": "terraform_module()\n",
             "src/tf/resources/grok/subdir/versions.tf": "",
             "src/tf/resources/grok/BUILD": "terraform_module()\n",
@@ -107,6 +112,7 @@ def test_dependency_inference_module(rule_runner: RuleRunner) -> None:
                 Address("src/tf/modules/foo"),
                 Address("src/tf/modules/foo/bar"),
                 Address("src/tf/resources/grok/subdir"),
+                Address("src/tf/resources/grok", target_name=".terraform.lock.hcl"),
             ]
         ),
     )
@@ -142,6 +148,7 @@ def test_dependency_inference_autoinfered_files(rule_runner: RuleRunner) -> None
             "src/tf/main.tf": "",
             "src/tf/main.tfvars": "",
             "src/tf/main.tfbackend": "",
+            "src/tf/.terraform.lock.hcl": "",
         }
     )
     target = rule_runner.get_target(Address("src/tf", target_name="deployment"))
@@ -154,7 +161,8 @@ def test_dependency_inference_autoinfered_files(rule_runner: RuleRunner) -> None
         ],
     )
     assert set(inferred_deps.include) == {
-        Address("src/tf", target_name=tgt) for tgt in ("mod", "tfbackend", "tfvars")
+        Address("src/tf", target_name=tgt)
+        for tgt in ("mod", "tfbackend", "tfvars", ".terraform.lock.hcl")
     }
 
 

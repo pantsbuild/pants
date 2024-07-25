@@ -110,48 +110,14 @@ async def setup_process_for_parse_terraform_module_sources(
 
 @dataclass(frozen=True)
 class TerraformModuleDependenciesInferenceFieldSet(FieldSet):
-    required_fields = (TerraformModuleSourcesField,)
+    required_fields = (TerraformModuleSourcesField, TerraformDependenciesField)
 
     sources: TerraformModuleSourcesField
+    dependencies: TerraformDependenciesField
 
 
 class InferTerraformModuleDependenciesRequest(InferDependenciesRequest):
     infer_from = TerraformModuleDependenciesInferenceFieldSet
-
-
-@rule
-async def infer_terraform_module_dependencies(
-    request: InferTerraformModuleDependenciesRequest,
-) -> InferredDependencies:
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources))
-
-    paths = OrderedSet(
-        filename for filename in hydrated_sources.snapshot.files if filename.endswith(".tf")
-    )
-    result = await Get(
-        ProcessResult,
-        ParseTerraformModuleSources(
-            sources_digest=hydrated_sources.snapshot.digest,
-            paths=tuple(paths),
-        ),
-    )
-    candidate_spec_paths = [line for line in result.stdout.decode("utf-8").split("\n") if line]
-
-    # For each path, see if there is a `terraform_module` target at the specified spec_path.
-    candidate_targets = await Get(
-        Targets,
-        RawSpecs(
-            dir_globs=tuple(DirGlobSpec(path) for path in candidate_spec_paths),
-            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
-            description_of_origin="the `terraform_module` dependency inference rule",
-        ),
-    )
-    # TODO: Need to either implement the standard ambiguous dependency logic or ban >1 terraform_module
-    # per directory.
-    terraform_module_addresses = [
-        tgt.address for tgt in candidate_targets if tgt.has_field(TerraformModuleSourcesField)
-    ]
-    return InferredDependencies(terraform_module_addresses)
 
 
 @dataclass(frozen=True)
@@ -258,6 +224,66 @@ def identify_terraform_backend_and_vars(
         lockfile = None
 
     return TerraformDeploymentInvocationFiles(backend_targets, vars_targets, lockfile)
+
+
+async def _infer_dependencies_from_sources(
+    request: InferTerraformModuleDependenciesRequest,
+) -> list[Address]:
+    """Parse the source code for references to other modules."""
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources))
+    paths = OrderedSet(
+        filename for filename in hydrated_sources.snapshot.files if filename.endswith(".tf")
+    )
+    result = await Get(
+        ProcessResult,
+        ParseTerraformModuleSources(
+            sources_digest=hydrated_sources.snapshot.digest,
+            paths=tuple(paths),
+        ),
+    )
+    candidate_spec_paths = [line for line in result.stdout.decode("utf-8").split("\n") if line]
+    # For each path, see if there is a `terraform_module` target at the specified spec_path.
+    candidate_targets = await Get(
+        Targets,
+        RawSpecs(
+            dir_globs=tuple(DirGlobSpec(path) for path in candidate_spec_paths),
+            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+            description_of_origin="the `terraform_module` dependency inference rule",
+        ),
+    )
+    # TODO: Need to either implement the standard ambiguous dependency logic or ban >1 terraform_module
+    # per directory.
+    terraform_module_addresses = [
+        tgt.address for tgt in candidate_targets if tgt.has_field(TerraformModuleSourcesField)
+    ]
+    return terraform_module_addresses
+
+
+async def _infer_lockfile(request: InferTerraformModuleDependenciesRequest) -> list[Address]:
+    """Pull in the lockfile for a Terraform module.
+
+    This is necessary for `terraform validate`.
+    """
+    invocation_files = await Get(
+        TerraformDeploymentInvocationFiles,
+        TerraformDeploymentInvocationFilesRequest(
+            request.field_set.address, request.field_set.dependencies
+        ),
+    )
+    if invocation_files.lockfile:
+        return [invocation_files.lockfile.address]
+    else:
+        return []
+
+
+@rule
+async def infer_terraform_module_dependencies(
+    request: InferTerraformModuleDependenciesRequest,
+) -> InferredDependencies:
+    terraform_module_addresses = await _infer_dependencies_from_sources(request)
+    lockfile_address = await _infer_lockfile(request)
+
+    return InferredDependencies([*terraform_module_addresses, *lockfile_address])
 
 
 @rule
