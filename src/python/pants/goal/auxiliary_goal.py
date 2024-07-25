@@ -43,7 +43,7 @@ class AuxiliaryGoal(ABC, GoalSubsystem):
     which must run "outside" of the usual engine processing to function.
     """
 
-    # Used by `pants.option.arg_splitter.ArgSplitter()` to optionally allow aliasing daemon goals.
+    # Used by `pants.option.arg_splitter.ArgSplitter()` to optionally allow aliasing auxiliary goals.
     aliases: ClassVar[tuple[str, ...]] = ()
 
     @classmethod

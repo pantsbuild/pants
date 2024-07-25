@@ -157,13 +157,13 @@ class ArgSplitter:
                 if builtin_or_auxiliary_goal:
                     goals.add(builtin_or_auxiliary_goal)
 
-                # Get scope from info in case we hit an aliased builtin/daemon goal.
+                # Get scope from info in case we hit an aliased builtin/auxiliary goal.
                 builtin_or_auxiliary_goal = scope_info.scope
             else:
                 goals.add(scope_info.scope)
             add_scope(scope_info.scope)
 
-            # Use builtin/daemon goal as default scope for args.
+            # Use builtin/auxiliary goal as default scope for args.
             return builtin_or_auxiliary_goal or scope_info.scope
 
         self._unconsumed_args = list(reversed(args))
