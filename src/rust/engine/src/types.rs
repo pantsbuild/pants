@@ -38,5 +38,6 @@ pub struct Types {
     pub docker_resolve_image_result: TypeId,
     pub parsed_python_deps_result: TypeId,
     pub parsed_javascript_deps_result: TypeId,
+    pub parsed_dockerfile_info_result: TypeId,
     pub deps_request: TypeId,
 }

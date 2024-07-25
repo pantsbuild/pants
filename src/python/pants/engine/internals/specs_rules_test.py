@@ -793,14 +793,21 @@ def test_resolve_specs_paths(rule_runner: RuleRunner) -> None:
     )
     assert_paths(["demo/*.foo", "-demo/unowned.foo"], set(), set())
 
-    assert_paths([":"], {"f.txt"}, set())
+    assert_paths([":"], {"BUILDROOT", "f.txt"}, set())
     for dir_suffix in ("", ":"):
         assert_paths([f"unowned{dir_suffix}"], {"unowned/f.txt"}, {"unowned"})
         assert_paths([f"demo{dir_suffix}"], {*all_expected_demo_files, "demo/BUILD"}, {"demo"})
 
     assert_paths(
         ["::"],
-        {*all_expected_demo_files, "demo/BUILD", "f.txt", "unowned/f.txt", "unowned/subdir/f.txt"},
+        {
+            *all_expected_demo_files,
+            "BUILDROOT",
+            "demo/BUILD",
+            "f.txt",
+            "unowned/f.txt",
+            "unowned/subdir/f.txt",
+        },
         {"demo", "unowned", "unowned/subdir"},
     )
     assert_paths(

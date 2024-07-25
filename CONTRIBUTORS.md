@@ -164,6 +164,7 @@ Created as part of the release process.
 + John Basila
 + John Chee
 + John Gallagher
++ John Granström
 + John Ioannidis
 + John Sirois
 + John Townsend

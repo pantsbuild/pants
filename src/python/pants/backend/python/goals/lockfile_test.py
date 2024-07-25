@@ -20,6 +20,7 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
 from pants.engine.fs import DigestContents
+from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule
 from pants.util.ordered_set import FrozenOrderedSet
@@ -42,7 +43,7 @@ def rule_runner() -> PythonRuleRunner:
 def _generate(
     *,
     rule_runner: PythonRuleRunner,
-    ansicolors_version: str = "==1.1.8",
+    requirements_string: str = "ansicolors==1.1.8",
     requirement_constraints_str: str = '//   "requirement_constraints": [],\n',
     only_binary_and_no_binary_str: str = '//   "only_binary": [],\n//   "no_binary": []',
 ) -> str:
@@ -50,7 +51,7 @@ def _generate(
         GenerateLockfileResult,
         [
             GeneratePythonLockfile(
-                requirements=FrozenOrderedSet([f"ansicolors{ansicolors_version}"]),
+                requirements=FrozenOrderedSet([requirements_string] if requirements_string else []),
                 find_links=FrozenOrderedSet([]),
                 interpreter_constraints=InterpreterConstraints(),
                 resolve_name="test",
@@ -75,7 +76,7 @@ def _generate(
             //   "version": 3,
             //   "valid_for_interpreter_constraints": [],
             //   "generated_with_requirements": [
-            //     "ansicolors{ansicolors_version}"
+            //     "{requirements_string}"
             //   ],
             //   "manylinux": "manylinux2014",
             """
@@ -179,7 +180,7 @@ def test_constraints_file(rule_runner: PythonRuleRunner) -> None:
     lock_entry = json.loads(
         _generate(
             rule_runner=rule_runner,
-            ansicolors_version=">=1.0",
+            requirements_string="ansicolors>=1.0",
             requirement_constraints_str=dedent(
                 """\
                 //   "requirement_constraints": [
@@ -252,3 +253,18 @@ def test_multiple_resolves() -> None:
             diff=False,
         ),
     }
+
+
+def test_empty_requirements(rule_runner: PythonRuleRunner) -> None:
+    with pytest.raises(ExecutionError) as excinfo:
+        json.loads(
+            _generate(
+                rule_runner=rule_runner,
+                requirements_string="",
+            )
+        )
+
+    assert (
+        "Cannot generate lockfile with no requirements. Please add some requirements to test."
+        in str(excinfo.value)
+    )

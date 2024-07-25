@@ -21,16 +21,21 @@ walkdir = { workspace = true }
 tree-sitter = { workspace = true }
 tree-sitter-javascript = { workspace = true }
 tree-sitter-python = { workspace = true }
+tree-sitter-dockerfile = { workspace = true }
 
 [dependencies]
 fnv = { workspace = true }
 protos = { path = "../protos" }
+indexmap = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 itertools = { workspace = true }
 tree-sitter = { workspace = true }
 tree-sitter-javascript = { workspace = true }
 tree-sitter-python = { workspace = true }
+tree-sitter-dockerfile = { workspace = true }
+lazy_static = { workspace = true }
+regex = { workspace = true }
 
 [lints]
 workspace = true

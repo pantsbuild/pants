@@ -22,6 +22,7 @@ from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import SourcesField
 from pants.engine.unions import UnionRule
+from pants.option.global_options import KeepSandboxes
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ async def prepare_terraform_deployment(
     request: TerraformDeploymentRequest,
     terraform_subsystem: TerraformTool,
     deploy_subsystem: DeploySubsystem,
+    keep_sandboxes: KeepSandboxes,
 ) -> InteractiveProcess:
     initialised_terraform = await Get(
         TerraformInitResponse,
@@ -85,7 +87,7 @@ async def prepare_terraform_deployment(
             chdir=initialised_terraform.chdir,
         ),
     )
-    return InteractiveProcess.from_process(process)
+    return InteractiveProcess.from_process(process, keep_sandboxes=keep_sandboxes)
 
 
 @rule(desc="Run Terraform deploy process", level=LogLevel.DEBUG)

@@ -119,6 +119,7 @@ class Options:
         # We default to error to be strict in tests, but set explicitly in OptionsBootstrapper
         # for user-facing behavior.
         native_options_validation: NativeOptionsValidation = NativeOptionsValidation.error,
+        native_options_config_discovery: bool = True,
     ) -> Options:
         """Create an Options instance.
 
@@ -131,6 +132,7 @@ class Options:
         :param allow_unknown_options: Whether to ignore or error on unknown cmd-line flags.
         :param native_options_validation: How to validate the native options parser against the
                legacy Python parser.
+        :param native_options_config_discovery: Whether to discover config files in the native parser or use the ones supplied
         """
         # We need parsers for all the intermediate scopes, so inherited option values
         # can propagate through them.
@@ -163,7 +165,10 @@ class Options:
         parser_by_scope = {si.scope: Parser(env, config, si) for si in complete_known_scope_infos}
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
 
-        native_parser = NativeOptionParser(args, env, config.sources(), allow_pantsrc=True)
+        config_to_pass = None if native_options_config_discovery else config.sources()
+        native_parser = NativeOptionParser(
+            args, env, config_sources=config_to_pass, allow_pantsrc=True
+        )
 
         return cls(
             builtin_goal=split_args.builtin_or_daemon_goal,

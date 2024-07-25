@@ -1,7 +1,7 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Iterable, Tuple
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
@@ -38,7 +38,7 @@ from pants.core.util_rules.system_binaries import (
     WcBinary,
     XargsBinary,
 )
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.util.logging import LogLevel
 
 
@@ -133,5 +133,5 @@ async def get_binaries_required_for_makeself(
     )
 
 
-def rules():
+def rules() -> Iterable[Rule]:
     return collect_rules()

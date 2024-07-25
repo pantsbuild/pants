@@ -778,3 +778,26 @@ def test_self_types_on_same_package(rule_runner: RuleRunner) -> None:
     assert sorted(analysis.fully_qualified_consumed_symbols()) == [
         "foo.Foo",
     ]
+
+
+def test_typed_pattern_on_same_package(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """\
+            package foo
+            class A
+            object B {
+                def fn(v: Any) = v match {
+                    case _: A =>
+                }
+            }
+            """
+        ),
+    )
+
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.A",
+        "foo.Any",
+        "foo.v",
+    ]

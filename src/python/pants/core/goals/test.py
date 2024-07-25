@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import itertools
+import json
 import logging
 import os
 import shlex
 from abc import ABC, ABCMeta
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from pathlib import PurePath
 from typing import Any, ClassVar, Iterable, Optional, Sequence, Tuple, TypeVar, cast
@@ -64,6 +66,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption, EnumOption, IntOption, StrListOption, StrOption
 from pants.util.collections import partition_sequentially
+from pants.util.dirutil import safe_open
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized, memoized_property
@@ -682,6 +685,21 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
+    experimental_report_test_result_info = BoolOption(
+        default=False,
+        advanced=True,
+        help=softwrap(
+            """
+            Report information about the test results.
+
+            For now, it reports only the source from where the test results were fetched. When running tests,
+            they may be executed locally or remotely, but if there are results of previous runs available,
+            they may be retrieved from the local or remote cache, or be memoized. Knowing where the test
+            results come from might be useful when evaluating the efficiency of the cache and the nature of
+            the changes in the source code that may lead to frequent cache invalidations.
+            """
+        ),
+    )
 
     def report_dir(self, distdir: DistDir) -> PurePath:
         return PurePath(self._report_dir.format(distdir=distdir.relpath))
@@ -869,6 +887,14 @@ async def _run_debug_tests(
     return Test(exit_code)
 
 
+def _save_test_result_info_report_file(run_id: RunId, results: dict[str, dict]) -> None:
+    """Save a JSON file with the information about the test results."""
+    timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    obj = json.dumps({"timestamp": timestamp, "run_id": run_id, "info": results})
+    with safe_open(f"test_result_info_report_runid{run_id}_{timestamp}.json", "w") as fh:
+        fh.write(obj)
+
+
 @goal_rule
 async def run_tests(
     console: Console,
@@ -940,6 +966,8 @@ async def run_tests(
     exit_code = 0
     if results:
         console.print_stderr("")
+    if test_subsystem.experimental_report_test_result_info:
+        test_result_info = {}
     for result in sorted(results):
         if result.exit_code is None:
             # We end up here, e.g., if we implemented test discovery and found no tests.
@@ -949,7 +977,10 @@ async def run_tests(
         if result.result_metadata is None:
             # We end up here, e.g., if compilation failed during self-implemented test discovery.
             continue
-
+        if test_subsystem.experimental_report_test_result_info:
+            test_result_info[result.addresses[0].spec] = {
+                "source": result.result_metadata.source(run_id).value
+            }
         console.print_stderr(_format_test_summary(result, run_id, console))
 
         if result.extra_output and result.extra_output.files:
@@ -1032,6 +1063,9 @@ async def run_tests(
                 # coverage.py uses 2 to indicate failure due to insufficient coverage.
                 # We may as well follow suit in the general case, for all languages.
                 exit_code = 2
+
+    if test_subsystem.experimental_report_test_result_info:
+        _save_test_result_info_report_file(run_id, test_result_info)
 
     return Test(exit_code)
 

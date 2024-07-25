@@ -488,7 +488,7 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
         You can give a list of multiple complete platforms to create a multiplatform PEX,
         meaning that the PEX will be executable in all of the supported environments.
 
-        Complete platforms should be addresses of `file` targets that point to files that contain
+        Complete platforms should be addresses of `file` or `resource` targets that point to files that contain
         complete platform JSON as described by Pex
         (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
 

@@ -42,16 +42,20 @@ def all_help_info(rule_runner: RuleRunner) -> AllHelpInfo:
     def fake_consumed_scopes_mapper(scope: str) -> tuple[str, ...]:
         return ("somescope", f"used_by_{scope or 'GLOBAL_SCOPE'}")
 
-    return HelpInfoExtracter.get_all_help_info(
-        options=rule_runner.options_bootstrapper.full_options(
-            rule_runner.build_config, union_membership=UnionMembership({})
-        ),
-        union_membership=rule_runner.union_membership,
-        consumed_scopes_mapper=fake_consumed_scopes_mapper,
-        registered_target_types=RegisteredTargetTypes.create(rule_runner.build_config.target_types),
-        build_symbols=BuildFileSymbolsInfo.from_info(),
-        build_configuration=rule_runner.build_config,
-    )
+    with rule_runner.pushd():
+        all_help_info = HelpInfoExtracter.get_all_help_info(
+            options=rule_runner.options_bootstrapper.full_options(
+                rule_runner.build_config, union_membership=UnionMembership({})
+            ),
+            union_membership=rule_runner.union_membership,
+            consumed_scopes_mapper=fake_consumed_scopes_mapper,
+            registered_target_types=RegisteredTargetTypes.create(
+                rule_runner.build_config.target_types
+            ),
+            build_symbols=BuildFileSymbolsInfo.from_info(),
+            build_configuration=rule_runner.build_config,
+        )
+    return all_help_info
 
 
 @pytest.fixture

@@ -42,10 +42,10 @@ def rule_runner() -> RuleRunner:
 
 
 def test_version_option_overrides_default(rule_runner: RuleRunner):
-    rule_runner.set_options(["--cowsay-version=cowsay@1.5.0"], env_inherit={"PATH"})
+    rule_runner.set_options(["--cowsay-version=cowsay@1.6.0"], env_inherit={"PATH"})
     tool = rule_runner.request(CowsayTool, [])
     assert tool.default_version == "cowsay@1.4.0"
-    assert tool.version == "cowsay@1.5.0"
+    assert tool.version == "cowsay@1.6.0"
 
 
 @pytest.mark.parametrize(
@@ -63,9 +63,8 @@ def test_execute_process_with_package_manager(
 ):
     rule_runner.set_options(
         [
-            "--cowsay-version=cowsay@1.5.0",
+            "--cowsay-version=cowsay@1.6.0",
             f"--nodejs-package-manager={package_manager}",
-            "--nodejs-package-managers={'npm': '7.20.1', 'yarn': '1.22.15', 'pnpm': '6.32.12'}",
         ],
         env_inherit={"PATH"},
     )
@@ -75,19 +74,19 @@ def test_execute_process_with_package_manager(
 
     to_run = rule_runner.request(Process, [request])
 
-    assert to_run.argv == expected_argv + ("cowsay@1.5.0", "--version")
+    assert to_run.argv == expected_argv + ("cowsay@1.6.0", "--version")
 
     result = rule_runner.request(ProcessResult, [request])
 
-    assert result.stdout == b"1.5.0\n"
+    assert result.stdout == b"1.6.0\n"
 
 
 @pytest.mark.parametrize(
     "package_manager, version",
     [
-        pytest.param("yarn", "1.22.15", id="yarn"),
-        pytest.param("npm", "7.20.1", id="npm"),
-        pytest.param("pnpm", "6.32.12", id="pnpm"),
+        pytest.param("yarn", "1.22.22", id="yarn"),
+        pytest.param("npm", "10.8.1", id="npm"),
+        pytest.param("pnpm", "9.5.0", id="pnpm"),
     ],
 )
 def test_execute_process_with_package_manager_version_from_configuration(
@@ -113,12 +112,10 @@ def test_execute_process_with_package_manager_version_from_configuration(
 @pytest.mark.parametrize(
     "lockfile_path, package_manager, version",
     [
-        pytest.param(Path(__file__).parent / "yarn.lock", "yarn", "1.22.15", id="yarn_resolve"),
+        pytest.param(Path(__file__).parent / "yarn.lock", "yarn", "1.22.22", id="yarn_resolve"),
+        pytest.param(Path(__file__).parent / "pnpm-lock.yaml", "pnpm", "9.5.0", id="pnpm_resolve"),
         pytest.param(
-            Path(__file__).parent / "pnpm-lock.yaml", "pnpm", "6.32.12", id="pnpm_resolve"
-        ),
-        pytest.param(
-            Path(__file__).parent / "package-lock.json", "npm", "7.20.1", id="npm_resolve"
+            Path(__file__).parent / "package-lock.json", "npm", "10.8.1", id="npm_resolve"
         ),
     ],
 )
@@ -141,7 +138,7 @@ def test_execute_process_with_package_manager_version_from_resolve_package_manag
             "package.json": json.dumps(
                 {
                     "name": "@the-company/project",
-                    "devDependencies": {"cowsay": "1.5.0"},
+                    "devDependencies": {"cowsay": "^1.6.0"},
                     "packageManager": f"{package_manager}@{version}",
                 }
             ),
@@ -170,7 +167,7 @@ def test_resolve_dictates_version(
         {
             "BUILD": "package_json(name='root_pkg')",
             "package.json": json.dumps(
-                {"name": "@the-company/project", "devDependencies": {"cowsay": "1.5.0"}}
+                {"name": "@the-company/project", "devDependencies": {"cowsay": "^1.6.0"}}
             ),
             lockfile_path.name: lockfile_path.read_text(),
         }
@@ -188,7 +185,7 @@ def test_resolve_dictates_version(
         [tool.request(("--version",), EMPTY_DIGEST, "Cowsay version", LogLevel.DEBUG)],
     )
 
-    assert result.stdout == b"1.5.0\n"
+    assert result.stdout == b"1.6.0\n"
 
 
 def request_package_manager_version_for_tool(
