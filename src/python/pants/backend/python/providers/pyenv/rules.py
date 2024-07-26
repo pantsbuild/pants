@@ -60,7 +60,7 @@ class PyenvPythonProviderSubsystem(TemplatedExternalTool):
         """
     )
 
-    default_version = "2.3.13"
+    default_version = "2.4.7"
     default_url_template = "https://github.com/pyenv/pyenv/archive/refs/tags/v{version}.tar.gz"
 
     class EnvironmentAware:
@@ -92,8 +92,8 @@ class PyenvPythonProviderSubsystem(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "9105de5e5cf8dc0eca2a520ed04493d183128d46a2cfb402d4cc271af1bf144b",
-                    "749323",
+                    "0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d",
+                    "799490",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
