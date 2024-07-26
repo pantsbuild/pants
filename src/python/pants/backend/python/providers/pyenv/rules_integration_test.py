@@ -140,6 +140,6 @@ def test_using_pyenv_with_incompatible_interpreter_constraints(rule_runner):
     target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
     with pytest.raises(
         ExecutionError,
-        match=r"(?si)couldn't find a Python 3.7 .* compatible with .* CPython==3.7.20 .* pyenv 2.3.13 .*latest known version 3.7.1[0-9].* Suggestion: .*",
+        match=r"(?si)couldn't find a Python 3.7 .* compatible with .* CPython==3.7.20 .*latest known version 3.7.1[0-9].* Suggestion: .*",
     ):
         run_run_request(rule_runner, target)
