@@ -270,13 +270,14 @@ async def get_python(
             for (major, minor, patch) in supported_triplets
             if major == major_to_use and minor == minor_to_use and patch <= latest_known_patch
         )
-    except ValueError as e:
+    except ValueError:
         raise ValueError(
             f"Couldn't find a Python {major_minor_to_use_str} version that"
             f" is compatible with the interpreter constraints {request.interpreter_constraints}"
             f" and known to pyenv {pyenv_subsystem.version}"
-            f" (latest known version {major_to_use}.{minor_to_use}.{latest_known_patch})"
-        ) from e
+            f" (latest known version {major_to_use}.{minor_to_use}.{latest_known_patch})."
+            " Suggestion: consider upgrading pyenv or adjusting your interpreter constraints."
+        ) from None
 
     major_minor_patch_to_use_str = ".".join(map(str, major_minor_patch_to_use))
 
