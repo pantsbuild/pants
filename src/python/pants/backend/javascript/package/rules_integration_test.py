@@ -19,7 +19,8 @@ from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSo
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FileTarget, ResourceTarget
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, Snapshot
+from pants.engine.fs import DigestEntries
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, RemovePrefix, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources
 from pants.testutil.rule_runner import RuleRunner
@@ -34,6 +35,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(GeneratedSources, (GenerateResourcesFromNodeBuildScriptRequest,)),
             QueryRule(BuiltPackage, (NodeBuildScriptPackageFieldSet,)),
             QueryRule(Snapshot, (Digest,)),
+            QueryRule(DigestEntries, (Digest,)),
         ],
         target_types=[
             *package_json.target_types(),
@@ -58,10 +60,38 @@ def rule_runner() -> RuleRunner:
 )
 def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRunner:
     lockfile, package_manager = request.param
-    rule_runner.set_options([f"--nodejs-package-manager={package_manager}"], env_inherit={"PATH"})
+    rule_runner.set_options(
+        [f"--nodejs-package-manager={package_manager}"],
+        env_inherit={"PATH"},
+    )
     rule_runner.write_files(
         {
             "src/js/BUILD": dedent(
+                """\
+                package_json(
+                    dependencies=[":npmrc"],
+                )
+                file(name="npmrc", source=".npmrc")
+                """
+            ),
+            "src/js/.npmrc": "strict-peer-dependencies=false",
+            f"src/js/{lockfile.name}": lockfile.read_text(),
+            "src/js/package.json": json.dumps(
+                {
+                    "name": "root",
+                    "version": "0.0.1",
+                    "workspaces": ["ham", "child-lib"],
+                    "private": True,
+                }
+            ),
+            "src/js/pnpm-workspace.yaml": dedent(
+                """\
+                packages:
+                - "./ham"
+                - "./child-lib"
+                """
+            ),
+            "src/js/ham/BUILD": dedent(
                 """\
                 package_json(
                     scripts=[
@@ -71,65 +101,76 @@ def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRu
                             extra_caches=[".parcel-cache"],
                         )
                     ],
-                    dependencies=[":npmrc"],
                 )
-                file(name="npmrc", source=".npmrc")
+                javascript_sources(name="hamjs", dependencies=[":style"])
+                resource(name="style", source="style.css")
                 """
-            ),
-            "src/js/package.json": json.dumps(
-                {
-                    "name": "ham",
-                    "version": "0.0.1",
-                    "source": "lib/index.mjs",
-                    "scripts": {
-                        "build": "parcel build lib/index.mjs --dist-dir=dist --cache-dir=.parcel-cache"
-                    },
-                    "devDependencies": {"parcel": "^2.12.0"},
-                }
             ),
             "src/js/.npmrc": "strict-peer-dependencies=false",
             f"src/js/{lockfile.name}": lockfile.read_text(),
             "src/js/lib/BUILD": dedent(
                 """\
-                javascript_sources(dependencies=[":style"])
+                javascript_sources(name="hamjs", dependencies=[":style"])
                 resource(name="style", source="style.css")
                 """
             ),
-            "src/js/lib/style.css": "",
-            "src/js/lib/index.mjs": "import './style.css' ",
+            "src/js/ham/package.json": json.dumps(
+                {
+                    "name": "ham",
+                    "version": "0.0.1",
+                    "source": "index.mjs",
+                    "scripts": {
+                        "build": "parcel build index.mjs --dist-dir=dist --cache-dir=.parcel-cache"
+                    },
+                    "dependencies": {"child-lib": "*"},
+                    "devDependencies": {"parcel": "^2.12.0"},
+                    "private": True,
+                }
+            ),
+            "src/js/ham/style.css": "",
+            "src/js/ham/index.mjs": "import './style.css'; import * as cl from 'child-lib';",
+            "src/js/child-lib/BUILD": dedent(
+                """\
+                javascript_sources(name="js")
+                package_json()
+                """
+            ),
+            "src/js/child-lib/index.mjs": "console.log('child-lib')",
+            "src/js/child-lib/package.json": json.dumps(
+                {"name": "child-lib", "version": "0.0.1", "source": "index.mjs"}
+            ),
         }
     )
     return rule_runner
 
 
 def test_packages_sources_as_resource_using_build_tool(rule_runner: RuleRunner) -> None:
-    tgt = rule_runner.get_target(Address("src/js", generated_name="build"))
+    tgt = rule_runner.get_target(Address("src/js/ham", generated_name="build"))
     snapshot = rule_runner.request(Snapshot, (EMPTY_DIGEST,))
+
     result = rule_runner.request(
         GeneratedSources, [GenerateResourcesFromNodeBuildScriptRequest(snapshot, tgt)]
     )
     assert result.snapshot.files == (
-        "src/js/dist/index.css",
-        "src/js/dist/index.css.map",
-        "src/js/dist/index.js",
-        "src/js/dist/index.js.map",
+        "src/js/ham/dist/index.css",
+        "src/js/ham/dist/index.css.map",
+        "src/js/ham/dist/index.js",
+        "src/js/ham/dist/index.js.map",
     )
 
 
 def test_packages_sources_as_package_using_build_tool(rule_runner: RuleRunner) -> None:
-    tgt = rule_runner.get_target(Address("src/js", generated_name="build"))
+    tgt = rule_runner.get_target(Address("src/js/ham", generated_name="build"))
     result = rule_runner.request(BuiltPackage, [NodeBuildScriptPackageFieldSet.create(tgt)])
-    rule_runner.write_digest(result.digest)
+
+    output_digest = rule_runner.request(Digest, [RemovePrefix(result.digest, "src.js.ham/build")])
+    entries = rule_runner.request(DigestEntries, [output_digest])
 
     assert result.artifacts[0].relpath == "dist"
 
-    result_path = Path(rule_runner.build_root) / "dist"
-
-    assert sorted(
-        str(path.relative_to(rule_runner.build_root)) for path in result_path.iterdir()
-    ) == [
-        "dist/index.css",
-        "dist/index.css.map",
-        "dist/index.js",
-        "dist/index.js.map",
+    assert sorted(entry.path for entry in entries) == [
+        "ham/dist/index.css",
+        "ham/dist/index.css.map",
+        "ham/dist/index.js",
+        "ham/dist/index.js.map",
     ]

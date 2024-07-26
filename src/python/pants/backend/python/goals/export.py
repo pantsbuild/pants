@@ -134,17 +134,48 @@ class ExportPluginOptions:
             """
         ),
         advanced=True,
-    )
-
-    py_generated_sources = BoolOption(
-        default=False,
-        help=softwrap(
+        removal_version="2.24.0.dev0",
+        removal_hint=softwrap(
             """
-            When exporting a mutable virtualenv for a resolve, generate any sources
-            which result from code generation (for example, the `protobuf_sources` and `thrift_sources` targets)
-            and place the generated files under the site-packages directory of the virtualenv.
+            Use `--export-py-non-hermetic-scripts-in-resolve` instead.
             """
         ),
+    )
+
+    py_non_hermetic_scripts_in_resolve = StrListOption(
+        help=softwrap(
+            """
+            When exporting a mutable virtualenv for a resolve listed in this option, by default
+            console script shebang lines will be made "hermetic". Specifically, the shebang of
+            hermetic console scripts will uses the python args `-sE` where:
+
+              - `-s` skips inclusion of the user site-packages directory,
+              - `-E` ignores all `PYTHON*` env vars like `PYTHONPATH`.
+
+            If you need "non-hermetic" scripts for a partcular resolve, then add that resolve's name
+            to this option. This will allow simple python shebangs that respect vars like
+            `PYTHONPATH`, which, for example, will allow IDEs like PyCharm to inject its debugger,
+            coverage, or other IDE-specific libs when running a script.
+
+            This only applies when when exporting a `mutable_virtualenv`
+            (`symlinked_immutable_virtualenv` exports are not "full"
+            virtualenvs because they are used internally by pants itself.
+            Pants requires hermetic scripts to provide its reproduciblity
+            guarantee, fine-grained caching, and other features).
+            """
+        ),
+        advanced=True,
+    )
+
+    py_generated_sources_in_resolve = StrListOption(
+        help=softwrap(
+            """
+            When exporting a mutable virtualenv for a resolve listed in this option, generate sources which result from
+            code generation (for example, the `protobuf_sources` and `thrift_sources` target types) into the mutable
+            virtualenv exported for that resolve. Generated sources will be placed in the appropriate location within
+            the site-packages directory of the mutable virtualenv.
+            """
+        )
     )
 
 
@@ -252,7 +283,10 @@ async def do_export(
             f"--prompt={venv_prompt}",
             output_path,
         ]
-        if not export_subsys.options.py_hermetic_scripts:
+        if (
+            req.resolve_name in export_subsys.options.py_non_hermetic_scripts_in_resolve
+            or not export_subsys.options.py_hermetic_scripts
+        ):
             pex_args.insert(-1, "--non-hermetic-scripts")
 
         post_processing_cmds = [
@@ -513,9 +547,7 @@ async def export_virtualenv_for_resolve(
             lockfile = None
 
     if not lockfile:
-        raise ExportError(
-            f"No resolve named {resolve} found in [{python_setup.options_scope}].resolves."
-        )
+        return MaybeExportResult(None)
 
     interpreter_constraints = InterpreterConstraints(
         python_setup.resolves_to_interpreter_constraints.get(
@@ -558,9 +590,9 @@ async def export_virtualenv_for_resolve(
         ),
     )
 
-    # Add generated Python sources from codegen targets to the virtualenv.
+    # Add generated Python sources from codegen targets to the mutable virtualenv.
     if (
-        export_subsys.options.py_generated_sources
+        resolve in export_subsys.options.py_generated_sources_in_resolve
         and export_subsys.options.py_resolve_format == PythonResolveExportFormat.mutable_virtualenv
     ):
         export_result = await add_codegen_to_export_result(
@@ -575,10 +607,6 @@ async def export_virtualenvs(
     request: ExportVenvsRequest,
     export_subsys: ExportSubsystem,
 ) -> ExportResults:
-    if not export_subsys.options.resolve:
-        raise ExportError("Must specify at least one --resolve to export")
-    if request.targets:
-        raise ExportError("The `export` goal does not take target specs.")
     maybe_venvs = await MultiGet(
         Get(MaybeExportResult, _ExportVenvForResolveRequest(resolve))
         for resolve in export_subsys.options.resolve

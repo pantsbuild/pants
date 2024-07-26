@@ -683,9 +683,13 @@ async def find_owning_package(request: OwningNodePackageRequest) -> OwningNodePa
 @rule
 async def parse_package_json(content: FileContent) -> PackageJson:
     parsed_package_json = FrozenDict.deep_freeze(json.loads(content.content))
+    package_name = parsed_package_json.get("name")
+    if not package_name:
+        raise ValueError("No package name found in package.json")
+
     return PackageJson(
         content=parsed_package_json,
-        name=parsed_package_json["name"],
+        name=package_name,
         version=parsed_package_json.get("version"),
         snapshot=await Get(Snapshot, PathGlobs([content.path])),
         module=parsed_package_json.get("type"),

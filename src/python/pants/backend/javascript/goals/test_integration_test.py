@@ -297,7 +297,7 @@ def test_jest_test_with_coverage_reporting(
                             coverage_args=['--coverage', '--coverage-directory=.coverage/'],
                             coverage_output_files=['.coverage/clover.xml'],
                         )
-                    ]
+                    ],
                 )
                 """
             ),

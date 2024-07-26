@@ -106,7 +106,8 @@ async def pack_node_package_into_tgz_for_publication(
         ),
     )
     if field_set.output_path.value:
-        digest = await Get(Digest, AddPrefix(result.output_digest, field_set.output_path.value))
+        output_path = field_set.output_path.value_or_default(file_ending=None)
+        digest = await Get(Digest, AddPrefix(result.output_digest, output_path))
     else:
         digest = result.output_digest
 
@@ -236,7 +237,8 @@ async def generate_package_artifact_from_node_build_script(
     request = NodeBuildScriptRequest.from_package_request(req)
     result = await Get(NodeBuildScriptResult, NodeBuildScriptRequest, request)
     if req.output_path.value:
-        digest = await Get(Digest, AddPrefix(result.process.output_digest, req.output_path.value))
+        output_path = req.output_path.value_or_default(file_ending=None)
+        digest = await Get(Digest, AddPrefix(result.process.output_digest, output_path))
     else:
         digest = result.process.output_digest
     artifacts = tuple(BuiltPackageArtifact(path) for path in request.get_paths())

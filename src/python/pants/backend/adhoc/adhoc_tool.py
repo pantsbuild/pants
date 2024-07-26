@@ -14,6 +14,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
+    AdhocToolPathEnvModifyModeField,
     AdhocToolRunnableDependenciesField,
     AdhocToolRunnableField,
     AdhocToolSourcesField,
@@ -29,6 +30,7 @@ from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessResult,
     ToolRunner,
     ToolRunnerRequest,
+    prepare_env_vars,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
@@ -96,6 +98,14 @@ async def run_in_sandbox_request(
             description_of_origin=f"`{AdhocToolWorkspaceInvalidationSourcesField.alias}` for `adhoc_tool` target at `{target.address}`",
         )
 
+    env_vars = await prepare_env_vars(
+        tool_runner.extra_env,
+        target.get(AdhocToolExtraEnvVarsField).value or (),
+        extra_paths=tool_runner.extra_paths,
+        path_env_modify_mode=target.get(AdhocToolPathEnvModifyModeField).enum_value,
+        description_of_origin=f"`{AdhocToolExtraEnvVarsField.alias}` for `adhoc_tool` target at `{target.address}`",
+    )
+
     process_request = AdhocProcessRequest(
         description=description,
         address=target.address,
@@ -108,8 +118,7 @@ async def run_in_sandbox_request(
         append_only_caches=FrozenDict(tool_runner.append_only_caches),
         output_files=output_files,
         output_directories=output_directories,
-        fetch_env_vars=target.get(AdhocToolExtraEnvVarsField).value or (),
-        supplied_env_var_values=FrozenDict(tool_runner.extra_env),
+        env_vars=env_vars,
         log_on_process_errors=None,
         log_output=target[AdhocToolLogOutputField].value,
         capture_stderr_file=target[AdhocToolStderrFilenameField].value,

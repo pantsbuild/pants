@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import difflib
 import os.path
+import re
 from fnmatch import fnmatch
 from typing import Callable, Iterable, Iterator, Sequence, TypeVar
 
@@ -14,6 +15,23 @@ from pants.help.maybe_color import MaybeColor
 from pants.util.ordered_set import FrozenOrderedSet
 
 _T = TypeVar("_T", bound="KeyValueSequenceUtil")
+
+
+image_ref_regexp = re.compile(
+    r"""
+    ^
+    # Optional registry.
+    ((?P<registry>[^/:_ ]+:?[^/:_ ]*)/)?
+    # Repository.
+    (?P<repository>[^:@ \t\n\r\f\v]+)
+    # Optionally with `:tag`.
+    (:(?P<tag>[^@ ]+))?
+    # Optionally with `@digest`.
+    (@(?P<digest>\S+))?
+    $
+    """,
+    re.VERBOSE,
+)
 
 
 class KeyValueSequenceUtil(FrozenOrderedSet[str]):
