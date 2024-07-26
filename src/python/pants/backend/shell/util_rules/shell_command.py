@@ -19,6 +19,7 @@ from pants.backend.shell.target_types import (
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
+    ShellCommandPathEnvModifyModeField,
     ShellCommandRunnableDependenciesField,
     ShellCommandSourcesField,
     ShellCommandTarget,
@@ -39,6 +40,7 @@ from pants.core.util_rules.adhoc_process_support import (
     ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
     parse_relative_directory,
+    prepare_env_vars,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
@@ -119,31 +121,36 @@ async def _prepare_process_request_from_target(
 
     extra_sandbox_contents.append(
         ExtraSandboxContents(
-            EMPTY_DIGEST,
-            resolved_tools.path_component,
-            FrozenDict(resolved_tools.immutable_input_digests or {}),
-            FrozenDict(),
-            FrozenDict(),
+            digest=EMPTY_DIGEST,
+            paths=(resolved_tools.path_component,),
+            immutable_input_digests=FrozenDict(resolved_tools.immutable_input_digests or {}),
+            append_only_caches=FrozenDict(),
+            extra_env=FrozenDict(),
         )
     )
 
     if runnable_dependencies:
         extra_sandbox_contents.append(
             ExtraSandboxContents(
-                EMPTY_DIGEST,
-                f"{{chroot}}/{runnable_dependencies.path_component}",
-                runnable_dependencies.immutable_input_digests,
-                runnable_dependencies.append_only_caches,
-                runnable_dependencies.extra_env,
+                digest=EMPTY_DIGEST,
+                paths=(f"{{chroot}}/{runnable_dependencies.path_component}",),
+                immutable_input_digests=runnable_dependencies.immutable_input_digests,
+                append_only_caches=runnable_dependencies.append_only_caches,
+                extra_env=runnable_dependencies.extra_env,
             )
         )
 
     merged_extras = await Get(
         ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))
     )
-    extra_env = dict(merged_extras.extra_env)
-    if merged_extras.path:
-        extra_env["PATH"] = merged_extras.path
+
+    env_vars = await prepare_env_vars(
+        merged_extras.extra_env,
+        shell_command.get(ShellCommandExtraEnvVarsField).value or (),
+        extra_paths=merged_extras.paths,
+        path_env_modify_mode=shell_command.get(ShellCommandPathEnvModifyModeField).enum_value,
+        description_of_origin=f"`{ShellCommandExtraEnvVarsField.alias}` for `shell_command` target at `{shell_command.address}`",
+    )
 
     append_only_caches = {
         **merged_extras.append_only_caches,
@@ -174,9 +181,8 @@ async def _prepare_process_request_from_target(
         input_digest=dependencies_digest,
         output_files=output_files,
         output_directories=output_directories,
-        fetch_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
         append_only_caches=FrozenDict(append_only_caches),
-        supplied_env_var_values=FrozenDict(extra_env),
+        env_vars=env_vars,
         immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
         log_on_process_errors=_LOG_ON_PROCESS_ERRORS,
         log_output=shell_command[ShellCommandLogOutputField].value,

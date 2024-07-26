@@ -374,3 +374,72 @@ def test_adhoc_tool_workspace_invalidation_sources(rule_runner: PythonRuleRunner
     (Path(rule_runner.build_root) / "src" / "a-file").write_text("xyzzy")
     result3 = execute_adhoc_tool(rule_runner, address)
     assert result1.snapshot != result3.snapshot
+
+
+def test_adhoc_tool_path_env_modify_mode(rule_runner: PythonRuleRunner) -> None:
+    expected_path = "/bin:/usr/bin"
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                f"""\
+            system_binary(name="bash", binary_name="bash")
+            system_binary(name="renamed_cat", binary_name="cat")
+            adhoc_tool(
+                name="shims_prepend",
+                runnable=":bash",
+                args=["-c", "echo $PATH > foo.txt && renamed_cat foo.txt > path.txt"],
+                extra_env_vars=["PATH={expected_path}"],
+                output_files=["path.txt"],
+                runnable_dependencies=[":renamed_cat"],
+                path_env_modify="prepend",
+            )
+            adhoc_tool(
+                name="shims_append",
+                runnable=":bash",
+                args=["-c", "echo $PATH > foo.txt && renamed_cat foo.txt > path.txt"],
+                extra_env_vars=["PATH={expected_path}"],
+                output_files=["path.txt"],
+                runnable_dependencies=[":renamed_cat"],
+                path_env_modify="append",
+            )
+            adhoc_tool(
+                name="shims_off",
+                runnable=":bash",
+                args=[
+                    "-c",
+                    '''
+                    echo $PATH > path.txt
+                    for dir in $( echo "$PATH" | tr ':' '\\n' ) ; do
+                      if [ -e "$dir/renamed_cat" ]; then
+                        echo "ERROR: Did not expect to find renamed_cat on PATH, but did find it."
+                        exit 1
+                      fi
+                    done
+                    '''
+                ],
+                extra_env_vars=["PATH={expected_path}"],
+                output_files=["path.txt"],
+                runnable_dependencies=[":renamed_cat"],
+                path_env_modify="off",
+            )
+            """
+            )
+        }
+    )
+
+    def run(target_name: str) -> str:
+        result = execute_adhoc_tool(rule_runner, Address("src", target_name=target_name))
+        contents = rule_runner.request(DigestContents, [result.snapshot.digest])
+        assert len(contents) == 1
+        return contents[0].content.decode().strip()
+
+    path_prepend = run("shims_prepend")
+    assert path_prepend.endswith(expected_path)
+    assert len(path_prepend) > len(expected_path)
+
+    path_append = run("shims_append")
+    assert path_append.startswith(expected_path)
+    assert len(path_append) > len(expected_path)
+
+    path_off = run("shims_off")
+    assert path_off == expected_path

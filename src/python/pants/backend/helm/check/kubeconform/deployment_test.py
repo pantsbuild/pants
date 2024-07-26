@@ -111,6 +111,7 @@ def test_valid_deployment(rule_runner: RuleRunner) -> None:
             "src/deployment/BUILD": "helm_deployment(name='foo', chart='//src/mychart')",
         }
     )
+    rule_runner.set_options("--helm-infer-external-docker-images=['*']")
 
     addr = Address("src/deployment", target_name="foo")
     checked = run_check(rule_runner, addr)
@@ -186,7 +187,6 @@ def test_valid_deployment_ignoring_sources(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-
     addr = Address("src/deployment", target_name="foo")
     checked = run_check(rule_runner, addr)
 
@@ -266,7 +266,11 @@ def run_check(
     rule_runner: RuleRunner, address: Address, *, source_root_patterns: Iterable[str] = ("/src/*",)
 ) -> CheckResults:
     rule_runner.set_options(
-        [f"--source-root-patterns={repr(source_root_patterns)}", "--kubeconform-summary"],
+        [
+            f"--source-root-patterns={repr(source_root_patterns)}",
+            "--kubeconform-summary",
+            "--helm-infer-external-docker-images=['*']",
+        ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 

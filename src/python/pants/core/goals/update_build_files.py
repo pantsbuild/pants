@@ -120,9 +120,6 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         This does not handle the full Pants upgrade. You must still manually change
         `pants_version` in `pants.toml` and you may need to manually address some deprecations.
         See {doc_url('docs/releases/upgrade-tips')} for upgrade tips.
-
-        This goal is run without arguments. It will run over all BUILD files in your
-        project.
         """
     )
 

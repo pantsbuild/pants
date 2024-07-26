@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 from pants.backend.terraform.dependency_inference import (
@@ -17,14 +16,7 @@ from pants.backend.terraform.target_types import (
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import PathGlobs
-from pants.engine.internals.native_engine import (
-    Address,
-    AddressInput,
-    Digest,
-    MergeDigests,
-    Snapshot,
-)
+from pants.engine.internals.native_engine import Address, AddressInput, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure
 from pants.engine.rules import collect_rules, rule
@@ -85,7 +77,7 @@ async def get_terraform_providers(
         FallibleProcessResult,
         TerraformProcess(
             args=tuple(args),
-            input_digest=(req.dependencies_files),
+            input_digest=req.dependencies_files,
             output_files=(".terraform.lock.hcl",),
             output_directories=(".terraform",),
             description=init_process_description,
@@ -143,7 +135,7 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         ),
     )
 
-    source_files, dependencies_files, lockfile = await MultiGet(
+    source_files, dependencies_files = await MultiGet(
         Get(
             SourceFiles, SourceFilesRequest([module.target.get(SourcesField)])
         ),  # TODO: get through transitive deps???
@@ -151,12 +143,6 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
             SourceFiles,
             SourceFilesRequest(
                 [tgt.get(SourcesField) for tgt in this_targets_dependencies.dependencies]
-            ),
-        ),
-        Get(
-            Snapshot,
-            PathGlobs(
-                [(Path(request.root_module.address.spec_path) / ".terraform.lock.hcl").as_posix()]
             ),
         ),
     )
@@ -190,12 +176,10 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
 
     source_for_validate = await Get(
         Digest,
-        MergeDigests(
-            [source_files.snapshot.digest, dependencies_files.snapshot.digest, lockfile.digest]
-        ),
+        MergeDigests([source_files.snapshot.digest, dependencies_files.snapshot.digest]),
     )
 
-    has_lockfile = len(lockfile.files) > 0
+    has_lockfile = invocation_files.lockfile is not None
     third_party_deps = await Get(
         TerraformDependenciesResponse,
         TerraformDependenciesRequest(

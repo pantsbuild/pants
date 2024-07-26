@@ -1,11 +1,13 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import os.path
 from dataclasses import dataclass
 from pathlib import Path
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.target_types import (
     TerraformDependenciesField,
+    TerraformLockfileTarget,
     TerraformModuleSourcesField,
     TerraformModuleTarget,
     TerraformRootModuleField,
@@ -20,8 +22,11 @@ from pants.core.goals.generate_lockfiles import (
     UserGenerateLockfiles,
 )
 from pants.engine.addresses import Addresses
-from pants.engine.internals.native_engine import Address, AddressInput
+from pants.engine.fs import PathGlobs
+from pants.engine.internals.native_engine import Address, AddressInput, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, Targets
@@ -41,6 +46,8 @@ async def identify_user_resolves_from_terraform_files(
     _: KnownTerraformResolveNamesRequest,
     all_targets: AllTargets,
 ) -> KnownUserResolveNames:
+    """We don't use the TerraformSyntheticLockfileTargetsRequest because those only include
+    lockfiles that have been written and not new lockfiles."""
     known_terraform_module_dirs = set()
 
     for tgt in all_targets:
@@ -123,10 +130,43 @@ async def generate_lockfile_from_sources(
     )
 
 
+@dataclass(frozen=True)
+class TerraformSyntheticLockfileTargetsRequest(SyntheticTargetsRequest):
+    path: str = SyntheticTargetsRequest.REQUEST_TARGETS_PER_DIRECTORY
+
+
+@rule
+async def terraform_lockfile_synthetic_targets(
+    request: TerraformSyntheticLockfileTargetsRequest,
+) -> SyntheticAddressMaps:
+    path = request.path
+    lockfile = await Get(Snapshot, PathGlobs([Path(path, ".terraform.lock.hcl").as_posix()]))
+    if not lockfile.files:
+        return SyntheticAddressMaps(tuple())
+
+    return SyntheticAddressMaps.for_targets_request(
+        request,
+        [
+            (
+                os.path.join(path, "BUILD.terraform-lockfiles"),
+                (
+                    TargetAdaptor(
+                        TerraformLockfileTarget.alias,
+                        name=".terraform.lock.hcl",
+                        source=".terraform.lock.hcl",
+                        __description_of_origin__="terraform",
+                    ),
+                ),
+            )
+        ],
+    )
+
+
 def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateLockfile, GenerateTerraformLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownTerraformResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedTerraformResolveNames),
+        UnionRule(SyntheticTargetsRequest, TerraformSyntheticLockfileTargetsRequest),
     )

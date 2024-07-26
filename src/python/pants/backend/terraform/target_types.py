@@ -145,5 +145,28 @@ def all_terraform_deployment_targets(targets: AllTargets) -> AllTerraformDeploym
     )
 
 
+class LockfileSourceField(SingleSourceField):
+    """Source field for synthesized `_lockfile` targets."""
+
+    default = ".terraform.lock.hcl"
+
+
+class LockfileDependenciesField(Dependencies):
+    pass
+
+
+class TerraformLockfileTarget(Target):
+    alias = "_terraform_lockfile"
+    core_fields = (*COMMON_TARGET_FIELDS, LockfileSourceField, LockfileDependenciesField)
+    help = help_text(
+        """
+        A target for lockfiles in order to include them in the dependency graph of other targets.
+
+        This tracks them so that `--changed-since --changed-dependents` works properly for targets
+        relying on a particular lockfile.
+        """
+    )
+
+
 def rules():
     return collect_rules()
