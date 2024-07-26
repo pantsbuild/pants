@@ -22,22 +22,8 @@ class BuildifierRequest(FmtBuildFilesRequest):
 async def buildfier_fmt(
     request: BuildifierRequest.Batch, buildifier: Buildifier, platform: Platform
 ) -> FmtResult:
-    buildifier_tool = await download_external_tool(buildifier.get_request(platform))
-    input_digest = await merge_digests_request_to_digest(
-        MergeDigests((request.snapshot.digest, buildifier_tool.digest))
-    )
-    result = await fallible_to_exec_result_or_raise(
-        **implicitly(
-            Process(
-                argv=[buildifier_tool.exe, "-type=build", *request.files],
-                input_digest=input_digest,
-                output_files=request.files,
-                description=f"Run {Buildifier.options_scope} on {pluralize(len(request.files), 'file')}.",
-                level=LogLevel.DEBUG,
-            )
-        ),
-    )
-    return await FmtResult.create(request, result)
+    result = await _run_buildifier_fmt(request, buildifier, platform)
+    return result
 
 
 # Note - this function is kept separate because it is invoked from update_build_files.py, but
