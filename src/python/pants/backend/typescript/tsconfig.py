@@ -24,19 +24,6 @@ class TSConfig:
     module_resolution: str | None = None
     paths: FrozenDict[str, tuple[str, ...]] | None = None
     base_url: str | None = None
-    extends: str | None = None
-
-    @classmethod
-    def parse_from_content(cls, content: FileContent) -> TSConfig:
-        parsed_ts_config_json = FrozenDict.deep_freeze(json.loads(content.content))
-        compiler_options = parsed_ts_config_json.get("compilerOptions", FrozenDict())
-        return TSConfig(
-            content.path,
-            module_resolution=compiler_options.get("moduleResolution"),
-            paths=compiler_options.get("paths"),
-            base_url=compiler_options.get("baseUrl"),
-            extends=compiler_options.get("extends"),
-        )
 
     @property
     def resolution_root_dir(self) -> str:
@@ -78,21 +65,31 @@ async def _read_parent_config(
     )
 
 
+def _parse_config_from_content(content: FileContent) -> tuple[TSConfig, str | None]:
+    parsed_ts_config_json = FrozenDict.deep_freeze(json.loads(content.content))
+    compiler_options = parsed_ts_config_json.get("compilerOptions", FrozenDict())
+    return TSConfig(
+        content.path,
+        module_resolution=compiler_options.get("moduleResolution"),
+        paths=compiler_options.get("paths"),
+        base_url=compiler_options.get("baseUrl"),
+    ), compiler_options.get("extends")
+
+
 @rule
 async def parse_extended_ts_config(request: ParseTSConfigRequest) -> TSConfig:
-    ts_config = TSConfig.parse_from_content(request.content)
-    if not ts_config.extends:
+    ts_config, extends = _parse_config_from_content(request.content)
+    if not extends:
         return ts_config
 
     extended_parent = await _read_parent_config(
-        ts_config.path, ts_config.extends, request.others, request.target_file
+        ts_config.path, extends, request.others, request.target_file
     )
     return TSConfig(
         ts_config.path,
         module_resolution=ts_config.module_resolution or extended_parent.module_resolution,
         paths=ts_config.paths or extended_parent.paths,
         base_url=ts_config.base_url or extended_parent.base_url,
-        extends=ts_config.extends or extended_parent.extends,
     )
 
 
