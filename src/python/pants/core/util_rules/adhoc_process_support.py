@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
+import json
 import logging
 import os
 import shlex
 from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, TypeVar, Union
 
@@ -28,9 +32,12 @@ from pants.engine.fs import (
     FileContent,
     MergeDigests,
     PathGlobs,
+    PathMetadataRequest,
+    PathMetadataResult,
+    Paths,
     Snapshot,
 )
-from pants.engine.internals.native_engine import AddressInput, RemovePrefix
+from pants.engine.internals.native_engine import AddressInput, PathMetadata, RemovePrefix
 from pants.engine.process import (
     FallibleProcessResult,
     Process,
@@ -66,8 +73,7 @@ class AdhocProcessRequest:
     append_only_caches: FrozenDict[str, str] | None
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
-    fetch_env_vars: tuple[str, ...]
-    supplied_env_var_values: FrozenDict[str, str] | None
+    env_vars: FrozenDict[str, str]
     log_on_process_errors: FrozenDict[int, str] | None
     log_output: bool
     capture_stdout_file: str | None
@@ -118,6 +124,7 @@ class ToolRunner:
     digest: Digest
     args: tuple[str, ...]
     extra_env: FrozenDict[str, str]
+    extra_paths: tuple[str, ...]
     append_only_caches: FrozenDict[str, str]
     immutable_input_digests: FrozenDict[str, Digest]
 
@@ -130,7 +137,7 @@ class ToolRunner:
 @dataclass(frozen=True)
 class ExtraSandboxContents:
     digest: Digest
-    path: str | None
+    paths: tuple[str, ...]
     immutable_input_digests: Mapping[str, Digest]
     append_only_caches: Mapping[str, str]
     extra_env: Mapping[str, str]
@@ -141,66 +148,32 @@ class MergeExtraSandboxContents:
     additions: tuple[ExtraSandboxContents, ...]
 
 
-@dataclass(frozen=True)
-class AddExtraSandboxContentsToProcess:
-    process: Process
-    contents: ExtraSandboxContents
-
-
 @rule
 async def merge_extra_sandbox_contents(request: MergeExtraSandboxContents) -> ExtraSandboxContents:
     additions = request.additions
 
-    digests = []
-    paths = []
+    digests: list[Digest] = []
+    paths: list[str] = []
     immutable_input_digests: dict[str, Digest] = {}
     append_only_caches: dict[str, str] = {}
     extra_env: dict[str, str] = {}
 
     for addition in additions:
         digests.append(addition.digest)
-        if addition.path is not None:
-            paths.append(addition.path)
+        if addition.paths:
+            paths.extend(addition.paths)
         _safe_update(immutable_input_digests, addition.immutable_input_digests)
         _safe_update(append_only_caches, addition.append_only_caches)
         _safe_update(extra_env, addition.extra_env)
 
     digest = await Get(Digest, MergeDigests(digests))
-    path = ":".join(paths) if paths else None
 
     return ExtraSandboxContents(
-        digest,
-        path,
-        FrozenDict(immutable_input_digests),
-        FrozenDict(append_only_caches),
-        FrozenDict(extra_env),
-    )
-
-
-@rule
-async def add_extra_contents_to_process(request: AddExtraSandboxContentsToProcess) -> Process:
-    proc = request.process
-    extras = request.contents
-    new_digest = await Get(
-        Digest, MergeDigests((request.process.input_digest, request.contents.digest))
-    )
-    immutable_input_digests = dict(proc.immutable_input_digests)
-    append_only_caches = dict(proc.append_only_caches)
-    env = dict(proc.env)
-
-    _safe_update(immutable_input_digests, extras.immutable_input_digests)
-    _safe_update(append_only_caches, extras.append_only_caches)
-    _safe_update(env, extras.extra_env)
-    # need to do `PATH` after `env` in case `extra_env` contains a `PATH`.
-    if extras.path:
-        env["PATH"] = extras.path + (":" + env["PATH"]) if "PATH" in env else ""
-
-    return dataclasses.replace(
-        proc,
-        input_digest=new_digest,
+        digest=digest,
+        paths=tuple(paths),
         immutable_input_digests=FrozenDict(immutable_input_digests),
         append_only_caches=FrozenDict(append_only_caches),
-        env=FrozenDict(env),
+        extra_env=FrozenDict(extra_env),
     )
 
 
@@ -253,7 +226,7 @@ async def _resolve_runnable_dependencies(
         extras.append(
             ExtraSandboxContents(
                 digest=runnable.digest,
-                path=None,
+                paths=(),
                 immutable_input_digests=FrozenDict(runnable.immutable_input_digests or {}),
                 append_only_caches=FrozenDict(runnable.append_only_caches or {}),
                 extra_env=FrozenDict(),
@@ -445,22 +418,22 @@ async def create_tool_runner(
 
     extra_sandbox_contents.append(
         ExtraSandboxContents(
-            EMPTY_DIGEST,
-            extra_path,
-            run_request.immutable_input_digests or FrozenDict(),
-            run_request.append_only_caches or FrozenDict(),
-            run_request.extra_env or FrozenDict(),
+            digest=EMPTY_DIGEST,
+            paths=(extra_path,) if extra_path else (),
+            immutable_input_digests=run_request.immutable_input_digests or FrozenDict(),
+            append_only_caches=run_request.append_only_caches or FrozenDict(),
+            extra_env=run_request.extra_env or FrozenDict(),
         )
     )
 
     if runnable_dependencies:
         extra_sandbox_contents.append(
             ExtraSandboxContents(
-                EMPTY_DIGEST,
-                f"{{chroot}}/{runnable_dependencies.path_component}",
-                runnable_dependencies.immutable_input_digests,
-                runnable_dependencies.append_only_caches,
-                runnable_dependencies.extra_env,
+                digest=EMPTY_DIGEST,
+                paths=(f"{{chroot}}/{runnable_dependencies.path_component}",),
+                immutable_input_digests=runnable_dependencies.immutable_input_digests,
+                append_only_caches=runnable_dependencies.append_only_caches,
+                extra_env=runnable_dependencies.extra_env,
             )
         )
 
@@ -470,8 +443,6 @@ async def create_tool_runner(
     )
 
     extra_env = dict(merged_extras.extra_env)
-    if merged_extras.path:
-        extra_env["PATH"] = merged_extras.path
 
     append_only_caches = {
         **merged_extras.append_only_caches,
@@ -482,6 +453,7 @@ async def create_tool_runner(
         digest=main_digest,
         args=run_request.args + tuple(request.args),
         extra_env=FrozenDict(extra_env),
+        extra_paths=merged_extras.paths,
         append_only_caches=FrozenDict(append_only_caches),
         immutable_input_digests=FrozenDict(merged_extras.immutable_input_digests),
     )
@@ -542,6 +514,53 @@ async def run_adhoc_process(
     return AdhocProcessResult(result, adjusted)
 
 
+# Compute a stable bytes value for a `PathMetadata` consisting of the values to be hashed.
+# Access time is not included to avoid having mere access to a file invalidating an execution.
+def _path_metadata_to_bytes(m: PathMetadata | None) -> bytes:
+    if m is None:
+        return b""
+
+    def dt_fmt(dt: datetime | None) -> str | None:
+        if dt is not None:
+            return dt.isoformat()
+        return None
+
+    d = {
+        "path": m.path,
+        "kind": str(m.kind),
+        "length": m.length,
+        "is_executable": m.is_executable,
+        "unix_mode": m.unix_mode,
+        "created": dt_fmt(m.created),
+        "modified": dt_fmt(m.modified),
+        "symlink_target": m.symlink_target,
+    }
+
+    return json.dumps(d, sort_keys=True).encode()
+
+
+async def compute_workspace_invalidation_hash(path_globs: PathGlobs) -> str:
+    raw_paths = await Get(Paths, PathGlobs, path_globs)
+    paths = sorted([*raw_paths.files, *raw_paths.dirs])
+    metadata_results = await MultiGet(
+        Get(PathMetadataResult, PathMetadataRequest(path)) for path in paths
+    )
+
+    # Compute a stable hash of all of the metadatas since the hash value should be stable
+    # when used outside the process (for example, in the cache). (The `__hash__` dunder method
+    # computes an unstable hash which can and does vary across different process invocations.)
+    #
+    # While it could be more of an intellectual correctness point than a necessity, It does matter,
+    # however, for a single user to see the same behavior across process invocations if pantsd restarts.
+    #
+    # Note: This could probbaly use a non-cryptographic hash (e.g., Murmur), but that would require
+    # a third party dependency.
+    h = hashlib.sha256()
+    for mr in metadata_results:
+        h.update(_path_metadata_to_bytes(mr.metadata))
+    return h.hexdigest()
+
+
 @rule
 async def prepare_adhoc_process(
     request: AdhocProcessRequest,
@@ -556,27 +575,18 @@ async def prepare_adhoc_process(
     timeout: int | None = request.timeout
     output_files = request.output_files
     output_directories = request.output_directories
-    fetch_env_vars = request.fetch_env_vars
-    supplied_env_vars = request.supplied_env_var_values or FrozenDict()
     append_only_caches = request.append_only_caches or FrozenDict()
     immutable_input_digests = request.immutable_input_digests or FrozenDict()
 
-    command_env: dict[str, str] = {}
+    command_env: dict[str, str] = dict(request.env_vars)
 
-    extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(fetch_env_vars))
-    command_env.update(extra_env)
-
-    if supplied_env_vars:
-        command_env.update(supplied_env_vars)
-
-    # Compute the digest for any workspace invalidation sources and put the digest into the environment as a dummy variable
+    # Compute the hash for any workspace invalidation sources and put the hash into the environment as a dummy variable
     # so that the process produced by this rule will be invalidated if any of the referenced files change.
     if request.workspace_invalidation_globs is not None:
-        workspace_invalidation_digest = await Get(
-            Digest, PathGlobs, request.workspace_invalidation_globs
+        workspace_invalidation_hash = await compute_workspace_invalidation_hash(
+            request.workspace_invalidation_globs
         )
-        digest_str = f"{workspace_invalidation_digest.fingerprint}-{workspace_invalidation_digest.serialized_bytes_length}"
-        command_env["__PANTS_WORKSPACE_INVALIDATION_SOURCES_DIGEST"] = digest_str
+        command_env["__PANTS_WORKSPACE_INVALIDATION_SOURCES_HASH"] = workspace_invalidation_hash
 
     input_snapshot = await Get(Snapshot, Digest, request.input_digest)
 
@@ -603,6 +613,73 @@ async def prepare_adhoc_process(
     )
 
     return _output_at_build_root(proc, bash)
+
+
+class PathEnvModifyMode(Enum):
+    """How the PATH environment variable should be augmented with extra path elements."""
+
+    PREPEND = "prepend"
+    APPEND = "append"
+    OFF = "off"
+
+
+async def prepare_env_vars(
+    existing_env_vars: Mapping[str, str],
+    env_vars_templates: tuple[str, ...],
+    *,
+    extra_paths: tuple[str, ...] = (),
+    path_env_modify_mode: PathEnvModifyMode = PathEnvModifyMode.PREPEND,
+    description_of_origin: str,
+) -> FrozenDict[str, str]:
+    env_vars: dict[str, str] = dict(existing_env_vars)
+
+    to_fetch: set[str] = set()
+    duplicate_keys: set[str] = set()
+    for env_var in env_vars_templates:
+        parts = env_var.split("=", 1)
+        if parts[0] in env_vars:
+            duplicate_keys.add(parts[0])
+
+        if len(parts) == 2:
+            env_vars[parts[0]] = parts[1]
+        else:
+            to_fetch.add(parts[0])
+
+    if duplicate_keys:
+        dups_as_str = ", ".join(sorted(duplicate_keys))
+        raise ValueError(
+            f"The following environment variables referenced in {description_of_origin} are defined multiple times: {dups_as_str}"
+        )
+
+    if to_fetch:
+        fetched_env_vars = await Get(
+            EnvironmentVars, EnvironmentVarsRequest(tuple(sorted(to_fetch)))
+        )
+        env_vars.update(fetched_env_vars)
+
+    def path_env_join(left: str | None, right: str | None) -> str | None:
+        if not left and not right:
+            return None
+        if left and not right:
+            return left
+        if not left and right:
+            return right
+        return f"{left}:{right}"
+
+    if extra_paths:
+        existing_path_env = env_vars.get("PATH")
+        extra_paths_as_str = ":".join(extra_paths)
+
+        new_path_env: str | None = None
+        if path_env_modify_mode == PathEnvModifyMode.PREPEND:
+            new_path_env = path_env_join(extra_paths_as_str, existing_path_env)
+        elif path_env_modify_mode == PathEnvModifyMode.APPEND:
+            new_path_env = path_env_join(existing_path_env, extra_paths_as_str)
+
+        if new_path_env:
+            env_vars["PATH"] = new_path_env
+
+    return FrozenDict(env_vars)
 
 
 def _output_at_build_root(process: Process, bash: BashBinary) -> Process:

@@ -12,10 +12,10 @@ from pants.backend.build_files.fix.base import FixBuildFilesRequest
 from pants.backend.build_files.fix.deprecations.base import FixBUILDFileRequest, FixedBUILDFile
 from pants.backend.build_files.fix.deprecations.subsystem import BUILDDeprecationsFixer
 from pants.core.goals.fix import FixResult
-from pants.engine.fs import CreateDigest, DigestContents, FileContent
-from pants.engine.internals.native_engine import Digest, Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import digest_to_snapshot, directory_digest_to_digest_contents
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import RegisteredTargetTypes, TargetGenerator
 from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
@@ -149,17 +149,18 @@ def fix_single(
 
 
 @rule(desc="Fix deprecated field names", level=LogLevel.DEBUG)
-async def fix(
-    request: RenameFieldsInFilesRequest.Batch,
-) -> FixResult:
-    digest_contents = await Get(DigestContents, Digest, request.snapshot.digest)
-    fixed_contents = await MultiGet(
-        Get(FixedBUILDFile, RenameFieldsInFileRequest(file_content.path, file_content.content))
+async def fix(request: RenameFieldsInFilesRequest.Batch) -> FixResult:
+    digest_contents = await directory_digest_to_digest_contents(request.snapshot.digest)
+    fixed_contents = await concurrently(
+        fix_single(
+            RenameFieldsInFileRequest(file_content.path, file_content.content), **implicitly()
+        )
         for file_content in digest_contents
     )
-    snapshot = await Get(
-        Snapshot,
-        CreateDigest(FileContent(content.path, content.content) for content in fixed_contents),
+    snapshot = await digest_to_snapshot(
+        **implicitly(
+            CreateDigest(FileContent(content.path, content.content) for content in fixed_contents)
+        )
     )
     return FixResult(
         request.snapshot, snapshot, "", "", tool_name=RenameFieldsInFilesRequest.tool_name

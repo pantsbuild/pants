@@ -14,6 +14,7 @@ from pants.backend.terraform.goals.lockfiles import rules as terraform_lockfile_
 from pants.backend.terraform.target_types import (
     TerraformBackendTarget,
     TerraformDeploymentTarget,
+    TerraformLockfileTarget,
     TerraformModuleTarget,
     TerraformVarFileTarget,
 )
@@ -35,6 +36,7 @@ def rule_runner_with_auto_approve() -> RuleRunner:
             TerraformDeploymentTarget,
             TerraformBackendTarget,
             TerraformVarFileTarget,
+            TerraformLockfileTarget,
         ],
         rules=[
             *dependency_inference.rules(),

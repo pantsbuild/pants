@@ -212,7 +212,7 @@ async def run_javascript_tests(
             args=(
                 "run",
                 entry_point,
-                "--",
+                *installation.project_env.project.args_separator,
                 *sorted(relative_package_dir(file) for file in field_set_source_files.files),
                 *coverage_args,
             ),

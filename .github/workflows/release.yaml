@@ -8,6 +8,7 @@ jobs:
     container:
       image: ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf
     env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -60,6 +61,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-Linux-ARM64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
@@ -83,6 +85,7 @@ jobs:
     container:
       image: quay.io/pypa/manylinux2014_x86_64:latest
     env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -120,7 +123,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: 1.19.5
     - env:
@@ -137,6 +140,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
@@ -165,6 +169,7 @@ jobs:
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -176,7 +181,7 @@ jobs:
     - macOS-10.15-X64
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -188,11 +193,11 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.78.0-*
+        path: '~/.rustup/toolchains/1.79.0-*
 
           ~/.rustup/update-hashes
 
@@ -211,7 +216,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - env:
@@ -225,9 +230,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-macOS10-15-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
@@ -249,6 +255,7 @@ jobs:
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -260,7 +267,7 @@ jobs:
     - macOS-11-ARM64
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -272,11 +279,11 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.78.0-*
+        path: '~/.rustup/toolchains/1.79.0-*
 
           ~/.rustup/update-hashes
 
@@ -295,7 +302,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - env:
@@ -309,9 +316,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-macOS11-ARM64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
@@ -345,13 +353,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Pants at Release Tag
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: '0'
         fetch-tags: true
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     - name: Expose Pythons
@@ -364,10 +372,10 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.78.0-*
+        path: '~/.rustup/toolchains/1.79.0-*
 
           ~/.rustup/update-hashes
 
@@ -385,7 +393,7 @@ jobs:
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: 'src/python/pants/bin/native_client

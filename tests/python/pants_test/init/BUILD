@@ -11,7 +11,8 @@ python_tests(
                 # These tests load `pants.toml`, which references many of these plugins.
                 "src/python/pants/bin:plugins",
             ],
-        }
+        },
+        "test_logging.py": {"dependencies": ["//BUILD_ROOT:files"]},
     },
 )
 

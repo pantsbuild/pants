@@ -96,6 +96,20 @@ class NodeJSProject:
             return "workspace"
         return "--workspace"
 
+    @property
+    def args_separator(self) -> tuple[str, ...]:
+        # pnpm 7 changed the arguments to the `run` command - all other package managers
+        # accept an args separator --, but pnpm does not in versions 7 and above.
+        # > When using pnpm run <script>, all command line arguments after the script
+        # > name are now passed to the script's argv, even --.
+        if self.package_manager == "pnpm" and (
+            self.package_manager_version is None
+            or nodesemver.satisfies(self.package_manager_version, ">=7")
+        ):
+            return ()
+
+        return ("--",)
+
     def extra_env(self) -> dict[str, str]:
         if self.package_manager == "pnpm":
             return {"PNPM_HOME": "{chroot}/._pnpm_home"}
@@ -222,6 +236,8 @@ async def find_node_js_projects(
     nodejs: NodeJS,
     resolve_names: UserChosenNodeJSResolveAliases,
 ) -> AllNodeJSProjects:
+    # Note: If pnpm_workspace.yaml is present for an npm-managed project, it will override the package.json["workspaces"] setting, which is not intuitive
+    # pnpm_workspace.yaml should only be used for pnpm projects - see https://github.com/pantsbuild/pants/issues/21134
     project_paths = (
         ProjectPaths(pkg.root_dir, ["", *pkg.workspaces])
         if pkg not in pnpm_workspaces

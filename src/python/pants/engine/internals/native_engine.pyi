@@ -37,6 +37,7 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
+    NativeParsedDockerfileInfo,
     NativeParsedJavascriptDependencies,
     NativeParsedPythonDependencies,
 )
@@ -501,6 +502,18 @@ class PathMetadataKind:
     SYMLINK: PathMetadataKind = ...
 
 class PathMetadata:
+    def __new__(
+        cls,
+        path: str,
+        kind: PathMetadataKind,
+        length: int,
+        is_executable: bool,
+        unix_mode: int | None,
+        accessed: datetime | None,
+        created: datetime | None,
+        modified: datetime | None,
+        symlink_target: str | None,
+    ) -> PathMetadata: ...
     @property
     def path(self) -> str: ...
     @property
@@ -519,6 +532,7 @@ class PathMetadata:
     def modified(self) -> datetime | None: ...
     @property
     def symlink_target(self) -> str | None: ...
+    def copy(self) -> PathMetadata: ...
 
 # ------------------------------------------------------------------------------
 # Intrinsics
@@ -552,6 +566,9 @@ async def interactive_process(
     process: InteractiveProcess, process_execution_environment: ProcessExecutionEnvironment
 ) -> InteractiveProcessResult: ...
 async def docker_resolve_image(request: DockerResolveImageRequest) -> DockerResolveImageResult: ...
+async def parse_dockerfile_info(
+    deps_request: NativeDependenciesRequest,
+) -> NativeParsedDockerfileInfo: ...
 async def parse_python_deps(
     deps_request: NativeDependenciesRequest,
 ) -> NativeParsedPythonDependencies: ...

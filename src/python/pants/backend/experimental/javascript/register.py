@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from pants.backend.javascript import package_json
-from pants.backend.javascript.goals import lockfile, tailor, test
+from pants.backend.javascript.goals import export, lockfile, tailor, test
 from pants.backend.javascript.package.rules import rules as package_rules
 from pants.backend.javascript.run.rules import rules as run_rules
 from pants.backend.javascript.subsystems import nodejs
@@ -30,6 +30,7 @@ def rules() -> Iterable[Rule | UnionRule]:
         *package_rules(),
         *run_rules(),
         *test.rules(),
+        *export.rules(),
     )
 
 

@@ -142,6 +142,40 @@ def test_byname() -> None:
     assert_awaitables(rule3, [(int, []), (int, int), (int, [])])
 
 
+def test_byname_recursion() -> None:
+    # Note that it's important that the rule is defined inside this function, so that
+    # the @rule decorator is evaluated at test runtime, and not test file parse time.
+    @rule
+    async def recursive_rule(arg: int) -> int:
+        if arg == 0:
+            return 0
+        recursive = await recursive_rule(arg - 1)
+        return recursive
+
+    assert_awaitables(recursive_rule, [(int, [])])
+
+
+@pytest.mark.xfail(
+    reason="We don't yet support mutual recursion via call-by-name.",
+    run=False,
+)
+def test_byname_mutual_recursion() -> None:
+    @rule
+    async def mutually_recursive_rule_1(arg: str) -> int:
+        if arg == "0":
+            return 0
+        recursive = await mutually_recursive_rule_2(int(arg) - 1)
+        return int(recursive)
+
+    @rule
+    async def mutually_recursive_rule_2(arg: int) -> str:
+        recursive = await mutually_recursive_rule_1(str(arg - 1))
+        return str(recursive)
+
+    assert_awaitables(mutually_recursive_rule_1, [(str, [])])
+    assert_awaitables(mutually_recursive_rule_2, [(int, [])])
+
+
 def test_rule_helpers_free_functions() -> None:
     async def rule():
         _top_helper(1)

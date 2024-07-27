@@ -1,6 +1,9 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import annotations
+
+from typing import Iterable
 
 from pants.backend.cue.rules import _run_cue
 from pants.backend.cue.subsystem import Cue
@@ -8,7 +11,7 @@ from pants.backend.cue.target_types import CueFieldSet
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.platform import Platform
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.util.logging import LogLevel
 
 
@@ -30,8 +33,8 @@ async def run_cue_fmt(request: CueFmtRequest.Batch, cue: Cue, platform: Platform
     return await FmtResult.create(request, process_result)
 
 
-def rules():
-    return [
+def rules() -> Iterable[Rule]:
+    return (
         *collect_rules(),
         *CueFmtRequest.rules(),
-    ]
+    )

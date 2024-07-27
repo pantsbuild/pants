@@ -60,7 +60,7 @@ class PyenvPythonProviderSubsystem(TemplatedExternalTool):
         """
     )
 
-    default_version = "2.3.13"
+    default_version = "2.4.7"
     default_url_template = "https://github.com/pyenv/pyenv/archive/refs/tags/v{version}.tar.gz"
 
     class EnvironmentAware:
@@ -92,8 +92,8 @@ class PyenvPythonProviderSubsystem(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "9105de5e5cf8dc0eca2a520ed04493d183128d46a2cfb402d4cc271af1bf144b",
-                    "749323",
+                    "0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d",
+                    "799490",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
@@ -216,6 +216,11 @@ class PyenvPythonProvider(PythonProvider):
     pass
 
 
+def _major_minor_patch_to_int(major_minor_patch: str) -> tuple[int, int, int]:
+    major, minor, patch = map(int, major_minor_patch.split(".", maxsplit=2))
+    return (major, minor, patch)
+
+
 @rule
 async def get_python(
     request: PyenvPythonProvider,
@@ -229,26 +234,52 @@ async def get_python(
         Get(RunRequest, PyenvInstallInfoRequest()),
     )
 
-    python_to_use = request.interpreter_constraints.minimum_python_version(
+    # Determine the lowest major/minor version supported according to the interpreter constraints.
+    major_minor_to_use_str = request.interpreter_constraints.minimum_python_version(
         python_setup.interpreter_versions_universe
     )
-    if python_to_use is None:
+    if major_minor_to_use_str is None:
         raise ValueError(
             f"Couldn't determine a compatible Interpreter Constraint from {python_setup.interpreter_versions_universe}"
         )
 
-    which_python_result = await Get(
+    # Find the highest patch version given the major/minor version that is known to our version of pyenv.
+    pyenv_latest_known_result = await Get(
         ProcessResult,
         Process(
-            [pyenv.exe, "latest", "--known", python_to_use],
+            [pyenv.exe, "latest", "--known", major_minor_to_use_str],
             input_digest=pyenv.digest,
-            description=f"Choose specific version for Python {python_to_use}",
+            description=f"Choose specific version for Python {major_minor_to_use_str}",
             env={"PATH": env_vars.get("PATH", "")},
-            # Caching the result is OK, since if the user really needs a different patch,
-            # they should list a more precise IC.
         ),
     )
-    specific_python = which_python_result.stdout.decode().strip()
+    major_to_use, minor_to_use, latest_known_patch = _major_minor_patch_to_int(
+        pyenv_latest_known_result.stdout.decode().strip()
+    )
+
+    # Pick the highest patch version given the major/minor version that is supported according to
+    # the interpreter constraints and known to our version of pyenv.
+    # We assume pyenv knows every patch version smaller or equal the its latest known patch
+    # version, to avoid calling it for each patch version separately.
+    supported_triplets = request.interpreter_constraints.enumerate_python_versions(
+        python_setup.interpreter_versions_universe
+    )
+    try:
+        major_minor_patch_to_use = max(
+            (major, minor, patch)
+            for (major, minor, patch) in supported_triplets
+            if major == major_to_use and minor == minor_to_use and patch <= latest_known_patch
+        )
+    except ValueError:
+        raise ValueError(
+            f"Couldn't find a Python {major_minor_to_use_str} version that"
+            f" is compatible with the interpreter constraints {request.interpreter_constraints}"
+            f" and known to pyenv {pyenv_subsystem.version}"
+            f" (latest known version {major_to_use}.{minor_to_use}.{latest_known_patch})."
+            " Suggestion: consider upgrading pyenv or adjusting your interpreter constraints."
+        ) from None
+
+    major_minor_patch_to_use_str = ".".join(map(str, major_minor_patch_to_use))
 
     # NB: We don't cache this process at any level for two reasons:
     #   1. Several tools (including pex) refer to Python at an absolute path, so a named cache is
@@ -263,10 +294,10 @@ async def get_python(
     result = await Get(
         ProcessResult,
         Process(
-            pyenv_install.args + (specific_python,),
+            pyenv_install.args + (major_minor_patch_to_use_str,),
             level=LogLevel.DEBUG,
             input_digest=pyenv_install.digest,
-            description=f"Install Python {python_to_use}",
+            description=f"Install Python {major_minor_patch_to_use_str}",
             append_only_caches=pyenv_install.append_only_caches,
             env=pyenv_install.extra_env,
             # Don't cache, we want this to always be run so that we can assume for the rest of the

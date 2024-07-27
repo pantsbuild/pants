@@ -51,7 +51,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     validate_metadata,
 )
 from pants.build_graph.address import Address
-from pants.core.target_types import FileSourceField
+from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.core.util_rules.stripped_source_files import rules as stripped_source_rules
@@ -136,7 +136,13 @@ async def digest_complete_platform_addresses(
     original_files_sources = await MultiGet(
         Get(
             HydratedSources,
-            HydrateSourcesRequest(tgt.get(SourcesField), for_sources_types=(FileSourceField,)),
+            HydrateSourcesRequest(
+                tgt.get(SourcesField),
+                for_sources_types=(
+                    FileSourceField,
+                    ResourceSourceField,
+                ),
+            ),
         )
         for tgt in original_file_targets
     )

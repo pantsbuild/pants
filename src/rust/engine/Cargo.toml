@@ -72,7 +72,7 @@ process_execution = { path = "process_execution" }
 pyo3 = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
-reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
+reqwest = { version = "0.11", default-features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
 smallvec = { version = "1", features = ["union"] }
 stdio = { path = "stdio" }
@@ -254,7 +254,7 @@ humansize = "1.1"
 hyper = "0.14"
 hyper-rustls = "0.24"
 ignore = { git = "https://github.com/pantsbuild/ripgrep.git", rev = "0f7e0fdd00ae528745a7fea24a320cae98235341" }
-indexmap = "1.9"
+indexmap = { version = "1.9", features = ["std", "serde"] }
 indicatif = "0.17.8"
 internment = "0.6"
 itertools = "0.10"
@@ -335,6 +335,8 @@ whoami = "1.4.1"
 tree-sitter = "0.20.10"
 tree-sitter-javascript = "0.20.1"
 tree-sitter-python = "0.20.4"
+# TODO: Waiting on https://github.com/camdencheek/tree-sitter-dockerfile/pull/58.
+tree-sitter-dockerfile = { git = "https://github.com/tobni/tree-sitter-dockerfile.git", rev = "ce1cbc3537995f0d968c8bc6315b6a62d6faacde" }
 
 # Default lints adopted by most crates in this workspace.
 
