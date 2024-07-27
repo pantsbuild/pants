@@ -8,8 +8,6 @@ from dataclasses import dataclass, replace
 from pathlib import PurePath
 from typing import Iterable
 
-import nodesemver
-
 from pants.backend.javascript import package_json
 from pants.backend.javascript.package_json import (
     AllPackageJson,
@@ -17,6 +15,7 @@ from pants.backend.javascript.package_json import (
     PnpmWorkspaceGlobs,
     PnpmWorkspaces,
 )
+from pants.backend.javascript.package_manager import PackageManager
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.subsystems.nodejs import NodeJS, UserChosenNodeJSResolveAliases
 from pants.core.util_rules import stripped_source_files
@@ -56,80 +55,38 @@ class NodeJSProject:
     root_dir: str
     workspaces: FrozenOrderedSet[PackageJson]
     default_resolve_name: str
-    package_manager: str
-    package_manager_version: str | None = None
+    package_manager: PackageManager
     pnpm_workspace: PnpmWorkspaceGlobs | None = None
 
     @property
     def lockfile_name(self) -> str:
-        if self.package_manager == "pnpm":
-            return "pnpm-lock.yaml"
-        elif self.package_manager == "yarn":
-            return "yarn.lock"
-        return "package-lock.json"
+        return self.package_manager.lockfile_name
 
     @property
     def generate_lockfile_args(self) -> tuple[str, ...]:
-        if self.package_manager == "pnpm":
-            return ("install", "--lockfile-only")
-        elif self.package_manager == "yarn":
-            return ("install",)  # yarn does not provide a lockfile only mode.
-        return ("install", "--package-lock-only")
+        return self.package_manager.generate_lockfile_args
 
     @property
     def immutable_install_args(self) -> tuple[str, ...]:
-        if self.package_manager == "npm":
-            return ("clean-install",)
-        if self.package_manager == "pnpm":
-            return ("install", "--frozen-lockfile")
-        if self.package_manager == "yarn":
-            if nodesemver.satisfies(self.package_manager_version, "1.x"):
-                return ("install", "--frozen-lockfile")
-            return ("install", "--immutable")
-        raise ValueError(f"Unsupported package manager: {self.package_manager}")
+        return self.package_manager.immutable_install_args
 
     @property
     def workspace_specifier_arg(self) -> str:
-        if self.package_manager == "pnpm":
-            return "--filter"
-        elif self.package_manager == "yarn":
-            return "workspace"
-        return "--workspace"
+        return self.package_manager.workspace_specifier_arg
 
     @property
     def args_separator(self) -> tuple[str, ...]:
-        # pnpm 7 changed the arguments to the `run` command - all other package managers
-        # accept an args separator --, but pnpm does not in versions 7 and above.
-        # > When using pnpm run <script>, all command line arguments after the script
-        # > name are now passed to the script's argv, even --.
-        if self.package_manager == "pnpm" and (
-            self.package_manager_version is None
-            or nodesemver.satisfies(self.package_manager_version, ">=7")
-        ):
-            return ()
-
-        return ("--",)
+        return self.package_manager.run_arg_separator
 
     def extra_env(self) -> dict[str, str]:
-        if self.package_manager == "pnpm":
-            return {"PNPM_HOME": "{chroot}/._pnpm_home"}
-        elif self.package_manager == "yarn":
-            return {"YARN_CACHE_FOLDER": "{chroot}/._yarn_cache"}
-        return {}
+        return dict(self.package_manager.extra_env)
 
     @property
     def pack_archive_format(self) -> str:
-        if self.package_manager == "yarn":
-            return "{}-v{}.tgz"
-        else:
-            return "{}-{}.tgz"
+        return self.package_manager.pack_archive_format
 
     def extra_caches(self) -> dict[str, str]:
-        if self.package_manager == "pnpm":
-            return {"pnpm_home": "._pnpm_home"}
-        elif self.package_manager == "yarn":
-            return {"yarn_cache": "._yarn_cache"}
-        return {}
+        return dict(self.package_manager.extra_caches)
 
     def get_project_digest(self) -> MergeDigests:
         return MergeDigests(
@@ -182,15 +139,12 @@ class NodeJSProject:
                             """
                         )
                     )
-        package_manager_command, *maybe_version = package_manager.split("@")
-        package_manager_version = maybe_version[0] if maybe_version else None
 
         return NodeJSProject(
             root_dir=project.root_dir,
             workspaces=project.workspaces,
             default_resolve_name=project.default_resolve_name or "nodejs-default",
-            package_manager=package_manager_command,
-            package_manager_version=package_manager_version,
+            package_manager=PackageManager.from_string(package_manager),
             pnpm_workspace=pnpm_workspaces.for_root(project.root_dir),
         )
 
@@ -239,9 +193,11 @@ async def find_node_js_projects(
     # Note: If pnpm_workspace.yaml is present for an npm-managed project, it will override the package.json["workspaces"] setting, which is not intuitive
     # pnpm_workspace.yaml should only be used for pnpm projects - see https://github.com/pantsbuild/pants/issues/21134
     project_paths = (
-        ProjectPaths(pkg.root_dir, ["", *pkg.workspaces])
-        if pkg not in pnpm_workspaces
-        else ProjectPaths(pkg.root_dir, ["", *pnpm_workspaces[pkg].packages])
+        (
+            ProjectPaths(pkg.root_dir, ["", *pkg.workspaces])
+            if pkg not in pnpm_workspaces
+            else ProjectPaths(pkg.root_dir, ["", *pnpm_workspaces[pkg].packages])
+        )
         for pkg in package_workspaces
     )
 
