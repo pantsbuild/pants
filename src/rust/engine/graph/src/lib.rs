@@ -83,9 +83,9 @@ impl<N: Node> InnerGraph<N> {
     }
 
     ///
-    /// Locates all* cycles in running nodes in the graph, and terminates one Node in each of them.
+    /// Locates all cycles in running nodes in the graph, and terminates one Node in each of them.
     ///
-    /// * Finding "all simple cycles" in a graph is apparently best accomplished with [Johnson's
+    /// Note: Finding "all simple cycles" in a graph is apparently best accomplished with [Johnson's
     /// algorithm](https://www.cs.tufts.edu/comp/150GA/homeworks/hw1/Johnson%2075.PDF), which uses
     /// the strongly connected components, but goes a bit further. Because this method will run
     /// multiple times, we don't worry about that, and just kill one member of each SCC.
