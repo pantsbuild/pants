@@ -52,7 +52,7 @@ impl PyInferenceMetadata {
         Ok(Self(dependency_inference_request::Metadata::Js(
             JavascriptInferenceMetadata {
                 package_root,
-                import_patterns: import_patterns,
+                import_patterns,
                 config_root,
                 paths,
             },
