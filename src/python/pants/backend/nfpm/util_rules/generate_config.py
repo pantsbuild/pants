@@ -26,6 +26,11 @@ from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, DigestEntries, FileContent, FileEntry
 from pants.engine.internals.native_engine import Digest
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.intrinsics import directory_digest_to_digest_entries
+from pants.engine.intrinsics import create_digest_to_digest
+from pants.engine.rules import implicitly
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionMembership
 from pants.util.logging import LogLevel
@@ -55,20 +60,17 @@ class NfpmSrcMissingFromSandboxException(Exception):
 async def generate_nfpm_yaml(
     request: NfpmPackageConfigRequest, union_membership: UnionMembership
 ) -> NfpmPackageConfig:
-    transitive_targets = await Get(
-        TransitiveTargets,
-        TransitiveTargetsRequest(
+    transitive_targets = await transitive_targets_get(TransitiveTargetsRequest(
             [request.field_set.address],
             should_traverse_deps_predicate=TraverseIfNotPackageTarget(
                 roots=[request.field_set.address],
                 union_membership=union_membership,
             ),
-        ),
-    )
+        ), **implicitly())
 
     # TODO: Maybe allow setting default mtime via an nfpm subsystem option.
     # TODO: Maybe add an mtime field to nfpm_*_package targets.
-    environ = await Get(EnvironmentVars, EnvironmentVarsRequest(["SOURCE_DATE_EPOCH"]))
+    environ = await environment_vars_subset(EnvironmentVarsRequest(["SOURCE_DATE_EPOCH"]), **implicitly())
     # This protects against an empty SOURCE_DATE_EPOCH var as mtime must not be empty.
     mtime = environ.get("SOURCE_DATE_EPOCH", "") or NfpmContentFileMtimeField.default
 
@@ -79,7 +81,7 @@ async def generate_nfpm_yaml(
     # Second, gather package contents from hydrated deps.
     contents: list[NfpmContent] = config["contents"]
 
-    content_sandbox_entries = await Get(DigestEntries, Digest, request.content_sandbox_digest)
+    content_sandbox_entries = await directory_digest_to_digest_entries(request.content_sandbox_digest)
     content_sandbox_files = {
         entry.path: entry for entry in content_sandbox_entries if isinstance(entry, FileEntry)
     }
@@ -184,7 +186,7 @@ async def generate_nfpm_yaml(
     nfpm_yaml += yaml.safe_dump(config)
     nfpm_yaml_content = FileContent("nfpm.yaml", nfpm_yaml.encode())
 
-    digest = await Get(Digest, CreateDigest([nfpm_yaml_content]))
+    digest = await create_digest_to_digest(CreateDigest([nfpm_yaml_content]))
     return NfpmPackageConfig(digest)
 
 
