@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -14,6 +15,8 @@ from pants.engine.internals.selectors import Get, concurrently
 from pants.engine.intrinsics import directory_digest_to_digest_contents, path_globs_to_digest
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.util.frozendict import FrozenDict
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -47,7 +50,7 @@ async def _read_parent_config(
     extends_path: str,
     others: DigestContents,
     target_file: Literal["tsconfig.json", "jsconfig.json"],
-) -> TSConfig:
+) -> TSConfig | None:
     if child_path.endswith(".json"):
         relative = os.path.dirname(child_path)
     else:
@@ -57,9 +60,10 @@ async def _read_parent_config(
         relative = os.path.join(relative, target_file)
     parent = next((other for other in others if other.path == relative), None)
     if not parent:
-        raise ValueError(
-            f"pants could not locate {child_path}'s parent at {relative}. Found: {[other.path for other in others]}."
+        logger.warning(
+            f"pants could not locate {child_path}'s 'extends' at {relative}. Found: {[other.path for other in others]}."
         )
+        return None
     return await Get(  # Must be a Get until https://github.com/pantsbuild/pants/pull/21174 lands
         TSConfig, ParseTSConfigRequest(parent, others, target_file)
     )
@@ -85,6 +89,8 @@ async def parse_extended_ts_config(request: ParseTSConfigRequest) -> TSConfig:
     extended_parent = await _read_parent_config(
         ts_config.path, extends, request.others, request.target_file
     )
+    if not extended_parent:
+        return ts_config
     return TSConfig(
         ts_config.path,
         module_resolution=ts_config.module_resolution or extended_parent.module_resolution,
