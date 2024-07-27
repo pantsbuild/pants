@@ -121,19 +121,14 @@ async def map_candidate_node_packages(
     )
 
 
-@dataclass(frozen=True)
-class InferenceMetadataRequest:
-    imports: PackageJsonImports
-    config: TSConfig | None
-
-
-@rule
-async def prepare_inference_metadata(req: InferenceMetadataRequest) -> InferenceMetadata:
+def _create_inference_metadata(
+    imports: PackageJsonImports, config: TSConfig | None
+) -> InferenceMetadata:
     return InferenceMetadata.javascript(
-        req.imports.root_dir,
-        dict(req.imports.imports),
-        req.config.resolution_root_dir if req.config else None,
-        dict(req.config.paths or {}) if req.config else {},
+        imports.root_dir,
+        dict(imports.imports),
+        config.resolution_root_dir if config else None,
+        dict(config.paths or {}) if config else {},
     )
 
 
@@ -153,11 +148,9 @@ async def _prepare_inference_metadata(address: Address, file_path: str) -> Infer
             maybe_config.ts_config.resolution_root_dir if maybe_config.ts_config else None,
             dict(maybe_config.ts_config.paths or {}) if maybe_config.ts_config else {},
         )
-    return await prepare_inference_metadata(
-        InferenceMetadataRequest(
-            await subpath_imports_for_source(owning_pkg.target[PackageJsonSourceField]),
-            maybe_config.ts_config,
-        )
+    return _create_inference_metadata(
+        await subpath_imports_for_source(owning_pkg.target[PackageJsonSourceField]),
+        maybe_config.ts_config,
     )
 
 
