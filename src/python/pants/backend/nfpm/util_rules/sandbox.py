@@ -18,31 +18,27 @@ from pants.backend.nfpm.fields.contents import (
 )
 from pants.backend.nfpm.target_types import NfpmContentFile, NfpmPackageTarget
 from pants.core.goals.package import (
-    BuiltPackage,
     EnvironmentAwarePackageRequest,
     PackageFieldSet,
     TraverseIfNotPackageTarget,
+    environment_aware_package,
 )
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.fs import CreateDigest, DigestEntries, Directory, FileEntry, SymlinkEntry
-from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get, concurrently
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.graph import find_valid_field_sets, hydrate_sources
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
-from pants.engine.internals.graph import find_valid_field_sets
-from pants.core.goals.package import environment_aware_package
-from pants.engine.internals.graph import hydrate_sources
-from pants.engine.intrinsics import directory_digest_to_digest_entries
-from pants.engine.intrinsics import create_digest_to_digest
-from pants.core.util_rules.source_files import determine_source_files
-from pants.engine.intrinsics import merge_digests_request_to_digest
-from pants.engine.rules import implicitly
+from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import (
+    create_digest_to_digest,
+    directory_digest_to_digest_entries,
+    merge_digests_request_to_digest,
+)
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
-    FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     GenerateSourcesRequest,
-    HydratedSources,
     HydrateSourcesRequest,
     SourcesField,
     Target,
@@ -163,19 +159,24 @@ class NfpmContentSandbox:
 async def populate_nfpm_content_sandbox(
     request: NfpmContentSandboxRequest, union_membership: UnionMembership
 ) -> NfpmContentSandbox:
-    transitive_targets = await transitive_targets_get(TransitiveTargetsRequest(
+    transitive_targets = await transitive_targets_get(
+        TransitiveTargetsRequest(
             [request.field_set.address],
             should_traverse_deps_predicate=TraverseIfNotPackageTarget(
                 roots=[request.field_set.address],
                 union_membership=union_membership,
             ),
-        ), **implicitly())
+        ),
+        **implicitly(),
+    )
 
     deps = _NfpmSortedDeps.sort(request.field_set, transitive_targets, union_membership)
 
     # 1. Build packages for deps that are (non-nfpm) Packages
 
-    package_field_sets_per_target = await find_valid_field_sets(FieldSetsPerTargetRequest(PackageFieldSet, deps.package_targets), **implicitly())
+    package_field_sets_per_target = await find_valid_field_sets(
+        FieldSetsPerTargetRequest(PackageFieldSet, deps.package_targets), **implicitly()
+    )
     packages = await concurrently(
         environment_aware_package(EnvironmentAwarePackageRequest(field_set))
         for field_set in package_field_sets_per_target.field_sets
@@ -245,11 +246,14 @@ async def populate_nfpm_content_sandbox(
         if not found:
             codegen_sources_fields_with_output.append((sources_field, type(sources_field)))
     hydrated_dep_sources = await concurrently(
-        hydrate_sources(HydrateSourcesRequest(
+        hydrate_sources(
+            HydrateSourcesRequest(
                 sources,
                 for_sources_types=(output_type,),
                 enable_codegen=True,
-            ), **implicitly())
+            ),
+            **implicitly(),
+        )
         for sources, output_type in codegen_sources_fields_with_output
     )
 
@@ -261,7 +265,8 @@ async def populate_nfpm_content_sandbox(
 
     # This should include at least all files in 'src' fields of nfpm_content_file targets.
     # Other dependency files aren't required since nFPM will ignore anything not configured.
-    sandbox_digest = await merge_digests_request_to_digest(MergeDigests(
+    sandbox_digest = await merge_digests_request_to_digest(
+        MergeDigests(
             [
                 *(package.digest for package in packages),
                 # nfpm_content_file 'src' from 'source' field
@@ -270,7 +275,8 @@ async def populate_nfpm_content_sandbox(
                 # nfpm_content_file 'src' from 'dependencies' field
                 *(hydrated.snapshot.digest for hydrated in hydrated_dep_sources),
             ]
-        ))
+        )
+    )
 
     return NfpmContentSandbox(sandbox_digest)
 
