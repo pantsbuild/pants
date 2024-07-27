@@ -94,21 +94,22 @@ async def package_nfpm_package(
     )
 
     result = await fallible_to_exec_result_or_raise(
-        Process(
-            argv=(
-                downloaded_tool.exe,
-                "package",  # or "pkg" or "p"
-                # use default config file: nfpm.yaml
-                "--packager",  # or "-p"
-                field_set.packager,
-                "--target",  # or "-t"
-                output_dir,
-            ),
-            description=f"Creating {field_set.packager} package with nFPM: {field_set.address}",
-            input_digest=sandbox_digest,
-            output_directories=(output_dir,),
+        **implicitly(
+            Process(
+                argv=(
+                    downloaded_tool.exe,
+                    "package",  # or "pkg" or "p"
+                    # use default config file: nfpm.yaml
+                    "--packager",  # or "-p"
+                    field_set.packager,
+                    "--target",  # or "-t"
+                    output_dir,
+                ),
+                description=f"Creating {field_set.packager} package with nFPM: {field_set.address}",
+                input_digest=sandbox_digest,
+                output_directories=(output_dir,),
+            )
         ),
-        **implicitly(),
     )
 
     # The final directory that should contain the package artifact.
@@ -132,22 +133,34 @@ async def package_nfpm_package(
 
 @rule
 async def package_nfpm_apk_package(field_set: NfpmApkPackageFieldSet) -> BuiltPackage:
-    return await package_nfpm_package(NfpmPackageRequest(field_set), **implicitly())
+    built_package: BuiltPackage = await package_nfpm_package(
+        NfpmPackageRequest(field_set), **implicitly()
+    )
+    return built_package
 
 
 @rule
 async def package_nfpm_archlinux_package(field_set: NfpmArchlinuxPackageFieldSet) -> BuiltPackage:
-    return await package_nfpm_package(NfpmPackageRequest(field_set), **implicitly())
+    built_package: BuiltPackage = await package_nfpm_package(
+        NfpmPackageRequest(field_set), **implicitly()
+    )
+    return built_package
 
 
 @rule
 async def package_nfpm_deb_package(field_set: NfpmDebPackageFieldSet) -> BuiltPackage:
-    return await package_nfpm_package(NfpmPackageRequest(field_set), **implicitly())
+    built_package: BuiltPackage = await package_nfpm_package(
+        NfpmPackageRequest(field_set), **implicitly()
+    )
+    return built_package
 
 
 @rule
 async def package_nfpm_rpm_package(field_set: NfpmRpmPackageFieldSet) -> BuiltPackage:
-    return await package_nfpm_package(NfpmPackageRequest(field_set), **implicitly())
+    built_package: BuiltPackage = await package_nfpm_package(
+        NfpmPackageRequest(field_set), **implicitly()
+    )
+    return built_package
 
 
 def rules():

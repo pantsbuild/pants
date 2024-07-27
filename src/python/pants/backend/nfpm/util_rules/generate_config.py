@@ -72,7 +72,7 @@ async def generate_nfpm_yaml(
     # TODO: Maybe allow setting default mtime via an nfpm subsystem option.
     # TODO: Maybe add an mtime field to nfpm_*_package targets.
     environ = await environment_vars_subset(
-        EnvironmentVarsRequest(["SOURCE_DATE_EPOCH"]), **implicitly()
+        **implicitly(EnvironmentVarsRequest(["SOURCE_DATE_EPOCH"]))
     )
     # This protects against an empty SOURCE_DATE_EPOCH var as mtime must not be empty.
     mtime = environ.get("SOURCE_DATE_EPOCH", "") or NfpmContentFileMtimeField.default
