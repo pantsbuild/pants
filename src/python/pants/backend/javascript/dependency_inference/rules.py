@@ -256,7 +256,11 @@ async def infer_js_source_dependencies(
     _handle_unowned_imports(
         request.field_set.address,
         nodejs_infer.unowned_dependency_behavior,
-        frozenset(string for string, addresses in imports.items() if not addresses),
+        frozenset(
+            string
+            for string, addresses in imports.items()
+            if not addresses and not string.startswith("node:")
+        ),
     )
 
     return InferredDependencies(itertools.chain.from_iterable(imports.values()))
