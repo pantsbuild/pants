@@ -81,12 +81,12 @@ async def _read_parent_config(
 @rule
 async def parse_extended_ts_config(request: ParseTSConfigRequest) -> TSConfig:
     ts_config = TSConfig.parse_from_content(request.content)
-    if ts_config.extends:
-        extended_parent = await _read_parent_config(
-            ts_config.path, ts_config.extends, request.others, request.target_file
-        )
-    else:
-        extended_parent = TSConfig(ts_config.path)
+    if not ts_config.extends:
+        return ts_config
+
+    extended_parent = await _read_parent_config(
+        ts_config.path, ts_config.extends, request.others, request.target_file
+    )
     return TSConfig(
         ts_config.path,
         module_resolution=ts_config.module_resolution or extended_parent.module_resolution,
