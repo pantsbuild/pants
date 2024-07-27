@@ -72,7 +72,7 @@ fn placed_at_root(package_root: &str, string: &str) -> bool {
 }
 
 fn is_relative_specifier(string: &str) -> bool {
-    string.starts_with(&['.', '/'])
+    string.starts_with(['.', '/'])
 }
 
 fn match_and_extend_with_config_candidates(
