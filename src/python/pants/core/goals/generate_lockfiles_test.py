@@ -32,11 +32,9 @@ from pants.core.goals.generate_lockfiles import (
     NoCompatibleResolveException,
     RequestedUserResolveNames,
     UnrecognizedResolveNamesError,
-    WrappedGenerateLockfile,
     _preferred_environment,
     determine_resolves_to_generate,
     filter_lockfiles_for_unconfigured_exportable_tools,
-    filter_tool_lockfile_requests,
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.engine.console import Console
@@ -64,9 +62,7 @@ def test_determine_tool_sentinels_to_generate() -> None:
         requested: set[str],
         expected_user_resolves: list[RequestedUserResolveNames],
     ) -> None:
-        user_resolves = determine_resolves_to_generate(
-            [lang1_resolves, lang2_resolves], requested
-        )
+        user_resolves = determine_resolves_to_generate([lang1_resolves, lang2_resolves], requested)
         assert user_resolves == expected_user_resolves
 
     assert_chosen(
@@ -82,7 +78,6 @@ def test_determine_tool_sentinels_to_generate() -> None:
 
     with pytest.raises(UnrecognizedResolveNamesError):
         assert_chosen({"fake"}, expected_user_resolves=[])
-
 
     # Error if the same resolve name is used for multiple user lockfiles.
     with pytest.raises(AmbiguousResolveNamesError):
@@ -101,40 +96,6 @@ def test_determine_tool_sentinels_to_generate() -> None:
             ],
             set(),
         )
-
-
-def test_filter_tool_lockfile_requests() -> None:
-    def create_request(name: str, lockfile_dest: str | None = None) -> GenerateLockfile:
-        return GenerateLockfile(
-            resolve_name=name, lockfile_dest=lockfile_dest or f"{name}.txt", diff=False
-        )
-
-    tool1 = create_request("tool1")
-    tool2 = create_request("tool2")
-    default_tool = create_request("default", lockfile_dest=DEFAULT_TOOL_LOCKFILE)
-
-    def assert_filtered(
-        extra_request: GenerateLockfile | None,
-        *,
-        resolve_specified: bool,
-    ) -> None:
-        requests = [WrappedGenerateLockfile(tool1), WrappedGenerateLockfile(tool2)]
-        if extra_request:
-            requests.append(WrappedGenerateLockfile(extra_request))
-        assert filter_tool_lockfile_requests(requests, resolve_specified=resolve_specified) == [
-            tool1,
-            tool2,
-        ]
-
-    assert_filtered(None, resolve_specified=False)
-    assert_filtered(None, resolve_specified=True)
-
-    assert_filtered(default_tool, resolve_specified=False)
-    with pytest.raises(ValueError) as exc:
-        assert_filtered(default_tool, resolve_specified=True)
-    assert f"`[{default_tool.resolve_name}].lockfile` is set to `{DEFAULT_TOOL_LOCKFILE}`" in str(
-        exc.value
-    )
 
 
 def test_no_compatible_resolve_error() -> None:

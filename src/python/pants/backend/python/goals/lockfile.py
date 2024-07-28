@@ -216,11 +216,14 @@ def determine_python_user_resolves(
     python_setup: PythonSetup,
     union_membership: UnionMembership,
 ) -> KnownUserResolveNames:
-    """Find all know Python resolves, from both user-created resolves and internal tools"""
+    """Find all know Python resolves, from both user-created resolves and internal tools."""
     python_tool_resolves = ExportableTool.filter_for_subclasses(union_membership, PythonToolBase)
 
     return KnownUserResolveNames(
-        names=(*python_setup.resolves.keys(), *python_tool_resolves.keys()),  # the order of the keys doesn't matter since shadowing is done in `setup_user_lockfile_requests`
+        names=(
+            *python_setup.resolves.keys(),
+            *python_tool_resolves.keys(),
+        ),  # the order of the keys doesn't matter since shadowing is done in `setup_user_lockfile_requests`
         option_name="[python].resolves",
         requested_resolve_names_cls=RequestedPythonUserResolveNames,
     )
@@ -233,11 +236,10 @@ async def setup_user_lockfile_requests(
     python_setup: PythonSetup,
     union_membership: UnionMembership,
 ) -> UserGenerateLockfiles:
-    """
-    Transform the names of resolves requested into the `GeneratePythonLockfile` request object.
+    """Transform the names of resolves requested into the `GeneratePythonLockfile` request object.
 
-    Shadowing is done here by only checking internal resolves if the resolve is not a user-created resolve.
-
+    Shadowing is done here by only checking internal resolves if the resolve is not a user-created
+    resolve.
     """
     if not (python_setup.enable_resolves and python_setup.resolves_generate_lockfiles):
         return UserGenerateLockfiles()
