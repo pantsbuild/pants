@@ -217,6 +217,11 @@ def _handle_unowned_imports(
         raise UnownedDependencyError(msg)
 
 
+def _is_node_builtin_module(import_string: str) -> bool:
+    """https://nodejs.org/api/modules.html#built-in-modules"""
+    return import_string.startswith("node:")
+
+
 @rule
 async def infer_js_source_dependencies(
     request: InferJSDependenciesRequest,
@@ -252,7 +257,7 @@ async def infer_js_source_dependencies(
         frozenset(
             string
             for string, addresses in imports.items()
-            if not addresses and not string.startswith("node:")
+            if not addresses and not _is_node_builtin_module(string)
         ),
     )
 
