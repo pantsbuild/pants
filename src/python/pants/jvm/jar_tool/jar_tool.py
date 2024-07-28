@@ -11,7 +11,7 @@ from typing import Iterable, Mapping
 import pkg_resources
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -35,6 +35,21 @@ from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+
+
+class JarTool(JvmToolBase):
+    options_scope = "jar_tool"
+    help = "The Java Archive Tool"
+
+    default_artifacts = (
+        "args4j:args4j:2.33",
+        "com.google.code.findbugs:jsr305:3.0.2",
+        "com.google.guava:guava:18.0",
+    )
+    default_lockfile_resource = (
+        "pants.jvm.jar_tool",
+        "jar_tool.lock",
+    )
 
 
 @unique
@@ -111,10 +126,6 @@ class JarToolRequest:
 _JAR_TOOL_MAIN_CLASS = "org.pantsbuild.tools.jar.Main"
 
 
-class JarToolGenerateLockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = "jar_tool"
-
-
 @dataclass(frozen=True)
 class JarToolCompiledClassfiles:
     digest: Digest
@@ -122,17 +133,15 @@ class JarToolCompiledClassfiles:
 
 @rule
 async def run_jar_tool(
-    request: JarToolRequest, jdk: InternalJdk, jar_tool: JarToolCompiledClassfiles
+    request: JarToolRequest, jdk: InternalJdk, tool: JarTool, jar_tool: JarToolCompiledClassfiles
 ) -> Digest:
     output_prefix = "__out"
     output_jarname = os.path.join(output_prefix, request.jar_name)
 
-    lockfile_request, empty_output_digest = await MultiGet(
-        Get(GenerateJvmLockfileFromTool, JarToolGenerateLockfileSentinel()),
+    tool_classpath, empty_output_digest = await MultiGet(
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(tool))),
         Get(Digest, CreateDigest([Directory(output_prefix)])),
     )
-
-    tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
 
     toolcp_prefix = "__toolcp"
     jartoolcp_prefix = "__jartoolcp"
@@ -218,18 +227,20 @@ def _load_jar_tool_sources() -> list[FileContent]:
 
 # TODO(13879): Consolidate compilation of wrapper binaries to common rules.
 @rule
-async def build_jar_tool(jdk: InternalJdk) -> JarToolCompiledClassfiles:
-    lockfile_request, source_digest = await MultiGet(
-        Get(GenerateJvmLockfileFromTool, JarToolGenerateLockfileSentinel()),
-        Get(
-            Digest,
-            CreateDigest(_load_jar_tool_sources()),
-        ),
+async def build_jar_tool(jdk: InternalJdk, tool: JarTool) -> JarToolCompiledClassfiles:
+    source_digest = await Get(
+        Digest,
+        CreateDigest(_load_jar_tool_sources()),
     )
 
     dest_dir = "classfiles"
     materialized_classpath, java_subset_digest, empty_dest_dir = await MultiGet(
-        Get(ToolClasspath, ToolClasspathRequest(prefix="__toolcp", lockfile=lockfile_request)),
+        Get(
+            ToolClasspath,
+            ToolClasspathRequest(
+                prefix="__toolcp", lockfile=GenerateJvmLockfileFromTool.create(tool)
+            ),
+        ),
         Get(
             Digest,
             DigestSubset(
@@ -279,33 +290,11 @@ async def build_jar_tool(jdk: InternalJdk) -> JarToolCompiledClassfiles:
     return JarToolCompiledClassfiles(digest=stripped_classfiles_digest)
 
 
-class JarTool(JvmToolBase):
-    options_scope = "jar_tool"
-    help = "The Java Archive Tool"
-
-    default_artifacts = (
-        "args4j:args4j:2.33",
-        "com.google.code.findbugs:jsr305:3.0.2",
-        "com.google.guava:guava:18.0",
-    )
-    default_lockfile_resource = (
-        "pants.jvm.jar_tool",
-        "jar_tool.lock",
-    )
-
-
-@rule
-async def generate_jartool_lockfile_request(
-    _: JarToolGenerateLockfileSentinel, tool: JarTool
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(tool)
-
-
 def rules():
     return [
         *collect_rules(),
         *coursier_fetch_rules(),
         *jdk_rules(),
         *jvm_tool_rules(),
-        UnionRule(GenerateToolLockfileSentinel, JarToolGenerateLockfileSentinel),
+        UnionRule(ExportableTool, JarTool),
     ]
