@@ -111,19 +111,6 @@ async def generate_lockfile_from_sources(
             upgrade=True,
         ),
     )
-    result = await Get(
-        ProcessResult,
-        TerraformProcess(
-            args=(
-                "providers",
-                "lock",
-            ),
-            input_digest=initialised_terraform.sources_and_deps,
-            output_files=(".terraform.lock.hcl",),
-            description=f"Update terraform lockfile for {lockfile_request.resolve_name}",
-            chdir=initialised_terraform.chdir,
-        ),
-    )
 
     return GenerateLockfileResult(
         result.output_digest, lockfile_request.resolve_name, lockfile_request.lockfile_dest
