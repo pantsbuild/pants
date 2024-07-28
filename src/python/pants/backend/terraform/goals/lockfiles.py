@@ -4,7 +4,7 @@ import os.path
 from dataclasses import dataclass
 from pathlib import Path
 
-from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
+from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformUpgradeResponse
 from pants.backend.terraform.target_types import (
     TerraformDependenciesField,
     TerraformLockfileTarget,
@@ -12,7 +12,6 @@ from pants.backend.terraform.target_types import (
     TerraformModuleTarget,
     TerraformRootModuleField,
 )
-from pants.backend.terraform.tool import TerraformProcess
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
@@ -27,7 +26,6 @@ from pants.engine.internals.native_engine import Address, AddressInput, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, Targets
 from pants.engine.unions import UnionRule
@@ -101,7 +99,7 @@ async def generate_lockfile_from_sources(
 ) -> GenerateLockfileResult:
     """Generate a Terraform lockfile by running `terraform providers lock` on the sources."""
     initialised_terraform = await Get(
-        TerraformInitResponse,
+        TerraformUpgradeResponse,
         TerraformInitRequest(
             TerraformRootModuleField(
                 lockfile_request.target.address.spec, lockfile_request.target.address
@@ -113,7 +111,7 @@ async def generate_lockfile_from_sources(
     )
 
     return GenerateLockfileResult(
-        result.output_digest, lockfile_request.resolve_name, lockfile_request.lockfile_dest
+        initialised_terraform.lockfile, lockfile_request.resolve_name, lockfile_request.lockfile_dest
     )
 
 
