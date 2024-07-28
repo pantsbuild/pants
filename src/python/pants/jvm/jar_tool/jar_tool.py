@@ -31,7 +31,7 @@ from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -279,26 +279,23 @@ async def build_jar_tool(jdk: InternalJdk) -> JarToolCompiledClassfiles:
     )
     return JarToolCompiledClassfiles(digest=stripped_classfiles_digest)
 
+class JarTool(JvmToolBase):
+    options_scope = "jar_tool"
+    help = ""
+
+    default_artifacts = (
+       "args4j:args4j:2.33",
+       "com.google.code.findbugs:jsr305:3.0.2",
+       "com.google.guava:guava:18.0",
+    )
+    default_lockfile_resource = ("pants.jvm.jar_tool", "jar_tool.lock",)
+
 
 @rule
 async def generate_jartool_lockfile_request(
-    _: JarToolGenerateLockfileSentinel,
+    _: JarToolGenerateLockfileSentinel, tool: JarTool
 ) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool(
-        artifact_inputs=FrozenOrderedSet(
-            {
-                "args4j:args4j:2.33",
-                "com.google.code.findbugs:jsr305:3.0.2",
-                "com.google.guava:guava:18.0",
-            }
-        ),
-        artifact_option_name="n/a",
-        lockfile_option_name="n/a",
-        resolve_name=JarToolGenerateLockfileSentinel.resolve_name,
-        read_lockfile_dest=DEFAULT_TOOL_LOCKFILE,
-        write_lockfile_dest="src/python/pants/jvm/jar_tool/jar_tool.lock",
-        default_lockfile_resource=("pants.jvm.jar_tool", "jar_tool.lock"),
-    )
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():
