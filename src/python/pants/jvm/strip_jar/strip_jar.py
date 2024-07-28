@@ -22,7 +22,7 @@ _OUTPUT_PATH = "__stripped_jars"
 
 
 class StripJarTool(JvmToolBase):
-    options_scope = "strip_jar"
+    options_scope = "strip-jar"
     help = "Reproducible Build Maven Plugin"
 
     default_version = "0.16"

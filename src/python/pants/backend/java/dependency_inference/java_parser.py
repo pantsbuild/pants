@@ -30,7 +30,7 @@ _LAUNCHER_BASENAME = "PantsJavaParserLauncher.java"
 
 
 class JavaParser(JvmToolBase):
-    options_scope = "java_parser"
+    options_scope = "java-parser"
     help = "Internal tool for parsing JVM sources to identify dependencies"
 
     default_artifacts = (

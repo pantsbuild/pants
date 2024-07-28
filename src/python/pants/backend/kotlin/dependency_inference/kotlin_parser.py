@@ -29,7 +29,7 @@ _PARSER_KOTLIN_VERSION = "1.6.20"
 
 
 class KotlinParser(JvmToolBase):
-    options_scope = "kotlin_parser"
+    options_scope = "kotlin-parser"
     help = "Internal tool for parsing Kotlin sources to identify dependencies"
 
     default_version = _PARSER_KOTLIN_VERSION

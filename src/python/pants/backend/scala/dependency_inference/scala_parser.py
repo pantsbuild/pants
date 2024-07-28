@@ -54,7 +54,7 @@ _PARSER_SCALA_BINARY_VERSION = _PARSER_SCALA_VERSION.binary
 
 
 class ScalaParser(JvmToolBase):
-    options_scope = "scala_parser"
+    options_scope = "scala-parser"
     help = "Internal tool for parsing Scala sources to identify dependencies"
 
     default_artifacts = (
