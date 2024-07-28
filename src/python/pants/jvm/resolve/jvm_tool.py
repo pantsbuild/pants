@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 from pants.build_graph.address import Address, AddressInput
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
 from pants.core.goals.resolves import ExportableTool
 from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import Get, MultiGet
@@ -182,10 +182,6 @@ async def gather_coordinates_for_jvm_lockfile(
         )
 
     return ArtifactRequirements(requirements)
-
-
-class GenerateJvmToolLockfileSentinel(GenerateToolLockfileSentinel):
-    pass
 
 
 @dataclass(frozen=True)
