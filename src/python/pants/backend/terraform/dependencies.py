@@ -106,7 +106,6 @@ class TerraformInitRequest:
 
     # Not initialising the backend means we won't access remote state. Useful for `validate`
     initialise_backend: bool = False
-    upgrade: bool = False
 
 
 @dataclass(frozen=True)
@@ -122,7 +121,7 @@ class TerraformUpgradeResponse:
     chdir: str
 
 
-async def run_terraform_init(request: TerraformInitRequest):
+async def run_terraform_init(request: TerraformInitRequest, upgrade: bool):
     """Just run `terraform init`"""
     this_targets_dependencies = await Get(
         TransitiveTargets, TransitiveTargetsRequest((request.dependencies.address,))
@@ -197,7 +196,7 @@ async def run_terraform_init(request: TerraformInitRequest):
             has_lockfile,
             source_for_validate,
             initialise_backend=request.initialise_backend,
-            upgrade=request.upgrade,
+            upgrade=upgrade,
         ),
     )
 
@@ -206,7 +205,13 @@ async def run_terraform_init(request: TerraformInitRequest):
 
 @rule
 async def terraform_init(request: TerraformInitRequest) -> TerraformInitResponse:
-    source_files, dependencies_files, init_response, chdir = await run_terraform_init(request)
+    """Run `terraform init`.
+
+    Returns all the initialised files, ready for execution of subsequent tasks
+    """
+    source_files, dependencies_files, init_response, chdir = await run_terraform_init(
+        request, upgrade=False
+    )
 
     all_terraform_files = await Get(
         Digest,
@@ -226,7 +231,12 @@ async def terraform_init(request: TerraformInitRequest) -> TerraformInitResponse
 
 @rule
 async def terraform_upgrade_lockfile(request: TerraformInitRequest) -> TerraformUpgradeResponse:
-    _, _, init_response, chdir = await run_terraform_init(request)
+    """Run `terraform init -upgrade`. Returns just the lockfile.
+
+    This split exists because the new and old lockfile will conflict if merging digests
+    """
+
+    _, _, init_response, chdir = await run_terraform_init(request, upgrade=True)
 
     lockfile = await Get(
         Digest,

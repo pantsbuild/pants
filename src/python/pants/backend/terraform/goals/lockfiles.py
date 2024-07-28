@@ -106,12 +106,13 @@ async def generate_lockfile_from_sources(
             ),
             lockfile_request.target[TerraformDependenciesField],
             initialise_backend=False,
-            upgrade=True,
         ),
     )
 
     return GenerateLockfileResult(
-        initialised_terraform.lockfile, lockfile_request.resolve_name, lockfile_request.lockfile_dest
+        initialised_terraform.lockfile,
+        lockfile_request.resolve_name,
+        lockfile_request.lockfile_dest,
     )
 
 
