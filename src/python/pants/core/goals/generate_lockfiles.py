@@ -8,18 +8,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import (
-    Callable,
-    ClassVar,
-    Iterable,
-    Iterator,
-    Mapping,
-    Protocol,
-    Sequence,
-    Tuple,
-    Type,
-    cast,
-)
+from typing import Callable, Iterable, Iterator, Mapping, Protocol, Sequence, Tuple, Type, cast
 
 from pants.core.goals.resolves import ExportableTool
 from pants.engine.collection import Collection
@@ -355,20 +344,7 @@ def determine_resolves_to_generate(
     all_known_user_resolve_names: Iterable[KnownUserResolveNames],
     requested_resolve_names: set[str],
 ) -> list[RequestedUserResolveNames]:
-    """Apply the `--resolve` option to determine which resolves are specified.
-
-    Return a tuple of `(user_resolves, tool_lockfile_sentinels)`.
-    """
-    # Let user resolve names silently shadow tools with the same name.
-    # This is necessary since we now support installing a tool from a named resolve,
-    # and it's not reasonable to ban the name of the tool as the resolve name, when it
-    # is the most obvious choice for that...
-    # This is likely only an issue if you were going to, e.g., have a named resolve called flake8
-    # but not use it as the resolve for the flake8 tool, which seems pretty unlikely.
-    all_known_user_resolve_name_strs = set(
-        itertools.chain.from_iterable(akurn.names for akurn in all_known_user_resolve_names)
-    )
-
+    """Apply the `--resolve` option to determine which resolves are specified."""
     # Resolve names must be globally unique, so check for ambiguity across backends.
     _check_ambiguous_resolve_names(all_known_user_resolve_names)
 
@@ -403,42 +379,12 @@ def determine_resolves_to_generate(
     return requested_user_resolve_names
 
 
-def filter_tool_lockfile_requests(
-    specified_requests: Sequence[WrappedGenerateLockfile], *, resolve_specified: bool
-) -> list[GenerateLockfile]:
-    result = []
-    for wrapped_req in specified_requests:
-        req = wrapped_req.request
-
-        if req.lockfile_dest != DEFAULT_TOOL_LOCKFILE:
-            result.append(req)
-            continue
-        if resolve_specified:
-            resolve = req.resolve_name
-            raise ValueError(
-                softwrap(
-                    f"""
-                    You requested to generate a lockfile for {resolve} because
-                    you included it in `--generate-lockfiles-resolve`, but
-                    `[{resolve}].lockfile` is set to `{req.lockfile_dest}`
-                    so a lockfile will not be generated.
-
-                    If you would like to generate a lockfile for {resolve}, please
-                    set `[{resolve}].lockfile` to the path where it should be
-                    generated and run again.
-                    """
-                )
-            )
-
-    return result
-
-
 def filter_lockfiles_for_unconfigured_exportable_tools(
     generate_lockfile_requests: Sequence[GenerateLockfile],
     exportabletools_by_name: dict[str, Type[ExportableTool]],
     *,
     resolve_specified: bool,
-) -> Tuple[Sequence[str], Sequence[GenerateLockfile]]:
+) -> tuple[tuple[str, ...], tuple[GenerateLockfile, ...]]:
     """Filter lockfile requests for tools still using their default lockfiles."""
 
     valid_lockfiles = []
@@ -480,7 +426,7 @@ def filter_lockfiles_for_unconfigured_exportable_tools(
             )
             continue
 
-    return errs, valid_lockfiles
+    return tuple(errs), tuple(valid_lockfiles)
 
 
 class GenerateLockfilesSubsystem(GoalSubsystem):
@@ -596,7 +542,7 @@ async def generate_lockfiles_goal(
     # environment to execute the request in. Currently we warn if multiple environments are
     # specified.
     if generate_lockfiles_subsystem.request_diffs:
-        all_requests = (replace(req, diff=True) for req in applicable_user_requests)
+        all_requests = tuple(replace(req, diff=True) for req in applicable_user_requests)
     else:
         all_requests = applicable_user_requests
 
