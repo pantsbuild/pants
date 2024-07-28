@@ -1,7 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-"""
-# Terraform
+"""# Terraform
 
 ## Caching: Pants uses the [provider cache](https://developer.hashicorp.com/terraform/cli/config/config-file#provider-plugin-cache) for caching providers.
 These are the things that need to be downloaded, so this provides the most speedup.
