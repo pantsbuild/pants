@@ -12,7 +12,6 @@ from typing import Iterable, Mapping, Sequence, cast
 
 from pants.base.build_root import BuildRoot
 from pants.core.goals.generate_lockfiles import (
-    GenerateToolLockfileSentinel,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     UnrecognizedResolveNamesError,
@@ -251,10 +250,6 @@ async def export(
         all_valid_resolve_names = sorted(
             {
                 *itertools.chain.from_iterable(kurn.names for kurn in all_known_user_resolve_names),
-                *(
-                    sentinel.resolve_name
-                    for sentinel in union_membership.get(GenerateToolLockfileSentinel)
-                ),
             }
         )
         raise UnrecognizedResolveNamesError(
