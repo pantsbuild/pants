@@ -218,7 +218,7 @@ def _handle_unowned_imports(
 
 
 def _is_node_builtin_module(import_string: str) -> bool:
-    """https://nodejs.org/api/modules.html#built-in-modules"""
+    """https://nodejs.org/api/modules.html#built-in-modules."""
     return import_string.startswith("node:")
 
 

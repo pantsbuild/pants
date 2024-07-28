@@ -1,5 +1,13 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+"""tsconfig.json is primarily used by the typescript compiler in order to resolve types during
+compilation. The format is also used by IDE:s to provide intellisense. The format is used for
+projects that use only javascript, and is then named jsconfig.json.
+
+See https://code.visualstudio.com/docs/languages/jsconfig
+"""
+
+
 from __future__ import annotations
 
 import json

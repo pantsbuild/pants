@@ -75,9 +75,12 @@ impl<'a> Pattern<'a> {
     }
 }
 
+/// One of the results of testing all patterns against an import string.
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub(crate) enum Import {
+    /// A string that matched a pattern, with '*' substituion applied, when applicable.
     Matched(String),
+    /// An unchanged string that did not match a pattern.
     UnMatched(String),
 }
 
