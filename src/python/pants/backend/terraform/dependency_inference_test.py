@@ -161,8 +161,7 @@ def test_dependency_inference_autoinfered_files(rule_runner: RuleRunner) -> None
         ],
     )
     assert set(inferred_deps.include) == {
-        Address("src/tf", target_name=tgt)
-        for tgt in ("mod", "tfbackend", "tfvars", ".terraform.lock.hcl")
+        Address("src/tf", target_name=tgt) for tgt in ("mod", "tfbackend", "tfvars")
     }
 
 

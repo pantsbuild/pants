@@ -302,8 +302,7 @@ async def infer_terraform_deployment_dependencies(
     )
     deps.extend(e.address for e in invocation_files.backend_configs)
     deps.extend(e.address for e in invocation_files.vars_files)
-    if invocation_files.lockfile:
-        deps.append(invocation_files.lockfile.address)
+    # lockfile is attached to the module itself
 
     return InferredDependencies(deps)
 
