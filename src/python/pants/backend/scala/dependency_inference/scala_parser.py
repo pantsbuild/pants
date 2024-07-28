@@ -375,7 +375,7 @@ async def setup_scala_parser_classfiles(
 
     parser_source = FileContent("ScalaParser.scala", parser_source_content)
 
-    scala_artifacts = Get(
+    scala_artifacts = await Get(
         ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(_PARSER_SCALA_VERSION)
     )
 
