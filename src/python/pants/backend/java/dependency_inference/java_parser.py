@@ -20,9 +20,8 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel, JvmToolBase
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -200,28 +199,26 @@ async def build_processors(jdk: InternalJdk) -> JavaParserCompiledClassfiles:
     return JavaParserCompiledClassfiles(digest=stripped_classfiles_digest)
 
 
-@rule
-def generate_java_parser_lockfile_request(
-    _: JavaParserToolLockfileSentinel,
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool(
-        artifact_inputs=FrozenOrderedSet(
-            {
+class JavaParser(JvmToolBase):
+    options_scope = "java_parser"
+    help = "Internal tool for parsing JVM sources to identify dependencies"
+
+    default_artifacts = (
                 "com.fasterxml.jackson.core:jackson-databind:2.12.4",
                 "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.12.4",
                 "com.github.javaparser:javaparser-symbol-solver-core:3.25.5",
-            }
-        ),
-        artifact_option_name="n/a",
-        lockfile_option_name="n/a",
-        resolve_name=JavaParserToolLockfileSentinel.resolve_name,
-        read_lockfile_dest=DEFAULT_TOOL_LOCKFILE,
-        write_lockfile_dest="src/python/pants/backend/java/dependency_inference/java_parser.lock",
-        default_lockfile_resource=(
-            "pants.backend.java.dependency_inference",
-            "java_parser.lock",
-        ),
     )
+    default_lockfile_resource = (
+        "pants.backend.java.dependency_inference",
+        "java_parser.lock",
+    )
+
+
+@rule
+def generate_java_parser_lockfile_request(
+    _: JavaParserToolLockfileSentinel, tool: JavaParser
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():
