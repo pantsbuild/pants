@@ -20,7 +20,7 @@ from pants.jvm.jdk_rules import InternalJdk, JdkEnvironment, JdkRequest, JvmProc
 from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel, JvmToolBase
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -298,28 +298,27 @@ async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompil
     return KotlinParserCompiledClassfiles(digest=stripped_classfiles_digest)
 
 
-@rule
-def generate_kotlin_parser_lockfile_request(
-    _: KotlinParserToolLockfileSentinel,
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool(
-        artifact_inputs=FrozenOrderedSet(
-            {
-                f"org.jetbrains.kotlin:kotlin-compiler:{_PARSER_KOTLIN_VERSION}",
-                f"org.jetbrains.kotlin:kotlin-stdlib:{_PARSER_KOTLIN_VERSION}",
+class KotlinParser(JvmToolBase):
+    options_scope = "kotlin_parser"
+    help = "Internal tool for parsing Kotlin sources to identify dependencies"
+
+    default_version = _PARSER_KOTLIN_VERSION
+    default_artifacts = (
+                "org.jetbrains.kotlin:kotlin-compiler:{version}",
+                "org.jetbrains.kotlin:kotlin-stdlib:{version}",
                 "com.google.code.gson:gson:2.9.0",
-            }
-        ),
-        artifact_option_name="n/a",
-        lockfile_option_name="n/a",
-        resolve_name=KotlinParserToolLockfileSentinel.resolve_name,
-        read_lockfile_dest=DEFAULT_TOOL_LOCKFILE,
-        write_lockfile_dest="src/python/pants/backend/kotlin/dependency_inference/kotlin_parser.lock",
-        default_lockfile_resource=(
+    )
+    default_lockfile_resource = (
             "pants.backend.kotlin.dependency_inference",
             "kotlin_parser.lock",
-        ),
-    )
+        )
+
+
+@rule
+def generate_kotlin_parser_lockfile_request(
+    _: KotlinParserToolLockfileSentinel, tool: KotlinParser
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():
