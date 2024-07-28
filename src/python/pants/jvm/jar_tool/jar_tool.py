@@ -11,7 +11,7 @@ from typing import Iterable, Mapping
 import pkg_resources
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -35,7 +35,6 @@ from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 @unique
@@ -279,16 +278,20 @@ async def build_jar_tool(jdk: InternalJdk) -> JarToolCompiledClassfiles:
     )
     return JarToolCompiledClassfiles(digest=stripped_classfiles_digest)
 
+
 class JarTool(JvmToolBase):
     options_scope = "jar_tool"
-    help = ""
+    help = "The Java Archive Tool"
 
     default_artifacts = (
-       "args4j:args4j:2.33",
-       "com.google.code.findbugs:jsr305:3.0.2",
-       "com.google.guava:guava:18.0",
+        "args4j:args4j:2.33",
+        "com.google.code.findbugs:jsr305:3.0.2",
+        "com.google.guava:guava:18.0",
     )
-    default_lockfile_resource = ("pants.jvm.jar_tool", "jar_tool.lock",)
+    default_lockfile_resource = (
+        "pants.jvm.jar_tool",
+        "jar_tool.lock",
+    )
 
 
 @rule

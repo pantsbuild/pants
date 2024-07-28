@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import pkg_resources
 
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, DigestContents, Directory, FileContent
 from pants.engine.internals.native_engine import MergeDigests, RemovePrefix
@@ -20,7 +20,11 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel, JvmToolBase
+from pants.jvm.resolve.jvm_tool import (
+    GenerateJvmLockfileFromTool,
+    GenerateJvmToolLockfileSentinel,
+    JvmToolBase,
+)
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -204,9 +208,9 @@ class JavaParser(JvmToolBase):
     help = "Internal tool for parsing JVM sources to identify dependencies"
 
     default_artifacts = (
-                "com.fasterxml.jackson.core:jackson-databind:2.12.4",
-                "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.12.4",
-                "com.github.javaparser:javaparser-symbol-solver-core:3.25.5",
+        "com.fasterxml.jackson.core:jackson-databind:2.12.4",
+        "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.12.4",
+        "com.github.javaparser:javaparser-symbol-solver-core:3.25.5",
     )
     default_lockfile_resource = (
         "pants.backend.java.dependency_inference",

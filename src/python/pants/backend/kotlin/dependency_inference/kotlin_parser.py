@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from typing import Any, Iterator
 
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import CreateDigest, DigestContents, Directory, FileContent
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, RemovePrefix
@@ -20,10 +20,13 @@ from pants.jvm.jdk_rules import InternalJdk, JdkEnvironment, JdkRequest, JvmProc
 from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel, JvmToolBase
+from pants.jvm.resolve.jvm_tool import (
+    GenerateJvmLockfileFromTool,
+    GenerateJvmToolLockfileSentinel,
+    JvmToolBase,
+)
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.resources import read_resource
 
 _PARSER_KOTLIN_VERSION = "1.6.20"
@@ -304,14 +307,14 @@ class KotlinParser(JvmToolBase):
 
     default_version = _PARSER_KOTLIN_VERSION
     default_artifacts = (
-                "org.jetbrains.kotlin:kotlin-compiler:{version}",
-                "org.jetbrains.kotlin:kotlin-stdlib:{version}",
-                "com.google.code.gson:gson:2.9.0",
+        "org.jetbrains.kotlin:kotlin-compiler:{version}",
+        "org.jetbrains.kotlin:kotlin-stdlib:{version}",
+        "com.google.code.gson:gson:2.9.0",
     )
     default_lockfile_resource = (
-            "pants.backend.kotlin.dependency_inference",
-            "kotlin_parser.lock",
-        )
+        "pants.backend.kotlin.dependency_inference",
+        "kotlin_parser.lock",
+    )
 
 
 @rule
