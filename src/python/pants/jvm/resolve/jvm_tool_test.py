@@ -17,7 +17,7 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as util_rules
-from pants.option.scope import ScopedOptions, Scope
+from pants.option.scope import Scope, ScopedOptions
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 
