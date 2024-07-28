@@ -254,7 +254,7 @@ async def setup_kotlin_parser_classfiles(
                         Coordinate(
                             group="org.jetbrains.kotlin",
                             artifact="kotlin-compiler-embeddable",
-                            version=tool.version
+                            version=tool.version,
                         ),
                     ]
                 ),
@@ -262,7 +262,9 @@ async def setup_kotlin_parser_classfiles(
         ),
         Get(
             ToolClasspath,
-            ToolClasspathRequest(prefix="__parsercp", lockfile=(GenerateJvmLockfileFromTool.create(tool))),
+            ToolClasspathRequest(
+                prefix="__parsercp", lockfile=(GenerateJvmLockfileFromTool.create(tool))
+            ),
         ),
         Get(Digest, CreateDigest([parser_source, Directory(dest_dir)])),
     )
