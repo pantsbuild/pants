@@ -14,7 +14,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel, JvmToolBase
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -158,26 +158,24 @@ async def build_processors(jdk: InternalJdk) -> StripJarCompiledClassfiles:
     return StripJarCompiledClassfiles(digest=stripped_classfiles_digest)
 
 
+class StripJarTool(JvmToolBase):
+    options_scope = "strip_jar"
+    help = ""
+
+    default_version = "0.16"
+    default_artifacts = (
+        "io.github.zlika:reproducible-build-maven-plugin:{version}",
+    )
+    default_lockfile_resource = (
+    "pants.jvm.strip_jar",
+    "strip_jar.lock"
+    )
+
 @rule
 def generate_strip_jar_lockfile_request(
-    _: StripJarToolLockfileSentinel,
+    _: StripJarToolLockfileSentinel, tool: StripJarTool
 ) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool(
-        artifact_inputs=FrozenOrderedSet(
-            {
-                "io.github.zlika:reproducible-build-maven-plugin:0.16",
-            }
-        ),
-        artifact_option_name="n/a",
-        lockfile_option_name="n/a",
-        resolve_name=StripJarToolLockfileSentinel.resolve_name,
-        read_lockfile_dest=DEFAULT_TOOL_LOCKFILE,
-        write_lockfile_dest="src/python/pants/jvm/strip_jar/strip_jar.lock",
-        default_lockfile_resource=(
-            "pants.jvm.strip_jar",
-            "strip_jar.lock",
-        ),
-    )
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():
