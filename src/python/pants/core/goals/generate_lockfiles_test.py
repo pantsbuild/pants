@@ -25,7 +25,6 @@ from pants.core.goals.generate_lockfiles import (
     AmbiguousResolveNamesError,
     GenerateLockfile,
     GenerateLockfileWithEnvironments,
-    GenerateToolLockfileSentinel,
     KnownUserResolveNames,
     LockfileDiff,
     LockfileDiffPrinter,
@@ -48,15 +47,6 @@ from pants.util.strutil import softwrap
 
 
 def test_determine_tool_sentinels_to_generate() -> None:
-    class Tool1(GenerateToolLockfileSentinel):
-        resolve_name = "tool1"
-
-    class Tool2(GenerateToolLockfileSentinel):
-        resolve_name = "tool2"
-
-    class Tool3(GenerateToolLockfileSentinel):
-        resolve_name = "tool3"
-
     class Lang1Requested(RequestedUserResolveNames):
         pass
 
@@ -73,50 +63,26 @@ def test_determine_tool_sentinels_to_generate() -> None:
     def assert_chosen(
         requested: set[str],
         expected_user_resolves: list[RequestedUserResolveNames],
-        expected_tools: list[type[GenerateToolLockfileSentinel]],
     ) -> None:
-        user_resolves, tools = determine_resolves_to_generate(
-            [lang1_resolves, lang2_resolves], [Tool1, Tool2, Tool3], requested
+        user_resolves = determine_resolves_to_generate(
+            [lang1_resolves, lang2_resolves], requested
         )
         assert user_resolves == expected_user_resolves
-        assert tools == expected_tools
 
     assert_chosen(
-        {Tool2.resolve_name, "u2"},
+        {"u2"},
         expected_user_resolves=[Lang1Requested(["u2"])],
-        expected_tools=[Tool2],
-    )
-    assert_chosen(
-        {Tool1.resolve_name, Tool3.resolve_name},
-        expected_user_resolves=[],
-        expected_tools=[Tool1, Tool3],
     )
 
     # If none are specifically requested, return all.
     assert_chosen(
         set(),
         expected_user_resolves=[Lang1Requested(["u1", "u2"]), Lang2Requested(["u3"])],
-        expected_tools=[Tool1, Tool2, Tool3],
     )
 
     with pytest.raises(UnrecognizedResolveNamesError):
-        assert_chosen({"fake"}, expected_user_resolves=[], expected_tools=[])
+        assert_chosen({"fake"}, expected_user_resolves=[])
 
-    class AmbiguousTool(GenerateToolLockfileSentinel):
-        resolve_name = "ambiguous"
-
-    # Let a user resolve shadow a tool resolve with the same name.
-    assert determine_resolves_to_generate(
-        [
-            KnownUserResolveNames(
-                ("ambiguous",),
-                "[lang].resolves",
-                requested_resolve_names_cls=Lang1Requested,
-            )
-        ],
-        [AmbiguousTool],
-        set(),
-    ) == ([Lang1Requested(["ambiguous"])], [])
 
     # Error if the same resolve name is used for multiple user lockfiles.
     with pytest.raises(AmbiguousResolveNamesError):
@@ -133,7 +99,6 @@ def test_determine_tool_sentinels_to_generate() -> None:
                     requested_resolve_names_cls=Lang1Requested,
                 ),
             ],
-            [],
             set(),
         )
 
