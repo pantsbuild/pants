@@ -1,5 +1,20 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+"""
+# Terraform
+
+## Caching: Pants uses the [provider cache](https://developer.hashicorp.com/terraform/cli/config/config-file#provider-plugin-cache) for caching providers.
+These are the things that need to be downloaded, so this provides the most speedup.
+We use the providers cache instead of identifying and caching the providers individually for a few reasons:
+1. This leverages Terraform's existing caching mechanism
+2. This is much simpler
+3. This incurs almost no overhead, since it is done as part of `terraform init`. We don't need to run more analysers or separately download providers
+
+We didn't use `terraform providers lock` for a few reasons:
+1. `terraform providers lock` isn't designed for this usecase, it's designedto create mirrors of providers. It does more work (to set up manifests) and would require us to set more config settings
+2. `terraform providers lock` doesn't use itself as a cache. So every time we would want to refresh the cache, we need to download _everything_ again. Even if nothing has changed.
+"""
+
 from __future__ import annotations
 
 import os
