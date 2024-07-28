@@ -423,11 +423,13 @@ async def setup_terraform_process(
         path.append(user_path)
     path.append(extra_bins.path_component)
 
-    env = {
-        **env,
-        "PATH": ":".join(path),
-        "TF_PLUGIN_CACHE_DIR": (os.path.join("{chroot}", terraform.plugin_cache_dir)),
-    }
+    env = EnvironmentVars(
+        {
+            **env,
+            "PATH": ":".join(path),
+            "TF_PLUGIN_CACHE_DIR": (os.path.join("{chroot}", terraform.plugin_cache_dir)),
+        }
+    )
 
     immutable_input_digests = {
         "__terraform": downloaded_terraform.digest,
