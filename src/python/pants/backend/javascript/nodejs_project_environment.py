@@ -142,8 +142,8 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
         Process,
         NodeJSToolProcess,
         NodeJSToolProcess(
-            tool=req.env.project.package_manager,
-            tool_version=req.env.project.package_manager_version,
+            tool=req.env.project.package_manager.name,
+            tool_version=req.env.project.package_manager.version,
             args=args,
             description=req.description,
             level=req.level,
