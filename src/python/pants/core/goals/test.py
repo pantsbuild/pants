@@ -891,6 +891,10 @@ async def run_tests(
         no_applicable_targets_behavior = NoApplicableTargetsBehavior.warn
 
     shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")
+
+    # Here we somehow need to get the resolve of each target, then pass it down to the module_mapper** 
+    # *How will this work if a target belongs to multiple resolves?
+    # *How will this impact caching?
     targets_to_valid_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(

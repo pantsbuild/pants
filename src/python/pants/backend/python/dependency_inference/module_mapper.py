@@ -22,6 +22,7 @@ from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
     DEFAULT_TYPE_STUB_MODULE_PATTERN_MAPPING,
 )
+from pants.backend.python.dependency_inference.subsystem import AmbiguityResolution, PythonInferSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
@@ -46,6 +47,10 @@ logger = logging.getLogger(__name__)
 
 ResolveName = str
 
+# This sort key supports `None` resolves
+def resolve_sort_key(item):
+    key, value = item
+    return (key is None, key)
 
 @total_ordering
 class ModuleProviderType(enum.Enum):
@@ -126,7 +131,7 @@ class FirstPartyPythonMappingImpl(
                     (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
                 ),
             )
-            for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
+            for resolve, mapping in sorted(resolves_to_modules_to_providers.items(), key=resolve_sort_key)
         )
 
 
@@ -224,7 +229,7 @@ async def merge_first_party_module_mappings(
                     (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
                 ),
             )
-            for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
+            for resolve, mapping in sorted(resolves_to_modules_to_providers.items(), key=resolve_sort_key)
         )
     )
 
@@ -404,7 +409,7 @@ async def map_third_party_modules_to_addresses(
                     (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
                 ),
             )
-            for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
+            for resolve, mapping in sorted(resolves_to_modules_to_providers.items(), key=resolve_sort_key)
         )
     )
 
@@ -452,11 +457,14 @@ class PythonModuleOwnersRequest:
 @rule
 async def map_module_to_address(
     request: PythonModuleOwnersRequest,
+    python_infer_subsystem: PythonInferSubsystem, 
     first_party_mapping: FirstPartyPythonModuleMapping,
     third_party_mapping: ThirdPartyPythonModuleMapping,
 ) -> PythonModuleOwners:
     possible_providers: tuple[PossibleModuleProvider, ...] = (
+        *third_party_mapping.providers_for_module(request.module, resolve=None),
         *third_party_mapping.providers_for_module(request.module, resolve=request.resolve),
+        *first_party_mapping.providers_for_module(request.module, resolve=None),
         *first_party_mapping.providers_for_module(request.module, resolve=request.resolve),
     )
 
@@ -478,6 +486,11 @@ async def map_module_to_address(
         # that caused that check to pass.
         if possible_provider.ancestry == val[0]:
             val[1].append(possible_provider.provider)
+
+    if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root_with_resolve_override:
+        # Check if the 3rd party dependency exists in the resolve of the top most target
+        # Which requires the resolve to be passed down in the graph
+        pass
 
     if request.locality:
         # For each provider type, if we have more than one provider left, prefer

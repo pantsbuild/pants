@@ -136,7 +136,7 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     enable_resolves = BoolOption(
-        default=False,
+        default=True,
         help=softwrap(
             """
             Set to true to enable lockfiles for user code. See `[python].resolves` for an
@@ -157,7 +157,7 @@ class PythonSetup(Subsystem):
         mutually_exclusive_group="lockfile",
     )
     resolves = DictOption[str](
-        default={"python-default": "3rdparty/python/default.lock"},
+        default={},
         help=softwrap(
             f"""
             A mapping of logical names to lockfile paths used in your project.
@@ -187,18 +187,7 @@ class PythonSetup(Subsystem):
                 `python_test` / `python_tests`, and `pex_binary` which need to set a non-default\
                 resolve with the `resolve` field.
 
-            If a target can work with multiple resolves, you can either use the `parametrize`
-            mechanism or manually create a distinct target per resolve. See {doc_url("docs/using-pants/key-concepts/targets-and-build-files")}
-            for information about `parametrize`.
-
-            For example:
-
-                python_sources(
-                    resolve=parametrize("data-science", "web-app"),
-                )
-
-            You can name the lockfile paths what you would like; Pants does not expect a
-            certain file extension or location.
+            By default, a target does not belong to a resolve (resolve=None) and can be used by any other resolves
 
             Only applies if `[python].enable_resolves` is true.
             """
@@ -206,7 +195,7 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     default_resolve = StrOption(
-        default="python-default",
+        default=None,
         help=softwrap(
             """
             The default value used for the `resolve` field.
@@ -578,7 +567,7 @@ class PythonSetup(Subsystem):
         result = {}
         unrecognized_resolves = []
         for resolve, ics in self._resolves_to_interpreter_constraints.items():
-            if resolve not in self.resolves:
+            if resolve is not None and resolve not in self.resolves:
                 unrecognized_resolves.append(resolve)
             result[resolve] = tuple(ics)
         if unrecognized_resolves:

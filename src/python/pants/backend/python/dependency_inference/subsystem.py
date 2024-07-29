@@ -32,6 +32,7 @@ class AmbiguityResolution(Enum):
 
     none = "none"
     by_source_root = "by_source_root"
+    by_source_root_with_resolve_override = "by_source_root_with_resolve_override"
 
 
 class PythonInferSubsystem(Subsystem):
@@ -165,6 +166,10 @@ class PythonInferSubsystem(Subsystem):
             This is useful when multiple projects in different source roots provide the same
             symbols (because of repeated first-party module paths or overlapping
             requirements.txt) and you want to resolve the ambiguity locally in each project.
+
+            `{AmbiguityResolution.by_source_root_with_resolve_override.value}`:  Looks for a provider in the same resolve 
+            as the target file being executed, otherwise falls back to `by_source_root`. This is 
+            useful when you want to override dependencies of a first-party library.
             """
         ),
     )
