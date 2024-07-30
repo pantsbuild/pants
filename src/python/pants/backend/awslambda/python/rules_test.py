@@ -184,6 +184,7 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
         Address("src/py/project", target_name="lambda"),
         expected_extra_log_lines=(
             "    Runtime: python3.7",
+            f"    Architecture: {AWSLambdaArchitecture.X86_64.value}",
             "    Handler: lambda_function.handler",
         ),
     )

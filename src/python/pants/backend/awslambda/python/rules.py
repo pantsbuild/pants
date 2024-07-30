@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from pants.backend.awslambda.python.aws_architecture import AWSLambdaArchitecture
+from pants.backend.awslambda.python.aws_architecture import AWSLambdaArchitectureField
 from pants.backend.awslambda.python.target_types import (
     PythonAWSLambda,
     PythonAwsLambdaHandlerField,
@@ -50,7 +50,7 @@ class PythonAwsLambdaFieldSet(_BaseFieldSet):
     required_fields = (PythonAwsLambdaHandlerField,)
 
     handler: PythonAwsLambdaHandlerField
-    architecture: AWSLambdaArchitecture = AWSLambdaArchitecture.X86_64
+    architecture: AWSLambdaArchitectureField
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,7 @@ class PythonAwsLambdaLayerFieldSet(_BaseFieldSet):
 
     dependencies: PythonAwsLambdaLayerDependenciesField
     include_sources: PythonAwsLambdaIncludeSources
-    architecture: AWSLambdaArchitecture = AWSLambdaArchitecture.X86_64
+    architecture: AWSLambdaArchitectureField
 
 
 @rule(desc="Create Python AWS Lambda Function", level=LogLevel.DEBUG)

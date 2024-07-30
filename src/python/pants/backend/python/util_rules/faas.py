@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Optional, cast
 
-from pants.backend.awslambda.python.aws_architecture import AWSLambdaArchitecture
+from pants.backend.awslambda.python.aws_architecture import AWSLambdaArchitecture, AWSLambdaArchitectureField
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
@@ -466,7 +466,7 @@ class BuildPythonFaaSRequest:
     log_only_reexported_handler_func: bool = False
 
     prefix_in_artifact: None | str = None
-    architecture: AWSLambdaArchitecture = AWSLambdaArchitecture.X86_64
+    architecture: AWSLambdaArchitectureField
 
 
 @rule
@@ -570,8 +570,7 @@ async def build_python_faas(
             f"    Runtime: {request.runtime.from_interpreter_version(*platforms.interpreter_version)}"
         )
 
-    if request.architecture:
-        extra_log_lines.append(f"    Architecture: {request.architecture.value}")
+    extra_log_lines.append(f"    Architecture: {request.architecture.value}")
 
     if reexported_handler_func is not None:
         if request.log_only_reexported_handler_func:
