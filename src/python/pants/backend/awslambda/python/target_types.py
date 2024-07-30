@@ -109,10 +109,15 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         PythonFaaSKnownRuntime(3, 6, "3.6"),
         PythonFaaSKnownRuntime(3, 7, "3.7"),
         PythonFaaSKnownRuntime(3, 8, "3.8-x86_64"),
+        PythonFaaSKnownRuntime(3, 8, "3.8-arm64"),
         PythonFaaSKnownRuntime(3, 9, "3.9-x86_64"),
+        PythonFaaSKnownRuntime(3, 9, "3.9-arm64"),
         PythonFaaSKnownRuntime(3, 10, "3.10-x86_64"),
+        PythonFaaSKnownRuntime(3, 10, "3.10-arm64"),
         PythonFaaSKnownRuntime(3, 11, "3.11-x86_64"),
+        PythonFaaSKnownRuntime(3, 11, "3.11-arm64"),
         PythonFaaSKnownRuntime(3, 12, "3.12-x86_64"),
+        PythonFaaSKnownRuntime(3, 12, "3.12-arm64"),
     )
 
     @classmethod
