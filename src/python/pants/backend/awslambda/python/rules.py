@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from enum import Enum
 
 from pants.backend.awslambda.python.target_types import (
     PythonAWSLambda,
@@ -32,6 +33,11 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
+class PythonAwsLambdaArchitecture(str, Enum):
+    X86_64 = "x86_64"
+    ARM64 = "arm64"
+
+
 @dataclass(frozen=True)
 class _BaseFieldSet(PackageFieldSet):
     include_requirements: PythonAwsLambdaIncludeRequirements
@@ -49,6 +55,7 @@ class PythonAwsLambdaFieldSet(_BaseFieldSet):
     required_fields = (PythonAwsLambdaHandlerField,)
 
     handler: PythonAwsLambdaHandlerField
+    architecture: PythonAwsLambdaArchitecture = PythonAwsLambdaArchitecture.X86_64
 
 
 @dataclass(frozen=True)
@@ -57,6 +64,7 @@ class PythonAwsLambdaLayerFieldSet(_BaseFieldSet):
 
     dependencies: PythonAwsLambdaLayerDependenciesField
     include_sources: PythonAwsLambdaIncludeSources
+    architecture: PythonAwsLambdaArchitecture = PythonAwsLambdaArchitecture.X86_64
 
 
 @rule(desc="Create Python AWS Lambda Function", level=LogLevel.DEBUG)
