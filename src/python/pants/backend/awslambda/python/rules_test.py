@@ -425,9 +425,9 @@ def test_pex3_venv_create_extra_args_are_passed_through(
     extra_args_field = PythonFaaSPex3VenvCreateExtraArgsField(extra_args, addr)
     field_set = field_set_ty(
         address=addr,
-        architecture=Mock(),
         include_requirements=Mock(),
         runtime=Mock(),
+        architecture=Mock(),
         complete_platforms=Mock(),
         output_path=Mock(),
         environment=Mock(),
