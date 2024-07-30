@@ -33,6 +33,7 @@ struct Inner {
     // start_background_thread. The decoupling of creating the `InvalidationWatcher` and starting it
     // is to allow for testing of the background thread.
     background_task_inputs: Option<WatcherTaskInputs>,
+    precise_watches: bool,
 }
 
 type WatcherTaskInputs = (
@@ -49,6 +50,7 @@ impl InvalidationWatcher {
         executor: Executor,
         build_root: PathBuf,
         ignorer: Arc<GitignoreStyleExcludes>,
+        precise_watches: bool,
     ) -> Result<Arc<InvalidationWatcher>, String> {
         // Inotify events contain canonical paths to the files being watched.
         // If the build_root contains a symlink the paths returned in notify events
@@ -78,7 +80,7 @@ impl InvalidationWatcher {
         // recursively, so we set up that watch here and then return early when watch() is
         // called by nodes that are running. On Linux the notify crate handles adding paths to watch
         // much more efficiently so we do that instead on Linux.
-        if cfg!(target_os = "macos") {
+        if cfg!(target_os = "macos") && !precise_watches {
             watcher
                 .watch(&canonical_build_root, RecursiveMode::Recursive)
                 .map_err(|e| {
@@ -96,6 +98,7 @@ impl InvalidationWatcher {
                 liveness_sender,
                 watch_receiver,
             )),
+            precise_watches,
         }))))
     }
 
@@ -278,9 +281,10 @@ impl InvalidationWatcher {
     /// Add a path to the set of paths being watched by this invalidation watcher, non-recursively.
     ///
     pub async fn watch(self: &Arc<Self>, path: PathBuf) -> Result<(), String> {
-        if cfg!(target_os = "macos") {
+        if cfg!(target_os = "macos") && !self.0.lock().precise_watches {
             // Short circuit here if we are on a Darwin platform because we should be watching
-            // the entire build root recursively already.
+            // the entire build root recursively already and have not been configured to use
+            // precise watches.
             return Ok(());
         }
 
