@@ -1583,3 +1583,20 @@ def test_path_metadata_request(rule_runner: RuleRunner) -> None:
     assert m5.path == "sub-dir"
     assert m5.kind == PathMetadataKind.DIRECTORY
     assert m5.symlink_target is None
+
+
+def test_local_system_watch_requests(rule_runner: RuleRunner) -> None:
+    def get_metadata(path: str) -> PathMetadata | None:
+        result = rule_runner.request(PathMetadataResult, [PathMetadataRequest(path)])
+        return result.metadata
+
+    with temporary_dir() as non_buildroot_dir:
+        assert not non_buildroot_dir.startswith(rule_runner.build_root)
+        base_path = Path(non_buildroot_dir)
+        path1 = base_path / "foo.txt"
+        path1.write_text("This is a test.")
+
+        m = get_metadata(str(path1))
+        assert m is not None
+        assert m.path == str(path1)
+        assert m.kind == PathMetadataKind.FILE
