@@ -7,7 +7,10 @@ import re
 from dataclasses import dataclass
 from typing import ClassVar, Match, Optional, Tuple, cast
 
-from pants.backend.awslambda.python.aws_architecture import AWSLambdaArchitecture
+from pants.backend.awslambda.python.aws_architecture import (
+    AWSLambdaArchitecture,
+    AWSLambdaArchitectureField,
+)
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.backend.python.util_rules.faas import (
     PythonFaaSCompletePlatforms,
@@ -194,6 +197,7 @@ class PythonAWSLambda(_AWSLambdaBaseTarget):
         *_AWSLambdaBaseTarget.core_fields,
         PythonFaaSDependencies,
         PythonAwsLambdaHandlerField,
+        AWSLambdaArchitectureField,
     )
     help = help_text(
         f"""
@@ -210,6 +214,7 @@ class PythonAWSLambdaLayer(_AWSLambdaBaseTarget):
         *_AWSLambdaBaseTarget.core_fields,
         PythonAwsLambdaIncludeSources,
         PythonAwsLambdaLayerDependenciesField,
+        AWSLambdaArchitectureField,
     )
     help = help_text(
         f"""
