@@ -369,7 +369,10 @@ impl NodeKey {
     }
 
     async fn maybe_watch(&self, context: &Context) -> NodeResult<()> {
-        if let Some((path, watcher)) = self.fs_path_to_watch().zip(context.core.watcher.as_ref()) {
+        if let Some((path, watcher)) = self
+            .fs_path_to_watch()
+            .zip(context.core.buildroot_watcher.as_ref())
+        {
             let abs_path = context.core.build_root.join(path);
             watcher
                 .watch(abs_path)

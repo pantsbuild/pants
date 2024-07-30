@@ -180,7 +180,7 @@ impl Scheduler {
         let core = self.core.clone();
         self.core.executor.block_on(async move {
             // Confirm that our InvalidationWatcher is still alive.
-            if let Some(watcher) = &core.watcher {
+            if let Some(watcher) = &core.buildroot_watcher {
                 watcher.is_valid().await
             } else {
                 Ok(())

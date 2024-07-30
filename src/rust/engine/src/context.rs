@@ -70,7 +70,8 @@ pub struct Core {
     pub http_client: reqwest::Client,
     pub local_cache: PersistentCache,
     pub vfs: PosixFS,
-    pub watcher: Option<Arc<InvalidationWatcher>>,
+    pub buildroot_watcher: Option<Arc<InvalidationWatcher>>,
+    pub local_system_watcher: Option<Arc<InvalidationWatcher>>,
     pub build_root: PathBuf,
     pub local_parallelism: usize,
     pub graceful_shutdown_timeout: Duration,
@@ -664,11 +665,27 @@ impl Core {
             GitignoreStyleExcludes::create_with_gitignore_files(ignore_patterns, gitignore_files)
                 .map_err(|e| format!("Could not parse build ignore patterns: {e:?}"))?;
 
-        let watcher = if watch_filesystem {
-            let w =
-                InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
+        let buildroot_watcher = if watch_filesystem {
+            let w = InvalidationWatcher::new(
+                executor.clone(),
+                build_root.clone(),
+                ignorer.clone(),
+                false,
+            )?;
             w.start(&graph)?;
             Some(w)
+        } else {
+            None
+        };
+
+        // Create an invalidation watcher to monitor local system paths outside of the buildroot. 
+        let local_system_watcher = if watch_filesystem {
+            Some(InvalidationWatcher::new(
+                executor.clone(),
+                PathBuf::from("/"),
+                GitignoreStyleExcludes::empty(),
+                true,  // ensure recursive mode on macos is not used
+            )?)
         } else {
             None
         };
@@ -688,7 +705,8 @@ impl Core {
             vfs: PosixFS::new(&build_root, ignorer, executor)
                 .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,
             build_root,
-            watcher,
+            buildroot_watcher,
+            local_system_watcher,
             local_parallelism: exec_strategy_opts.local_parallelism,
             graceful_shutdown_timeout: exec_strategy_opts.graceful_shutdown_timeout,
             sessions,
