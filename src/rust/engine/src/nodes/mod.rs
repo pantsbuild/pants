@@ -369,15 +369,29 @@ impl NodeKey {
     }
 
     async fn maybe_watch(&self, context: &Context) -> NodeResult<()> {
-        if let Some((path, watcher)) = self
-            .fs_path_to_watch()
-            .zip(context.core.buildroot_watcher.as_ref())
-        {
-            let abs_path = context.core.build_root.join(path);
-            watcher
-                .watch(abs_path)
-                .map_err(|e| Context::mk_error(&e))
-                .await
+        if let Some(path) = self.fs_path_to_watch() {
+            let use_local_system_watcher =
+                path.is_absolute() && !path.starts_with(&context.core.build_root);
+            if use_local_system_watcher {
+                if let Some(watcher) = context.core.local_system_watcher.as_ref() {
+                    watcher
+                        .watch(path.to_path_buf())
+                        .map_err(|e| Context::mk_error(&e))
+                        .await
+                } else {
+                    Ok(())
+                }
+            } else {
+                if let Some(watcher) = context.core.buildroot_watcher.as_ref() {
+                    let abs_path = context.core.build_root.join(path);
+                    watcher
+                        .watch(abs_path)
+                        .map_err(|e| Context::mk_error(&e))
+                        .await
+                } else {
+                    Ok(())
+                }
+            }
         } else {
             Ok(())
         }
