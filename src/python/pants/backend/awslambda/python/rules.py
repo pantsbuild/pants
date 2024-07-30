@@ -6,8 +6,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from pants.backend.awslambda.python.aws_architecture import AWSLambdaArchitecture
 from pants.backend.awslambda.python.target_types import (
-    AWSLambdaArchitecture,
     PythonAWSLambda,
     PythonAwsLambdaHandlerField,
     PythonAwsLambdaIncludeRequirements,

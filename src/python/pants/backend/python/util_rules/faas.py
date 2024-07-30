@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Optional, cast
 
-from pants.backend.awslambda.python.target_types import AWSLambdaArchitecture
+from pants.backend.awslambda.python.aws_architecture import AWSLambdaArchitecture
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,

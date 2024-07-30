@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from enum import Enum
 from typing import ClassVar, Match, Optional, Tuple, cast
 
+from pants.backend.awslambda.python.aws_architecture import AWSLambdaArchitecture
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.backend.python.util_rules.faas import (
     PythonFaaSCompletePlatforms,
@@ -29,7 +29,6 @@ from pants.engine.target import (
     BoolField,
     Field,
     InvalidFieldException,
-    StringField,
     Target,
 )
 from pants.util.docutil import doc_url
@@ -86,24 +85,6 @@ class PythonAwsLambdaIncludeSources(BoolField):
         Whether to resolve first party sources and include them in the AWS Lambda artifact. This is
         most useful to allow creating a Lambda Layer with only third-party requirements.
         https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html
-        """
-    )
-
-
-class AWSLambdaArchitecture(str, Enum):  # noqa: N818
-    X86_64 = "x86_64"
-    ARM64 = "arm64"
-
-
-class AWSLambdaArchitectureField(StringField):
-    alias = "architecture"
-    valid_choices = AWSLambdaArchitecture
-    expected_type = str
-    default = AWSLambdaArchitecture.X86_64.value
-    help = help_text(
-        """
-        The architecture of the AWS Lambda runtime to target (x86_64 or arm64).
-        See https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html.
         """
     )
 
