@@ -9,6 +9,7 @@ from typing import ClassVar, Match, Optional, Tuple, cast
 
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.backend.python.util_rules.faas import (
+    FaaSArchitecture,
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
@@ -106,18 +107,18 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
     # https://gallery.ecr.aws/lambda/python
     known_runtimes_docker_repo = "public.ecr.aws/lambda/python"
     known_runtimes = (
-        PythonFaaSKnownRuntime(3, 6, "3.6"),
-        PythonFaaSKnownRuntime(3, 7, "3.7"),
-        PythonFaaSKnownRuntime(3, 8, "3.8-x86_64"),
-        PythonFaaSKnownRuntime(3, 8, "3.8-arm64"),
-        PythonFaaSKnownRuntime(3, 9, "3.9-x86_64"),
-        PythonFaaSKnownRuntime(3, 9, "3.9-arm64"),
-        PythonFaaSKnownRuntime(3, 10, "3.10-x86_64"),
-        PythonFaaSKnownRuntime(3, 10, "3.10-arm64"),
-        PythonFaaSKnownRuntime(3, 11, "3.11-x86_64"),
-        PythonFaaSKnownRuntime(3, 11, "3.11-arm64"),
-        PythonFaaSKnownRuntime(3, 12, "3.12-x86_64"),
-        PythonFaaSKnownRuntime(3, 12, "3.12-arm64"),
+        PythonFaaSKnownRuntime(3, 6, FaaSArchitecture.X86_64, "3.6"),
+        PythonFaaSKnownRuntime(3, 7, FaaSArchitecture.X86_64, "3.7"),
+        PythonFaaSKnownRuntime(3, 8, FaaSArchitecture.X86_64, "3.8-x86_64"),
+        PythonFaaSKnownRuntime(3, 8, FaaSArchitecture.ARM64, "3.8-arm64"),
+        PythonFaaSKnownRuntime(3, 9, FaaSArchitecture.X86_64, "3.9-x86_64"),
+        PythonFaaSKnownRuntime(3, 9, FaaSArchitecture.ARM64, "3.9-arm64"),
+        PythonFaaSKnownRuntime(3, 10, FaaSArchitecture.X86_64, "3.10-x86_64"),
+        PythonFaaSKnownRuntime(3, 10, FaaSArchitecture.ARM64, "3.10-arm64"),
+        PythonFaaSKnownRuntime(3, 11, FaaSArchitecture.X86_64, "3.11-x86_64"),
+        PythonFaaSKnownRuntime(3, 11, FaaSArchitecture.ARM64, "3.11-arm64"),
+        PythonFaaSKnownRuntime(3, 12, FaaSArchitecture.X86_64, "3.12-x86_64"),
+        PythonFaaSKnownRuntime(3, 12, FaaSArchitecture.ARM64, "3.12-arm64"),
     )
 
     @classmethod

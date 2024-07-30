@@ -295,6 +295,7 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
 class PythonFaaSKnownRuntime:
     major: int
     minor: int
+    architecture: FaaSArchitecture
     tag: str
 
     def file_name(self) -> str:
@@ -429,7 +430,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         file_name = next(
             rt.file_name()
             for rt in request.runtime.known_runtimes
-            if version == (rt.major, rt.minor)
+            if version == (rt.major, rt.minor) and request.architecture == rt.architecture
         )
     except StopIteration:
         # Not a known runtime, so fallback to just passing a platform
