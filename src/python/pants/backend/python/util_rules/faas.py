@@ -428,8 +428,10 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         file_name = next(
             rt.file_name()
             for rt in request.runtime.known_runtimes
-            if version == (rt.major, rt.minor) and (
-                request.aws_architecture is None or request.aws_architecture.value == rt.aws_architecture
+            if version == (rt.major, rt.minor)
+            and (
+                request.aws_architecture is None
+                or request.aws_architecture.value == rt.aws_architecture
             )
         )
     except StopIteration:
