@@ -7,6 +7,7 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.awslambda.python.target_types import (
+    AWSLambdaArchitecture,
     PythonAWSLambda,
     PythonAwsLambdaHandlerField,
     PythonAwsLambdaIncludeRequirements,
@@ -17,7 +18,6 @@ from pants.backend.awslambda.python.target_types import (
 )
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
-    FaaSArchitecture,
     PythonFaaSCompletePlatforms,
     PythonFaaSLayoutField,
     PythonFaaSPex3VenvCreateExtraArgsField,
@@ -50,7 +50,7 @@ class PythonAwsLambdaFieldSet(_BaseFieldSet):
     required_fields = (PythonAwsLambdaHandlerField,)
 
     handler: PythonAwsLambdaHandlerField
-    architecture: FaaSArchitecture = FaaSArchitecture.X86_64
+    architecture: AWSLambdaArchitecture = AWSLambdaArchitecture.X86_64
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,7 @@ class PythonAwsLambdaLayerFieldSet(_BaseFieldSet):
 
     dependencies: PythonAwsLambdaLayerDependenciesField
     include_sources: PythonAwsLambdaIncludeSources
-    architecture: FaaSArchitecture = FaaSArchitecture.X86_64
+    architecture: AWSLambdaArchitecture = AWSLambdaArchitecture.X86_64
 
 
 @rule(desc="Create Python AWS Lambda Function", level=LogLevel.DEBUG)

@@ -9,10 +9,10 @@ import logging
 import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 from typing import ClassVar, Optional, cast
 
+from pants.backend.awslambda.python.target_types import AWSLambdaArchitecture
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
@@ -68,11 +68,6 @@ from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
-
-
-class FaaSArchitecture(str, Enum):
-    X86_64 = "x86_64"
-    ARM64 = "arm64"
 
 
 class PythonFaaSLayoutField(StringField):
@@ -295,8 +290,8 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
 class PythonFaaSKnownRuntime:
     major: int
     minor: int
-    architecture: FaaSArchitecture
     tag: str
+    aws_architecture: Optional[AWSLambdaArchitecture] = None
 
     def file_name(self) -> str:
         return f"complete_platform_{self.tag}.json"
@@ -359,7 +354,7 @@ class RuntimePlatformsRequest:
 
     runtime: PythonFaaSRuntimeField
     complete_platforms: PythonFaaSCompletePlatforms
-    architecture: FaaSArchitecture = FaaSArchitecture.X86_64
+    architecture: AWSLambdaArchitecture = AWSLambdaArchitecture.X86_64
 
 
 @dataclass(frozen=True)
@@ -430,7 +425,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         file_name = next(
             rt.file_name()
             for rt in request.runtime.known_runtimes
-            if version == (rt.major, rt.minor) and request.architecture == rt.architecture
+            if version == (rt.major, rt.minor) and request.architecture == rt.aws_architecture
         )
     except StopIteration:
         # Not a known runtime, so fallback to just passing a platform
@@ -471,7 +466,7 @@ class BuildPythonFaaSRequest:
     log_only_reexported_handler_func: bool = False
 
     prefix_in_artifact: None | str = None
-    architecture: FaaSArchitecture = FaaSArchitecture.X86_64
+    architecture: AWSLambdaArchitecture = AWSLambdaArchitecture.X86_64
 
 
 @rule

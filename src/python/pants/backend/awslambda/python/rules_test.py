@@ -21,7 +21,11 @@ from pants.backend.awslambda.python.rules import (
     package_python_aws_lambda_layer,
 )
 from pants.backend.awslambda.python.rules import rules as awslambda_python_rules
-from pants.backend.awslambda.python.target_types import PythonAWSLambda, PythonAWSLambdaLayer
+from pants.backend.awslambda.python.target_types import (
+    AWSLambdaArchitecture,
+    PythonAWSLambda,
+    PythonAWSLambdaLayer,
+)
 from pants.backend.awslambda.python.target_types import rules as target_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -33,7 +37,6 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
-    FaaSArchitecture,
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
 )
@@ -201,14 +204,25 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
 @pytest.mark.parametrize(
     ("ics", "runtime", "architecture"),
     [
-        pytest.param(["==3.7.*"], None, FaaSArchitecture.X86_64, id="runtime inferred from ICs, x86_64"),
-        pytest.param(None, "python3.7", FaaSArchitecture.X86_64, id="runtime explicitly set, x86_64"),
-        pytest.param(["==3.7.*"], None, FaaSArchitecture.ARM64, id="runtime inferred from ICs, ARM64"),
-        pytest.param(None, "python3.7", FaaSArchitecture.ARM64, id="runtime explicitly set, ARM64"),
+        pytest.param(
+            ["==3.7.*"], None, AWSLambdaArchitecture.X86_64, id="runtime inferred from ICs, x86_64"
+        ),
+        pytest.param(
+            None, "python3.7", AWSLambdaArchitecture.X86_64, id="runtime explicitly set, x86_64"
+        ),
+        pytest.param(
+            ["==3.7.*"], None, AWSLambdaArchitecture.ARM64, id="runtime inferred from ICs, ARM64"
+        ),
+        pytest.param(
+            None, "python3.7", AWSLambdaArchitecture.ARM64, id="runtime explicitly set, ARM64"
+        ),
     ],
 )
 def test_create_hello_world_lambda(
-    ics: list[str] | None, runtime: None | str, architecture: FaaSArchitecture, rule_runner: PythonRuleRunner
+    ics: list[str] | None,
+    runtime: None | str,
+    architecture: AWSLambdaArchitecture,
+    rule_runner: PythonRuleRunner,
 ) -> None:
     rule_runner.write_files(
         {
