@@ -203,16 +203,28 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     ("ics", "runtime", "architecture"),
     [
         pytest.param(
-            ["==3.7.*"], None, AWSLambdaArchitecture.X86_64, id="runtime inferred from ICs, x86_64 architecture"
+            ["==3.7.*"],
+            None,
+            AWSLambdaArchitecture.X86_64,
+            id="runtime inferred from ICs, x86_64 architecture",
         ),
         pytest.param(
-            None, "python3.7", AWSLambdaArchitecture.X86_64, id="runtime explicitly set, x86_64 architecture"
+            None,
+            "python3.7",
+            AWSLambdaArchitecture.X86_64,
+            id="runtime explicitly set, x86_64 architecture",
         ),
         pytest.param(
-            ["==3.7.*"], None, AWSLambdaArchitecture.ARM64, id="runtime inferred from ICs, ARM64 architecture"
+            ["==3.7.*"],
+            None,
+            AWSLambdaArchitecture.ARM64,
+            id="runtime inferred from ICs, ARM64 architecture",
         ),
         pytest.param(
-            None, "python3.7", AWSLambdaArchitecture.ARM64, id="runtime explicitly set, ARM64 architecture"
+            None,
+            "python3.7",
+            AWSLambdaArchitecture.ARM64,
+            id="runtime explicitly set, ARM64 architecture",
         ),
     ],
 )
@@ -298,7 +310,9 @@ def test_create_hello_world_lambda(
     "architecture",
     AWSLambdaArchitecture.__members__.values(),
 )
-def test_create_hello_world_layer(rule_runner: PythonRuleRunner, architecture: AWSLambdaArchitecture) -> None:
+def test_create_hello_world_layer(
+    rule_runner: PythonRuleRunner, architecture: AWSLambdaArchitecture
+) -> None:
     rule_runner.write_files(
         {
             "src/python/foo/bar/hello_world.py": dedent(
