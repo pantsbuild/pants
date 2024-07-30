@@ -678,13 +678,13 @@ impl Core {
             None
         };
 
-        // Create an invalidation watcher to monitor local system paths outside of the buildroot. 
+        // Create an invalidation watcher to monitor local system paths outside of the buildroot.
         let local_system_watcher = if watch_filesystem {
             Some(InvalidationWatcher::new(
                 executor.clone(),
                 PathBuf::from("/"),
                 GitignoreStyleExcludes::empty(),
-                true,  // ensure recursive mode on macos is not used
+                true, // ensure recursive mode on macos is not used
             )?)
         } else {
             None
