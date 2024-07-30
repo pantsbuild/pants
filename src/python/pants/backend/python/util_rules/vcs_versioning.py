@@ -70,7 +70,7 @@ async def generate_python_from_setuptools_scm(
             softwrap(
                 f"""
                 Trying to determine the version for the {request.protocol_target.address} target at
-                {request.protocol_target.address}, but you are not running in a git worktree.
+                {request.protocol_target.address}, but {maybe_git_worktree.failure_reason}.
                 """
             )
         )
