@@ -9,6 +9,7 @@ import logging
 import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import ClassVar, Optional, cast
 
@@ -67,6 +68,11 @@ from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class FaaSArchitecture(str, Enum):
+    X86_64 = "x86_64"
+    ARM64 = "arm64"
 
 
 class PythonFaaSLayoutField(StringField):
@@ -352,6 +358,7 @@ class RuntimePlatformsRequest:
 
     runtime: PythonFaaSRuntimeField
     complete_platforms: PythonFaaSCompletePlatforms
+    architecture: FaaSArchitecture = FaaSArchitecture.X86_64
 
 
 @dataclass(frozen=True)
@@ -463,6 +470,7 @@ class BuildPythonFaaSRequest:
     log_only_reexported_handler_func: bool = False
 
     prefix_in_artifact: None | str = None
+    architecture: FaaSArchitecture = FaaSArchitecture.X86_64
 
 
 @rule
@@ -485,6 +493,7 @@ async def build_python_faas(
             address=request.address,
             target_name=request.target_name,
             runtime=request.runtime,
+            architecture=request.architecture,
             complete_platforms=request.complete_platforms,
         ),
     )

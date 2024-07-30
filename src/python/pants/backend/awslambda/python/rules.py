@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
 
 from pants.backend.awslambda.python.target_types import (
     PythonAWSLambda,
@@ -18,6 +17,7 @@ from pants.backend.awslambda.python.target_types import (
 )
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
+    FaaSArchitecture,
     PythonFaaSCompletePlatforms,
     PythonFaaSLayoutField,
     PythonFaaSPex3VenvCreateExtraArgsField,
@@ -31,11 +31,6 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
-
-
-class PythonAwsLambdaArchitecture(str, Enum):
-    X86_64 = "x86_64"
-    ARM64 = "arm64"
 
 
 @dataclass(frozen=True)
@@ -55,7 +50,7 @@ class PythonAwsLambdaFieldSet(_BaseFieldSet):
     required_fields = (PythonAwsLambdaHandlerField,)
 
     handler: PythonAwsLambdaHandlerField
-    architecture: PythonAwsLambdaArchitecture = PythonAwsLambdaArchitecture.X86_64
+    architecture: FaaSArchitecture = FaaSArchitecture.X86_64
 
 
 @dataclass(frozen=True)
@@ -64,7 +59,7 @@ class PythonAwsLambdaLayerFieldSet(_BaseFieldSet):
 
     dependencies: PythonAwsLambdaLayerDependenciesField
     include_sources: PythonAwsLambdaIncludeSources
-    architecture: PythonAwsLambdaArchitecture = PythonAwsLambdaArchitecture.X86_64
+    architecture: FaaSArchitecture = FaaSArchitecture.X86_64
 
 
 @rule(desc="Create Python AWS Lambda Function", level=LogLevel.DEBUG)
@@ -78,6 +73,7 @@ async def package_python_aws_lambda_function(
             target_name=PythonAWSLambda.alias,
             complete_platforms=field_set.complete_platforms,
             runtime=field_set.runtime,
+            architecture=field_set.architecture,
             handler=field_set.handler,
             output_path=field_set.output_path,
             include_requirements=field_set.include_requirements.value,
@@ -101,6 +97,7 @@ async def package_python_aws_lambda_layer(
             target_name=PythonAWSLambdaLayer.alias,
             complete_platforms=field_set.complete_platforms,
             runtime=field_set.runtime,
+            architecture=field_set.architecture,
             output_path=field_set.output_path,
             include_requirements=field_set.include_requirements.value,
             include_sources=field_set.include_sources.value,
