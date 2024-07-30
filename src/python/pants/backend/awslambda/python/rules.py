@@ -43,6 +43,7 @@ class _BaseFieldSet(PackageFieldSet):
     layout: PythonFaaSLayoutField
     output_path: OutputPathField
     environment: EnvironmentField
+    architecture: AWSLambdaArchitectureField
 
 
 @dataclass(frozen=True)
@@ -50,7 +51,6 @@ class PythonAwsLambdaFieldSet(_BaseFieldSet):
     required_fields = (PythonAwsLambdaHandlerField,)
 
     handler: PythonAwsLambdaHandlerField
-    architecture: AWSLambdaArchitectureField
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,6 @@ class PythonAwsLambdaLayerFieldSet(_BaseFieldSet):
 
     dependencies: PythonAwsLambdaLayerDependenciesField
     include_sources: PythonAwsLambdaIncludeSources
-    architecture: AWSLambdaArchitectureField
 
 
 @rule(desc="Create Python AWS Lambda Function", level=LogLevel.DEBUG)
