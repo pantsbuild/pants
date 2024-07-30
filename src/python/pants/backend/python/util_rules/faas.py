@@ -473,8 +473,7 @@ class BuildPythonFaaSRequest:
     log_only_reexported_handler_func: bool = False
 
     prefix_in_artifact: None | str = None
-
-    aws_architecture: Optional[AWSLambdaArchitectureField] = None
+    aws_architecture: None | AWSLambdaArchitectureField = None
 
 
 @rule
