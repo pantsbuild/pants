@@ -33,6 +33,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
+    FaaSArchitecture,
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
 )
@@ -198,14 +199,16 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
 
 
 @pytest.mark.parametrize(
-    ("ics", "runtime"),
+    ("ics", "runtime", "architecture"),
     [
-        pytest.param(["==3.7.*"], None, id="runtime inferred from ICs"),
-        pytest.param(None, "python3.7", id="runtime explicitly set"),
+        pytest.param(["==3.7.*"], None, FaaSArchitecture.X86_64, id="runtime inferred from ICs, x86_64"),
+        pytest.param(None, "python3.7", FaaSArchitecture.X86_64, id="runtime explicitly set, x86_64"),
+        pytest.param(["==3.7.*"], None, FaaSArchitecture.ARM64, id="runtime inferred from ICs, ARM64"),
+        pytest.param(None, "python3.7", FaaSArchitecture.ARM64, id="runtime explicitly set, ARM64"),
     ],
 )
 def test_create_hello_world_lambda(
-    ics: list[str] | None, runtime: None | str, rule_runner: PythonRuleRunner
+    ics: list[str] | None, runtime: None | str, architecture: FaaSArchitecture, rule_runner: PythonRuleRunner
 ) -> None:
     rule_runner.write_files(
         {
@@ -226,12 +229,14 @@ def test_create_hello_world_lambda(
                     name='lambda',
                     handler='foo.bar.hello_world:handler',
                     runtime={runtime!r},
+                    architecture="{architecture.value}",
                 )
                 python_aws_lambda_function(
                     name='slimlambda',
                     include_requirements=False,
                     handler='foo.bar.hello_world:handler',
                     runtime={runtime!r},
+                    architecture="{architecture.value}",
                 )
                 """
             ),
@@ -244,6 +249,7 @@ def test_create_hello_world_lambda(
         expected_extra_log_lines=(
             "    Runtime: python3.7",
             "    Handler: lambda_function.handler",
+            f"    Architecture: {architecture.value}",
         ),
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
@@ -262,6 +268,7 @@ def test_create_hello_world_lambda(
         expected_extra_log_lines=(
             "    Runtime: python3.7",
             "    Handler: lambda_function.handler",
+            f"    Architecture: {architecture.value}",
         ),
     )
     assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
