@@ -202,16 +202,16 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     ("ics", "runtime", "architecture"),
     [
         pytest.param(
-            ["==3.7.*"], None, AWSLambdaArchitecture.X86_64, id="runtime inferred from ICs, x86_64"
+            ["==3.7.*"], None, AWSLambdaArchitecture.X86_64, id="runtime inferred from ICs, x86_64 architecture"
         ),
         pytest.param(
-            None, "python3.7", AWSLambdaArchitecture.X86_64, id="runtime explicitly set, x86_64"
+            None, "python3.7", AWSLambdaArchitecture.X86_64, id="runtime explicitly set, x86_64 architecture"
         ),
         pytest.param(
-            ["==3.7.*"], None, AWSLambdaArchitecture.ARM64, id="runtime inferred from ICs, ARM64"
+            ["==3.7.*"], None, AWSLambdaArchitecture.ARM64, id="runtime inferred from ICs, ARM64 architecture"
         ),
         pytest.param(
-            None, "python3.7", AWSLambdaArchitecture.ARM64, id="runtime explicitly set, ARM64"
+            None, "python3.7", AWSLambdaArchitecture.ARM64, id="runtime explicitly set, ARM64 architecture"
         ),
     ],
 )
@@ -259,8 +259,8 @@ def test_create_hello_world_lambda(
         Address("src/python/foo/bar", target_name="lambda"),
         expected_extra_log_lines=(
             "    Runtime: python3.7",
-            "    Handler: lambda_function.handler",
             f"    Architecture: {architecture.value}",
+            "    Handler: lambda_function.handler",
         ),
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
@@ -278,8 +278,8 @@ def test_create_hello_world_lambda(
         Address("src/python/foo/bar", target_name="slimlambda"),
         expected_extra_log_lines=(
             "    Runtime: python3.7",
-            "    Handler: lambda_function.handler",
             f"    Architecture: {architecture.value}",
+            "    Handler: lambda_function.handler",
         ),
     )
     assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
@@ -293,7 +293,11 @@ def test_create_hello_world_lambda(
     )
 
 
-def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize(
+    "architecture",
+    AWSLambdaArchitecture.__members__.values(),
+)
+def test_create_hello_world_layer(rule_runner: PythonRuleRunner, architecture: AWSLambdaArchitecture) -> None:
     rule_runner.write_files(
         {
             "src/python/foo/bar/hello_world.py": dedent(
@@ -305,7 +309,7 @@ def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
                 """
             ),
             "src/python/foo/bar/BUILD": dedent(
-                """
+                f"""
                 python_requirement(name="mureq", requirements=["mureq==0.2"])
                 python_sources()
 
@@ -313,12 +317,14 @@ def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
                     name='lambda',
                     dependencies=["./hello_world.py"],
                     runtime="python3.7",
+                    architecture="{architecture.value}",
                 )
                 python_aws_lambda_layer(
                     name='slimlambda',
                     include_sources=False,
                     dependencies=["./hello_world.py"],
                     runtime="python3.7",
+                    architecture="{architecture.value}",
                 )
                 """
             ),
@@ -328,7 +334,10 @@ def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
-        expected_extra_log_lines=("    Runtime: python3.7",),
+        expected_extra_log_lines=(
+            "    Runtime: python3.7",
+            f"    Architecture: {architecture.value}",
+        ),
         layer=True,
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
@@ -343,7 +352,10 @@ def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
-        expected_extra_log_lines=("    Runtime: python3.7",),
+        expected_extra_log_lines=(
+            "    Runtime: python3.7",
+            f"    Architecture: {architecture.value}",
+        ),
         layer=True,
     )
     assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath

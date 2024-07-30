@@ -570,6 +570,9 @@ async def build_python_faas(
             f"    Runtime: {request.runtime.from_interpreter_version(*platforms.interpreter_version)}"
         )
 
+    if request.architecture:
+        extra_log_lines.append(f"    Architecture: {request.architecture.value}")
+
     if reexported_handler_func is not None:
         if request.log_only_reexported_handler_func:
             handler_text = reexported_handler_func
