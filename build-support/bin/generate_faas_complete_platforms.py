@@ -9,6 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from pants.backend.awslambda.python.aws_architecture import AWSLambdaArchitecture
 from pants.backend.awslambda.python.target_types import PythonAwsLambdaRuntime
 from pants.backend.python.util_rules.faas import PythonFaaSRuntimeField
 from pants.base.build_environment import get_buildroot
@@ -22,11 +23,12 @@ RUNTIME_FIELDS = [
 ]
 
 
-def extract_complete_platform(repo: str, tag: str) -> object:
+def extract_complete_platform(repo: str, architecture: AWSLambdaArchitecture, tag: str) -> object:
     image = f"{repo}:{tag}"
-    print(f"Extracting complete platform for {image}", file=sys.stderr)
+    docker_platform = "linux/amd64" if architecture == AWSLambdaArchitecture.X86_64 else "linux/arm64"
+    print(f"Extracting complete platform for {image} on platform {docker_platform}", file=sys.stderr)
     result = subprocess.run(
-        ["docker", "run", "--entrypoint", "sh", image, "-c", COMMAND],
+        ["docker", "run", "--platform", docker_platform, "--entrypoint", "sh", image, "-c", COMMAND],
         check=True,
         stdout=subprocess.PIPE,
     )
@@ -39,7 +41,11 @@ def run(runtime_field: type[PythonFaaSRuntimeField], python_base: Path) -> None:
     )
     print(f"Generating for {runtime_field.__name__}, writing to {cp_dir}", file=sys.stderr)
     for rt in runtime_field.known_runtimes:
-        cp = extract_complete_platform(runtime_field.known_runtimes_docker_repo, rt.tag)
+        cp = extract_complete_platform(
+            runtime_field.known_runtimes_docker_repo,
+            AWSLambdaArchitecture(rt.aws_architecture.value) if rt.aws_architecture else AWSLambdaArchitecture.X86_64,
+            rt.tag
+        )
 
         fname = cp_dir / rt.file_name()
         with fname.open("w") as f:
