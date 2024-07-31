@@ -19,11 +19,7 @@ from pants.backend.javascript.package_json import (
     PackageJsonSourceField,
 )
 from pants.backend.javascript.subsystems.nodejs_infer import NodeJSInfer
-from pants.backend.javascript.target_types import (
-    JSDependenciesField,
-    JSRuntimeDependenciesField,
-    JSRuntimeSourceField,
-)
+from pants.backend.javascript.target_types import JSRuntimeDependenciesField, JSRuntimeSourceField
 from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
@@ -61,7 +57,7 @@ class JSSourceInferenceFieldSet(FieldSet):
     required_fields = (JSRuntimeSourceField, JSRuntimeDependenciesField)
 
     source: JSRuntimeSourceField
-    dependencies: JSDependenciesField
+    dependencies: JSRuntimeDependenciesField
 
 
 class InferJSDependenciesRequest(InferDependenciesRequest):

@@ -6,7 +6,7 @@ import pytest
 
 from pants.backend.jsx.goals import tailor
 from pants.backend.jsx.goals.tailor import PutativeJSXTargetsRequest
-from pants.backend.jsx.target_types import JSXSourcesGeneratorTarget
+from pants.backend.jsx.target_types import JSXSourcesGeneratorTarget, JSXTestsGeneratorTarget
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.core.util_rules.source_files import ClassifiedSources
 from pants.engine.rules import QueryRule
@@ -20,7 +20,7 @@ def rule_runner() -> RuleRunner:
             *tailor.rules(),
             QueryRule(PutativeTargets, (PutativeJSXTargetsRequest, AllOwnedSources)),
         ],
-        target_types=[JSXSourcesGeneratorTarget],
+        target_types=[JSXTestsGeneratorTarget, JSXSourcesGeneratorTarget],
     )
 
 
@@ -42,7 +42,37 @@ def rule_runner() -> RuleRunner:
                 )
             ],
             id="only_jsx_sources",
-        )
+        ),
+        pytest.param(
+            {
+                "src/owned/BUILD": "jsx_sources()\n",
+                "src/owned/OwnedFile.jsx": "",
+                "src/unowned/UnownedFile1.test.jsx": "",
+                "src/unowned/UnownedFile2.test.mjsx": "",
+                "src/unowned/UnownedFile3.test.cjsx": "",
+            },
+            [
+                ClassifiedSources(
+                    JSXTestsGeneratorTarget,
+                    ["UnownedFile1.test.jsx", "UnownedFile2.test.mjsx", "UnownedFile3.test.cjsx"],
+                    "tests",
+                )
+            ],
+            id="only_jsx_tests",
+        ),
+        pytest.param(
+            {
+                "src/owned/BUILD": "jsx_sources()\n",
+                "src/owned/OwnedFile.jsx": "",
+                "src/unowned/UnownedFile1.jsx": "",
+                "src/unowned/UnownedFile1.test.jsx": "",
+            },
+            [
+                ClassifiedSources(JSXTestsGeneratorTarget, ["UnownedFile1.test.jsx"], "tests"),
+                ClassifiedSources(JSXSourcesGeneratorTarget, ["UnownedFile1.jsx"]),
+            ],
+            id="both_tests_and_source",
+        ),
     ],
 )
 def test_find_putative_jsx_targets(

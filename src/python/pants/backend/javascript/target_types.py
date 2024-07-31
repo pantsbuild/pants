@@ -37,6 +37,10 @@ class JSRuntimeSourceField(SingleSourceField):
     """A source that is javascript at runtime."""
 
 
+class JSTestRuntimeSourceField(SingleSourceField):
+    """A source that is runnable by javascript test-runners at runtime."""
+
+
 class JSSourceField(JSRuntimeSourceField):
     expected_file_extensions = JS_FILE_EXTENSIONS
 
@@ -94,7 +98,7 @@ class JSTestDependenciesField(JSDependenciesField):
     pass
 
 
-class JSTestSourceField(JSSourceField):
+class JSTestSourceField(JSSourceField, JSTestRuntimeSourceField):
     expected_file_extensions = JS_FILE_EXTENSIONS
 
 
