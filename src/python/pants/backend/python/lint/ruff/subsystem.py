@@ -14,7 +14,14 @@ from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
+from pants.option.option_types import (
+    ArgsListOption,
+    BoolOption,
+    FileOption,
+    SkipOption,
+    StrListOption,
+    StrOption,
+)
 from pants.util.strutil import softwrap
 
 
@@ -97,6 +104,45 @@ class Ruff(TemplatedExternalTool):
             check_existence=[os.path.join(d, "ruff.toml") for d in all_dirs],
             check_content={os.path.join(d, "pyproject.toml"): b"[tool.ruff" for d in all_dirs},
         )
+
+    # Options that only exist to ease the upgrade from Ruff as a Python tool to Ruff as an external
+    # downloaded one
+    install_from_resolve = StrOption(
+        advanced=True,
+        default=None,
+        removal_version="2.26.0.dev0",
+        removal_hint="Now ignored: use `version` and `known_version` to customise the version, consider deleting the resolve and `python_requirement` if no longer used",
+        help="Formerly used to customise the version of Ruff to install.",
+    )
+
+    requirements = StrListOption(
+        advanced=True,
+        default=None,
+        removal_version="2.26.0.dev0",
+        removal_hint="Now ignored: use `version` and `known_version` to customise the version, consider deleting the resolve and `python_requirement` if no longer used",
+        help="Formerly used to customise the version of Ruff to install.",
+    )
+    interpreter_constraints = StrListOption(
+        advanced=True,
+        default=None,
+        removal_version="2.26.0.dev0",
+        removal_hint="Now ignored: use `version` and `known_version` to customise the version, consider deleting the resolve and `python_requirement` if no longer used",
+        help="Formerly used to customise the version of Ruff to install.",
+    )
+    console_script = StrOption(
+        advanced=True,
+        default=None,
+        removal_version="2.26.0.dev0",
+        removal_hint="Now ignored: use `version` and `known_version` to customise the version, consider deleting the resolve and `python_requirement` if no longer used",
+        help="Formerly used to customise the version of Ruff to install.",
+    )
+    entry_point = StrOption(
+        advanced=True,
+        default=None,
+        removal_version="2.26.0.dev0",
+        removal_hint="Now ignored: use `version` and `known_version` to customise the version, consider deleting the resolve and `python_requirement` if no longer used",
+        help="Formerly used to customise the version of Ruff to install.",
+    )
 
 
 def rules():
