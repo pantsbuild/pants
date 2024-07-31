@@ -4,9 +4,10 @@
 use std::path::{Path, PathBuf};
 
 use deepsize::DeepSizeOf;
+use fs::RelativePath;
 use graph::CompoundNode;
 
-use super::{NodeKey, NodeOutput, NodeResult};
+use super::{NodeKey, NodeOutput, NodeResult, SubjectPath};
 use crate::context::Context;
 use crate::python::throw;
 
@@ -15,24 +16,33 @@ use crate::python::throw;
 ///
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct PathMetadata {
-    path: PathBuf,
+    pub(super) subject_path: SubjectPath,
 }
 
 impl PathMetadata {
-    pub fn new(path: PathBuf) -> Self {
-        Self { path }
+    pub fn new(path: PathBuf) -> Result<Self, String> {
+        let subject_path = SubjectPath::Workspace(RelativePath::new(path)?);
+        Ok(Self { subject_path })
     }
 
     pub fn path(&self) -> &Path {
-        &self.path
+        match &self.subject_path {
+            SubjectPath::Workspace(relpath) => relpath.as_path(),
+            SubjectPath::LocalSystem(path) => path,
+        }
     }
 
     pub(super) async fn run_node(self, context: Context) -> NodeResult<Option<fs::PathMetadata>> {
-        let node = self;
-        context
-            .core
-            .vfs
-            .path_metadata(node.path.clone())
+        let (vfs, path) = match &self.subject_path {
+            SubjectPath::Workspace(relpath) => (&context.core.vfs, relpath.as_path()),
+            SubjectPath::LocalSystem(_) => {
+                return Err(throw(
+                    "Path metadata lookups of system paths not supported yet.".into(),
+                ))
+            }
+        };
+
+        vfs.path_metadata(path.to_path_buf())
             .await
             .map_err(|e| throw(format!("{e}")))
     }
