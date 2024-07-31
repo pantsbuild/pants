@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 import subprocess
 import sys
@@ -52,16 +51,7 @@ def run(runtime_field: type[PythonFaaSRuntimeField], python_base: Path) -> None:
             json.dump(cp, f, indent=2)
 
 
-def create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Generates the complete platform JSON files for AWS Lambda and GCF"
-    )
-    return parser
-
-
 def main() -> None:
-    create_parser().parse_args()
-
     build_root = Path(get_buildroot()) / "src/python"
     for runtime_field in RUNTIME_FIELDS:
         run(runtime_field, build_root)
