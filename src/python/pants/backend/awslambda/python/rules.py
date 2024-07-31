@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from pants.backend.python.util_rules.faas import FaaSArchitectureField
 from pants.backend.awslambda.python.target_types import (
     PythonAWSLambda,
     PythonAwsLambdaHandlerField,
@@ -18,6 +17,7 @@ from pants.backend.awslambda.python.target_types import (
 )
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
+    FaaSArchitectureField,
     PythonFaaSCompletePlatforms,
     PythonFaaSLayoutField,
     PythonFaaSPex3VenvCreateExtraArgsField,

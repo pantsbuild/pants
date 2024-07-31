@@ -37,9 +37,7 @@ RUNTIME_FIELDS = [
 
 def extract_complete_platform(repo: str, architecture: FaaSArchitecture, tag: str) -> object:
     image = f"{repo}:{tag}"
-    docker_platform = (
-        "linux/amd64" if architecture == FaaSArchitecture.X86_64 else "linux/arm64"
-    )
+    docker_platform = "linux/amd64" if architecture == FaaSArchitecture.X86_64 else "linux/arm64"
     print(
         f"Extracting complete platform for {image} on platform {docker_platform}", file=sys.stderr
     )
@@ -69,9 +67,7 @@ def run(runtime_field: type[PythonFaaSRuntimeField], python_base: Path) -> None:
     for rt in runtime_field.known_runtimes:
         cp = extract_complete_platform(
             runtime_field.known_runtimes_docker_repo,
-            FaaSArchitecture(rt.architecture)
-            if rt.architecture
-            else FaaSArchitecture.X86_64,
+            FaaSArchitecture(rt.architecture) if rt.architecture else FaaSArchitecture.X86_64,
             rt.tag,
         )
 

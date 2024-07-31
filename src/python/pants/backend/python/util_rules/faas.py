@@ -3,13 +3,13 @@
 """Function-as-a-service (FaaS) support like AWS Lambda and Google Cloud Functions."""
 
 from __future__ import annotations
-from enum import Enum
 
 import importlib.resources
 import logging
 import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import ClassVar, Optional, cast
 
@@ -309,7 +309,7 @@ class PythonFaaSKnownRuntime:
     major: int
     minor: int
     tag: str
-    architecture: FaaSArchitecture
+    architecture: FaaSArchitecture = FaaSArchitecture.X86_64
 
     def file_name(self) -> str:
         return f"complete_platform_{self.tag}.json"
