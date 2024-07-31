@@ -640,7 +640,10 @@ impl Core {
         .await?;
         log::debug!("Using {command_runners:?} for process execution.");
 
-        let graph = Arc::new(InvalidatableGraph(Graph::new(executor.clone())));
+        let graph = Arc::new(InvalidatableGraph {
+            graph: Graph::new(executor.clone()),
+            build_root: build_root.clone(),
+        });
 
         // These certs are for downloads, not to be confused with the ones used for remoting.
         let ca_certs = Self::load_certificates(ca_certs_path)?;
@@ -747,7 +750,10 @@ impl Core {
     }
 }
 
-pub struct InvalidatableGraph(Graph<NodeKey>);
+pub struct InvalidatableGraph {
+    graph: Graph<NodeKey>,
+    build_root: PathBuf,
+}
 
 fn caller_to_logging_info(caller: InvalidateCaller) -> (Level, &'static str) {
     match caller {
@@ -766,7 +772,8 @@ impl Invalidatable for InvalidatableGraph {
         let InvalidationResult { cleared, dirtied } =
             self.invalidate_from_roots(false, move |node| {
                 if let Some(fs_subject) = node.fs_subject() {
-                    paths.contains(fs_subject)
+                    let path = fs_subject.to_path_in_workspace(&self.build_root);
+                    paths.contains(&path)
                 } else {
                     false
                 }
@@ -802,7 +809,7 @@ impl Deref for InvalidatableGraph {
     type Target = Graph<NodeKey>;
 
     fn deref(&self) -> &Graph<NodeKey> {
-        &self.0
+        &self.graph
     }
 }
 
