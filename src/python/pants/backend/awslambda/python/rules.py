@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from pants.backend.awslambda.python.aws_architecture import AWSLambdaArchitectureField
+from pants.backend.python.util_rules.faas import FaaSArchitectureField
 from pants.backend.awslambda.python.target_types import (
     PythonAWSLambda,
     PythonAwsLambdaHandlerField,
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 class _BaseFieldSet(PackageFieldSet):
     include_requirements: PythonAwsLambdaIncludeRequirements
     runtime: PythonAwsLambdaRuntime
-    architecture: AWSLambdaArchitectureField
+    architecture: FaaSArchitectureField
     complete_platforms: PythonFaaSCompletePlatforms
     pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
     pex_build_extra_args: PythonFaaSPexBuildExtraArgs

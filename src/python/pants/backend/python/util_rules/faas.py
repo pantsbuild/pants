@@ -3,6 +3,7 @@
 """Function-as-a-service (FaaS) support like AWS Lambda and Google Cloud Functions."""
 
 from __future__ import annotations
+from enum import Enum
 
 import importlib.resources
 import logging
@@ -285,12 +286,30 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
     )
 
 
+class FaaSArchitecture(str, Enum):
+    X86_64 = "x86_64"
+    ARM64 = "arm64"
+
+
+class FaaSArchitectureField(StringField):
+    alias = "architecture"
+    valid_choices = FaaSArchitecture
+    expected_type = str
+    default = FaaSArchitecture.X86_64.value
+    help = help_text(
+        """
+        The architecture of the AWS Lambda runtime to target (x86_64 or arm64).
+        See https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html.
+        """
+    )
+
+
 @dataclass(frozen=True)
 class PythonFaaSKnownRuntime:
     major: int
     minor: int
     tag: str
-    architecture: Optional[str] = None
+    architecture: FaaSArchitecture
 
     def file_name(self) -> str:
         return f"complete_platform_{self.tag}.json"

@@ -7,12 +7,10 @@ import re
 from dataclasses import dataclass
 from typing import ClassVar, Match, Optional, Tuple, cast
 
-from pants.backend.awslambda.python.aws_architecture import (
-    AWSLambdaArchitecture,
-    AWSLambdaArchitectureField,
-)
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.backend.python.util_rules.faas import (
+    FaaSArchitecture,
+    FaaSArchitectureField,
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
@@ -110,18 +108,18 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
     # https://gallery.ecr.aws/lambda/python
     known_runtimes_docker_repo = "public.ecr.aws/lambda/python"
     known_runtimes = (
-        PythonFaaSKnownRuntime(3, 6, "3.6", AWSLambdaArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 7, "3.7", AWSLambdaArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 8, "3.8-x86_64", AWSLambdaArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 8, "3.8-arm64", AWSLambdaArchitecture.ARM64),
-        PythonFaaSKnownRuntime(3, 9, "3.9-x86_64", AWSLambdaArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 9, "3.9-arm64", AWSLambdaArchitecture.ARM64),
-        PythonFaaSKnownRuntime(3, 10, "3.10-x86_64", AWSLambdaArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 10, "3.10-arm64", AWSLambdaArchitecture.ARM64),
-        PythonFaaSKnownRuntime(3, 11, "3.11-x86_64", AWSLambdaArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 11, "3.11-arm64", AWSLambdaArchitecture.ARM64),
-        PythonFaaSKnownRuntime(3, 12, "3.12-x86_64", AWSLambdaArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 12, "3.12-arm64", AWSLambdaArchitecture.ARM64),
+        PythonFaaSKnownRuntime(3, 6, "3.6", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 7, "3.7", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 8, "3.8-x86_64", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 8, "3.8-arm64", FaaSArchitecture.ARM64),
+        PythonFaaSKnownRuntime(3, 9, "3.9-x86_64", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 9, "3.9-arm64", FaaSArchitecture.ARM64),
+        PythonFaaSKnownRuntime(3, 10, "3.10-x86_64", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 10, "3.10-arm64", FaaSArchitecture.ARM64),
+        PythonFaaSKnownRuntime(3, 11, "3.11-x86_64", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 11, "3.11-arm64", FaaSArchitecture.ARM64),
+        PythonFaaSKnownRuntime(3, 12, "3.12-x86_64", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 12, "3.12-arm64", FaaSArchitecture.ARM64),
     )
 
     @classmethod
@@ -197,7 +195,7 @@ class PythonAWSLambda(_AWSLambdaBaseTarget):
         *_AWSLambdaBaseTarget.core_fields,
         PythonFaaSDependencies,
         PythonAwsLambdaHandlerField,
-        AWSLambdaArchitectureField,
+        FaaSArchitectureField,
     )
     help = help_text(
         f"""
@@ -214,7 +212,7 @@ class PythonAWSLambdaLayer(_AWSLambdaBaseTarget):
         *_AWSLambdaBaseTarget.core_fields,
         PythonAwsLambdaIncludeSources,
         PythonAwsLambdaLayerDependenciesField,
-        AWSLambdaArchitectureField,
+        FaaSArchitectureField,
     )
     help = help_text(
         f"""

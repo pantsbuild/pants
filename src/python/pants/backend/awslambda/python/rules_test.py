@@ -13,7 +13,6 @@ from zipfile import ZipFile
 
 import pytest
 
-from pants.backend.awslambda.python.aws_architecture import AWSLambdaArchitecture
 from pants.backend.awslambda.python.rules import (
     PythonAwsLambdaFieldSet,
     PythonAwsLambdaLayerFieldSet,
@@ -34,6 +33,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
+    FaaSArchitecture,
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
 )
@@ -184,7 +184,7 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
         Address("src/py/project", target_name="lambda"),
         expected_extra_log_lines=(
             "    Runtime: python3.7",
-            f"    Architecture: {AWSLambdaArchitecture.X86_64.value}",
+            f"    Architecture: {FaaSArchitecture.X86_64.value}",
             "    Handler: lambda_function.handler",
         ),
     )
@@ -205,25 +205,25 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
         pytest.param(
             ["==3.7.*"],
             None,
-            AWSLambdaArchitecture.X86_64,
+            FaaSArchitecture.X86_64,
             id="runtime inferred from ICs, x86_64 architecture",
         ),
         pytest.param(
             None,
             "python3.7",
-            AWSLambdaArchitecture.X86_64,
+            FaaSArchitecture.X86_64,
             id="runtime explicitly set, x86_64 architecture",
         ),
         pytest.param(
             ["==3.7.*"],
             None,
-            AWSLambdaArchitecture.ARM64,
+            FaaSArchitecture.ARM64,
             id="runtime inferred from ICs, ARM64 architecture",
         ),
         pytest.param(
             None,
             "python3.7",
-            AWSLambdaArchitecture.ARM64,
+            FaaSArchitecture.ARM64,
             id="runtime explicitly set, ARM64 architecture",
         ),
     ],
@@ -231,7 +231,7 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
 def test_create_hello_world_lambda(
     ics: list[str] | None,
     runtime: None | str,
-    architecture: AWSLambdaArchitecture,
+    architecture: FaaSArchitecture,
     rule_runner: PythonRuleRunner,
 ) -> None:
     rule_runner.write_files(
@@ -308,10 +308,10 @@ def test_create_hello_world_lambda(
 
 @pytest.mark.parametrize(
     "architecture",
-    AWSLambdaArchitecture.__members__.values(),
+    FaaSArchitecture.__members__.values(),
 )
 def test_create_hello_world_layer(
-    rule_runner: PythonRuleRunner, architecture: AWSLambdaArchitecture
+    rule_runner: PythonRuleRunner, architecture: FaaSArchitecture
 ) -> None:
     rule_runner.write_files(
         {

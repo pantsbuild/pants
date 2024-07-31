@@ -22,9 +22,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from pants.backend.awslambda.python.aws_architecture import AWSLambdaArchitecture
 from pants.backend.awslambda.python.target_types import PythonAwsLambdaRuntime
-from pants.backend.python.util_rules.faas import PythonFaaSRuntimeField
+from pants.backend.python.util_rules.faas import FaaSArchitecture, PythonFaaSRuntimeField
 from pants.base.build_environment import get_buildroot
 
 COMMAND = "pip install pex 1>&2 && pex3 interpreter inspect --markers --tags"
@@ -36,10 +35,10 @@ RUNTIME_FIELDS = [
 ]
 
 
-def extract_complete_platform(repo: str, architecture: AWSLambdaArchitecture, tag: str) -> object:
+def extract_complete_platform(repo: str, architecture: FaaSArchitecture, tag: str) -> object:
     image = f"{repo}:{tag}"
     docker_platform = (
-        "linux/amd64" if architecture == AWSLambdaArchitecture.X86_64 else "linux/arm64"
+        "linux/amd64" if architecture == FaaSArchitecture.X86_64 else "linux/arm64"
     )
     print(
         f"Extracting complete platform for {image} on platform {docker_platform}", file=sys.stderr
@@ -70,9 +69,9 @@ def run(runtime_field: type[PythonFaaSRuntimeField], python_base: Path) -> None:
     for rt in runtime_field.known_runtimes:
         cp = extract_complete_platform(
             runtime_field.known_runtimes_docker_repo,
-            AWSLambdaArchitecture(rt.architecture)
+            FaaSArchitecture(rt.architecture)
             if rt.architecture
-            else AWSLambdaArchitecture.X86_64,
+            else FaaSArchitecture.X86_64,
             rt.tag,
         )
 
