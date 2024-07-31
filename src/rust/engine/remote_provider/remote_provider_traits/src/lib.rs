@@ -12,6 +12,16 @@ use remexec::ActionResult;
 use tokio::fs::File;
 use tokio::io::{AsyncSeekExt, AsyncWrite};
 
+pub enum ListMissingDigestsAssurance {
+    /// The caller just wants an estimate of what's missing, if it's quick. Digests that do exist in
+    /// the remote _can_ be reported as missing. Digests that do NOT exist _must_ be reported as
+    /// missing.
+    AllowFalsePositives,
+    /// The caller needs to know the current state of what's missing. Digests that do in the remote
+    /// _must not_ be reported as missing. Digests that do NOT exist _must_ be reported as missing.
+    ConfirmExistence,
+}
+
 // TODO: this is duplicated with global_options.py, it'd be good to have this be the single source
 // of truth.
 #[derive(Clone, Copy, Debug, strum_macros::EnumString)]
@@ -70,6 +80,7 @@ pub trait ByteStoreProvider: Sync + Send + 'static {
     async fn list_missing_digests(
         &self,
         digests: &mut (dyn Iterator<Item = Digest> + Send),
+        assurance: ListMissingDigestsAssurance,
     ) -> Result<HashSet<Digest>, String>;
 }
 

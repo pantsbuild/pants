@@ -6,7 +6,8 @@ use std::sync::Arc;
 // Re-export these so that consumers don't have to know about the exact arrangement of underlying
 // crates.
 pub use remote_provider_traits::{
-    ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteProvider, RemoteStoreOptions,
+    ActionCacheProvider, ByteStoreProvider, ListMissingDigestsAssurance, LoadDestination,
+    RemoteProvider, RemoteStoreOptions,
 };
 
 // TODO(#19902): a unified view of choosing a provider would be nice
