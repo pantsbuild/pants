@@ -51,7 +51,7 @@ def run(runtime_field: type[PythonFaaSRuntimeField], python_base: Path) -> None:
     for rt in runtime_field.known_runtimes:
         cp = extract_complete_platform(
             runtime_field.known_runtimes_docker_repo,
-            AWSLambdaArchitecture(rt.aws_architecture.value) if rt.aws_architecture else AWSLambdaArchitecture.X86_64,
+            AWSLambdaArchitecture(rt.architecture.value) if rt.architecture else AWSLambdaArchitecture.X86_64,
             rt.tag
         )
 

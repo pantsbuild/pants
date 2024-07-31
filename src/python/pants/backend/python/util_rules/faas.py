@@ -12,10 +12,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Optional, cast
 
-from pants.backend.awslambda.python.aws_architecture import (
-    AWSLambdaArchitecture,
-    AWSLambdaArchitectureField,
-)
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
@@ -294,7 +290,7 @@ class PythonFaaSKnownRuntime:
     major: int
     minor: int
     tag: str
-    aws_architecture: Optional[AWSLambdaArchitecture] = None
+    architecture: Optional[str] = None
 
     def file_name(self) -> str:
         return f"complete_platform_{self.tag}.json"
@@ -357,7 +353,7 @@ class RuntimePlatformsRequest:
 
     runtime: PythonFaaSRuntimeField
     complete_platforms: PythonFaaSCompletePlatforms
-    aws_architecture: Optional[AWSLambdaArchitectureField] = None
+    architecture: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -429,10 +425,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
             rt.file_name()
             for rt in request.runtime.known_runtimes
             if version == (rt.major, rt.minor)
-            and (
-                request.aws_architecture is None
-                or request.aws_architecture.value == rt.aws_architecture
-            )
+            and (request.architecture is None or request.architecture == rt.architecture)
         )
     except StopIteration:
         # Not a known runtime, so fallback to just passing a platform
@@ -473,7 +466,7 @@ class BuildPythonFaaSRequest:
     log_only_reexported_handler_func: bool = False
 
     prefix_in_artifact: None | str = None
-    aws_architecture: None | AWSLambdaArchitectureField = None
+    architecture: None | str = None
 
 
 @rule
@@ -496,7 +489,7 @@ async def build_python_faas(
             address=request.address,
             target_name=request.target_name,
             runtime=request.runtime,
-            aws_architecture=request.aws_architecture,
+            architecture=request.architecture,
             complete_platforms=request.complete_platforms,
         ),
     )
@@ -577,8 +570,8 @@ async def build_python_faas(
             f"    Runtime: {request.runtime.from_interpreter_version(*platforms.interpreter_version)}"
         )
 
-    if request.aws_architecture is not None:
-        extra_log_lines.append(f"    Architecture: {request.aws_architecture.value}")
+    if request.architecture is not None:
+        extra_log_lines.append(f"    Architecture: {request.architecture}")
 
     if reexported_handler_func is not None:
         if request.log_only_reexported_handler_func:
