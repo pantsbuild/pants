@@ -27,7 +27,7 @@ pub struct DownloadedFile(pub Key);
 impl DownloadedFile {
     fn url_key(url: &Url, digest: Digest) -> CacheKey {
         let observed_url = ObservedUrl {
-            url: url.path().to_owned(),
+            url: url.as_str().to_owned(),
             observed_digest: Some(digest.into()),
         };
         CacheKey {
