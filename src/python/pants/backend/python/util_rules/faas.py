@@ -372,7 +372,7 @@ class RuntimePlatformsRequest:
 
     runtime: PythonFaaSRuntimeField
     complete_platforms: PythonFaaSCompletePlatforms
-    architecture: Optional[str] = None
+    architecture: Optional[FaaSArchitectureField] = None
 
 
 @dataclass(frozen=True)
@@ -444,7 +444,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
             rt.file_name()
             for rt in request.runtime.known_runtimes
             if version == (rt.major, rt.minor)
-            and (request.architecture is None or request.architecture == rt.architecture)
+            and (request.architecture is None or request.architecture.value == rt.architecture)
         )
     except StopIteration:
         # Not a known runtime, so fallback to just passing a platform
@@ -485,7 +485,7 @@ class BuildPythonFaaSRequest:
     log_only_reexported_handler_func: bool = False
 
     prefix_in_artifact: None | str = None
-    architecture: None | str = None
+    architecture: None | FaaSArchitectureField = None
 
 
 @rule
@@ -590,7 +590,7 @@ async def build_python_faas(
         )
 
     if request.architecture is not None:
-        extra_log_lines.append(f"    Architecture: {request.architecture}")
+        extra_log_lines.append(f"    Architecture: {request.architecture.value}")
 
     if reexported_handler_func is not None:
         if request.log_only_reexported_handler_func:
