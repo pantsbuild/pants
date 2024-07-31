@@ -28,7 +28,7 @@ def extract_complete_platform(repo: str, architecture: AWSLambdaArchitecture, ta
     docker_platform = "linux/amd64" if architecture == AWSLambdaArchitecture.X86_64 else "linux/arm64"
     print(f"Extracting complete platform for {image} on platform {docker_platform}", file=sys.stderr)
     result = subprocess.run(
-        ["docker", "run", "--platform", docker_platform, "--entrypoint", "sh", image, "-c", COMMAND],
+        ["docker", "run", "--platform", docker_platform, "--entrypoint", "/bin/sh", image, "-c", COMMAND],
         check=True,
         stdout=subprocess.PIPE,
     )
