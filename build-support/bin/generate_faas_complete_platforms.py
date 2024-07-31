@@ -38,10 +38,24 @@ RUNTIME_FIELDS = [
 
 def extract_complete_platform(repo: str, architecture: AWSLambdaArchitecture, tag: str) -> object:
     image = f"{repo}:{tag}"
-    docker_platform = "linux/amd64" if architecture == AWSLambdaArchitecture.X86_64 else "linux/arm64"
-    print(f"Extracting complete platform for {image} on platform {docker_platform}", file=sys.stderr)
+    docker_platform = (
+        "linux/amd64" if architecture == AWSLambdaArchitecture.X86_64 else "linux/arm64"
+    )
+    print(
+        f"Extracting complete platform for {image} on platform {docker_platform}", file=sys.stderr
+    )
     result = subprocess.run(
-        ["docker", "run", "--platform", docker_platform, "--entrypoint", "/bin/sh", image, "-c", COMMAND],
+        [
+            "docker",
+            "run",
+            "--platform",
+            docker_platform,
+            "--entrypoint",
+            "/bin/sh",
+            image,
+            "-c",
+            COMMAND,
+        ],
         check=True,
         stdout=subprocess.PIPE,
     )
@@ -56,8 +70,10 @@ def run(runtime_field: type[PythonFaaSRuntimeField], python_base: Path) -> None:
     for rt in runtime_field.known_runtimes:
         cp = extract_complete_platform(
             runtime_field.known_runtimes_docker_repo,
-            AWSLambdaArchitecture(rt.architecture.value) if rt.architecture else AWSLambdaArchitecture.X86_64,
-            rt.tag
+            AWSLambdaArchitecture(rt.architecture)
+            if rt.architecture
+            else AWSLambdaArchitecture.X86_64,
+            rt.tag,
         )
 
         fname = cp_dir / rt.file_name()
