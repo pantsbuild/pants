@@ -218,15 +218,17 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
             FaaSArchitecture.X86_64,
             id="runtime explicitly set, x86_64 architecture",
         ),
+        # Python version changes for these two because Lambda
+        # doesn't support ARM architecture below Python 3.8.
         pytest.param(
-            ["==3.7.*"],
+            ["==3.8.*"],
             None,
             FaaSArchitecture.ARM64,
             id="runtime inferred from ICs, ARM64 architecture",
         ),
         pytest.param(
             None,
-            "python3.7",
+            "python3.8",
             FaaSArchitecture.ARM64,
             id="runtime explicitly set, ARM64 architecture",
         ),
