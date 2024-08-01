@@ -12,6 +12,7 @@ from pants.backend.terraform.target_types import (
     TerraformModuleTarget,
     TerraformRootModuleField,
 )
+from pants.backend.terraform.tool import TerraformProcess
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
@@ -26,9 +27,11 @@ from pants.engine.internals.native_engine import Address, AddressInput, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.process import ProcessExecutionFailure, ProcessResult, FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, Targets
 from pants.engine.unions import UnionRule
+from pants.option.global_options import KeepSandboxes
 
 
 class KnownTerraformResolveNamesRequest(KnownUserResolveNamesRequest):
@@ -96,6 +99,7 @@ async def setup_user_lockfile_requests(
 @rule
 async def generate_lockfile_from_sources(
     lockfile_request: GenerateTerraformLockfile,
+    keep_sandboxes: KeepSandboxes,
 ) -> GenerateLockfileResult:
     """Generate a Terraform lockfile by running `terraform providers lock` on the sources."""
     initialised_terraform = await Get(
@@ -108,8 +112,10 @@ async def generate_lockfile_from_sources(
             initialise_backend=False,
         ),
     )
-    result = await Get(
-        ProcessResult,
+
+    provider_lock_description = f"Update terraform lockfile for {lockfile_request.resolve_name}"
+    multiplatform_lockfile = await Get(
+        FallibleProcessResult,
         TerraformProcess(
             args=(
                 "providers",
@@ -117,13 +123,21 @@ async def generate_lockfile_from_sources(
             ),
             input_digest=initialised_terraform.sources_and_deps,
             output_files=(".terraform.lock.hcl",),
-            description=f"Update terraform lockfile for {lockfile_request.resolve_name}",
+            description=provider_lock_description,
             chdir=initialised_terraform.chdir,
         ),
     )
+    if multiplatform_lockfile.exit_code != 0:
+        raise ProcessExecutionFailure(
+            multiplatform_lockfile.exit_code,
+            multiplatform_lockfile.stdout,
+            multiplatform_lockfile.stderr,
+            provider_lock_description,
+            keep_sandboxes=keep_sandboxes,
+        )
 
     return GenerateLockfileResult(
-        initialised_terraform.lockfile,
+        multiplatform_lockfile.output_digest,
         lockfile_request.resolve_name,
         lockfile_request.lockfile_dest,
     )

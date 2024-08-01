@@ -117,6 +117,7 @@ class TerraformInitResponse:
 
 @dataclass(frozen=True)
 class TerraformUpgradeResponse:
+    sources_and_deps: Digest
     lockfile: Digest
     chdir: str
 
@@ -250,7 +251,7 @@ async def terraform_upgrade_lockfile(request: TerraformInitRequest) -> Terraform
         ),
     )
 
-    return TerraformUpgradeResponse(lockfile, chdir)
+    return TerraformUpgradeResponse(init_response.digest, lockfile, chdir)
 
 
 def rules():
