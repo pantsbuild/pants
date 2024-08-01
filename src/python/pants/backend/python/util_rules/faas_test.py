@@ -247,10 +247,9 @@ def test_infer_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
 
 class TestRuntimeField(PythonFaaSRuntimeField):
     known_runtimes = (
-        PythonFaaSKnownRuntime(3, 45, tag="faas-test-3-45"),
-        PythonFaaSKnownRuntime(67, 89, tag="faas-test-67-89"),
+        PythonFaaSKnownRuntime(3, 45, "", tag="faas-test-3-45"),
+        PythonFaaSKnownRuntime(67, 89, "", tag="faas-test-67-89"),
     )
-    known_runtimes_docker_repo = ""
 
     def to_interpreter_version(self) -> None | tuple[int, int]:
         if self.value is None:

@@ -295,6 +295,7 @@ class FaaSArchitecture(str, Enum):
 class PythonFaaSKnownRuntime:
     major: int
     minor: int
+    docker_repo: str
     tag: str
     architecture: FaaSArchitecture = FaaSArchitecture.X86_64
 
@@ -307,7 +308,6 @@ class PythonFaaSRuntimeField(StringField, ABC):
     default = None
 
     known_runtimes: ClassVar[tuple[PythonFaaSKnownRuntime, ...]] = ()
-    known_runtimes_docker_repo: ClassVar[str]
 
     @classmethod
     def known_runtimes_complete_platforms_module(cls) -> str:

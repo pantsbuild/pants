@@ -67,7 +67,7 @@ def run(runtime_field: type[PythonFaaSRuntimeField], python_base: Path) -> None:
     print(f"Generating for {runtime_field.__name__}, writing to {cp_dir}", file=sys.stderr)
     for rt in runtime_field.known_runtimes:
         cp = extract_complete_platform(
-            runtime_field.known_runtimes_docker_repo,
+            rt.docker_repo,
             FaaSArchitecture(rt.architecture) if rt.architecture else FaaSArchitecture.X86_64,
             rt.tag,
         )
