@@ -83,6 +83,8 @@ terraform_deployment(name="test", root_module=":root", dependencies=["test_backe
 
 Lockfiles will be loaded from the directory of the root module of a deployment, just like with the `terraform` command. Pants will automatically generate targets for them if they exist.
 
+Pants can generate and update lockfiles with the `generate-lockfiles` command. Use the target of the `terraform_module`'s address as the resolve name. For example, `pants generate-lockfiles --resolve=tf:infrastructure`.
+
 ```python tab={"label":"prod/BUILD"}
 terraform_deployment(name="prod", root_module="//tf:infrastructure")
 ```
@@ -119,7 +121,12 @@ provider "registry.terraform.io/hashicorp/null" {
 }
 ```
 
-Pants can generate and update lockfiles with the `generate-lockfiles` command. Use the target of the `terraform_module`'s address as the resolve name. For example, `pants generate-lockfiles --resolve=tf:infrastructure`.
+Pants can generate multi-platform lockfiles for Terraform. The setting `[download-terraform].platforms` uses the same values as [Terraform's multi-platform implementation](https://developer.hashicorp.com/terraform/cli/commands/providers/lock#specifying-target-platforms).
+
+```toml title=pants.toml
+[download_terraform]
+platforms = ["windows_amd64", "darwin_amd64", "linux_amd64"]
+```
 
 ### Basic Operations
 
