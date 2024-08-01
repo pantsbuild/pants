@@ -28,8 +28,10 @@ from pants.backend.google_cloud_function.python.target_types import PythonGoogle
 from pants.backend.python.util_rules.faas import FaaSArchitecture, PythonFaaSRuntimeField
 from pants.base.build_environment import get_buildroot
 
+# GCF images throw permissions errors when trying to install pex in the default site-packages.
+# Additionally, some of the images are missing a `pip` alias, so we need to use `python -m pip`.
 COMMAND = (
-    "pip install --target=/tmp/subdir pex 1>&2 && "
+    "python -m pip install --target=/tmp/subdir pex 1>&2 && "
     + "PYTHONPATH=/tmp/subdir /tmp/subdir/bin/pex3 interpreter inspect --markers --tags"
 )
 
