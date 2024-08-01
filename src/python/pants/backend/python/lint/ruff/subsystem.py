@@ -22,6 +22,7 @@ from pants.option.option_types import (
     StrListOption,
     StrOption,
 )
+from pants.util.docutil import doc_url
 from pants.util.strutil import softwrap
 
 
@@ -105,7 +106,7 @@ class Ruff(TemplatedExternalTool):
             check_content={os.path.join(d, "pyproject.toml"): b"[tool.ruff" for d in all_dirs},
         )
 
-    _removal_hint = "Now ignored: use `version` and `known_version` to customise the version, consider deleting the resolve and `python_requirement` if no longer used"
+    _removal_hint = f"NOW IGNORED: use `version` and `known_versions` options to customise the version of ruff, replacing this option; consider deleting the resolve and `python_requirement` if no longer used. See {doc_url('reference/subsystems/ruff')}"
 
     # Options that only exist to ease the upgrade from Ruff as a Python tool to Ruff as an external
     # downloaded one
