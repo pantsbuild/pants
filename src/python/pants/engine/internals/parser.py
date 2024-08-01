@@ -69,8 +69,6 @@ class BuildFilePreludeSymbols(BuildFileSymbolsInfo):
         info = {}
         annotations = ns.get("__annotations__", {})
         for name, symb in ns.items():
-            if name.startswith("_"):
-                continue
             # We only need type hints via `annotations` for top-level values which doesn't work with `inspect`.
             info[name] = BuildFileSymbolInfo(name, symb, type_hints=annotations.get(name))
         return cls(info=FrozenDict(info), referenced_env_vars=tuple(sorted(env_vars)))
