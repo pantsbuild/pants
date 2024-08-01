@@ -9,7 +9,7 @@ import pkg_resources
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, FileContent
 from pants.engine.internals.native_engine import MergeDigests, RemovePrefix
-from pants.engine.process import FallibleProcessResult, ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
@@ -87,6 +87,7 @@ async def strip_jar(
             extra_nailgun_keys=extra_immutable_input_digests,
             description=f"Stripping jar {filenames[0]}",
             level=LogLevel.DEBUG,
+            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
         ),
     )
 
