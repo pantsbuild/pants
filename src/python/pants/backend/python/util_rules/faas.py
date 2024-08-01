@@ -297,7 +297,7 @@ class PythonFaaSKnownRuntime:
     minor: int
     docker_repo: str
     tag: str
-    architecture: FaaSArchitecture = FaaSArchitecture.X86_64
+    architecture: FaaSArchitecture
 
     def file_name(self) -> str:
         return f"complete_platform_{self.tag}.json"
