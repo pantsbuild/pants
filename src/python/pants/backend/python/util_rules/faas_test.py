@@ -248,8 +248,12 @@ def test_infer_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
 
 class TestRuntimeField(PythonFaaSRuntimeField):
     known_runtimes = (
-        PythonFaaSKnownRuntime(3, 45, "", tag="faas-test-3-45", architecture=FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(67, 89, "", tag="faas-test-67-89", architecture=FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(
+            3, 45, "", tag="faas-test-3-45", architecture=FaaSArchitecture.X86_64
+        ),
+        PythonFaaSKnownRuntime(
+            67, 89, "", tag="faas-test-67-89", architecture=FaaSArchitecture.X86_64
+        ),
     )
 
     def to_interpreter_version(self) -> None | tuple[int, int]:
