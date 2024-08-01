@@ -29,15 +29,9 @@ from pants.backend.python.util_rules.faas import FaaSArchitecture, PythonFaaSRun
 from pants.base.build_environment import get_buildroot
 
 COMMAND = (
-    "pip install --target=/tmp/subdir pex 1>&2 && " +
-    "PYTHONPATH=/tmp/subdir /tmp/subdir/bin/pex3 interpreter inspect --markers --tags"
+    "pip install --target=/tmp/subdir pex 1>&2 && "
+    + "PYTHONPATH=/tmp/subdir /tmp/subdir/bin/pex3 interpreter inspect --markers --tags"
 )
-
-
-RUNTIME_FIELDS: list[type[PythonFaaSRuntimeField]] = [
-    PythonAwsLambdaRuntime,
-    PythonGoogleCloudFunctionRuntime,
-]
 
 
 def extract_complete_platform(repo: str, architecture: FaaSArchitecture, tag: str) -> object:
@@ -83,18 +77,32 @@ def run(runtime_field: type[PythonFaaSRuntimeField], python_base: Path) -> None:
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generates the complete platform JSON files for AWS Lambda and GCF"
+        description="Generates the complete platform JSON files for AWS Lambda and/or GCF"
+    )
+    parser.add_argument(
+        "--runtime",
+        choices=["lambda", "gcf", "all"],
+        default="all",
+        help="Choose which runtime(s) to generate complete platform files for",
     )
     return parser
 
 
 def main() -> None:
-    # The args are discarded, but the parser is useful
-    # to ensure that --help works.
-    create_parser().parse_args()
+    args = create_parser().parse_args()
 
     build_root = Path(get_buildroot()) / "src/python"
-    for runtime_field in RUNTIME_FIELDS:
+
+    # Type declaration needed for mypy
+    selected_runtimes: list[type[PythonFaaSRuntimeField]]
+    if args.runtime == "lambda":
+        selected_runtimes = [PythonAwsLambdaRuntime]
+    elif args.runtime == "gcf":
+        selected_runtimes = [PythonGoogleCloudFunctionRuntime]
+    else:
+        selected_runtimes = [PythonAwsLambdaRuntime, PythonGoogleCloudFunctionRuntime]
+
+    for runtime_field in selected_runtimes:
         run(runtime_field, build_root)
 
 
