@@ -11,7 +11,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-import textwrap
 from typing import ClassVar, Optional, cast
 
 from pants.backend.python.dependency_inference.module_mapper import (
@@ -431,13 +430,12 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         file_name = next(
             rt.file_name()
             for rt in request.runtime.known_runtimes
-            if version == (rt.major, rt.minor)
-            and request.architecture.value == rt.architecture
+            if version == (rt.major, rt.minor) and request.architecture.value == rt.architecture
         )
     except StopIteration:
         # Not a known runtime, so error out.
         raise ValueError(
-            textwrap.dedent(
+            softwrap(
                 f"""\
                 Could not find a known runtime for the given Python version and machine architecture!
 
