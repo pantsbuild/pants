@@ -28,7 +28,10 @@ from pants.backend.google_cloud_function.python.target_types import PythonGoogle
 from pants.backend.python.util_rules.faas import FaaSArchitecture, PythonFaaSRuntimeField
 from pants.base.build_environment import get_buildroot
 
-COMMAND = "pip install pex 1>&2 && pex3 interpreter inspect --markers --tags"
+COMMAND = (
+    "pip install --target=/tmp/subdir pex 1>&2 && " +
+    "PYTHONPATH=/tmp/subdir /tmp/subdir/bin/pex3 interpreter inspect --markers --tags"
+)
 
 
 RUNTIME_FIELDS: list[type[PythonFaaSRuntimeField]] = [
