@@ -10,7 +10,6 @@ from typing import ClassVar, Match, Optional, Tuple, cast
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.backend.python.util_rules.faas import (
     FaaSArchitecture,
-    FaaSArchitectureField,
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
@@ -30,6 +29,7 @@ from pants.engine.target import (
     BoolField,
     Field,
     InvalidFieldException,
+    StringField,
     Target,
 )
 from pants.util.docutil import doc_url
@@ -150,6 +150,19 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         return f"python{py_major}.{py_minor}"
 
 
+class AWSLambdaArchitectureField(StringField):
+    alias = "architecture"
+    valid_choices = FaaSArchitecture
+    expected_type = str
+    default = FaaSArchitecture.X86_64.value
+    help = help_text(
+        """
+        The architecture of the AWS Lambda runtime to target (x86_64 or arm64).
+        See https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html.
+        """
+    )
+
+
 class PythonAwsLambdaLayerDependenciesField(PythonFaaSDependencies):
     required = True
 
@@ -195,7 +208,7 @@ class PythonAWSLambda(_AWSLambdaBaseTarget):
         *_AWSLambdaBaseTarget.core_fields,
         PythonFaaSDependencies,
         PythonAwsLambdaHandlerField,
-        FaaSArchitectureField,
+        AWSLambdaArchitectureField,
     )
     help = help_text(
         f"""
@@ -212,7 +225,7 @@ class PythonAWSLambdaLayer(_AWSLambdaBaseTarget):
         *_AWSLambdaBaseTarget.core_fields,
         PythonAwsLambdaIncludeSources,
         PythonAwsLambdaLayerDependenciesField,
-        FaaSArchitectureField,
+        AWSLambdaArchitectureField,
     )
     help = help_text(
         f"""

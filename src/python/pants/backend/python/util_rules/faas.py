@@ -291,19 +291,6 @@ class FaaSArchitecture(str, Enum):
     ARM64 = "arm64"
 
 
-class FaaSArchitectureField(StringField):
-    alias = "architecture"
-    valid_choices = FaaSArchitecture
-    expected_type = str
-    default = FaaSArchitecture.X86_64.value
-    help = help_text(
-        """
-        The architecture of the AWS Lambda runtime to target (x86_64 or arm64).
-        See https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html.
-        """
-    )
-
-
 @dataclass(frozen=True)
 class PythonFaaSKnownRuntime:
     major: int
@@ -372,7 +359,7 @@ class RuntimePlatformsRequest:
 
     runtime: PythonFaaSRuntimeField
     complete_platforms: PythonFaaSCompletePlatforms
-    architecture: Optional[FaaSArchitectureField] = None
+    architecture: Optional[FaaSArchitecture] = None
 
 
 @dataclass(frozen=True)
@@ -485,7 +472,7 @@ class BuildPythonFaaSRequest:
     log_only_reexported_handler_func: bool = False
 
     prefix_in_artifact: None | str = None
-    architecture: None | FaaSArchitectureField = None
+    architecture: None | FaaSArchitecture = None
 
 
 @rule
