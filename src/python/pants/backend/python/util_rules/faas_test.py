@@ -297,13 +297,16 @@ def test_infer_runtime_platforms_when_runtime_and_no_complete_platforms(
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
     )
 
-    platforms = rule_runner.request(RuntimePlatforms, [request])
-
-    assert platforms == RuntimePlatforms(
-        expected_interpreter_version,
-        PexPlatforms(expected_platforms),
-        CompletePlatforms(expected_complete_platforms),
-    )
+    if expected_platforms:
+        with engine_error(ValueError, contains="Could not find a known runtime"):
+            rule_runner.request(RuntimePlatforms, [request])
+    else:
+        platforms = rule_runner.request(RuntimePlatforms, [request])
+        assert platforms == RuntimePlatforms(
+            expected_interpreter_version,
+            PexPlatforms(expected_platforms),
+            CompletePlatforms(expected_complete_platforms),
+        )
 
 
 def test_infer_runtime_platforms_when_complete_platforms(
@@ -360,13 +363,16 @@ def test_infer_runtime_platforms_when_narrow_ics_only(
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
     )
 
-    platforms = rule_runner.request(RuntimePlatforms, [request])
-
-    assert platforms == RuntimePlatforms(
-        expected_interpreter_version,
-        PexPlatforms(expected_platforms),
-        CompletePlatforms(expected_complete_platforms),
-    )
+    if expected_platforms:
+        with engine_error(ValueError, contains="Could not find a known runtime"):
+            rule_runner.request(RuntimePlatforms, [request])
+    else:
+        platforms = rule_runner.request(RuntimePlatforms, [request])
+        assert platforms == RuntimePlatforms(
+            expected_interpreter_version,
+            PexPlatforms(expected_platforms),
+            CompletePlatforms(expected_complete_platforms),
+        )
 
 
 @pytest.mark.parametrize(
