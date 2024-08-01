@@ -359,7 +359,7 @@ class RuntimePlatformsRequest:
 
     runtime: PythonFaaSRuntimeField
     complete_platforms: PythonFaaSCompletePlatforms
-    architecture: Optional[FaaSArchitecture] = None
+    architecture: FaaSArchitecture
 
 
 @dataclass(frozen=True)
@@ -461,6 +461,7 @@ class BuildPythonFaaSRequest:
     handler: None | PythonFaaSHandlerField
     output_path: OutputPathField
     runtime: PythonFaaSRuntimeField
+    architecture: FaaSArchitecture
     pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
     pex_build_extra_args: PythonFaaSPexBuildExtraArgs
     layout: PythonFaaSLayoutField
@@ -472,7 +473,6 @@ class BuildPythonFaaSRequest:
     log_only_reexported_handler_func: bool = False
 
     prefix_in_artifact: None | str = None
-    architecture: None | FaaSArchitecture = None
 
 
 @rule
