@@ -21,7 +21,11 @@ from pants.backend.awslambda.python.rules import (
     package_python_aws_lambda_layer,
 )
 from pants.backend.awslambda.python.rules import rules as awslambda_python_rules
-from pants.backend.awslambda.python.target_types import AWSLambdaArchitectureField, PythonAWSLambda, PythonAWSLambdaLayer
+from pants.backend.awslambda.python.target_types import (
+    AWSLambdaArchitectureField,
+    PythonAWSLambda,
+    PythonAWSLambdaLayer,
+)
 from pants.backend.awslambda.python.target_types import rules as target_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
