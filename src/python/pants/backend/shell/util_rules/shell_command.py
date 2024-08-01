@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     RunShellCommandWorkdirField,
+    ShellCommandCacheScopeField,
     ShellCommandCommandField,
     ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
@@ -158,6 +159,9 @@ async def _prepare_process_request_from_target(
     }
 
     cache_scope = env_target.default_cache_scope
+    maybe_override_cache_scope = shell_command.get(ShellCommandCacheScopeField).enum_value
+    if maybe_override_cache_scope is not None:
+        cache_scope = maybe_override_cache_scope
 
     workspace_invalidation_globs: PathGlobs | None = None
     workspace_invalidation_sources = (

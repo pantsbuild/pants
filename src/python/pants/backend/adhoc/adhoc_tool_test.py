@@ -443,3 +443,36 @@ def test_adhoc_tool_path_env_modify_mode(rule_runner: PythonRuleRunner) -> None:
 
     path_off = run("shims_off")
     assert path_off == expected_path
+
+
+def test_adhoc_tool_cache_scope_session(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+            system_binary(name="bash", binary_name="bash")
+            adhoc_tool(
+              name="cmd",
+              runnable=":bash",
+              # Use a random value so we can detect when re-execution occurs.
+              args=["-c", "echo $RANDOM > out.log"],
+              output_files=["out.log"],
+              cache_scope="session",
+            )
+            """
+            ),
+            "src/a-file": "",
+        }
+    )
+    address = Address("src", target_name="cmd")
+
+    # Re-executing the initial execution should be cached if in the same session.
+    result1 = execute_adhoc_tool(rule_runner, address)
+    result2 = execute_adhoc_tool(rule_runner, address)
+    assert result1.snapshot == result2.snapshot
+
+    # In a new session, the process should be re-executed.
+    rule_runner.new_session("second-session")
+    rule_runner.set_options([])
+    result3 = execute_adhoc_tool(rule_runner, address)
+    assert result2.snapshot != result3.snapshot
