@@ -769,10 +769,12 @@ fn caller_to_logging_info(caller: InvalidateCaller) -> (Level, &'static str) {
 
 impl Invalidatable for InvalidatableGraph {
     fn invalidate(&self, paths: &HashSet<PathBuf>, caller: InvalidateCaller) -> usize {
+        eprintln!("invalidate path = {paths:?}");
         let InvalidationResult { cleared, dirtied } =
             self.invalidate_from_roots(false, move |node| {
                 if let Some(fs_subject) = node.fs_subject() {
                     let path = fs_subject.to_path_in_workspace(&self.build_root);
+                    eprintln!("path: {fs_subject:?} -> {path:?}");
                     paths.contains(&path)
                 } else {
                     false

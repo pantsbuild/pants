@@ -58,7 +58,7 @@ from pants.util.dirutil import relative_symlink, safe_file_dump
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rr = RuleRunner(
         rules=[
             QueryRule(Digest, [CreateDigest]),
             QueryRule(DigestContents, [PathGlobs]),
@@ -71,6 +71,8 @@ def rule_runner() -> RuleRunner:
         ],
         isolated_local_store=True,
     )
+    rr.set_options(["-ldebug", "--log-show-rust-3rdparty"])
+    return rr
 
 
 ROLAND_FILE_DIGEST = FileDigest(
