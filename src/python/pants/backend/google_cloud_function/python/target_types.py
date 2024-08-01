@@ -7,9 +7,11 @@ from typing import Match, Optional, Tuple, cast
 
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.backend.python.util_rules.faas import (
+    FaaSArchitecture,
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
+    PythonFaaSKnownRuntime,
     PythonFaaSLayoutField,
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
@@ -54,6 +56,24 @@ class PythonGoogleCloudFunctionRuntimes(Enum):
 
 class PythonGoogleCloudFunctionRuntime(PythonFaaSRuntimeField):
     PYTHON_RUNTIME_REGEX = r"^python(?P<major>\d)(?P<minor>\d+)$"
+    DOCKER_REPO_MAPPING = {
+        PythonGoogleCloudFunctionRuntimes.PYTHON_37: "us-central1-docker.pkg.dev/serverless-runtimes/google-18-full/runtimes/python37",
+        PythonGoogleCloudFunctionRuntimes.PYTHON_38: "us-central1-docker.pkg.dev/serverless-runtimes/google-18-full/runtimes/python38",
+        PythonGoogleCloudFunctionRuntimes.PYTHON_39: "us-central1-docker.pkg.dev/serverless-runtimes/google-18-full/runtimes/python39",
+        PythonGoogleCloudFunctionRuntimes.PYTHON_310: "us-central1-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/python310",
+        PythonGoogleCloudFunctionRuntimes.PYTHON_311: "us-central1-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/python311",
+        PythonGoogleCloudFunctionRuntimes.PYTHON_312: "us-central1-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/python312",
+    }
+    # Unfortunately, GCF has many different components to the tags used, so we need to map them
+    # here.
+    DOCKER_TAG_MAPPING = {
+        PythonGoogleCloudFunctionRuntimes.PYTHON_37: "python37_20240728_3_7_17_RC00",
+        PythonGoogleCloudFunctionRuntimes.PYTHON_38: "python38_20240728_3_8_19_RC00",
+        PythonGoogleCloudFunctionRuntimes.PYTHON_39: "python39_20240728_3_9_19_RC00",
+        PythonGoogleCloudFunctionRuntimes.PYTHON_310: "python310_20240728_3_10_14_RC00",
+        PythonGoogleCloudFunctionRuntimes.PYTHON_311: "python311_20240728_3_11_9_RC00",
+        PythonGoogleCloudFunctionRuntimes.PYTHON_312: "python312_20240728_3_12_4_RC00",
+    }
 
     valid_choices = PythonGoogleCloudFunctionRuntimes
     help = help_text(
@@ -66,6 +86,15 @@ class PythonGoogleCloudFunctionRuntime(PythonFaaSRuntimeField):
         packaging the Google Cloud Function PEX or running it as a deployed Google Cloud Function,
         you should try using `complete_platforms` instead.
         """
+    )
+
+    known_runtimes = (
+        PythonFaaSKnownRuntime(3, 7, DOCKER_REPO_MAPPING[PythonGoogleCloudFunctionRuntimes.PYTHON_37], DOCKER_TAG_MAPPING[PythonGoogleCloudFunctionRuntimes.PYTHON_37], FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 8, DOCKER_REPO_MAPPING[PythonGoogleCloudFunctionRuntimes.PYTHON_38], DOCKER_TAG_MAPPING[PythonGoogleCloudFunctionRuntimes.PYTHON_38], FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 9, DOCKER_REPO_MAPPING[PythonGoogleCloudFunctionRuntimes.PYTHON_39], DOCKER_TAG_MAPPING[PythonGoogleCloudFunctionRuntimes.PYTHON_39], FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 10, DOCKER_REPO_MAPPING[PythonGoogleCloudFunctionRuntimes.PYTHON_310], DOCKER_TAG_MAPPING[PythonGoogleCloudFunctionRuntimes.PYTHON_310], FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 11, DOCKER_REPO_MAPPING[PythonGoogleCloudFunctionRuntimes.PYTHON_311], DOCKER_TAG_MAPPING[PythonGoogleCloudFunctionRuntimes.PYTHON_311], FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 12, DOCKER_REPO_MAPPING[PythonGoogleCloudFunctionRuntimes.PYTHON_312], DOCKER_TAG_MAPPING[PythonGoogleCloudFunctionRuntimes.PYTHON_312], FaaSArchitecture.X86_64),
     )
 
     @classmethod

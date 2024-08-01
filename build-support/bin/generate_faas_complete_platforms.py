@@ -24,15 +24,16 @@ import sys
 from pathlib import Path
 
 from pants.backend.awslambda.python.target_types import PythonAwsLambdaRuntime
+from pants.backend.google_cloud_function.python.target_types import PythonGoogleCloudFunctionRuntime
 from pants.backend.python.util_rules.faas import FaaSArchitecture, PythonFaaSRuntimeField
 from pants.base.build_environment import get_buildroot
 
 COMMAND = "pip install pex 1>&2 && pex3 interpreter inspect --markers --tags"
 
 
-RUNTIME_FIELDS = [
+RUNTIME_FIELDS: list[type[PythonFaaSRuntimeField]] = [
     PythonAwsLambdaRuntime,
-    # TODO: what docker images to use for GCF?
+    PythonGoogleCloudFunctionRuntime,
 ]
 
 
