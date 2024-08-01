@@ -18,6 +18,7 @@ from pants.backend.awslambda.python.target_types import (
 )
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
+    FaaSArchitecture,
     PythonFaaSCompletePlatforms,
     PythonFaaSLayoutField,
     PythonFaaSPex3VenvCreateExtraArgsField,
@@ -72,7 +73,9 @@ async def package_python_aws_lambda_function(
             target_name=PythonAWSLambda.alias,
             complete_platforms=field_set.complete_platforms,
             runtime=field_set.runtime,
-            architecture=field_set.architecture,
+            architecture=FaaSArchitecture(field_set.architecture.value)
+            if field_set.architecture.value
+            else None,
             handler=field_set.handler,
             output_path=field_set.output_path,
             include_requirements=field_set.include_requirements.value,
@@ -96,7 +99,9 @@ async def package_python_aws_lambda_layer(
             target_name=PythonAWSLambdaLayer.alias,
             complete_platforms=field_set.complete_platforms,
             runtime=field_set.runtime,
-            architecture=field_set.architecture,
+            architecture=FaaSArchitecture(field_set.architecture.value)
+            if field_set.architecture.value
+            else None,
             output_path=field_set.output_path,
             include_requirements=field_set.include_requirements.value,
             include_sources=field_set.include_sources.value,

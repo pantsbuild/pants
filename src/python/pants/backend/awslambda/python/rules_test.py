@@ -21,7 +21,7 @@ from pants.backend.awslambda.python.rules import (
     package_python_aws_lambda_layer,
 )
 from pants.backend.awslambda.python.rules import rules as awslambda_python_rules
-from pants.backend.awslambda.python.target_types import PythonAWSLambda, PythonAWSLambdaLayer
+from pants.backend.awslambda.python.target_types import AWSLambdaArchitectureField, PythonAWSLambda, PythonAWSLambdaLayer
 from pants.backend.awslambda.python.target_types import rules as target_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -427,7 +427,7 @@ def test_pex3_venv_create_extra_args_are_passed_through(
         address=addr,
         include_requirements=Mock(),
         runtime=Mock(),
-        architecture=Mock(),
+        architecture=AWSLambdaArchitectureField(FaaSArchitecture.X86_64.value, addr),
         complete_platforms=Mock(),
         output_path=Mock(),
         environment=Mock(),
