@@ -7,6 +7,7 @@ import os
 
 from pants.backend.adhoc.target_types import (
     AdhocToolArgumentsField,
+    AdhocToolCacheScopeField,
     AdhocToolExecutionDependenciesField,
     AdhocToolExtraEnvVarsField,
     AdhocToolLogOutputField,
@@ -85,6 +86,9 @@ async def run_in_sandbox_request(
     output_directories = target.get(AdhocToolOutputDirectoriesField).value or ()
 
     cache_scope = env_target.default_cache_scope
+    maybe_override_cache_scope = target.get(AdhocToolCacheScopeField).enum_value
+    if maybe_override_cache_scope is not None:
+        cache_scope = maybe_override_cache_scope
 
     workspace_invalidation_globs: PathGlobs | None = None
     workspace_invalidation_sources = (
