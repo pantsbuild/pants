@@ -105,13 +105,15 @@ class Ruff(TemplatedExternalTool):
             check_content={os.path.join(d, "pyproject.toml"): b"[tool.ruff" for d in all_dirs},
         )
 
+    _removal_hint = "Now ignored: use `version` and `known_version` to customise the version, consider deleting the resolve and `python_requirement` if no longer used"
+
     # Options that only exist to ease the upgrade from Ruff as a Python tool to Ruff as an external
     # downloaded one
     install_from_resolve = StrOption(
         advanced=True,
         default=None,
         removal_version="2.26.0.dev0",
-        removal_hint="Now ignored: use `version` and `known_version` to customise the version, consider deleting the resolve and `python_requirement` if no longer used",
+        removal_hint=_removal_hint,
         help="Formerly used to customise the version of Ruff to install.",
     )
 
@@ -119,28 +121,28 @@ class Ruff(TemplatedExternalTool):
         advanced=True,
         default=None,
         removal_version="2.26.0.dev0",
-        removal_hint="Now ignored: use `version` and `known_version` to customise the version, consider deleting the resolve and `python_requirement` if no longer used",
+        removal_hint=_removal_hint,
         help="Formerly used to customise the version of Ruff to install.",
     )
     interpreter_constraints = StrListOption(
         advanced=True,
         default=None,
         removal_version="2.26.0.dev0",
-        removal_hint="Now ignored: use `version` and `known_version` to customise the version, consider deleting the resolve and `python_requirement` if no longer used",
+        removal_hint=_removal_hint,
         help="Formerly used to customise the version of Ruff to install.",
     )
     console_script = StrOption(
         advanced=True,
         default=None,
         removal_version="2.26.0.dev0",
-        removal_hint="Now ignored: use `version` and `known_version` to customise the version, consider deleting the resolve and `python_requirement` if no longer used",
+        removal_hint=_removal_hint,
         help="Formerly used to customise the version of Ruff to install.",
     )
     entry_point = StrOption(
         advanced=True,
         default=None,
         removal_version="2.26.0.dev0",
-        removal_hint="Now ignored: use `version` and `known_version` to customise the version, consider deleting the resolve and `python_requirement` if no longer used",
+        removal_hint=_removal_hint,
         help="Formerly used to customise the version of Ruff to install.",
     )
 
