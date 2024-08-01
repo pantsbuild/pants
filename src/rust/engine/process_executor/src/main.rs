@@ -363,6 +363,7 @@ async fn main() {
                             append_only_caches_base_path: args
                                 .named_cache_path
                                 .map(|p| p.to_string_lossy().to_string()),
+                            log_cache_misses: false,
                         },
                         RemoteStoreOptions {
                             provider: RemoteProvider::Reapi,

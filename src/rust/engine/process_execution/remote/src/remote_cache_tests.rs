@@ -159,6 +159,7 @@ async fn create_cached_runner(
                 warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
                 cache_content_behavior,
                 append_only_caches_base_path: None,
+                log_cache_misses: false,
             },
             RemoteStoreOptions {
                 provider: RemoteProvider::Reapi,
@@ -763,6 +764,7 @@ async fn make_action_result_basic() {
             warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
             cache_content_behavior: CacheContentBehavior::Defer,
             append_only_caches_base_path: None,
+            log_cache_misses: false,
         },
         RemoteStoreOptions {
             provider: RemoteProvider::Reapi,

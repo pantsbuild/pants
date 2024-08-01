@@ -274,6 +274,7 @@ def test_remote_provider_matches_rust_enum(
         cache_content_behavior="validate",
         cache_rpc_concurrency=0,
         cache_rpc_timeout_millis=0,
+        cache_log_cache_misses=False,
         execution_headers={},
         execution_overall_deadline_secs=0,
         execution_rpc_concurrency=0,

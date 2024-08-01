@@ -101,6 +101,7 @@ pub struct RemotingOptions {
     pub cache_content_behavior: CacheContentBehavior,
     pub cache_rpc_concurrency: usize,
     pub cache_rpc_timeout: Duration,
+    pub cache_log_cache_misses: bool,
     pub execution_headers: BTreeMap<String, String>,
     pub execution_overall_deadline: Duration,
     pub execution_rpc_concurrency: usize,
@@ -376,6 +377,7 @@ impl Core {
                         append_only_caches_base_path: remoting_opts
                             .append_only_caches_base_path
                             .clone(),
+                        log_cache_misses: remoting_opts.cache_log_cache_misses,
                     },
                     remoting_opts.to_remote_store_options(tls_config)?,
                 )

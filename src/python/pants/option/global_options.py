@@ -641,6 +641,7 @@ class ExecutionOptions:
     remote_cache_warnings: RemoteCacheWarningsBehavior
     remote_cache_rpc_concurrency: int
     remote_cache_rpc_timeout_millis: int
+    remote_cache_log_cache_misses: bool
 
     remote_execution_address: str | None
     remote_execution_headers: dict[str, str]
@@ -689,6 +690,7 @@ class ExecutionOptions:
             remote_cache_warnings=bootstrap_options.remote_cache_warnings,
             remote_cache_rpc_concurrency=dynamic_remote_options.cache_rpc_concurrency,
             remote_cache_rpc_timeout_millis=bootstrap_options.remote_cache_rpc_timeout_millis,
+            remote_cache_log_cache_misses=bootstrap_options.remote_cache_log_cache_misses,
             # Remote execution setup.
             remote_execution_address=dynamic_remote_options.execution_address,
             remote_execution_headers=dynamic_remote_options.execution_headers,
@@ -778,6 +780,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_cache_warnings=RemoteCacheWarningsBehavior.backoff,
     remote_cache_rpc_concurrency=128,
     remote_cache_rpc_timeout_millis=1500,
+    remote_cache_log_cache_misses=False,
     # Remote execution setup.
     remote_execution_address=None,
     remote_execution_headers={
@@ -1686,6 +1689,11 @@ class BootstrapOptions:
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_timeout_millis,
         help="Timeout value for remote cache RPCs in milliseconds.",
+    )
+    remote_cache_log_cache_misses = BoolOption(
+        advanced=True,
+        default=DEFAULT_EXECUTION_OPTIONS.remote_cache_log_cache_misses,
+        help="Whether to log cache misses.",
     )
     remote_execution_address = StrOption(
         advanced=True,

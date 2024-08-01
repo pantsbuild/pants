@@ -51,6 +51,7 @@ pub struct RemoteCacheRunnerOptions {
     pub warnings_behavior: RemoteCacheWarningsBehavior,
     pub cache_content_behavior: CacheContentBehavior,
     pub append_only_caches_base_path: Option<String>,
+    pub log_cache_misses: bool,
 }
 
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
@@ -76,6 +77,7 @@ pub struct CommandRunner {
     warnings_behavior: RemoteCacheWarningsBehavior,
     read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
     write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
+    log_cache_misses: bool,
 }
 
 impl CommandRunner {
@@ -91,6 +93,7 @@ impl CommandRunner {
             warnings_behavior,
             cache_content_behavior,
             append_only_caches_base_path,
+            log_cache_misses,
         }: RemoteCacheRunnerOptions,
         provider: Arc<dyn ActionCacheProvider + 'static>,
     ) -> Self {
@@ -108,6 +111,7 @@ impl CommandRunner {
             warnings_behavior,
             read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
             write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
+            log_cache_misses,
         }
     }
 
@@ -298,11 +302,19 @@ impl CommandRunner {
                         cached_response_opt
                     }
                     _ => {
-                        log::debug!(
-                            "remote cache miss for: {:?} digest={:?}",
-                            request.description,
-                            action_digest
-                        );
+                        if self.log_cache_misses {
+                            log::info!(
+                                "remote cache miss for: {:?} digest={:?}",
+                                request.description,
+                                action_digest.hash.to_hex()
+                            );
+                        } else {
+                            log::debug!(
+                                "remote cache miss for: {:?} digest={:?}",
+                                request.description,
+                                action_digest
+                            );
+                        }
                         None
                     }
                 },

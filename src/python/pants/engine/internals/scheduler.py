@@ -196,6 +196,7 @@ class Scheduler:
             cache_content_behavior=execution_options.cache_content_behavior.value,
             cache_rpc_concurrency=execution_options.remote_cache_rpc_concurrency,
             cache_rpc_timeout_millis=execution_options.remote_cache_rpc_timeout_millis,
+            cache_log_cache_misses=execution_options.remote_cache_log_cache_misses,
             execution_headers=execution_options.remote_execution_headers,
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
             execution_rpc_concurrency=execution_options.remote_execution_rpc_concurrency,
