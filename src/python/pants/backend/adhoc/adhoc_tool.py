@@ -126,6 +126,7 @@ async def run_in_sandbox_request(
         capture_stdout_file=target[AdhocToolStdoutFilenameField].value,
         workspace_invalidation_globs=workspace_invalidation_globs,
         cache_scope=cache_scope,
+        use_working_directory_as_base_for_output_captures=environment_target.use_working_directory_as_base_for_output_captures,
     )
 
     adhoc_result = await Get(
