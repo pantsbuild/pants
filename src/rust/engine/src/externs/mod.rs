@@ -131,7 +131,10 @@ pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {
 }
 
 /// Store a slice containing 2-tuples of (key, value) as a Python dictionary.
-pub fn store_dict(py: Python, keys_and_values: Vec<(Value, Value)>) -> PyResult<Value> {
+pub fn store_dict(
+    py: Python,
+    keys_and_values: impl IntoIterator<Item = (Value, Value)>,
+) -> PyResult<Value> {
     let dict = PyDict::new(py);
     for (k, v) in keys_and_values {
         dict.set_item(k.consume_into_py_object(py), v.consume_into_py_object(py))?;
