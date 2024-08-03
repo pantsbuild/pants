@@ -158,7 +158,7 @@ async def _prepare_inference_metadata(address: Address, file_path: str) -> Infer
 
 
 def _add_extensions(file_imports: frozenset[str]) -> PathGlobs:
-    file_extensions = (*JS_FILE_EXTENSIONS, *JSX_FILE_EXTENSIONS) 
+    file_extensions = (*JS_FILE_EXTENSIONS, *JSX_FILE_EXTENSIONS)
     extensions = file_extensions + tuple(f"/index{ext}" for ext in file_extensions)
     return PathGlobs(
         string
