@@ -48,7 +48,6 @@ class GenerateFilesFromAdhocToolRequest(GenerateSourcesRequest):
 @rule(desc="Running run_in_sandbox target", level=LogLevel.DEBUG)
 async def run_in_sandbox_request(
     request: GenerateFilesFromAdhocToolRequest,
-    env_target: EnvironmentTarget,
 ) -> GeneratedSources:
     target = request.protocol_target
     description = f"the `{target.alias}` at {target.address}"
@@ -56,6 +55,8 @@ async def run_in_sandbox_request(
     environment_name = await Get(
         EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)
     )
+
+    environment_target = await Get(EnvironmentTarget, EnvironmentName, environment_name)
 
     runnable_address_str = target[AdhocToolRunnableField].value
     if not runnable_address_str:
@@ -79,7 +80,7 @@ async def run_in_sandbox_request(
     output_files = target.get(AdhocToolOutputFilesField).value or ()
     output_directories = target.get(AdhocToolOutputDirectoriesField).value or ()
 
-    cache_scope = env_target.default_cache_scope
+    cache_scope = environment_target.default_cache_scope
 
     process_request = AdhocProcessRequest(
         description=description,
