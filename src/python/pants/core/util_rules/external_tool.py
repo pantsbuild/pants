@@ -12,13 +12,14 @@ from enum import Enum
 
 from pkg_resources import Requirement
 
+from pants.core.goals.export import ExportResult, ExportExternalToolRequest
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive
 from pants.engine.fs import CreateDigest, Digest, DigestEntries, DownloadFile, FileDigest, FileEntry
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import DictOption, EnumOption, StrListOption, StrOption
-from pants.option.subsystem import Subsystem
+from pants.option.subsystem import Subsystem, _construct_subsystem
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
@@ -390,6 +391,24 @@ async def download_external_tool(request: ExternalToolRequest) -> DownloadedExte
         digest = await Get(Digest, CreateDigest(digest_entries))
 
     return DownloadedExternalTool(digest, request.exe)
+
+
+@rule(level=LogLevel.DEBUG)
+async def export_external_tool(req: ExportExternalToolRequest, platform: Platform) -> ExportResult:
+    tool = await _construct_subsystem(req.tool)
+    t = await Get(
+        DownloadedExternalTool,
+        ExternalToolRequest,
+        tool.get_request(platform)
+    )
+
+    dest = "bin"
+
+    return ExportResult(
+        description=f"Export tool {req.tool.name}",
+        reldir=dest,
+        digest=t.digest,
+    )
 
 
 def rules():
