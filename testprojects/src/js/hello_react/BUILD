@@ -4,7 +4,8 @@ package_json(
     scripts=[
         node_build_script(entry_point="build", output_directories=["dist"]),
     ],
-    dependencies=[":babel_config"],
+    dependencies=[":babel_config", ":jsconfig"],
 )
 
 file(name="babel_config", source="babel.config.json")
+file(name="jsconfig", source="jsconfig.json")

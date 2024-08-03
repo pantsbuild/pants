@@ -21,6 +21,9 @@
   "jest": {
     "extensionsToTreatAsEsm": [
       ".jsx"
-    ]
+    ],
+    "moduleNameMapper": {
+      "^@app/(.*)$": "<rootDir>/src/$1"
+    }
   }
 }

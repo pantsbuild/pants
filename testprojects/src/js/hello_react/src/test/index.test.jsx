@@ -7,7 +7,7 @@
 import React from "react";
 import Server from "react-dom/server";
 
-import HelloPage from "../App.jsx";
+import HelloPage from "@app/App";
 
 it("page to greet you", () => {
   const rendered = Server.renderToString(<HelloPage />);
