@@ -117,14 +117,17 @@ async def generate_lockfile_from_sources(
         ),
     )
 
-    args = ["providers", "lock"]
-    args.extend(terraform_arg("-platform", platform) for platform in lockfile_request.platforms)
+    args = (
+        "providers",
+        "lock",
+        *(terraform_arg("-platform", platform) for platform in lockfile_request.platforms),
+    )
 
     provider_lock_description = f"Update terraform lockfile for {lockfile_request.resolve_name}"
     multiplatform_lockfile = await Get(
         FallibleProcessResult,
         TerraformProcess(
-            args=tuple(args),
+            args=args,
             input_digest=initialised_terraform.sources_and_deps,
             output_files=(".terraform.lock.hcl",),
             description=provider_lock_description,
