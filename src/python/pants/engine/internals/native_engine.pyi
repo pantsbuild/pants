@@ -897,6 +897,10 @@ _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
 
 class PyGeneratorResponseCall:
+    output_type: type
+    input_types: Sequence[type]
+    inputs: Sequence[Any]
+
     @overload
     def __init__(
         self,
