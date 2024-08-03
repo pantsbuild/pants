@@ -27,7 +27,7 @@ use crate::cas_service::StubCASResponder;
 /// * ContentAddressableStorage
 /// * ActionCache
 /// * Capabilities
-/// ...gRPC APIs.
+/// * ...gRPC APIs.
 ///
 /// NB: You might expect that these services could be generically composed, but the
 /// `tonic::{Server, Router}` builder pattern changes its type with each call to `add_service`,

@@ -110,12 +110,13 @@ def _make_rule(
         if not inspect.isfunction(original_func):
             raise ValueError("The @rule decorator must be applied innermost of all decorators.")
 
+        # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
+        original_func.__line_number__ = original_func.__code__.co_firstlineno
+        original_func.rule_id = canonical_name
+
         awaitables = FrozenOrderedSet(collect_awaitables(original_func))
 
         validate_requirements(func_id, parameter_types, awaitables, cacheable)
-
-        # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
-        original_func.__line_number__ = original_func.__code__.co_firstlineno
 
         func = _rule_call_trampoline(canonical_name, return_type, original_func)
 

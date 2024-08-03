@@ -19,11 +19,10 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
 )
-from pants.backend.python.dependency_inference.rules import UnownedDependencyError, import_rules
+from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.dependency_inference.subsystem import (
     AmbiguityResolution,
     PythonInferSubsystem,
-    UnownedDependencyUsage,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -50,6 +49,10 @@ from pants.backend.python.util_rules.entry_points import (
 )
 from pants.backend.python.util_rules.interpreter_constraints import interpreter_constraints_contains
 from pants.backend.python.util_rules.package_dists import InvalidEntryPoint
+from pants.core.util_rules.unowned_dependency_behavior import (
+    UnownedDependencyError,
+    UnownedDependencyUsage,
+)
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -313,7 +316,7 @@ def _determine_entry_point_owner(
 def _handle_unresolved_pex_entrypoint(
     address: Address,
     entry_point: str,
-    ambiguous_owners,
+    ambiguous_owners: tuple[Address, ...],
     unowned_dependency_behavior: UnownedDependencyUsage,
 ) -> None:
     """Raise an error if we could not disambiguate an entrypoint for the PEX."""
