@@ -295,6 +295,7 @@ class UnrecognizedResolveNamesError(Exception):
         self,
         unrecognized_resolve_names: list[str],
         all_valid_names: Iterable[str],
+        all_valid_binaries: Iterable[str] | None = None,
         *,
         description_of_origin: str,
     ) -> None:
@@ -305,16 +306,17 @@ class UnrecognizedResolveNamesError(Exception):
         else:
             unrecognized_str = str(sorted(unrecognized_resolve_names))
             name_description = "names"
-        super().__init__(
-            softwrap(
-                f"""
+
+        message = f"""
                 Unrecognized resolve {name_description} from {description_of_origin}:
                 {unrecognized_str}
 
                 All valid resolve names: {sorted(all_valid_names)}
                 """
-            )
-        )
+        if all_valid_binaries:
+            message += f"\nAll valid exportable binaries: {sorted(all_valid_binaries)}"
+
+        super().__init__(softwrap(message))
 
 
 class _ResolveProviderType(Enum):

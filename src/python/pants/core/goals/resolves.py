@@ -2,12 +2,24 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from enum import Enum
 from typing import TypeVar
 
 from pants.engine.unions import UnionMembership, union
 from pants.util.strutil import softwrap
 
 T = TypeVar("T", bound="ExportableTool")
+
+
+class ExportMode(Enum):
+    """How this tool should be exported.
+
+    resolve: in a language-based resolve
+    binary: as a single binary
+    """
+
+    resolve = "resolve"
+    binary = "binary"
 
 
 @union
@@ -23,6 +35,7 @@ class ExportableTool:
     """
 
     options_scope: str
+    export_mode: ExportMode = ExportMode.resolve
 
     @classmethod
     def help_for_generate_lockfile_with_default_location(cls, resolve_name: str):
