@@ -9,10 +9,7 @@ from enum import Enum, unique
 from typing import Iterable, Mapping
 
 from pants.backend.openapi.subsystems import openapi_generator
-from pants.backend.openapi.subsystems.openapi_generator import (
-    OpenAPIGenerator,
-    OpenAPIGeneratorLockfileSentinel,
-)
+from pants.backend.openapi.subsystems.openapi_generator import OpenAPIGenerator
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
@@ -85,8 +82,9 @@ _GENERATOR_CLASS_NAME = "org.openapitools.codegen.OpenAPIGenerator"
 async def openapi_generator_process(
     request: OpenAPIGeneratorProcess, jdk: InternalJdk, subsystem: OpenAPIGenerator
 ) -> Process:
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, OpenAPIGeneratorLockfileSentinel())
-    tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
+    tool_classpath = await Get(
+        ToolClasspath, ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(subsystem))
+    )
 
     toolcp_relpath = "__toolcp"
     immutable_input_digests = {

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 from pants.build_graph.address import Address, AddressInput
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
 from pants.core.goals.resolves import ExportableTool
 from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import Get, MultiGet
@@ -184,10 +184,6 @@ async def gather_coordinates_for_jvm_lockfile(
     return ArtifactRequirements(requirements)
 
 
-class GenerateJvmToolLockfileSentinel(GenerateToolLockfileSentinel):
-    pass
-
-
 @dataclass(frozen=True)
 class GenerateJvmLockfileFromTool:
     """Create a `GenerateJvmLockfile` request for a JVM tool.
@@ -198,24 +194,28 @@ class GenerateJvmLockfileFromTool:
     """
 
     artifact_inputs: FrozenOrderedSet[str]
-    artifact_option_name: str
-    lockfile_option_name: str
+    options_scope: str
     resolve_name: str
-    read_lockfile_dest: str  # Path to lockfile when reading, or DEFAULT_TOOL_LOCKFILE to read from resource.
-    write_lockfile_dest: str  # Path to lockfile when generating the lockfile.
+    lockfile: str
     default_lockfile_resource: tuple[str, str]
 
     @classmethod
     def create(cls, tool: JvmToolBase) -> GenerateJvmLockfileFromTool:
         return GenerateJvmLockfileFromTool(
             FrozenOrderedSet(tool.artifact_inputs),
-            artifact_option_name=f"[{tool.options_scope}].artifacts",
-            lockfile_option_name=f"[{tool.options_scope}].lockfile",
+            options_scope=tool.options_scope,
             resolve_name=tool.options_scope,
-            read_lockfile_dest=tool.lockfile,
-            write_lockfile_dest=tool.lockfile,
+            lockfile=tool.lockfile,
             default_lockfile_resource=tool.default_lockfile_resource,
         )
+
+    @property
+    def artifact_option_name(self) -> str:
+        return f"[{self.options_scope}].artifacts"
+
+    @property
+    def lockfile_option_name(self):
+        return f"[{self.options_scope}].lockfile"
 
 
 def rules():
