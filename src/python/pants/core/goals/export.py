@@ -50,11 +50,6 @@ class ExportRequest:
 
 
 @dataclass(frozen=True)
-class ExportExternalToolRequest:
-    tool: type[ExternalTool]
-
-
-@dataclass(frozen=True)
 class PostProcessingCommand:
     """A command to run as a local process after an exported digest is materialized."""
 
@@ -137,7 +132,7 @@ class ExportSubsystem(GoalSubsystem):
     binaries = StrListOption(
         flag_name="--bin",  # `bin` is a python builtin
         default=[],
-        help="Export the specified binaries."
+        help="Export the specified binaries.",
     )
 
 
@@ -158,7 +153,7 @@ async def export(
 ) -> Export:
     request_types = cast("Iterable[type[ExportRequest]]", union_membership.get(ExportRequest))
 
-    if not (export_subsys.options.resolve or export_subsys.options.binaries):
+    if not (export_subsys.resolve or export_subsys.options.bin):
         raise ExportError("Must specify at least one `--resolve` or `--bin` to export")
     if targets:
         raise ExportError("The `export` goal does not take target specs.")
@@ -167,10 +162,6 @@ async def export(
     all_results = await MultiGet(Get(ExportResults, ExportRequest, request) for request in requests)
     flattened_results = [res for results in all_results for res in results]
 
-    from pants.backend.terraform.tool import TerraformTool
-    tool_export = await Get(ExportResult, ExportExternalToolRequest(TerraformTool))
-    prefixed = await Get(Digest, AddPrefix(tool_export.digest, tool_export.reldir))
-
     prefixed_digests = await MultiGet(
         Get(Digest, AddPrefix(result.digest, result.reldir)) for result in flattened_results
     )
@@ -178,7 +169,7 @@ async def export(
     for result in flattened_results:
         digest_root = os.path.join(build_root.path, output_dir, result.reldir)
         safe_rmtree(digest_root)
-    merged_digest = await Get(Digest, MergeDigests([*prefixed_digests, prefixed]))
+    merged_digest = await Get(Digest, MergeDigests(prefixed_digests))
     dist_digest = await Get(Digest, AddPrefix(merged_digest, output_dir))
     workspace.write_digest(dist_digest)
     environment = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
