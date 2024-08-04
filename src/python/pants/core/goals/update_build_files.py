@@ -47,6 +47,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.parser import ParseError
+from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption
@@ -395,10 +396,9 @@ class FormatWithRuffRequest(RewrittenBuildFileRequest):
 
 @rule
 async def format_build_file_with_ruff(
-    request: FormatWithRuffRequest, ruff: Ruff
+    request: FormatWithRuffRequest, ruff: Ruff, platform: Platform
 ) -> RewrittenBuildFile:
     input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
-    ruff_ics = await get_lockfile_interpreter_constraints(ruff)
     result = await _run_ruff_fmt(
         RuffRequest.Batch(
             Ruff.options_scope,
@@ -407,7 +407,7 @@ async def format_build_file_with_ruff(
             snapshot=input_snapshot,
         ),
         ruff,
-        ruff_ics,
+        platform,
     )
     output_content = await Get(DigestContents, Digest, result.output.digest)
 

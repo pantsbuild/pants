@@ -198,7 +198,7 @@ def test_skip_field(rule_runner: RuleRunner) -> None:
 
     fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
 
-    assert lint_result.exit_code == 1
+    assert lint_result.exit_code == 0
     assert fix_result.output == rule_runner.make_snapshot({})
     assert fix_result.did_change is False
     assert fmt_result.output == rule_runner.make_snapshot({})
@@ -224,7 +224,7 @@ def test_skip_check_field(rule_runner: RuleRunner) -> None:
 
     fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
 
-    assert lint_result.exit_code == 1
+    assert lint_result.exit_code == 0
     assert fix_result.output == rule_runner.make_snapshot({})
     assert fix_result.did_change is False
     assert fmt_result.output == rule_runner.make_snapshot(

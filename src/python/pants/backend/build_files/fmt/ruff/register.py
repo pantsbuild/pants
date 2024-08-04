@@ -8,6 +8,7 @@ from pants.backend.python.lint.ruff.format.rules import _run_ruff_fmt
 from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.subsystems.python_tool_base import get_lockfile_interpreter_constraints
 from pants.core.goals.fmt import FmtResult
+from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
 
@@ -17,9 +18,8 @@ class RuffRequest(FmtBuildFilesRequest):
 
 
 @rule(desc="Format with Ruff", level=LogLevel.DEBUG)
-async def ruff_fmt(request: RuffRequest.Batch, ruff: Ruff) -> FmtResult:
-    ruff_ics = await get_lockfile_interpreter_constraints(ruff)
-    return await _run_ruff_fmt(request, ruff, ruff_ics)
+async def ruff_fmt(request: RuffRequest.Batch, ruff: Ruff, platform: Platform) -> FmtResult:
+    return await _run_ruff_fmt(request, ruff, platform)
 
 
 def rules():
