@@ -117,6 +117,7 @@ class TerraformInitResponse:
 
 @dataclass(frozen=True)
 class TerraformUpgradeResponse:
+    sources_and_deps: Digest
     lockfile: Digest
     chdir: str
 
@@ -231,26 +232,54 @@ async def terraform_init(request: TerraformInitRequest) -> TerraformInitResponse
 
 @rule
 async def terraform_upgrade_lockfile(request: TerraformInitRequest) -> TerraformUpgradeResponse:
-    """Run `terraform init -upgrade`. Returns just the lockfile.
+    """Run `terraform init -upgrade`. Returns all terraform files with the new lockfile.
 
     This split exists because the new and old lockfile will conflict if merging digests
     """
 
-    _, _, init_response, chdir = await run_terraform_init(request, upgrade=True)
+    source_files, dependencies_files, init_response, chdir = await run_terraform_init(
+        request, upgrade=True
+    )
 
-    lockfile = await Get(
-        Digest,
-        DigestSubset(
-            init_response.digest,
-            PathGlobs(
-                (os.path.join(chdir, ".terraform.lock.hcl"),),
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin="upgrade terraform lockfile with `terraform init`",
+    updated_lockfile, dependencies_except_lockfile = await MultiGet(
+        Get(
+            Digest,
+            DigestSubset(
+                init_response.digest,
+                PathGlobs(
+                    (os.path.join(chdir, ".terraform.lock.hcl"),),
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    description_of_origin="upgrade terraform lockfile with `terraform init`",
+                ),
+            ),
+        ),
+        Get(
+            Digest,
+            DigestSubset(
+                dependencies_files.snapshot.digest,
+                PathGlobs(
+                    (
+                        "**",
+                        "!" + os.path.join(chdir, ".terraform.lock.hcl"),
+                    ),
+                ),
             ),
         ),
     )
 
-    return TerraformUpgradeResponse(lockfile, chdir)
+    all_terraform_files = await Get(
+        Digest,
+        MergeDigests(
+            [
+                source_files.snapshot.digest,
+                dependencies_except_lockfile,
+                init_response.digest,
+                updated_lockfile,
+            ]
+        ),
+    )
+
+    return TerraformUpgradeResponse(all_terraform_files, updated_lockfile, chdir)
 
 
 def rules():

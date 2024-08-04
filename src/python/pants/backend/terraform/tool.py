@@ -358,6 +358,16 @@ class TerraformTool(TemplatedExternalTool):
         ),
     )
 
+    platforms = StrListOption(
+        help=softwrap(
+            """
+            Platforms to generate lockfiles for. See the [documentation for the providers lock command](https://developer.hashicorp.com/terraform/cli/commands/providers/lock#platform-os_arch).
+            For example, `["windows_amd64", "darwin_amd64", "linux_amd64"]`
+            """
+        ),
+        advanced=True,
+    )
+
     tailor = BoolOption(
         default=True,
         help="If true, add `terraform_module` targets with the `tailor` goal.",
