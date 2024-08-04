@@ -6,7 +6,7 @@ import dataclasses
 import json
 import textwrap
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
@@ -26,7 +26,7 @@ standard_deployment = standard_deployment
 
 def _do_init_terraform(
     rule_runner: RuleRunner, standard_deployment: StandardDeployment, initialise_backend: bool
-) -> Tuple[DigestContents, DigestEntries]:
+) -> tuple[DigestContents, DigestEntries]:
     rule_runner.write_files(standard_deployment.files)
     target = rule_runner.get_target(standard_deployment.target)
     field_set = DeployTerraformFieldSet.create(target)

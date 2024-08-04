@@ -10,7 +10,7 @@ We use the providers cache instead of identifying and caching the providers indi
 3. This incurs almost no overhead, since it is done as part of `terraform init`. We don't need to run more analysers or separately download providers
 
 We didn't use `terraform providers lock` for a few reasons:
-1. `terraform providers lock` isn't designed for this usecase, it's designedto create mirrors of providers. It does more work (to set up manifests) and would require us to set more config settings
+1. `terraform providers lock` isn't designed for this usecase, it's designed to create mirrors of providers. It does more work (to set up manifests) and would require us to set more config settings
 2. `terraform providers lock` doesn't use itself as a cache. So every time we would want to refresh the cache, we need to download _everything_ again. Even if nothing has changed.
 """
 
@@ -433,7 +433,7 @@ async def setup_terraform_process(
 
     path = []
     user_path = env.get("PATH")
-    if user_path is not None:
+    if user_path:
         path.append(user_path)
     path.append(extra_bins.path_component)
 
