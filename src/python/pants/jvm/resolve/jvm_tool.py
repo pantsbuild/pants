@@ -75,7 +75,7 @@ class JvmToolBase(Subsystem, ExportableTool):
             See {cls.default_lockfile_url} for the default lockfile contents.
 
             To use a custom lockfile, set this option to a file path relative to the
-            build root, then run `{bin_name()} jvm-generate-lockfiles
+            build root, then run `{bin_name()} generate-lockfiles
             --resolve={cls.options_scope}`.
             """
         ),
