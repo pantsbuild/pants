@@ -12,12 +12,16 @@ from enum import Enum
 
 from pkg_resources import Requirement
 
-from pants.core.goals.export import ExportResult, ExportExternalToolRequest
+from pants.core.goals.export import ExportRequest, ExportResult, ExportResults, ExportSubsystem
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, DigestEntries, DownloadFile, FileDigest, FileEntry
+from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import DictOption, EnumOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem, _construct_subsystem
 from pants.util.docutil import doc_url
@@ -140,7 +144,7 @@ class ExternalToolOptionsMixin:
     )
 
 
-class ExternalTool(Subsystem, ExternalToolOptionsMixin, metaclass=ABCMeta):
+class ExternalTool(Subsystem, ExportableTool, ExternalToolOptionsMixin, metaclass=ABCMeta):
     """Configuration for an invocable tool that we download from an external source.
 
     Subclass this to configure a specific tool.
@@ -393,23 +397,64 @@ async def download_external_tool(request: ExternalToolRequest) -> DownloadedExte
     return DownloadedExternalTool(digest, request.exe)
 
 
+@dataclass(frozen=True)
+class ExportExternalToolRequest(ExportRequest):
+    pass
+    # tool: type[ExternalTool]
+
+
+@dataclass(frozen=True)
+class _ExportExternalToolForResolveRequest(EngineAwareParameter):
+    resolve: str
+
+
+@dataclass(frozen=True)
+class MaybeExportResult:
+    result: ExportResult | None
+
+
 @rule(level=LogLevel.DEBUG)
-async def export_external_tool(req: ExportExternalToolRequest, platform: Platform) -> ExportResult:
-    tool = await _construct_subsystem(req.tool)
-    t = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        tool.get_request(platform)
+async def export_external_tool(
+    req: _ExportExternalToolForResolveRequest, platform: Platform, union_membership: UnionMembership
+) -> MaybeExportResult:
+    exporatbles = ExportableTool.filter_for_subclasses(
+        union_membership,
+        ExternalTool,  # type:ignore[type-abstract]  # ExternalTool is abstract, and mypy doesn't like that we might return it
+    )
+    maybe_exportable = exporatbles.get(req.resolve)
+    if not maybe_exportable:
+        return MaybeExportResult(None)
+
+    tool = await _construct_subsystem(maybe_exportable)
+    downloaded_tool = await Get(
+        DownloadedExternalTool, ExternalToolRequest, tool.get_request(platform)
     )
 
     dest = "bin"
 
-    return ExportResult(
-        description=f"Export tool {req.tool.name}",
-        reldir=dest,
-        digest=t.digest,
+    return MaybeExportResult(
+        ExportResult(
+            description=f"Export tool {req.resolve}",
+            reldir=dest,
+            digest=downloaded_tool.digest,
+        )
     )
 
 
+@rule
+async def export_external_tools(
+    request: ExportExternalToolRequest, export: ExportSubsystem
+) -> ExportResults:
+    maybe_tools = await MultiGet(
+        Get(MaybeExportResult, _ExportExternalToolForResolveRequest(resolve))
+        for resolve in export.binaries
+    )
+    return ExportResults(tool.result for tool in maybe_tools if tool.result is not None)
+
+
 def rules():
-    return (*collect_rules(), *archive.rules())
+    return (
+        *collect_rules(),
+        *archive.rules(),
+        UnionRule(ExportRequest, ExportExternalToolRequest),
+    )

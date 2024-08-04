@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Tuple
 
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -19,6 +20,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, StrListOption
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
@@ -406,4 +408,8 @@ async def setup_terraform_process(
 
 
 def rules():
-    return [*collect_rules(), *external_tool.rules()]
+    return [
+        *collect_rules(),
+        *external_tool.rules(),
+        UnionRule(ExportableTool, TerraformTool),
+    ]
