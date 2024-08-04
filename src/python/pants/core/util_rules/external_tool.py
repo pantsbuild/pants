@@ -13,7 +13,7 @@ from enum import Enum
 from pkg_resources import Requirement
 
 from pants.core.goals.export import ExportRequest, ExportResult, ExportResults, ExportSubsystem
-from pants.core.goals.resolves import ExportableTool
+from pants.core.goals.resolves import ExportableTool, ExportMode
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive
 from pants.engine.engine_aware import EngineAwareParameter
@@ -183,6 +183,8 @@ class ExternalTool(Subsystem, ExportableTool, ExternalToolOptionsMixin, metaclas
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.check_version_constraints()
+
+    export_mode = ExportMode.binary
 
     use_unsupported_version = EnumOption(
         advanced=True,

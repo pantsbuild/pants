@@ -15,6 +15,7 @@ from pants.core.goals.generate_lockfiles import (
     KnownUserResolveNamesRequest,
     UnrecognizedResolveNamesError,
 )
+from pants.core.goals.resolves import ExportableTool, ExportMode
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -191,12 +192,19 @@ async def export(
             resolves_exported.add(result.resolve)
         console.print_stdout(f"Wrote {result.description} to {result_dir}")
 
-    unexported_resolves = sorted(set(export_subsys.resolve) - resolves_exported)
+    unexported_resolves = sorted(
+        (set(export_subsys.resolve) | set(export_subsys.binaries)) - resolves_exported
+    )
     if unexported_resolves:
         all_known_user_resolve_names = await MultiGet(
             Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
             for request in union_membership.get(KnownUserResolveNamesRequest)
         )
+        all_known_bin_names = [
+            e.options_scope
+            for e in union_membership.get(ExportableTool)
+            if e.export_mode == ExportMode.binary
+        ]
         all_valid_resolve_names = sorted(
             {
                 *itertools.chain.from_iterable(kurn.names for kurn in all_known_user_resolve_names),
@@ -209,6 +217,7 @@ async def export(
         raise UnrecognizedResolveNamesError(
             unexported_resolves,
             all_valid_resolve_names,
+            all_known_bin_names,
             description_of_origin="the option --export-resolve",
         )
 
