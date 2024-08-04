@@ -23,7 +23,8 @@ from pants.core.goals.deploy import DeployProcess
 from pants.core.register import rules as core_rules
 from pants.core.util_rules import source_files
 from pants.engine import process
-from pants.engine.internals.native_engine import Address
+from pants.engine.fs import DigestEntries
+from pants.engine.internals.native_engine import Address, Digest
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -50,6 +51,7 @@ def rule_runner_with_auto_approve() -> RuleRunner:
             *process.rules(),
             QueryRule(DeployProcess, (DeployTerraformFieldSet,)),
             QueryRule(TerraformInitResponse, (TerraformInitRequest,)),
+            QueryRule(DigestEntries, (Digest,)),
         ],
         preserve_tmpdirs=True,
     )

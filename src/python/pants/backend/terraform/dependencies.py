@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
 import os.path
 from dataclasses import dataclass
 from typing import Optional
@@ -88,12 +89,8 @@ async def get_terraform_providers(
         ),
     )
     if fetched_deps.exit_code != 0:
-        raise ProcessExecutionFailure(
-            fetched_deps.exit_code,
-            fetched_deps.stdout,
-            fetched_deps.stderr,
-            init_process_description,
-            keep_sandboxes=keep_sandboxes,
+        raise ProcessExecutionFailure.from_result(
+            fetched_deps, init_process_description, keep_sandboxes
         )
 
     return TerraformDependenciesResponse(fetched_deps.output_digest)
