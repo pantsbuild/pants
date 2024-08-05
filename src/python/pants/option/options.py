@@ -396,6 +396,8 @@ class Options:
         )
         native_mismatch_msgs = []
 
+        scope_section = GLOBAL_SCOPE_CONFIG_SECTION if scope == GLOBAL_SCOPE else scope
+
         if self._native_options_validation == NativeOptionsValidation.ignore:
             native_values = None
         else:
@@ -403,7 +405,7 @@ class Options:
                 native_values = self.get_parser(scope).parse_args_native(self._native_parser)
             except Exception as e:
                 native_mismatch_msgs.append(
-                    f"Failed to parse options in scope [{scope}] "
+                    f"Failed to parse options in scope [{scope_section}] "
                     f"with native parser due to error: {e}"
                 )
                 native_values = None
@@ -454,7 +456,7 @@ class Options:
             for key in sorted(legacy_values.get_keys() | native_values.get_keys()):
                 if listify_tuples(legacy_values.get(key)) != native_values.get(key):
                     native_mismatch_msgs.append(
-                        f"Value mismatch for the option `{key}` in scope [{scope}]:\n"
+                        f"Value mismatch for the option `{key}` in scope [{scope_section}]:\n"
                         f"{legacy_val_info(key)}\n"
                         f"{native_val_info(key)}"
                     )
