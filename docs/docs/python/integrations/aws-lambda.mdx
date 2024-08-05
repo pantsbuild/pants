@@ -33,7 +33,7 @@ First, add your lambda function in a Python file like you would [normally do wit
 
 Then, in your BUILD file, make sure that you have a `python_source` or `python_sources` target with the handler file included in the `sources` field. You can use [`pants tailor ::`](../../getting-started/initial-configuration.mdx#5-generate-build-files) to automate this.
 
-Add a `python_aws_lambda_function` target and define the `runtime` and `handler` fields. The `runtime` should be one of the values from [https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html](https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html). The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
+Add a `python_aws_lambda_function` target and define the `handler` fields. The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
 
 For example:
 
@@ -43,7 +43,6 @@ python_sources(name="lib")
 
 python_aws_lambda_function(
     name="lambda",
-    runtime="python3.8",
     # Pants will convert this to `project.lambda_example:example_handler`.
     handler="lambda_example.py:example_handler",
 )
@@ -65,6 +64,40 @@ Use [layout](../../../reference/targets/python_aws_lambda_function.mdx#layout) t
 :::caution Use `resource` instead of `file`
 `file` / `files` targets will not be included in the built AWS Lambda artifacts because filesystem APIs like `open()` would not load them as expected. Instead, use the `resource` and `resources` target. See [Assets and archives](../../using-pants/assets-and-archives.mdx) for further explanation.
 :::
+
+### Specifying a runtime explicitly
+
+Pants will attempt to infer the appropriate runtime and its platform-specific details from [the relevant interpreter constraints](../overview/interpreter-compatibility.mdx). For example, given `interpreter_constaints = ["==3.12.*"]`, Pants will build the Lambda package to appropriate for the  `python3.12` runtime. The Lambda environment is a relatively stable, running Linux on either a x86-64 or arm64 CPU, and thus Pants includes default "complete platforms" specifications that allow choosing appropriate artifacts for third-party dependencies with native code. These are chosen based on the (inferred or explicit) runtime and [the architecture](../../../reference/targets/python_aws_lambda_function.mdx#architecture).
+
+The inference may not work in your scenario and/or may not be appropriate:
+
+1. if the interpreter constraints are not obviously referring to all versions from a given minor release series, Pants won't infer the runtime. For instance, `>=3.11,<3.13` is too wide (it covers both 3.11 and 3.12), while `==3.12.1` is too specific (AWS's `python3.12` runtime may not use that patch version).
+2. if the interpreter constraints refer to a runtime that Pants doesn't have a default complete platforms JSON specification for, Pants will require you to specify one.
+3. if the cloud environment has changed, Pants' default complete platforms value may imply correct artifacts dependency and you may want to customise.
+
+In the first case, [the `runtime` field](../../../reference/targets/python_aws_lambda_function.mdx#runtime) can be used to specify which runtime is intended for each `python_aws_lambda_function` and `python_aws_lambda_layer` target. It should be one of the values from [https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html](https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html).
+
+```python title="BUILD"
+python_aws_lambda_function(
+    name="lambda",
+    handler="lambda_example.py:example_handler",
+    # Explicit runtime:
+    runtime="python3.12",
+)
+```
+
+Otherwise, the platform-dependent information should be specified with [the `complete_platforms` field](../../../reference/targets/python_aws_lambda_function.mdx#complete_platforms).
+
+```python title="BUILD"
+file(name="lambda-platform", source="lambda-platform.json")
+
+python_aws_lambda_function(
+    name="lambda",
+    handler="lambda_example.py:example_handler",
+    # Explicit complete platforms:
+    complete_platforms=[":lambda-platform"],
+)
+```
 
 ## Step 3: Run `package`
 
@@ -118,7 +151,6 @@ python_sources()
 
 python_aws_lambda_function(
     name="lambda",
-    runtime="python3.8",
     handler="main.py:lambda_handler"
 )
 
@@ -148,7 +180,6 @@ python_sources(name="lib")
 
 python_aws_lambda_function(
     name="function",
-    runtime="python3.8",
     handler="lambda_example.py:example_handler",
     # only include the sources, the boto3 requirement is packaged in `:layer`
     include_requirements=False,
@@ -156,7 +187,6 @@ python_aws_lambda_function(
 
 python_aws_lambda_layer(
     name="layer",
-    runtime="python3.8"
     # specify the handler file, and pants will automatically find its transitive dependencies
     dependencies=["./lambda_example.py"],
     # only include the boto3 requirement, any sources are packaged in `:function`
@@ -198,8 +228,8 @@ python_sources()
 pex_binary(
     name="lambda",
     entry_point="lambda_example.py",
-    # specify an appropriate platform(s) for the targeted Lambda runtime (complete_platforms works too)
-    platforms=["linux_x86_64-cp39-cp39"],
+    # specify an appropriate platform for the targeted Lambda runtime:
+    complete_platforms=["path/to:platform-json-target"],
 )
 ```
 
