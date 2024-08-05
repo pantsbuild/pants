@@ -144,7 +144,8 @@ class ExportPluginOptions:
             virtualenv exported for that resolve. Generated sources will be placed in the appropriate location within
             the site-packages directory of the mutable virtualenv.
             """
-        )
+        ),
+        advanced=True,
     )
 
 
