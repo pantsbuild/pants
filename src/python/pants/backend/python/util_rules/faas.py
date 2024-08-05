@@ -37,7 +37,6 @@ from pants.backend.python.util_rules.pex_from_targets import (
 from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
 from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
 from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, OutputPathField
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import (
