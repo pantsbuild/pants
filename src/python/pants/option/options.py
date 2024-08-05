@@ -18,6 +18,7 @@ from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.parser import Parser
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
+from pants.util.docutil import doc_url
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
@@ -471,13 +472,15 @@ class Options:
                         {formatted_msgs}
 
                         If you can't resolve this discrepancy, please reach out to the Pants
-                        development team: https://www.pantsbuild.org/community/getting-help.
+                        development team: {doc_url('/community/getting-help')}.
 
                         The native parser will become the default in 2.23.x, and the legacy parser
                         will be removed in 2.24.x. So it is imperative that we find out about any
                         discrepancies during this transition period.
 
-                        You can use the global native_options_validation option to configure this check.
+                        You can use the global native_options_validation option
+                        ({doc_url('reference/global-options#native_options_validation')}) to
+                        configure this check.
                         """
                     )
                 )
