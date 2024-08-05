@@ -307,6 +307,7 @@ class PythonFaaSKnownRuntime:
     def __str__(self) -> str:
         return f"{self.name} - Python {self.major}.{self.minor}"
 
+
 class PythonFaaSRuntimeField(StringField, ABC):
     alias = "runtime"
     default = None

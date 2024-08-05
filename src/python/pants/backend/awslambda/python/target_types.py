@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from enum import Enum
 from typing import ClassVar, Match, Optional, Tuple, cast
 
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
@@ -90,10 +91,41 @@ class PythonAwsLambdaIncludeSources(BoolField):
     )
 
 
+PYTHON_RUNTIME_REGEX = r"python(?P<major>\d)\.(?P<minor>\d+)"
+
+
+class PythonAwsLambdaFunctionRuntimes(Enum):
+    PYTHON_37 = "python3.7"
+    PYTHON_38 = "python3.8"
+    PYTHON_39 = "python3.9"
+    PYTHON_310 = "python3.10"
+    PYTHON_311 = "python3.11"
+    PYTHON_312 = "python3.12"
+
+    def to_interpreter_version(self) -> Tuple[int, int]:
+        """Returns the Python version implied by the runtime, as (major, minor)."""
+        mo = cast(Match, re.match(PYTHON_RUNTIME_REGEX, self.value))
+        return int(mo.group("major")), int(mo.group("minor"))
+
+
+LAMBDA_DOCKER_REPO = "public.ecr.aws/lambda/python"
+
+
 class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
-    PYTHON_RUNTIME_REGEX = r"python(?P<major>\d)\.(?P<minor>\d+)"
     # https://gallery.ecr.aws/lambda/python
-    LAMBDA_DOCKER_REPO = "public.ecr.aws/lambda/python"
+    RUNTIME_TAG_MAPPING = {
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_37, FaaSArchitecture.X86_64): "3.7",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_38, FaaSArchitecture.X86_64): "3.8-x86_64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_38, FaaSArchitecture.ARM64): "3.8-arm64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_39, FaaSArchitecture.X86_64): "3.9-x86_64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_39, FaaSArchitecture.ARM64): "3.9-arm64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_310, FaaSArchitecture.X86_64): "3.10-x86_64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_310, FaaSArchitecture.ARM64): "3.10-arm64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_311, FaaSArchitecture.X86_64): "3.11-x86_64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_311, FaaSArchitecture.ARM64): "3.11-arm64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_312, FaaSArchitecture.X86_64): "3.12-x86_64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_312, FaaSArchitecture.ARM64): "3.12-arm64",
+    }
 
     help = help_text(
         """
@@ -107,19 +139,11 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         """
     )
 
-    known_runtimes = (
-        PythonFaaSKnownRuntime(3, 6, LAMBDA_DOCKER_REPO, "3.6", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 7, LAMBDA_DOCKER_REPO, "3.7", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 8, LAMBDA_DOCKER_REPO, "3.8-x86_64", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 8, LAMBDA_DOCKER_REPO, "3.8-arm64", FaaSArchitecture.ARM64),
-        PythonFaaSKnownRuntime(3, 9, LAMBDA_DOCKER_REPO, "3.9-x86_64", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 9, LAMBDA_DOCKER_REPO, "3.9-arm64", FaaSArchitecture.ARM64),
-        PythonFaaSKnownRuntime(3, 10, LAMBDA_DOCKER_REPO, "3.10-x86_64", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 10, LAMBDA_DOCKER_REPO, "3.10-arm64", FaaSArchitecture.ARM64),
-        PythonFaaSKnownRuntime(3, 11, LAMBDA_DOCKER_REPO, "3.11-x86_64", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 11, LAMBDA_DOCKER_REPO, "3.11-arm64", FaaSArchitecture.ARM64),
-        PythonFaaSKnownRuntime(3, 12, LAMBDA_DOCKER_REPO, "3.12-x86_64", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 12, LAMBDA_DOCKER_REPO, "3.12-arm64", FaaSArchitecture.ARM64),
+    known_runtimes = tuple(
+        PythonFaaSKnownRuntime(
+            runtime.value, *runtime.to_interpreter_version(), LAMBDA_DOCKER_REPO, tag, architecture
+        )
+        for (runtime, architecture), tag in RUNTIME_TAG_MAPPING.items()
     )
 
     @classmethod
@@ -127,7 +151,7 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
-        if not re.match(cls.PYTHON_RUNTIME_REGEX, value):
+        if not re.match(PYTHON_RUNTIME_REGEX, value):
             raise InvalidFieldException(
                 softwrap(
                     f"""
@@ -142,7 +166,7 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         """Returns the Python version implied by the runtime, as (major, minor)."""
         if self.value is None:
             return None
-        mo = cast(Match, re.match(self.PYTHON_RUNTIME_REGEX, self.value))
+        mo = cast(Match, re.match(PYTHON_RUNTIME_REGEX, self.value))
         return int(mo.group("major")), int(mo.group("minor"))
 
     @classmethod

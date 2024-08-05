@@ -105,7 +105,11 @@ class PythonGoogleCloudFunctionRuntime(PythonFaaSRuntimeField):
 
     known_runtimes = tuple(
         PythonFaaSKnownRuntime(
-            *runtime.to_interpreter_version(), docker_repo, docker_tag, FaaSArchitecture.X86_64
+            runtime.value,
+            *runtime.to_interpreter_version(),
+            docker_repo,
+            docker_tag,
+            FaaSArchitecture.X86_64,
         )
         for runtime, (docker_repo, docker_tag) in DOCKER_RUNTIME_MAPPING.items()
     )
