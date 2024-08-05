@@ -433,26 +433,12 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
             if version == (rt.major, rt.minor) and request.architecture.value == rt.architecture
         )
     except StopIteration:
-        # Not a known runtime, so error out.
-        raise ValueError(
-            softwrap(
-                f"""\
-                Could not find a known runtime for the given Python version and machine architecture!
-
-                Python version: {version}
-                Machine architecture: {request.architecture.value}
-
-                Known runtimes:
-                {request.runtime.known_runtimes}
-
-                To fix, please generate a `complete_platforms` file for the given Python version and
-                machine architecture, or specify a runtime that is known to Pants.
-
-                You can follow the instructions at https://github.com/pantsbuild/pants/discussions/18756
-                to generate a `complete_platforms` file for your Python version and machine
-                architecture.
-                """
-            )
+        # Not a known runtime, so fallback to just passing a platform
+        # TODO: maybe this should be an error, and we require users to specify
+        # complete_platforms themselves?
+        return RuntimePlatforms(
+            interpreter_version=version,
+            pex_platforms=PexPlatforms((_format_platform_from_major_minor(*version),)),
         )
 
     module = request.runtime.known_runtimes_complete_platforms_module()
