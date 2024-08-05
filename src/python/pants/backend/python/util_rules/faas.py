@@ -37,6 +37,7 @@ from pants.backend.python.util_rules.pex_from_targets import (
 from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
 from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
 from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
+from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, OutputPathField
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import (
@@ -293,6 +294,7 @@ class FaaSArchitecture(str, Enum):
 
 @dataclass(frozen=True)
 class PythonFaaSKnownRuntime:
+    name: str
     major: int
     minor: int
     docker_repo: str
@@ -302,6 +304,8 @@ class PythonFaaSKnownRuntime:
     def file_name(self) -> str:
         return f"complete_platform_{self.tag}.json"
 
+    def __str__(self) -> str:
+        return f"{self.name} - Python {self.major}.{self.minor}"
 
 class PythonFaaSRuntimeField(StringField, ABC):
     alias = "runtime"
@@ -422,9 +426,11 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         return RuntimePlatforms(interpreter_version=None, complete_platforms=complete_platforms)
 
     version = request.runtime.to_interpreter_version()
+    inferred_from_ics = False
     if version is None:
         # if there's not a specified version, let's try to infer it from the interpreter constraints
         version = await _infer_from_ics(request)
+        inferred_from_ics = True
 
     try:
         file_name = next(
@@ -434,8 +440,30 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         )
     except StopIteration:
         # Not a known runtime, so fallback to just passing a platform
-        # TODO: maybe this should be an error, and we require users to specify
-        # complete_platforms themselves?
+        version_modifier = "[inferred from interpreter constraints]" if inferred_from_ics else ""
+        version_adjective = "inferred" if inferred_from_ics else "specified"
+        warn_or_error(
+            "2.26.0.dev0",
+            "implicitly resolving platforms for unknown FaaS runtimes",
+            softwrap(
+                f"""
+                Could not find a known runtime for the {version_adjective} Python version and machine architecture!
+
+                Python version: {version} {version_modifier}
+                Machine architecture: {request.architecture.value}
+
+                Known runtimes:
+                {request.runtime.known_runtimes}
+
+                To fix, please generate a `complete_platforms` file for the given Python version and
+                machine architecture, or specify a runtime that is known to Pants.
+
+                You can follow the instructions at https://github.com/pantsbuild/pants/discussions/18756
+                to generate a `complete_platforms` file for your Python version and machine
+                architecture.
+                """
+            ),
+        )
         return RuntimePlatforms(
             interpreter_version=version,
             pex_platforms=PexPlatforms((_format_platform_from_major_minor(*version),)),
