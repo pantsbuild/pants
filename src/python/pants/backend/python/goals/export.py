@@ -176,6 +176,7 @@ class ExportPluginOptions:
             the site-packages directory of the mutable virtualenv.
             """
         )
+        advanced=True,
     )
 
 
