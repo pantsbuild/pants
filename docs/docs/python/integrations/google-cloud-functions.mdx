@@ -33,7 +33,7 @@ First, add your Cloud function in a Python file like you would [normally do with
 
 Then, in your BUILD file, make sure that you have a `python_source` or `python_sources` target with the handler file included in the `sources` field. You can use [`pants tailor ::`](../../getting-started/initial-configuration.mdx#5-generate-build-files) to automate this.
 
-Add a `python_google_cloud_function` target and define the `runtime`, `handler`, and `type` fields. The `type` should be either `"event"` or `"http"`. The `runtime` should be one of the values from [https://cloud.google.com/functions/docs/concepts/python-runtime](https://cloud.google.com/functions/docs/concepts/python-runtime). The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
+Add a `python_google_cloud_function` target and define `handler` and `type` fields. The `type` should be either `"event"` or `"http"`.  The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
 
 For example:
 
@@ -43,7 +43,6 @@ python_sources(name="lib")
 
 python_google_cloud_function(
     name="cloud_function",
-    runtime="python38",
     # Pants will convert this to `project.google_cloud_function_example:example_handler`.
     handler="google_cloud_function_example.py:example_handler",
     type="event",
@@ -66,6 +65,42 @@ Use [layout](../../../reference/targets/python_google_cloud_function.mdx#layout)
 :::caution Use `resource` instead of `file`
 `file` / `files` targets will not be included in the built Cloud Function because filesystem APIs like `open()` would not load them as expected. Instead, use the `resource` / `resources` target. See [Assets and archives](../../using-pants/assets-and-archives.mdx) for further explanation.
 :::
+
+### Specifying a runtime explicitly
+
+Pants will attempt to infer the appropriate runtime and its platform-specific details from [the relevant interpreter constraints](../overview/interpreter-compatibility.mdx). For example, given `interpreter_constaints = ["==3.12.*"]`, Pants will build the Lambda package to appropriate for the  `python312` runtime. The Lambda environment is a relatively stable, running Linux on a x86-64 CPU, and thus Pants includes default "complete platforms" specifications that allow choosing appropriate artifacts of third-party dependencies with native code. These are chosen based on the (inferred or explicit) runtime.
+
+The inference may not work in your scenario and/or may not be appropriate:
+
+1. if the interpreter constraints are not obviously referring to all versions from a given minor release series, Pants won't infer the runtime. For instance, `>=3.11,<3.13` is too wide (it covers both 3.11 and 3.12), while `==3.12.1` is too specific (GCF's `python312` runtime may not use that patch version).
+2. if the interpreter constraints refer to a runtime that Pants doesn't have a default complete platforms JSON specification for, Pants will require you to specify one.
+3. if the cloud environment has changed, Pants' default complete platforms value may imply correct artifacts dependency and you may want to customise.
+
+In the first case, [the `runtime` field](../../../reference/targets/python_google_cloud_function.mdx#runtime) can be used to specify which runtime is intended for each `python_google_cloud_function` target. It should be one of the values from [https://cloud.google.com/functions/docs/concepts/python-runtime](https://cloud.google.com/functions/docs/concepts/python-runtime).
+
+```python title="BUILD"
+python_google_cloud_function(
+    name="cloud_function",
+    handler="google_cloud_function_example.py:example_handler",
+    type="event",
+    # Explicit runtime:
+    runtime="python312",
+)
+```
+
+Otherwise, the platform-dependent information should be specified with [the `complete_platforms` field](../../../reference/targets/python_aws_lambda_function.mdx#complete_platforms).
+
+```python title="BUILD"
+file(name="gcf-platform", source="gcf-platform.json")
+
+python_google_cloud_function(
+    name="cloud_function",
+    handler="google_cloud_function_example.py:example_handler",
+    type="event",
+    # Explicit complete platforms:
+    complete_platforms=[":gcf-platform"],
+)
+```
 
 ## Step 3: Run `package`
 
@@ -119,8 +154,8 @@ python_sources()
 pex_binary(
     name="gcf",
     entry_point="gcf_example.py",
-    # specify an appropriate platform(s) for the targeted GCF runtime (complete_platforms works too)
-    platforms=["linux_x86_64-cp39-cp39"],
+    # specify an appropriate platform for the targeted Lambda runtime:
+    complete_platforms=["path/to:platform-json-target"],
 )
 ```
 
