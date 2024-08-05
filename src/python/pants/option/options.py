@@ -394,6 +394,7 @@ class Options:
         legacy_values = self.get_parser(scope).parse_args(
             parse_args_request, log_warnings=log_parser_warnings
         )
+        native_mismatch_msgs = []
 
         if self._native_options_validation == NativeOptionsValidation.ignore:
             native_values = None
@@ -422,7 +423,6 @@ class Options:
                 return x
 
         if native_values:
-            msgs = []
 
             def legacy_val_info(k):
                 if k in legacy_values:
@@ -446,35 +446,35 @@ class Options:
 
             for key in sorted(legacy_values.get_keys() | native_values.get_keys()):
                 if listify_tuples(legacy_values.get(key)) != native_values.get(key):
-                    msgs.append(
+                    native_mismatch_msgs.append(
                         f"Value mismatch for the option `{key}` in scope [{scope}]:\n"
                         f"{legacy_val_info(key)}\n"
                         f"{native_val_info(key)}"
                     )
 
-            if msgs:
+        if native_mismatch_msgs:
 
-                def log(log_func):
-                    for msg in msgs:
-                        log_func(msg)
-                    log_func(
-                        "If you can't resolve this discrepancy, please reach out to the Pants "
-                        "development team: https://www.pantsbuild.org/community/getting-help. "
-                    )
-                    log_func(
-                        "The native parser will become the default in 2.23.x, and the legacy parser "
-                        "will be removed in 2.24.x. So it is imperative that we find out about any "
-                        "discrepancies during this transition period."
-                    )
-                    log_func(
-                        "You can use the global native_options_validation option to configure this check."
-                    )
+            def log(log_func):
+                for msg in native_mismatch_msgs:
+                    log_func(msg)
+                log_func(
+                    "If you can't resolve this discrepancy, please reach out to the Pants "
+                    "development team: https://www.pantsbuild.org/community/getting-help. "
+                )
+                log_func(
+                    "The native parser will become the default in 2.23.x, and the legacy parser "
+                    "will be removed in 2.24.x. So it is imperative that we find out about any "
+                    "discrepancies during this transition period."
+                )
+                log_func(
+                    "You can use the global native_options_validation option to configure this check."
+                )
 
-                if self._native_options_validation == NativeOptionsValidation.warning:
-                    log(logger.warning)
-                elif self._native_options_validation == NativeOptionsValidation.error:
-                    log(logger.error)
-                    raise Exception("Option value mismatches detected, aborting.")
+            if self._native_options_validation == NativeOptionsValidation.warning:
+                log(logger.warning)
+            elif self._native_options_validation == NativeOptionsValidation.error:
+                log(logger.error)
+                raise Exception("Option value mismatches detected, aborting.")
         # TODO: In a future release, switch to the native_values as authoritative.
         return legacy_values
 
