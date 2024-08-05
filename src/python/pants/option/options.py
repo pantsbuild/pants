@@ -399,7 +399,14 @@ class Options:
         if self._native_options_validation == NativeOptionsValidation.ignore:
             native_values = None
         else:
-            native_values = self.get_parser(scope).parse_args_native(self._native_parser)
+            try:
+                native_values = self.get_parser(scope).parse_args_native(self._native_parser)
+            except Exception as e:
+                native_mismatch_msgs.append(
+                    f"Failed to parse options in scope [{scope}] "
+                    f"with native parser due to error: {e}"
+                )
+                native_values = None
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
