@@ -486,7 +486,9 @@ class Options:
                 log(logger.warning)
             elif self._native_options_validation == NativeOptionsValidation.error:
                 log(logger.error)
-                raise Exception("Option value mismatches detected, aborting.")
+                raise Exception(
+                    "Option value mismatches detected, see logs above for details. Aborting."
+                )
         # TODO: In a future release, switch to the native_values as authoritative.
         return legacy_values
 
