@@ -1,7 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.java.bsp import rules as java_bsp_rules
 from pants.backend.java.compile import javac
 from pants.backend.java.dependency_inference import java_parser
 from pants.backend.java.dependency_inference import rules as dependency_inference_rules
@@ -39,7 +38,6 @@ def rules():
         *java_parser.rules(),
         *dependency_inference_rules.rules(),
         *tailor.rules(),
-        *java_bsp_rules.rules(),
         *archive.rules(),
         *target_types_rules(),
         *jvm_common.rules(),

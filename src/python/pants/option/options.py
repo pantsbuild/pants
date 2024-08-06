@@ -172,7 +172,7 @@ class Options:
         )
 
         return cls(
-            builtin_goal=split_args.builtin_goal,
+            builtin_or_auxiliary_goal=split_args.builtin_or_auxiliary_goal,
             goals=split_args.goals,
             unknown_goals=split_args.unknown_goals,
             scope_to_flags=split_args.scope_to_flags,
@@ -188,7 +188,7 @@ class Options:
 
     def __init__(
         self,
-        builtin_goal: str | None,
+        builtin_or_auxiliary_goal: str | None,
         goals: list[str],
         unknown_goals: list[str],
         scope_to_flags: dict[str, list[str]],
@@ -205,7 +205,7 @@ class Options:
 
         Dependents should use `Options.create` instead.
         """
-        self._builtin_goal = builtin_goal
+        self._builtin_or_auxiliary_goal = builtin_or_auxiliary_goal
         self._goals = goals
         self._unknown_goals = unknown_goals
         self._scope_to_flags = scope_to_flags
@@ -227,12 +227,12 @@ class Options:
         return self._specs
 
     @property
-    def builtin_goal(self) -> str | None:
-        """The requested builtin goal, if any.
+    def builtin_or_auxiliary_goal(self) -> str | None:
+        """The requested builtin or auxiliary goal, if any.
 
         :API: public
         """
-        return self._builtin_goal
+        return self._builtin_or_auxiliary_goal
 
     @property
     def goals(self) -> list[str]:
