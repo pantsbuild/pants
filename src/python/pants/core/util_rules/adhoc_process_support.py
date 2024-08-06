@@ -465,6 +465,45 @@ async def create_tool_runner(
     )
 
 
+async def check_outputs(
+    output_digest: Digest,
+    output_files: Iterable[str],
+    output_directories: Iterable[str],
+    outputs_match_error_behavior: GlobMatchErrorBehavior,
+    outputs_match_mode: GlobExpansionConjunction | None,
+    description_of_origin: str,
+) -> None:
+    if outputs_match_mode is None:
+        return
+
+    _filtered_for_output_files, _filtered_for_output_directories = await MultiGet(
+        Get(
+            Digest,
+            DigestSubset(
+                output_digest,
+                PathGlobs(
+                    output_files,
+                    glob_match_error_behavior=outputs_match_error_behavior,
+                    conjunction=outputs_match_mode,
+                    description_of_origin=f"the `output_files` field at `{description_of_origin}`",
+                ),
+            ),
+        ),
+        Get(
+            Digest,
+            DigestSubset(
+                output_digest,
+                PathGlobs(
+                    output_directories,
+                    glob_match_error_behavior=outputs_match_error_behavior,
+                    conjunction=outputs_match_mode,
+                    description_of_origin=f"output_directories field at `{description_of_origin}`",
+                ),
+            ),
+        ),
+    )
+
+
 @rule
 async def run_adhoc_process(
     request: AdhocProcessRequest,
@@ -507,7 +546,19 @@ async def run_adhoc_process(
     extra_contents = {i: j for i, j in extras if i}
 
     output_digest = result.output_digest
-    await check_outputs(request, output_digest)
+    output_files: list[str] = list(request.output_files)
+    output_directories: list[str] = list(request.output_directories)
+    if root_output_directory:
+        output_files = [os.path.join(root_output_directory, of) for of in output_files]
+        output_directories = [os.path.join(root_output_directory, od) for od in output_directories]
+    await check_outputs(
+        output_digest=output_digest,
+        output_files=request.output_files,
+        output_directories=request.output_directories,
+        outputs_match_error_behavior=request.outputs_match_error_behavior,
+        outputs_match_mode=request.outputs_match_mode,
+        description_of_origin=f"{request.address}",
+    )
 
     if extra_contents:
         if request.use_working_directory_as_base_for_output_captures:
@@ -754,39 +805,6 @@ def _parse_relative_file(file_in: str, relative_to: str) -> str:
         return file_in[1:]
 
     return os.path.join(relative_to, file_in)
-
-
-async def check_outputs(request: AdhocProcessRequest, output_digest: Digest) -> None:
-    outputs_match_mode = request.outputs_match_mode
-    if outputs_match_mode is None:
-        return
-
-    _filtered_for_output_files, _filtered_for_output_directories = await MultiGet(
-        Get(
-            Digest,
-            DigestSubset(
-                output_digest,
-                PathGlobs(
-                    request.output_files,
-                    glob_match_error_behavior=request.outputs_match_error_behavior,
-                    conjunction=outputs_match_mode,
-                    description_of_origin=f"the `output_files` field at `{request.address}`",
-                ),
-            ),
-        ),
-        Get(
-            Digest,
-            DigestSubset(
-                output_digest,
-                PathGlobs(
-                    request.output_directories,
-                    glob_match_error_behavior=request.outputs_match_error_behavior,
-                    conjunction=outputs_match_mode,
-                    description_of_origin=f"output_directories field at `{request.address}`",
-                ),
-            ),
-        ),
-    )
 
 
 def rules():
