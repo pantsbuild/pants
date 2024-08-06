@@ -213,19 +213,25 @@ class CoursierResolvedLockfile:
         self, key: CoursierResolveKey, coord: Coordinate
     ) -> tuple[CoursierLockfileEntry, tuple[CoursierLockfileEntry, ...]]:
         """Return the entry for the given Coordinate, and for its direct dependencies."""
-        entries = {(i.coord.group, i.coord.artifact): i for i in self.entries}
-        entry = entries.get((coord.group, coord.artifact))
+        entries = {(i.coord.group, i.coord.artifact, i.coord.classifier): i for i in self.entries}
+        entry = entries.get((coord.group, coord.artifact, coord.classifier))
         if entry is None:
             raise self._coordinate_not_found(key, coord)
 
-        return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.direct_dependencies))
+        return (
+            entry,
+            tuple(
+                entries[(i.group, i.artifact, i.coord.classifier)]
+                for i in entry.direct_dependencies
+            ),
+        )
 
     def dependencies(
         self, key: CoursierResolveKey, coord: Coordinate
     ) -> tuple[CoursierLockfileEntry, tuple[CoursierLockfileEntry, ...]]:
         """Return the entry for the given Coordinate, and for its transitive dependencies."""
-        entries = {(i.coord.group, i.coord.artifact): i for i in self.entries}
-        entry = entries.get((coord.group, coord.artifact))
+        entries = {(i.coord.group, i.coord.artifact, i.coord.classifier): i for i in self.entries}
+        entry = entries.get((coord.group, coord.artifact, coord.classifier))
         if entry is None:
             raise self._coordinate_not_found(key, coord)
 
@@ -238,7 +244,8 @@ class CoursierResolvedLockfile:
                 # https://github.com/coursier/coursier/issues/2884
                 # As a workaround, if this happens, we want to skip the dependency.
                 # TODO Drop the check once the bug is fixed.
-                if (dependency_entry := entries.get((d.group, d.artifact))) is not None
+                if (dependency_entry := entries.get((d.group, d.artifact, d.classifier)))
+                is not None
             ),
         )
 
@@ -627,14 +634,25 @@ async def coursier_fetch_one_coord(
     report = json.loads(report_contents[0].content)
 
     report_deps = report["dependencies"]
+
     if len(report_deps) == 0:
         raise CoursierError("Coursier fetch report has no dependencies (i.e. nothing was fetched).")
-    elif len(report_deps) > 1:
+
+    dep = None
+    for report_dep in report_deps:
+        report_dep_coord = Coordinate.from_coord_str(report_dep["coord"])
+        if report_dep_coord == request.coord:
+            if dep is not None:
+                raise CoursierError(
+                    "Coursier fetch report has multiple dependencies, but exactly 1 was expected."
+                )
+            dep = report_dep
+
+    if dep is None:
         raise CoursierError(
-            "Coursier fetch report has multiple dependencies, but exactly 1 was expected."
+            f'Coursier fetch report has no matching dependencies for coord "{request.coord.to_coord_str()}".'
         )
 
-    dep = report_deps[0]
     resolved_coord = Coordinate.from_coord_str(dep["coord"])
     if resolved_coord != request.coord:
         raise CoursierError(

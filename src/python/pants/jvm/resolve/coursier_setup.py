@@ -44,10 +44,32 @@ COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(  # noqa: PNT20
     classpath = dict()
     for dep in report['dependencies']:
         if not dep.get('file'):
-            raise Exception(
-                f"No jar found for {dep['coord']}. Check that it's available in the"
-                + " repositories configured in [coursier].repos in pants.toml."
-            )
+            if ":jar:sources:" in dep['coord']:
+                path = os.path.join(os.getcwd(), sys.argv[1] + ".empty")
+                f = open(path, "w")
+                f.write("")
+                f.close()
+                source = PurePath(path)
+                dest_name = dep['coord'].replace(":", "_")
+                classpath_dest = f"classpath/{dest_name}{ext}"
+                existing_source = classpath.get(classpath_dest)
+                if existing_source:
+                    if existing_source == source:
+                    # We've already captured this file.
+                        continue
+                    raise Exception(
+                        f"Duplicate jar name {classpath_dest} with incompatible source:\\n"
+                        f"  {source}\\n"
+                        f"  {existing_source}\\n"
+                    )
+                classpath[classpath_dest] = source
+                copyfile(source, classpath_dest)
+                continue
+            else:
+                raise Exception(
+                    f"No jar found for {dep['coord']}. Check that it's available in the"
+                    + " repositories configured in [coursier].repos in pants.toml."
+                )
         source = PurePath(dep['file'])
         dest_name = dep['coord'].replace(":", "_")
         _, ext = os.path.splitext(source)
@@ -80,6 +102,8 @@ COURSIER_FETCH_WRAPPER_SCRIPT = textwrap.dedent(  # noqa: PNT20
     working_dir="$(pwd)"
     "$coursier_exe" fetch {repos_args} \
         --json-output-file="$json_output_file" \
+        --default=true \
+        --sources \
         "${{@//{coursier_working_directory}/$working_dir}}"
     /bin/mkdir -p classpath
     {python_path} {coursier_bin_dir}/coursier_post_processing_script.py "$json_output_file"

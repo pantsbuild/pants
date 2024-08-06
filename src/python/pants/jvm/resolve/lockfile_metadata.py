@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable, cast
@@ -76,7 +77,21 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
     def from_artifact_requirements(
         cls, requirements: Iterable[ArtifactRequirement]
     ) -> JVMLockfileMetadataV1:
-        return cls(FrozenOrderedSet(sorted(i.to_metadata_str() for i in requirements)))
+        reqs = list(requirements)
+        req_sources = [
+            dataclasses.replace(
+                i, coordinate=dataclasses.replace(i.coordinate, classifier="sources")
+            )
+            for i in reqs
+        ]
+
+        extended = []
+        for i in reqs:
+            extended.append(i)
+        for i in req_sources:
+            extended.append(i)
+
+        return cls(FrozenOrderedSet(sorted(i.to_metadata_str() for i in extended)))
 
     @classmethod
     def _from_json_dict(
