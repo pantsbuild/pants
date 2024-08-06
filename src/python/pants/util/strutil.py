@@ -139,7 +139,7 @@ def strip_v2_chroot_path(v: bytes | str) -> str:
     """
     if isinstance(v, bytes):
         v = v.decode()
-    return re.sub(r"/.*/pants-sandbox-[a-zA-Z0-9]+/", "", v)
+    return re.sub(r"/[a-zA-Z0-9-_\/]*/pants-sandbox-[a-zA-Z0-9]+/", "", v)
 
 
 @dataclasses.dataclass(frozen=True)

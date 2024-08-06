@@ -707,7 +707,10 @@ class PyStubCAS:
 class InferenceMetadata:
     @staticmethod
     def javascript(
-        package_root: str, import_patterns: dict[str, list[str]]
+        package_root: str,
+        import_patterns: dict[str, Sequence[str]],
+        config_root: str | None,
+        paths: dict[str, Sequence[str]],
     ) -> InferenceMetadata: ...
     def __eq__(self, other: InferenceMetadata | Any) -> bool: ...
     def __hash__(self) -> int: ...
@@ -894,6 +897,10 @@ _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
 
 class PyGeneratorResponseCall:
+    output_type: type
+    input_types: Sequence[type]
+    inputs: Sequence[Any]
+
     @overload
     def __init__(
         self,

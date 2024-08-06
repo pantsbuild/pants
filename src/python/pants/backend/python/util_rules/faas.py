@@ -9,6 +9,7 @@ import logging
 import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import ClassVar, Optional, cast
 
@@ -285,11 +286,17 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
     )
 
 
+class FaaSArchitecture(str, Enum):
+    X86_64 = "x86_64"
+    ARM64 = "arm64"
+
+
 @dataclass(frozen=True)
 class PythonFaaSKnownRuntime:
     major: int
     minor: int
     tag: str
+    architecture: FaaSArchitecture = FaaSArchitecture.X86_64
 
     def file_name(self) -> str:
         return f"complete_platform_{self.tag}.json"
@@ -352,6 +359,7 @@ class RuntimePlatformsRequest:
 
     runtime: PythonFaaSRuntimeField
     complete_platforms: PythonFaaSCompletePlatforms
+    architecture: Optional[FaaSArchitecture] = None
 
 
 @dataclass(frozen=True)
@@ -423,6 +431,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
             rt.file_name()
             for rt in request.runtime.known_runtimes
             if version == (rt.major, rt.minor)
+            and (request.architecture is None or request.architecture.value == rt.architecture)
         )
     except StopIteration:
         # Not a known runtime, so fallback to just passing a platform
@@ -463,6 +472,7 @@ class BuildPythonFaaSRequest:
     log_only_reexported_handler_func: bool = False
 
     prefix_in_artifact: None | str = None
+    architecture: None | FaaSArchitecture = None
 
 
 @rule
@@ -485,6 +495,7 @@ async def build_python_faas(
             address=request.address,
             target_name=request.target_name,
             runtime=request.runtime,
+            architecture=request.architecture,
             complete_platforms=request.complete_platforms,
         ),
     )
@@ -564,6 +575,9 @@ async def build_python_faas(
         extra_log_lines.append(
             f"    Runtime: {request.runtime.from_interpreter_version(*platforms.interpreter_version)}"
         )
+
+    if request.architecture is not None:
+        extra_log_lines.append(f"    Architecture: {request.architecture.value}")
 
     if reexported_handler_func is not None:
         if request.log_only_reexported_handler_func:

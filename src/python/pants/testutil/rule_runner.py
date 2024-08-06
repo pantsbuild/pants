@@ -46,7 +46,7 @@ from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import ProcessExecutionEnvironment, PyExecutor
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
-from pants.engine.internals.selectors import Effect, Get, Params
+from pants.engine.internals.selectors import Call, Effect, Get, Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
@@ -740,7 +740,7 @@ def run_rule_with_mocks(
     if not isinstance(res, (Coroutine, Generator)):
         return res
 
-    def get(res: Get | Effect):
+    def get(res: Get | Effect | Call):
         provider = next(
             (
                 mock_get.mock
@@ -770,7 +770,7 @@ def run_rule_with_mocks(
     while True:
         try:
             res = rule_coroutine.send(rule_input)
-            if isinstance(res, (Get, Effect)):
+            if isinstance(res, (Get, Effect, Call)):
                 rule_input = get(res)
             elif type(res) in (tuple, list):
                 rule_input = [get(g) for g in res]  # type: ignore[union-attr]

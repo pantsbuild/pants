@@ -18,6 +18,7 @@ from pants.backend.javascript.package_json import (
     NodePackageVersionField,
     PackageJsonSourceField,
 )
+from pants.backend.javascript.package_manager import PackageManager
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.target_types import JSSourceField
 from pants.build_graph.address import Address
@@ -51,6 +52,10 @@ class InstalledNodePackage:
     @property
     def target(self) -> Target:
         return self.project_env.ensure_target()
+
+    @property
+    def package_manager(self) -> PackageManager:
+        return self.project_env.project.package_manager
 
 
 @dataclass(frozen=True)

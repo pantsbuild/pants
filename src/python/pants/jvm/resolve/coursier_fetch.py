@@ -778,16 +778,16 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
         lockfile_req = request.lockfile
         assert lockfile_req is not None
         regen_command = f"`{GenerateLockfilesSubsystem.name} --resolve={lockfile_req.resolve_name}`"
-        if lockfile_req.read_lockfile_dest == DEFAULT_TOOL_LOCKFILE:
+        if lockfile_req.lockfile == DEFAULT_TOOL_LOCKFILE:
             lockfile_bytes = importlib.resources.read_binary(
                 *lockfile_req.default_lockfile_resource
             )
             resolution = CoursierResolvedLockfile.from_serialized(lockfile_bytes)
         else:
-            lockfile_snapshot = await Get(Snapshot, PathGlobs([lockfile_req.read_lockfile_dest]))
+            lockfile_snapshot = await Get(Snapshot, PathGlobs([lockfile_req.lockfile]))
             if not lockfile_snapshot.files:
                 raise ValueError(
-                    f"No lockfile found at {lockfile_req.read_lockfile_dest}, which is configured "
+                    f"No lockfile found at {lockfile_req.lockfile}, which is configured "
                     f"by the option {lockfile_req.lockfile_option_name}."
                     f"Run {regen_command} to generate it."
                 )
@@ -796,7 +796,7 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
                 CoursierResolvedLockfile,
                 CoursierResolveKey(
                     name=lockfile_req.resolve_name,
-                    path=lockfile_req.read_lockfile_dest,
+                    path=lockfile_req.lockfile,
                     digest=lockfile_snapshot.digest,
                 ),
             )
@@ -812,7 +812,7 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
             lockfile_inputs, LockfileContext.TOOL
         ):
             raise ValueError(
-                f"The lockfile {lockfile_req.read_lockfile_dest} (configured by the option "
+                f"The lockfile {lockfile_req.lockfile} (configured by the option "
                 f"{lockfile_req.lockfile_option_name}) was generated with different requirements "
                 f"than are currently set via {lockfile_req.artifact_option_name}. Run "
                 f"{regen_command} to regenerate the lockfile."

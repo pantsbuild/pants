@@ -114,6 +114,18 @@ def test_strip_chroot_path() -> None:
     assert strip_v2_chroot_path("") == ""
     assert strip_v2_chroot_path("hello world") == "hello world"
 
+    # Confirm other data (e.g. URLS) is unaffected
+    assert (
+        strip_v2_chroot_path("https://pantsbuild.org and /private/tmp/pants-sandbox-uPH7bl/sandbox")
+        == "https://pantsbuild.org and sandbox"
+    )
+    assert (
+        strip_v2_chroot_path(
+            "{'URL': 'https://pantsbuild.org', 'VENV': '/tmp/q_dt/pants-sandbox-K3/.cache/pex'}"
+        )
+        == "{'URL': 'https://pantsbuild.org', 'VENV': '.cache/pex'}"
+    )
+
 
 @pytest.mark.parametrize(
     ("strip_chroot_path", "strip_formatting", "expected"),

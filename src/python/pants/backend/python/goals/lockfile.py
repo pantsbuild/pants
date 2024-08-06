@@ -206,14 +206,6 @@ class KnownPythonUserResolveNamesRequest(KnownUserResolveNamesRequest):
     pass
 
 
-def python_exportable_tools(union_membership: UnionMembership) -> dict[str, type[PythonToolBase]]:
-    exportable_tools = union_membership.get(ExportableTool)
-    names_of_python_tools: dict[str, type[PythonToolBase]] = {
-        e.options_scope: e for e in exportable_tools if issubclass(e, PythonToolBase)  # type: ignore  # mypy isn't narrowing with `issubclass`
-    }
-    return names_of_python_tools
-
-
 @rule
 def determine_python_user_resolves(
     _: KnownPythonUserResolveNamesRequest,

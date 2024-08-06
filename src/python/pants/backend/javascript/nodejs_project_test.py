@@ -110,10 +110,9 @@ def test_immutable_install_args_property_with_unsupported_package_manager(
             "src/js/foo/package.json": given_package("foo", "0.0.1", package_manager="bar@2.4.3"),
         }
     )
-    projects = rule_runner.request(AllNodeJSProjects, [])
     expected_error = "Unsupported package manager: bar"
-    with pytest.raises(ValueError, match=expected_error):
-        {project.immutable_install_args for project in projects}
+    with engine_error(ValueError, contains=expected_error):
+        rule_runner.request(AllNodeJSProjects, [])
 
 
 def test_root_package_json_is_supported(rule_runner: RuleRunner) -> None:
@@ -144,7 +143,7 @@ def test_parses_project_with_workspaces(rule_runner: RuleRunner) -> None:
     [project] = rule_runner.request(AllNodeJSProjects, [])
     assert project.root_dir == "src/js"
     assert {workspace.name for workspace in project.workspaces} == {"egg", "ham", "spam"}
-    assert project.package_manager == "npm"
+    assert project.package_manager.name == "npm"
 
 
 def test_parses_project_with_nested_workspaces(rule_runner: RuleRunner) -> None:

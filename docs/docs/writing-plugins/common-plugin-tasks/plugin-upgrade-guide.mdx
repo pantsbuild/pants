@@ -7,6 +7,72 @@ How to adjust for changes made to the Plugin API.
 
 ---
 
+## 2.23
+
+### Deprecated GenerateToolLockfileSentinel
+
+`GenerateToolLockfileSentinel` was used to generate lockfiles. It is deprecated in favour of `ExportableTool`.
+
+```python title=Before
+class JarJar(JvmToolBase):
+    ...
+
+class JarJarGeneratorLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = JarJar.options_scope
+
+
+@rule
+async def generate_jarjar_lockfile_request(
+    _: JarJarGeneratorLockfileSentinel, jarjar: JarJar
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(jarjar)
+
+
+def rules():
+    return [..., UnionRule(GenerateToolLockfileSentinel, JarJarGeneratorLockfileSentinel)]
+```
+
+```python title=After
+class JarJar(JvmToolBase):
+    ...
+
+def rules():
+    return [..., UnionRule(ExportableTool, JarJar)]
+```
+
+#### JVM: Deprecated Get(GenerateJvmLockfileFromTool, GenerateToolLockfileSentinel) for lockfiles
+
+As part of the deprecation, `GenerateJvmLockfileFromTool` can be invoked directly on your tool, without a Get. You may need to request your `JvmToolBase`
+
+```python title=Before
+@rule
+async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) -> ShadedJar:
+    ...
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, JarJarGeneratorLockfileSentinel())
+
+    tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
+```
+
+```python title=After
+@rule
+async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) -> ShadedJar:
+    ...
+    await Get(
+            ToolClasspath, ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(jarjar))
+        )
+```
+
+### JVM: Migrating from GenerateJvmLockfileFromTool to JvmToolBase
+
+`JvmToolBase` is the preferred way to define JVM-based tools.
+
+1. set the `options_scope`, usually to the `resolve_name`
+2. set the `help`
+3. `default_artifacts` is the `artifact_inputs` converted to a tuple. A version can be replaced by `{version}` and moved to the `default_version` field
+4. `default_lockfile_resource` is the same
+
+A `GenerateJvmLockfileFromTool` is created from a `JvmToolBase` with `GenerateJvmLockfileFromTool.create`
+
 ## 2.17
 
 ### Deprecated some `Request` types in favor of `Get` with only one arg
