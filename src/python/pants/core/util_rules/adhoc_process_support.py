@@ -548,13 +548,18 @@ async def run_adhoc_process(
     output_digest = result.output_digest
     output_files: list[str] = list(request.output_files)
     output_directories: list[str] = list(request.output_directories)
-    if root_output_directory:
-        output_files = [os.path.join(root_output_directory, of) for of in output_files]
-        output_directories = [os.path.join(root_output_directory, od) for od in output_directories]
+    if request.use_working_directory_as_base_for_output_captures:
+        output_files = [
+            os.path.normpath(os.path.join(working_directory, of)) for of in output_files
+        ]
+        output_directories = [
+            os.path.normpath(os.path.join(working_directory, od)) for od in output_directories
+        ]
+        print(f"updated to output_files={output_files}, output_directories={output_directories}")
     await check_outputs(
         output_digest=output_digest,
-        output_files=request.output_files,
-        output_directories=request.output_directories,
+        output_files=output_files,
+        output_directories=output_directories,
         outputs_match_error_behavior=request.outputs_match_error_behavior,
         outputs_match_mode=request.outputs_match_mode,
         description_of_origin=f"{request.address}",
