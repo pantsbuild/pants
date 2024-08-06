@@ -92,6 +92,8 @@ class PythonAwsLambdaIncludeSources(BoolField):
 
 class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
     PYTHON_RUNTIME_REGEX = r"python(?P<major>\d)\.(?P<minor>\d+)"
+    # https://gallery.ecr.aws/lambda/python
+    LAMBDA_DOCKER_REPO = "public.ecr.aws/lambda/python"
 
     help = help_text(
         """
@@ -105,21 +107,19 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         """
     )
 
-    # https://gallery.ecr.aws/lambda/python
-    known_runtimes_docker_repo = "public.ecr.aws/lambda/python"
     known_runtimes = (
-        PythonFaaSKnownRuntime(3, 6, "3.6", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 7, "3.7", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 8, "3.8-x86_64", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 8, "3.8-arm64", FaaSArchitecture.ARM64),
-        PythonFaaSKnownRuntime(3, 9, "3.9-x86_64", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 9, "3.9-arm64", FaaSArchitecture.ARM64),
-        PythonFaaSKnownRuntime(3, 10, "3.10-x86_64", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 10, "3.10-arm64", FaaSArchitecture.ARM64),
-        PythonFaaSKnownRuntime(3, 11, "3.11-x86_64", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 11, "3.11-arm64", FaaSArchitecture.ARM64),
-        PythonFaaSKnownRuntime(3, 12, "3.12-x86_64", FaaSArchitecture.X86_64),
-        PythonFaaSKnownRuntime(3, 12, "3.12-arm64", FaaSArchitecture.ARM64),
+        PythonFaaSKnownRuntime(3, 6, LAMBDA_DOCKER_REPO, "3.6", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 7, LAMBDA_DOCKER_REPO, "3.7", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 8, LAMBDA_DOCKER_REPO, "3.8-x86_64", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 8, LAMBDA_DOCKER_REPO, "3.8-arm64", FaaSArchitecture.ARM64),
+        PythonFaaSKnownRuntime(3, 9, LAMBDA_DOCKER_REPO, "3.9-x86_64", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 9, LAMBDA_DOCKER_REPO, "3.9-arm64", FaaSArchitecture.ARM64),
+        PythonFaaSKnownRuntime(3, 10, LAMBDA_DOCKER_REPO, "3.10-x86_64", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 10, LAMBDA_DOCKER_REPO, "3.10-arm64", FaaSArchitecture.ARM64),
+        PythonFaaSKnownRuntime(3, 11, LAMBDA_DOCKER_REPO, "3.11-x86_64", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 11, LAMBDA_DOCKER_REPO, "3.11-arm64", FaaSArchitecture.ARM64),
+        PythonFaaSKnownRuntime(3, 12, LAMBDA_DOCKER_REPO, "3.12-x86_64", FaaSArchitecture.X86_64),
+        PythonFaaSKnownRuntime(3, 12, LAMBDA_DOCKER_REPO, "3.12-arm64", FaaSArchitecture.ARM64),
     )
 
     @classmethod

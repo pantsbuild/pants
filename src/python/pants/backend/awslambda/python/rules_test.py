@@ -207,26 +207,26 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     ("ics", "runtime", "architecture"),
     [
         pytest.param(
-            ["==3.7.*"],
+            ["==3.8.*"],
             None,
             FaaSArchitecture.X86_64,
             id="runtime inferred from ICs, x86_64 architecture",
         ),
         pytest.param(
             None,
-            "python3.7",
+            "python3.8",
             FaaSArchitecture.X86_64,
             id="runtime explicitly set, x86_64 architecture",
         ),
         pytest.param(
-            ["==3.7.*"],
+            ["==3.8.*"],
             None,
             FaaSArchitecture.ARM64,
             id="runtime inferred from ICs, ARM64 architecture",
         ),
         pytest.param(
             None,
-            "python3.7",
+            "python3.8",
             FaaSArchitecture.ARM64,
             id="runtime explicitly set, ARM64 architecture",
         ),
@@ -275,7 +275,7 @@ def test_create_hello_world_lambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
         expected_extra_log_lines=(
-            "    Runtime: python3.7",
+            "    Runtime: python3.8",
             f"    Architecture: {architecture.value}",
             "    Handler: lambda_function.handler",
         ),
@@ -294,7 +294,7 @@ def test_create_hello_world_lambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
         expected_extra_log_lines=(
-            "    Runtime: python3.7",
+            "    Runtime: python3.8",
             f"    Architecture: {architecture.value}",
             "    Handler: lambda_function.handler",
         ),
@@ -335,14 +335,14 @@ def test_create_hello_world_layer(
                 python_aws_lambda_layer(
                     name='lambda',
                     dependencies=["./hello_world.py"],
-                    runtime="python3.7",
+                    runtime="python3.8",
                     architecture="{architecture.value}",
                 )
                 python_aws_lambda_layer(
                     name='slimlambda',
                     include_sources=False,
                     dependencies=["./hello_world.py"],
-                    runtime="python3.7",
+                    runtime="python3.8",
                     architecture="{architecture.value}",
                 )
                 """
@@ -354,7 +354,7 @@ def test_create_hello_world_layer(
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
         expected_extra_log_lines=(
-            "    Runtime: python3.7",
+            "    Runtime: python3.8",
             f"    Architecture: {architecture.value}",
         ),
         layer=True,
@@ -372,7 +372,7 @@ def test_create_hello_world_layer(
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
         expected_extra_log_lines=(
-            "    Runtime: python3.7",
+            "    Runtime: python3.8",
             f"    Architecture: {architecture.value}",
         ),
         layer=True,
