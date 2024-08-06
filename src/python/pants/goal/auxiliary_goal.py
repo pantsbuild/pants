@@ -28,8 +28,8 @@ class AuxiliaryGoalContext:
 
 
 class AuxiliaryGoal(ABC, GoalSubsystem):
-    """Configure an "auxiliary" goal which allows rules to "take over" Pants client execution in lieu
-    of executing an ordinary goal.
+    """Configure an "auxiliary" goal which allows rules to "take over" Pants client execution in
+    lieu of executing an ordinary goal.
 
     Only a single auxiliary goal is executed per run, any remaining goals/arguments are passed
     unaltered to the auxiliary goal. Auxiliary goals have precedence over regular goals.
