@@ -32,7 +32,6 @@ from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessResult,
     ToolRunner,
     ToolRunnerRequest,
-    check_outputs,
     prepare_env_vars,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
@@ -131,7 +130,7 @@ async def run_in_sandbox_request(
         cache_scope=cache_scope,
         use_working_directory_as_base_for_output_captures=environment_target.use_working_directory_as_base_for_output_captures,
         outputs_match_error_behavior=target.get(AdhocToolOutputsMatchErrorBehavior).enum_value,
-        outputs_match_mode=target.get(AdhocToolOutputsMatchMode).conjunction_enum_value,
+        outputs_match_mode=target.get(AdhocToolOutputsMatchMode).enum_value,
     )
 
     adhoc_result = await Get(

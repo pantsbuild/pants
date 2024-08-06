@@ -3,11 +3,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
 from typing import ClassVar
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.util_rules.adhoc_process_support import OutputsMatchMode, PathEnvModifyMode
+from pants.core.util_rules.adhoc_process_support import PathEnvModifyMode
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.fs import GlobExpansionConjunction
 from pants.engine.target import (
@@ -324,7 +323,7 @@ class AdhocToolOutputsMatchErrorBehavior(StringField):
 
 class AdhocToolOutputsMatchMode(StringField):
     alias = "outputs_match_mode"
-    default = "all_match"
+    default = "all"
     help = help_text(
         """
         Configure whether all globs referencing files or directory outputs to be captured must match.
@@ -334,27 +333,27 @@ class AdhocToolOutputsMatchMode(StringField):
         - `all`: All globs provided in the `output_files` and `output_directories` fields must match or else Pants
         will error.
 
-        - `any`: At least one glob provided in the `output_files` and `output_directories` fields must match or 
+        - `any`: At least one glob provided in the `output_files` and `output_directories` fields must match or
         else Pants will error.
 
         - `allow_empty`: Allow empty digests (which means nothing was captured)
         """
     )
-    valid_choices = ("all_match", "any_match", "allow_empty")
+    valid_choices = ("all", "any", "allow_empty")
 
     @property
-    def conjunction_enum_value(self) -> GlobExpansionConjunction | None:
+    def enum_value(self) -> GlobExpansionConjunction | None:
         value = self.value
-        if value == "all_match":
+        if value == "all":
             return GlobExpansionConjunction.all_match
-        elif value == "any_match":
+        elif value == "any":
             return GlobExpansionConjunction.any_match
         else:
             return None
 
-    @property
-    def allow_empty(self) -> bool:
-        return self.value == "allow_empty"
+    # @property
+    # def allow_empty(self) -> bool:
+    #     return self.value == "allow_empty"
 
 
 class AdhocToolTarget(Target):
