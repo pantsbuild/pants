@@ -39,6 +39,9 @@ class ScopeInfo:
     # Builtin goals, such as `help` and `version` etc.
     is_builtin: bool = False
 
+    # Auxiliary goals, such as the `experimental-bsp` goal.
+    is_auxiliary: bool = False
+
     @property
     def description(self) -> str:
         return cast(str, self._subsystem_cls_attr("help"))
