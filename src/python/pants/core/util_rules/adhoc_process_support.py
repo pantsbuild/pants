@@ -14,7 +14,7 @@ from enum import Enum
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, TypeVar, Union
 
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior, GlobExpansionConjunction
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
@@ -85,7 +85,7 @@ class AdhocProcessRequest:
     cache_scope: ProcessCacheScope | None = None
     use_working_directory_as_base_for_output_captures: bool = True
     outputs_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error
-    outputs_match_mode: GlobExpansionConjunction = GlobExpansionConjunction.AllMatch
+    outputs_match_mode: GlobExpansionConjunction | None = GlobExpansionConjunction.all_match
 
 
 @dataclass(frozen=True)
@@ -757,6 +757,10 @@ def _parse_relative_file(file_in: str, relative_to: str) -> str:
 
 
 async def check_outputs(request: AdhocProcessRequest, output_digest: Digest) -> None:
+    outputs_match_mode = request.outputs_match_mode
+    if outputs_match_mode is None:
+        return
+
     _filtered_for_output_files, _filtered_for_output_directories = await MultiGet(
         Get(
             Digest,
@@ -765,7 +769,7 @@ async def check_outputs(request: AdhocProcessRequest, output_digest: Digest) -> 
                 PathGlobs(
                     request.output_files,
                     glob_match_error_behavior=request.outputs_match_error_behavior,
-                    conjunction=request.outputs_match_mode,
+                    conjunction=outputs_match_mode,
                     description_of_origin=f"the `output_files` field at `{request.address}`",
                 ),
             ),
@@ -777,7 +781,7 @@ async def check_outputs(request: AdhocProcessRequest, output_digest: Digest) -> 
                 PathGlobs(
                     request.output_directories,
                     glob_match_error_behavior=request.outputs_match_error_behavior,
-                    conjunction=request.outputs_match_mode,
+                    conjunction=outputs_match_mode,
                     description_of_origin=f"output_directories field at `{request.address}`",
                 ),
             ),
