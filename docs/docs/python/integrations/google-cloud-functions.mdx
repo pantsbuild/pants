@@ -68,7 +68,7 @@ Use [layout](../../../reference/targets/python_google_cloud_function.mdx#layout)
 
 ### Specifying a runtime explicitly
 
-Pants will attempt to infer the appropriate runtime and its platform-specific details from [the relevant interpreter constraints](../overview/interpreter-compatibility.mdx). For example, given `interpreter_constaints = ["==3.12.*"]`, Pants will build the Lambda package to appropriate for the  `python312` runtime. The Lambda environment is a relatively stable, running Linux on a x86-64 CPU, and thus Pants includes default "complete platforms" specifications that allow choosing appropriate artifacts of third-party dependencies with native code. These are chosen based on the (inferred or explicit) runtime.
+Pants will attempt to infer the appropriate runtime and its platform-specific details from [the relevant interpreter constraints](../overview/interpreter-compatibility.mdx). For example, given `interpreter_constaints = ["==3.12.*"]`, Pants will build the Cloud function package to appropriate for the  `python312` runtime. The GCF environment is a relatively stable, running Linux on a x86-64 CPU, and thus Pants includes default "complete platforms" specifications that allow choosing appropriate artifacts of third-party dependencies with native code. These are chosen based on the (inferred or explicit) runtime.
 
 The inference may not work in your scenario and/or may not be appropriate:
 
@@ -88,7 +88,7 @@ python_google_cloud_function(
 )
 ```
 
-Otherwise, the platform-dependent information should be specified with [the `complete_platforms` field](../../../reference/targets/python_aws_lambda_function.mdx#complete_platforms).
+Otherwise, the platform-dependent information should be specified with [the `complete_platforms` field](../../../reference/targets/python_google_cloud_function.mdx#complete_platforms).
 
 ```python title="BUILD"
 file(name="gcf-platform", source="gcf-platform.json")
@@ -154,7 +154,7 @@ python_sources()
 pex_binary(
     name="gcf",
     entry_point="gcf_example.py",
-    # specify an appropriate platform for the targeted Lambda runtime:
+    # specify an appropriate platform for the targeted GCF runtime:
     complete_platforms=["path/to:platform-json-target"],
 )
 ```
