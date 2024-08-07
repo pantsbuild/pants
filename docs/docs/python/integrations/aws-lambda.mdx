@@ -67,37 +67,46 @@ Use [layout](../../../reference/targets/python_aws_lambda_function.mdx#layout) t
 
 ### Specifying a runtime explicitly
 
-Pants will attempt to infer the appropriate runtime and its platform-specific details from [the relevant interpreter constraints](../overview/interpreter-compatibility.mdx). For example, given `interpreter_constaints = ["==3.12.*"]`, Pants will build the Lambda package to appropriate for the  `python3.12` runtime. The Lambda environment is a relatively stable, running Linux on either a x86-64 or arm64 CPU, and thus Pants includes default "complete platforms" specifications that allow choosing appropriate artifacts for third-party dependencies with native code. These are chosen based on the (inferred or explicit) runtime and [the architecture](../../../reference/targets/python_aws_lambda_function.mdx#architecture).
+When building an Lambda artifact, Pants and the underlying Pex tool need to know details about target runtime to be able to choose appropriate artifacts for third-party dependencies that have native code. These details can be inferred or provided in three ways, from highest precedence to lowest precedence:
 
-The inference may not work in your scenario and/or may not be appropriate:
+1. An explicit value for [the `complete_platforms` field](../../../reference/targets/python_aws_lambda_function.mdx#complete_platforms). The "complete platforms" are the underlying source of truth.
+    ```python title="BUILD"
+    file(name="lambda-platform", source="lambda-platform.json")
 
-1. if the interpreter constraints are not obviously referring to all versions from a given minor release series, Pants won't infer the runtime. For instance, `>=3.11,<3.13` is too wide (it covers both 3.11 and 3.12), while `==3.12.1` is too specific (AWS's `python3.12` runtime may not use that patch version).
-2. if the interpreter constraints refer to a runtime that Pants doesn't have a default complete platforms JSON specification for, Pants will require you to specify one.
-3. if the cloud environment has changed, Pants' default complete platforms value may imply correct artifacts dependency and you may want to customise.
+    python_aws_lambda_function(
+        name="lambda",
+        handler="lambda_example.py:example_handler",
+        # Explicit complete platforms:
+        complete_platforms=[":lambda-platform"],
+    )
+    ```
+2. An explicit value for [the `runtime` field](../../../reference/targets/python_aws_lambda_function.mdx#runtime) and, optionally, [the `architecture` field](../../../reference/targets/python_aws_lambda_function.mdx#architecture): Pants uses these to pick an appropriate "complete platforms" value, from options that Pants has pre-packaged. These are static exports from docker images provided by AWS, relying on the environment being relatively stable. (If Pants doesn't have an appropriate "complete platforms" default built-in, you will be prompted to use option 1 above.)
+    ```python title="BUILD"
+    python_aws_lambda_function(
+        name="lambda",
+        handler="lambda_example.py:example_handler",
+        # Explicit runtime, `complete_platforms` taken from Pants' built-in defaults:
+        runtime="python3.12",
+        # Override the default x86_64 architecture:
+        architecture="arm64",
+    )
+    ```
+3. Inferred from [the relevant interpreter constraints](../overview/interpreter-compatibility.mdx): the interpreter constraints may unambiguously imply a value for the `runtime` and thus `complete_platforms` fields. For example, `interpreter_constaints = ["==3.12.*"]` implies `runtime="python3.12"`. This only works with interpreter constraints that cover all patch versions of a given minor release series: `>=3.11,<3.13` is too wide (it covers both 3.11 and 3.12), while `==3.12.0` is too specific (AWS's `python3.12` runtime may not use that exact patch version). As with option 2, the architecture is `x86_64` by default, but can changed using the `architecture` field.
 
-In the first case, [the `runtime` field](../../../reference/targets/python_aws_lambda_function.mdx#runtime) can be used to specify which runtime is intended for each `python_aws_lambda_function` and `python_aws_lambda_layer` target. It should be one of the values from [https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html](https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html).
+    ```toml tab={"label":"pants.toml"}
+    [python]
+    interpreter_constraints = ["==3.12.*"]
+    ```
+    ```python tab={"label":"project/BUILD"}
+    python_aws_lambda_function(
+        name="lambda",
+        handler="lambda_example.py:example_handler",
+        # `runtime` inferred and `complete_platforms` from built-in defaults,
+        # `architecture` defaults to x86_64, but can be overridden
+    )
+    ```
 
-```python title="BUILD"
-python_aws_lambda_function(
-    name="lambda",
-    handler="lambda_example.py:example_handler",
-    # Explicit runtime:
-    runtime="python3.12",
-)
-```
-
-Otherwise, the platform-dependent information should be specified with [the `complete_platforms` field](../../../reference/targets/python_aws_lambda_function.mdx#complete_platforms).
-
-```python title="BUILD"
-file(name="lambda-platform", source="lambda-platform.json")
-
-python_aws_lambda_function(
-    name="lambda",
-    handler="lambda_example.py:example_handler",
-    # Explicit complete platforms:
-    complete_platforms=[":lambda-platform"],
-)
-```
+This guide is written using the last option, with the default `x86_64` architecture, but you can add `runtime`, `complete_platforms` and/or `architecture` to any examples using the `python_aws_lambda_function` or `python_aws_lambda_layer` targets.
 
 ## Step 3: Run `package`
 
