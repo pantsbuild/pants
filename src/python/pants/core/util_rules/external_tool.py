@@ -440,6 +440,7 @@ async def export_external_tool(
             description=f"Export tool {req.resolve}",
             reldir=dest,
             digest=downloaded_tool.digest,
+            resolve=req.resolve
         )
     )
 
