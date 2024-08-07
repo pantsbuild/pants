@@ -139,6 +139,7 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         """
     )
 
+    valid_choices = PythonAwsLambdaFunctionRuntimes
     known_runtimes = tuple(
         PythonFaaSKnownRuntime(
             runtime.value, *runtime.to_interpreter_version(), LAMBDA_DOCKER_REPO, tag, architecture

@@ -66,6 +66,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
@@ -304,9 +305,6 @@ class PythonFaaSKnownRuntime:
     def file_name(self) -> str:
         return f"complete_platform_{self.tag}.json"
 
-    def __str__(self) -> str:
-        return f"{self.name} - Python {self.major}.{self.minor}"
-
 
 class PythonFaaSRuntimeField(StringField, ABC):
     alias = "runtime"
@@ -443,6 +441,9 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         # Not a known runtime, so fallback to just passing a platform
         version_modifier = "[inferred from interpreter constraints]" if inferred_from_ics else ""
         version_adjective = "inferred" if inferred_from_ics else "specified"
+        known_runtimes_str = ", ".join(
+            FrozenOrderedSet(r.name for r in request.runtime.known_runtimes)
+        )
         warn_or_error(
             "2.26.0.dev0",
             "implicitly resolving platforms for unknown FaaS runtimes",
@@ -453,8 +454,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
                 Python version: {version} {version_modifier}
                 Machine architecture: {request.architecture.value}
 
-                Known runtimes:
-                {request.runtime.known_runtimes}
+                Known runtime values: {known_runtimes_str}
 
                 To fix, please generate a `complete_platforms` file for the given Python version and
                 machine architecture, or specify a runtime that is known to Pants.
