@@ -2774,7 +2774,7 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
 
         @rule
         def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
-            hydrated_sources = await Get(HydratedSources, HydrateSources(request.sources))
+            hydrated_sources = await Get(HydratedSources, HydrateSources(request.field_set.sources))
             ...
             return InferredDependencies(...)
 
