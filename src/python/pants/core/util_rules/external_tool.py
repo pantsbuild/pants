@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import os
 import textwrap
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
@@ -419,11 +420,11 @@ class MaybeExportResult:
 async def export_external_tool(
     req: _ExportExternalToolForResolveRequest, platform: Platform, union_membership: UnionMembership
 ) -> MaybeExportResult:
-    exporatbles = ExportableTool.filter_for_subclasses(
+    exportables = ExportableTool.filter_for_subclasses(
         union_membership,
         ExternalTool,  # type:ignore[type-abstract]  # ExternalTool is abstract, and mypy doesn't like that we might return it
     )
-    maybe_exportable = exporatbles.get(req.resolve)
+    maybe_exportable = exportables.get(req.resolve)
     if not maybe_exportable:
         return MaybeExportResult(None)
 
@@ -432,7 +433,7 @@ async def export_external_tool(
         DownloadedExternalTool, ExternalToolRequest, tool.get_request(platform)
     )
 
-    dest = "bin"
+    dest = os.path.join("bins", tool.name)
 
     return MaybeExportResult(
         ExportResult(
