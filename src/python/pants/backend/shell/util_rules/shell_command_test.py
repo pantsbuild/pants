@@ -913,6 +913,34 @@ def test_shell_command_workspace_invalidation_sources(rule_runner: RuleRunner) -
     assert result1.snapshot != result3.snapshot
 
 
+def test_shell_command_workspace_output_capture_base(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+            shell_command(
+                name="make-file",
+                tools=["cp"],
+                command="[ -r ./foo.txt ] && cp ./foo.txt {chroot}/bar.txt",
+                output_files=["bar.txt"],
+                environment="workspace",
+                workdir="subdir",
+            )
+            experimental_workspace_environment(name="workspace")
+            """
+            ),
+            "subdir/foo.txt": "xyzzy",
+        }
+    )
+    rule_runner.set_options(
+        ["--environments-preview-names={'workspace': '//:workspace'}"], env_inherit={"PATH"}
+    )
+
+    assert_shell_command_result(
+        rule_runner, Address("", target_name="make-file"), {"bar.txt": "xyzzy"}
+    )
+
+
 def test_shell_command_path_env_modify_mode(rule_runner: RuleRunner) -> None:
     expected_path = "/bin:/usr/bin"
     rule_runner.write_files(

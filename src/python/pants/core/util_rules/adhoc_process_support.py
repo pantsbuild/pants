@@ -80,6 +80,7 @@ class AdhocProcessRequest:
     capture_stderr_file: str | None
     workspace_invalidation_globs: PathGlobs | None
     cache_scope: ProcessCacheScope | None = None
+    use_working_directory_as_base_for_output_captures: bool = True
 
 
 @dataclass(frozen=True)
@@ -487,9 +488,12 @@ async def run_adhoc_process(
             logger.warning(result.stderr.decode())
 
     working_directory = parse_relative_directory(request.working_directory, request.address)
-    root_output_directory = parse_relative_directory(
-        request.root_output_directory, working_directory
-    )
+
+    root_output_directory: str | None = None
+    if request.use_working_directory_as_base_for_output_captures:
+        root_output_directory = parse_relative_directory(
+            request.root_output_directory, working_directory
+        )
 
     extras = (
         (request.capture_stdout_file, result.stdout),
@@ -500,16 +504,27 @@ async def run_adhoc_process(
     output_digest = result.output_digest
 
     if extra_contents:
-        extra_digest = await Get(
-            Digest,
-            CreateDigest(
-                FileContent(_parse_relative_file(name, working_directory), content)
-                for name, content in extra_contents.items()
-            ),
-        )
+        if request.use_working_directory_as_base_for_output_captures:
+            extra_digest = await Get(
+                Digest,
+                CreateDigest(
+                    FileContent(_parse_relative_file(name, working_directory), content)
+                    for name, content in extra_contents.items()
+                ),
+            )
+        else:
+            extra_digest = await Get(
+                Digest,
+                CreateDigest(
+                    FileContent(name, content) for name, content in extra_contents.items()
+                ),
+            )
+
         output_digest = await Get(Digest, MergeDigests((output_digest, extra_digest)))
 
-    adjusted = await Get(Digest, RemovePrefix(output_digest, root_output_directory))
+    adjusted: Digest = output_digest
+    if root_output_directory is not None:
+        adjusted = await Get(Digest, RemovePrefix(output_digest, root_output_directory))
 
     return AdhocProcessResult(result, adjusted)
 
@@ -612,7 +627,10 @@ async def prepare_adhoc_process(
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
 
-    return _output_at_build_root(proc, bash)
+    if request.use_working_directory_as_base_for_output_captures:
+        return _output_at_build_root(proc, bash)
+    else:
+        return proc
 
 
 class PathEnvModifyMode(Enum):

@@ -18,6 +18,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
+    FaaSArchitecture,
     InferPythonFaaSHandlerDependency,
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
@@ -247,10 +248,13 @@ def test_infer_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
 
 class TestRuntimeField(PythonFaaSRuntimeField):
     known_runtimes = (
-        PythonFaaSKnownRuntime(3, 45, tag="faas-test-3-45"),
-        PythonFaaSKnownRuntime(67, 89, tag="faas-test-67-89"),
+        PythonFaaSKnownRuntime(
+            3, 45, "", tag="faas-test-3-45", architecture=FaaSArchitecture.X86_64
+        ),
+        PythonFaaSKnownRuntime(
+            67, 89, "", tag="faas-test-67-89", architecture=FaaSArchitecture.X86_64
+        ),
     )
-    known_runtimes_docker_repo = ""
 
     def to_interpreter_version(self) -> None | tuple[int, int]:
         if self.value is None:
@@ -290,6 +294,7 @@ def test_infer_runtime_platforms_when_runtime_and_no_complete_platforms(
         target_name="unused",
         runtime=TestRuntimeField(value, address),
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
+        architecture=FaaSArchitecture.X86_64,
     )
 
     platforms = rule_runner.request(RuntimePlatforms, [request])
@@ -310,6 +315,7 @@ def test_infer_runtime_platforms_when_complete_platforms(
         address=address,
         target_name="unused",
         runtime=TestRuntimeField("completely ignored!", address),
+        architecture=FaaSArchitecture.ARM64,  # ignored
         complete_platforms=PythonFaaSCompletePlatforms(["path:cp"], address),
     )
 
@@ -351,6 +357,7 @@ def test_infer_runtime_platforms_when_narrow_ics_only(
         target_name="example_target",
         runtime=TestRuntimeField(None, address),
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
+        architecture=FaaSArchitecture.X86_64,
     )
 
     platforms = rule_runner.request(RuntimePlatforms, [request])
@@ -388,6 +395,7 @@ def test_infer_runtime_platforms_errors_when_wide_ics(
         address=address,
         target_name="example_target",
         runtime=TestRuntimeField(None, address),
+        architecture=FaaSArchitecture.X86_64,
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
     )
 
@@ -415,6 +423,7 @@ def test_venv_create_extra_args_are_passed_through() -> None:
         handler=None,
         output_path=OutputPathField(None, addr),
         runtime=Mock(),
+        architecture=FaaSArchitecture.X86_64,
         pex3_venv_create_extra_args=extra_args_field,
         pex_build_extra_args=PythonFaaSPexBuildExtraArgs(None, addr),
         layout=PythonFaaSLayoutField(PexVenvLayout.FLAT_ZIPPED.value, addr),
@@ -478,6 +487,7 @@ def test_layout_should_be_passed_through_and_adjust_filename(input_layout, expec
         handler=None,
         output_path=OutputPathField(None, addr),
         runtime=Mock(),
+        architecture=FaaSArchitecture.X86_64,
         pex3_venv_create_extra_args=Mock(),
         pex_build_extra_args=PythonFaaSPexBuildExtraArgs(None, addr),
         layout=input_layout,
@@ -531,6 +541,7 @@ def test_pex_build_extra_args_passed_through() -> None:
         handler=None,
         output_path=OutputPathField(None, addr),
         runtime=Mock(),
+        architecture=FaaSArchitecture.X86_64,
         pex3_venv_create_extra_args=Mock(),
         pex_build_extra_args=extra_pex_args_field,
         layout=PythonFaaSLayoutField(PexVenvLayout.FLAT_ZIPPED.value, addr),

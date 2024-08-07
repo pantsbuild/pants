@@ -992,7 +992,9 @@ class BootstrapOptions:
             This option controls how to report discrepancies that arise.
 
             - `error`: Discrepancies will cause Pants to exit.
+
             - `warning`: Discrepancies will be logged but Pants will continue.
+
             - `ignore`: A last resort to turn off this check entirely.
 
             If you encounter discrepancies that are not easily resolvable, please reach out to
