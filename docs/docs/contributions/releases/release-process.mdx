@@ -77,7 +77,7 @@ The release commit is the commit that bumps the VERSION string. For `dev`/`a0` r
 
 ### Bump the VERSION
 
-From the `main` branch, run `pants run src/python/pants_release/start_release.py -- --new 2.9.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
+From the `main` branch, run `pants --no-watch-filesystem --no-pantsd run src/python/pants_release/start_release.py -- --new 2.99.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
 
 This will create a pull request that:
 
@@ -157,6 +157,30 @@ This workflow checks out various open-source repositories that use Pants and run
 Once the workflow finishes, look through any failures and determine if there's any interesting/unknown problems, ensuring there's issues filed (and tagged with the appropriate milestone) for them. For instance, a custom plugin that is broken by a plugin API change is okay, but other sorts of breakage might not be. If there's a failure during the baseline, a similar failure during the real (non-baseline) test can be ignored, as it likely means the repository in question is broken.
 
 Alternatively, after starting the workflow, post the link to the in-progress run in `#development` in Slack, so that someone can come back to it when it does finish.
+
+## Step 5: Publish a schema in JSON Schema Store
+
+Some editors can use JSON Schema for better completions when editing TOML files like `pants.toml`.
+Pants configuration file schema is published at https://www.schemastore.org/. For every stable `2.x.0` release,
+a new schema needs to be generated and uploaded by submitting a PR against https://github.com/SchemaStore/schemastore.
+This is an example pull request for reference: https://github.com/SchemaStore/schemastore/pull/3880.
+
+To produce `pantsbuild-<version>.json` schema file, run:
+
+```bash
+pants help-all > all-help.json
+pants run build-support/bin/generate_json_schema.py -- --all-help-file=all-help.json
+```
+
+It may be helpful to compare the last schema file with the newly produced one to make sure there are no discrepancies
+(e.g. the config values have a sensible type and the help strings are rendered adequately). You can download the
+schemas of previous releases from the store website; the JSON files are available at
+`https://json.schemastore.org/pantsbuild-<version>.json`.
+
+Watch out for any configuration parameters that may rely on your local environment as certain default config values
+will be expanded using local runtime environment which is undesirable. The script handles those known config values
+by keeping a list of them, however, it may need to be extended as more options with environment specific default
+values are added.
 
 ## When Things Go Wrong
 

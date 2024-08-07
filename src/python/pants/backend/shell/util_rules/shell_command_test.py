@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import shlex
+import time
 from pathlib import Path
 from textwrap import dedent
 
@@ -69,9 +70,19 @@ def rule_runner() -> RuleRunner:
             FilesGeneratorTarget,
             LocalWorkspaceEnvironmentTarget,
         ],
+        isolated_local_store=True,
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
+
+
+def execute_shell_command(
+    rule_runner: RuleRunner,
+    address: Address,
+) -> GeneratedSources:
+    generator_type: type[GenerateSourcesRequest] = GenerateFilesFromShellCommandRequest
+    target = rule_runner.get_target(address)
+    return rule_runner.request(GeneratedSources, [generator_type(EMPTY_SNAPSHOT, target)])
 
 
 def assert_shell_command_result(
@@ -79,9 +90,7 @@ def assert_shell_command_result(
     address: Address,
     expected_contents: dict[str, str],
 ) -> None:
-    generator_type: type[GenerateSourcesRequest] = GenerateFilesFromShellCommandRequest
-    target = rule_runner.get_target(address)
-    result = rule_runner.request(GeneratedSources, [generator_type(EMPTY_SNAPSHOT, target)])
+    result = execute_shell_command(rule_runner, address)
     assert result.snapshot.files == tuple(expected_contents)
     contents = rule_runner.request(DigestContents, [result.snapshot.digest])
     for fc in contents:
@@ -853,7 +862,7 @@ def test_shell_command_with_workspace_execution(rule_runner: RuleRunner) -> None
                 output_files=["out.log"],
                 environment="workspace",
             )
-            workspace_environment(name="workspace")
+            experimental_workspace_environment(name="workspace")
             """
             )
         }
@@ -871,3 +880,115 @@ def test_shell_command_with_workspace_execution(rule_runner: RuleRunner) -> None
     workspace_output_path = Path(rule_runner.build_root).joinpath("foo.txt")
     assert workspace_output_path.exists()
     assert workspace_output_path.read_text().strip() == "workspace"
+
+
+def test_shell_command_workspace_invalidation_sources(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+            shell_command(
+              name="cmd",
+              # Use a random value so we can detect when re-execution occurs.
+              command='echo $RANDOM > out.log',
+              output_files=["out.log"],
+              workspace_invalidation_sources=['a-file'],
+            )
+            """
+            ),
+            "src/a-file": "",
+        }
+    )
+    address = Address("src", target_name="cmd")
+
+    # Re-executing the initial execution should be cached.
+    result1 = execute_shell_command(rule_runner, address)
+    result2 = execute_shell_command(rule_runner, address)
+    assert result1.snapshot == result2.snapshot
+
+    # Update the hash-only source file's content. The shell_command should be re-executed now.
+    (Path(rule_runner.build_root) / "src" / "a-file").write_text("xyzzy")
+    time.sleep(0.100)
+    result3 = execute_shell_command(rule_runner, address)
+    assert result1.snapshot != result3.snapshot
+
+
+def test_shell_command_workspace_output_capture_base(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+            shell_command(
+                name="make-file",
+                tools=["cp"],
+                command="[ -r ./foo.txt ] && cp ./foo.txt {chroot}/bar.txt",
+                output_files=["bar.txt"],
+                environment="workspace",
+                workdir="subdir",
+            )
+            experimental_workspace_environment(name="workspace")
+            """
+            ),
+            "subdir/foo.txt": "xyzzy",
+        }
+    )
+    rule_runner.set_options(
+        ["--environments-preview-names={'workspace': '//:workspace'}"], env_inherit={"PATH"}
+    )
+
+    assert_shell_command_result(
+        rule_runner, Address("", target_name="make-file"), {"bar.txt": "xyzzy"}
+    )
+
+
+def test_shell_command_path_env_modify_mode(rule_runner: RuleRunner) -> None:
+    expected_path = "/bin:/usr/bin"
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                f"""\
+            shell_command(
+                name="shims_prepend",
+                tools=["echo"],
+                command="echo $PATH > path.txt",
+                extra_env_vars=["PATH={expected_path}"],
+                output_files=["path.txt"],
+                path_env_modify="prepend",
+            )
+            shell_command(
+                name="shims_append",
+                tools=["echo"],
+                command="echo $PATH > path.txt",
+                extra_env_vars=["PATH={expected_path}"],
+                output_files=["path.txt"],
+                path_env_modify="append",
+            )
+            shell_command(
+                name="shims_off",
+                tools=["echo"],
+                command="echo $PATH > path.txt",
+                extra_env_vars=["PATH={expected_path}"],
+                output_files=["path.txt"],
+                path_env_modify="off",
+            )
+            """
+            )
+        }
+    )
+
+    def run(target_name: str) -> str:
+        result = execute_shell_command(rule_runner, Address("src", target_name=target_name))
+        contents = rule_runner.request(DigestContents, [result.snapshot.digest])
+        assert len(contents) == 1
+        return contents[0].content.decode().strip()
+
+    path_prepend = run("shims_prepend")
+    assert path_prepend.endswith(expected_path)
+    assert len(path_prepend) > len(expected_path)
+
+    path_append = run("shims_append")
+    assert path_append.startswith(expected_path)
+    assert len(path_append) > len(expected_path)
+
+    path_off = run("shims_off")
+    assert path_off == expected_path

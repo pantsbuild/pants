@@ -1,5 +1,6 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import annotations
 
 import os.path
@@ -12,7 +13,7 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.backend.sql.lint.sqlfluff.skip_field import SkipSqlfluffField
 from pants.backend.sql.target_types import SqlSourceField
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import collect_rules
+from pants.engine.rules import Rule, collect_rules
 from pants.engine.target import FieldSet, Target
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
@@ -100,5 +101,5 @@ class Sqlfluff(PythonToolBase):
         )
 
 
-def rules():
+def rules() -> Iterable[Rule]:
     return collect_rules()

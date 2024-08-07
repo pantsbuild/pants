@@ -61,6 +61,8 @@ def rule_runner() -> RuleRunner:
             QueryRule(EnvironmentTarget, [EnvironmentName]),
             QueryRule(EnvironmentName, [EnvironmentNameRequest]),
             QueryRule(EnvironmentName, [SingleEnvironmentNameRequest]),
+            QueryRule(ChosenLocalEnvironmentName, []),
+            QueryRule(ChosenLocalWorkspaceEnvironmentName, []),
         ],
         target_types=[
             LocalEnvironmentTarget,
@@ -525,3 +527,26 @@ def test_executable_search_path_cache_scope() -> None:
     ):
         assert_cache(tgt, cache_failures=False, expected=ProcessCacheScope.SUCCESSFUL)
         assert_cache(tgt, cache_failures=True, expected=ProcessCacheScope.ALWAYS)
+
+
+# Test for regression in choosing local environments.
+def test_find_chosen_local_and_experimental_workspace_environments(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+            local_environment(name="local")
+            experimental_workspace_environment(name="workspace")
+            """
+            )
+        }
+    )
+    rule_runner.set_options(
+        ["--environments-preview-names={'local': '//:local', 'workspace': '//:workspace'}"]
+    )
+
+    chosen_local_env = rule_runner.request(ChosenLocalEnvironmentName, [])
+    assert chosen_local_env.val.val == "local"
+
+    chosen_workspace_env = rule_runner.request(ChosenLocalWorkspaceEnvironmentName, [])
+    assert chosen_workspace_env.val.val == "workspace"

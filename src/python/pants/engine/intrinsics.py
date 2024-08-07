@@ -13,6 +13,8 @@ from pants.engine.fs import (
     MergeDigests,
     NativeDownloadFile,
     PathGlobs,
+    PathMetadataRequest,
+    PathMetadataResult,
     Paths,
     RemovePrefix,
     Snapshot,
@@ -20,6 +22,7 @@ from pants.engine.fs import (
 from pants.engine.internals import native_engine
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
+    NativeParsedDockerfileInfo,
     NativeParsedJavascriptDependencies,
     NativeParsedPythonDependencies,
 )
@@ -130,6 +133,13 @@ async def docker_resolve_image(request: DockerResolveImageRequest) -> DockerReso
 
 
 @rule
+async def parse_dockerfile_info(
+    deps_request: NativeDependenciesRequest,
+) -> NativeParsedDockerfileInfo:
+    return await native_engine.parse_dockerfile_info(deps_request)
+
+
+@rule
 async def parse_python_deps(
     deps_request: NativeDependenciesRequest,
 ) -> NativeParsedPythonDependencies:
@@ -141,6 +151,11 @@ async def parse_javascript_deps(
     deps_request: NativeDependenciesRequest,
 ) -> NativeParsedJavascriptDependencies:
     return await native_engine.parse_javascript_deps(deps_request)
+
+
+@rule
+async def path_metadata_request(request: PathMetadataRequest) -> PathMetadataResult:
+    return await native_engine.path_metadata_request(request)
 
 
 def rules():

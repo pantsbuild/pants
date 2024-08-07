@@ -6,9 +6,10 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from functools import partial
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Iterator
+from typing import Any, Callable, Iterator
 
 import pytest
 
@@ -17,7 +18,14 @@ from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
 from pants.util.dirutil import touch
-from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, get_git_worktree
+from pants.vcs.git import (
+    DiffParser,
+    GitWorktree,
+    GitWorktreeRequest,
+    MaybeGitWorktree,
+    get_git_worktree,
+)
+from pants.vcs.hunk import Hunk, TextBlock
 
 
 def init_repo(remote_name: str, remote: PurePath) -> None:
@@ -111,7 +119,16 @@ def git(
         os.symlink("loop2", os.path.join(worktree, "loop1"))
 
         subprocess.check_call(
-            ["git", "add", "README", "dir", "loop1", "loop2", "link-to-dir", "not-a-dir"]
+            [
+                "git",
+                "add",
+                "README",
+                "dir",
+                "loop1",
+                "loop2",
+                "link-to-dir",
+                "not-a-dir",
+            ]
         )
         subprocess.check_call(["git", "commit", "-am", "initial commit with decode -> \x81b"])
 
@@ -126,9 +143,47 @@ def git(
         yield MutatingGitWorktree(binary=GitBinary(path="git"), gitdir=gitdir, worktree=worktree)
 
 
-def test_integration(worktree: Path, readme_file: Path, git: MutatingGitWorktree) -> None:
-    assert set() == git.changed_files()
-    assert {"README"} == git.changed_files(from_commit="HEAD^")
+# This way we can make sure that `git.changed_files` and
+# `git.changed_files_lines` behave identically.
+parametrize_changed_files = pytest.mark.parametrize(
+    "name,changed,expected",
+    [
+        (
+            "changed_files",
+            lambda git: git.changed_files,
+            lambda files: set(files.keys()),
+        ),
+        (
+            "changed_files_lines",
+            lambda git: partial(
+                git.changed_files_lines, ["README", "INSTALL", "WITH SPACE", "untracked_file"]
+            ),
+            lambda files: files,
+        ),
+    ],
+)
+
+
+@parametrize_changed_files
+def test_integration(
+    worktree: Path,
+    readme_file: Path,
+    git: MutatingGitWorktree,
+    name: str,
+    changed: Callable[[Any], Any],
+    expected: Callable[[Any], Any],
+) -> None:
+    assert expected({}) == changed(git)()
+    assert expected(
+        {
+            "README": (
+                Hunk(
+                    left=TextBlock(start=0, count=0),
+                    right=TextBlock(start=1, count=1),
+                ),
+            )
+        }
+    ) == changed(git)(from_commit="HEAD^")
 
     assert "main" == git.branch_name
 
@@ -137,14 +192,39 @@ def test_integration(worktree: Path, readme_file: Path, git: MutatingGitWorktree
 
     (worktree / "INSTALL").write_text("make install")
 
-    assert {"README"} == git.changed_files()
-    assert {"README", "INSTALL"} == git.changed_files(include_untracked=True)
+    assert (
+        expected(
+            {
+                "README": (
+                    Hunk(
+                        left=TextBlock(start=1, count=1),
+                        right=TextBlock(start=1, count=1),
+                    ),
+                )
+            }
+        )
+        == changed(git)()
+    )
+    assert expected(
+        {
+            "README": (Hunk(left=TextBlock(start=1, count=1), right=TextBlock(start=1, count=1)),),
+            "INSTALL": (Hunk(left=TextBlock(start=0, count=0), right=TextBlock(start=1, count=1)),),
+        }
+    ) == changed(git)(include_untracked=True)
 
     (worktree / "WITH SPACE").write_text("space in path")
-    assert {"README", "INSTALL", "WITH SPACE"} == git.changed_files(include_untracked=True)
+    assert expected(
+        {
+            "README": (Hunk(left=TextBlock(start=1, count=1), right=TextBlock(start=1, count=1)),),
+            "INSTALL": (Hunk(left=TextBlock(start=0, count=0), right=TextBlock(start=1, count=1)),),
+            "WITH SPACE": (
+                Hunk(left=TextBlock(start=0, count=0), right=TextBlock(start=1, count=1)),
+            ),
+        }
+    ) == changed(git)(include_untracked=True)
 
     # Confirm that files outside of a given relative_to path are ignored
-    assert set() == git.changed_files(relative_to="non-existent")
+    assert expected({}) == changed(git)(relative_to="non-existent")
 
 
 def test_detect_worktree(tmp_path: Path, origin: PurePath, git: MutatingGitWorktree) -> None:
@@ -253,26 +333,43 @@ def test_changes_in(gitdir: PurePath, worktree: Path, git: MutatingGitWorktree) 
         assert {"foo", "bar", "baz"} == git.changes_in(f"{c1}..{c4}")
 
 
-def test_commit_with_new_untracked_file_adds_file(worktree: Path, git: MutatingGitWorktree) -> None:
+@parametrize_changed_files
+def test_commit_with_new_untracked_file_adds_file(
+    worktree: Path, git: MutatingGitWorktree, name: str, changed: Any, expected: Any
+) -> None:
     new_file = worktree / "untracked_file"
     new_file.touch()
 
-    assert {"untracked_file"} == git.changed_files(include_untracked=True)
+    assert expected(
+        {
+            "untracked_file": (Hunk(left=None, right=TextBlock(start=0, count=0)),),
+        }
+    ) == changed(git)(include_untracked=True)
 
     git.add(new_file)
 
-    assert {"untracked_file"} == git.changed_files()
+    assert (
+        expected(
+            {
+                "untracked_file": (Hunk(left=None, right=TextBlock(start=0, count=0)),),
+            }
+        )
+        == changed(git)()
+    )
 
     git.commit("API Changes.")
 
-    assert set() == git.changed_files(include_untracked=True)
+    assert expected({}) == changed(git)(include_untracked=True)
 
 
-def test_bad_ref_stderr_issues_13396(git: MutatingGitWorktree) -> None:
+@parametrize_changed_files
+def test_bad_ref_stderr_issues_13396(
+    git: MutatingGitWorktree, name: str, changed: Any, expected: Any
+) -> None:
     with pytest.raises(
         GitBinaryException, match=re.escape("fatal: bad revision 'remote/dne...HEAD'\n")
     ):
-        git.changed_files(from_commit="remote/dne")
+        changed(git)(from_commit="remote/dne")
 
     with pytest.raises(
         GitBinaryException,
@@ -367,6 +464,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 QueryRule(str, []),
             ]
         )
+        rule_runner.build_root = origin.as_posix()
 
         rule_runner.set_options([], env_inherit={"PATH"})
         worktree_id_1 = rule_runner.request(str, [])
@@ -376,3 +474,132 @@ def test_worktree_invalidation(origin: Path) -> None:
         worktree_id_2 = rule_runner.request(str, [])
 
         assert worktree_id_1 != worktree_id_2
+
+
+@pytest.mark.parametrize(
+    "diff,expected",
+    [
+        [
+            dedent(
+                """\
+                diff --git a/file.txt b/file.txt
+                index e69de29..9daeafb 100644
+                --- a/file.txt
+                +++ b/file.txt
+                @@ -1,0 +2 @@
+                +two
+                """
+            ),
+            {"file.txt": (Hunk(TextBlock(1, 0), TextBlock(2, 1)),)},
+        ],
+        [
+            dedent(
+                """\
+                diff --git a/file.txt b/file.txt
+                index e69de29..9daeafb 100644
+                --- a/file.txt
+                +++ b/file.txt
+                @@ -2 +1,0 @@
+                -two
+                """
+            ),
+            {"file.txt": (Hunk(TextBlock(2, 1), TextBlock(1, 0)),)},
+        ],
+        [
+            dedent(
+                """\
+                diff --git a/file.txt b/file.txt
+                index e69de29..9daeafb 100644
+                --- a/file.txt
+                +++ b/file.txt
+                @@ -2 +2 @@
+                -two
+                +four
+                """
+            ),
+            {"file.txt": (Hunk(TextBlock(2, 1), TextBlock(2, 1)),)},
+        ],
+        [
+            dedent(
+                """\
+                diff --git a/file.txt b/file.txt
+                index e69de29..9daeafb 100644
+                --- a/file.txt
+                +++ b/file.txt
+                @@ -2,2 +2,2 @@
+                -two
+                -three
+                +five
+                +six
+                """
+            ),
+            {"file.txt": (Hunk(TextBlock(2, 2), TextBlock(2, 2)),)},
+        ],
+        [
+            dedent(
+                """\
+                diff --git a/one.txt b/one.txt
+                index 5626abf..d00491f 100644
+                --- a/one.txt
+                +++ b/one.txt
+                @@ -1 +1 @@
+                -one
+                +1
+                diff --git a/two.txt b/two.txt
+                index f719efd..0cfbf08 100644
+                --- a/two.txt
+                +++ b/two.txt
+                @@ -1 +1 @@
+                -two
+                +2
+                """
+            ),
+            {
+                "one.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),),
+                "two.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),),
+            },
+        ],
+        [
+            dedent(
+                """\
+                diff --git a/sp ce.txt b/sp ce.txt
+                index 9daeafb..c7e32ef 100644
+                --- a/sp ce.txt
+                +++ b/sp ce.txt
+                @@ -1 +1 @@
+                -test
+                +t st
+                """
+            ),
+            {"sp ce.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)},
+        ],
+        [
+            dedent(
+                """\
+                diff --git "a/q\\"ote.txt" "b/q\\"ote.txt"
+                index 79fdb36..9daeafb 100644
+                --- "a/q\\"ote.txt"
+                +++ "b/q\\"ote.txt"
+                @@ -1 +1 @@
+                -te"t
+                +test
+                """
+            ),
+            {'q"ote.txt': (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)},
+        ],
+        [
+            dedent(
+                """\
+                diff --git a/empty b/empty
+                new file mode 100644
+                index 0000000000..e69de29bb2
+                """
+            ),
+            {"empty": (Hunk(None, TextBlock(0, 0)),)},
+        ],
+    ],
+)
+def test_parse_unified_diff(diff, expected):
+    wt = DiffParser()
+    actual = wt.parse_unified_diff(diff)
+    assert expected == actual

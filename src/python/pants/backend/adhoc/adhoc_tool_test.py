@@ -56,9 +56,19 @@ def rule_runner() -> PythonRuleRunner:
             PythonSourceTarget,
             LocalWorkspaceEnvironmentTarget,
         ],
+        isolated_local_store=True,
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
+
+
+def execute_adhoc_tool(
+    rule_runner: PythonRuleRunner,
+    address: Address,
+) -> GeneratedSources:
+    generator_type: type[GenerateSourcesRequest] = GenerateFilesFromAdhocToolRequest
+    target = rule_runner.get_target(address)
+    return rule_runner.request(GeneratedSources, [generator_type(EMPTY_SNAPSHOT, target)])
 
 
 def assert_adhoc_tool_result(
@@ -66,9 +76,7 @@ def assert_adhoc_tool_result(
     address: Address,
     expected_contents: dict[str, str],
 ) -> None:
-    generator_type: type[GenerateSourcesRequest] = GenerateFilesFromAdhocToolRequest
-    target = rule_runner.get_target(address)
-    result = rule_runner.request(GeneratedSources, [generator_type(EMPTY_SNAPSHOT, target)])
+    result = execute_adhoc_tool(rule_runner, address)
     assert result.snapshot.files == tuple(expected_contents)
     contents = rule_runner.request(DigestContents, [result.snapshot.digest])
     for fc in contents:
@@ -320,7 +328,7 @@ def test_adhoc_tool_with_workspace_execution(rule_runner: PythonRuleRunner) -> N
                 environment="workspace",
                 stderr="stderr",
             )
-            workspace_environment(name="workspace")
+            experimental_workspace_environment(name="workspace")
             """
             )
         }
@@ -334,3 +342,135 @@ def test_adhoc_tool_with_workspace_execution(rule_runner: PythonRuleRunner) -> N
     workspace_output_path = Path(rule_runner.build_root).joinpath("foo.txt")
     assert workspace_output_path.exists()
     assert workspace_output_path.read_text().strip() == "workspace"
+
+
+def test_adhoc_tool_workspace_invalidation_sources(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+            system_binary(name="bash", binary_name="bash")
+            adhoc_tool(
+              name="cmd",
+              runnable=":bash",
+              # Use a random value so we can detect when re-execution occurs.
+              args=["-c", "echo $RANDOM > out.log"],
+              output_files=["out.log"],
+              workspace_invalidation_sources=['a-file'],
+            )
+            """
+            ),
+            "src/a-file": "",
+        }
+    )
+    address = Address("src", target_name="cmd")
+
+    # Re-executing the initial execution should be cached.
+    result1 = execute_adhoc_tool(rule_runner, address)
+    result2 = execute_adhoc_tool(rule_runner, address)
+    assert result1.snapshot == result2.snapshot
+
+    # Update the hash-only source file's content. The adhoc_tool should be re-executed now.
+    (Path(rule_runner.build_root) / "src" / "a-file").write_text("xyzzy")
+    result3 = execute_adhoc_tool(rule_runner, address)
+    assert result1.snapshot != result3.snapshot
+
+
+def test_adhoc_tool_workspace_output_capture_base(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+            system_binary(name="bash", binary_name="bash")
+            system_binary(name="cp", binary_name="cp")
+            adhoc_tool(
+                name="make-file",
+                runnable=":bash",
+                args=["-c", "pwd && [ -r ./foo.txt ] && cp ./foo.txt {chroot}/bar.txt"],
+                output_files=["bar.txt"],
+                environment="workspace",
+                workdir="subdir",
+                execution_dependencies=[":cp"],
+            )
+            experimental_workspace_environment(name="workspace")
+            """
+            ),
+            "subdir/foo.txt": "xyzzy",
+        }
+    )
+    rule_runner.set_options(
+        ["--environments-preview-names={'workspace': '//:workspace'}"], env_inherit={"PATH"}
+    )
+
+    assert_adhoc_tool_result(
+        rule_runner, Address("", target_name="make-file"), {"bar.txt": "xyzzy"}
+    )
+
+
+def test_adhoc_tool_path_env_modify_mode(rule_runner: PythonRuleRunner) -> None:
+    expected_path = "/bin:/usr/bin"
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                f"""\
+            system_binary(name="bash", binary_name="bash")
+            system_binary(name="renamed_cat", binary_name="cat")
+            adhoc_tool(
+                name="shims_prepend",
+                runnable=":bash",
+                args=["-c", "echo $PATH > foo.txt && renamed_cat foo.txt > path.txt"],
+                extra_env_vars=["PATH={expected_path}"],
+                output_files=["path.txt"],
+                runnable_dependencies=[":renamed_cat"],
+                path_env_modify="prepend",
+            )
+            adhoc_tool(
+                name="shims_append",
+                runnable=":bash",
+                args=["-c", "echo $PATH > foo.txt && renamed_cat foo.txt > path.txt"],
+                extra_env_vars=["PATH={expected_path}"],
+                output_files=["path.txt"],
+                runnable_dependencies=[":renamed_cat"],
+                path_env_modify="append",
+            )
+            adhoc_tool(
+                name="shims_off",
+                runnable=":bash",
+                args=[
+                    "-c",
+                    '''
+                    echo $PATH > path.txt
+                    for dir in $( echo "$PATH" | tr ':' '\\n' ) ; do
+                      if [ -e "$dir/renamed_cat" ]; then
+                        echo "ERROR: Did not expect to find renamed_cat on PATH, but did find it."
+                        exit 1
+                      fi
+                    done
+                    '''
+                ],
+                extra_env_vars=["PATH={expected_path}"],
+                output_files=["path.txt"],
+                runnable_dependencies=[":renamed_cat"],
+                path_env_modify="off",
+            )
+            """
+            )
+        }
+    )
+
+    def run(target_name: str) -> str:
+        result = execute_adhoc_tool(rule_runner, Address("src", target_name=target_name))
+        contents = rule_runner.request(DigestContents, [result.snapshot.digest])
+        assert len(contents) == 1
+        return contents[0].content.decode().strip()
+
+    path_prepend = run("shims_prepend")
+    assert path_prepend.endswith(expected_path)
+    assert len(path_prepend) > len(expected_path)
+
+    path_append = run("shims_append")
+    assert path_append.startswith(expected_path)
+    assert len(path_append) > len(expected_path)
+
+    path_off = run("shims_off")
+    assert path_off == expected_path

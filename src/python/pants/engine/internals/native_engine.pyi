@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from io import RawIOBase
 from typing import (
     Any,
@@ -30,10 +31,13 @@ from pants.engine.fs import (
     DigestSubset,
     NativeDownloadFile,
     PathGlobs,
+    PathMetadataRequest,
+    PathMetadataResult,
     Paths,
 )
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
+    NativeParsedDockerfileInfo,
     NativeParsedJavascriptDependencies,
     NativeParsedPythonDependencies,
 )
@@ -492,6 +496,44 @@ EMPTY_SNAPSHOT: Snapshot
 
 def default_cache_path() -> str: ...
 
+class PathMetadataKind:
+    FILE: PathMetadataKind = ...
+    DIRECTORY: PathMetadataKind = ...
+    SYMLINK: PathMetadataKind = ...
+
+class PathMetadata:
+    def __new__(
+        cls,
+        path: str,
+        kind: PathMetadataKind,
+        length: int,
+        is_executable: bool,
+        unix_mode: int | None,
+        accessed: datetime | None,
+        created: datetime | None,
+        modified: datetime | None,
+        symlink_target: str | None,
+    ) -> PathMetadata: ...
+    @property
+    def path(self) -> str: ...
+    @property
+    def kind(self) -> PathMetadataKind: ...
+    @property
+    def length(self) -> int: ...
+    @property
+    def is_executable(self) -> bool: ...
+    @property
+    def unix_mode(self) -> int | None: ...
+    @property
+    def accessed(self) -> datetime | None: ...
+    @property
+    def created(self) -> datetime | None: ...
+    @property
+    def modified(self) -> datetime | None: ...
+    @property
+    def symlink_target(self) -> str | None: ...
+    def copy(self) -> PathMetadata: ...
+
 # ------------------------------------------------------------------------------
 # Intrinsics
 # ------------------------------------------------------------------------------
@@ -524,12 +566,16 @@ async def interactive_process(
     process: InteractiveProcess, process_execution_environment: ProcessExecutionEnvironment
 ) -> InteractiveProcessResult: ...
 async def docker_resolve_image(request: DockerResolveImageRequest) -> DockerResolveImageResult: ...
+async def parse_dockerfile_info(
+    deps_request: NativeDependenciesRequest,
+) -> NativeParsedDockerfileInfo: ...
 async def parse_python_deps(
     deps_request: NativeDependenciesRequest,
 ) -> NativeParsedPythonDependencies: ...
 async def parse_javascript_deps(
     deps_request: NativeDependenciesRequest,
 ) -> NativeParsedJavascriptDependencies: ...
+async def path_metadata_request(request: PathMetadataRequest) -> PathMetadataResult: ...
 
 # ------------------------------------------------------------------------------
 # `pantsd`
@@ -661,7 +707,10 @@ class PyStubCAS:
 class InferenceMetadata:
     @staticmethod
     def javascript(
-        package_root: str, import_patterns: dict[str, list[str]]
+        package_root: str,
+        import_patterns: dict[str, Sequence[str]],
+        config_root: str | None,
+        paths: dict[str, Sequence[str]],
     ) -> InferenceMetadata: ...
     def __eq__(self, other: InferenceMetadata | Any) -> bool: ...
     def __hash__(self) -> int: ...
@@ -848,6 +897,10 @@ _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
 
 class PyGeneratorResponseCall:
+    output_type: type
+    input_types: Sequence[type]
+    inputs: Sequence[Any]
+
     @overload
     def __init__(
         self,

@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use deepsize::DeepSizeOf;
-use fs::{self, Dir, DirectoryDigest, DirectoryListing, File, Link, Vfs};
+use fs::{self, Dir, DirectoryDigest, DirectoryListing, File, Link, PathMetadata, Vfs};
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use graph::{Node, NodeError};
 use internment::Intern;
@@ -29,6 +29,7 @@ use crate::tasks::Rule;
 mod digest_file;
 mod downloaded_file;
 mod execute_process;
+mod path_metadata;
 mod read_link;
 mod root;
 mod run_id;
@@ -41,6 +42,7 @@ mod task;
 pub use self::digest_file::DigestFile;
 pub use self::downloaded_file::DownloadedFile;
 pub use self::execute_process::{ExecuteProcess, ProcessResult};
+pub use self::path_metadata::PathMetadata as PathMetadataNode;
 pub use self::read_link::{LinkDest, ReadLink};
 pub use self::root::Root;
 pub use self::run_id::RunId;
@@ -96,6 +98,10 @@ impl Vfs<Failure> for Context {
 
     async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, Failure> {
         self.get(Scandir(dir)).await
+    }
+
+    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, Failure> {
+        self.get(PathMetadataNode::new(path)).await
     }
 
     fn is_ignored(&self, stat: &fs::Stat) -> bool {
@@ -226,6 +232,7 @@ pub enum NodeKey {
     ExecuteProcess(Box<ExecuteProcess>),
     ReadLink(ReadLink),
     Scandir(Scandir),
+    PathMetadata(PathMetadataNode),
     Root(Box<Root>),
     Snapshot(Snapshot),
     SessionValues(SessionValues),
@@ -234,11 +241,16 @@ pub enum NodeKey {
 }
 
 impl NodeKey {
+    /// Returns filesystem path (if any) in which this node is interested. Any changes to that path
+    /// will invalidate the applicable graph node.
+    ///
+    /// See `fs_path_to_watch` for where the filesystem watch is actually placed.
     pub fn fs_subject(&self) -> Option<&Path> {
         match self {
             NodeKey::DigestFile(s) => Some(s.0.path.as_path()),
             NodeKey::ReadLink(s) => Some((s.0).path.as_path()),
             NodeKey::Scandir(s) => Some((s.0).0.as_path()),
+            NodeKey::PathMetadata(fs) => Some(fs.path()),
 
             // Not FS operations:
             // Explicitly listed so that if people add new NodeKeys they need to consider whether their
@@ -251,6 +263,22 @@ impl NodeKey {
             | &NodeKey::Snapshot { .. }
             | &NodeKey::Task { .. }
             | &NodeKey::DownloadedFile { .. } => None,
+        }
+    }
+
+    /// Returns the filesystem path where the inotify watch should be attached.
+    ///
+    /// This is not the same as `fs_subject`. There is a difference between the path on which to place the filesystem
+    /// watch and the path which actually invalidates this node. This is necessary because in the existing inotify logic,
+    /// if the path does not exist, then trying to place a watch on the path will fail with a "file not found" error.
+    pub fn fs_path_to_watch(&self) -> Option<&Path> {
+        match self {
+            // For `PathMetadata`, watch the parent directory so that nonexistence of the path can be monitored
+            // since creation/deletion events occur on the parent directory.
+            NodeKey::PathMetadata(fs) => Some(fs.path().parent().unwrap_or_else(|| Path::new("."))),
+
+            // For all other node types, attach the watch to the actual path since the path is assumed or known to exist.
+            _ => self.fs_subject(),
         }
     }
 
@@ -281,6 +309,7 @@ impl NodeKey {
             NodeKey::DownloadedFile(..) => "downloaded_file",
             NodeKey::ReadLink(..) => "read_link",
             NodeKey::Scandir(..) => "scandir",
+            NodeKey::PathMetadata(..) => "path_metadata",
             NodeKey::Root(..) => "root",
             NodeKey::SessionValues(..) => "session_values",
             NodeKey::RunId(..) => "run_id",
@@ -331,6 +360,7 @@ impl NodeKey {
             NodeKey::Scandir(Scandir(Dir(path))) => {
                 Some(format!("Reading directory: {}", path.display()))
             }
+            NodeKey::PathMetadata(fs) => Some(format!("Checking path: {}", fs.path().display())),
             NodeKey::DownloadedFile(..)
             | NodeKey::Root(..)
             | NodeKey::SessionValues(..)
@@ -339,7 +369,7 @@ impl NodeKey {
     }
 
     async fn maybe_watch(&self, context: &Context) -> NodeResult<()> {
-        if let Some((path, watcher)) = self.fs_subject().zip(context.core.watcher.as_ref()) {
+        if let Some((path, watcher)) = self.fs_path_to_watch().zip(context.core.watcher.as_ref()) {
             let abs_path = context.core.build_root.join(path);
             watcher
                 .watch(abs_path)
@@ -418,6 +448,9 @@ impl Node for NodeKey {
                     NodeKey::ReadLink(n) => n.run_node(context).await.map(NodeOutput::LinkDest),
                     NodeKey::Scandir(n) => {
                         n.run_node(context).await.map(NodeOutput::DirectoryListing)
+                    }
+                    NodeKey::PathMetadata(n) => {
+                        n.run_node(context).await.map(NodeOutput::PathMetadata)
                     }
                     NodeKey::Root(n) => n.run_node(context).await.map(NodeOutput::Value),
                     NodeKey::Snapshot(n) => n.run_node(context).await.map(NodeOutput::Snapshot),
@@ -521,6 +554,7 @@ impl Display for NodeKey {
             }
             NodeKey::ReadLink(s) => write!(f, "ReadLink({})", (s.0).path.display()),
             NodeKey::Scandir(s) => write!(f, "Scandir({})", (s.0).0.display()),
+            NodeKey::PathMetadata(s) => write!(f, "PathMetadata({})", s.path().display()),
             NodeKey::Root(s) => write!(f, "{}", s.product),
             NodeKey::Task(task) => {
                 let params = {
@@ -565,6 +599,7 @@ pub enum NodeOutput {
     Snapshot(store::Snapshot),
     DirectoryListing(Arc<DirectoryListing>),
     LinkDest(LinkDest),
+    PathMetadata(Option<fs::PathMetadata>),
     ProcessResult(Box<ProcessResult>),
     Value(Value),
 }
@@ -586,7 +621,10 @@ impl NodeOutput {
                 digests.push(p.result.stderr_digest);
                 digests
             }
-            NodeOutput::DirectoryListing(_) | NodeOutput::LinkDest(_) | NodeOutput::Value(_) => {
+            NodeOutput::DirectoryListing(_)
+            | NodeOutput::LinkDest(_)
+            | NodeOutput::Value(_)
+            | NodeOutput::PathMetadata(_) => {
                 vec![]
             }
         }

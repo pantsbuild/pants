@@ -14,6 +14,7 @@ from pants.backend.google_cloud_function.python.target_types import (
 )
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
+    FaaSArchitecture,
     PythonFaaSCompletePlatforms,
     PythonFaaSLayoutField,
     PythonFaaSPex3VenvCreateExtraArgsField,
@@ -55,6 +56,8 @@ async def package_python_google_cloud_function(
             target_name=PythonGoogleCloudFunction.alias,
             complete_platforms=field_set.complete_platforms,
             runtime=field_set.runtime,
+            # GCF only supports x86_64 architecture for now.
+            architecture=FaaSArchitecture.X86_64,
             handler=field_set.handler,
             pex3_venv_create_extra_args=field_set.pex3_venv_create_extra_args,
             pex_build_extra_args=field_set.pex_build_extra_args,

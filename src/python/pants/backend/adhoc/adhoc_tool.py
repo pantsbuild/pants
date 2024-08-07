@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from pants.backend.adhoc.target_types import (
     AdhocToolArgumentsField,
@@ -13,24 +14,28 @@ from pants.backend.adhoc.target_types import (
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
+    AdhocToolPathEnvModifyModeField,
     AdhocToolRunnableDependenciesField,
     AdhocToolRunnableField,
     AdhocToolSourcesField,
     AdhocToolStderrFilenameField,
     AdhocToolStdoutFilenameField,
     AdhocToolWorkdirField,
+    AdhocToolWorkspaceInvalidationSourcesField,
 )
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
     AdhocProcessResult,
     ToolRunner,
     ToolRunnerRequest,
+    prepare_env_vars,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, Snapshot
+from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest
 from pants.engine.unions import UnionRule
@@ -48,7 +53,6 @@ class GenerateFilesFromAdhocToolRequest(GenerateSourcesRequest):
 @rule(desc="Running run_in_sandbox target", level=LogLevel.DEBUG)
 async def run_in_sandbox_request(
     request: GenerateFilesFromAdhocToolRequest,
-    env_target: EnvironmentTarget,
 ) -> GeneratedSources:
     target = request.protocol_target
     description = f"the `{target.alias}` at {target.address}"
@@ -56,6 +60,8 @@ async def run_in_sandbox_request(
     environment_name = await Get(
         EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)
     )
+
+    environment_target = await Get(EnvironmentTarget, EnvironmentName, environment_name)
 
     runnable_address_str = target[AdhocToolRunnableField].value
     if not runnable_address_str:
@@ -79,7 +85,27 @@ async def run_in_sandbox_request(
     output_files = target.get(AdhocToolOutputFilesField).value or ()
     output_directories = target.get(AdhocToolOutputDirectoriesField).value or ()
 
-    cache_scope = env_target.default_cache_scope
+    cache_scope = environment_target.default_cache_scope
+
+    workspace_invalidation_globs: PathGlobs | None = None
+    workspace_invalidation_sources = (
+        target.get(AdhocToolWorkspaceInvalidationSourcesField).value or ()
+    )
+    if workspace_invalidation_sources:
+        spec_path = target.address.spec_path
+        workspace_invalidation_globs = PathGlobs(
+            globs=(os.path.join(spec_path, glob) for glob in workspace_invalidation_sources),
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"`{AdhocToolWorkspaceInvalidationSourcesField.alias}` for `adhoc_tool` target at `{target.address}`",
+        )
+
+    env_vars = await prepare_env_vars(
+        tool_runner.extra_env,
+        target.get(AdhocToolExtraEnvVarsField).value or (),
+        extra_paths=tool_runner.extra_paths,
+        path_env_modify_mode=target.get(AdhocToolPathEnvModifyModeField).enum_value,
+        description_of_origin=f"`{AdhocToolExtraEnvVarsField.alias}` for `adhoc_tool` target at `{target.address}`",
+    )
 
     process_request = AdhocProcessRequest(
         description=description,
@@ -93,13 +119,14 @@ async def run_in_sandbox_request(
         append_only_caches=FrozenDict(tool_runner.append_only_caches),
         output_files=output_files,
         output_directories=output_directories,
-        fetch_env_vars=target.get(AdhocToolExtraEnvVarsField).value or (),
-        supplied_env_var_values=FrozenDict(tool_runner.extra_env),
+        env_vars=env_vars,
         log_on_process_errors=None,
         log_output=target[AdhocToolLogOutputField].value,
         capture_stderr_file=target[AdhocToolStderrFilenameField].value,
         capture_stdout_file=target[AdhocToolStdoutFilenameField].value,
+        workspace_invalidation_globs=workspace_invalidation_globs,
         cache_scope=cache_scope,
+        use_working_directory_as_base_for_output_captures=environment_target.use_working_directory_as_base_for_output_captures,
     )
 
     adhoc_result = await Get(

@@ -35,6 +35,7 @@ Created as part of the release process.
 + Bob Gregory
 + Borja Lorente
 + Brandon Milton
++ Brandon Novick
 + Brian Larson
 + Brian Wickman
 + Bruno Bieth
@@ -163,10 +164,12 @@ Created as part of the release process.
 + John Basila
 + John Chee
 + John Gallagher
++ John Granström
 + John Ioannidis
 + John Sirois
 + John Townsend
 + Jon Boulle
++ Jonas Rauber
 + Jonas Stendahl
 + Jonathan Coveney
 + Jonathan D. Simms
@@ -202,6 +205,7 @@ Created as part of the release process.
 + Lei Wang
 + Leo Kim
 + Lex Spoon
++ Li Li
 + Liam Deacon
 + Liam Wilson
 + Luc Cary

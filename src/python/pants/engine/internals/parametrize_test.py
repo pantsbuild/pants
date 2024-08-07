@@ -99,6 +99,20 @@ def test_bad_group_name(exception_str: str, args: list[Any], kwargs: dict[str, A
         ),
         (
             [
+                ("a@parametrize=A,x=x1", {"f0": "c", "f1": 1, "f2": 2, "x": 1}),
+                ("a@parametrize=A,x=x2", {"f0": "c", "f1": 1, "f2": 2, "x": 2}),
+                ("a@parametrize=B,x=x1", {"f0": "c", "f1": 3, "f2": 4, "x": 1}),
+                ("a@parametrize=B,x=x2", {"f0": "c", "f1": 3, "f2": 4, "x": 2}),
+            ],
+            {
+                "f0": "c",
+                "x": Parametrize(x1=1, x2=2),
+                **Parametrize("A", f1=1, f2=2),
+                **Parametrize("B", f1=3, f2=4),
+            },
+        ),
+        (
+            [
                 ("a@parametrize=A", {"f": 1}),
                 ("a@parametrize=B", {"f": 2}),
                 ("a@parametrize=C", {"f": "x", "g": ()}),
@@ -113,6 +127,23 @@ def test_bad_group_name(exception_str: str, args: list[Any], kwargs: dict[str, A
                 **Parametrize("C", g=[]),
             ),
         ),
+        (
+            # Nested parametrization groups with parametrize!
+            [
+                ("a@c=sub_c3,parametrize=root-sub2", {"a": 2, "b": 0, "c": "val3"}),
+                ("a@c=val2,parametrize=root-sub2", {"a": 2, "b": 0, "c": "val2"}),
+                ("a@parametrize=root-sub1", {"a": 1, "b": 1}),
+            ],
+            dict(  # type: ignore[arg-type]
+                b=0,
+                **Parametrize(  # type: ignore[arg-type]
+                    "root",
+                    a=1,
+                    **Parametrize("sub1", b=1),
+                    **Parametrize("sub2", a=2, c=Parametrize("val2", sub_c3="val3")),
+                ),
+            ),
+        ),
     ],
 )
 def test_expand(
@@ -123,7 +154,6 @@ def test_expand(
             (address.spec, result_fields)
             for address, result_fields in Parametrize.expand(Address("a"), fields)
         ),
-        key=lambda value: value[0],
     )
 
 
@@ -176,7 +206,6 @@ def test_expand_existing_parameters(
                 Address("a", parameters=parameters), fields
             )
         ),
-        key=lambda value: value[0],
     )
 
 
@@ -193,7 +222,23 @@ def test_expand_existing_parameters(
                 **Parametrize("A", f=1),  # type: ignore[arg-type]
                 **Parametrize("B", g=2, x=3),
             ),
-            "Failed to parametrize `a:a`:\n  Conflicting parametrizations for fields: f, g",
+            "Failed to parametrize `a:a`:\n  Conflicting parametrizations for fields: 'f', 'g'",
+        ),
+        (
+            dict(
+                f=Parametrize("x", "y"),
+                g=Parametrize("x", "y"),
+                h=Parametrize("x", "y"),
+                x=5,
+                z=6,
+                **Parametrize(
+                    "root",
+                    **Parametrize("A", f=1, h=4),  # type: ignore[arg-type]
+                    **Parametrize("B", g=2, x=3),
+                ),
+            ),
+            # We only catch fields from one nested group at a time.
+            "Failed to parametrize `a:a`:\n  Conflicting parametrizations for fields: 'f', 'h'",
         ),
         (
             dict(

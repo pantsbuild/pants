@@ -256,39 +256,39 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             "org.pantsbuild.example.OuterObject": FrozenOrderedSet(["Foo"]),
             "org.pantsbuild.example.Functions": FrozenOrderedSet(
                 [
-                    "TupleTypeArg2",
-                    "foo",
-                    "TupleTypeArg1",
-                    "LambdaReturnType",
                     "+",
-                    "Unit",
-                    "Integer",
-                    "LambdaTypeArg2",
                     "AParameterType",
+                    "Integer",
+                    "LambdaReturnType",
                     "LambdaTypeArg1",
+                    "LambdaTypeArg2",
                     "OuterObject",
-                    "bar",
                     "OuterObject.NestedVal",
+                    "TupleTypeArg1",
+                    "TupleTypeArg2",
+                    "Unit",
+                    "bar",
+                    "foo",
                 ]
             ),
             "org.pantsbuild.example.HasPrimaryConstructor": FrozenOrderedSet(
-                ["bar", "SomeTypeInSecondaryConstructor"]
+                ["SomeTypeInSecondaryConstructor", "bar"]
             ),
             "org.pantsbuild.example.OuterClass": FrozenOrderedSet(["Foo"]),
             "org.pantsbuild.example.ApplyQualifier": FrozenOrderedSet(
-                ["Integer", "a", "toInt", "calc.calcFunc", "calc"]
+                ["Integer", "a", "calc", "calc.calcFunc", "toInt"]
             ),
             "org.pantsbuild.example.OuterTrait": FrozenOrderedSet(
-                ["Integer", "TraitConsumedType", "Foo"]
+                ["Foo", "Integer", "TraitConsumedType"]
             ),
             "org.pantsbuild.example": FrozenOrderedSet(
                 [
                     "ABaseClass",
                     "ATrait1",
-                    "SomeTypeInPrimaryConstructor",
-                    "foo",
                     "ATrait2.Nested",
                     "BaseWithConstructor",
+                    "SomeTypeInPrimaryConstructor",
+                    "foo",
                 ]
             ),
         }
@@ -433,6 +433,31 @@ def test_relative_import(rule_runner: RuleRunner) -> None:
         "sio",
         "sio.apply",
     }
+
+
+def test_import_root_pacjage(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+
+            import _root_.io.circe.syntax._
+
+            object Foo {
+                val foo: _root_.foo.Bar = ???
+            }
+            """
+        ),
+    )
+
+    assert analysis.imports_by_scope == FrozenDict(
+        {"foo": (ScalaImport(name="io.circe.syntax", alias=None, is_wildcard=True),)}
+    )
+
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.Bar",
+    ]
 
 
 def test_package_object(rule_runner: RuleRunner) -> None:
@@ -752,4 +777,27 @@ def test_self_types_on_same_package(rule_runner: RuleRunner) -> None:
 
     assert sorted(analysis.fully_qualified_consumed_symbols()) == [
         "foo.Foo",
+    ]
+
+
+def test_typed_pattern_on_same_package(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """\
+            package foo
+            class A
+            object B {
+                def fn(v: Any) = v match {
+                    case _: A =>
+                }
+            }
+            """
+        ),
+    )
+
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.A",
+        "foo.Any",
+        "foo.v",
     ]

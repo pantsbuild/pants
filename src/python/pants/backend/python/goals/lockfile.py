@@ -98,8 +98,12 @@ async def generate_lockfile(
     python_setup: PythonSetup,
     pex_subsystem: PexSubsystem,
 ) -> GenerateLockfileResult:
-    pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
+    if not req.requirements:
+        raise ValueError(
+            f"Cannot generate lockfile with no requirements. Please add some requirements to {req.resolve_name}."
+        )
 
+    pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
     header_delimiter = "//"
     result = await Get(
         ProcessResult,
@@ -200,14 +204,6 @@ class RequestedPythonUserResolveNames(RequestedUserResolveNames):
 
 class KnownPythonUserResolveNamesRequest(KnownUserResolveNamesRequest):
     pass
-
-
-def python_exportable_tools(union_membership: UnionMembership) -> dict[str, type[PythonToolBase]]:
-    exportable_tools = union_membership.get(ExportableTool)
-    names_of_python_tools: dict[str, type[PythonToolBase]] = {
-        e.options_scope: e for e in exportable_tools if issubclass(e, PythonToolBase)  # type: ignore  # mypy isn't narrowing with `issubclass`
-    }
-    return names_of_python_tools
 
 
 @rule

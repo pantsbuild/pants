@@ -60,6 +60,21 @@ python_distribution(
 )
 ```
 
+### Multiple BUILD files in a directory
+
+Typically, there would be one BUILD file in every directory containing source code and any other resources you
+may want to use as part of your builds. Most likely, having just one BUILD file in a directory is also what you would want.
+However, you can have multiple BUILD files in a single directory, if desired. When running a Pants goal, the contents
+of the BUILD files will be merged making it possible to better group your targets.
+
+Storing targets in multiple BUILD files also makes it possible to dynamically include or exclude targets from your
+builds. For example, you could include some experimental targets when running a Pants goal from a command line by
+extending the list of recognized BUILD file patterns:
+
+```bash
+$ pants --build-patterns="+['BUILD.experimental']" package project:app
+```
+
 ## Target addresses
 
 A target is identified by its unique address, in the form `path/to/dir:name`. The above example has the addresses `helloworld/greet:tests` and `helloworld/greet:bin`.
@@ -400,6 +415,8 @@ python_test(
     **parametrize("py3", interpreter_constraints=[">=3.6,<3.7"], resolve="lock-b"),
 )
 ```
+
+(Using `parametrize` on grouped fields is also supported. For instance, if there is two resolves to use for Python 3.10, these can be provided within the py310 group: `**parametrize("py310", interpreter_constraints=[">=3.10,<3.11"], resolve=parametrize("lock-b", "lock-c"))`.)
 
 The targets' addresses will have `@key=value` at the end, as shown above. Run [`pants list dir:`](../project-introspection.mdx) in the directory of the parametrized target to see all parametrized target addresses, and [`pants peek dir:`](../project-introspection.mdx) to see all their metadata.
 

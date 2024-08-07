@@ -15,6 +15,7 @@ from pants.engine.streaming_workunit_handler import (
 from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption, StrOption
 from pants.option.subsystem import Subsystem
+from pants.util.dirutil import safe_open
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class WorkunitLoggerCallback(WorkunitsCallback):
             self._completed_workunits[wu["span_id"]] = wu
         if finished:
             filepath = f"{self.wulogger.logdir}/{context.run_tracker.run_id}.json"
-            with open(filepath, "w") as f:
+            with safe_open(filepath, "w") as f:
                 json.dump(just_dump_map(self._completed_workunits), f)
                 logger.info(f"Wrote log to {filepath}")
 

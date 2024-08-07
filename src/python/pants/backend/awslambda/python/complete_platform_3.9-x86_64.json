@@ -562,14 +562,14 @@
   ],
   "marker_environment": {
     "implementation_name": "cpython",
-    "implementation_version": "3.9.16",
+    "implementation_version": "3.9.19",
     "os_name": "posix",
     "platform_machine": "x86_64",
     "platform_python_implementation": "CPython",
-    "platform_release": "5.10.104-linuxkit",
+    "platform_release": "5.15.0-1052-aws",
     "platform_system": "Linux",
-    "platform_version": "#1 SMP PREEMPT Wed Mar 9 19:01:25 UTC 2022",
-    "python_full_version": "3.9.16",
+    "platform_version": "#57~20.04.1-Ubuntu SMP Mon Jan 15 17:04:56 UTC 2024",
+    "python_full_version": "3.9.19",
     "python_version": "3.9",
     "sys_platform": "linux"
   }

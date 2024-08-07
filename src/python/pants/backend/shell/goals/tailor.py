@@ -50,13 +50,24 @@ async def find_putative_targets(
     if not shell_setup.tailor:
         return PutativeTargets()
 
+    if not (shell_setup.tailor_sources or shell_setup.tailor_shunit2_tests):
+        return PutativeTargets()
+
     all_shell_files = await Get(Paths, PathGlobs, req.path_globs("*.sh"))
     unowned_shell_files = set(all_shell_files.files) - set(all_owned_sources)
     classified_unowned_shell_files = classify_source_files(unowned_shell_files)
     pts = []
     for tgt_type, paths in classified_unowned_shell_files.items():
         for dirname, filenames in group_by_dir(paths).items():
-            name = "tests" if tgt_type == Shunit2TestsGeneratorTarget else None
+            if tgt_type == Shunit2TestsGeneratorTarget:
+                if not shell_setup.tailor_shunit2_tests:
+                    continue
+                name = "tests"
+            else:
+                if not shell_setup.tailor_sources:
+                    continue
+                name = None
+
             pts.append(
                 PutativeTarget.for_target_type(
                     tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)

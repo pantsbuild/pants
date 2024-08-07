@@ -391,18 +391,11 @@ class DynamicRemoteOptions:
 
     @classmethod
     def _use_oauth_token(cls, bootstrap_options: OptionValueContainer) -> DynamicRemoteOptions:
-        if bootstrap_options.remote_oauth_bearer_token:
-            oauth_token = bootstrap_options.remote_oauth_bearer_token
-            description = "`remote_oauth_bearer_token` option"
-        else:
-            oauth_token = (
-                Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
-            )
-            description = f"`remote_oauth_bearer_token_path` option ({bootstrap_options.remote_oauth_bearer_token_path})"
+        oauth_token = bootstrap_options.remote_oauth_bearer_token
 
         if set(oauth_token).intersection({"\n", "\r"}):
             raise OptionsError(
-                f"OAuth bearer token from {description} must not contain multiple lines."
+                "OAuth bearer token from `remote_oauth_bearer_token` option must not contain multiple lines."
             )
 
         token_header = {"authorization": f"Bearer {oauth_token}"}
@@ -455,9 +448,6 @@ class DynamicRemoteOptions:
 
         sources = {
             str(remote_auth_plugin_func): bool(remote_auth_plugin_func),
-            "[GLOBAL].remote_oauth_bearer_token_path": bool(
-                bootstrap_options.remote_oauth_bearer_token_path
-            ),
             "[GLOBAL].remote_oauth_bearer_token": bool(bootstrap_options.remote_oauth_bearer_token),
         }
         enabled_sources = [name for name, enabled in sources.items() if enabled]
@@ -471,10 +461,7 @@ class DynamicRemoteOptions:
                     """
                 )
             )
-        if (
-            bootstrap_options.remote_oauth_bearer_token_path
-            or bootstrap_options.remote_oauth_bearer_token
-        ):
+        if bootstrap_options.remote_oauth_bearer_token:
             return cls._use_oauth_token(bootstrap_options), None
         if remote_auth_plugin_func is not None:
             return cls._use_auth_plugin(
@@ -1005,7 +992,9 @@ class BootstrapOptions:
             This option controls how to report discrepancies that arise.
 
             - `error`: Discrepancies will cause Pants to exit.
+
             - `warning`: Discrepancies will be logged but Pants will continue.
+
             - `ignore`: A last resort to turn off this check entirely.
 
             If you encounter discrepancies that are not easily resolvable, please reach out to
@@ -1605,23 +1594,6 @@ class BootstrapOptions:
             """
         ),
     )
-    remote_oauth_bearer_token_path = StrOption(
-        default=None,
-        advanced=True,
-        help=softwrap(
-            """
-            Path to a file containing an oauth token to use for gGRPC connections to
-            `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address`.
-
-            If specified, Pants will add a header in the format `authorization: Bearer <token>`.
-            You can also manually add this header via `[GLOBAL].remote_execution_headers` and
-            `[GLOBAL].remote_store_headers`, or use `[GLOBAL].remote_auth_plugin` to provide a plugin to
-            dynamically set the relevant headers. Otherwise, no authorization will be performed.
-            """
-        ),
-        removal_version="2.23.0.dev0",
-        removal_hint=f'use `[GLOBAL].remote_oauth_bearer_token = "@/path/to/token.txt"` instead, see {doc_url("reference/global-options#remote_oauth_bearer_token")}',
-    )
 
     remote_oauth_bearer_token = StrOption(
         default=None,
@@ -1887,6 +1859,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     )
     subproject_roots = StrListOption(
         help="Paths that correspond with build roots for any subproject that this project depends on.",
+        advanced=True,
+    )
+
+    enable_target_origin_sources_blocks = BoolOption(
+        default=False,
+        help="Enable fine grained target analysis based on line numbers.",
         advanced=True,
     )
 

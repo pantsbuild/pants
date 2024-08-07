@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pants.backend.javascript.package_json import PackageJsonEntryPoints
+from pants.core.util_rules.unowned_dependency_behavior import UnownedDependencyUsageOption
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
@@ -37,4 +38,8 @@ class NodeJSInfer(Subsystem):
             {PackageJsonEntryPoints.__doc__}
             """
         ),
+    )
+    unowned_dependency_behavior = UnownedDependencyUsageOption(
+        example_runtime_issue="`Error: ENOENT: no such file or directory`",
+        how_to_ignore="add `// pants: no-infer-dep` to the line of the import",
     )

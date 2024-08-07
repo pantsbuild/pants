@@ -41,10 +41,11 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, DownloadFile
 from pants.engine.internals.native_engine import FileDigest, MergeDigests
+from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, Rule, collect_rules, rule
+from pants.engine.rules import Get, Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import DictOption, ShellStrListOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -61,12 +62,12 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     options_scope = "nodejs"
     help = "The Node.js Javascript runtime (including Corepack)."
 
-    default_version = "v16.15.0"
+    default_version = "v20.15.1"
     default_known_versions = [
-        "v16.15.0|macos_arm64|ad8d8fc5330ef47788f509c2af398c8060bb59acbe914070d0df684cd2d8d39b|29126014",
-        "v16.15.0|macos_x86_64|a6bb12bbf979d32137598e49d56d61bcddf8a8596c3442b44a9b3ace58dd4de8|30561503",
-        "v16.15.0|linux_arm64|b4080b86562c5397f32da7a0723b95b1df523cab4c757688a184e3f733a7df56|21403276",
-        "v16.15.0|linux_x86_64|ebdf4dc9d992d19631f0931cca2fc33c6d0d382543639bc6560d31d5060a8372|22031988",
+        "v20.15.1|macos_arm64|4743bc042f90ba5d9edf09403207290a9cdd2f6061bdccf7caaa0bbfd49f343e|41888895",
+        "v20.15.1|macos_x86_64|f5379772ffae1404cfd1fcc8cf0c6c5971306b8fb2090d348019047306de39dc|43531593",
+        "v20.15.1|linux_arm64|10d47a46ef208b3e4b226e4d595a82659123b22397ed77b7975d989114ec317e|24781292",
+        "v20.15.1|linux_x86_64|26700f8d3e78112ad4a2618a9c8e2816e38a49ecf0213ece80e54c38cb02563f|25627852",
     ]
 
     default_url_template = "https://nodejs.org/dist/{version}/node-{version}-{platform}.tar"
@@ -137,7 +138,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     )
 
     package_managers = DictOption[str](
-        default={"npm": "8.5.5"},
+        default={"npm": "10.8.1", "yarn": "1.22.22", "pnpm": "9.5.0"},
         help=help_text(
             """
             A mapping of package manager versions to semver releases.
@@ -287,9 +288,16 @@ class NodeJSProcessEnvironment:
 
     base_bin_dir: ClassVar[str] = "__node"
 
-    def to_env_dict(self) -> dict[str, str]:
+    def to_env_dict(self, extras: Mapping[str, str] | None = None) -> dict[str, str]:
+        extras = extras or {}
+        extra_path = extras.get("PATH", "")
+        path = [self.tool_binaries.path_component, self.corepack_shims, self.binary_directory]
+        if extra_path:
+            path.append(extra_path)
+
         return {
-            "PATH": f"{self.tool_binaries.path_component}:{self.corepack_shims}:{self.binary_directory}",
+            **extras,
+            "PATH": os.pathsep.join(path),
             "npm_config_cache": self.npm_config_cache,  # Normally stored at ~/.npm,
             "COREPACK_HOME": os.path.join("{chroot}", self.corepack_home),
             **self.corepack_env_vars,
@@ -383,7 +391,11 @@ class NodeJSBootstrap:
 async def _get_nvm_root() -> str | None:
     """See https://github.com/nvm-sh/nvm#installing-and-updating."""
 
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")))
+    env = await environment_vars_subset(
+        **implicitly(
+            {EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")): EnvironmentVarsRequest}
+        )
+    )
     nvm_dir = env.get("NVM_DIR")
     default_dir = env.get("XDG_CONFIG_HOME", env.get("HOME"))
     if nvm_dir:
@@ -530,8 +542,6 @@ async def determine_nodejs_binaries(
 @dataclass(frozen=True)
 class CorepackToolRequest:
     tool: str
-    input_digest: Digest
-    working_directory: str | None = None
     version: str | None = None
 
 
@@ -545,20 +555,16 @@ async def prepare_corepack_tool(
     request: CorepackToolRequest, environment: NodeJSProcessEnvironment, nodejs: NodeJS
 ) -> CorepackToolDigest:
     version = request.version or nodejs.package_managers.get(request.tool)
-    if not version and request.input_digest == EMPTY_DIGEST:
-        raise ValueError(f"Could not determine tool version for {request.tool}.")
     tool_spec = f"{request.tool}@{version}" if version else request.tool
     tool_description = tool_spec if version else f"default {tool_spec} version"
     result = await Get(
         ProcessResult,
         Process(
             argv=filter(
-                None, ("corepack", "prepare", tool_spec if version else None, "--activate")
+                None, ("corepack", "prepare", tool_spec if version else "--all", "--activate")
             ),
             description=f"Preparing configured {tool_description}.",
-            input_digest=request.input_digest,
             immutable_input_digests=environment.immutable_digest(),
-            working_directory=request.working_directory,
             level=LogLevel.DEBUG,
             env=environment.to_env_dict(),
             append_only_caches={**environment.append_only_caches},
@@ -576,12 +582,7 @@ async def setup_node_tool_process(
         tool_name = request.tool.replace("npx", "npm")
         corepack_tool = await Get(
             CorepackToolDigest,
-            CorepackToolRequest(
-                tool_name,
-                request.project_digest or EMPTY_DIGEST,
-                request.working_directory,
-                request.tool_version,
-            ),
+            CorepackToolRequest(tool_name, request.tool_version),
         )
         input_digest = await Get(Digest, MergeDigests([request.input_digest, corepack_tool.digest]))
     else:
@@ -594,7 +595,7 @@ async def setup_node_tool_process(
         output_directories=request.output_directories,
         description=request.description,
         level=request.level,
-        env={**request.extra_env, **environment.to_env_dict()},
+        env=environment.to_env_dict(request.extra_env),
         working_directory=request.working_directory,
         append_only_caches={**request.append_only_caches, **environment.append_only_caches},
         timeout_seconds=request.timeout_seconds,
