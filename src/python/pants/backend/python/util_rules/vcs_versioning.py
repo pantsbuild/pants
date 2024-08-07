@@ -41,7 +41,7 @@ from pants.engine.target import AllTargets, GeneratedSources, GenerateSourcesReq
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
-from pants.vcs.git import GitWorktreeRequest, MaybeGitWorktree
+from pants.vcs.git import GitWorktreeRequest, get_git_worktree
 
 
 class VCSVersioningError(Exception):
@@ -64,7 +64,14 @@ async def generate_python_from_setuptools_scm(
     # A MaybeGitWorktree is uncacheable, so this enclosing rule will run every time its result
     # is needed, and the process invocation below caches at session scope, meaning this rule
     # will always return a result based on the current underlying git state.
-    maybe_git_worktree = await Get(MaybeGitWorktree, GitWorktreeRequest())
+    maybe_git_worktree = await get_git_worktree(
+        GitWorktreeRequest(),
+        **implicitly(
+            {
+                local_environment_name.val: EnvironmentName,
+            }
+        ),
+    )
     if not maybe_git_worktree.git_worktree:
         raise VCSVersioningError(
             softwrap(
