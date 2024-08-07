@@ -14,6 +14,7 @@ from enum import Enum
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, TypeVar, Union
 
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
@@ -28,8 +29,10 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
     Digest,
+    DigestSubset,
     Directory,
     FileContent,
+    GlobExpansionConjunction,
     MergeDigests,
     PathGlobs,
     PathMetadataRequest,
@@ -81,6 +84,8 @@ class AdhocProcessRequest:
     workspace_invalidation_globs: PathGlobs | None
     cache_scope: ProcessCacheScope | None = None
     use_working_directory_as_base_for_output_captures: bool = True
+    outputs_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error
+    outputs_match_mode: GlobExpansionConjunction | None = GlobExpansionConjunction.all_match
 
 
 @dataclass(frozen=True)
@@ -460,6 +465,45 @@ async def create_tool_runner(
     )
 
 
+async def check_outputs(
+    output_digest: Digest,
+    output_files: Iterable[str],
+    output_directories: Iterable[str],
+    outputs_match_error_behavior: GlobMatchErrorBehavior,
+    outputs_match_mode: GlobExpansionConjunction | None,
+    description_of_origin: str,
+) -> None:
+    if outputs_match_mode is None:
+        return
+
+    _filtered_for_output_files, _filtered_for_output_directories = await MultiGet(
+        Get(
+            Digest,
+            DigestSubset(
+                output_digest,
+                PathGlobs(
+                    output_files,
+                    glob_match_error_behavior=outputs_match_error_behavior,
+                    conjunction=outputs_match_mode,
+                    description_of_origin=f"the `output_files` field at `{description_of_origin}`",
+                ),
+            ),
+        ),
+        Get(
+            Digest,
+            DigestSubset(
+                output_digest,
+                PathGlobs(
+                    output_directories,
+                    glob_match_error_behavior=outputs_match_error_behavior,
+                    conjunction=outputs_match_mode,
+                    description_of_origin=f"output_directories field at `{description_of_origin}`",
+                ),
+            ),
+        ),
+    )
+
+
 @rule
 async def run_adhoc_process(
     request: AdhocProcessRequest,
@@ -502,6 +546,24 @@ async def run_adhoc_process(
     extra_contents = {i: j for i, j in extras if i}
 
     output_digest = result.output_digest
+    output_files: list[str] = list(request.output_files)
+    output_directories: list[str] = list(request.output_directories)
+    if request.use_working_directory_as_base_for_output_captures:
+        output_files = [
+            os.path.normpath(os.path.join(working_directory, of)) for of in output_files
+        ]
+        output_directories = [
+            os.path.normpath(os.path.join(working_directory, od)) for od in output_directories
+        ]
+        print(f"updated to output_files={output_files}, output_directories={output_directories}")
+    await check_outputs(
+        output_digest=output_digest,
+        output_files=output_files,
+        output_directories=output_directories,
+        outputs_match_error_behavior=request.outputs_match_error_behavior,
+        outputs_match_mode=request.outputs_match_mode,
+        description_of_origin=f"{request.address}",
+    )
 
     if extra_contents:
         if request.use_working_directory_as_base_for_output_captures:
