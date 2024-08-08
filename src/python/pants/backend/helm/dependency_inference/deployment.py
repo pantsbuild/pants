@@ -7,7 +7,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import PurePath
-from typing import Any
+from typing import Any, Tuple
 
 from pants.backend.docker.target_types import AllDockerImageTargets
 from pants.backend.docker.target_types import rules as docker_target_types_rules
@@ -18,6 +18,7 @@ from pants.backend.helm.dependency_inference.subsystem import (
     UnownedHelmDependencyUsage,
 )
 from pants.backend.helm.subsystems import k8s_parser
+from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.subsystems.k8s_parser import ParsedKubeManifest, ParseKubeManifestRequest
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.backend.helm.target_types import rules as helm_target_types_rules
@@ -278,15 +279,31 @@ class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
 @rule(desc="Find the dependencies needed by a Helm deployment")
 async def inject_deployment_dependencies(
     request: InferHelmDeploymentDependenciesRequest,
+    subsytem: HelmSubsystem,
 ) -> InferredDependencies:
-    chart_address, explicitly_provided_deps, mapping = await MultiGet(
-        Get(Address, AddressInput, request.field_set.chart.to_address_input()),
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(
-            FirstPartyHelmDeploymentMapping,
-            FirstPartyHelmDeploymentMappingRequest(request.field_set),
-        ),
+    get_address = Get(Address, AddressInput, request.field_set.chart.to_address_input())
+    get_explicit_deps = Get(
+        ExplicitlyProvidedDependencies,
+        DependenciesRequest(request.field_set.dependencies),
     )
+
+    if subsytem.infer_docker_image_dependencies:
+        chart_address, explicitly_provided_deps, mapping = await MultiGet(
+            get_address,
+            get_explicit_deps,
+            Get(
+                FirstPartyHelmDeploymentMapping,
+                FirstPartyHelmDeploymentMappingRequest(request.field_set),
+            ),
+        )
+    else:
+        (chart_address, explicitly_provided_deps), mapping = (
+            await MultiGet(get_address, get_explicit_deps),
+            FirstPartyHelmDeploymentMapping(
+                request.field_set.address,
+                MutableYamlIndex[Tuple[str, Address]]().frozen(),
+            ),
+        )
 
     dependencies: OrderedSet[Address] = OrderedSet()
     dependencies.add(chart_address)
