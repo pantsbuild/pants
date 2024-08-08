@@ -992,3 +992,21 @@ def test_shell_command_path_env_modify_mode(rule_runner: RuleRunner) -> None:
 
     path_off = run("shims_off")
     assert path_off == expected_path
+
+
+def test_shell_command_check_outputs(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({
+        "BUILD": dedent(
+            """\
+            shell_command(
+                name="allow_empty",
+                command="true",
+                output_files=["non-existent-file"],
+                output_directories=["non-existent-dir"],
+                # outputs_match_mode="allow_empty",
+            )
+            """
+        )
+    })
+
+    assert_shell_command_result(rule_runner, Address("", target_name="allow_empty"), {})
