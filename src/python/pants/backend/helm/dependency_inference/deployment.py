@@ -44,7 +44,7 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize, softwrap
-from python.pants.backend.helm.subsystems.helm import HelmSubsystem
+from pants.backend.helm.subsystems.helm import HelmSubsystem
 
 logger = logging.getLogger(__name__)
 
