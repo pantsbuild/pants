@@ -89,6 +89,8 @@ def _parse_filemode(filemode: str) -> int:
     mode = 0
     # enumerate starting with index 1 to avoid irrelevant filetype bits.
     for i, symbol in enumerate(filemode, 1):
+        if symbol == "-":
+            continue
         for bit, char in _filemode_table[i]:
             if symbol == char:
                 mode = mode | bit
