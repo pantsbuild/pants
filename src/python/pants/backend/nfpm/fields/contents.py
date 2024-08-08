@@ -185,7 +185,7 @@ class NfpmContentFileMtimeField(StringField):
     alias: ClassVar[str] = "file_mtime"
     # Default copied from PEX (which uses zipfile standard MS-DOS epoch).
     # https://github.com/pex-tool/pex/blob/v2.1.137/pex/common.py#L39-L45
-    default = "1980-01-01T00:00:00"
+    default = "1980-01-01T00:00:00Z"
     help = help_text(
         lambda: f"""
         The file modification time as an RFC 3339 formatted string.
