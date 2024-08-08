@@ -22,6 +22,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 @dataclass(frozen=True)
 class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     packager: ClassVar[str]
+    extension: ClassVar[str]
     output_path: NfpmOutputPathField
     package_name: NfpmPackageNameField
     description: DescriptionField
@@ -87,6 +88,7 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
 @dataclass(frozen=True)
 class NfpmApkPackageFieldSet(NfpmPackageFieldSet):
     packager = "apk"
+    extension = f".{packager}"
     required_fields = APK_FIELDS
 
 
@@ -95,6 +97,7 @@ class NfpmApkPackageFieldSet(NfpmPackageFieldSet):
 class NfpmArchlinuxPackageFieldSet(NfpmPackageFieldSet):
     packager = "archlinux"
     # NB: uses *.tar.zst (unlike the other packagers where packager == file extension)
+    extension = ".tar.zst"
     required_fields = ARCHLINUX_FIELDS
 
 
@@ -102,6 +105,7 @@ class NfpmArchlinuxPackageFieldSet(NfpmPackageFieldSet):
 @dataclass(frozen=True)
 class NfpmDebPackageFieldSet(NfpmPackageFieldSet):
     packager = "deb"
+    extension = f".{packager}"
     required_fields = DEB_FIELDS
 
 
@@ -109,6 +113,7 @@ class NfpmDebPackageFieldSet(NfpmPackageFieldSet):
 @dataclass(frozen=True)
 class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
     packager = "rpm"
+    extension = f".{packager}"
     required_fields = RPM_FIELDS
     ghost_contents: NfpmRpmGhostContents
 
@@ -118,7 +123,7 @@ class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
         return config
 
 
-NFPM_PACKAGE_FIELD_SET_TYPES: FrozenOrderedSet[type[PackageFieldSet]] = FrozenOrderedSet(
+NFPM_PACKAGE_FIELD_SET_TYPES: FrozenOrderedSet[type[NfpmPackageFieldSet]] = FrozenOrderedSet(
     (
         NfpmApkPackageFieldSet,
         NfpmArchlinuxPackageFieldSet,
