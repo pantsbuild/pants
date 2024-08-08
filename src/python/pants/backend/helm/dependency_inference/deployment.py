@@ -44,6 +44,7 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize, softwrap
+from python.pants.backend.helm.subsystems.helm import HelmSubsystem
 
 logger = logging.getLogger(__name__)
 
@@ -278,15 +279,31 @@ class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
 @rule(desc="Find the dependencies needed by a Helm deployment")
 async def inject_deployment_dependencies(
     request: InferHelmDeploymentDependenciesRequest,
+    subsytem: HelmSubsystem,
 ) -> InferredDependencies:
-    chart_address, explicitly_provided_deps, mapping = await MultiGet(
-        Get(Address, AddressInput, request.field_set.chart.to_address_input()),
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(
-            FirstPartyHelmDeploymentMapping,
-            FirstPartyHelmDeploymentMappingRequest(request.field_set),
-        ),
+    get_address = Get(Address, AddressInput, request.field_set.chart.to_address_input())
+    get_explicit_deps = Get(
+        ExplicitlyProvidedDependencies,
+        DependenciesRequest(request.field_set.dependencies),
     )
+
+    if subsytem.infer_docker_image_dependencies:
+        chart_address, explicitly_provided_deps, mapping = await MultiGet(
+            get_address,
+            get_explicit_deps,
+            Get(
+                FirstPartyHelmDeploymentMapping,
+                FirstPartyHelmDeploymentMappingRequest(request.field_set),
+            ),
+        )
+    else:
+        (chart_address, explicitly_provided_deps), mapping = (
+            await MultiGet(get_address, get_explicit_deps),
+            FirstPartyHelmDeploymentMapping(
+                request.field_set.address,
+                MutableYamlIndex().frozen(),
+            ),
+        )
 
     dependencies: OrderedSet[Address] = OrderedSet()
     dependencies.add(chart_address)
