@@ -3,15 +3,16 @@
 
 from __future__ import annotations
 
+import os
 from typing import ClassVar, Optional
 
 from pants.engine.internals.native_engine import Address
-from pants.engine.target import DictStringToStringField, InvalidFieldException
+from pants.engine.target import AsyncFieldMixin, DictStringToStringField, InvalidFieldException
 from pants.util.frozendict import FrozenDict
 
 
 # TODO: dependency inference based on script_src (values of this dict)
-class NfpmPackageScriptsField(DictStringToStringField):
+class NfpmPackageScriptsField(AsyncFieldMixin, DictStringToStringField):
     nfpm_alias = ""  # maps to more than one nfpm.yaml field
     alias: ClassVar[str] = "scripts"
     # The keys of nfpm_aliases are the only valid keys of this field.
@@ -38,3 +39,15 @@ class NfpmPackageScriptsField(DictStringToStringField):
                     f"{repr(tuple(cls.nfpm_aliases.keys()))}, but {repr(invalid_keys)} was provided.",
                 )
         return value_or_default
+
+    @property
+    def normalized_value(self) -> FrozenDict[str, str]:
+        value = self.value
+        if not value:
+            return FrozenDict()
+        return FrozenDict(
+            {
+                script_type: os.path.join(self.address.spec_path, script_src)
+                for script_type, script_src in value.items()
+            }
+        )

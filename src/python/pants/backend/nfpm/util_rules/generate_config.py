@@ -169,7 +169,7 @@ async def generate_nfpm_yaml(
 
     script_src_missing_from_sandbox = {
         script_type: script_src
-        for script_type, script_src in (request.field_set.scripts.value or {}).items()
+        for script_type, script_src in request.field_set.scripts.normalized_value.items()
         if content_sandbox_files.get(script_src) is None
     }
     if script_src_missing_from_sandbox:

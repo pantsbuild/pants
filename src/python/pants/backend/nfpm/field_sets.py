@@ -74,7 +74,7 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
 
             fill_nested(nfpm_alias, field_value)
 
-        for script_type, script_src in (self.scripts.value or {}).items():
+        for script_type, script_src in self.scripts.normalized_value.items():
             nfpm_alias = self.scripts.nfpm_aliases[script_type]
             fill_nested(nfpm_alias, script_src)
 
