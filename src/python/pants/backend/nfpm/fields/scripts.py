@@ -11,7 +11,6 @@ from pants.engine.target import AsyncFieldMixin, DictStringToStringField, Invali
 from pants.util.frozendict import FrozenDict
 
 
-# TODO: dependency inference based on script_src (values of this dict)
 class NfpmPackageScriptsField(AsyncFieldMixin, DictStringToStringField):
     nfpm_alias = ""  # maps to more than one nfpm.yaml field
     alias: ClassVar[str] = "scripts"

@@ -9,6 +9,7 @@ from typing import Any, ContextManager, Type, cast
 import pytest
 from _pytest.mark import ParameterSet
 
+from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
 from pants.backend.nfpm.field_sets import (
     NFPM_PACKAGE_FIELD_SET_TYPES,
     NfpmApkPackageFieldSet,
@@ -22,7 +23,8 @@ from pants.backend.nfpm.subsystem import rules as nfpm_subsystem_rules
 from pants.backend.nfpm.target_types import target_types as nfpm_target_types
 from pants.backend.nfpm.target_types_rules import rules as nfpm_target_types_rules
 from pants.core.goals.package import BuiltPackage
-from pants.core.target_types import FileTarget
+from pants.core.target_types import FileTarget, FilesGeneratorTarget
+from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.internals.native_engine import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import Target
@@ -35,11 +37,14 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         target_types=[
             FileTarget,
+            FilesGeneratorTarget,
             *nfpm_target_types(),
         ],
         rules=[
+            *core_target_type_rules(),
             *nfpm_subsystem_rules(),
             *nfpm_target_types_rules(),
+            *nfpm_dependency_inference_rules(),
             *nfpm_rules(),
             *(
                 QueryRule(BuiltPackage, [field_set_type])
@@ -93,6 +98,7 @@ _test_cases: tuple[ParameterSet, ...] = (
             "replaces": ["some-command"],
             "provides": [f"cmd:some-command={_pkg_version}"],
             "depends": ["bash", "git=2.40.1-r0", "/bin/sh", "so:libcurl.so.4"],
+            "scripts": {"postinstall": "postinstall.sh", "postupgrade": "apk-postupgrade.sh"},
         },
         True,
         id="apk-extra-metadata",
@@ -116,6 +122,7 @@ _test_cases: tuple[ParameterSet, ...] = (
             "provides": ["foo", "bar=1.0.0", "libbaz.so=2"],
             "depends": ["bash", "git>=2.40.1"],
             "conflicts": ["conflicting-pkg"],
+            "scripts": {"postinstall": "postinstall.sh", "postupgrade": "arch-postupgrade.sh"},
         },
         True,
         id="archlinux-extra-metadata",
@@ -154,6 +161,7 @@ _test_cases: tuple[ParameterSet, ...] = (
             "conflicts": ["replaced-pkg"],
             "breaks": ["partial-pkg"],
             "compression": "none",  # defaults to gzip
+            "scripts": {"postinstall": "postinstall.sh", "config": "deb-config.sh"},
         },
         True,
         id="deb-extra-metadata",
@@ -182,6 +190,7 @@ _test_cases: tuple[ParameterSet, ...] = (
             "suggests": ["beneficial-other-pkg"],
             "conflicts": ["replaced-pkg"],
             "compression": "zstd:fastest",  # defaults to gzip:-1
+            "scripts": {"postinstall": "postinstall.sh", "verify": "rpm-verify.sh"},
             "ghost_contents": ["/var/log/pkg.log"],
         },
         True,
@@ -198,6 +207,8 @@ def test_generate_package_without_contents(
     valid_target: bool,
 ) -> None:
     packager = field_set_type.packager
+    # do not use scripts for this test.
+    extra_metadata = {key: value for key, value in extra_metadata.items() if key != "scripts"}
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -231,6 +242,7 @@ def test_generate_package_with_contents(
     valid_target: bool,
 ) -> None:
     packager = field_set_type.packager
+    scripts = extra_metadata.get("scripts", {})
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -249,8 +261,14 @@ def test_generate_package_with_contents(
                     ],
                     **{extra_metadata}
                 )
+                if {bool(scripts)}:
+                    files(
+                        name="scripts",
+                        sources={list(path for path in scripts.values())},
+                    )
                 """
             ),
+            **{path: "" for path in scripts.values()},
             "contents/BUILD": dedent(
                 f"""
                 file(
