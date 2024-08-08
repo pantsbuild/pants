@@ -7,7 +7,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import PurePath
-from typing import Any
+from typing import Any, Tuple
 
 from pants.backend.docker.target_types import AllDockerImageTargets
 from pants.backend.docker.target_types import rules as docker_target_types_rules
@@ -301,7 +301,7 @@ async def inject_deployment_dependencies(
             await MultiGet(get_address, get_explicit_deps),
             FirstPartyHelmDeploymentMapping(
                 request.field_set.address,
-                MutableYamlIndex().frozen(),
+                MutableYamlIndex[Tuple[str, Address]]().frozen(),
             ),
         )
 
