@@ -1,0 +1,77 @@
+# Creating a `complete_platforms` File for Python FaaS Environments
+
+When building Python artifacts for Function-as-a-Service (FaaS) environments like AWS Lambda or Google Cloud Functions,
+it's often helpful to use a `complete_platforms` file to specify exactly the Python versions
+and machine architectures that are supported by the environment.
+
+This file provides detailed information about the target runtime environment, enabling tools like PEX to select appropriate dependencies.
+
+## Inferring `complete_platforms` using the `runtime` field
+
+For both [AWS Lambda](./aws-lambda.mdx#specifying-a-runtime-explicitly) and [Google Cloud Functions](./google-cloud-functions.mdx#specifying-a-runtime-explicitly), the `runtime` or `interpreter_constraints` field in the `python_aws_lambda_function` or `python_google_cloud_function` target can be used to infer a value for the `complete_platforms` file.
+
+However, if there isn't already a `complete_platforms` file corresponding to your target environment, then you'll have to create one.
+
+## Why use `complete_platforms`?
+
+Using a `complete_platforms` file instead of just specifying a runtime allows for:
+
+- More accurate dependency resolution
+- Better cross-platform builds (e.g., building on macOS for Linux deployment)
+- Improved compatibility with the target environment
+
+## Generating the `complete_platforms` File
+
+There are two primary ways to generate a `complete_platforms` file for FaaS environments:
+
+### Using PEX in a Docker Container
+
+If your target platform publishes Docker image containing the appropriate Python runtime, then you can use the `pex` package inside a Docker container to generate the file. This is much more convenient than running a cloud function, and should be preferred if possible.
+
+[AWS Lambda](https://gallery.ecr.aws/lambda/python/) and [Google Cloud Functions](https://cloud.google.com/functions/docs/concepts/execution-environment#python) publish their runtimes as Docker images, so you should be able to find the appropriate Docker repository and image tag for your target environment.
+
+Once you have the Docker repo and tag corresponding to your target environment, you can generate the file as follows:
+
+1. Start a container with the appropriate image and run the PEX tool inside it:
+
+    Python 3.9+:
+
+    ```sh
+    docker run --entrypoint='/bin/sh' -it --rm <image_repo>:<image_tag> -c "python -m pip install --target=/tmp/pex pex >/dev/null 2>&1 && PYTHONPATH=/tmp/pex/bin/pex3 interpreter inspect --markers --tags | python -m json.tool --indent=2" > complete_platforms.json
+    ```
+
+    Python 3.8 (or older):
+
+    ```sh
+    docker run --entrypoint='/bin/sh' -it --rm <image_repo>:<image_tag> -c "python -m pip install --target=/tmp/pex pex >/dev/null 2>&1 && PYTHONPATH=/tmp/pex /tmp/pex/bin/pex3 interpreter inspect --markers --tags | python -c 'import sys, json; print(json.dumps(json.load(sys.stdin), indent=2))'" > complete_platforms.json
+    ```
+
+This command will output a JSON string containing a generated `complete_platforms` file, and store it in a file named `complete_platforms.json` inside the current directory.
+
+### Using PEX in a Cloud Function
+
+Alternatively, if there is no Docker image published for the FaaS environment, then the only way to generate the `complete_platforms` file might be to run a cloud function and output the file contents. This will likely vary by
+
+For AWS Lambda, a handler to generate the file might look like this:
+
+   ```python
+   import subprocess
+   import json
+
+   def lambda_handler(event, context):
+       subprocess.run("pip install --target=/tmp/pex pex", shell=True)
+       result = subprocess.run(
+           "PYTHONPATH=/tmp/pex /tmp/pex/bin/pex3 interpreter inspect --markers --tags",
+           shell=True, capture_output=True, text=True
+       )
+       return {
+           "statusCode": 200,
+           "body": json.dumps(json.loads(result.stdout), indent=2)
+       }
+   ```
+
+2. Deploy and invoke the function, then retrieve the output to use as your `complete_platforms` file.
+
+### 3. Using the Generated File
+
+Once you have the `complete_platforms` file, you can use it in your `BUILD` file:
