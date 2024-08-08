@@ -114,8 +114,8 @@ async def generate_nfpm_yaml(
                 )
             )
         elif tgt.has_field(NfpmContentDstField):  # an NfpmContentFile
-            source: str | None = tgt[NfpmContentFileSourceField].value
-            src: str | None = tgt[NfpmContentSrcField].value
+            source: str | None = tgt[NfpmContentFileSourceField].file_path
+            src: str | None = tgt[NfpmContentSrcField].file_path
             dst: str = tgt[NfpmContentDstField].value
             if source is not None and not src:
                 # If defined, 'source' provides the default value for 'src'.

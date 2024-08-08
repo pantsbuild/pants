@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import stat
 from enum import Enum
 from typing import Any, ClassVar, Iterable, Optional, Union
@@ -11,6 +12,7 @@ from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.core.target_types import RelocatedFiles
 from pants.engine.addresses import Address
 from pants.engine.target import (
+    AsyncFieldMixin,
     ImmutableValue,
     IntField,
     InvalidFieldException,
@@ -316,7 +318,7 @@ class NfpmContentFileSourceField(OptionalSingleSourceField):
         return value_or_default
 
 
-class NfpmContentSrcField(StringField):
+class NfpmContentSrcField(AsyncFieldMixin, StringField):
     nfpm_alias = "contents.[].src"
     alias: ClassVar[str] = "src"
     help = help_text(
@@ -340,6 +342,16 @@ class NfpmContentSrcField(StringField):
         how the '{RelocatedFiles.alias}' target works).
         """
     )
+
+    @property
+    def file_path(self) -> str | None:
+        """The path to the file, relative to the build root.
+
+        The return type is optional because it's possible to have 0-1 files.
+        """
+        if self.value is None:
+            return None
+        return os.path.join(self.address.spec_path, self.value)
 
 
 class NfpmContentDstField(StringField):
