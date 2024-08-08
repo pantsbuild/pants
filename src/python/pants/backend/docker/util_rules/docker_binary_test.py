@@ -1,6 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import typing
 from hashlib import sha256
 from unittest import mock
 
@@ -11,14 +12,16 @@ from pants.backend.docker.util_rules.docker_binary import DockerBinary, get_dock
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.experimental.docker.podman.register import rules as podman_rules
 from pants.core.util_rules.system_binaries import (
+    BinaryNotFoundError,
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
     BinaryShims,
     BinaryShimsRequest,
 )
-from pants.engine.fs import EMPTY_DIGEST, Digest
+from pants.engine.fs import EMPTY_DIGEST, Digest, DigestEntries
 from pants.engine.process import Process, ProcessCacheScope
+from pants.engine.rules import QueryRule
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
 
@@ -39,6 +42,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *rules(),
             *podman_rules(),
+            QueryRule(DigestEntries, (Digest,)),
         ]
     )
 
@@ -113,9 +117,12 @@ def test_docker_binary_run_image(docker_path: str, docker: DockerBinary) -> None
 
 @pytest.mark.parametrize("podman_enabled", [True, False])
 @pytest.mark.parametrize("podman_found", [True, False])
-def test_get_docker(rule_runner: RuleRunner, podman_enabled, podman_found) -> None:
+def test_get_docker(rule_runner: RuleRunner, podman_enabled: bool, podman_found: bool) -> None:
     docker_options = create_subsystem(
-        DockerOptions, experimental_enable_podman=podman_enabled, tools=[]
+        DockerOptions,
+        experimental_enable_podman=podman_enabled,
+        tools=[],
+        optional_tools=[],
     )
     docker_options_env_aware = mock.MagicMock(spec=DockerOptions.EnvironmentAware)
 
@@ -153,3 +160,55 @@ def test_get_docker(rule_runner: RuleRunner, podman_enabled, podman_found) -> No
     else:
         assert result.path == "/bin/docker"
         assert not result.is_podman
+
+
+def test_get_docker_with_tools(rule_runner: RuleRunner) -> None:
+    def mock_get_binary_path(request: BinaryPathRequest) -> BinaryPaths:
+        if request.binary_name == "docker":
+            return BinaryPaths("docker", paths=[BinaryPath("/bin/docker")])
+        elif request.binary_name == "real-tool":
+            return BinaryPaths("real-tool", paths=[BinaryPath("/bin/a-real-tool")])
+        else:
+            return BinaryPaths(request.binary_name, ())
+
+    def mock_get_binary_shims(request: BinaryShimsRequest) -> BinaryShims:
+        return BinaryShims(EMPTY_DIGEST, "cache_name")
+
+    def run(tools: list[str], optional_tools: list[str]) -> DockerBinary:
+        docker_options = create_subsystem(
+            DockerOptions,
+            experimental_enable_podman=False,
+            tools=tools,
+            optional_tools=optional_tools,
+        )
+        docker_options_env_aware = mock.MagicMock(spec=DockerOptions.EnvironmentAware)
+
+        nonlocal mock_get_binary_path
+        nonlocal mock_get_binary_shims
+
+        result = run_rule_with_mocks(
+            get_docker,
+            rule_args=[docker_options, docker_options_env_aware],
+            mock_gets=[
+                MockGet(
+                    output_type=BinaryPaths,
+                    input_types=(BinaryPathRequest,),
+                    mock=mock_get_binary_path,
+                ),
+                MockGet(
+                    output_type=BinaryShims,
+                    input_types=(BinaryShimsRequest,),
+                    mock=mock_get_binary_shims,
+                ),
+            ],
+        )
+
+        return typing.cast(DockerBinary, result)
+
+    run(tools=["real-tool"], optional_tools=[])
+
+    with pytest.raises(BinaryNotFoundError, match="Cannot find `nonexistent-tool`"):
+        run(tools=["real-tool", "nonexistent-tool"], optional_tools=[])
+
+    # Optional non-existent tool should still succeed.
+    run(tools=[], optional_tools=["real-tool", "nonexistent-tool"])
