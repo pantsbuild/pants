@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
-from typing import Type
+from textwrap import dedent
+from typing import ContextManager, Type, cast
 
 import pytest
 
+from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
 from pants.backend.nfpm.field_sets import (
     NfpmApkPackageFieldSet,
     NfpmArchlinuxPackageFieldSet,
@@ -19,24 +21,48 @@ from pants.backend.nfpm.target_types import (
     NfpmArchlinuxPackage,
     NfpmContentDir,
     NfpmContentFile,
+    NfpmContentFiles,
     NfpmContentSymlink,
     NfpmDebPackage,
     NfpmRpmPackage,
 )
-from pants.backend.nfpm.util_rules.sandbox import _DepCategory
-from pants.core.target_types import ArchiveTarget, FileTarget, GenericTarget, ResourceTarget
+from pants.backend.nfpm.target_types_rules import rules as nfpm_target_types_rules
+from pants.backend.nfpm.util_rules.sandbox import (
+    NfpmContentSandbox,
+    NfpmContentSandboxRequest,
+    _DepCategory,
+)
+from pants.backend.nfpm.util_rules.sandbox import rules as nfpm_sandbox_rules
+from pants.core.target_types import (
+    ArchiveTarget,
+    FilesGeneratorTarget,
+    FileTarget,
+    GenericTarget,
+    ResourceTarget,
+)
+from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.addresses import Address
+from pants.engine.fs import DigestEntries
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
+from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.rules import QueryRule
 from pants.engine.target import Target
+from pants.testutil.pytest_util import no_exception
+from pants.testutil.rule_runner import RuleRunner
 
 # _NfpmSortedDeps.sort(...)
 
+_pkg_name = "pkg"
+_pkg_version = "3.2.1"
+
 _a = Address("", target_name="t")
-_apk_pkg = NfpmApkPackage({"package_name": "pkg", "version": "3.2.1"}, _a)
-_archlinux_pkg = NfpmArchlinuxPackage({"package_name": "pkg", "version": "3.2.1"}, _a)
+_apk_pkg = NfpmApkPackage({"package_name": _pkg_name, "version": _pkg_version}, _a)
+_archlinux_pkg = NfpmArchlinuxPackage({"package_name": _pkg_name, "version": _pkg_version}, _a)
 _deb_pkg = NfpmDebPackage(
-    {"package_name": "pkg", "version": "3.2.1", "maintainer": "Foo Bar <baz@example.com>"}, _a
+    {"package_name": _pkg_name, "version": _pkg_version, "maintainer": "Foo Bar <baz@example.com>"},
+    _a,
 )
-_rpm_pkg = NfpmRpmPackage({"package_name": "pkg", "version": "3.2.1"}, _a)
+_rpm_pkg = NfpmRpmPackage({"package_name": _pkg_name, "version": _pkg_version}, _a)
 
 
 @pytest.mark.parametrize(
@@ -85,3 +111,239 @@ def test_dep_category_for_target(
 ):
     category = _DepCategory.for_target(tgt, field_set_type)
     assert category == expected
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    rule_runner = RuleRunner(
+        target_types=[
+            FileTarget,
+            FilesGeneratorTarget,
+            NfpmApkPackage,
+            NfpmArchlinuxPackage,
+            NfpmDebPackage,
+            NfpmRpmPackage,
+            NfpmContentFile,
+            NfpmContentFiles,
+        ],
+        rules=[
+            *core_target_type_rules(),
+            *nfpm_target_types_rules(),
+            *nfpm_dependency_inference_rules(),
+            *nfpm_sandbox_rules(),
+            QueryRule(NfpmContentSandbox, (NfpmContentSandboxRequest,)),
+            QueryRule(DigestEntries, (Digest,)),
+        ],
+    )
+    return rule_runner
+
+
+@pytest.mark.parametrize(
+    "packager,field_set_type,dependencies,scripts,expected",
+    (
+        # empty digest
+        ("apk", NfpmApkPackageFieldSet, [], {}, set()),
+        ("archlinux", NfpmArchlinuxPackageFieldSet, [], {}, set()),
+        ("deb", NfpmDebPackageFieldSet, [], {}, set()),
+        ("rpm", NfpmRpmPackageFieldSet, [], {}, set()),
+        # non-empty digest
+        (
+            "apk",
+            NfpmApkPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/postinstall.sh", "postupgrade": "scripts/apk-postupgrade.sh"},
+            {
+                "contents/sandbox-file.txt",
+                "contents/some-executable",
+                "scripts/postinstall.sh",
+                "scripts/apk-postupgrade.sh",
+            },
+        ),
+        (
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/postinstall.sh", "postupgrade": "scripts/arch-postupgrade.sh"},
+            {
+                "contents/sandbox-file.txt",
+                "contents/some-executable",
+                "scripts/postinstall.sh",
+                "scripts/arch-postupgrade.sh",
+            },
+        ),
+        (
+            "deb",
+            NfpmDebPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/postinstall.sh", "config": "scripts/deb-config.sh"},
+            {
+                "contents/sandbox-file.txt",
+                "contents/some-executable",
+                "scripts/postinstall.sh",
+                "scripts/deb-config.sh",
+            },
+        ),
+        (
+            "rpm",
+            NfpmRpmPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/postinstall.sh", "verify": "scripts/rpm-verify.sh"},
+            {
+                "contents/sandbox-file.txt",
+                "contents/some-executable",
+                "scripts/postinstall.sh",
+                "scripts/rpm-verify.sh",
+            },
+        ),
+        # error finding script
+        (
+            "apk",
+            NfpmApkPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/missing.sh"},
+            pytest.raises(ExecutionError),
+        ),
+        (
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/missing.sh"},
+            pytest.raises(ExecutionError),
+        ),
+        (
+            "deb",
+            NfpmDebPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/missing.sh"},
+            pytest.raises(ExecutionError),
+        ),
+        (
+            "rpm",
+            NfpmRpmPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/missing.sh"},
+            pytest.raises(ExecutionError),
+        ),
+        # dependency on file w/o intermediate nfpm_content_file target
+        # should have the file in the sandbox, though config won't include it.
+        (
+            "apk",
+            NfpmApkPackageFieldSet,
+            ["contents/sandbox-file.txt:sandbox_file"],
+            {},
+            {"contents/sandbox-file.txt"},
+        ),
+        (
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
+            ["contents/sandbox-file.txt:sandbox_file"],
+            {},
+            {"contents/sandbox-file.txt"},
+        ),
+        (
+            "deb",
+            NfpmDebPackageFieldSet,
+            ["contents/sandbox-file.txt:sandbox_file"],
+            {},
+            {"contents/sandbox-file.txt"},
+        ),
+        (
+            "rpm",
+            NfpmRpmPackageFieldSet,
+            ["contents/sandbox-file.txt:sandbox_file"],
+            {},
+            {"contents/sandbox-file.txt"},
+        ),
+    ),
+)
+def test_populate_nfpm_content_sandbox(
+    rule_runner: RuleRunner,
+    packager: str,
+    field_set_type: Type[NfpmPackageFieldSet],
+    dependencies: list[str],
+    scripts: dict[str, str],
+    expected: set[str] | ContextManager,
+):
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                f"""
+                nfpm_{packager}_package(
+                    name="{_pkg_name}",
+                    package_name="{_pkg_name}",
+                    version="{_pkg_version}",
+                    {'' if packager != 'deb' else 'maintainer="Foo Bar <deb@example.com>",'}
+                    dependencies={repr(dependencies)},
+                    scripts={repr(scripts)},
+                )
+                """
+            ),
+            "contents/BUILD": dedent(
+                f"""
+                file(
+                    name="unrelated_file",
+                    source="should.not.be.in.digest.txt",
+                )
+                file(
+                    name="sandbox_file",
+                    source="sandbox-file.txt",
+                )
+                nfpm_content_files(
+                    name="files",
+                    files=[
+                        ("sandbox-file.txt", "/usr/share/{_pkg_name}/{_pkg_name}.{_pkg_version}/installed-file.txt"),
+                        ("sandbox-file.txt", "/etc/{_pkg_name}/installed-file.txt"),
+                    ],
+                    dependencies=[":sandbox_file"],
+                )
+                nfpm_content_file(
+                    name="file",
+                    source="some-executable",
+                    dst="/usr/bin/some-executable",
+                )
+                """
+            ),
+            "contents/sandbox-file.txt": "",
+            "contents/some-executable": "",
+            "scripts/BUILD": dedent(
+                """
+                files(
+                    name="scripts",
+                    sources=["*", "!BUILD"],
+                )
+                """
+            ),
+            **{
+                path: ""
+                for path in [
+                    "scripts/postinstall.sh",
+                    "scripts/apk-postupgrade.sh",
+                    "scripts/arch-postupgrade.sh",
+                    "scripts/deb-config.sh",
+                    "scripts/rpm-verify.sh",
+                ]
+            },
+        }
+    )
+
+    target = rule_runner.get_target(Address("", target_name=_pkg_name))
+
+    with cast(ContextManager, no_exception()) if isinstance(expected, set) else expected:
+        result = rule_runner.request(
+            NfpmContentSandbox,
+            [
+                NfpmContentSandboxRequest(field_set=field_set_type.create(target)),
+            ],
+        )
+
+    if not isinstance(expected, set):
+        # error was raised, nothing else to check
+        return
+
+    if not expected:
+        assert result.digest == EMPTY_DIGEST
+        return
+
+    digest_entries = rule_runner.request(DigestEntries, (result.digest,))
+    paths = {entry.path for entry in digest_entries}
+    assert paths == expected
