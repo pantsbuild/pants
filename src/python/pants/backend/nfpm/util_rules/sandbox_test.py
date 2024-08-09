@@ -36,8 +36,8 @@ from pants.backend.nfpm.util_rules.sandbox import (
 from pants.backend.nfpm.util_rules.sandbox import rules as nfpm_sandbox_rules
 from pants.core.target_types import (
     ArchiveTarget,
-    FileSourceField,
     FilesGeneratorTarget,
+    FileSourceField,
     FileTarget,
     GenericTarget,
     ResourceTarget,
@@ -49,7 +49,7 @@ from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import QueryRule, rule
-from pants.engine.target import GenerateSourcesRequest, GeneratedSources, SingleSourceField, Target
+from pants.engine.target import GeneratedSources, GenerateSourcesRequest, SingleSourceField, Target
 from pants.engine.unions import UnionRule
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import RuleRunner
