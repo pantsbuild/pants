@@ -23,7 +23,7 @@ from pants.backend.nfpm.subsystem import rules as nfpm_subsystem_rules
 from pants.backend.nfpm.target_types import target_types as nfpm_target_types
 from pants.backend.nfpm.target_types_rules import rules as nfpm_target_types_rules
 from pants.core.goals.package import BuiltPackage
-from pants.core.target_types import FileTarget, FilesGeneratorTarget
+from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.internals.native_engine import Address
 from pants.engine.internals.scheduler import ExecutionError
@@ -264,7 +264,7 @@ def test_generate_package_with_contents(
                 if {bool(scripts)}:
                     files(
                         name="scripts",
-                        sources={list(path for path in scripts.values())},
+                        sources={list(scripts.values())},
                     )
                 """
             ),

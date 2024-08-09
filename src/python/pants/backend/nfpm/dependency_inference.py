@@ -8,7 +8,7 @@ from pants.base.specs import FileLiteralSpec, RawSpecs
 from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies, Targets
+from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
