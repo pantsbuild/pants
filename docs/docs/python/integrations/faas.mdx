@@ -1,0 +1,61 @@
+# Creating a `complete_platforms` File for Python FaaS Environments
+
+When building Python artifacts for Function-as-a-Service (FaaS) environments like AWS Lambda or Google Cloud Functions, it's often helpful to use a `complete_platforms` file to specify exactly the Python versions and machine architectures that are supported by the environment.
+
+## Inferring `complete_platforms` using the `runtime` field
+
+For both [AWS Lambda](./aws-lambda.mdx#specifying-a-runtime-explicitly) and [Google Cloud Functions](./google-cloud-functions.mdx#specifying-a-runtime-explicitly), the `runtime` or `interpreter_constraints` fields can be used to infer a value for the `complete_platforms` file.
+
+However, if there isn't already a `complete_platforms` file corresponding to your target environment, then you'll have to create one.
+
+## Updating default `complete_platforms` for AWS Lambda and Google Cloud Functions
+
+You can use the `generate_faas_complete_platforms.py` script to update the `complete_platforms` files for AWS Lambda and Google Cloud Functions. For detailed instructions, refer to the [Update or create FaaS platforms files](../../contributions/development/maintenance-tasks-and-scripts.mdx#update-or-create-faas-complete-platforms-files) section.
+
+## Generating the `complete_platforms` file
+
+If generating complete platforms for a different platform, you'll need to generate the `complete_platforms` file manually. There are two primary ways to generate a `complete_platforms` file for FaaS environments:
+
+### Using PEX in a Docker container
+
+If your target platform publishes Docker image containing the appropriate Python runtime, then you can use the `pex` package inside a Docker container to generate the file. This is much more convenient than running a cloud function, and should be preferred if possible.
+
+Once you have the Docker repo and tag corresponding to your target environment, you can start a container with the appropriate image and run the PEX tool inside it to generate the file:
+
+* Python 3.9+:
+
+    ```sh
+    docker run --entrypoint='/bin/sh' -it --rm <docker_repo>:<image_tag> -c "python -m pip install --target=/tmp/pex pex >/dev/null 2>&1 && PYTHONPATH=/tmp/pex/bin/pex3 interpreter inspect --markers --tags | python -m json.tool --indent=2" > complete_platforms.json
+    ```
+
+* Python 3.8 (or older):
+
+    ```sh
+    docker run --entrypoint='/bin/sh' -it --rm <docker_repo>:<image_tag> -c "python -m pip install --target=/tmp/pex pex >/dev/null 2>&1 && PYTHONPATH=/tmp/pex /tmp/pex/bin/pex3 interpreter inspect --markers --tags | python -c 'import sys, json; print(json.dumps(json.load(sys.stdin), indent=2))'" > complete_platforms.json
+    ```
+
+This command will output a JSON string containing a generated `complete_platforms` file, and store it in a file named `complete_platforms.json` inside the current directory.
+
+### Using PEX in a cloud function execution environment
+
+Alternatively, if there is no Docker image published for the FaaS environment, then the only way to generate the `complete_platforms` file might be to run a cloud function and output the file contents. This will likely vary by FaaS provider, but for AWS Lambda, a handler to generate the file might look like this:
+
+   ```python
+   import subprocess
+   import json
+
+   def lambda_handler(event, context):
+       subprocess.run("pip install --target=/tmp/pex pex", shell=True)
+       result = subprocess.run(
+           "PYTHONPATH=/tmp/pex /tmp/pex/bin/pex3 interpreter inspect --markers --tags",
+           shell=True, capture_output=True, text=True
+       )
+       return {
+           "statusCode": 200,
+           "body": json.dumps(json.loads(result.stdout), indent=2)
+       }
+   ```
+
+2. Deploy and invoke the function, then retrieve the output to use as your `complete_platforms` file.
+
+
