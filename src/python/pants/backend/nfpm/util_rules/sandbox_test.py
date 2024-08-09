@@ -148,6 +148,7 @@ async def do_codegen(request: MockCodegenGenerateSourcesRequest) -> GeneratedSou
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         target_types=[
+            ArchiveTarget,
             FileTarget,
             FilesGeneratorTarget,
             NfpmApkPackage,
@@ -169,6 +170,7 @@ def rule_runner() -> RuleRunner:
             UnionRule(GenerateSourcesRequest, MockCodegenGenerateSourcesRequest),
         ],
     )
+    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     return rule_runner
 
 
@@ -259,34 +261,50 @@ def rule_runner() -> RuleRunner:
             {},
             {"contents/sandbox-file.txt"},
         ),
-        # codegen
+        # codegen & package build
         (
             "apk",
             NfpmApkPackageFieldSet,
-            ["codegen:generated", "contents:files"],
+            ["codegen:generated", "contents:files", "package:package"],
             {},
-            {"codegen/foobar.codegen.generated", "contents/sandbox-file.txt"},
+            {
+                "codegen/foobar.codegen.generated",
+                "contents/sandbox-file.txt",
+                "package/archive.tar",
+            },
         ),
         (
             "archlinux",
             NfpmArchlinuxPackageFieldSet,
-            ["codegen:generated", "contents:files"],
+            ["codegen:generated", "contents:files", "package:package"],
             {},
-            {"codegen/foobar.codegen.generated", "contents/sandbox-file.txt"},
+            {
+                "codegen/foobar.codegen.generated",
+                "contents/sandbox-file.txt",
+                "package/archive.tar",
+            },
         ),
         (
             "deb",
             NfpmDebPackageFieldSet,
-            ["codegen:generated", "contents:files"],
+            ["codegen:generated", "contents:files", "package:package"],
             {},
-            {"codegen/foobar.codegen.generated", "contents/sandbox-file.txt"},
+            {
+                "codegen/foobar.codegen.generated",
+                "contents/sandbox-file.txt",
+                "package/archive.tar",
+            },
         ),
         (
             "rpm",
             NfpmRpmPackageFieldSet,
-            ["codegen:generated", "contents:files"],
+            ["codegen:generated", "contents:files", "package:package"],
             {},
-            {"codegen/foobar.codegen.generated", "contents/sandbox-file.txt"},
+            {
+                "codegen/foobar.codegen.generated",
+                "contents/sandbox-file.txt",
+                "package/archive.tar",
+            },
         ),
         # error finding script
         (
@@ -355,6 +373,26 @@ def test_populate_nfpm_content_sandbox(
                 """
             ),
             "codegen/foobar.codegen": "",
+            "package/BUILD": dedent(
+                """
+                file(
+                    name="file",
+                    source="archive-contents.txt",
+                )
+                archive(
+                    name="archive",
+                    format="tar",
+                    files=[":file"],
+                )
+                nfpm_content_file(
+                    name="package",
+                    src="archive.tar",
+                    dst="/opt/foo/archive.tar",
+                    dependencies=[":archive"],
+                )
+                """
+            ),
+            "package/archive-contents.txt": "",
             "contents/BUILD": dedent(
                 f"""
                 file(
