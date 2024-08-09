@@ -18,18 +18,18 @@ class NfpmSubsystem(TemplatedExternalTool):
     help = "The nFPM deb, rpm, apk, and archlinux packager (https://nfpm.goreleaser.com)."
 
     # The version WITHOUT the 'v' prefix which we add as needed in the url_template.
-    default_version = "2.37.1"  # released 09 May 2024
+    default_version = "2.38.0"  # released 05 July 2024
     # v2.35.0 added SOURCE_DATE_EPOCH support
     # v2.36.0 added rpm.scripts.verify
     # v2.37.0 added support for IPK packaging (TODO: add IPK package target+fields+rules)
     default_known_versions = [
-        # checksums from https://github.com/goreleaser/nfpm/releases/download/v2.37.1/checksums.txt
-        "2.37.1|linux_arm64 |df8f272195b7ddb09af9575673a9b8111f9eb7529cdd0a3fac4d44b52513a1e1|4780446",
-        "2.37.1|linux_x86_64|3e1fe85c9a224a221c64cf72fc19e7cd6a0a51a5c4f4b336e3b8eccd417116a3|5195594",
-        "2.37.1|macos_arm64 |5162ce5a59fe8d3b511583cb604c34d08bd2bcced87d9159c7005fc35287b9cd|4976450",
-        "2.37.1|macos_x86_64|0213fa5d5af6f209d953c963103f9b6aec8a0e89d4bf0ab3d531f5f8b20b8eeb|5293359",
-        "2.37.1|win_arm64   |d6edb839381d29ee1eb5eaa1a9443cf8d90f16e686a80b2245d650ed61268573|4884573",
-        "2.37.1|win_x86_64  |2cc80804188048a577dd940a7a7cf04e2c57304fdf339c8692e50b43d3bc3bd4|5386526",
+        # checksums from https://github.com/goreleaser/nfpm/releases/download/v2.38.0/checksums.txt
+        "2.38.0|linux_arm64 |e63be8d586d7c8f6af06945956aa29fb88388caa19d7c5b652f41ae37a155b27|4780662",
+        "2.38.0|linux_x86_64|d9eebe93ee2832cfc8435b3f79ee92a845f1e5fbb99db5a3777a0013e175170d|5196368",
+        "2.38.0|macos_arm64 |48788831696cf056b1a0f9f52e187dbb65c191f5488962696ab3b98fff9f7821|4978997",
+        "2.38.0|macos_x86_64|781420f18ed6bd84a437fe3b272c1b1a03bad546aaaf4f7251b21c25a24ce32b|5294310",
+        "2.38.0|win_arm64   |1a9c7fcd50eb105231f6f6f6cb90d7cdf50e6c34665eb6e881a185387ad158b1|4888861",
+        "2.38.0|win_x86_64  |3124f9bb838410ef98eebfed2267670790ce6bb262ae2a6ca1938a69e087593b|5389117",
     ]
 
     default_url_template = (

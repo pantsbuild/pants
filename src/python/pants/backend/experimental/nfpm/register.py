@@ -4,7 +4,7 @@
 """Create apk, archlinux, deb, and rpm system packages.
 
 See https://nfpm.goreleaser.com/ for details on nFPM, including these descriptions of it:
-  - nFPM is "effing simple package management" 
+  - nFPM is "effing simple package management"
   - "nFPM is Not FPM--a zero dependencies, simple deb, rpm, apk, and arch linux packager written in Go."
 """  # TODO: include ipk in this docstring once support is added.
 
