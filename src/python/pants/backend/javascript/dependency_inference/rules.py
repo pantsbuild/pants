@@ -157,7 +157,7 @@ async def _prepare_inference_metadata(address: Address, file_path: str) -> Infer
     )
 
 
-def _add_extensions(file_imports: frozenset[str], file_extensions: tuple[str]) -> PathGlobs:
+def _add_extensions(file_imports: frozenset[str], file_extensions: tuple[str, ...]) -> PathGlobs:
     extensions = file_extensions + tuple(f"/index{ext}" for ext in file_extensions)
     return PathGlobs(
         string
@@ -173,7 +173,7 @@ def _add_extensions(file_imports: frozenset[str], file_extensions: tuple[str]) -
 async def _determine_import_from_candidates(
     candidates: ParsedJavascriptDependencyCandidate,
     package_candidate_map: NodePackageCandidateMap,
-    file_extensions: tuple[str],
+    file_extensions: tuple[str, ...],
 ) -> Addresses:
     paths = await path_globs_to_paths(
         _add_extensions(
