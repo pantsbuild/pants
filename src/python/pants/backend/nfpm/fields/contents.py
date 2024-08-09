@@ -152,7 +152,7 @@ class NfpmContentFileModeField(IntField):
     )
 
     # The octal should be between 0o0000 and 0o7777 (inclusive)
-    valid_numbers = ValidNumbers.positive_only
+    valid_numbers = ValidNumbers.positive_and_zero
 
     @classmethod
     def compute_value(cls, raw_value: Optional[Union[int, str]], address: Address) -> Optional[int]:
