@@ -95,7 +95,6 @@ PYTHON_RUNTIME_REGEX = r"python(?P<major>\d)\.(?P<minor>\d+)"
 
 
 class PythonAwsLambdaFunctionRuntimes(Enum):
-    PYTHON_37 = "python3.7"
     PYTHON_38 = "python3.8"
     PYTHON_39 = "python3.9"
     PYTHON_310 = "python3.10"
@@ -114,7 +113,6 @@ LAMBDA_DOCKER_REPO = "public.ecr.aws/lambda/python"
 class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
     # https://gallery.ecr.aws/lambda/python
     RUNTIME_TAG_MAPPING = {
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_37, FaaSArchitecture.X86_64): "3.7",
         (PythonAwsLambdaFunctionRuntimes.PYTHON_38, FaaSArchitecture.X86_64): "3.8-x86_64",
         (PythonAwsLambdaFunctionRuntimes.PYTHON_38, FaaSArchitecture.ARM64): "3.8-arm64",
         (PythonAwsLambdaFunctionRuntimes.PYTHON_39, FaaSArchitecture.X86_64): "3.9-x86_64",
