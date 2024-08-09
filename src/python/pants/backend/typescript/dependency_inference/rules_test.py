@@ -60,7 +60,7 @@ def rule_runner() -> RuleRunner:
 def test_infers_typescript_file_imports_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/ts/BUILD": "typescript_sources()",
+            "src/ts/BUILD": "typescript_sources()\njavascript_sources(name='js')",
             "src/ts/index.ts": dedent(
                 """\
                 import { x } from "./localModuleA";
@@ -73,6 +73,9 @@ def test_infers_typescript_file_imports_dependencies(rule_runner: RuleRunner) ->
 
                 // You can import a file and not include any variables
                 import "./localModuleC";
+
+                // You can import a JS module in a TypeScript module
+                import { x } from './localModuleJs';
                 """
             ),
             "src/ts/localModuleA.ts": "",
@@ -83,6 +86,7 @@ def test_infers_typescript_file_imports_dependencies(rule_runner: RuleRunner) ->
             "src/ts/localModuleF.ts": "",
             "src/ts/localModuleG.ts": "",
             "src/ts/localModuleH.ts": "",
+            "src/ts/localModuleJs.js": "",
         }
     )
 
@@ -101,6 +105,7 @@ def test_infers_typescript_file_imports_dependencies(rule_runner: RuleRunner) ->
         Address("src/ts", relative_file_path="localModuleF.ts"),
         Address("src/ts", relative_file_path="localModuleG.ts"),
         Address("src/ts", relative_file_path="localModuleH.ts"),
+        Address("src/ts", relative_file_path="localModuleJs.js", target_name="js"),
     }
 
 

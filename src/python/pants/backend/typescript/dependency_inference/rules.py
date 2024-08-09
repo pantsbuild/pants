@@ -10,8 +10,11 @@ from typing import Iterable
 from pants.backend.javascript import package_json
 from pants.backend.javascript.dependency_inference.rules import (
     InferNodePackageDependenciesRequest,
-    NodePackageCandidateMap,
     RequestNodePackagesCandidateMap,
+    _determine_import_from_candidates,
+    _handle_unowned_imports,
+    _is_node_builtin_module,
+    map_candidate_node_packages,
 )
 from pants.backend.javascript.package_json import (
     OwningNodePackageRequest,
@@ -21,6 +24,7 @@ from pants.backend.javascript.package_json import (
     subpath_imports_for_source,
 )
 from pants.backend.javascript.subsystems.nodejs_infer import NodeJSInfer
+from pants.backend.javascript.target_types import JS_FILE_EXTENSIONS
 from pants.backend.typescript import tsconfig
 from pants.backend.typescript.target_types import (
     TS_FILE_EXTENSIONS,
@@ -29,11 +33,9 @@ from pants.backend.typescript.target_types import (
 )
 from pants.backend.typescript.tsconfig import ParentTSConfigRequest, TSConfig, find_parent_ts_config
 from pants.build_graph.address import Address
-from pants.engine.addresses import Addresses
-from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.internals.native_dep_inference import NativeParsedJavascriptDependencies
 from pants.engine.internals.native_engine import InferenceMetadata, NativeDependenciesRequest
-from pants.engine.internals.selectors import Get, MultiGet, concurrently
+from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.intrinsics import parse_javascript_deps
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSet,
@@ -41,10 +43,8 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    Targets,
 )
 from pants.engine.unions import UnionRule
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
@@ -101,21 +101,6 @@ async def _prepare_inference_metadata(address: Address, file_path: str) -> Infer
 
 
 @rule
-async def get_file_imports_targets(import_path: TypeScriptFileImportPath) -> Targets:
-    """Get address to build targets representing a file import discovered with dependency inference.
-
-    For now, we only support .ts files; in the future, may need to iterate through all possible file
-    extensions until find one matching, if any.
-    """
-    package, filename = os.path.dirname(import_path.path), os.path.basename(import_path.path)
-    address = Address(package, relative_file_path=f"{filename}{TS_FILE_EXTENSIONS[0]}")
-    _ = await Get(Targets, Addresses([address]))
-    owners = await Get(Owners, OwnersRequest((str(address),)))
-    owning_targets = await Get(Targets, Addresses(owners))
-    return owning_targets
-
-
-@rule
 async def infer_typescript_source_dependencies(
     request: InferTypeScriptDependenciesRequest,
     nodejs_infer: NodeJSInfer,
@@ -129,36 +114,45 @@ async def infer_typescript_source_dependencies(
     )
     metadata = await _prepare_inference_metadata(request.field_set.address, source.file_path)
 
-    import_strings = await Get(
-        NativeParsedJavascriptDependencies,
-        NativeDependenciesRequest(sources.snapshot.digest, metadata),
+    import_strings, candidate_pkgs = await concurrently(
+        parse_javascript_deps(NativeDependenciesRequest(sources.snapshot.digest, metadata)),
+        map_candidate_node_packages(
+            RequestNodePackagesCandidateMap(request.field_set.address), **implicitly()
+        ),
     )
 
-    owning_targets_collection = await MultiGet(
-        Get(Targets, TypeScriptFileImportPath, TypeScriptFileImportPath(path=path))
-        for path in import_strings.file_imports
-    )
-    owning_targets = [tgt for targets in owning_targets_collection for tgt in targets]
-
-    non_path_string_bases = FrozenOrderedSet(
-        non_path_string.partition(os.path.sep)[0]
-        for non_path_string in import_strings.package_imports
-    )
-
-    candidate_pkgs = await Get(
-        NodePackageCandidateMap, RequestNodePackagesCandidateMap(request.field_set.address)
-    )
-
-    pkg_addresses = (
-        candidate_pkgs[pkg_name] for pkg_name in non_path_string_bases if pkg_name in candidate_pkgs
-    )
-
-    return InferredDependencies(
-        itertools.chain(
-            pkg_addresses,
-            (tgt.address for tgt in owning_targets if tgt.has_field(TypeScriptSourceField)),
+    imports = dict(
+        zip(
+            import_strings.imports,
+            await concurrently(
+                _determine_import_from_candidates(
+                    candidates,
+                    candidate_pkgs,
+                    file_extensions=TS_FILE_EXTENSIONS + JS_FILE_EXTENSIONS,
+                )
+                for string, candidates in import_strings.imports.items()
+            ),
         )
     )
+    _handle_unowned_imports(
+        request.field_set.address,
+        nodejs_infer.unowned_dependency_behavior,
+        frozenset(
+            string
+            for string, addresses in imports.items()
+            if not addresses and not _is_node_builtin_module(string)
+        ),
+    )
+    _handle_unowned_imports(
+        request.field_set.address,
+        nodejs_infer.unowned_dependency_behavior,
+        frozenset(
+            string
+            for string, addresses in imports.items()
+            if not addresses and not _is_node_builtin_module(string)
+        ),
+    )
+    return InferredDependencies(itertools.chain.from_iterable(imports.values()))
 
 
 def rules() -> Iterable[Rule | UnionRule]:
