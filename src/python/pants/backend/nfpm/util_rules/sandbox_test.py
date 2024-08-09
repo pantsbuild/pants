@@ -195,35 +195,6 @@ def rule_runner() -> RuleRunner:
                 "scripts/rpm-verify.sh",
             },
         ),
-        # error finding script
-        (
-            "apk",
-            NfpmApkPackageFieldSet,
-            ["contents:files", "contents:file"],
-            {"postinstall": "scripts/missing.sh"},
-            pytest.raises(ExecutionError),
-        ),
-        (
-            "archlinux",
-            NfpmArchlinuxPackageFieldSet,
-            ["contents:files", "contents:file"],
-            {"postinstall": "scripts/missing.sh"},
-            pytest.raises(ExecutionError),
-        ),
-        (
-            "deb",
-            NfpmDebPackageFieldSet,
-            ["contents:files", "contents:file"],
-            {"postinstall": "scripts/missing.sh"},
-            pytest.raises(ExecutionError),
-        ),
-        (
-            "rpm",
-            NfpmRpmPackageFieldSet,
-            ["contents:files", "contents:file"],
-            {"postinstall": "scripts/missing.sh"},
-            pytest.raises(ExecutionError),
-        ),
         # dependency on file w/o intermediate nfpm_content_file target
         # should have the file in the sandbox, though config won't include it.
         (
@@ -253,6 +224,35 @@ def rule_runner() -> RuleRunner:
             ["contents/sandbox-file.txt:sandbox_file"],
             {},
             {"contents/sandbox-file.txt"},
+        ),
+        # error finding script
+        (
+            "apk",
+            NfpmApkPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/missing.sh"},
+            pytest.raises(ExecutionError),
+        ),
+        (
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/missing.sh"},
+            pytest.raises(ExecutionError),
+        ),
+        (
+            "deb",
+            NfpmDebPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/missing.sh"},
+            pytest.raises(ExecutionError),
+        ),
+        (
+            "rpm",
+            NfpmRpmPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/missing.sh"},
+            pytest.raises(ExecutionError),
         ),
     ),
 )
