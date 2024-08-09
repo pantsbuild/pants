@@ -13,9 +13,7 @@ from pants.backend.nfpm.dependency_inference import (
     InferNfpmPackageScriptsDependencies,
     NfpmPackageScriptsInferenceFieldSet,
 )
-from pants.backend.nfpm.dependency_inference import (
-    rules as nfpm_dep_rules,
-)
+from pants.backend.nfpm.dependency_inference import rules as nfpm_dep_rules
 from pants.backend.nfpm.fields.apk import NfpmApkScriptsField
 from pants.backend.nfpm.fields.archlinux import NfpmArchlinuxScriptsField
 from pants.backend.nfpm.fields.deb import NfpmDebScriptsField
@@ -73,9 +71,9 @@ def test_infer_nfpm_package_scripts_dependencies(
     scripts_types = tuple(script_type for script_type in scripts_field_type.nfpm_aliases)
     scripts = {script_type: f"scripts/{script_type}.sh" for script_type in scripts_types}
     scripts_paths = tuple(scripts.values())
-    relative_scripts_paths = list(
+    relative_scripts_paths = [
         PurePath(path).relative_to("scripts").as_posix() for path in scripts_paths
-    )
+    ]
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -116,7 +114,7 @@ def test_infer_nfpm_package_scripts_dependencies(
         Address("", target_name=_pkg_name),
     ) == InferredDependencies(
         [
-            Address(f"scripts", relative_file_path=f"{script_type}.sh")
+            Address("scripts", relative_file_path=f"{script_type}.sh")
             for script_type in scripts_types
         ],
     )
