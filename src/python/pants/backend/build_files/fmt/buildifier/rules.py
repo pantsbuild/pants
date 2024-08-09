@@ -18,31 +18,6 @@ class BuildifierRequest(FmtBuildFilesRequest):
     tool_subsystem = Buildifier
 
 
-@rule(desc="Format with Buildifier", level=LogLevel.DEBUG)
-async def buildifier_fmt(
-    request: BuildifierRequest.Batch, buildifier: Buildifier, platform: Platform
-) -> FmtResult:
-    buildifier_tool = await download_external_tool(buildifier.get_request(platform))
-    input_digest = await merge_digests_request_to_digest(
-        MergeDigests((request.snapshot.digest, buildifier_tool.digest))
-    )
-    result = await fallible_to_exec_result_or_raise(
-        **implicitly(
-            Process(
-                argv=[buildifier_tool.exe, "-type=build", *request.files],
-                input_digest=input_digest,
-                output_files=request.files,
-                description=f"Run {Buildifier.options_scope} on {pluralize(len(request.files), 'file')}.",
-                level=LogLevel.DEBUG,
-            )
-        ),
-    )
-    return await FmtResult.create(request, result)
-
-
-# Note - this function is kept separate because it is invoked from update_build_files.py, but
-# not as a rule. This function cannot be called from the `buildifier_fmt` rule because other rules
-# invocations will not be detected in the @rule body at rule compile time.
 async def _run_buildifier_fmt(
     request: AbstractFmtRequest.Batch, buildifier: Buildifier, platform: Platform
 ) -> FmtResult:
@@ -62,6 +37,14 @@ async def _run_buildifier_fmt(
         ),
     )
     return await FmtResult.create(request, result)
+
+
+@rule(desc="Format with Buildifier", level=LogLevel.DEBUG)
+async def buildifier_fmt(
+    request: BuildifierRequest.Batch, buildifier: Buildifier, platform: Platform
+) -> FmtResult:
+    result = await _run_buildifier_fmt(request, buildifier, platform)
+    return result
 
 
 def rules():
