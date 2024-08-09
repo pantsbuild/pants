@@ -336,7 +336,7 @@ def test_generate_package_with_contents(
 
     # noinspection DuplicatedCode
     with cast(ContextManager, no_exception()) if valid_target else pytest.raises(ExecutionError):
-        binary_tgt = rule_runner.get_target(Address("", target_name="pkg"))
+        binary_tgt = rule_runner.get_target(Address("", target_name=_pkg_name))
     if not valid_target:
         return
 
