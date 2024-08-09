@@ -18,6 +18,7 @@ from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.parser import Parser
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
+from pants.util.docutil import doc_url
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
@@ -171,7 +172,7 @@ class Options:
         )
 
         return cls(
-            builtin_goal=split_args.builtin_goal,
+            builtin_or_auxiliary_goal=split_args.builtin_or_auxiliary_goal,
             goals=split_args.goals,
             unknown_goals=split_args.unknown_goals,
             scope_to_flags=split_args.scope_to_flags,
@@ -187,7 +188,7 @@ class Options:
 
     def __init__(
         self,
-        builtin_goal: str | None,
+        builtin_or_auxiliary_goal: str | None,
         goals: list[str],
         unknown_goals: list[str],
         scope_to_flags: dict[str, list[str]],
@@ -204,7 +205,7 @@ class Options:
 
         Dependents should use `Options.create` instead.
         """
-        self._builtin_goal = builtin_goal
+        self._builtin_or_auxiliary_goal = builtin_or_auxiliary_goal
         self._goals = goals
         self._unknown_goals = unknown_goals
         self._scope_to_flags = scope_to_flags
@@ -226,12 +227,12 @@ class Options:
         return self._specs
 
     @property
-    def builtin_goal(self) -> str | None:
-        """The requested builtin goal, if any.
+    def builtin_or_auxiliary_goal(self) -> str | None:
+        """The requested builtin or auxiliary goal, if any.
 
         :API: public
         """
-        return self._builtin_goal
+        return self._builtin_or_auxiliary_goal
 
     @property
     def goals(self) -> list[str]:
@@ -394,11 +395,18 @@ class Options:
         legacy_values = self.get_parser(scope).parse_args(
             parse_args_request, log_warnings=log_parser_warnings
         )
+        native_mismatch_msgs = []
 
         if self._native_options_validation == NativeOptionsValidation.ignore:
             native_values = None
         else:
-            native_values = self.get_parser(scope).parse_args_native(self._native_parser)
+            try:
+                native_values = self.get_parser(scope).parse_args_native(self._native_parser)
+            except Exception as e:
+                native_mismatch_msgs.append(
+                    f"Failed to parse options with native parser due to error:\n    {e}"
+                )
+                native_values = None
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
@@ -422,7 +430,6 @@ class Options:
                 return x
 
         if native_values:
-            msgs = []
 
             def legacy_val_info(k):
                 if k in legacy_values:
@@ -446,35 +453,45 @@ class Options:
 
             for key in sorted(legacy_values.get_keys() | native_values.get_keys()):
                 if listify_tuples(legacy_values.get(key)) != native_values.get(key):
-                    msgs.append(
-                        f"Value mismatch for the option `{key}` in scope [{scope}]:\n"
-                        f"{legacy_val_info(key)}\n"
-                        f"{native_val_info(key)}"
+                    native_mismatch_msgs.append(
+                        f"Value mismatch for the option `{key}`:\n"
+                        f"    {legacy_val_info(key)}\n"
+                        f"    {native_val_info(key)}"
                     )
 
-            if msgs:
+        if native_mismatch_msgs:
 
-                def log(log_func):
-                    for msg in msgs:
-                        log_func(msg)
-                    log_func(
-                        "If you can't resolve this discrepancy, please reach out to the Pants "
-                        "development team: https://www.pantsbuild.org/community/getting-help. "
-                    )
-                    log_func(
-                        "The native parser will become the default in 2.23.x, and the legacy parser "
-                        "will be removed in 2.24.x. So it is imperative that we find out about any "
-                        "discrepancies during this transition period."
-                    )
-                    log_func(
-                        "You can use the global native_options_validation option to configure this check."
-                    )
+            def log(log_func):
+                scope_section = GLOBAL_SCOPE_CONFIG_SECTION if scope == GLOBAL_SCOPE else scope
+                formatted_msgs = "\n\n".join(f"- {m}" for m in native_mismatch_msgs)
+                log_func(
+                    softwrap(
+                        f"""
+                        Found differences between the new native options parser and the legacy options parser in scope [{scope_section}]:
 
-                if self._native_options_validation == NativeOptionsValidation.warning:
-                    log(logger.warning)
-                elif self._native_options_validation == NativeOptionsValidation.error:
-                    log(logger.error)
-                    raise Exception("Option value mismatches detected, aborting.")
+                        {formatted_msgs}
+
+                        If you can't resolve this discrepancy, please reach out to the Pants
+                        development team: {doc_url('/community/getting-help')}.
+
+                        The native parser will become the default in 2.23.x, and the legacy parser
+                        will be removed in 2.24.x. So it is imperative that we find out about any
+                        discrepancies during this transition period.
+
+                        You can use the global native_options_validation option
+                        ({doc_url('reference/global-options#native_options_validation')}) to
+                        configure this check.
+                        """
+                    )
+                )
+
+            if self._native_options_validation == NativeOptionsValidation.warning:
+                log(logger.warning)
+            elif self._native_options_validation == NativeOptionsValidation.error:
+                log(logger.error)
+                raise Exception(
+                    "Option value mismatches detected, see logs above for details. Aborting."
+                )
         # TODO: In a future release, switch to the native_values as authoritative.
         return legacy_values
 

@@ -9,6 +9,7 @@ from typing import Iterable
 
 import pytest
 
+from pants.backend.build_files.fmt.buildifier.subsystem import Buildifier
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.lint.yapf.subsystem import Yapf
@@ -23,6 +24,7 @@ from pants.backend.python.util_rules.pex_requirements import (
 )
 from pants.core.goals.update_build_files import (
     FormatWithBlackRequest,
+    FormatWithBuildifierRequest,
     FormatWithRuffRequest,
     FormatWithYapfRequest,
     RewrittenBuildFile,
@@ -30,6 +32,7 @@ from pants.core.goals.update_build_files import (
     UpdateBuildFilesGoal,
     UpdateBuildFilesSubsystem,
     format_build_file_with_black,
+    format_build_file_with_buildifier,
     format_build_file_with_ruff,
     format_build_file_with_yapf,
     update_build_files,
@@ -334,6 +337,57 @@ def test_ruff_fixer_noops() -> None:
     assert result.exit_code == 0
     assert not result.stdout
     assert build == 'target(name="t")\n'
+
+
+# ------------------------------------------------------------------------------------------
+# Buildifier formatter fixer
+# ------------------------------------------------------------------------------------------
+
+
+def run_buildifier(
+    build_content: str, *, extra_args: list[str] | None = None
+) -> tuple[GoalRuleResult, str]:
+    """Returns the Goal's result and contents of the BUILD file after execution."""
+    rule_runner = RuleRunner(
+        rules=(
+            format_build_file_with_buildifier,
+            update_build_files,
+            *config_files.rules(),
+            *pex.rules(),
+            *Buildifier.rules(),
+            *UpdateBuildFilesSubsystem.rules(),
+            UnionRule(RewrittenBuildFileRequest, FormatWithBuildifierRequest),
+        ),
+        target_types=[GenericTarget],
+    )
+    rule_runner.write_files({"BUILD": build_content})
+    goal_result = rule_runner.run_goal_rule(
+        UpdateBuildFilesGoal,
+        args=[f"--update-build-files-formatter={Buildifier.options_scope}", "::"],
+        global_args=extra_args or (),
+        env_inherit=BLACK_ENV_INHERIT,
+    )
+    rewritten_build = Path(rule_runner.build_root, "BUILD").read_text()
+    return goal_result, rewritten_build
+
+
+def test_buildifier_fixer_fixes() -> None:
+    result, build = run_buildifier("target(name='t')")
+    assert result.exit_code == 0
+    assert result.stdout == dedent(
+        f"""\
+        Updated BUILD:
+          - Format with {Buildifier.name}
+        """
+    )
+    assert build == 'target(name = "t")\n'
+
+
+def test_buildifier_fixer_noops() -> None:
+    result, build = run_buildifier('target(name = "t")\n')
+    assert result.exit_code == 0
+    assert not result.stdout
+    assert build == 'target(name = "t")\n'
 
 
 # ------------------------------------------------------------------------------------------

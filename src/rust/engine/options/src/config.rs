@@ -192,6 +192,9 @@ impl FromValue for f64 {
     fn from_value(value: &Value) -> Result<f64, ValueConversionError> {
         if let Some(float) = value.as_float() {
             Ok(float)
+        } else if let Some(int) = value.as_integer() {
+            // See if we can parse as an int and coerce it to a float.
+            Ok(int as f64)
         } else {
             Err(ValueConversionError {
                 expected_type: "float",

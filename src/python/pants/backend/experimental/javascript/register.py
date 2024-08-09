@@ -16,6 +16,13 @@ from pants.backend.javascript.target_types import (
     JSTestsGeneratorTarget,
     JSTestTarget,
 )
+from pants.backend.jsx.goals import tailor as jsx_tailor
+from pants.backend.jsx.target_types import (
+    JSXSourcesGeneratorTarget,
+    JSXSourceTarget,
+    JSXTestsGeneratorTarget,
+    JSXTestTarget,
+)
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.rules import Rule
 from pants.engine.target import Target
@@ -31,6 +38,7 @@ def rules() -> Iterable[Rule | UnionRule]:
         *run_rules(),
         *test.rules(),
         *export.rules(),
+        *jsx_tailor.rules(),
     )
 
 
@@ -40,6 +48,10 @@ def target_types() -> Iterable[type[Target]]:
         JSSourcesGeneratorTarget,
         JSTestTarget,
         JSTestsGeneratorTarget,
+        JSXSourceTarget,
+        JSXSourcesGeneratorTarget,
+        JSXTestTarget,
+        JSXTestsGeneratorTarget,
         *package_json.target_types(),
     )
 

@@ -287,6 +287,18 @@ class ProcessExecutionFailure(Exception):
             )
         super().__init__("\n".join(err_strings))
 
+    @classmethod
+    def from_result(
+        cls, result: FallibleProcessResult, description: str, keep_sandboxes: KeepSandboxes
+    ) -> ProcessExecutionFailure:
+        return cls(
+            result.exit_code,
+            result.stdout,
+            result.stderr,
+            description,
+            keep_sandboxes=keep_sandboxes,
+        )
+
 
 @rule
 def get_multi_platform_request_description(req: Process) -> ProductDescription:

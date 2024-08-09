@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
+import os.path
 from dataclasses import dataclass
 from typing import Optional
 
@@ -15,7 +17,9 @@ from pants.backend.terraform.target_types import (
 )
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.fs import DigestSubset, PathGlobs
 from pants.engine.internals.native_engine import Address, AddressInput, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure
@@ -85,12 +89,8 @@ async def get_terraform_providers(
         ),
     )
     if fetched_deps.exit_code != 0:
-        raise ProcessExecutionFailure(
-            fetched_deps.exit_code,
-            fetched_deps.stdout,
-            fetched_deps.stderr,
-            init_process_description,
-            keep_sandboxes=keep_sandboxes,
+        raise ProcessExecutionFailure.from_result(
+            fetched_deps, init_process_description, keep_sandboxes
         )
 
     return TerraformDependenciesResponse(fetched_deps.output_digest)
@@ -103,7 +103,6 @@ class TerraformInitRequest:
 
     # Not initialising the backend means we won't access remote state. Useful for `validate`
     initialise_backend: bool = False
-    upgrade: bool = False
 
 
 @dataclass(frozen=True)
@@ -113,8 +112,15 @@ class TerraformInitResponse:
     chdir: str
 
 
-@rule
-async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse:
+@dataclass(frozen=True)
+class TerraformUpgradeResponse:
+    sources_and_deps: Digest
+    lockfile: Digest
+    chdir: str
+
+
+async def run_terraform_init(request: TerraformInitRequest, upgrade: bool):
+    """Just run `terraform init`"""
     this_targets_dependencies = await Get(
         TransitiveTargets, TransitiveTargetsRequest((request.dependencies.address,))
     )
@@ -180,7 +186,7 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
     )
 
     has_lockfile = invocation_files.lockfile is not None
-    third_party_deps = await Get(
+    init_response = await Get(
         TerraformDependenciesResponse,
         TerraformDependenciesRequest(
             chdir,
@@ -188,8 +194,21 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
             has_lockfile,
             source_for_validate,
             initialise_backend=request.initialise_backend,
-            upgrade=request.upgrade,
+            upgrade=upgrade,
         ),
+    )
+
+    return source_files, dependencies_files, init_response, chdir
+
+
+@rule
+async def terraform_init(request: TerraformInitRequest) -> TerraformInitResponse:
+    """Run `terraform init`.
+
+    Returns all the initialised files, ready for execution of subsequent tasks
+    """
+    source_files, dependencies_files, init_response, chdir = await run_terraform_init(
+        request, upgrade=False
     )
 
     all_terraform_files = await Get(
@@ -198,7 +217,7 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
             [
                 source_files.snapshot.digest,
                 dependencies_files.snapshot.digest,
-                third_party_deps.digest,
+                init_response.digest,
             ]
         ),
     )
@@ -206,6 +225,58 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
     return TerraformInitResponse(
         sources_and_deps=all_terraform_files, terraform_files=source_files, chdir=chdir
     )
+
+
+@rule
+async def terraform_upgrade_lockfile(request: TerraformInitRequest) -> TerraformUpgradeResponse:
+    """Run `terraform init -upgrade`. Returns all terraform files with the new lockfile.
+
+    This split exists because the new and old lockfile will conflict if merging digests
+    """
+
+    source_files, dependencies_files, init_response, chdir = await run_terraform_init(
+        request, upgrade=True
+    )
+
+    updated_lockfile, dependencies_except_lockfile = await MultiGet(
+        Get(
+            Digest,
+            DigestSubset(
+                init_response.digest,
+                PathGlobs(
+                    (os.path.join(chdir, ".terraform.lock.hcl"),),
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    description_of_origin="upgrade terraform lockfile with `terraform init`",
+                ),
+            ),
+        ),
+        Get(
+            Digest,
+            DigestSubset(
+                dependencies_files.snapshot.digest,
+                PathGlobs(
+                    (
+                        "**",
+                        "!" + os.path.join(chdir, ".terraform.lock.hcl"),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    all_terraform_files = await Get(
+        Digest,
+        MergeDigests(
+            [
+                source_files.snapshot.digest,
+                dependencies_except_lockfile,
+                init_response.digest,
+                updated_lockfile,
+            ]
+        ),
+    )
+
+    return TerraformUpgradeResponse(all_terraform_files, updated_lockfile, chdir)
 
 
 def rules():

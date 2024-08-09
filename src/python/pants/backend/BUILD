@@ -36,6 +36,8 @@ __dependents_rules__(
             "[/build_files/fmt/black/register.py]",
             "[/build_files/fmt/ruff/register.py]",
             "[/build_files/fmt/yapf/register.py]",
+            "[/build_files/fmt/buildifier/rules.py]",
+            "[/build_files/fmt/buildifier/subsystem.py]",
             "[/python/lint/black/rules.py]",
             "[/python/lint/black/subsystem.py]",
             "[/python/lint/ruff/format/rules.py]",
