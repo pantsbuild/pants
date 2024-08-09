@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from textwrap import dedent
 from typing import ContextManager, Type, cast
 
@@ -35,6 +36,7 @@ from pants.backend.nfpm.util_rules.sandbox import (
 from pants.backend.nfpm.util_rules.sandbox import rules as nfpm_sandbox_rules
 from pants.core.target_types import (
     ArchiveTarget,
+    FileSourceField,
     FilesGeneratorTarget,
     FileTarget,
     GenericTarget,
@@ -42,11 +44,13 @@ from pants.core.target_types import (
 )
 from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.addresses import Address
-from pants.engine.fs import DigestEntries
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
+from pants.engine.fs import CreateDigest, DigestContents, DigestEntries
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import QueryRule
-from pants.engine.target import Target
+from pants.engine.internals.selectors import Get
+from pants.engine.rules import QueryRule, rule
+from pants.engine.target import GenerateSourcesRequest, GeneratedSources, SingleSourceField, Target
+from pants.engine.unions import UnionRule
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import RuleRunner
 
@@ -113,6 +117,33 @@ def test_dep_category_for_target(
     assert category == expected
 
 
+class MockCodegenSourceField(SingleSourceField):
+    pass
+
+
+class MockCodegenTarget(Target):
+    alias = "codegen_target"
+    core_fields = (MockCodegenSourceField,)
+    help = "n/a"
+
+
+class MockCodegenGenerateSourcesRequest(GenerateSourcesRequest):
+    input = MockCodegenSourceField
+    output = FileSourceField
+
+
+@rule
+async def do_codegen(request: MockCodegenGenerateSourcesRequest) -> GeneratedSources:
+    # Generate a file with the same contents as each input file.
+    input_files = await Get(DigestContents, Digest, request.protocol_sources.digest)
+    generated_files = [
+        dataclasses.replace(input_file, path=input_file.path + ".generated")
+        for input_file in input_files
+    ]
+    result = await Get(Snapshot, CreateDigest(generated_files))
+    return GeneratedSources(result)
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
@@ -125,6 +156,7 @@ def rule_runner() -> RuleRunner:
             NfpmRpmPackage,
             NfpmContentFile,
             NfpmContentFiles,
+            MockCodegenTarget,
         ],
         rules=[
             *core_target_type_rules(),
@@ -133,6 +165,8 @@ def rule_runner() -> RuleRunner:
             *nfpm_sandbox_rules(),
             QueryRule(NfpmContentSandbox, (NfpmContentSandboxRequest,)),
             QueryRule(DigestEntries, (Digest,)),
+            do_codegen,
+            UnionRule(GenerateSourcesRequest, MockCodegenGenerateSourcesRequest),
         ],
     )
     return rule_runner
@@ -225,6 +259,35 @@ def rule_runner() -> RuleRunner:
             {},
             {"contents/sandbox-file.txt"},
         ),
+        # codegen
+        (
+            "apk",
+            NfpmApkPackageFieldSet,
+            ["codegen:generated", "contents:files"],
+            {},
+            {"codegen/foobar.codegen.generated", "contents/sandbox-file.txt"},
+        ),
+        (
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
+            ["codegen:generated", "contents:files"],
+            {},
+            {"codegen/foobar.codegen.generated", "contents/sandbox-file.txt"},
+        ),
+        (
+            "deb",
+            NfpmDebPackageFieldSet,
+            ["codegen:generated", "contents:files"],
+            {},
+            {"codegen/foobar.codegen.generated", "contents/sandbox-file.txt"},
+        ),
+        (
+            "rpm",
+            NfpmRpmPackageFieldSet,
+            ["codegen:generated", "contents:files"],
+            {},
+            {"codegen/foobar.codegen.generated", "contents/sandbox-file.txt"},
+        ),
         # error finding script
         (
             "apk",
@@ -278,6 +341,20 @@ def test_populate_nfpm_content_sandbox(
                 )
                 """
             ),
+            "codegen/BUILD": dedent(
+                """
+                codegen_target(
+                    source="./foobar.codegen",
+                )
+                nfpm_content_file(
+                    name="generated",
+                    src="foobar.codegen.generated",
+                    dst="/usr/lib/foobar.codegen.generated",
+                    dependencies=["./foobar.codegen"],
+                )
+                """
+            ),
+            "codegen/foobar.codegen": "",
             "contents/BUILD": dedent(
                 f"""
                 file(
