@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class NfpmSubsystem(TemplatedExternalTool):
     name = "nFPM"
     options_scope = "nfpm"
-    help = "The nFPM deb, rpm, and apk packager (https://nfpm.goreleaser.com)."
+    help = "The nFPM deb, rpm, apk, and archlinux packager (https://nfpm.goreleaser.com)."
 
     # The version WITHOUT the 'v' prefix which we add as needed in the url_template.
     default_version = "2.37.1"  # released 09 May 2024
