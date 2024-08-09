@@ -26,6 +26,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
+from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
@@ -41,6 +42,10 @@ class PexCli(TemplatedExternalTool):
     default_version = "v2.11.0"
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
     version_constraints = ">=2.3.0,<3.0"
+
+    # extra args to be passed to the pex tool; note that they
+    # are going to apply to all invocations of the pex tool.
+    args = ArgsListOption(example="--check=error --no-compile")
 
     @classproperty
     def default_known_versions(cls):
@@ -123,6 +128,7 @@ async def setup_pex_cli_process(
     python_native_code: PythonNativeCodeSubsystem.EnvironmentAware,
     global_options: GlobalOptions,
     pex_subsystem: PexSubsystem,
+    pex_cli_subsystem: PexCli,
     python_setup: PythonSetup,
 ) -> Process:
     tmpdir = ".tmp"
@@ -179,6 +185,7 @@ async def setup_pex_cli_process(
         *warnings_args,
         *pip_version_args,
         *resolve_args,
+        *pex_cli_subsystem.args,
         # NB: This comes at the end because it may use `--` passthrough args, # which must come at
         # the end.
         *request.extra_args,
