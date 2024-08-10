@@ -176,7 +176,7 @@ class NfpmRpmProvidesField(NfpmPackageRelationshipsField):
 
 class NfpmRpmDependsField(NfpmPackageRelationshipsField):
     nfpm_alias = "depends"
-    alias: ClassVar[str] = nfpm_alias  # TODO: this might be confused with "dependencies"
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         List of package requirements (for package installers).
@@ -412,7 +412,9 @@ class NfpmRpmGhostContents(StringSequenceField):
         https://docs.fedoraproject.org/en-US/packaging-guidelines/Alternatives/#_how_to_use_alternatives
         """
     )
-    # TODO: does this need any validation like requiring absolute paths?
+    # nFPM normalizes paths to be absolute, so "" is effectively the same as "/".
+    # But this does not validate the paths, leaving it up to nFPM to do any validation
+    # that a specific packager might require.
 
     @property
     def nfpm_contents(self) -> list[NfpmContent]:

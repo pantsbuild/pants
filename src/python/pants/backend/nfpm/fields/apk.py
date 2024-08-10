@@ -109,7 +109,7 @@ class NfpmApkProvidesField(NfpmPackageRelationshipsField):
 
 class NfpmApkDependsField(NfpmPackageRelationshipsField):
     nfpm_alias = "depends"
-    alias: ClassVar[str] = nfpm_alias  # TODO: this might be confused with "dependencies"
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         List of package dependencies or conflicts (for package installers).

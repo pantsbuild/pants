@@ -132,7 +132,7 @@ class NfpmArchlinuxProvidesField(NfpmPackageRelationshipsField):
 
 class NfpmArchlinuxDependsField(NfpmPackageRelationshipsField):
     nfpm_alias = "depends"
-    alias: ClassVar[str] = nfpm_alias  # TODO: this might be confused with "dependencies"
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         List of package dependencies (for package installers).

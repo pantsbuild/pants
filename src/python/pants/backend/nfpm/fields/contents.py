@@ -292,7 +292,9 @@ class _SrcDstSequenceField(Field):
             validated.append(cast(tuple[str, str], element))
         src_dst_map = tuple(validated)
 
-        # TODO: does src and dst need to be validated as non-empty valid paths?
+        # nFPM normalizes paths to be absolute, so "" is effectively the same as "/".
+        # But, this does not validate the paths, leaving it up to nFPM to do any validation
+        # that a specific packager might require.
 
         dst_seen = set()
         dst_dupes = set()
@@ -634,7 +636,9 @@ class NfpmContentDirsField(StringSequenceField):
     def compute_value(cls, raw_value: Optional[Iterable[str]], address: Address) -> tuple[str, ...]:
         dst_dirs = super().compute_value(raw_value, address)
         assert dst_dirs is not None  # it is required
-        # TODO: does dst need to be validated as non-empty valid paths?
+        # nFPM normalizes paths to be absolute, so "" is effectively the same as "/".
+        # But this does not validate the paths, leaving it up to nFPM to do any validation
+        # that a specific packager might require.
 
         dst_seen = set()
         dst_dupes = set()
