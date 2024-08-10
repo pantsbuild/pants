@@ -26,6 +26,7 @@ from pants.util.logging import LogLevel
 @unique
 class OpenAPIGeneratorType(Enum):
     JAVA = "java"
+    PYTHON = "python"
 
 
 @dataclass(frozen=True)
