@@ -8,8 +8,7 @@ from dataclasses import dataclass
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import FileLiteralSpec, RawSpecs
-from pants.engine.addresses import Addresses
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.specs_rules import resolve_addresses_from_raw_specs
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
@@ -39,13 +38,12 @@ async def infer_nfpm_package_scripts_dependencies(
     if not scripts_paths:
         return InferredDependencies(())
 
-    resolved_scripts_addresses = await Get(
-        Addresses,
+    resolved_scripts_addresses = await resolve_addresses_from_raw_specs(
         RawSpecs(
             file_literals=tuple(FileLiteralSpec(script_path) for script_path in scripts_paths),
             unmatched_glob_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="nfpm package scripts field dependency inference",
-        ),
+        )
     )
 
     return InferredDependencies(resolved_scripts_addresses)
