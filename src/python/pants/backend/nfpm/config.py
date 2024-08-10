@@ -50,15 +50,11 @@ def file_info(
         # If we don't pass an explicit mode, nFPM will try to use the sandboxed file's mode.
         mode = 0o755 if default_is_executable else 0o644
 
-    mtime = target[NfpmContentFileMtimeField].value
-    if mtime == NfpmContentFileMtimeField.default and default_mtime and mtime != default_mtime:
-        mtime = default_mtime
-
     return NfpmFileInfo(
         owner=target[NfpmContentFileOwnerField].value,
         group=target[NfpmContentFileGroupField].value,
         mode=OctalInt(mode) if mode is not None else mode,
-        mtime=mtime,
+        mtime=target[NfpmContentFileMtimeField].normalized_value(default_mtime),
     )
 
 

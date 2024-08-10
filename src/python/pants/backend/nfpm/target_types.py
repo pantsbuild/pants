@@ -9,6 +9,7 @@ from pants.backend.nfpm.fields.all import (
     NfpmHomepageField,
     NfpmLicenseField,
     NfpmOutputPathField,
+    NfpmPackageMtimeField,
     NfpmPackageNameField,
     NfpmPlatformField,
 )
@@ -101,6 +102,7 @@ from pants.util.strutil import help_text
 COMMON_NFPM_PACKAGE_FIELDS = (
     *COMMON_TARGET_FIELDS,  # tags, description
     NfpmOutputPathField,
+    NfpmPackageMtimeField,
     NfpmDependencies,
     # NfpmPackageNameField is in the packager-specific lists of fields so that it ends up
     # in field_set.required_fields even though it is also required by NfpmPackageFieldSet.

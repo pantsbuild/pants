@@ -9,13 +9,17 @@ from pants.backend.nfpm.field_sets import (
     NfpmDebPackageFieldSet,
     NfpmRpmPackageFieldSet,
 )
-from pants.backend.nfpm.fields.all import NfpmHomepageField, NfpmLicenseField, NfpmPackageNameField
+from pants.backend.nfpm.fields.all import (
+    NfpmHomepageField,
+    NfpmLicenseField,
+    NfpmPackageMtimeField,
+    NfpmPackageNameField,
+)
 from pants.backend.nfpm.fields.apk import NfpmApkDependsField, NfpmApkMaintainerField
 from pants.backend.nfpm.fields.archlinux import (
     NfpmArchlinuxDependsField,
     NfpmArchlinuxPackagerField,
 )
-from pants.backend.nfpm.fields.contents import NfpmContentFileMtimeField
 from pants.backend.nfpm.fields.deb import (
     NfpmDebDependsField,
     NfpmDebFieldsField,
@@ -40,7 +44,7 @@ from pants.backend.nfpm.target_types import (
 from pants.engine.addresses import Address
 from pants.engine.target import DescriptionField
 
-mtime = NfpmContentFileMtimeField.default
+mtime = NfpmPackageMtimeField.default
 
 
 def test_generate_nfpm_config_for_apk():
@@ -86,7 +90,7 @@ def test_generate_nfpm_config_for_apk():
     }
 
     field_set = NfpmApkPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt, mtime=mtime)
+    nfpm_config = field_set.nfpm_config(tgt, default_mtime=mtime)
     assert nfpm_config == expected_nfpm_config
 
 
@@ -133,7 +137,7 @@ def test_generate_nfpm_config_for_archlinux():
     }
 
     field_set = NfpmArchlinuxPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt, mtime=mtime)
+    nfpm_config = field_set.nfpm_config(tgt, default_mtime=mtime)
     assert nfpm_config == expected_nfpm_config
 
 
@@ -189,7 +193,7 @@ def test_generate_nfpm_config_for_deb():
     }
 
     field_set = NfpmDebPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt, mtime=mtime)
+    nfpm_config = field_set.nfpm_config(tgt, default_mtime=mtime)
     assert nfpm_config == expected_nfpm_config
 
 
@@ -243,5 +247,5 @@ def test_generate_nfpm_config_for_rpm():
     }
 
     field_set = NfpmRpmPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt, mtime=mtime)
+    nfpm_config = field_set.nfpm_config(tgt, default_mtime=mtime)
     assert nfpm_config == expected_nfpm_config

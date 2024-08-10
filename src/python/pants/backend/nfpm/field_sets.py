@@ -7,7 +7,11 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from pants.backend.nfpm.fields.all import NfpmOutputPathField, NfpmPackageNameField
+from pants.backend.nfpm.fields.all import (
+    NfpmOutputPathField,
+    NfpmPackageMtimeField,
+    NfpmPackageNameField,
+)
 from pants.backend.nfpm.fields.rpm import NfpmRpmGhostContents
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.backend.nfpm.target_types import APK_FIELDS, ARCHLINUX_FIELDS, DEB_FIELDS, RPM_FIELDS
@@ -25,15 +29,16 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     extension: ClassVar[str]
     output_path: NfpmOutputPathField
     package_name: NfpmPackageNameField
+    mtime: NfpmPackageMtimeField
     description: DescriptionField
     scripts: NfpmPackageScriptsField
 
-    def nfpm_config(self, tgt: Target, *, mtime: str) -> dict[str, Any]:
+    def nfpm_config(self, tgt: Target, *, default_mtime: str | None) -> dict[str, Any]:
         config: dict[str, Any] = {
             # pants handles any globbing before passing contents to nFPM.
             "disable_globbing": True,
             "contents": [],
-            "mtime": mtime,
+            "mtime": self.mtime.normalized_value(default_mtime),
         }
 
         def fill_nested(_nfpm_alias: str, value: Any) -> None:
@@ -117,8 +122,8 @@ class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
     required_fields = RPM_FIELDS
     ghost_contents: NfpmRpmGhostContents
 
-    def nfpm_config(self, tgt: Target, *, mtime: str) -> dict[str, Any]:
-        config = super().nfpm_config(tgt, mtime=mtime)
+    def nfpm_config(self, tgt: Target, *, default_mtime: str | None) -> dict[str, Any]:
+        config = super().nfpm_config(tgt, default_mtime=default_mtime)
         config["contents"].extend(self.ghost_contents.nfpm_contents)
         return config
 

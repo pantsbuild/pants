@@ -13,7 +13,6 @@ from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.backend.nfpm.fields.contents import (
     NfpmContentDirDstField,
     NfpmContentDstField,
-    NfpmContentFileMtimeField,
     NfpmContentFileSourceField,
     NfpmContentSrcField,
     NfpmContentSymlinkDstField,
@@ -70,16 +69,14 @@ async def generate_nfpm_yaml(
     )
 
     # TODO: Maybe allow setting default mtime via an nfpm subsystem option.
-    # TODO: Maybe add an mtime field to nfpm_*_package targets.
     environ = await environment_vars_subset(
         **implicitly(EnvironmentVarsRequest(["SOURCE_DATE_EPOCH"]))
     )
-    # This protects against an empty SOURCE_DATE_EPOCH var as mtime must not be empty.
-    mtime = environ.get("SOURCE_DATE_EPOCH", "") or NfpmContentFileMtimeField.default
+    default_mtime = environ.get("SOURCE_DATE_EPOCH", "")
 
     # Fist get the config that can be constructed from the target itself.
     nfpm_package_target = transitive_targets.roots[0]
-    config = request.field_set.nfpm_config(nfpm_package_target, mtime=mtime)
+    config = request.field_set.nfpm_config(nfpm_package_target, default_mtime=default_mtime)
 
     # Second, gather package contents from hydrated deps.
     contents: list[NfpmContent] = config["contents"]
@@ -101,7 +98,7 @@ async def generate_nfpm_yaml(
                 NfpmContent(
                     type="dir",
                     dst=tgt[NfpmContentDirDstField].value,
-                    file_info=file_info(tgt, default_mtime=mtime),
+                    file_info=file_info(tgt, default_mtime=default_mtime),
                 )
             )
         elif tgt.has_field(NfpmContentSymlinkDstField):  # an NfpmContentSymlink
@@ -110,7 +107,7 @@ async def generate_nfpm_yaml(
                     type="symlink",
                     src=tgt[NfpmContentSymlinkSrcField].value,
                     dst=tgt[NfpmContentSymlinkDstField].value,
-                    file_info=file_info(tgt, default_mtime=mtime),
+                    file_info=file_info(tgt, default_mtime=default_mtime),
                 )
             )
         elif tgt.has_field(NfpmContentDstField):  # an NfpmContentFile
@@ -132,7 +129,7 @@ async def generate_nfpm_yaml(
                     type=tgt[NfpmContentTypeField].value,
                     src=src,
                     dst=dst,
-                    file_info=file_info(tgt, sandbox_file.is_executable, mtime),
+                    file_info=file_info(tgt, sandbox_file.is_executable, default_mtime),
                 )
             )
 

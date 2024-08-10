@@ -24,6 +24,40 @@ class NfpmPackageNameField(StringField):
     )
 
 
+class NfpmPackageMtimeField(StringField):
+    nfpm_alias = ""  # field handled separately to call normalized_value
+    alias: ClassVar[str] = "mtime"
+    # Default copied from PEX (which uses zipfile standard MS-DOS epoch).
+    # https://github.com/pex-tool/pex/blob/v2.1.137/pex/common.py#L39-L45
+    default = "1980-01-01T00:00:00Z"
+    help = help_text(
+        lambda: f"""
+        The file modification time as an RFC 3339 formatted string.
+
+        For example: 2008-01-02T15:04:05Z
+
+        The format is defined in RFC 3339: https://rfc-editor.org/rfc/rfc3339.html
+
+        NOTE: This field does NOT set the mtime for package contents. It sets the
+        build time in package metadata (for package types that have that metadata),
+        as well as the file modification time for files that nFPM generates in the
+        package. To set the mtime for package contents, use the `file_mtime` field
+        on the relevant `nfpm_content_*` targets.
+
+        The default value is {repr(NfpmPackageMtimeField.default)}. You may also
+        set the SOURCE_DATE_EPOCH environment variable to override this default.
+
+        See also: https://reproducible-builds.org/docs/timestamps/
+        """
+    )
+
+    def normalized_value(self, default_mtime: str | None):
+        # This protects against an empty SOURCE_DATE_EPOCH var as mtime must not be empty.
+        if self.value == self.default and default_mtime and self.value != default_mtime:
+            return default_mtime
+        return self.value
+
+
 class NfpmDependencies(Dependencies):
     nfpm_alias = ""  # doesn't map directly to a nfpm.yaml field
 

@@ -210,6 +210,11 @@ class NfpmContentFileMtimeField(StringField):
         """
     )
 
+    def normalized_value(self, default_mtime: str | None):
+        if self.value == self.default and default_mtime and self.value != default_mtime:
+            return default_mtime
+        return self.value
+
 
 # -----------------------------------------------------------------------------------------------
 # Internal generic parent class fields
