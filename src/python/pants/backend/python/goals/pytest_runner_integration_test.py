@@ -731,7 +731,7 @@ def test_setup_plugins_and_runtime_package_dependency(rule_runner: PythonRuleRun
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_binary_call.py"))
     result = run_pytest(rule_runner, [tgt])
-    assert result.exit_code == 0, f"pytest test faied:\n{result.stdout_bytes.decode()}"
+    assert result.exit_code == 0, f"pytest test failed:\n{result.stdout_bytes.decode()}"
 
 
 def test_local_dists(rule_runner: PythonRuleRunner) -> None:
