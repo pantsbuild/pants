@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
-from enum import Enum, unique
 from typing import Iterable, Mapping
 
 from pants.backend.openapi.subsystems import openapi_generator
@@ -23,16 +22,10 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
-@unique
-class OpenAPIGeneratorType(Enum):
-    JAVA = "java"
-    PYTHON = "python"
-
-
 @dataclass(frozen=True)
 class OpenAPIGeneratorProcess:
     argv: tuple[str, ...]
-    generator_type: OpenAPIGeneratorType
+    generator_name: str
     input_digest: Digest
     description: str = dataclasses.field(compare=False)
     level: LogLevel
@@ -47,7 +40,7 @@ class OpenAPIGeneratorProcess:
     def __init__(
         self,
         *,
-        generator_type: OpenAPIGeneratorType,
+        generator_name: str,
         argv: Iterable[str],
         input_digest: Digest,
         description: str,
@@ -60,7 +53,7 @@ class OpenAPIGeneratorProcess:
         extra_jvm_options: Iterable[str] | None = None,
         cache_scope: ProcessCacheScope | None = None,
     ):
-        object.__setattr__(self, "generator_type", generator_type)
+        object.__setattr__(self, "generator_name", generator_name)
         object.__setattr__(self, "argv", tuple(argv))
         object.__setattr__(self, "input_digest", input_digest)
         object.__setattr__(self, "description", description)
@@ -106,7 +99,7 @@ async def openapi_generator_process(
             _GENERATOR_CLASS_NAME,
             "generate",
             "-g",
-            request.generator_type.value,
+            request.generator_name,
             *request.argv,
         ],
         classpath_entries=classpath_entries,

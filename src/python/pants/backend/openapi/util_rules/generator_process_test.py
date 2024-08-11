@@ -8,7 +8,6 @@ import pytest
 from pants.backend.openapi.util_rules import generator_process
 from pants.backend.openapi.util_rules.generator_process import (
     OpenAPIGeneratorProcess,
-    OpenAPIGeneratorType,
 )
 from pants.core.util_rules import config_files, external_tool, source_files, system_binaries
 from pants.engine.fs import EMPTY_DIGEST
@@ -37,12 +36,12 @@ def rule_runner() -> RuleRunner:
 @maybe_skip_jdk_test
 def test_generator_process(rule_runner: RuleRunner) -> None:
     generator_process = OpenAPIGeneratorProcess(
-        generator_type=OpenAPIGeneratorType.JAVA,
+        generator_name='java',
         argv=["foo"],
         description="Test generator process",
         input_digest=EMPTY_DIGEST,
     )
 
     process = rule_runner.request(Process, [generator_process])
-    assert OpenAPIGeneratorType.JAVA.value in process.argv
+    assert 'java' in process.argv
     assert "org.openapitools.codegen.OpenAPIGenerator" in process.argv

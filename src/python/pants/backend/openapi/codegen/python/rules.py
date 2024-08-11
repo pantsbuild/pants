@@ -2,35 +2,47 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
+from typing import Tuple
 
+from packaging.utils import canonicalize_name as canonicalize_project_name
+from collections import defaultdict
+from collections.abc import Iterable
+from pants.backend.codegen.utils import (
+    MissingPythonCodegenRuntimeLibrary,
+)
+from pants.engine.internals.native_engine import Address
+from pants.util.requirements import parse_requirements_file
 from dataclasses import dataclass
+import itertools
 
-from pants.backend.python.target_types import PythonSourceField
+from pants.backend.python.target_types import (
+    PrefixedPythonResolveField,
+    PythonRequirementResolveField,
+    PythonRequirementsField,
+    PythonSourceField,
+)
 from pants.backend.openapi.codegen.python import extra_fields, symbol_mapper
 from pants.backend.openapi.codegen.python.extra_fields import (
-    OpenApiPythonApiPackageField,
-    OpenApiPythonModelPackageField,
+    OpenApiPythonAdditionalPropertiesField,
+    OpenApiPythonGeneratorNameField,
     OpenApiPythonSkipField,
 )
-from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
 from pants.backend.openapi.subsystems.openapi_generator import OpenAPIGenerator
 from pants.backend.openapi.target_types import (
     OpenApiDocumentDependenciesField,
     OpenApiDocumentField,
-    OpenApiDocumentTarget,
     OpenApiSourceField,
 )
 from pants.backend.openapi.util_rules import generator_process, pom_parser
 from pants.backend.openapi.util_rules.generator_process import (
     OpenAPIGeneratorProcess,
-    OpenAPIGeneratorType,
 )
-from pants.backend.openapi.util_rules.pom_parser import AnalysePomRequest, PomReport
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     AddPrefix,
     CreateDigest,
     Digest,
+    DigestContents,
     DigestSubset,
     Directory,
     FileContent,
@@ -54,15 +66,20 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
-from pants.jvm.dependency_inference.artifact_mapper import (
-    AllJvmArtifactTargets,
-    find_jvm_artifacts_or_raise,
-)
-from pants.jvm.resolve.coordinate import Coordinate
-from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
+import logging
+
+from pants.util.frozendict import FrozenDict
+from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
+from pants.backend.python.dependency_inference.module_mapper import (
+    AllPythonTargets,
+)
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.util.pip_requirement import PipRequirement
+from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 class GeneratePythonFromOpenAPIRequest(GenerateSourcesRequest):
@@ -76,8 +93,8 @@ class OpenApiDocumentPythonFieldSet(FieldSet):
 
     source: OpenApiDocumentField
     dependencies: OpenApiDocumentDependenciesField
-    api_package: OpenApiPythonApiPackageField
-    model_package: OpenApiPythonModelPackageField
+    generator_name: OpenApiPythonGeneratorNameField
+    additional_properties: OpenApiPythonAdditionalPropertiesField
     skip: OpenApiPythonSkipField
 
 
@@ -86,14 +103,14 @@ class CompileOpenApiIntoPythonRequest:
     input_file: str
     input_digest: Digest
     description: str
-    api_package: str | None = None
-    model_package: str | None = None
+    generator_name: str
+    additional_properties: FrozenDict[str, str] | None = None
 
 
 @dataclass(frozen=True)
 class CompiledPythonFromOpenApi:
     output_digest: Digest
-    runtime_dependencies: tuple[Coordinate, ...]
+    runtime_dependencies: tuple[PipRequirement, ...]
 
 
 @rule
@@ -105,19 +122,21 @@ async def compile_openapi_into_python(
 
     merged_digests = await Get(Digest, MergeDigests([request.input_digest, output_digest]))
 
+    additional_properties: Iterable[str] = (
+        itertools.chain(
+            *[
+                ("--additional-properties", f"{k}={v}")
+                for k, v in request.additional_properties.items()
+            ]
+        )
+        if request.additional_properties
+        else ()
+    )
+
     process = OpenAPIGeneratorProcess(
-        generator_type=OpenAPIGeneratorType.PYTHON,
+        generator_name=request.generator_name,
         argv=[
-            *(
-                ("--additional-properties", f"apiPackage={request.api_package}")
-                if request.api_package
-                else ()
-            ),
-            *(
-                ("--additional-properties", f"modelPackage={request.model_package}")
-                if request.model_package
-                else ()
-            ),
+            *additional_properties,
             "-i",
             request.input_file,
             "-o",
@@ -132,23 +151,31 @@ async def compile_openapi_into_python(
     result = await Get(ProcessResult, OpenAPIGeneratorProcess, process)
     normalized_digest = await Get(Digest, RemovePrefix(result.output_digest, output_dir))
 
-    pom_digest, python_sources_digest = await MultiGet(
-        Get(Digest, DigestSubset(normalized_digest, PathGlobs(["pom.xml"]))),
-        Get(Digest, DigestSubset(normalized_digest, PathGlobs(["src/main/python/**/*.python"]))),
+    requirements_digest, python_sources_digest = await MultiGet(
+        Get(Digest, DigestSubset(normalized_digest, PathGlobs(["requirements.txt"]))),
+        Get(Digest, DigestSubset(normalized_digest, PathGlobs(["**/*.py"]))),
     )
-
-    pom_report, stripped_python_sources_digest = await MultiGet(
-        Get(PomReport, AnalysePomRequest(pom_digest)),
-        Get(Digest, RemovePrefix(python_sources_digest, "src/main/python")),
-    )
+    requirements_contents = await Get(DigestContents, Digest, requirements_digest)
+    runtime_dependencies: Tuple[PipRequirement, ...] = ()
+    if len(requirements_contents) > 0:
+        file = requirements_contents[0]
+        runtime_dependencies = tuple(
+            parse_requirements_file(
+                file.content.decode("utf-8"),
+                rel_path=file.path,
+            )
+        )
 
     return CompiledPythonFromOpenApi(
-        output_digest=stripped_python_sources_digest, runtime_dependencies=pom_report.dependencies
+        output_digest=python_sources_digest,
+        runtime_dependencies=runtime_dependencies,
     )
 
 
 @rule
-async def generate_python_from_openapi(request: GeneratePythonFromOpenAPIRequest) -> GeneratedSources:
+async def generate_python_from_openapi(
+    request: GeneratePythonFromOpenAPIRequest,
+) -> GeneratedSources:
     field_set = OpenApiDocumentPythonFieldSet.create(request.protocol_target)
     if field_set.skip.value:
         return GeneratedSources(EMPTY_SNAPSHOT)
@@ -174,20 +201,29 @@ async def generate_python_from_openapi(request: GeneratePythonFromOpenAPIRequest
         ),
     )
 
-    compiled_sources = await MultiGet(
-        Get(
-            CompiledPythonFromOpenApi,
-            CompileOpenApiIntoPythonRequest(
-                file,
-                input_digest=input_digest,
-                description=f"Generating Python sources from OpenAPI definition {field_set.address}",
-                api_package=field_set.api_package.value,
-                model_package=field_set.model_package.value,
-            ),
-        )
-        for file in document_sources.snapshot.files
-    )
+    gets = []
+    for file in document_sources.snapshot.files:
+        generator_name = field_set.generator_name.value
+        if generator_name is None:
+            raise ValueError(
+                f"Field `{OpenApiPythonGeneratorNameField.alias}` is required for target {field_set.address}"
+            )
 
+        gets.append(
+            Get(
+                CompiledPythonFromOpenApi,
+                CompileOpenApiIntoPythonRequest(
+                    file,
+                    input_digest=input_digest,
+                    description=f"Generating Python sources from OpenAPI definition {field_set.address}",
+                    generator_name=generator_name,
+                    additional_properties=field_set.additional_properties.value,
+                ),
+            )
+        )
+    compiled_sources = await MultiGet(gets)
+
+    logger.info("digests: %s", [sources.output_digest for sources in compiled_sources])
     output_digest, source_root = await MultiGet(
         Get(Digest, MergeDigests([sources.output_digest for sources in compiled_sources])),
         Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)),
@@ -203,10 +239,12 @@ async def generate_python_from_openapi(request: GeneratePythonFromOpenAPIRequest
 
 @dataclass(frozen=True)
 class OpenApiDocumentPythonRuntimeInferenceFieldSet(FieldSet):
-    required_fields = (OpenApiDocumentDependenciesField, JvmResolveField)
+    required_fields = (OpenApiDocumentDependenciesField, PrefixedPythonResolveField)
 
     dependencies: OpenApiDocumentDependenciesField
-    resolve: JvmResolveField
+    python_resolve: PrefixedPythonResolveField
+    generator_name: OpenApiPythonGeneratorNameField
+    additional_properties: OpenApiPythonAdditionalPropertiesField
     skip: OpenApiPythonSkipField
 
 
@@ -214,17 +252,48 @@ class InferOpenApiPythonRuntimeDependencyRequest(InferDependenciesRequest):
     infer_from = OpenApiDocumentPythonRuntimeInferenceFieldSet
 
 
+@dataclass(frozen=True)
+class PythonRequirements:
+    resolves_to_requirements_to_addresses: FrozenDict[str, FrozenDict[str, Address]]
+
+
+@rule
+async def get_python_requirements(
+    python_targets: AllPythonTargets,
+    python_setup: PythonSetup,
+) -> PythonRequirements:
+    result: defaultdict[str, dict[str, Address]] = defaultdict(dict)
+    for target in python_targets.third_party:
+        for python_requirement in target[PythonRequirementsField].value:
+            project_name = canonicalize_project_name(python_requirement.project_name)
+            resolve = target[PythonRequirementResolveField].normalized_value(python_setup)
+            result[resolve][project_name] = target.address
+
+    return PythonRequirements(
+        resolves_to_requirements_to_addresses=FrozenDict(
+            (
+                resolve,
+                FrozenDict(
+                    (requirements, addresses)
+                    for requirements, addresses in requirements_to_addresses.items()
+                ),
+            )
+            for resolve, requirements_to_addresses in result.items()
+        ),
+    )
+
+
 @rule
 async def infer_openapi_python_dependencies(
     request: InferOpenApiPythonRuntimeDependencyRequest,
-    jvm: JvmSubsystem,
-    jvm_artifact_targets: AllJvmArtifactTargets,
+    python_setup: PythonSetup,
     openapi_generator: OpenAPIGenerator,
+    python_requirements: PythonRequirements,
 ) -> InferredDependencies:
     if request.field_set.skip.value:
         return InferredDependencies([])
 
-    resolve = request.field_set.resolve.normalized_value(jvm)
+    resolve = request.field_set.python_resolve.normalized_value(python_setup)
 
     # Because the runtime dependencies are the same regardless of the source being compiled
     # we use a sample OpenAPI spec to find out what are the runtime dependencies
@@ -242,17 +311,35 @@ async def infer_openapi_python_dependencies(
             input_file=sample_spec_name,
             input_digest=sample_source_digest,
             description=f"Inferring Python runtime dependencies for OpenAPI v{openapi_generator.version}",
+            generator_name=request.field_set.generator_name.value,
+            additional_properties=request.field_set.additional_properties.value,
         ),
     )
 
-    addresses = find_jvm_artifacts_or_raise(
-        required_coordinates=compiled_sources.runtime_dependencies,
-        resolve=resolve,
-        jvm_artifact_targets=jvm_artifact_targets,
-        jvm=jvm,
-        subsystem="the OpenAPI Python runtime",
-        target_type=OpenApiDocumentTarget.alias,
-    )
+    logger.info("Looking for thirdparty dependencies: %s", compiled_sources.runtime_dependencies)
+
+    requirements_to_addresses = python_requirements.resolves_to_requirements_to_addresses[resolve]
+
+    addresses = []
+    for runtime_dependency in compiled_sources.runtime_dependencies:
+        project_name = runtime_dependency.project_name
+        address = requirements_to_addresses.get(project_name)
+        if address is not None:
+            addresses.append(address)
+        else:
+            for_resolve_str = (
+                f" for the resolve '{resolve}'" if python_setup.enable_resolves else ""
+            )
+            raise MissingPythonCodegenRuntimeLibrary(
+                softwrap(
+                    f"""
+                    No `python_requirement` target was found with the module `{project_name}`
+                    in your project{for_resolve_str}, so the Python code generated from the target
+                    {request.field_set.address} will not work properly.
+                    """
+                )
+            )
+
     return InferredDependencies(addresses)
 
 
