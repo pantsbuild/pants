@@ -40,4 +40,10 @@ def test_all_backends_loaded() -> None:
 def test_each_distinct_backend_loads(backend) -> None:
     """This should catch graph incompleteness errors, i.e. when a required rule is not
     registered."""
-    assert_backends_load([backend])
+    # The `typescript` backend uses rules from the `javascript` backend, and it therefore
+    # should be loaded together with it for the relevant rules to be discovered.
+    if "typescript" in backend:
+        backend = ["pants.backend.experimental.javascript", "pants.backend.experimental.typescript"]
+    else:
+        backend = [backend]
+    assert_backends_load(backend)
