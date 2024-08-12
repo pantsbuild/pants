@@ -6,6 +6,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import ClassVar
 
+from pants.backend.nfpm.subsystem import mtime_default
 from pants.core.goals.package import OutputPathField
 from pants.engine.target import Dependencies, StringField
 from pants.util.docutil import bin_name
@@ -27,11 +28,9 @@ class NfpmPackageNameField(StringField):
 class NfpmPackageMtimeField(StringField):
     nfpm_alias = ""  # field handled separately to call normalized_value
     alias: ClassVar[str] = "mtime"
-    # Default copied from PEX (which uses zipfile standard MS-DOS epoch).
-    # https://github.com/pex-tool/pex/blob/v2.1.137/pex/common.py#L39-L45
-    default = "1980-01-01T00:00:00Z"
+    default = mtime_default
     help = help_text(
-        lambda: f"""
+        f"""
         The file modification time as an RFC 3339 formatted string.
 
         For example: 2008-01-02T15:04:05Z
@@ -44,8 +43,9 @@ class NfpmPackageMtimeField(StringField):
         package. To set the mtime for package contents, use the `file_mtime` field
         on the relevant `nfpm_content_*` targets.
 
-        The default value is {repr(NfpmPackageMtimeField.default)}. You may also
-        set the SOURCE_DATE_EPOCH environment variable to override this default.
+        The default value is {repr(mtime_default)}. You may also override
+        the default value by setting `[nfpm].default_mtime` in `pants.toml`,
+        or by setting the `SOURCE_DATE_EPOCH` environment variable.
 
         See also: https://reproducible-builds.org/docs/timestamps/
         """

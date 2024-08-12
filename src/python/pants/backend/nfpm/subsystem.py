@@ -8,8 +8,15 @@ import logging
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
+from pants.option.option_types import StrOption
+from pants.option.subsystem import Subsystem
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+# Default copied from PEX (which uses zipfile standard MS-DOS epoch).
+# https://github.com/pex-tool/pex/blob/v2.1.137/pex/common.py#L39-L45
+mtime_default = "1980-01-01T00:00:00Z"
 
 
 class NfpmSubsystem(TemplatedExternalTool):
@@ -52,6 +59,42 @@ class NfpmSubsystem(TemplatedExternalTool):
     def generate_exe(self, plat: Platform) -> str:
         return "./nfpm"
 
+    class EnvironmentAware(Subsystem.EnvironmentAware):
+        env_vars_used_by_options = ("SORCE_DATE_EPOCH",)
+
+        _default_mtime = StrOption(
+            default=mtime_default,
+            help=softwrap(
+                f"""
+                The file modification time as an RFC 3339 formatted string.
+
+                For example: 2008-01-02T15:04:05Z
+
+                The format is defined in RFC 3339: https://rfc-editor.org/rfc/rfc3339.html
+
+                This option sets the default value for:
+                - the `package_mtime` field on `nfpm_*_package` targets, and
+                - the `file_mtime` field on `nfpm_content_*` targets.
+
+                The default value is {repr(mtime_default)}. You may also
+                set the SOURCE_DATE_EPOCH environment variable to override this default.
+
+                See also: https://reproducible-builds.org/docs/timestamps/
+                """
+            ),
+        )
+
+        @property
+        def default_mtime(self) -> str:
+            default_mtime = self._default_mtime
+            if default_mtime != mtime_default:
+                return default_mtime
+            source_date_epoch = self._options_env.get("SOURCE_DATE_EPOCH", "")
+            return source_date_epoch if source_date_epoch else default_mtime
+
 
 def rules():
-    return external_tool.rules()
+    return [
+        *external_tool.rules(),
+        *NfpmSubsystem.rules(),
+    ]

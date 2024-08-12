@@ -9,6 +9,7 @@ from enum import Enum
 from typing import Any, ClassVar, Iterable, Optional, Union, cast
 
 from pants.backend.nfpm.fields.all import NfpmDependencies
+from pants.backend.nfpm.subsystem import mtime_default
 from pants.core.target_types import RelocatedFiles
 from pants.engine.addresses import Address
 from pants.engine.target import (
@@ -184,11 +185,9 @@ class NfpmContentFileModeField(IntField):
 class NfpmContentFileMtimeField(StringField):
     nfpm_alias = "contents.[].file_info.mtime"
     alias: ClassVar[str] = "file_mtime"
-    # Default copied from PEX (which uses zipfile standard MS-DOS epoch).
-    # https://github.com/pex-tool/pex/blob/v2.1.137/pex/common.py#L39-L45
-    default = "1980-01-01T00:00:00Z"
+    default = mtime_default
     help = help_text(
-        lambda: f"""
+        f"""
         The file modification time as an RFC 3339 formatted string.
 
         For example: 2008-01-02T15:04:05Z
@@ -203,8 +202,9 @@ class NfpmContentFileMtimeField(StringField):
         for reproducible packaging builds, and reproducible builds are required
         for pants to provide its fine-grained caches.
 
-        The default value is {repr(NfpmContentFileMtimeField.default)}. You may also
-        set the SOURCE_DATE_EPOCH environment variable to override this default.
+        The default value is {repr(mtime_default)}. You may also override
+        the default value by setting `[nfpm].default_mtime` in `pants.toml`,
+        or by setting the `SOURCE_DATE_EPOCH` environment variable.
 
         See also: https://reproducible-builds.org/docs/timestamps/
         """

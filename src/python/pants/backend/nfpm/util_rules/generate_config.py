@@ -19,13 +19,12 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentSymlinkSrcField,
     NfpmContentTypeField,
 )
+from pants.backend.nfpm.subsystem import NfpmSubsystem
 from pants.backend.nfpm.target_types import NfpmContentFile
 from pants.core.goals.package import TraverseIfNotPackageTarget
-from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, FileContent, FileEntry
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.internals.native_engine import Digest
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.intrinsics import create_digest_to_digest, directory_digest_to_digest_entries
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import TransitiveTargetsRequest
@@ -55,7 +54,9 @@ class NfpmSrcMissingFromSandboxException(Exception):
 
 @rule(level=LogLevel.DEBUG)
 async def generate_nfpm_yaml(
-    request: NfpmPackageConfigRequest, union_membership: UnionMembership
+    request: NfpmPackageConfigRequest,
+    nfpm_env_aware: NfpmSubsystem.EnvironmentAware,
+    union_membership: UnionMembership,
 ) -> NfpmPackageConfig:
     transitive_targets = await transitive_targets_get(
         TransitiveTargetsRequest(
@@ -68,11 +69,7 @@ async def generate_nfpm_yaml(
         **implicitly(),
     )
 
-    # TODO: Maybe allow setting default mtime via an nfpm subsystem option.
-    environ = await environment_vars_subset(
-        **implicitly(EnvironmentVarsRequest(["SOURCE_DATE_EPOCH"]))
-    )
-    default_mtime = environ.get("SOURCE_DATE_EPOCH", "")
+    default_mtime = nfpm_env_aware.default_mtime
 
     # Fist get the config that can be constructed from the target itself.
     nfpm_package_target = transitive_targets.roots[0]
