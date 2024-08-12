@@ -588,8 +588,12 @@ impl Node for NodeKey {
         match (self, output) {
             (NodeKey::ExecuteProcess(ref ep), NodeOutput::ProcessResult(ref process_result)) => {
                 match ep.process.cache_scope {
-                    ProcessCacheScope::Always | ProcessCacheScope::PerRestartAlways => true,
-                    ProcessCacheScope::Successful | ProcessCacheScope::PerRestartSuccessful => {
+                    ProcessCacheScope::Always
+                    | ProcessCacheScope::LocalAlways
+                    | ProcessCacheScope::PerRestartAlways => true,
+                    ProcessCacheScope::Successful
+                    | ProcessCacheScope::LocalSuccessful
+                    | ProcessCacheScope::PerRestartSuccessful => {
                         process_result.result.exit_code == 0
                     }
                     ProcessCacheScope::PerSession => false,
