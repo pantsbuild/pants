@@ -26,6 +26,7 @@ use process_execution::{
     ProcessExecutionEnvironment, ProcessResultSource,
 };
 use process_execution::{make_execute_request, EntireExecuteRequest};
+use workunit_store::UserMetadataItem;
 
 // Consumers of this crate shouldn't need to worry about the exact crate structure that comes
 // together to make a remote cache command runner.
@@ -318,6 +319,12 @@ impl CommandRunner {
         in_workunit!(
       "remote_cache_read_speculation",
       Level::Trace,
+      user_metadata = vec![(
+        "action_digest".to_owned(),        
+        UserMetadataItem::String(format!("{action_digest:?}"))),
+        ("request_description".to_owned(), UserMetadataItem::String(request.description.clone())),
+        ("request".to_owned(), UserMetadataItem::String(format!("{request:?}"))),
+    ],
       |workunit| async move {
         tokio::select! {
           cache_result = &mut cache_read_future => {
@@ -330,6 +337,24 @@ impl CommandRunner {
               }
               local_result = &mut local_execution_future => {
                 workunit.increment_counter(Metric::RemoteCacheSpeculationLocalCompletedFirst, 1);
+                workunit.update_metadata(|initial| {
+                    initial.map(|(initial, _)| {
+                        (
+                            WorkunitMetadata {
+                                user_metadata: initial
+                                    .user_metadata
+                                    .into_iter()
+                                    .chain(std::iter::once((
+                                        "outcome".to_owned(),
+                                        UserMetadataItem::String("remote miss".to_owned()),
+                                    )))
+                                    .collect(),
+                                ..initial
+                            },
+                            Level::Trace,
+                        )
+                    })
+                });
                 local_result.map(|res| (res, false))
               }
             }
@@ -366,6 +391,14 @@ impl CommandRunner {
                     (
                         WorkunitMetadata {
                             desc: initial.desc.as_ref().map(|desc| format!("Hit: {desc}")),
+                            user_metadata: initial
+                                .user_metadata
+                                .into_iter()
+                                .chain(std::iter::once((
+                                    "outcome".to_owned(),
+                                    UserMetadataItem::String("remote hit".to_owned()),
+                                )))
+                                .collect(),
                             ..initial
                         },
                         Level::Debug,
@@ -374,6 +407,24 @@ impl CommandRunner {
             });
             Ok((cached_response, true))
         } else {
+            workunit.update_metadata(|initial| {
+                initial.map(|(initial, _)| {
+                    (
+                        WorkunitMetadata {
+                            user_metadata: initial
+                                .user_metadata
+                                .into_iter()
+                                .chain(std::iter::once((
+                                    "outcome".to_owned(),
+                                    UserMetadataItem::String("remote miss".to_owned()),
+                                )))
+                                .collect(),
+                            ..initial
+                        },
+                        Level::Trace,
+                    )
+                })
+            });
             // Note that we don't increment a counter here, as there is nothing of note in this
             // scenario: the remote cache did not save unnecessary local work, nor was the remote
             // trip unusually slow such that local execution was faster.

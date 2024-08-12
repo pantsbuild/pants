@@ -84,6 +84,7 @@ target(
         "src/python/pants/backend/experimental/tools/trufflehog",
         "src/python/pants/backend/experimental/tools/workunit_logger",
         "src/python/pants/backend/experimental/tools/yamllint",
+        "src/python/pants/backend/experimental/tools/remote_cache_logger",
         "src/python/pants/backend/experimental/typescript",
         "src/python/pants/backend/experimental/visibility",
         "src/python/pants/backend/google_cloud_function/python",
