@@ -802,13 +802,13 @@ def test_typed_pattern_on_same_package(rule_runner: RuleRunner) -> None:
         "foo.v",
     ]
 
+
 def test_applied_types_to_terms(rule_runner: RuleRunner) -> None:
     analysis = _analyze(
         rule_runner,
         textwrap.dedent(
             """\
             package foo
-            
             object B {
                 val valDef = bar(applied[List[Foo]])
             }
