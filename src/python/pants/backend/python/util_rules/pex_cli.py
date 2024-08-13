@@ -45,7 +45,7 @@ class PexCli(TemplatedExternalTool):
 
     # extra args to be passed to the pex tool; note that they
     # are going to apply to all invocations of the pex tool.
-    args = ArgsListOption(example="--check=error --no-compile")
+    global_args = ArgsListOption(example="--check=error --no-compile")
 
     @classproperty
     def default_known_versions(cls):
@@ -185,7 +185,7 @@ async def setup_pex_cli_process(
         *warnings_args,
         *pip_version_args,
         *resolve_args,
-        *pex_cli_subsystem.args,
+        *pex_cli_subsystem.global_args,
         # NB: This comes at the end because it may use `--` passthrough args, # which must come at
         # the end.
         *request.extra_args,

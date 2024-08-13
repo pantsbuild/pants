@@ -283,8 +283,8 @@ def test_run_script_from_3rdparty_dist_issue_13747() -> None:
         assert SAY in result.stdout.strip()
 
 
-def test_pass_extra_pex_cli_subsystem_args() -> None:
-    """Test that extra args passed to the pex-cli subsystem propagate to the actual pex
+def test_pass_extra_pex_cli_subsystem_global_args() -> None:
+    """Test that extra global args passed to the pex-cli subsystem propagate to the actual pex
     invocation."""
     sources = {
         "src/BUILD": dedent(
@@ -297,7 +297,7 @@ def test_pass_extra_pex_cli_subsystem_args() -> None:
     with setup_tmpdir(sources) as tmpdir:
         args = [
             "--backend-packages=pants.backend.python",
-            "--pex-cli-args='--non-existing-flag-name=some-value'",
+            "--pex-cli-global-args='--non-existing-flag-name=some-value'",
             f"--source-root-patterns=['/{tmpdir}/src']",
             "run",
             f"{tmpdir}/src:test",
