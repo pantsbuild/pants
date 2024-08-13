@@ -13,6 +13,13 @@ from pants.backend.nfpm.fields.all import (
     NfpmPackageNameField,
     NfpmPlatformField,
 )
+from pants.backend.nfpm.fields.apk import (
+    NfpmApkDependsField,
+    NfpmApkMaintainerField,
+    NfpmApkProvidesField,
+    NfpmApkReplacesField,
+    NfpmApkScriptsField,
+)
 from pants.backend.nfpm.fields.contents import (
     NfpmContentDirDstField,
     NfpmContentDirsField,
@@ -95,6 +102,44 @@ COMMON_NFPM_PACKAGE_FIELDS = (
 
 class NfpmPackageTarget(Target):
     pass
+
+
+APK_FIELDS = (
+    NfpmPackageNameField,
+    NfpmArchField,
+    # version fields (apk does NOT get: version_metadata or epoch)
+    NfpmVersionField,
+    NfpmVersionSchemaField,
+    NfpmVersionPrereleaseField,
+    NfpmVersionReleaseField,
+    # other package metadata fields
+    NfpmHomepageField,
+    NfpmLicenseField,
+    NfpmApkMaintainerField,
+    # package relationships
+    NfpmApkReplacesField,
+    NfpmApkProvidesField,
+    NfpmApkDependsField,
+)
+
+
+class NfpmApkPackage(NfpmPackageTarget):
+    alias = "nfpm_apk_package"
+    core_fields = (
+        *COMMON_NFPM_PACKAGE_FIELDS,
+        *APK_FIELDS,
+        NfpmApkScriptsField,
+    )
+    help = help_text(
+        f"""
+        An APK system package (Alpine Package Keeper) built by nFPM.
+
+        This will not install the package, only create an .apk file
+        that you can then distribute and install, e.g. via pkg.
+
+        See {doc_url('nfpm-apk-package')}.
+        """
+    )
 
 
 DEB_FIELDS = (
@@ -356,6 +401,7 @@ class NfpmContentDirs(TargetGenerator):
 
 def target_types():
     return [
+        NfpmApkPackage,
         NfpmDebPackage,
         NfpmRpmPackage,
         NfpmContentFile,

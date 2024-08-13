@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.nfpm.field_sets import (
+    NfpmApkPackageFieldSet,
     NfpmDebPackageFieldSet,
     NfpmPackageFieldSet,
     NfpmRpmPackageFieldSet,
@@ -127,6 +128,14 @@ async def package_nfpm_package(
         final_snapshot.digest,
         artifacts=(BuiltNfpmPackageArtifact.create(conventional_file_name, field_set.packager),),
     )
+
+
+@rule
+async def package_nfpm_apk_package(field_set: NfpmApkPackageFieldSet) -> BuiltPackage:
+    built_package: BuiltPackage = await package_nfpm_package(
+        NfpmPackageRequest(field_set), **implicitly()
+    )
+    return built_package
 
 
 @rule

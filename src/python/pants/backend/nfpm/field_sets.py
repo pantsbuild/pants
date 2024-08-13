@@ -28,7 +28,7 @@ from pants.backend.nfpm.fields.contents import (
 )
 from pants.backend.nfpm.fields.rpm import NfpmRpmGhostContents
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
-from pants.backend.nfpm.target_types import DEB_FIELDS, RPM_FIELDS
+from pants.backend.nfpm.target_types import APK_FIELDS, DEB_FIELDS, RPM_FIELDS
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.fs import FileEntry
 from pants.engine.rules import collect_rules
@@ -105,6 +105,13 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
         return config
 
 
+@dataclass(frozen=True)
+class NfpmApkPackageFieldSet(NfpmPackageFieldSet):
+    packager = "apk"
+    extension = f".{packager}"
+    required_fields = APK_FIELDS
+
+
 # noinspection DuplicatedCode
 @dataclass(frozen=True)
 class NfpmDebPackageFieldSet(NfpmPackageFieldSet):
@@ -129,6 +136,7 @@ class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
 
 NFPM_PACKAGE_FIELD_SET_TYPES: FrozenOrderedSet[type[NfpmPackageFieldSet]] = FrozenOrderedSet(
     (
+        NfpmApkPackageFieldSet,
         NfpmDebPackageFieldSet,
         NfpmRpmPackageFieldSet,
     )

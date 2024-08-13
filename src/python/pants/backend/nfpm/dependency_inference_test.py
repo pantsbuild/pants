@@ -13,10 +13,11 @@ from pants.backend.nfpm.dependency_inference import (
     NfpmPackageScriptsInferenceFieldSet,
 )
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dep_rules
+from pants.backend.nfpm.fields.apk import NfpmApkScriptsField
 from pants.backend.nfpm.fields.deb import NfpmDebScriptsField
 from pants.backend.nfpm.fields.rpm import NfpmRpmScriptsField
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
-from pants.backend.nfpm.target_types import NfpmDebPackage, NfpmRpmPackage
+from pants.backend.nfpm.target_types import NfpmApkPackage, NfpmDebPackage, NfpmRpmPackage
 from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.addresses import Address
@@ -30,6 +31,7 @@ def rule_runner() -> RuleRunner:
         target_types=[
             FileTarget,
             FilesGeneratorTarget,
+            NfpmApkPackage,
             NfpmDebPackage,
             NfpmRpmPackage,
         ],
@@ -49,6 +51,7 @@ _PKG_VERSION = "3.2.1"
 @pytest.mark.parametrize(
     "packager,scripts_field_type",
     (
+        ("apk", NfpmApkScriptsField),
         ("deb", NfpmDebScriptsField),
         ("rpm", NfpmRpmScriptsField),
     ),

@@ -12,6 +12,7 @@ from _pytest.mark import ParameterSet
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
 from pants.backend.nfpm.field_sets import (
     NFPM_PACKAGE_FIELD_SET_TYPES,
+    NfpmApkPackageFieldSet,
     NfpmDebPackageFieldSet,
     NfpmPackageFieldSet,
     NfpmRpmPackageFieldSet,
@@ -78,6 +79,29 @@ _PKG_NAME = "pkg"
 _PKG_VERSION = "3.2.1"
 
 _TEST_CASES: tuple[ParameterSet, ...] = (
+    # apk
+    pytest.param(NfpmApkPackageFieldSet, {}, True, id="apk-minimal-metadata"),
+    pytest.param(
+        NfpmApkPackageFieldSet,
+        # apk uses "maintainer" not "packager"
+        {"packager": "Arch Maintainer <arch-maintainer@example.com>"},
+        False,
+        id="apk-invalid-field-packager",
+    ),
+    pytest.param(
+        NfpmApkPackageFieldSet,
+        {
+            "homepage": "https://apk.example.com",
+            "license": "Apache-2.0",
+            "maintainer": "APK Maintainer <apk-maintainer@example.com>",
+            "replaces": ["some-command"],
+            "provides": [f"cmd:some-command={_PKG_VERSION}"],
+            "depends": ["bash", "git=2.40.1-r0", "/bin/sh", "so:libcurl.so.4"],
+            "scripts": {"postinstall": "postinstall.sh", "postupgrade": "apk-postupgrade.sh"},
+        },
+        True,
+        id="apk-extra-metadata",
+    ),
     # deb
     pytest.param(NfpmDebPackageFieldSet, {}, False, id="deb-missing-maintainer-field"),
     pytest.param(

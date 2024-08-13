@@ -67,7 +67,8 @@ class NfpmVersionSchemaField(StringField):
         N.B.: Some of these fields are not available for all package types.
 
         This field is named "{NfpmVersionField.alias}" because that is the term
-        used by nFPM.
+        used by nFPM. Though deb and rpm packaging also use "version", this is
+        known as "pkgver" in apk packaging.
         """
     )
 
@@ -82,6 +83,7 @@ class NfpmVersionPrereleaseField(StringField):
         This is a pre-release indicator like "alpha" or "beta" and often includes
         a numeric component like "rc1" and "rc2".
 
+        For apk, version and prerelease are merely concatenated.
         For deb and rpm, prerelease is typically prefixed with a "~" in the version.
 
         nFPM extracts the default for this from '{NfpmVersionField.alias}'
