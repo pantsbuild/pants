@@ -5,7 +5,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.nfpm.field_sets import NfpmDebPackageFieldSet, NfpmPackageFieldSet
+from pants.backend.nfpm.field_sets import (
+    NfpmDebPackageFieldSet,
+    NfpmPackageFieldSet,
+    NfpmRpmPackageFieldSet,
+)
 from pants.backend.nfpm.field_sets import rules as field_sets_rules
 from pants.backend.nfpm.subsystem import NfpmSubsystem
 from pants.backend.nfpm.util_rules.generate_config import (
@@ -127,6 +131,14 @@ async def package_nfpm_package(
 
 @rule
 async def package_nfpm_deb_package(field_set: NfpmDebPackageFieldSet) -> BuiltPackage:
+    built_package: BuiltPackage = await package_nfpm_package(
+        NfpmPackageRequest(field_set), **implicitly()
+    )
+    return built_package
+
+
+@rule
+async def package_nfpm_rpm_package(field_set: NfpmRpmPackageFieldSet) -> BuiltPackage:
     built_package: BuiltPackage = await package_nfpm_package(
         NfpmPackageRequest(field_set), **implicitly()
     )

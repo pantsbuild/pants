@@ -82,7 +82,7 @@ class NfpmVersionPrereleaseField(StringField):
         This is a pre-release indicator like "alpha" or "beta" and often includes
         a numeric component like "rc1" and "rc2".
 
-        For deb, prerelease is typically prefixed with a "~" in the version.
+        For deb and rpm, prerelease is typically prefixed with a "~" in the version.
 
         nFPM extracts the default for this from '{NfpmVersionField.alias}'
         if it is semver compatible. If you set '{NfpmVersionPrereleaseField.alias}',
@@ -143,10 +143,12 @@ class NfpmVersionEpochField(IntField):
         A package with a higher version epoch will always be considered newer.
         This is primarily useful when the version numbering scheme has changed.
 
-        Debian documentation warns against using epoch in most cases:
+        Debian and RPM documentation warn against using epoch in most cases:
         https://www.debian.org/doc/debian-policy/ch-controlfields.html#epochs-should-be-used-sparingly
+        https://rpm-packaging-guide.github.io/#epoch
 
-        When this field is None (the default) nFPM will use "" for deb packages.
+        When this field is None (the default) nFPM will use "" for deb packages,
+        and "0" for rpm packages.
 
         N.B.: The nFPM documentation incorrectly notes that nFPM can parse this
         from the '{NfpmVersionField.alias}' field; the nFPM code actually does

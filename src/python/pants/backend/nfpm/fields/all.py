@@ -125,6 +125,7 @@ class NfpmPlatformField(StringField):
         "goreleaser" project). But, nFPM does not do much with it.
 
         For deb, this can be used as part of the 'Architecture' entry.
+        For rpm, this populates the "OS" tag.
         """
     )
 
@@ -138,6 +139,7 @@ class NfpmHomepageField(StringField):
 
         This field is named "{NfpmHomepageField.alias}" instead of "url" because
         that is the term used by nFPM, which adopted the term from deb packaging.
+        The term "url" is used by rpm packaging.
         """
     )
 

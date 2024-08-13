@@ -16,6 +16,7 @@ from pants.backend.nfpm.field_sets import (
     NfpmContentFieldSet,
     NfpmDebPackageFieldSet,
     NfpmPackageFieldSet,
+    NfpmRpmPackageFieldSet,
 )
 from pants.backend.nfpm.target_types import target_types as nfpm_target_types
 from pants.backend.nfpm.target_types_rules import rules as nfpm_target_types_rules
@@ -81,8 +82,20 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     (
         # no dependencies
         ("deb", NfpmDebPackageFieldSet, [], {}, [], {}, None),
+        ("rpm", NfpmRpmPackageFieldSet, [], {}, [], {}, None),
+        ("rpm", NfpmRpmPackageFieldSet, [], {}, [], {"ghost_contents": ["/var/log/pkg.log"]}, None),
         # no dependencies (extra file does not cause errors)
         ("deb", NfpmDebPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
+        ("rpm", NfpmRpmPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
+        (
+            "rpm",
+            NfpmRpmPackageFieldSet,
+            [],
+            {},
+            ["contents/extra-file.txt"],
+            {"ghost_contents": ["/var/log/pkg.log"]},
+            None,
+        ),
         # with dependencies
         (
             "deb",
@@ -105,10 +118,61 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             {},
             None,
         ),
+        (
+            "rpm",
+            NfpmRpmPackageFieldSet,
+            [
+                "contents:files",
+                "contents:file",
+                "contents:symlinks",
+                "contents:symlink",
+                "contents:dirs",
+                "contents:dir",
+            ],
+            {"postinstall": "scripts/postinstall.sh", "verify": "scripts/rpm-verify.sh"},
+            [
+                "contents/sandbox-file.txt",
+                "contents/some-executable",
+                "scripts/postinstall.sh",
+                "scripts/rpm-verify.sh",
+            ],
+            {},
+            None,
+        ),
+        (
+            "rpm",
+            NfpmRpmPackageFieldSet,
+            [
+                "contents:files",
+                "contents:file",
+                "contents:symlinks",
+                "contents:symlink",
+                "contents:dirs",
+                "contents:dir",
+            ],
+            {"postinstall": "scripts/postinstall.sh", "verify": "scripts/rpm-verify.sh"},
+            [
+                "contents/sandbox-file.txt",
+                "contents/some-executable",
+                "scripts/postinstall.sh",
+                "scripts/rpm-verify.sh",
+            ],
+            {"ghost_contents": ["/var/log/pkg.log"]},
+            None,
+        ),
         # with malformed dependency
         (
             "deb",
             NfpmDebPackageFieldSet,
+            ["contents:malformed"],
+            {},
+            [],
+            {},
+            pytest.raises(ExecutionError),
+        ),
+        (
+            "rpm",
+            NfpmRpmPackageFieldSet,
             ["contents:malformed"],
             {},
             [],
@@ -125,12 +189,30 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             {},
             pytest.raises(ExecutionError),
         ),
+        (
+            "rpm",
+            NfpmRpmPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {},
+            [],
+            {},
+            pytest.raises(ExecutionError),
+        ),
         # with script file missing from sandbox
         (
             "deb",
             NfpmDebPackageFieldSet,
             [],
             {"postinstall": "scripts/postinstall.sh", "config": "scripts/deb-config.sh"},
+            [],
+            {},
+            pytest.raises(ExecutionError),
+        ),
+        (
+            "rpm",
+            NfpmRpmPackageFieldSet,
+            [],
+            {"postinstall": "scripts/postinstall.sh", "verify": "scripts/rpm-verify.sh"},
             [],
             {},
             pytest.raises(ExecutionError),
@@ -190,7 +272,7 @@ def test_generate_nfpm_yaml(
                             file_group="root",
                         ),
                     }},
-                    content_type="",
+                    content_type="doc",
                     file_owner="root",
                     file_group="{_PKG_NAME}",
                     file_mode="644",  # same as 0o644 and "rw-r--r--"
@@ -250,6 +332,7 @@ def test_generate_nfpm_yaml(
                 for path in [
                     "scripts/postinstall.sh",
                     "scripts/deb-config.sh",
+                    "scripts/rpm-verify.sh",
                 ]
             },
         }
@@ -301,14 +384,15 @@ def test_generate_nfpm_yaml(
         assert "dst" in entry
         assert "packager" not in entry  # an nFPM feature that we will not support and do not use
         entry_type = entry["type"]
-        if entry_type != "dir":
+        if entry_type not in ("dir", "ghost"):
             assert "src" in entry
-        assert "file_info" in entry
-        file_info = entry["file_info"]
-        assert isinstance(file_info, dict)  # NfpmFileInfo is a TypedDict
-        for key in NfpmFileInfo.__annotations__:
-            # though nFPM does not require it, we always specify all of these.
-            assert key in file_info
+        if entry_type != "ghost":
+            assert "file_info" in entry
+            file_info = entry["file_info"]
+            assert isinstance(file_info, dict)  # NfpmFileInfo is a TypedDict
+            for key in NfpmFileInfo.__annotations__:
+                # though nFPM does not require it, we always specify all of these.
+                assert key in file_info
 
     contents_by_dst = {entry["dst"]: entry for entry in contents}
 
@@ -316,7 +400,7 @@ def test_generate_nfpm_yaml(
         dst = f"/usr/share/{_PKG_NAME}/{_PKG_NAME}.{_PKG_VERSION}/installed-file.txt"
         assert dst in contents_by_dst
         entry = contents_by_dst.pop(dst)
-        assert "" == entry["type"]
+        assert "doc" == entry["type"]
         assert "contents/sandbox-file.txt" == entry["src"]
         assert 0o0644 == entry["file_info"]["mode"]
 
@@ -370,6 +454,12 @@ def test_generate_nfpm_yaml(
         entry = contents_by_dst.pop(dst)
         assert "dir" == entry["type"]
         assert 0o0700 == entry["file_info"]["mode"]
+
+    if "ghost_contents" in extra_metadata:
+        for dst in extra_metadata["ghost_contents"]:
+            assert dst in contents_by_dst
+            entry = contents_by_dst.pop(dst)
+            assert "ghost" == entry["type"]
 
     # make sure all contents have been accounted for (popped off above)
     assert len(contents_by_dst) == 0
