@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import stat
+from abc import ABCMeta
 from enum import Enum
 from typing import Any, ClassVar, Iterable, Optional, Union, cast
 
@@ -369,9 +370,12 @@ class NfpmContentSrcField(AsyncFieldMixin, StringField):
         return os.path.join(self.address.spec_path, self.value)
 
 
-class NfpmContentDstField(StringField):
+class NfpmContentDstBaseField(StringField, metaclass=ABCMeta):
     nfpm_alias = "contents.[].dst"
     alias: ClassVar[str] = "dst"
+
+
+class NfpmContentDstField(NfpmContentDstBaseField):
     required = True
     value: str
     help = help_text(
@@ -476,7 +480,7 @@ class NfpmContentSymlinkSrcField(NfpmContentSrcField):
     )
 
 
-class NfpmContentSymlinkDstField(NfpmContentDstField):
+class NfpmContentSymlinkDstField(NfpmContentDstBaseField):
     required = True
     value: str
     help = help_text(
@@ -526,7 +530,7 @@ class NfpmContentSymlinksOverridesField(_NfpmContentOverridesField):
 # -----------------------------------------------------------------------------------------------
 
 
-class NfpmContentDirDstField(NfpmContentDstField):
+class NfpmContentDirDstField(NfpmContentDstBaseField):
     required = True
     value: str
     help = help_text(

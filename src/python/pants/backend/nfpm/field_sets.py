@@ -29,10 +29,9 @@ from pants.backend.nfpm.fields.contents import (
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.fs import FileEntry
-from pants.engine.internals.native_engine import Field
 from pants.engine.rules import collect_rules
 from pants.engine.target import DescriptionField, FieldSet, Target
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -107,15 +106,9 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
 NFPM_PACKAGE_FIELD_SET_TYPES: FrozenOrderedSet[type[NfpmPackageFieldSet]] = FrozenOrderedSet(())
 
 
+@union
 @dataclass(frozen=True)
 class NfpmContentFieldSet(FieldSet, metaclass=ABCMeta):
-    required_fields: ClassVar[tuple[type[Field], ...]] = (
-        NfpmContentFileOwnerField,
-        NfpmContentFileGroupField,
-        NfpmContentFileModeField,
-        NfpmContentFileMtimeField,
-    )
-
     owner: NfpmContentFileOwnerField
     group: NfpmContentFileGroupField
     mode: NfpmContentFileModeField
@@ -146,10 +139,7 @@ class NfpmContentFieldSet(FieldSet, metaclass=ABCMeta):
 
 @dataclass(frozen=True)
 class NfpmContentDirFieldSet(NfpmContentFieldSet):
-    required_fields = (
-        *NfpmContentFieldSet.required_fields,
-        NfpmContentDirDstField,
-    )
+    required_fields = (NfpmContentDirDstField,)
 
     dst: NfpmContentDirDstField
 
@@ -165,10 +155,7 @@ class NfpmContentDirFieldSet(NfpmContentFieldSet):
 
 @dataclass(frozen=True)
 class NfpmContentSymlinkFieldSet(NfpmContentFieldSet):
-    required_fields = (
-        *NfpmContentFieldSet.required_fields,
-        NfpmContentSymlinkDstField,
-    )
+    required_fields = (NfpmContentSymlinkDstField,)
 
     src: NfpmContentSymlinkSrcField
     dst: NfpmContentSymlinkDstField
@@ -186,11 +173,7 @@ class NfpmContentSymlinkFieldSet(NfpmContentFieldSet):
 
 @dataclass(frozen=True)
 class NfpmContentFileFieldSet(NfpmContentFieldSet):
-    required_fields = (
-        *NfpmContentFieldSet.required_fields,
-        NfpmContentDstField,
-        NfpmContentTypeField,
-    )
+    required_fields = (NfpmContentDstField,)
 
     source: NfpmContentFileSourceField
     src: NfpmContentSrcField
@@ -225,6 +208,15 @@ class NfpmContentFileFieldSet(NfpmContentFieldSet):
         )
 
 
+NFPM_CONTENT_FIELD_SET_TYPES: FrozenOrderedSet[type[NfpmContentFieldSet]] = FrozenOrderedSet(
+    (
+        NfpmContentDirFieldSet,
+        NfpmContentSymlinkFieldSet,
+        NfpmContentFileFieldSet,
+    )
+)
+
+
 def rules():
     return [
         *collect_rules(),
@@ -234,10 +226,6 @@ def rules():
         ),
         *(
             UnionRule(NfpmContentFieldSet, field_set_type)
-            for field_set_type in (
-                NfpmContentDirFieldSet,
-                NfpmContentSymlinkFieldSet,
-                NfpmContentFileFieldSet,
-            )
+            for field_set_type in NFPM_CONTENT_FIELD_SET_TYPES
         ),
     ]
