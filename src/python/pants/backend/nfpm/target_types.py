@@ -20,6 +20,15 @@ from pants.backend.nfpm.fields.apk import (
     NfpmApkReplacesField,
     NfpmApkScriptsField,
 )
+from pants.backend.nfpm.fields.archlinux import (
+    NfpmArchlinuxConflictsField,
+    NfpmArchlinuxDependsField,
+    NfpmArchlinuxPackagerField,
+    NfpmArchlinuxPkgbaseField,
+    NfpmArchlinuxProvidesField,
+    NfpmArchlinuxReplacesField,
+    NfpmArchlinuxScriptsField,
+)
 from pants.backend.nfpm.fields.contents import (
     NfpmContentDirDstField,
     NfpmContentDirsField,
@@ -138,6 +147,47 @@ class NfpmApkPackage(NfpmPackageTarget):
         that you can then distribute and install, e.g. via pkg.
 
         See {doc_url('nfpm-apk-package')}.
+        """
+    )
+
+
+ARCHLINUX_FIELDS = (
+    NfpmPackageNameField,
+    NfpmArchField,
+    # version fields (archlinux does NOT get: version_metadata)
+    NfpmVersionField,
+    NfpmVersionSchemaField,
+    NfpmVersionPrereleaseField,
+    NfpmVersionReleaseField,
+    NfpmVersionEpochField,
+    # other package metadata fields
+    NfpmHomepageField,
+    NfpmLicenseField,
+    NfpmArchlinuxPackagerField,
+    NfpmArchlinuxPkgbaseField,
+    # package relationships
+    NfpmArchlinuxReplacesField,
+    NfpmArchlinuxProvidesField,
+    NfpmArchlinuxDependsField,
+    NfpmArchlinuxConflictsField,
+)
+
+
+class NfpmArchlinuxPackage(NfpmPackageTarget):
+    alias = "nfpm_archlinux_package"
+    core_fields = (
+        *COMMON_NFPM_PACKAGE_FIELDS,
+        *ARCHLINUX_FIELDS,
+        NfpmArchlinuxScriptsField,
+    )
+    help = help_text(
+        f"""
+        An Archlinux system package built by nFPM.
+
+        This will not install the package, only create an .tar.zst file
+        that you can then distribute and install, e.g. via pkg.
+
+        See {doc_url('nfpm-archlinux-package')}.
         """
     )
 
@@ -402,6 +452,7 @@ class NfpmContentDirs(TargetGenerator):
 def target_types():
     return [
         NfpmApkPackage,
+        NfpmArchlinuxPackage,
         NfpmDebPackage,
         NfpmRpmPackage,
         NfpmContentFile,

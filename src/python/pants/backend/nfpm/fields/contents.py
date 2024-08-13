@@ -401,11 +401,11 @@ class NfpmContentFileType(Enum):
     file = ""
     config = "config"
     # config|noreplace is only used by rpm.
-    # For other packagers (deb, apk) this is the same as "config".
+    # For other packagers (deb, apk, archlinux) this is the same as "config".
     config_noreplace = "config|noreplace"
     # These are undocumented, but present in nFPM code for rpm.
     # If used, this changes the type used in the rpm header.
-    # For other packagers (deb, apk) this is the same as "file".
+    # For other packagers (deb, apk, archlinux) this is the same as "file".
     doc = "doc"
     license = "license"  # nFPM also supports "licence"
     readme = "readme"

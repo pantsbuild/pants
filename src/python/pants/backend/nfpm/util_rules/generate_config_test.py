@@ -14,6 +14,7 @@ from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inf
 from pants.backend.nfpm.field_sets import (
     NFPM_CONTENT_FIELD_SET_TYPES,
     NfpmApkPackageFieldSet,
+    NfpmArchlinuxPackageFieldSet,
     NfpmContentFieldSet,
     NfpmDebPackageFieldSet,
     NfpmPackageFieldSet,
@@ -83,11 +84,13 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     (
         # no dependencies
         ("apk", NfpmApkPackageFieldSet, [], {}, [], {}, None),
+        ("archlinux", NfpmArchlinuxPackageFieldSet, [], {}, [], {}, None),
         ("deb", NfpmDebPackageFieldSet, [], {}, [], {}, None),
         ("rpm", NfpmRpmPackageFieldSet, [], {}, [], {}, None),
         ("rpm", NfpmRpmPackageFieldSet, [], {}, [], {"ghost_contents": ["/var/log/pkg.log"]}, None),
         # no dependencies (extra file does not cause errors)
         ("apk", NfpmApkPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
+        ("archlinux", NfpmArchlinuxPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
         ("deb", NfpmDebPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
         ("rpm", NfpmRpmPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
         (
@@ -117,6 +120,27 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
                 "contents/some-executable",
                 "scripts/postinstall.sh",
                 "scripts/apk-postupgrade.sh",
+            ],
+            {},
+            None,
+        ),
+        (
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
+            [
+                "contents:files",
+                "contents:file",
+                "contents:symlinks",
+                "contents:symlink",
+                "contents:dirs",
+                "contents:dir",
+            ],
+            {"postinstall": "scripts/postinstall.sh", "postupgrade": "scripts/arch-postupgrade.sh"},
+            [
+                "contents/sandbox-file.txt",
+                "contents/some-executable",
+                "scripts/postinstall.sh",
+                "scripts/arch-postupgrade.sh",
             ],
             {},
             None,
@@ -195,6 +219,15 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             pytest.raises(ExecutionError),
         ),
         (
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
+            ["contents:malformed"],
+            {},
+            [],
+            {},
+            pytest.raises(ExecutionError),
+        ),
+        (
             "deb",
             NfpmDebPackageFieldSet,
             ["contents:malformed"],
@@ -216,6 +249,15 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
         (
             "apk",
             NfpmApkPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {},
+            [],
+            {},
+            pytest.raises(ExecutionError),
+        ),
+        (
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
             ["contents:files", "contents:file"],
             {},
             [],
@@ -246,6 +288,15 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             NfpmApkPackageFieldSet,
             [],
             {"postinstall": "scripts/postinstall.sh", "postupgrade": "scripts/apk-postupgrade.sh"},
+            [],
+            {},
+            pytest.raises(ExecutionError),
+        ),
+        (
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
+            [],
+            {"postinstall": "scripts/postinstall.sh", "postupgrade": "scripts/arch-postupgrade.sh"},
             [],
             {},
             pytest.raises(ExecutionError),
@@ -383,6 +434,7 @@ def test_generate_nfpm_yaml(
                 for path in [
                     "scripts/postinstall.sh",
                     "scripts/apk-postupgrade.sh",
+                    "scripts/arch-postupgrade.sh",
                     "scripts/deb-config.sh",
                     "scripts/rpm-verify.sh",
                 ]

@@ -13,6 +13,7 @@ from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inf
 from pants.backend.nfpm.field_sets import (
     NFPM_PACKAGE_FIELD_SET_TYPES,
     NfpmApkPackageFieldSet,
+    NfpmArchlinuxPackageFieldSet,
     NfpmDebPackageFieldSet,
     NfpmPackageFieldSet,
     NfpmRpmPackageFieldSet,
@@ -101,6 +102,30 @@ _TEST_CASES: tuple[ParameterSet, ...] = (
         },
         True,
         id="apk-extra-metadata",
+    ),
+    # archlinux
+    pytest.param(NfpmArchlinuxPackageFieldSet, {}, True, id="archlinux-minimal-metadata"),
+    pytest.param(
+        NfpmArchlinuxPackageFieldSet,
+        # archlinux uses "packager" not "maintainer"
+        {"maintainer": "Arch Maintainer <arch-maintainer@example.com>"},
+        False,
+        id="archlinux-invalid-field-maintainer",
+    ),
+    pytest.param(
+        NfpmArchlinuxPackageFieldSet,
+        {
+            "homepage": "https://arch.example.com",
+            "license": "Apache-2.0",
+            "packager": "Arch Maintainer <arch-maintainer@example.com>",
+            "replaces": ["obsolete-pkg"],
+            "provides": ["foo", "bar=1.0.0", "libbaz.so=2"],
+            "depends": ["bash", "git>=2.40.1"],
+            "conflicts": ["conflicting-pkg"],
+            "scripts": {"postinstall": "postinstall.sh", "postupgrade": "arch-postupgrade.sh"},
+        },
+        True,
+        id="archlinux-extra-metadata",
     ),
     # deb
     pytest.param(NfpmDebPackageFieldSet, {}, False, id="deb-missing-maintainer-field"),

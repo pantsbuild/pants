@@ -12,12 +12,14 @@ import pytest
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
 from pants.backend.nfpm.field_sets import (
     NfpmApkPackageFieldSet,
+    NfpmArchlinuxPackageFieldSet,
     NfpmDebPackageFieldSet,
     NfpmPackageFieldSet,
     NfpmRpmPackageFieldSet,
 )
 from pants.backend.nfpm.target_types import (
     NfpmApkPackage,
+    NfpmArchlinuxPackage,
     NfpmContentDir,
     NfpmContentFile,
     NfpmContentFiles,
@@ -59,6 +61,7 @@ _PKG_VERSION = "3.2.1"
 
 _A = Address("", target_name="t")
 _APK_PKG = NfpmApkPackage({"package_name": _PKG_NAME, "version": _PKG_VERSION}, _A)
+_ARCHLINUX_PKG = NfpmArchlinuxPackage({"package_name": _PKG_NAME, "version": _PKG_VERSION}, _A)
 _DEB_PKG = NfpmDebPackage(
     {"package_name": _PKG_NAME, "version": _PKG_VERSION, "maintainer": "Foo Bar <baz@example.com>"},
     _A,
@@ -86,12 +89,19 @@ _RPM_PKG = NfpmRpmPackage({"package_name": _PKG_NAME, "version": _PKG_VERSION}, 
             _DepCategory.nfpm_content_from_source,
         ),
         (_APK_PKG, NfpmApkPackageFieldSet, _DepCategory.nfpm_package),
+        (_APK_PKG, NfpmArchlinuxPackageFieldSet, _DepCategory.ignore),
         (_APK_PKG, NfpmDebPackageFieldSet, _DepCategory.ignore),
         (_APK_PKG, NfpmRpmPackageFieldSet, _DepCategory.ignore),
+        (_ARCHLINUX_PKG, NfpmApkPackageFieldSet, _DepCategory.ignore),
+        (_ARCHLINUX_PKG, NfpmArchlinuxPackageFieldSet, _DepCategory.nfpm_package),
+        (_ARCHLINUX_PKG, NfpmDebPackageFieldSet, _DepCategory.ignore),
+        (_ARCHLINUX_PKG, NfpmRpmPackageFieldSet, _DepCategory.ignore),
         (_DEB_PKG, NfpmApkPackageFieldSet, _DepCategory.ignore),
+        (_DEB_PKG, NfpmArchlinuxPackageFieldSet, _DepCategory.ignore),
         (_DEB_PKG, NfpmDebPackageFieldSet, _DepCategory.nfpm_package),
         (_DEB_PKG, NfpmRpmPackageFieldSet, _DepCategory.ignore),
         (_RPM_PKG, NfpmApkPackageFieldSet, _DepCategory.ignore),
+        (_RPM_PKG, NfpmArchlinuxPackageFieldSet, _DepCategory.ignore),
         (_RPM_PKG, NfpmDebPackageFieldSet, _DepCategory.ignore),
         (_RPM_PKG, NfpmRpmPackageFieldSet, _DepCategory.nfpm_package),
         (GenericTarget({}, _A), NfpmPackageFieldSet, _DepCategory.remaining),
@@ -142,6 +152,7 @@ def rule_runner() -> RuleRunner:
             FileTarget,
             FilesGeneratorTarget,
             NfpmApkPackage,
+            NfpmArchlinuxPackage,
             NfpmDebPackage,
             NfpmRpmPackage,
             NfpmContentFile,
@@ -168,6 +179,7 @@ def rule_runner() -> RuleRunner:
     (
         # empty digest
         ("apk", NfpmApkPackageFieldSet, [], {}, set()),
+        ("archlinux", NfpmArchlinuxPackageFieldSet, [], {}, set()),
         ("deb", NfpmDebPackageFieldSet, [], {}, set()),
         ("rpm", NfpmRpmPackageFieldSet, [], {}, set()),
         # non-empty digest
@@ -181,6 +193,18 @@ def rule_runner() -> RuleRunner:
                 "contents/some-executable",
                 "scripts/postinstall.sh",
                 "scripts/apk-postupgrade.sh",
+            },
+        ),
+        (
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/postinstall.sh", "postupgrade": "scripts/arch-postupgrade.sh"},
+            {
+                "contents/sandbox-file.txt",
+                "contents/some-executable",
+                "scripts/postinstall.sh",
+                "scripts/arch-postupgrade.sh",
             },
         ),
         (
@@ -217,6 +241,13 @@ def rule_runner() -> RuleRunner:
             {"contents/sandbox-file.txt"},
         ),
         (
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
+            ["contents/sandbox-file.txt:sandbox_file"],
+            {},
+            {"contents/sandbox-file.txt"},
+        ),
+        (
             "deb",
             NfpmDebPackageFieldSet,
             ["contents/sandbox-file.txt:sandbox_file"],
@@ -234,6 +265,17 @@ def rule_runner() -> RuleRunner:
         (
             "apk",
             NfpmApkPackageFieldSet,
+            ["codegen:generated", "contents:files", "package:package"],
+            {},
+            {
+                "codegen/foobar.codegen.generated",
+                "contents/sandbox-file.txt",
+                "package/archive.tar",
+            },
+        ),
+        (
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
             ["codegen:generated", "contents:files", "package:package"],
             {},
             {
@@ -268,6 +310,13 @@ def rule_runner() -> RuleRunner:
         (
             "apk",
             NfpmApkPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {"postinstall": "scripts/missing.sh"},
+            pytest.raises(ExecutionError),
+        ),
+        (
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
             ["contents:files", "contents:file"],
             {"postinstall": "scripts/missing.sh"},
             pytest.raises(ExecutionError),
@@ -384,6 +433,7 @@ def test_populate_nfpm_content_sandbox(
                 for path in [
                     "scripts/postinstall.sh",
                     "scripts/apk-postupgrade.sh",
+                    "scripts/arch-postupgrade.sh",
                     "scripts/deb-config.sh",
                     "scripts/rpm-verify.sh",
                 ]
