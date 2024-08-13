@@ -1950,25 +1950,31 @@ class SequenceField(Generic[T], Field):
         return tuple(value_or_default)
 
 
-class StringStringTupleSequenceField(Field):
+class TupleSequenceField(Generic[T], Field):
     # this cannot be a SequenceField as compute_value's use of ensure_list
     # does not work with expected_element_type=tuple when the value itself
     # is already a tuple.
-    value: tuple[tuple[str, str], ...]
+    expected_element_type: ClassVar[Type]
+    expected_element_count: ClassVar[int]  # -1 for unlimited
+    expected_type_description: ClassVar[str]
+    expected_element_type_description: ClassVar[str]
+
+    value: Optional[Tuple[Tuple[T, ...], ...]]
+    default: ClassVar[Optional[Tuple[Tuple[T, ...], ...]]] = None  # type: ignore[misc]
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[Iterable[str]]], address: Address
-    ) -> tuple[tuple[str, str], ...]:
+        cls, raw_value: Optional[Iterable[Iterable[T]]], address: Address
+    ) -> Optional[tuple[tuple[T, ...], ...]]:
         value_or_default = super().compute_value(raw_value, address)
-        if not value_or_default:
-            return ()
+        if value_or_default is None:
+            return value_or_default
         if not isinstance(value_or_default, Iterable):
             raise InvalidFieldTypeException(
                 address,
                 cls.alias,
                 raw_value,
-                expected_type="an iterable of 2-string-tuples (tuple[tuple[str, str], ...])",
+                expected_type=cls.expected_type_description,
             )
 
         def invalid_member_exception(
@@ -1978,22 +1984,22 @@ class StringStringTupleSequenceField(Field):
                 address,
                 cls.alias,
                 raw_value,
-                expected_type="2-string-tuples (tuple[str, str])",
+                expected_type=cls.expected_element_type_description,
                 wrong_element=wrong_element,
                 at_index=at_index,
             )
 
-        validated: list[tuple[str, str]] = []
+        validated: list[tuple[T, ...]] = []
         for i, x in enumerate(value_or_default):
             if not isinstance(x, Iterable):
                 raise invalid_member_exception(i, x)
             element = tuple(x)
-            if len(element) != 2:
+            if cls.expected_element_count >= 0 and cls.expected_element_count != len(element):
                 raise invalid_member_exception(i, x)
             for s in element:
-                if not isinstance(s, str):
+                if not isinstance(s, cls.expected_element_type):
                     raise invalid_member_exception(i, x)
-            validated.append(cast(tuple[str, str], element))
+            validated.append(cast(tuple[T, ...], element))
 
         return tuple(validated)
 

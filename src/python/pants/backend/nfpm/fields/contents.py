@@ -21,11 +21,11 @@ from pants.engine.target import (
     OverridesField,
     StringField,
     StringSequenceField,
-    StringStringTupleSequenceField,
+    TupleSequenceField,
     ValidNumbers,
 )
 from pants.util.frozendict import FrozenDict
-from pants.util.strutil import help_text, softwrap
+from pants.util.strutil import help_text
 
 # -----------------------------------------------------------------------------------------------
 # file_info fields
@@ -220,8 +220,14 @@ class NfpmContentFileMtimeField(StringField):
 # -----------------------------------------------------------------------------------------------
 
 
-class _SrcDstSequenceField(StringStringTupleSequenceField):
+class _SrcDstSequenceField(TupleSequenceField):
     nfpm_alias = ""
+
+    expected_element_type = str
+    expected_element_count = 2
+    expected_type_description = "an iterable of 2-string-tuples (tuple[tuple[str, str], ...])"
+    expected_element_type_description = "2-string-tuples (tuple[str, str])"
+    value: tuple[tuple[str, str], ...]
 
     # Subclasses must define these
     _dst_alias: ClassVar[str]
@@ -255,7 +261,7 @@ class _SrcDstSequenceField(StringStringTupleSequenceField):
                 )
             )
 
-        return src_dst_map
+        return cast("tuple[tuple[str, str], ...]", src_dst_map)
 
 
 class _NfpmContentOverridesField(OverridesField):
