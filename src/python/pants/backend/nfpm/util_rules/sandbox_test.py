@@ -10,13 +10,12 @@ from typing import ContextManager, Type, cast
 import pytest
 
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
-from pants.backend.nfpm.field_sets import NfpmDebPackageFieldSet, NfpmPackageFieldSet
+from pants.backend.nfpm.field_sets import NfpmPackageFieldSet
 from pants.backend.nfpm.target_types import (
     NfpmContentDir,
     NfpmContentFile,
     NfpmContentFiles,
     NfpmContentSymlink,
-    NfpmDebPackage,
 )
 from pants.backend.nfpm.target_types_rules import rules as nfpm_target_types_rules
 from pants.backend.nfpm.util_rules.sandbox import (
@@ -37,7 +36,6 @@ from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, DigestContents, DigestEntries
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, Snapshot
-from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest, SingleSourceField, Target
@@ -51,10 +49,6 @@ _pkg_name = "pkg"
 _pkg_version = "3.2.1"
 
 _a = Address("", target_name="t")
-_deb_pkg = NfpmDebPackage(
-    {"package_name": _pkg_name, "version": _pkg_version, "maintainer": "Foo Bar <baz@example.com>"},
-    _a,
-)
 
 
 @pytest.mark.parametrize(
@@ -76,7 +70,6 @@ _deb_pkg = NfpmDebPackage(
             NfpmPackageFieldSet,  # does not matter
             _DepCategory.nfpm_content_from_source,
         ),
-        (_deb_pkg, NfpmDebPackageFieldSet, _DepCategory.nfpm_package),
         (GenericTarget({}, _a), NfpmPackageFieldSet, _DepCategory.remaining),
         (FileTarget({"source": "foo"}, _a), NfpmPackageFieldSet, _DepCategory.remaining),
         (ResourceTarget({"source": "foo"}, _a), NfpmPackageFieldSet, _DepCategory.remaining),
@@ -124,7 +117,6 @@ def rule_runner() -> RuleRunner:
             ArchiveTarget,
             FileTarget,
             FilesGeneratorTarget,
-            NfpmDebPackage,
             NfpmContentFile,
             NfpmContentFiles,
             MockCodegenTarget,
@@ -146,52 +138,7 @@ def rule_runner() -> RuleRunner:
 
 @pytest.mark.parametrize(
     "packager,field_set_type,dependencies,scripts,expected",
-    (
-        # empty digest
-        ("deb", NfpmDebPackageFieldSet, [], {}, set()),
-        # non-empty digest
-        (
-            "deb",
-            NfpmDebPackageFieldSet,
-            ["contents:files", "contents:file"],
-            {"postinstall": "scripts/postinstall.sh", "config": "scripts/deb-config.sh"},
-            {
-                "contents/sandbox-file.txt",
-                "contents/some-executable",
-                "scripts/postinstall.sh",
-                "scripts/deb-config.sh",
-            },
-        ),
-        # dependency on file w/o intermediate nfpm_content_file target
-        # should have the file in the sandbox, though config won't include it.
-        (
-            "deb",
-            NfpmDebPackageFieldSet,
-            ["contents/sandbox-file.txt:sandbox_file"],
-            {},
-            {"contents/sandbox-file.txt"},
-        ),
-        # codegen & package build
-        (
-            "deb",
-            NfpmDebPackageFieldSet,
-            ["codegen:generated", "contents:files", "package:package"],
-            {},
-            {
-                "codegen/foobar.codegen.generated",
-                "contents/sandbox-file.txt",
-                "package/archive.tar",
-            },
-        ),
-        # error finding script
-        (
-            "deb",
-            NfpmDebPackageFieldSet,
-            ["contents:files", "contents:file"],
-            {"postinstall": "scripts/missing.sh"},
-            pytest.raises(ExecutionError),
-        ),
-    ),
+    (),  # TODO: add packagers
 )
 def test_populate_nfpm_content_sandbox(
     rule_runner: RuleRunner,
@@ -209,7 +156,6 @@ def test_populate_nfpm_content_sandbox(
                     name="{_pkg_name}",
                     package_name="{_pkg_name}",
                     version="{_pkg_version}",
-                    {'' if packager != 'deb' else 'maintainer="Foo Bar <deb@example.com>",'}
                     dependencies={repr(dependencies)},
                     scripts={repr(scripts)},
                 )
@@ -288,7 +234,6 @@ def test_populate_nfpm_content_sandbox(
                 path: ""
                 for path in [
                     "scripts/postinstall.sh",
-                    "scripts/deb-config.sh",
                 ]
             },
         }

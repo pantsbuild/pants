@@ -4,14 +4,9 @@
 from __future__ import annotations
 
 from pants.backend.nfpm.fields.all import (
-    NfpmArchField,
     NfpmDependencies,
-    NfpmHomepageField,
-    NfpmLicenseField,
     NfpmOutputPathField,
     NfpmPackageMtimeField,
-    NfpmPackageNameField,
-    NfpmPlatformField,
 )
 from pants.backend.nfpm.fields.contents import (
     NfpmContentDirDstField,
@@ -32,38 +27,12 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentSymlinkSrcField,
     NfpmContentTypeField,
 )
-from pants.backend.nfpm.fields.deb import (
-    NfpmDebBreaksField,
-    NfpmDebCompressionField,
-    NfpmDebConflictsField,
-    NfpmDebDependsField,
-    NfpmDebFieldsField,
-    NfpmDebMaintainerField,
-    NfpmDebPreDependsField,
-    NfpmDebPriorityField,
-    NfpmDebProvidesField,
-    NfpmDebRecommendsField,
-    NfpmDebReplacesField,
-    NfpmDebScriptsField,
-    NfpmDebSectionField,
-    NfpmDebSuggestsField,
-    NfpmDebTriggersField,
-)
-from pants.backend.nfpm.fields.version import (
-    NfpmVersionEpochField,
-    NfpmVersionField,
-    NfpmVersionMetadataField,
-    NfpmVersionPrereleaseField,
-    NfpmVersionReleaseField,
-    NfpmVersionSchemaField,
-)
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     InvalidTargetException,
     Target,
     TargetGenerator,
 )
-from pants.util.docutil import doc_url
 from pants.util.strutil import help_text
 
 # Fields required to satisfy NfpmPackageFieldSet on all NfpmPackageTarget subclasses.
@@ -79,59 +48,6 @@ COMMON_NFPM_PACKAGE_FIELDS = (
 
 class NfpmPackageTarget(Target):
     pass
-
-
-DEB_FIELDS = (
-    NfpmPackageNameField,
-    NfpmArchField,
-    NfpmPlatformField,
-    # version fields
-    NfpmVersionField,
-    NfpmVersionSchemaField,
-    NfpmVersionPrereleaseField,
-    NfpmVersionMetadataField,
-    NfpmVersionReleaseField,
-    NfpmVersionEpochField,
-    # other package metadata fields
-    NfpmHomepageField,
-    NfpmLicenseField,  # not used by nFPM yet.
-    NfpmDebMaintainerField,
-    NfpmDebSectionField,
-    NfpmDebPriorityField,
-    # control files metadata
-    NfpmDebFieldsField,
-    NfpmDebTriggersField,
-    # package relationships
-    NfpmDebReplacesField,
-    NfpmDebProvidesField,
-    NfpmDebDependsField,
-    NfpmDebPreDependsField,
-    NfpmDebRecommendsField,
-    NfpmDebSuggestsField,
-    NfpmDebConflictsField,
-    NfpmDebBreaksField,
-    # how to build the package
-    NfpmDebCompressionField,
-)
-
-
-class NfpmDebPackage(NfpmPackageTarget):
-    alias = "nfpm_deb_package"
-    core_fields = (
-        *COMMON_NFPM_PACKAGE_FIELDS,
-        *DEB_FIELDS,
-        NfpmDebScriptsField,
-    )
-    help = help_text(
-        f"""
-        A Debian system package built by nFPM.
-
-        This will not install the package, only create a .deb file
-        that you can then distribute and install, e.g. via pkg.
-
-        See {doc_url('nfpm-deb-package')}.
-        """
-    )
 
 
 CONTENT_FILE_INFO_FIELDS = (
@@ -289,7 +205,6 @@ class NfpmContentDirs(TargetGenerator):
 
 def target_types():
     return [
-        NfpmDebPackage,
         NfpmContentFile,
         NfpmContentFiles,
         NfpmContentSymlink,

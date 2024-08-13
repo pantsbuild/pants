@@ -14,9 +14,7 @@ from pants.backend.nfpm.dependency_inference import (
     NfpmPackageScriptsInferenceFieldSet,
 )
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dep_rules
-from pants.backend.nfpm.fields.deb import NfpmDebScriptsField
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
-from pants.backend.nfpm.target_types import NfpmDebPackage
 from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.addresses import Address
@@ -30,7 +28,6 @@ def rule_runner() -> RuleRunner:
         target_types=[
             FileTarget,
             FilesGeneratorTarget,
-            NfpmDebPackage,
         ],
         rules=[
             *core_target_type_rules(),
@@ -47,7 +44,7 @@ _pkg_version = "3.2.1"
 
 @pytest.mark.parametrize(
     "packager,scripts_field_type",
-    (("deb", NfpmDebScriptsField),),
+    (),  # TODO: add packagers
 )
 def test_infer_nfpm_package_scripts_dependencies(
     rule_runner: RuleRunner, packager: str, scripts_field_type: Type[NfpmPackageScriptsField]
@@ -66,7 +63,6 @@ def test_infer_nfpm_package_scripts_dependencies(
                     name="{_pkg_name}",
                     package_name="{_pkg_name}",
                     version="{_pkg_version}",
-                    {'' if packager != 'deb' else 'maintainer="Foo Bar <deb@example.com>",'}
                     scripts={scripts},
                 )
                 """

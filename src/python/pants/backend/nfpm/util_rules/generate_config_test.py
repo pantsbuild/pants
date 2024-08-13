@@ -11,7 +11,7 @@ import yaml
 
 from pants.backend.nfpm.config import NfpmFileInfo
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
-from pants.backend.nfpm.field_sets import NfpmDebPackageFieldSet, NfpmPackageFieldSet
+from pants.backend.nfpm.field_sets import NfpmPackageFieldSet
 from pants.backend.nfpm.target_types import target_types as nfpm_target_types
 from pants.backend.nfpm.target_types_rules import rules as nfpm_target_types_rules
 from pants.backend.nfpm.util_rules.generate_config import (
@@ -23,7 +23,6 @@ from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.fs import CreateDigest, DigestContents, FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Address, Digest
-from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import RuleRunner
@@ -68,64 +67,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
         "extra_metadata",
         "expect_raise",
     ),
-    (
-        # no dependencies
-        ("deb", NfpmDebPackageFieldSet, [], {}, [], {}, None),
-        # no dependencies (extra file does not cause errors)
-        ("deb", NfpmDebPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
-        # with dependencies
-        (
-            "deb",
-            NfpmDebPackageFieldSet,
-            [
-                "contents:files",
-                "contents:file",
-                "contents:symlinks",
-                "contents:symlink",
-                "contents:dirs",
-                "contents:dir",
-            ],
-            {"postinstall": "scripts/postinstall.sh", "config": "scripts/deb-config.sh"},
-            [
-                "contents/sandbox-file.txt",
-                "contents/some-executable",
-                "scripts/postinstall.sh",
-                "scripts/deb-config.sh",
-            ],
-            {},
-            None,
-        ),
-        # with malformed dependency
-        (
-            "deb",
-            NfpmDebPackageFieldSet,
-            ["contents:malformed"],
-            {},
-            [],
-            {},
-            pytest.raises(ExecutionError),
-        ),
-        # with dependency file missing from sandbox
-        (
-            "deb",
-            NfpmDebPackageFieldSet,
-            ["contents:files", "contents:file"],
-            {},
-            [],
-            {},
-            pytest.raises(ExecutionError),
-        ),
-        # with script file missing from sandbox
-        (
-            "deb",
-            NfpmDebPackageFieldSet,
-            [],
-            {"postinstall": "scripts/postinstall.sh", "config": "scripts/deb-config.sh"},
-            [],
-            {},
-            pytest.raises(ExecutionError),
-        ),
-    ),
+    (),  # TODO: add packagers
 )
 def test_generate_nfpm_yaml(
     rule_runner: RuleRunner,
@@ -149,7 +91,6 @@ def test_generate_nfpm_yaml(
                     description="{description}",
                     package_name="{_pkg_name}",
                     version="{_pkg_version}",
-                    {'' if packager != 'deb' else 'maintainer="Foo Bar <deb@example.com>",'}
                     dependencies={repr(dependencies)},
                     scripts={repr(scripts)},
                     **{extra_metadata},
@@ -239,7 +180,6 @@ def test_generate_nfpm_yaml(
                 path: ""
                 for path in [
                     "scripts/postinstall.sh",
-                    "scripts/deb-config.sh",
                 ]
             },
         }
