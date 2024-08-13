@@ -57,6 +57,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     return rule_runner.request(Digest, [CreateDigest(files)])
 
 
+@pytest.mark.skip("no nfpm_*_package targets available yet")
 @pytest.mark.parametrize(
     (
         "packager",

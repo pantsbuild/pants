@@ -75,6 +75,7 @@ _pkg_version = "3.2.1"
 _test_cases: tuple[ParameterSet, ...] = ()  # TODO: add packagers
 
 
+@pytest.mark.skip("no nfpm_*_package targets available yet")
 @pytest.mark.parametrize("field_set_type,extra_metadata,valid_target", _test_cases)
 def test_generate_package_without_contents(
     rule_runner: RuleRunner,
@@ -110,6 +111,7 @@ def test_generate_package_without_contents(
     _assert_one_built_artifact(_pkg_name, built_package, field_set_type)
 
 
+@pytest.mark.skip("no nfpm_*_package targets available yet")
 @pytest.mark.parametrize("field_set_type,extra_metadata,valid_target", _test_cases)
 def test_generate_package_with_contents(
     rule_runner: RuleRunner,
