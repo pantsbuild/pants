@@ -144,7 +144,6 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-@pytest.mark.skip("no nfpm_*_package targets available yet")
 @pytest.mark.parametrize(
     "packager,field_set_type,dependencies,scripts,expected",
     (

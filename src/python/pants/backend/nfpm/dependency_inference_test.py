@@ -44,7 +44,6 @@ _pkg_name = "pkg"
 _pkg_version = "3.2.1"
 
 
-@pytest.mark.skip("no nfpm_*_package targets available yet")
 @pytest.mark.parametrize(
     "packager,scripts_field_type",
     (("deb", NfpmDebScriptsField),),
