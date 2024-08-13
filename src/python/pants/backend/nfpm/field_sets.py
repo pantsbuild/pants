@@ -27,6 +27,7 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentTypeField,
 )
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
+from pants.backend.nfpm.target_types import DEB_FIELDS
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.fs import FileEntry
 from pants.engine.rules import collect_rules
@@ -103,7 +104,17 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
         return config
 
 
-NFPM_PACKAGE_FIELD_SET_TYPES: FrozenOrderedSet[type[NfpmPackageFieldSet]] = FrozenOrderedSet(())
+# noinspection DuplicatedCode
+@dataclass(frozen=True)
+class NfpmDebPackageFieldSet(NfpmPackageFieldSet):
+    packager = "deb"
+    extension = f".{packager}"
+    required_fields = DEB_FIELDS
+
+
+NFPM_PACKAGE_FIELD_SET_TYPES: FrozenOrderedSet[type[NfpmPackageFieldSet]] = FrozenOrderedSet(
+    (NfpmDebPackageFieldSet,)
+)
 
 
 @union

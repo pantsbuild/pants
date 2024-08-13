@@ -10,7 +10,11 @@ import pytest
 from _pytest.mark import ParameterSet
 
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
-from pants.backend.nfpm.field_sets import NFPM_PACKAGE_FIELD_SET_TYPES, NfpmPackageFieldSet
+from pants.backend.nfpm.field_sets import (
+    NFPM_PACKAGE_FIELD_SET_TYPES,
+    NfpmDebPackageFieldSet,
+    NfpmPackageFieldSet,
+)
 from pants.backend.nfpm.rules import rules as nfpm_rules
 from pants.backend.nfpm.subsystem import rules as nfpm_subsystem_rules
 from pants.backend.nfpm.target_types import target_types as nfpm_target_types
@@ -72,7 +76,47 @@ def _assert_one_built_artifact(
 _pkg_name = "pkg"
 _pkg_version = "3.2.1"
 
-_test_cases: tuple[ParameterSet, ...] = ()  # TODO: add packagers
+_test_cases: tuple[ParameterSet, ...] = (
+    # deb
+    pytest.param(NfpmDebPackageFieldSet, {}, False, id="deb-missing-maintainer-field"),
+    pytest.param(
+        NfpmDebPackageFieldSet,
+        # deb uses "maintainer" not "packager"
+        {"packager": "Deb Maintainer <deb-maintainer@example.com>"},
+        False,
+        id="deb-invalid-field-packager",
+    ),
+    pytest.param(
+        NfpmDebPackageFieldSet,
+        # maintainer is a required field
+        {"maintainer": "Deb Maintainer <deb-maintainer@example.com>"},
+        True,
+        id="deb-minimal-metadata",
+    ),
+    pytest.param(
+        NfpmDebPackageFieldSet,
+        {
+            "homepage": "https://deb.example.com",
+            "license": "Apache-2.0",
+            "maintainer": "deb-maintainer@example.com",
+            "section": "education",
+            "priority": "standard",  # defaults to optional
+            "fields": {"XB-Custom": "custom control file field"},
+            "triggers": {"interest_noawait": ["some-trigger"]},
+            "replaces": ["partial-pkg", "replaced-pkg"],
+            "provides": ["pkg"],
+            "depends": ["git", "libc6 (>= 2.2.1)", "default-mta | mail-transport-agent"],
+            "recommends": ["other-pkg"],
+            "suggests": ["beneficial-other-pkg"],
+            "conflicts": ["replaced-pkg"],
+            "breaks": ["partial-pkg"],
+            "compression": "none",  # defaults to gzip
+            "scripts": {"postinstall": "postinstall.sh", "config": "deb-config.sh"},
+        },
+        True,
+        id="deb-extra-metadata",
+    ),
+)
 
 
 @pytest.mark.skip("no nfpm_*_package targets available yet")
