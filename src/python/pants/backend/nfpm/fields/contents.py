@@ -449,19 +449,10 @@ class NfpmContentFileType(Enum):
     # Do not include these:
     # - dir (not a file: handled by nfpm_content_dir target)
     # - tree (not a file: pants needs more explicit config to build sandbox)
-    # - ghost (handled by ghost_contents field on nfpm_rpm_package target)
     # - symlink (handled by a nfpm_content_symlink target)
     file = ""
     config = "config"
-    # config|noreplace is only used by rpm.
-    # For other packagers (deb, apk, archlinux) this is the same as "config".
-    config_noreplace = "config|noreplace"
-    # These are undocumented, but present in nFPM code for rpm.
-    # If used, this changes the type used in the rpm header.
-    # For other packagers (deb, apk, archlinux) this is the same as "file".
-    doc = "doc"
-    license = "license"  # nFPM also supports "licence"
-    readme = "readme"
+    # excluded rpm-specific values
 
 
 class NfpmContentTypeField(StringField):
@@ -478,23 +469,10 @@ class NfpmContentTypeField(StringField):
           - {repr(NfpmContentFileType.file.value)}: a normal file (the default), or
           - {repr(NfpmContentFileType.config.value)}: a config file.
 
-        For RPM packaged files, the content type can also be one of:
-          - {repr(NfpmContentFileType.config_noreplace.value)},
-          - {repr(NfpmContentFileType.doc.value)},
-          - {repr(NfpmContentFileType.license.value)}, and
-          - {repr(NfpmContentFileType.readme.value)}.
-
-        The {repr(NfpmContentFileType.config_noreplace.value)} type is used for RPM's
-        `%config(noreplace)` option. For packagers other than RPM, using
-        {repr(NfpmContentFileType.config_noreplace.value)} is the same as
-        {repr(NfpmContentFileType.config.value)} and the remaining RPM-specific
-        types are the same as {repr(NfpmContentFileType.file.value)}, a normal file.
-
         This field only supports file-specific nFPM content types.
         Please use these targets for non-file content:
           - For 'dir' content, use targets `nfpm_content_dir` and `nfpm_content_dirs`.
           - For 'symlink' content, use targets `nfpm_content_symlink` and `nfpm_content_symlinks`.
-          - For RPM 'ghost' content, use field 'ghost_contents' on target `nfpm_rpm_package`.
 
         The nFPM 'tree' content type is not supported. Before passing the list of
         package contents to nFPM, pants expands target generators and any globs,

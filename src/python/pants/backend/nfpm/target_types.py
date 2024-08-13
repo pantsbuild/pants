@@ -13,22 +13,6 @@ from pants.backend.nfpm.fields.all import (
     NfpmPackageNameField,
     NfpmPlatformField,
 )
-from pants.backend.nfpm.fields.apk import (
-    NfpmApkDependsField,
-    NfpmApkMaintainerField,
-    NfpmApkProvidesField,
-    NfpmApkReplacesField,
-    NfpmApkScriptsField,
-)
-from pants.backend.nfpm.fields.archlinux import (
-    NfpmArchlinuxConflictsField,
-    NfpmArchlinuxDependsField,
-    NfpmArchlinuxPackagerField,
-    NfpmArchlinuxPkgbaseField,
-    NfpmArchlinuxProvidesField,
-    NfpmArchlinuxReplacesField,
-    NfpmArchlinuxScriptsField,
-)
 from pants.backend.nfpm.fields.contents import (
     NfpmContentDirDstField,
     NfpmContentDirsField,
@@ -65,22 +49,6 @@ from pants.backend.nfpm.fields.deb import (
     NfpmDebSuggestsField,
     NfpmDebTriggersField,
 )
-from pants.backend.nfpm.fields.rpm import (
-    NfpmRpmCompressionField,
-    NfpmRpmConflictsField,
-    NfpmRpmDependsField,
-    NfpmRpmGhostContents,
-    NfpmRpmGroupField,
-    NfpmRpmPackagerField,
-    NfpmRpmPrefixesField,
-    NfpmRpmProvidesField,
-    NfpmRpmRecommendsField,
-    NfpmRpmReplacesField,
-    NfpmRpmScriptsField,
-    NfpmRpmSuggestsField,
-    NfpmRpmSummaryField,
-    NfpmRpmVendorField,
-)
 from pants.backend.nfpm.fields.version import (
     NfpmVersionEpochField,
     NfpmVersionField,
@@ -111,85 +79,6 @@ COMMON_NFPM_PACKAGE_FIELDS = (
 
 class NfpmPackageTarget(Target):
     pass
-
-
-APK_FIELDS = (
-    NfpmPackageNameField,
-    NfpmArchField,
-    # version fields (apk does NOT get: version_metadata or epoch)
-    NfpmVersionField,
-    NfpmVersionSchemaField,
-    NfpmVersionPrereleaseField,
-    NfpmVersionReleaseField,
-    # other package metadata fields
-    NfpmHomepageField,
-    NfpmLicenseField,
-    NfpmApkMaintainerField,
-    # package relationships
-    NfpmApkReplacesField,
-    NfpmApkProvidesField,
-    NfpmApkDependsField,
-)
-
-
-class NfpmApkPackage(NfpmPackageTarget):
-    alias = "nfpm_apk_package"
-    core_fields = (
-        *COMMON_NFPM_PACKAGE_FIELDS,
-        *APK_FIELDS,
-        NfpmApkScriptsField,
-    )
-    help = help_text(
-        f"""
-        An APK system package (Alpine Package Keeper) built by nFPM.
-
-        This will not install the package, only create an .apk file
-        that you can then distribute and install, e.g. via pkg.
-
-        See {doc_url('nfpm-apk-package')}.
-        """
-    )
-
-
-ARCHLINUX_FIELDS = (
-    NfpmPackageNameField,
-    NfpmArchField,
-    # version fields (archlinux does NOT get: version_metadata)
-    NfpmVersionField,
-    NfpmVersionSchemaField,
-    NfpmVersionPrereleaseField,
-    NfpmVersionReleaseField,
-    NfpmVersionEpochField,
-    # other package metadata fields
-    NfpmHomepageField,
-    NfpmLicenseField,
-    NfpmArchlinuxPackagerField,
-    NfpmArchlinuxPkgbaseField,
-    # package relationships
-    NfpmArchlinuxReplacesField,
-    NfpmArchlinuxProvidesField,
-    NfpmArchlinuxDependsField,
-    NfpmArchlinuxConflictsField,
-)
-
-
-class NfpmArchlinuxPackage(NfpmPackageTarget):
-    alias = "nfpm_archlinux_package"
-    core_fields = (
-        *COMMON_NFPM_PACKAGE_FIELDS,
-        *ARCHLINUX_FIELDS,
-        NfpmArchlinuxScriptsField,
-    )
-    help = help_text(
-        f"""
-        An Archlinux system package built by nFPM.
-
-        This will not install the package, only create an .tar.zst file
-        that you can then distribute and install, e.g. via pkg.
-
-        See {doc_url('nfpm-archlinux-package')}.
-        """
-    )
 
 
 DEB_FIELDS = (
@@ -241,62 +130,6 @@ class NfpmDebPackage(NfpmPackageTarget):
         that you can then distribute and install, e.g. via pkg.
 
         See {doc_url('nfpm-deb-package')}.
-        """
-    )
-
-
-RPM_FIELDS = (
-    NfpmPackageNameField,
-    NfpmArchField,
-    NfpmPlatformField,
-    # version fields
-    NfpmVersionField,
-    NfpmVersionSchemaField,
-    NfpmVersionPrereleaseField,
-    NfpmVersionMetadataField,
-    NfpmVersionReleaseField,
-    NfpmVersionEpochField,
-    # other package metadata fields
-    NfpmHomepageField,
-    NfpmLicenseField,
-    NfpmRpmPackagerField,
-    NfpmRpmVendorField,
-    NfpmRpmGroupField,
-    NfpmRpmSummaryField,
-    NfpmRpmPrefixesField,
-    # package relationships
-    NfpmRpmReplacesField,
-    NfpmRpmProvidesField,
-    NfpmRpmDependsField,
-    NfpmRpmRecommendsField,
-    NfpmRpmSuggestsField,
-    NfpmRpmConflictsField,
-    # how to build the package
-    NfpmRpmCompressionField,
-)
-
-
-# TODO: Add support for IPK packages (new in nfpm 2.37.0)
-# class NfpmIpkPackage(NfpmPackageTarget):
-#    alias = "nfpm_ipk_package"
-
-
-class NfpmRpmPackage(NfpmPackageTarget):
-    alias = "nfpm_rpm_package"
-    core_fields = (
-        *COMMON_NFPM_PACKAGE_FIELDS,
-        *RPM_FIELDS,
-        NfpmRpmScriptsField,
-        NfpmRpmGhostContents,
-    )
-    help = help_text(
-        f"""
-        An RPM system package built by nFPM.
-
-        This will not install the package, only create an .rpm file
-        that you can then distribute and install, e.g. via pkg.
-
-        See {doc_url('nfpm-rpm-package')}.
         """
     )
 
@@ -456,10 +289,7 @@ class NfpmContentDirs(TargetGenerator):
 
 def target_types():
     return [
-        NfpmApkPackage,
-        NfpmArchlinuxPackage,
         NfpmDebPackage,
-        NfpmRpmPackage,
         NfpmContentFile,
         NfpmContentFiles,
         NfpmContentSymlink,

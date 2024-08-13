@@ -12,9 +12,8 @@ from pants.backend.nfpm.fields.all import (
     NfpmPackageMtimeField,
     NfpmPackageNameField,
 )
-from pants.backend.nfpm.fields.rpm import NfpmRpmGhostContents
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
-from pants.backend.nfpm.target_types import APK_FIELDS, ARCHLINUX_FIELDS, DEB_FIELDS, RPM_FIELDS
+from pants.backend.nfpm.target_types import DEB_FIELDS
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.rules import collect_rules
 from pants.engine.target import DescriptionField, Target
@@ -90,22 +89,6 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
         return config
 
 
-@dataclass(frozen=True)
-class NfpmApkPackageFieldSet(NfpmPackageFieldSet):
-    packager = "apk"
-    extension = f".{packager}"
-    required_fields = APK_FIELDS
-
-
-# noinspection DuplicatedCode
-@dataclass(frozen=True)
-class NfpmArchlinuxPackageFieldSet(NfpmPackageFieldSet):
-    packager = "archlinux"
-    # NB: uses *.tar.zst (unlike the other packagers where packager == file extension)
-    extension = ".tar.zst"
-    required_fields = ARCHLINUX_FIELDS
-
-
 # noinspection DuplicatedCode
 @dataclass(frozen=True)
 class NfpmDebPackageFieldSet(NfpmPackageFieldSet):
@@ -114,27 +97,8 @@ class NfpmDebPackageFieldSet(NfpmPackageFieldSet):
     required_fields = DEB_FIELDS
 
 
-# noinspection DuplicatedCode
-@dataclass(frozen=True)
-class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
-    packager = "rpm"
-    extension = f".{packager}"
-    required_fields = RPM_FIELDS
-    ghost_contents: NfpmRpmGhostContents
-
-    def nfpm_config(self, tgt: Target, *, default_mtime: str | None) -> dict[str, Any]:
-        config = super().nfpm_config(tgt, default_mtime=default_mtime)
-        config["contents"].extend(self.ghost_contents.nfpm_contents)
-        return config
-
-
 NFPM_PACKAGE_FIELD_SET_TYPES: FrozenOrderedSet[type[NfpmPackageFieldSet]] = FrozenOrderedSet(
-    (
-        NfpmApkPackageFieldSet,
-        NfpmArchlinuxPackageFieldSet,
-        NfpmDebPackageFieldSet,
-        NfpmRpmPackageFieldSet,
-    )
+    (NfpmDebPackageFieldSet,)
 )
 
 

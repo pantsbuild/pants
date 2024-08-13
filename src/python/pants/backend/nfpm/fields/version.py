@@ -67,8 +67,7 @@ class NfpmVersionSchemaField(StringField):
         N.B.: Some of these fields are not available for all package types.
 
         This field is named "{NfpmVersionField.alias}" because that is the term
-        used by nFPM. Though deb and rpm packaging also use "version", this is
-        known as "pkgver" in apk and archlinux packaging.
+        used by nFPM.
         """
     )
 
@@ -83,8 +82,7 @@ class NfpmVersionPrereleaseField(StringField):
         This is a pre-release indicator like "alpha" or "beta" and often includes
         a numeric component like "rc1" and "rc2".
 
-        For apk and archlinux, version and prerelease are merely concatenated.
-        For deb and rpm, prerelease is typically prefixed with a "~" in the version.
+        For deb, prerelease is typically prefixed with a "~" in the version.
 
         nFPM extracts the default for this from '{NfpmVersionField.alias}'
         if it is semver compatible. If you set '{NfpmVersionPrereleaseField.alias}',
@@ -145,9 +143,8 @@ class NfpmVersionEpochField(IntField):
         A package with a higher version epoch will always be considered newer.
         This is primarily useful when the version numbering scheme has changed.
 
-        Debian and RPM documentation warn against using epoch in most cases:
+        Debian documentation warns against using epoch in most cases:
         https://www.debian.org/doc/debian-policy/ch-controlfields.html#epochs-should-be-used-sparingly
-        https://rpm-packaging-guide.github.io/#epoch
 
         When this field is None (the default) nFPM will use "" for deb packages,
         and "0" for rpm packages.

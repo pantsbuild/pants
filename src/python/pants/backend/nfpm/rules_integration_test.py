@@ -12,11 +12,8 @@ from _pytest.mark import ParameterSet
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
 from pants.backend.nfpm.field_sets import (
     NFPM_PACKAGE_FIELD_SET_TYPES,
-    NfpmApkPackageFieldSet,
-    NfpmArchlinuxPackageFieldSet,
     NfpmDebPackageFieldSet,
     NfpmPackageFieldSet,
-    NfpmRpmPackageFieldSet,
 )
 from pants.backend.nfpm.rules import rules as nfpm_rules
 from pants.backend.nfpm.subsystem import rules as nfpm_subsystem_rules
@@ -80,53 +77,6 @@ _pkg_name = "pkg"
 _pkg_version = "3.2.1"
 
 _test_cases: tuple[ParameterSet, ...] = (
-    # apk
-    pytest.param(NfpmApkPackageFieldSet, {}, True, id="apk-minimal-metadata"),
-    pytest.param(
-        NfpmApkPackageFieldSet,
-        # apk uses "maintainer" not "packager"
-        {"packager": "Arch Maintainer <arch-maintainer@example.com>"},
-        False,
-        id="apk-invalid-field-packager",
-    ),
-    pytest.param(
-        NfpmApkPackageFieldSet,
-        {
-            "homepage": "https://apk.example.com",
-            "license": "Apache-2.0",
-            "maintainer": "APK Maintainer <apk-maintainer@example.com>",
-            "replaces": ["some-command"],
-            "provides": [f"cmd:some-command={_pkg_version}"],
-            "depends": ["bash", "git=2.40.1-r0", "/bin/sh", "so:libcurl.so.4"],
-            "scripts": {"postinstall": "postinstall.sh", "postupgrade": "apk-postupgrade.sh"},
-        },
-        True,
-        id="apk-extra-metadata",
-    ),
-    # archlinux
-    pytest.param(NfpmArchlinuxPackageFieldSet, {}, True, id="archlinux-minimal-metadata"),
-    pytest.param(
-        NfpmArchlinuxPackageFieldSet,
-        # archlinux uses "packager" not "maintainer"
-        {"maintainer": "Arch Maintainer <arch-maintainer@example.com>"},
-        False,
-        id="archlinux-invalid-field-maintainer",
-    ),
-    pytest.param(
-        NfpmArchlinuxPackageFieldSet,
-        {
-            "homepage": "https://arch.example.com",
-            "license": "Apache-2.0",
-            "packager": "Arch Maintainer <arch-maintainer@example.com>",
-            "replaces": ["obsolete-pkg"],
-            "provides": ["foo", "bar=1.0.0", "libbaz.so=2"],
-            "depends": ["bash", "git>=2.40.1"],
-            "conflicts": ["conflicting-pkg"],
-            "scripts": {"postinstall": "postinstall.sh", "postupgrade": "arch-postupgrade.sh"},
-        },
-        True,
-        id="archlinux-extra-metadata",
-    ),
     # deb
     pytest.param(NfpmDebPackageFieldSet, {}, False, id="deb-missing-maintainer-field"),
     pytest.param(
@@ -141,7 +91,7 @@ _test_cases: tuple[ParameterSet, ...] = (
         # maintainer is a required field
         {"maintainer": "Deb Maintainer <deb-maintainer@example.com>"},
         True,
-        id="archlinux-minimal-metadata",
+        id="deb-minimal-metadata",
     ),
     pytest.param(
         NfpmDebPackageFieldSet,
@@ -165,36 +115,6 @@ _test_cases: tuple[ParameterSet, ...] = (
         },
         True,
         id="deb-extra-metadata",
-    ),
-    # rpm
-    pytest.param(NfpmRpmPackageFieldSet, {}, True, id="archlinux-minimal-metadata"),
-    pytest.param(
-        NfpmRpmPackageFieldSet,
-        # rpm uses "packager" not "maintainer"
-        {"maintainer": "RPM Maintainer <rpm-maintainer@example.com>"},
-        False,
-        id="rpm-invalid-field-maintainer",
-    ),
-    pytest.param(
-        NfpmRpmPackageFieldSet,
-        {
-            "homepage": "https://rpm.example.com",
-            "license": "Apache-2.0",
-            "packager": "RPM Maintainer <rpm-maintainer@example.com>",
-            "vendor": "Example Organization",
-            "prefixes": ["/usr", "/usr/local", "/opt/foobar"],
-            "replaces": ["partial-pkg", "replaced-pkg"],
-            "provides": ["pkg"],
-            "depends": ["git", "libc6 (>= 2.2.1)", "default-mta | mail-transport-agent"],
-            "recommends": ["other-pkg"],
-            "suggests": ["beneficial-other-pkg"],
-            "conflicts": ["replaced-pkg"],
-            "compression": "zstd:fastest",  # defaults to gzip:-1
-            "scripts": {"postinstall": "postinstall.sh", "verify": "rpm-verify.sh"},
-            "ghost_contents": ["/var/log/pkg.log"],
-        },
-        True,
-        id="rpm-extra-metadata",
     ),
 )
 
@@ -289,7 +209,7 @@ def test_generate_package_with_contents(
                             file_group="root",
                         ),
                     }},
-                    content_type="doc",
+                    content_type="",
                     file_owner="root",
                     file_group="{_pkg_name}",
                     file_mode="644",  # same as 0o644 and "rw-r--r--"
