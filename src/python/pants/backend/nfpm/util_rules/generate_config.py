@@ -24,7 +24,11 @@ from pants.engine.internals.graph import transitive_targets as transitive_target
 from pants.engine.internals.native_engine import Digest
 from pants.engine.intrinsics import create_digest_to_digest, directory_digest_to_digest_entries
 from pants.engine.rules import collect_rules, implicitly, rule
-from pants.engine.target import FieldSetsPerTargetRequest, TransitiveTargetsRequest
+from pants.engine.target import (
+    FieldSetsPerTarget,
+    FieldSetsPerTargetRequest,
+    TransitiveTargetsRequest,
+)
 from pants.engine.unions import UnionMembership
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
@@ -85,13 +89,13 @@ async def generate_nfpm_yaml(
     invalid_content_file_addresses = []
     src_missing_from_sandbox_addresses = []
 
-    content_field_sets = await find_valid_field_sets(
+    content_field_sets: FieldSetsPerTarget = await find_valid_field_sets(
         FieldSetsPerTargetRequest(NfpmContentFieldSet, transitive_targets.dependencies),
         **implicitly(),
     )
 
     field_set: NfpmContentFieldSet
-    for field_set in content_field_sets.collection:
+    for field_set in content_field_sets.field_sets:
         try:
             nfpm_content = field_set.nfpm_config(
                 content_sandbox_files=content_sandbox_files, default_mtime=default_mtime
