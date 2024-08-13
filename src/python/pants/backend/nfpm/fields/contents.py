@@ -72,7 +72,7 @@ _FILEMODE_TABLE = (
     ((stat.S_IWOTH, "w"),),
     ((stat.S_IXOTH | stat.S_ISVTX, "t"), (stat.S_ISVTX, "T"), (stat.S_IXOTH, "x")),
 )
-_FILEMODE_CHARS = set("-rwxsStT")
+_FILEMODE_CHARS = frozenset("-rwxsStT")
 
 
 def _parse_filemode(filemode: str) -> int:
