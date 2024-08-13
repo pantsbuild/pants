@@ -1969,7 +1969,9 @@ class TupleSequenceField(Generic[T], Field):
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return value_or_default
-        if not isinstance(value_or_default, Iterable):
+        if isinstance(value_or_default, str) or not isinstance(
+            value_or_default, collections.abc.Iterable
+        ):
             raise InvalidFieldTypeException(
                 address,
                 cls.alias,
@@ -1991,7 +1993,7 @@ class TupleSequenceField(Generic[T], Field):
 
         validated: list[tuple[T, ...]] = []
         for i, x in enumerate(value_or_default):
-            if not isinstance(x, Iterable):
+            if isinstance(x, str) or not isinstance(x, collections.abc.Iterable):
                 raise invalid_member_exception(i, x)
             element = tuple(x)
             if cls.expected_element_count >= 0 and cls.expected_element_count != len(element):
