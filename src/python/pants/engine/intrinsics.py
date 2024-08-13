@@ -136,7 +136,7 @@ async def run_interactive_process(iproc: InteractiveProcess) -> InteractiveProce
     if not iproc.restartable:
         mark_nonrestartable()
 
-    ret: InteractiveProcessResult = await _interactive_process(iproc)
+    ret: InteractiveProcessResult = await _interactive_process(iproc, **implicitly())
     return ret
 
 
