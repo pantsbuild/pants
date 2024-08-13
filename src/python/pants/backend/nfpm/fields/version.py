@@ -21,7 +21,7 @@ class NfpmVersionField(StringField):
 
         If '{NfpmVersionSchemaField.alias}' is not 'semver', then this
         should not be prefixed with a 'v' because some package managers,
-        require the version start with a digit.
+        like deb, require the version start with a digit.
 
         See the '{NfpmVersionSchemaField.alias}' field's help for more
         details about how this field gets parsed by nFPM when it is 'semver'.
@@ -82,6 +82,8 @@ class NfpmVersionPrereleaseField(StringField):
         This is a pre-release indicator like "alpha" or "beta" and often includes
         a numeric component like "rc1" and "rc2".
 
+        For deb, prerelease is typically prefixed with a "~" in the version.
+
         nFPM extracts the default for this from '{NfpmVersionField.alias}'
         if it is semver compatible. If you set '{NfpmVersionPrereleaseField.alias}',
         then any prerelease component of '{NfpmVersionField.alias}' gets discarded.
@@ -98,6 +100,9 @@ class NfpmVersionMetadataField(StringField):
 
         This is typically prefixed with a "+" in the version. If the version
         contains "+git", then the '{NfpmVersionMetadataField.alias}' is "git".
+        Debian has various conventions for this metadata, including things like
+        "+b", "+nmu", "+really", and "+deb10u1". See:
+        https://www.debian.org/doc/debian-policy/ch-controlfields.html#special-version-conventions
 
         nFPM extracts the default for this from '{NfpmVersionField.alias}'
         if it is semver compatible. If you set '{NfpmVersionMetadataField.alias}',
@@ -137,6 +142,12 @@ class NfpmVersionEpochField(IntField):
         lambda: f"""
         A package with a higher version epoch will always be considered newer.
         This is primarily useful when the version numbering scheme has changed.
+
+        Debian documentation warns against using epoch in most cases:
+        https://www.debian.org/doc/debian-policy/ch-controlfields.html#epochs-should-be-used-sparingly
+
+        When this field is None (the default) nFPM will use "" for deb packages,
+        and "0" for rpm packages.
 
         N.B.: The nFPM documentation incorrectly notes that nFPM can parse this
         from the '{NfpmVersionField.alias}' field; the nFPM code actually does
