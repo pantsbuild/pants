@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 from textwrap import dedent
-from typing import ContextManager, Type, cast
+from typing import ContextManager, cast
 
 import pytest
 
@@ -77,7 +77,7 @@ _a = Address("", target_name="t")
     ),
 )
 def test_dep_category_for_target(
-    tgt: Target, field_set_type: Type[NfpmPackageFieldSet], expected: _DepCategory
+    tgt: Target, field_set_type: type[NfpmPackageFieldSet], expected: _DepCategory
 ):
     category = _DepCategory.for_target(tgt, field_set_type)
     assert category == expected
@@ -143,7 +143,7 @@ def rule_runner() -> RuleRunner:
 def test_populate_nfpm_content_sandbox(
     rule_runner: RuleRunner,
     packager: str,
-    field_set_type: Type[NfpmPackageFieldSet],
+    field_set_type: type[NfpmPackageFieldSet],
     dependencies: list[str],
     scripts: dict[str, str],
     expected: set[str] | ContextManager,

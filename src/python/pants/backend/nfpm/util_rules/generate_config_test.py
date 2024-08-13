@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from typing import Any, ContextManager, Type, cast
+from typing import Any, ContextManager, cast
 
 import pytest
 import yaml
@@ -72,7 +72,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
 def test_generate_nfpm_yaml(
     rule_runner: RuleRunner,
     packager: str,
-    field_set_type: Type[NfpmPackageFieldSet],
+    field_set_type: type[NfpmPackageFieldSet],
     dependencies: list[str],
     scripts: dict[str, str],
     content_sandbox_files: list[str],

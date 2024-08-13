@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from typing import Any, ContextManager, Type, cast
+from typing import Any, ContextManager, cast
 
 import pytest
 from _pytest.mark import ParameterSet
@@ -51,7 +51,7 @@ def rule_runner() -> RuleRunner:
 def build_package(
     rule_runner: RuleRunner,
     binary_target: Target,
-    field_set_type: Type[NfpmPackageFieldSet],
+    field_set_type: type[NfpmPackageFieldSet],
 ) -> BuiltPackage:
     field_set = field_set_type.create(binary_target)
     result = rule_runner.request(BuiltPackage, [field_set])
@@ -60,7 +60,7 @@ def build_package(
 
 
 def _assert_one_built_artifact(
-    pkg_name: str, built_package: BuiltPackage, field_set_type: Type[NfpmPackageFieldSet]
+    pkg_name: str, built_package: BuiltPackage, field_set_type: type[NfpmPackageFieldSet]
 ) -> None:
     assert len(built_package.artifacts) == 1
     artifact = built_package.artifacts[0]
@@ -78,7 +78,7 @@ _test_cases: tuple[ParameterSet, ...] = ()  # TODO: add packagers
 @pytest.mark.parametrize("field_set_type,extra_metadata,valid_target", _test_cases)
 def test_generate_package_without_contents(
     rule_runner: RuleRunner,
-    field_set_type: Type[NfpmPackageFieldSet],
+    field_set_type: type[NfpmPackageFieldSet],
     extra_metadata: dict[str, Any],
     valid_target: bool,
 ) -> None:
@@ -113,7 +113,7 @@ def test_generate_package_without_contents(
 @pytest.mark.parametrize("field_set_type,extra_metadata,valid_target", _test_cases)
 def test_generate_package_with_contents(
     rule_runner: RuleRunner,
-    field_set_type: Type[NfpmPackageFieldSet],
+    field_set_type: type[NfpmPackageFieldSet],
     extra_metadata: dict[str, Any],
     valid_target: bool,
 ) -> None:

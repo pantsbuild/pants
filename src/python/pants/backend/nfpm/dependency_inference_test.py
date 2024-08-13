@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Type
 
 import pytest
 
@@ -47,7 +46,7 @@ _pkg_version = "3.2.1"
     (),  # TODO: add packagers
 )
 def test_infer_nfpm_package_scripts_dependencies(
-    rule_runner: RuleRunner, packager: str, scripts_field_type: Type[NfpmPackageScriptsField]
+    rule_runner: RuleRunner, packager: str, scripts_field_type: type[NfpmPackageScriptsField]
 ) -> None:
     scripts_types = tuple(script_type for script_type in scripts_field_type.nfpm_aliases)
     scripts = {script_type: f"scripts/{script_type}.sh" for script_type in scripts_types}

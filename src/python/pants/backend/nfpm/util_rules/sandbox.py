@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Type, cast
+from typing import cast
 
 from pants.backend.nfpm.field_sets import NFPM_PACKAGE_FIELD_SET_TYPES, NfpmPackageFieldSet
 from pants.backend.nfpm.fields.contents import (
@@ -59,7 +59,7 @@ class _DepCategory(Enum):
     def for_target(
         cls,
         tgt: Target,
-        field_set_type: Type[NfpmPackageFieldSet],
+        field_set_type: type[NfpmPackageFieldSet],
     ) -> _DepCategory:
         # Assumption: this gets called with atomic targets not target generators. For example,
         # TransitiveTargets gets calculated AFTER target generation/expansion.
