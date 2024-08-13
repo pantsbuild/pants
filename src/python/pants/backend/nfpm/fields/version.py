@@ -146,8 +146,7 @@ class NfpmVersionEpochField(IntField):
         Debian documentation warns against using epoch in most cases:
         https://www.debian.org/doc/debian-policy/ch-controlfields.html#epochs-should-be-used-sparingly
 
-        When this field is None (the default) nFPM will use "" for deb packages,
-        and "0" for rpm packages.
+        When this field is None (the default) nFPM will use "" for deb packages.
 
         N.B.: The nFPM documentation incorrectly notes that nFPM can parse this
         from the '{NfpmVersionField.alias}' field; the nFPM code actually does
