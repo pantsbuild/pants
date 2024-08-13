@@ -30,6 +30,7 @@ from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,15 @@ class PexCli(TemplatedExternalTool):
 
     # extra args to be passed to the pex tool; note that they
     # are going to apply to all invocations of the pex tool.
-    global_args = ArgsListOption(example="--check=error --no-compile")
+    global_args = ArgsListOption(
+        example="--check=error --no-compile",
+        extra_help=softwrap(
+            """
+            Note that these apply to all invocations of the pex tool, including building `pex_binary`
+            targets, preparing `python_test` targets to run, and generating lockfiles.
+            """
+        ),
+    )
 
     @classproperty
     def default_known_versions(cls):
