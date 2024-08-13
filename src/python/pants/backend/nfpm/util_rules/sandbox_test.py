@@ -14,35 +14,32 @@ from pants.engine.target import Target
 
 # _NfpmSortedDeps.sort(...)
 
-_pkg_name = "pkg"
-_pkg_version = "3.2.1"
-
-_a = Address("", target_name="t")
+_A = Address("", target_name="t")
 
 
 @pytest.mark.parametrize(
     "tgt,field_set_type,expected",
     (
-        (NfpmContentDir({"dst": "/foo"}, _a), NfpmPackageFieldSet, _DepCategory.ignore),
+        (NfpmContentDir({"dst": "/foo"}, _A), NfpmPackageFieldSet, _DepCategory.ignore),
         (
-            NfpmContentSymlink({"dst": "/foo", "src": "/bar"}, _a),
+            NfpmContentSymlink({"dst": "/foo", "src": "/bar"}, _A),
             NfpmPackageFieldSet,  # does not matter
             _DepCategory.ignore,
         ),
         (
-            NfpmContentFile({"dst": "/foo", "src": "bar", "dependencies": [":bar"]}, _a),
+            NfpmContentFile({"dst": "/foo", "src": "bar", "dependencies": [":bar"]}, _A),
             NfpmPackageFieldSet,  # does not matter
             _DepCategory.nfpm_content_from_dependency,
         ),
         (
-            NfpmContentFile({"dst": "/foo", "source": "bar"}, _a),
+            NfpmContentFile({"dst": "/foo", "source": "bar"}, _A),
             NfpmPackageFieldSet,  # does not matter
             _DepCategory.nfpm_content_from_source,
         ),
-        (GenericTarget({}, _a), NfpmPackageFieldSet, _DepCategory.remaining),
-        (FileTarget({"source": "foo"}, _a), NfpmPackageFieldSet, _DepCategory.remaining),
-        (ResourceTarget({"source": "foo"}, _a), NfpmPackageFieldSet, _DepCategory.remaining),
-        (ArchiveTarget({"format": "zip"}, _a), NfpmPackageFieldSet, _DepCategory.remaining),
+        (GenericTarget({}, _A), NfpmPackageFieldSet, _DepCategory.remaining),
+        (FileTarget({"source": "foo"}, _A), NfpmPackageFieldSet, _DepCategory.remaining),
+        (ResourceTarget({"source": "foo"}, _A), NfpmPackageFieldSet, _DepCategory.remaining),
+        (ArchiveTarget({"format": "zip"}, _A), NfpmPackageFieldSet, _DepCategory.remaining),
     ),
 )
 def test_dep_category_for_target(

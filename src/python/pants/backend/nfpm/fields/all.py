@@ -6,7 +6,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import ClassVar
 
-from pants.backend.nfpm.subsystem import mtime_default
+from pants.backend.nfpm.subsystem import MTIME_DEFAULT
 from pants.core.goals.package import OutputPathField
 from pants.engine.target import Dependencies, StringField
 from pants.util.docutil import bin_name
@@ -28,7 +28,7 @@ class NfpmPackageNameField(StringField):
 class NfpmPackageMtimeField(StringField):
     nfpm_alias = ""  # field handled separately to call normalized_value
     alias: ClassVar[str] = "mtime"
-    default = mtime_default
+    default = MTIME_DEFAULT
     help = help_text(
         f"""
         The file modification time as an RFC 3339 formatted string.
@@ -43,7 +43,7 @@ class NfpmPackageMtimeField(StringField):
         package. To set the mtime for package contents, use the `file_mtime` field
         on the relevant `nfpm_content_*` targets.
 
-        The default value is {repr(mtime_default)}. You may also override
+        The default value is {repr(MTIME_DEFAULT)}. You may also override
         the default value by setting `[nfpm].default_mtime` in `pants.toml`,
         or by setting the `SOURCE_DATE_EPOCH` environment variable.
 

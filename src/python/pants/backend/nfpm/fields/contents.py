@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Any, ClassVar, Iterable, Optional, Union, cast
 
 from pants.backend.nfpm.fields.all import NfpmDependencies
-from pants.backend.nfpm.subsystem import mtime_default
+from pants.backend.nfpm.subsystem import MTIME_DEFAULT
 from pants.core.target_types import RelocatedFiles
 from pants.engine.addresses import Address
 from pants.engine.target import (
@@ -185,7 +185,7 @@ class NfpmContentFileModeField(IntField):
 class NfpmContentFileMtimeField(StringField):
     nfpm_alias = "contents.[].file_info.mtime"
     alias: ClassVar[str] = "file_mtime"
-    default = mtime_default
+    default = MTIME_DEFAULT
     help = help_text(
         f"""
         The file modification time as an RFC 3339 formatted string.
@@ -202,7 +202,7 @@ class NfpmContentFileMtimeField(StringField):
         for reproducible packaging builds, and reproducible builds are required
         for pants to provide its fine-grained caches.
 
-        The default value is {repr(mtime_default)}. You may also override
+        The default value is {repr(MTIME_DEFAULT)}. You may also override
         the default value by setting `[nfpm].default_mtime` in `pants.toml`,
         or by setting the `SOURCE_DATE_EPOCH` environment variable.
 
