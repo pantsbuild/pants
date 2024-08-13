@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::BTreeMap;
+use std::fmt;
 use std::io::{self, Write};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -20,10 +21,22 @@ use url::Url;
 use crate::context::Core;
 use workunit_store::{in_workunit, Level};
 
+#[derive(Debug)]
 enum StreamingError {
     Retryable(String),
     Permanent(String),
 }
+
+impl fmt::Display for StreamingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StreamingError::Retryable(inner) => write!(f, "{} (retryable)", inner.as_str()),
+            StreamingError::Permanent(inner) => write!(f, "{} (unretryable)", inner.as_str()),
+        }
+    }
+}
+
+impl std::error::Error for StreamingError {}
 
 impl From<StreamingError> for String {
     fn from(err: StreamingError) -> Self {
@@ -208,6 +221,7 @@ pub async fn download(
     expected_digest: hashing::Digest,
 ) -> Result<(), String> {
     let core2 = core.clone();
+    let mut attempt_number = 0;
     let (actual_digest, bytes) = in_workunit!(
         "download_file",
         Level::Debug,
@@ -225,6 +239,9 @@ pub async fn download(
             RetryIf::spawn(
                 retry_strategy,
                 || {
+                    attempt_number += 1;
+                    log::debug!("Downloading {} (attempt #{})", &url, &attempt_number);
+
                     attempt_download(
                         &core2,
                         &url,
@@ -233,7 +250,11 @@ pub async fn download(
                         expected_digest,
                     )
                 },
-                |err: &StreamingError| matches!(err, StreamingError::Retryable(_)),
+                |err: &StreamingError| {
+                    let is_retryable = matches!(err, StreamingError::Retryable(_));
+                    log::debug!("Error while downloading {}: {}", &url, err);
+                    is_retryable
+                },
             )
             .await
         }
