@@ -123,8 +123,6 @@ class NfpmPlatformField(StringField):
         You probably do not need to change the package's OS. nFPM is designed
         with the assumption that this is a GOOS value (since nFPM is part of the
         "goreleaser" project). But, nFPM does not do much with it.
-
-        For deb, this can be used as part of the 'Architecture' entry.
         """
     )
 
@@ -160,13 +158,6 @@ class NfpmLicenseField(StringField):
         See also these rpm-specific descriptions of how to set this field (this
         is helpful info even if you are not using rpm):
         https://docs.fedoraproject.org/en-US/legal/license-field/
-
-        nFPM does not yet generate the debian/copyright file, so this field is
-        technically unused for now. Even for deb, we recommend using this field
-        to document the software license for this package. See also these pages
-        about specifying a license for deb packaging:
-        https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/#license-specification
-        https://wiki.debian.org/Proposals/CopyrightFormat#Differences_between_DEP5_and_SPDX
         """
     )
 
