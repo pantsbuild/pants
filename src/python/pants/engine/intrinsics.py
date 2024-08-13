@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -26,7 +27,7 @@ from pants.engine.internals.native_dep_inference import (
     NativeParsedJavascriptDependencies,
     NativeParsedPythonDependencies,
 )
-from pants.engine.internals.native_engine import NativeDependenciesRequest
+from pants.engine.internals.native_engine import NativeDependenciesRequest, mark_nonrestartable
 from pants.engine.internals.session import RunId, SessionValues
 from pants.engine.process import (
     FallibleProcessResult,
@@ -35,7 +36,7 @@ from pants.engine.process import (
     Process,
     ProcessExecutionEnvironment,
 )
-from pants.engine.rules import _uncacheable_rule, collect_rules, rule
+from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
 
 
 @rule
@@ -120,11 +121,37 @@ async def run_id() -> RunId:
     return await native_engine.run_id()
 
 
+# NB: Call one of the helpers below, instead of calling this rule directly,
+#  to ensure correct application of restartable logic.
 @_uncacheable_rule
-async def interactive_process(
+async def _interactive_process(
     process: InteractiveProcess, process_execution_environment: ProcessExecutionEnvironment
 ) -> InteractiveProcessResult:
     return await native_engine.interactive_process(process, process_execution_environment)
+
+
+async def run_interactive_process(iproc: InteractiveProcess) -> InteractiveProcessResult:
+    # NB: We must call mark_nonrestartable() in this helper, rather than in a nested @rule call,
+    #  so that the Task for the @rule that calls this helper is the one marked as non-restartable.
+    if not iproc.restartable:
+        mark_nonrestartable()
+
+    ret: InteractiveProcessResult = await _interactive_process(iproc)
+    return ret
+
+
+async def run_interactive_process_in_environment(
+    iproc: InteractiveProcess, environment_name: EnvironmentName
+) -> InteractiveProcessResult:
+    # NB: We must call mark_nonrestartable() in this helper, rather than in a nested @rule call,
+    #  so that the Task for the @rule that calls this helper is the one marked as non-restartable.
+    if not iproc.restartable:
+        mark_nonrestartable()
+
+    ret: InteractiveProcessResult = await _interactive_process(
+        iproc, **implicitly({environment_name: EnvironmentName})
+    )
+    return ret
 
 
 @rule
