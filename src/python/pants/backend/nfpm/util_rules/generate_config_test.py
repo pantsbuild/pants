@@ -11,7 +11,12 @@ import yaml
 
 from pants.backend.nfpm.config import NfpmFileInfo
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
-from pants.backend.nfpm.field_sets import NfpmDebPackageFieldSet, NfpmPackageFieldSet
+from pants.backend.nfpm.field_sets import (
+    NFPM_CONTENT_FIELD_SET_TYPES,
+    NfpmContentFieldSet,
+    NfpmDebPackageFieldSet,
+    NfpmPackageFieldSet,
+)
 from pants.backend.nfpm.target_types import target_types as nfpm_target_types
 from pants.backend.nfpm.target_types_rules import rules as nfpm_target_types_rules
 from pants.backend.nfpm.util_rules.generate_config import (
@@ -25,6 +30,7 @@ from pants.engine.fs import CreateDigest, DigestContents, FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Address, Digest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
+from pants.engine.unions import UnionRule
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import RuleRunner
 
@@ -45,6 +51,10 @@ def rule_runner() -> RuleRunner:
             *nfpm_target_types_rules(),
             *nfpm_dependency_inference_rules(),
             *nfpm_generate_config_rules(),
+            *(
+                UnionRule(NfpmContentFieldSet, field_set_type)
+                for field_set_type in NFPM_CONTENT_FIELD_SET_TYPES
+            ),
             QueryRule(NfpmPackageConfig, (NfpmPackageConfigRequest,)),
             QueryRule(DigestContents, (Digest,)),
         ],
@@ -58,7 +68,6 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     return rule_runner.request(Digest, [CreateDigest(files)])
 
 
-@pytest.mark.skip("no nfpm_*_package targets available yet")
 @pytest.mark.parametrize(
     (
         "packager",
