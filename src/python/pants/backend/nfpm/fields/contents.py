@@ -60,7 +60,7 @@ class NfpmContentFileGroupField(StringField):
 
 
 # inlined private var from https://github.com/python/cpython/blob/3.9/Lib/stat.py#L128-L154
-_filemode_table = (
+_FILEMODE_TABLE = (
     (),  # exclude irrelevant filetype bits that are in stat._filemode_table
     ((stat.S_IRUSR, "r"),),
     ((stat.S_IWUSR, "w"),),
@@ -72,7 +72,7 @@ _filemode_table = (
     ((stat.S_IWOTH, "w"),),
     ((stat.S_IXOTH | stat.S_ISVTX, "t"), (stat.S_ISVTX, "T"), (stat.S_IXOTH, "x")),
 )
-_filemode_chars = set("-rwxsStT")
+_FILEMODE_CHARS = set("-rwxsStT")
 
 
 def _parse_filemode(filemode: str) -> int:
@@ -82,10 +82,10 @@ def _parse_filemode(filemode: str) -> int:
     """
     if len(filemode) != 9:
         raise ValueError(f"Symbolic file mode must be exactly 9 characters, not {len(filemode)}.")
-    if not _filemode_chars.issuperset(filemode):
+    if not _FILEMODE_CHARS.issuperset(filemode):
         raise ValueError(
             "Cannot parse symbolic file mode with unknown symbols: "
-            + "".join(set(filemode).difference(_filemode_chars))
+            + "".join(set(filemode).difference(_FILEMODE_CHARS))
         )
 
     mode = 0
@@ -93,7 +93,7 @@ def _parse_filemode(filemode: str) -> int:
     for i, symbol in enumerate(filemode, 1):
         if symbol == "-":
             continue
-        for bit, char in _filemode_table[i]:
+        for bit, char in _FILEMODE_TABLE[i]:
             if symbol == char:
                 mode = mode | bit
                 break
@@ -101,7 +101,7 @@ def _parse_filemode(filemode: str) -> int:
             # else none of the chars matched symbol (loop didn't hit break)
             raise ValueError(
                 f"Symbol at position {i} is unknown: '{symbol}'. Valid symbols at "
-                f"position {i}: {''.join(char for _, char in _filemode_table[i])}"
+                f"position {i}: {''.join(char for _, char in _FILEMODE_TABLE[i])}"
             )
     return mode
 

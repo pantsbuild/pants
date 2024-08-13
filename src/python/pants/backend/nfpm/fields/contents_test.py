@@ -8,8 +8,8 @@ from typing import ContextManager, cast
 import pytest
 
 from pants.backend.nfpm.fields.contents import (
+    _FILEMODE_CHARS,
     NfpmContentFileModeField,
-    _filemode_chars,
     _parse_filemode,
 )
 from pants.engine.internals.native_engine import Address
@@ -28,7 +28,7 @@ from pants.testutil.pytest_util import no_exception
         # bad chars
         ("RWX" * 2, pytest.raises(ValueError)),
         ("a--b--c--", pytest.raises(ValueError)),
-        *((char * 9, pytest.raises(ValueError)) for char in _filemode_chars - {"-"}),
+        *((char * 9, pytest.raises(ValueError)) for char in _FILEMODE_CHARS - {"-"}),
         # success
         ("---" * 3, 0),
         ("r--" * 3, 0o0444),
