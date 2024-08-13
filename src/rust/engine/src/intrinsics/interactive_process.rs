@@ -11,7 +11,6 @@ use process_execution::local::{
     apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
 };
 use process_execution::{ManagedChild, ProcessExecutionStrategy};
-use pyo3::exceptions::PyException;
 use pyo3::prelude::{pyfunction, wrap_pyfunction, PyAny, PyModule, PyResult, Python, ToPyObject};
 use stdio::TryCloneAsFile;
 use tokio::process;
@@ -19,18 +18,12 @@ use workunit_store::{in_workunit, Level};
 
 use crate::context::Context;
 use crate::externs::{self, PyGeneratorResponseNativeCall};
-use crate::nodes::{task_get_context, task_side_effected, ExecuteProcess, NodeResult};
+use crate::nodes::{task_get_context, ExecuteProcess, NodeResult};
 use crate::python::{Failure, Value};
 
 pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(mark_nonrestartable, m)?)?;
     m.add_function(wrap_pyfunction!(interactive_process, m)?)?;
     Ok(())
-}
-
-#[pyfunction]
-fn mark_nonrestartable() -> PyResult<()> {
-    task_side_effected().map_err(PyException::new_err)
 }
 
 #[pyfunction]

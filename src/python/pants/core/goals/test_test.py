@@ -607,7 +607,7 @@ def test_debug_target(rule_runner: PythonRuleRunner, monkeypatch: MonkeyPatch) -
     def noop():
         pass
 
-    monkeypatch.setattr("pants.engine.intrinsics.mark_nonrestartable", noop)
+    monkeypatch.setattr("pants.engine.intrinsics.task_side_effected", noop)
     exit_code, _ = run_test_rule(
         rule_runner,
         request_type=SuccessfulRequest,

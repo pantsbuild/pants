@@ -91,7 +91,7 @@ def run_export_rule(
     def noop():
         pass
 
-    monkeypatch.setattr("pants.engine.intrinsics.mark_nonrestartable", noop)
+    monkeypatch.setattr("pants.engine.intrinsics.task_side_effected", noop)
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         digest = rule_runner.request(Digest, [CreateDigest([FileContent("foo/bar", b"BAR")])])
         result: Export = run_rule_with_mocks(

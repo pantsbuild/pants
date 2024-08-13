@@ -94,7 +94,7 @@ def single_target_run(
     def noop():
         pass
 
-    monkeypatch.setattr("pants.engine.intrinsics.mark_nonrestartable", noop)
+    monkeypatch.setattr("pants.engine.intrinsics.task_side_effected", noop)
     with mock_console(rule_runner.options_bootstrapper) as (console, _):
         return run_rule_with_mocks(
             run,

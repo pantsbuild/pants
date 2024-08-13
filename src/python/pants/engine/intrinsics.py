@@ -27,7 +27,7 @@ from pants.engine.internals.native_dep_inference import (
     NativeParsedJavascriptDependencies,
     NativeParsedPythonDependencies,
 )
-from pants.engine.internals.native_engine import NativeDependenciesRequest, mark_nonrestartable
+from pants.engine.internals.native_engine import NativeDependenciesRequest, task_side_effected
 from pants.engine.internals.session import RunId, SessionValues
 from pants.engine.process import (
     FallibleProcessResult,
@@ -131,10 +131,10 @@ async def _interactive_process(
 
 
 async def run_interactive_process(iproc: InteractiveProcess) -> InteractiveProcessResult:
-    # NB: We must call mark_nonrestartable() in this helper, rather than in a nested @rule call,
+    # NB: We must call task_side_effected() in this helper, rather than in a nested @rule call,
     #  so that the Task for the @rule that calls this helper is the one marked as non-restartable.
     if not iproc.restartable:
-        mark_nonrestartable()
+        task_side_effected()
 
     ret: InteractiveProcessResult = await _interactive_process(iproc, **implicitly())
     return ret
@@ -143,10 +143,10 @@ async def run_interactive_process(iproc: InteractiveProcess) -> InteractiveProce
 async def run_interactive_process_in_environment(
     iproc: InteractiveProcess, environment_name: EnvironmentName
 ) -> InteractiveProcessResult:
-    # NB: We must call mark_nonrestartable() in this helper, rather than in a nested @rule call,
+    # NB: We must call task_side_effected() in this helper, rather than in a nested @rule call,
     #  so that the Task for the @rule that calls this helper is the one marked as non-restartable.
     if not iproc.restartable:
-        mark_nonrestartable()
+        task_side_effected()
 
     ret: InteractiveProcessResult = await _interactive_process(
         iproc, **implicitly({environment_name: EnvironmentName})
