@@ -23,16 +23,14 @@ class Buildifier(TemplatedExternalTool):
         """
     )
 
-    default_version = "5.1.0"
+    default_version = "7.1.2"
     default_known_versions = [
-        "5.1.0|macos_x86_64|c9378d9f4293fc38ec54a08fbc74e7a9d28914dae6891334401e59f38f6e65dc|7125968",
-        "5.1.0|macos_arm64 |745feb5ea96cb6ff39a76b2821c57591fd70b528325562486d47b5d08900e2e4|7334498",
-        "5.1.0|linux_x86_64|52bf6b102cb4f88464e197caac06d69793fa2b05f5ad50a7e7bf6fbd656648a3|7226100",
-        "5.1.0|linux_arm64 |917d599dbb040e63ae7a7e1adb710d2057811902fdc9e35cce925ebfd966eeb8|7171938",
+        "7.1.2|macos_x86_64|687c49c318fb655970cf716eed3c7bfc9caeea4f2931a2fd36593c458de0c537|7591232",
+        "7.1.2|macos_arm64 |d0909b645496608fd6dfc67f95d9d3b01d90736d7b8c8ec41e802cb0b7ceae7c|7528994",
+        "7.1.2|linux_x86_64|28285fe7e39ed23dc1a3a525dfcdccbc96c0034ff1d4277905d2672a71b38f13|7702060",
+        "7.1.2|linux_arm64 |c22a44eee37b8927167ee6ee67573303f4e31171e7ec3a8ea021a6a660040437|7568336",
     ]
-    default_url_template = (
-        "https://github.com/bazelbuild/buildtools/releases/download/{version}/buildifier-{platform}"
-    )
+    default_url_template = "https://github.com/bazelbuild/buildtools/releases/download/v{version}/buildifier-{platform}"
     default_url_platform_mapping = {
         "macos_arm64": "darwin-arm64",
         "macos_x86_64": "darwin-amd64",
