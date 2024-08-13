@@ -7,14 +7,6 @@ from typing import TypedDict
 
 import yaml
 
-from pants.backend.nfpm.fields.contents import (
-    NfpmContentFileGroupField,
-    NfpmContentFileModeField,
-    NfpmContentFileMtimeField,
-    NfpmContentFileOwnerField,
-)
-from pants.engine.target import Target
-
 
 class OctalInt(int):
     # noinspection PyUnusedLocal
@@ -39,23 +31,6 @@ class NfpmFileInfo(TypedDict, total=False):
     group: str | None
     mode: OctalInt | None
     mtime: str | None
-
-
-def file_info(
-    target: Target, default_is_executable: bool | None = None, default_mtime: str | None = None
-) -> NfpmFileInfo:
-    mode = target[NfpmContentFileModeField].value
-    if mode is None and default_is_executable is not None:
-        # NB: The execute bit is the only mode bit we can safely get from the sandbox.
-        # If we don't pass an explicit mode, nFPM will try to use the sandboxed file's mode.
-        mode = 0o755 if default_is_executable else 0o644
-
-    return NfpmFileInfo(
-        owner=target[NfpmContentFileOwnerField].value,
-        group=target[NfpmContentFileGroupField].value,
-        mode=OctalInt(mode) if mode is not None else mode,
-        mtime=target[NfpmContentFileMtimeField].normalized_value(default_mtime),
-    )
 
 
 class NfpmContent(TypedDict, total=False):

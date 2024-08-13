@@ -3,19 +3,35 @@
 
 from __future__ import annotations
 
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
+from pants.backend.nfpm.config import NfpmContent, NfpmFileInfo, OctalInt
 from pants.backend.nfpm.fields.all import (
     NfpmOutputPathField,
     NfpmPackageMtimeField,
     NfpmPackageNameField,
 )
+from pants.backend.nfpm.fields.contents import (
+    NfpmContentDirDstField,
+    NfpmContentDstField,
+    NfpmContentFileGroupField,
+    NfpmContentFileModeField,
+    NfpmContentFileMtimeField,
+    NfpmContentFileOwnerField,
+    NfpmContentFileSourceField,
+    NfpmContentSrcField,
+    NfpmContentSymlinkDstField,
+    NfpmContentSymlinkSrcField,
+    NfpmContentTypeField,
+)
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.core.goals.package import PackageFieldSet
+from pants.engine.fs import FileEntry
+from pants.engine.internals.native_engine import Field
 from pants.engine.rules import collect_rules
-from pants.engine.target import DescriptionField, Target
+from pants.engine.target import DescriptionField, FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
@@ -91,11 +107,137 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
 NFPM_PACKAGE_FIELD_SET_TYPES: FrozenOrderedSet[type[NfpmPackageFieldSet]] = FrozenOrderedSet(())
 
 
+@dataclass(frozen=True)
+class NfpmContentFieldSet(FieldSet, metaclass=ABCMeta):
+    required_fields: ClassVar[tuple[type[Field], ...]] = (
+        NfpmContentFileOwnerField,
+        NfpmContentFileGroupField,
+        NfpmContentFileModeField,
+        NfpmContentFileMtimeField,
+    )
+
+    owner: NfpmContentFileOwnerField
+    group: NfpmContentFileGroupField
+    mode: NfpmContentFileModeField
+    mtime: NfpmContentFileMtimeField
+
+    @abstractmethod
+    def nfpm_config(
+        self, *, content_sandbox_files: dict[str, FileEntry], default_mtime: str | None = None
+    ) -> NfpmContent:
+        pass
+
+    def file_info(
+        self, default_is_executable: bool | None = None, default_mtime: str | None = None
+    ) -> NfpmFileInfo:
+        mode = self.mode.value
+        if mode is None and default_is_executable is not None:
+            # NB: The execute bit is the only mode bit we can safely get from the sandbox.
+            # If we don't pass an explicit mode, nFPM will try to use the sandboxed file's mode.
+            mode = 0o755 if default_is_executable else 0o644
+
+        return NfpmFileInfo(
+            owner=self.owner.value,
+            group=self.group.value,
+            mode=OctalInt(mode) if mode is not None else mode,
+            mtime=self.mtime.normalized_value(default_mtime),
+        )
+
+
+@dataclass(frozen=True)
+class NfpmContentDirFieldSet(NfpmContentFieldSet):
+    required_fields = (
+        *NfpmContentFieldSet.required_fields,
+        NfpmContentDirDstField,
+    )
+
+    dst: NfpmContentDirDstField
+
+    def nfpm_config(
+        self, *, content_sandbox_files: dict[str, FileEntry], default_mtime: str | None = None
+    ) -> NfpmContent:
+        return NfpmContent(
+            type="dir",
+            dst=self.dst.value,
+            file_info=self.file_info(default_mtime=default_mtime),
+        )
+
+
+@dataclass(frozen=True)
+class NfpmContentSymlinkFieldSet(NfpmContentFieldSet):
+    required_fields = (
+        *NfpmContentFieldSet.required_fields,
+        NfpmContentSymlinkDstField,
+    )
+
+    src: NfpmContentSymlinkSrcField
+    dst: NfpmContentSymlinkDstField
+
+    def nfpm_config(
+        self, *, content_sandbox_files: dict[str, FileEntry], default_mtime: str | None = None
+    ) -> NfpmContent:
+        return NfpmContent(
+            type="symlink",
+            src=self.src.value,
+            dst=self.dst.value,
+            file_info=self.file_info(default_mtime=default_mtime),
+        )
+
+
+@dataclass(frozen=True)
+class NfpmContentFileFieldSet(NfpmContentFieldSet):
+    required_fields = (
+        *NfpmContentFieldSet.required_fields,
+        NfpmContentDstField,
+        NfpmContentTypeField,
+    )
+
+    source: NfpmContentFileSourceField
+    src: NfpmContentSrcField
+    dst: NfpmContentDstField
+    content_type: NfpmContentTypeField
+
+    class InvalidTarget(Exception):
+        pass
+
+    class SrcMissingFomSandbox(Exception):
+        pass
+
+    def nfpm_config(
+        self, *, content_sandbox_files: dict[str, FileEntry], default_mtime: str | None = None
+    ) -> NfpmContent:
+        source: str | None = self.source.file_path
+        src: str | None = self.src.file_path
+        dst: str = self.dst.value
+        if source is not None and not src:
+            # If defined, 'source' provides the default value for 'src'.
+            src = source
+        if src is None:  # src is NOT required; prepare to raise an error.
+            raise self.InvalidTarget()
+        sandbox_file: FileEntry | None = content_sandbox_files.get(src)
+        if sandbox_file is None:
+            raise self.SrcMissingFomSandbox()
+        return NfpmContent(
+            type=self.content_type.value,
+            src=src,
+            dst=dst,
+            file_info=self.file_info(sandbox_file.is_executable, default_mtime),
+        )
+
+
 def rules():
     return [
         *collect_rules(),
         *(
             UnionRule(PackageFieldSet, field_set_type)
             for field_set_type in NFPM_PACKAGE_FIELD_SET_TYPES
+        ),
+        *(
+            UnionRule(NfpmContentFieldSet, field_set_type)
+            for field_set_type in (
+                NfpmContentDirFieldSet,
+                NfpmContentSymlinkFieldSet,
+                NfpmContentFileFieldSet,
+            )
         ),
     ]
