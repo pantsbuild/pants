@@ -53,6 +53,7 @@ target(
         "src/python/pants/backend/experimental/kotlin/debug_goals",
         "src/python/pants/backend/experimental/kotlin/lint/ktlint",
         "src/python/pants/backend/experimental/makeself",
+        "src/python/pants/backend/experimental/nfpm",
         "src/python/pants/backend/experimental/openapi",
         "src/python/pants/backend/experimental/openapi/codegen/java",
         "src/python/pants/backend/experimental/openapi/lint/openapi_format",
