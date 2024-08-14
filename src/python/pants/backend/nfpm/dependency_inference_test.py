@@ -40,8 +40,8 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-_pkg_name = "pkg"
-_pkg_version = "3.2.1"
+_PKG_NAME = "pkg"
+_PKG_VERSION = "3.2.1"
 
 
 @pytest.mark.parametrize(
@@ -62,9 +62,9 @@ def test_infer_nfpm_package_scripts_dependencies(
             "BUILD": dedent(
                 f"""
                 nfpm_{packager}_package(
-                    name="{_pkg_name}",
-                    package_name="{_pkg_name}",
-                    version="{_pkg_version}",
+                    name="{_PKG_NAME}",
+                    package_name="{_PKG_NAME}",
+                    version="{_PKG_VERSION}",
                     {'' if packager != 'deb' else 'maintainer="Foo Bar <deb@example.com>",'}
                     scripts={scripts},
                 )
@@ -94,7 +94,7 @@ def test_infer_nfpm_package_scripts_dependencies(
         )
 
     assert run_dep_inference(
-        Address("", target_name=_pkg_name),
+        Address("", target_name=_PKG_NAME),
     ) == InferredDependencies(
         [
             Address("scripts", relative_file_path=f"{script_type}.sh")

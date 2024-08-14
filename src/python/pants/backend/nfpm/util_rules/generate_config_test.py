@@ -34,8 +34,8 @@ from pants.engine.unions import UnionRule
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import RuleRunner
 
-_pkg_name = "pkg"
-_pkg_version = "3.2.1"
+_PKG_NAME = "pkg"
+_PKG_VERSION = "3.2.1"
 
 
 @pytest.fixture
@@ -155,10 +155,10 @@ def test_generate_nfpm_yaml(
             "BUILD": dedent(
                 f"""
                 nfpm_{packager}_package(
-                    name="{_pkg_name}",
+                    name="{_PKG_NAME}",
                     description="{description}",
-                    package_name="{_pkg_name}",
-                    version="{_pkg_version}",
+                    package_name="{_PKG_NAME}",
+                    version="{_PKG_VERSION}",
                     {'' if packager != 'deb' else 'maintainer="Foo Bar <deb@example.com>",'}
                     dependencies={repr(dependencies)},
                     scripts={repr(scripts)},
@@ -179,12 +179,12 @@ def test_generate_nfpm_yaml(
                 nfpm_content_files(
                     name="files",
                     files=[
-                        ("sandbox-file.txt", "/usr/share/{_pkg_name}/{_pkg_name}.{_pkg_version}/installed-file.txt"),
-                        ("sandbox-file.txt", "/etc/{_pkg_name}/installed-file.txt"),
+                        ("sandbox-file.txt", "/usr/share/{_PKG_NAME}/{_PKG_NAME}.{_PKG_VERSION}/installed-file.txt"),
+                        ("sandbox-file.txt", "/etc/{_PKG_NAME}/installed-file.txt"),
                     ],
                     dependencies=[":sandbox_file"],
                     overrides={{
-                        "/etc/{_pkg_name}/installed-file.txt": dict(
+                        "/etc/{_PKG_NAME}/installed-file.txt": dict(
                             content_type="config",
                             file_mode="rw-------",  # same as 0o600 and "600"
                             file_group="root",
@@ -192,7 +192,7 @@ def test_generate_nfpm_yaml(
                     }},
                     content_type="",
                     file_owner="root",
-                    file_group="{_pkg_name}",
+                    file_group="{_PKG_NAME}",
                     file_mode="644",  # same as 0o644 and "rw-r--r--"
                 )
                 nfpm_content_file(
@@ -218,14 +218,14 @@ def test_generate_nfpm_yaml(
                 )
                 nfpm_content_dirs(
                     name="dirs",
-                    dirs=["/usr/share/{_pkg_name}"],
+                    dirs=["/usr/share/{_PKG_NAME}"],
                     overrides={{
-                        "/usr/share/{_pkg_name}": dict(file_group="special-group"),
+                        "/usr/share/{_PKG_NAME}": dict(file_group="special-group"),
                     }},
                 )
                 nfpm_content_dir(
                     name="dir",
-                    dst="/etc/{_pkg_name}",
+                    dst="/etc/{_PKG_NAME}",
                     file_mode=0o700,
                 )
                 nfpm_content_file(
@@ -254,7 +254,7 @@ def test_generate_nfpm_yaml(
             },
         }
     )
-    target = rule_runner.get_target(Address("", target_name=_pkg_name))
+    target = rule_runner.get_target(Address("", target_name=_PKG_NAME))
     field_set = field_set_type.create(target)
 
     with cast(ContextManager, no_exception()) if expect_raise is None else expect_raise:
@@ -313,14 +313,14 @@ def test_generate_nfpm_yaml(
     contents_by_dst = {entry["dst"]: entry for entry in contents}
 
     if "contents:files" in dependencies:
-        dst = f"/usr/share/{_pkg_name}/{_pkg_name}.{_pkg_version}/installed-file.txt"
+        dst = f"/usr/share/{_PKG_NAME}/{_PKG_NAME}.{_PKG_VERSION}/installed-file.txt"
         assert dst in contents_by_dst
         entry = contents_by_dst.pop(dst)
         assert "" == entry["type"]
         assert "contents/sandbox-file.txt" == entry["src"]
         assert 0o0644 == entry["file_info"]["mode"]
 
-        dst = f"/etc/{_pkg_name}/installed-file.txt"
+        dst = f"/etc/{_PKG_NAME}/installed-file.txt"
         assert dst in contents_by_dst
         entry = contents_by_dst.pop(dst)
         assert "config" == entry["type"]
@@ -358,14 +358,14 @@ def test_generate_nfpm_yaml(
         assert "/usr/bin/some-executable" == entry["src"]
 
     if "contents:dirs" in dependencies:
-        dst = f"/usr/share/{_pkg_name}"
+        dst = f"/usr/share/{_PKG_NAME}"
         assert dst in contents_by_dst
         entry = contents_by_dst.pop(dst)
         assert "dir" == entry["type"]
         assert "special-group" == entry["file_info"]["group"]
 
     if "contents:dir" in dependencies:
-        dst = f"/etc/{_pkg_name}"
+        dst = f"/etc/{_PKG_NAME}"
         assert dst in contents_by_dst
         entry = contents_by_dst.pop(dst)
         assert "dir" == entry["type"]

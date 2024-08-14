@@ -73,10 +73,10 @@ def _assert_one_built_artifact(
     assert relpath.startswith(f"{pkg_name}/{pkg_name}")
 
 
-_pkg_name = "pkg"
-_pkg_version = "3.2.1"
+_PKG_NAME = "pkg"
+_PKG_VERSION = "3.2.1"
 
-_test_cases: tuple[ParameterSet, ...] = (
+_TEST_CASES: tuple[ParameterSet, ...] = (
     # deb
     pytest.param(NfpmDebPackageFieldSet, {}, False, id="deb-missing-maintainer-field"),
     pytest.param(
@@ -119,7 +119,7 @@ _test_cases: tuple[ParameterSet, ...] = (
 )
 
 
-@pytest.mark.parametrize("field_set_type,extra_metadata,valid_target", _test_cases)
+@pytest.mark.parametrize("field_set_type,extra_metadata,valid_target", _TEST_CASES)
 def test_generate_package_without_contents(
     rule_runner: RuleRunner,
     field_set_type: type[NfpmPackageFieldSet],
@@ -134,9 +134,9 @@ def test_generate_package_without_contents(
             "BUILD": dedent(
                 f"""
                 nfpm_{packager}_package(
-                    name="{_pkg_name}",
-                    package_name="{_pkg_name}",
-                    version="{_pkg_version}",
+                    name="{_PKG_NAME}",
+                    package_name="{_PKG_NAME}",
+                    version="{_PKG_VERSION}",
                     **{extra_metadata}
                 )
                 """
@@ -151,10 +151,10 @@ def test_generate_package_without_contents(
         return
 
     built_package = build_package(rule_runner, binary_tgt, field_set_type)
-    _assert_one_built_artifact(_pkg_name, built_package, field_set_type)
+    _assert_one_built_artifact(_PKG_NAME, built_package, field_set_type)
 
 
-@pytest.mark.parametrize("field_set_type,extra_metadata,valid_target", _test_cases)
+@pytest.mark.parametrize("field_set_type,extra_metadata,valid_target", _TEST_CASES)
 def test_generate_package_with_contents(
     rule_runner: RuleRunner,
     field_set_type: type[NfpmPackageFieldSet],
@@ -168,9 +168,9 @@ def test_generate_package_with_contents(
             "BUILD": dedent(
                 f"""
                 nfpm_{packager}_package(
-                    name="{_pkg_name}",
-                    package_name="{_pkg_name}",
-                    version="{_pkg_version}",
+                    name="{_PKG_NAME}",
+                    package_name="{_PKG_NAME}",
+                    version="{_PKG_VERSION}",
                     dependencies=[
                         "contents:files",
                         "contents:file",
@@ -198,12 +198,12 @@ def test_generate_package_with_contents(
                 nfpm_content_files(
                     name="files",
                     files=[
-                        ("sandbox-file.txt", "/usr/share/{_pkg_name}/{_pkg_name}.{_pkg_version}/installed-file.txt"),
-                        ("sandbox-file.txt", "/etc/{_pkg_name}/installed-file.txt"),
+                        ("sandbox-file.txt", "/usr/share/{_PKG_NAME}/{_PKG_NAME}.{_PKG_VERSION}/installed-file.txt"),
+                        ("sandbox-file.txt", "/etc/{_PKG_NAME}/installed-file.txt"),
                     ],
                     dependencies=[":sandbox_file"],
                     overrides={{
-                        "/etc/{_pkg_name}/installed-file.txt": dict(
+                        "/etc/{_PKG_NAME}/installed-file.txt": dict(
                             content_type="config",
                             file_mode="rw-------",  # same as 0o600 and "600"
                             file_group="root",
@@ -211,7 +211,7 @@ def test_generate_package_with_contents(
                     }},
                     content_type="",
                     file_owner="root",
-                    file_group="{_pkg_name}",
+                    file_group="{_PKG_NAME}",
                     file_mode="644",  # same as 0o644 and "rw-r--r--"
                 )
                 nfpm_content_file(
@@ -237,14 +237,14 @@ def test_generate_package_with_contents(
                 )
                 nfpm_content_dirs(
                     name="dirs",
-                    dirs=["/usr/share/{_pkg_name}"],
+                    dirs=["/usr/share/{_PKG_NAME}"],
                     overrides={{
-                        "/usr/share/{_pkg_name}": dict(file_group="special-group"),
+                        "/usr/share/{_PKG_NAME}": dict(file_group="special-group"),
                     }},
                 )
                 nfpm_content_dir(
                     name="dir",
-                    dst="/etc/{_pkg_name}",
+                    dst="/etc/{_PKG_NAME}",
                     file_mode=0o700,
                 )
                 """
@@ -256,9 +256,9 @@ def test_generate_package_with_contents(
 
     # noinspection DuplicatedCode
     with cast(ContextManager, no_exception()) if valid_target else pytest.raises(ExecutionError):
-        binary_tgt = rule_runner.get_target(Address("", target_name=_pkg_name))
+        binary_tgt = rule_runner.get_target(Address("", target_name=_PKG_NAME))
     if not valid_target:
         return
 
     built_package = build_package(rule_runner, binary_tgt, field_set_type)
-    _assert_one_built_artifact(_pkg_name, built_package, field_set_type)
+    _assert_one_built_artifact(_PKG_NAME, built_package, field_set_type)
