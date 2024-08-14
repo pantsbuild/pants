@@ -14,6 +14,7 @@ from pants.backend.nfpm.field_sets import (
     NFPM_PACKAGE_FIELD_SET_TYPES,
     NfpmDebPackageFieldSet,
     NfpmPackageFieldSet,
+    NfpmRpmPackageFieldSet,
 )
 from pants.backend.nfpm.rules import rules as nfpm_rules
 from pants.backend.nfpm.subsystem import rules as nfpm_subsystem_rules
@@ -116,6 +117,36 @@ _TEST_CASES: tuple[ParameterSet, ...] = (
         True,
         id="deb-extra-metadata",
     ),
+    # rpm
+    pytest.param(NfpmRpmPackageFieldSet, {}, True, id="rpm-minimal-metadata"),
+    pytest.param(
+        NfpmRpmPackageFieldSet,
+        # rpm uses "packager" not "maintainer"
+        {"maintainer": "RPM Maintainer <rpm-maintainer@example.com>"},
+        False,
+        id="rpm-invalid-field-maintainer",
+    ),
+    pytest.param(
+        NfpmRpmPackageFieldSet,
+        {
+            "homepage": "https://rpm.example.com",
+            "license": "Apache-2.0",
+            "packager": "RPM Maintainer <rpm-maintainer@example.com>",
+            "vendor": "Example Organization",
+            "prefixes": ["/usr", "/usr/local", "/opt/foobar"],
+            "replaces": ["partial-pkg", "replaced-pkg"],
+            "provides": ["pkg"],
+            "depends": ["git", "libc6 (>= 2.2.1)", "default-mta | mail-transport-agent"],
+            "recommends": ["other-pkg"],
+            "suggests": ["beneficial-other-pkg"],
+            "conflicts": ["replaced-pkg"],
+            "compression": "zstd:fastest",  # defaults to gzip:-1
+            "scripts": {"postinstall": "postinstall.sh", "verify": "rpm-verify.sh"},
+            "ghost_contents": ["/var/log/pkg.log"],
+        },
+        True,
+        id="rpm-extra-metadata",
+    ),
 )
 
 
@@ -209,7 +240,7 @@ def test_generate_package_with_contents(
                             file_group="root",
                         ),
                     }},
-                    content_type="",
+                    content_type="doc",
                     file_owner="root",
                     file_group="{_PKG_NAME}",
                     file_mode="644",  # same as 0o644 and "rw-r--r--"

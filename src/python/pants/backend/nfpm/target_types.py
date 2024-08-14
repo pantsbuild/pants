@@ -49,6 +49,22 @@ from pants.backend.nfpm.fields.deb import (
     NfpmDebSuggestsField,
     NfpmDebTriggersField,
 )
+from pants.backend.nfpm.fields.rpm import (
+    NfpmRpmCompressionField,
+    NfpmRpmConflictsField,
+    NfpmRpmDependsField,
+    NfpmRpmGhostContents,
+    NfpmRpmGroupField,
+    NfpmRpmPackagerField,
+    NfpmRpmPrefixesField,
+    NfpmRpmProvidesField,
+    NfpmRpmRecommendsField,
+    NfpmRpmReplacesField,
+    NfpmRpmScriptsField,
+    NfpmRpmSuggestsField,
+    NfpmRpmSummaryField,
+    NfpmRpmVendorField,
+)
 from pants.backend.nfpm.fields.version import (
     NfpmVersionEpochField,
     NfpmVersionField,
@@ -130,6 +146,57 @@ class NfpmDebPackage(NfpmPackageTarget):
         that you can then distribute and install, e.g. via pkg.
 
         See {doc_url('nfpm-deb-package')}.
+        """
+    )
+
+
+RPM_FIELDS = (
+    NfpmPackageNameField,
+    NfpmArchField,
+    NfpmPlatformField,
+    # version fields
+    NfpmVersionField,
+    NfpmVersionSchemaField,
+    NfpmVersionPrereleaseField,
+    NfpmVersionMetadataField,
+    NfpmVersionReleaseField,
+    NfpmVersionEpochField,
+    # other package metadata fields
+    NfpmHomepageField,
+    NfpmLicenseField,
+    NfpmRpmPackagerField,
+    NfpmRpmVendorField,
+    NfpmRpmGroupField,
+    NfpmRpmSummaryField,
+    NfpmRpmPrefixesField,
+    # package relationships
+    NfpmRpmReplacesField,
+    NfpmRpmProvidesField,
+    NfpmRpmDependsField,
+    NfpmRpmRecommendsField,
+    NfpmRpmSuggestsField,
+    NfpmRpmConflictsField,
+    # how to build the package
+    NfpmRpmCompressionField,
+)
+
+
+class NfpmRpmPackage(NfpmPackageTarget):
+    alias = "nfpm_rpm_package"
+    core_fields = (
+        *COMMON_NFPM_PACKAGE_FIELDS,
+        *RPM_FIELDS,
+        NfpmRpmScriptsField,
+        NfpmRpmGhostContents,
+    )
+    help = help_text(
+        f"""
+        An RPM system package built by nFPM.
+
+        This will not install the package, only create an .rpm file
+        that you can then distribute and install, e.g. via pkg.
+
+        See {doc_url('nfpm-rpm-package')}.
         """
     )
 
@@ -290,6 +357,7 @@ class NfpmContentDirs(TargetGenerator):
 def target_types():
     return [
         NfpmDebPackage,
+        NfpmRpmPackage,
         NfpmContentFile,
         NfpmContentFiles,
         NfpmContentSymlink,

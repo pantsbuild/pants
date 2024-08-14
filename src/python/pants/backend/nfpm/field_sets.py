@@ -26,8 +26,9 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentSymlinkSrcField,
     NfpmContentTypeField,
 )
+from pants.backend.nfpm.fields.rpm import NfpmRpmGhostContents
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
-from pants.backend.nfpm.target_types import DEB_FIELDS
+from pants.backend.nfpm.target_types import DEB_FIELDS, RPM_FIELDS
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.fs import FileEntry
 from pants.engine.rules import collect_rules
@@ -112,8 +113,25 @@ class NfpmDebPackageFieldSet(NfpmPackageFieldSet):
     required_fields = DEB_FIELDS
 
 
+# noinspection DuplicatedCode
+@dataclass(frozen=True)
+class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
+    packager = "rpm"
+    extension = f".{packager}"
+    required_fields = RPM_FIELDS
+    ghost_contents: NfpmRpmGhostContents
+
+    def nfpm_config(self, tgt: Target, *, default_mtime: str | None) -> dict[str, Any]:
+        config = super().nfpm_config(tgt, default_mtime=default_mtime)
+        config["contents"].extend(self.ghost_contents.nfpm_contents)
+        return config
+
+
 NFPM_PACKAGE_FIELD_SET_TYPES: FrozenOrderedSet[type[NfpmPackageFieldSet]] = FrozenOrderedSet(
-    (NfpmDebPackageFieldSet,)
+    (
+        NfpmDebPackageFieldSet,
+        NfpmRpmPackageFieldSet,
+    )
 )
 
 
