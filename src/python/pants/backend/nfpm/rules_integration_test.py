@@ -84,7 +84,7 @@ _TEST_CASES: tuple[ParameterSet, ...] = (
     pytest.param(
         NfpmApkPackageFieldSet,
         # apk uses "maintainer" not "packager"
-        {"packager": "Arch Maintainer <arch-maintainer@example.com>"},
+        {"packager": "Apk Maintainer <apk-maintainer@example.com>"},
         False,
         id="apk-invalid-field-packager",
     ),
