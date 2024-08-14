@@ -3,6 +3,7 @@
 from pants.backend.terraform.lint.tfsec.tfsec import SkipTfSecField, TFSec, TfSecRequest
 from pants.backend.terraform.target_types import TerraformModuleTarget
 from pants.core.goals.lint import REPORT_DIR, LintResult
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import config_files
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
@@ -11,6 +12,7 @@ from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, Remov
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -80,4 +82,5 @@ def rules():
         *TfSecRequest.rules(),
         *config_files.rules(),
         TerraformModuleTarget.register_plugin_field(SkipTfSecField),
+        UnionRule(ExportableTool, TFSec),
     ]

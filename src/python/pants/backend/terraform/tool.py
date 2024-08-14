@@ -391,6 +391,9 @@ class TerraformTool(TemplatedExternalTool):
         advanced=True,
     )
 
+    def generate_exe(self, plat: Platform) -> str:
+        return "./terraform"
+
     @property
     def plugin_cache_dir(self) -> str:
         return "__terraform_filesystem_mirror"

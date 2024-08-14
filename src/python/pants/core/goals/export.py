@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import itertools
 import os
+from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Mapping, Sequence, cast
 
 from pants.base.build_root import BuildRoot
@@ -72,6 +74,17 @@ class PostProcessingCommand:
 
 
 @dataclass(frozen=True)
+class ExportedBinary:
+    """Binaries exposed by an export.
+
+    These will be added under the "bin" folder.
+    """
+
+    name: str
+    path_in_export: str
+
+
+@dataclass(frozen=True)
 class ExportResult:
     description: str
     # Materialize digests under this reldir.
@@ -83,6 +96,7 @@ class ExportResult:
     # Set for the common special case of exporting a resolve, and names that resolve.
     # Set to None for other export results.
     resolve: str | None
+    exported_binaries: tuple[ExportedBinary, ...]
 
     def __init__(
         self,
@@ -92,12 +106,14 @@ class ExportResult:
         digest: Digest = EMPTY_DIGEST,
         post_processing_cmds: Iterable[PostProcessingCommand] = tuple(),
         resolve: str | None = None,
+        exported_binaries: Iterable[ExportedBinary] = tuple(),
     ):
         object.__setattr__(self, "description", description)
         object.__setattr__(self, "reldir", reldir)
         object.__setattr__(self, "digest", digest)
         object.__setattr__(self, "post_processing_cmds", tuple(post_processing_cmds))
         object.__setattr__(self, "resolve", resolve)
+        object.__setattr__(self, "exported_binaries", tuple(exported_binaries))
 
 
 class ExportResults(Collection[ExportResult]):
@@ -191,6 +207,41 @@ async def export(
         if result.resolve:
             resolves_exported.add(result.resolve)
         console.print_stdout(f"Wrote {result.description} to {result_dir}")
+
+    exported_bins: dict[str, list[str]] = defaultdict(list)
+    for result in flattened_results:
+        for exported_bin in result.exported_binaries:
+            exported_bins[exported_bin.name].append(result.resolve or result.description)
+            if len(exported_bins[exported_bin.name]) > 1:
+                continue
+
+            ipr = await Effect(
+                InteractiveProcessResult,
+                InteractiveProcess(
+                    [
+                        "ln",
+                        "-sf",
+                        Path(
+                            build_root.path, output_dir, result.reldir, exported_bin.path_in_export
+                        ).as_posix(),
+                        Path(build_root.path, output_dir, "bin", exported_bin.name).as_posix(),
+                    ],
+                    env={"PATH": environment.get("PATH", "")},
+                    run_in_workspace=True,
+                ),
+            )
+            if ipr.exit_code:
+                raise ExportError(f"Failed to link binary {exported_bin.name} to bin directory")
+
+    for exported_bin_name, resolves in exported_bins.items():
+        if len(resolves) > 1:
+            msg = f"Exporting binary `{exported_bin_name}` had conflicts. "
+            succeeded_resolve, other_resolves = resolves[0], resolves[1:]
+            msg += (
+                f"The resolve {succeeded_resolve} was exported, but it conflicted with "
+                + ", ".join(other_resolves)
+            )
+            console.print_stderr(msg)
 
     unexported_resolves = sorted(
         (set(export_subsys.resolve) | set(export_subsys.binaries)) - resolves_exported
