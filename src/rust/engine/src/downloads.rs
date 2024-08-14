@@ -278,7 +278,7 @@ mod tests {
         collections::{BTreeMap, HashSet},
         net::SocketAddr,
         sync::{
-            atomic::{AtomicI32, Ordering},
+            atomic::{AtomicU32, Ordering},
             Arc,
         },
     };
@@ -352,10 +352,10 @@ mod tests {
 
         #[derive(Clone)]
         struct HandlerState {
-            attempt: Arc<AtomicI32>,
+            attempt: Arc<AtomicU32>,
         }
 
-        let attempt = Arc::new(AtomicI32::new(0));
+        let attempt = Arc::new(AtomicU32::new(0));
         let router = Router::new()
             .route(
                 "/foo.txt",
