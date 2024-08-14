@@ -10,10 +10,17 @@ import textwrap
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 from pkg_resources import Requirement
 
-from pants.core.goals.export import ExportRequest, ExportResult, ExportResults, ExportSubsystem
+from pants.core.goals.export import (
+    ExportedBinary,
+    ExportRequest,
+    ExportResult,
+    ExportResults,
+    ExportSubsystem,
+)
 from pants.core.goals.resolves import ExportableTool, ExportMode
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive
@@ -420,6 +427,13 @@ class MaybeExportResult:
 async def export_external_tool(
     req: _ExportExternalToolForResolveRequest, platform: Platform, union_membership: UnionMembership
 ) -> MaybeExportResult:
+    """Export a downloadable tool. Downloads all the tools to `bins`, and symlinks the primary exe
+    to the `bin` directory.
+
+    We use the last segment of the exe instead of the resolve because:
+    - it's probably the exe name people expect
+    - avoids clutter from the resolve name (ex "tfsec" instead of "terraform-tfsec")
+    """
     exportables = ExportableTool.filter_for_subclasses(
         union_membership,
         ExternalTool,  # type:ignore[type-abstract]  # ExternalTool is abstract, and mypy doesn't like that we might return it
@@ -435,12 +449,14 @@ async def export_external_tool(
 
     dest = os.path.join("bins", tool.name)
 
+    exe = tool.generate_exe(platform)
     return MaybeExportResult(
         ExportResult(
             description=f"Export tool {req.resolve}",
             reldir=dest,
             digest=downloaded_tool.digest,
             resolve=req.resolve,
+            exported_binaries=(ExportedBinary(name=Path(exe).name, path_in_export=exe),),
         )
     )
 
