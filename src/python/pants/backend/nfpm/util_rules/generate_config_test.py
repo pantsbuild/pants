@@ -13,6 +13,7 @@ from pants.backend.nfpm.config import NfpmFileInfo
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
 from pants.backend.nfpm.field_sets import (
     NFPM_CONTENT_FIELD_SET_TYPES,
+    NfpmApkPackageFieldSet,
     NfpmContentFieldSet,
     NfpmDebPackageFieldSet,
     NfpmPackageFieldSet,
@@ -81,10 +82,12 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     ),
     (
         # no dependencies
+        ("apk", NfpmApkPackageFieldSet, [], {}, [], {}, None),
         ("deb", NfpmDebPackageFieldSet, [], {}, [], {}, None),
         ("rpm", NfpmRpmPackageFieldSet, [], {}, [], {}, None),
         ("rpm", NfpmRpmPackageFieldSet, [], {}, [], {"ghost_contents": ["/var/log/pkg.log"]}, None),
         # no dependencies (extra file does not cause errors)
+        ("apk", NfpmApkPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
         ("deb", NfpmDebPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
         ("rpm", NfpmRpmPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
         (
@@ -97,6 +100,27 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             None,
         ),
         # with dependencies
+        (
+            "apk",
+            NfpmApkPackageFieldSet,
+            [
+                "contents:files",
+                "contents:file",
+                "contents:symlinks",
+                "contents:symlink",
+                "contents:dirs",
+                "contents:dir",
+            ],
+            {"postinstall": "scripts/postinstall.sh", "postupgrade": "scripts/apk-postupgrade.sh"},
+            [
+                "contents/sandbox-file.txt",
+                "contents/some-executable",
+                "scripts/postinstall.sh",
+                "scripts/apk-postupgrade.sh",
+            ],
+            {},
+            None,
+        ),
         (
             "deb",
             NfpmDebPackageFieldSet,
@@ -162,6 +186,15 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
         ),
         # with malformed dependency
         (
+            "apk",
+            NfpmApkPackageFieldSet,
+            ["contents:malformed"],
+            {},
+            [],
+            {},
+            pytest.raises(ExecutionError),
+        ),
+        (
             "deb",
             NfpmDebPackageFieldSet,
             ["contents:malformed"],
@@ -181,6 +214,15 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
         ),
         # with dependency file missing from sandbox
         (
+            "apk",
+            NfpmApkPackageFieldSet,
+            ["contents:files", "contents:file"],
+            {},
+            [],
+            {},
+            pytest.raises(ExecutionError),
+        ),
+        (
             "deb",
             NfpmDebPackageFieldSet,
             ["contents:files", "contents:file"],
@@ -199,6 +241,15 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             pytest.raises(ExecutionError),
         ),
         # with script file missing from sandbox
+        (
+            "apk",
+            NfpmApkPackageFieldSet,
+            [],
+            {"postinstall": "scripts/postinstall.sh", "postupgrade": "scripts/apk-postupgrade.sh"},
+            [],
+            {},
+            pytest.raises(ExecutionError),
+        ),
         (
             "deb",
             NfpmDebPackageFieldSet,
@@ -331,6 +382,7 @@ def test_generate_nfpm_yaml(
                 path: ""
                 for path in [
                     "scripts/postinstall.sh",
+                    "scripts/apk-postupgrade.sh",
                     "scripts/deb-config.sh",
                     "scripts/rpm-verify.sh",
                 ]
