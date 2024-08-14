@@ -62,7 +62,7 @@ def test_generate_nfpm_config_for_apk():
     expected_nfpm_config = {
         "disable_globbing": True,
         "contents": [],
-        "mtime": mtime,
+        "mtime": MTIME,
         "name": "treasure",
         "arch": "amd64",  # default
         "version": "3.2.1",
@@ -80,7 +80,7 @@ def test_generate_nfpm_config_for_apk():
     }
 
     field_set = NfpmApkPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt, default_mtime=mtime)
+    nfpm_config = field_set.nfpm_config(tgt, default_mtime=MTIME)
     assert nfpm_config == expected_nfpm_config
 
 
