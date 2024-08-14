@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pants.backend.nfpm.field_sets import (
     NfpmApkPackageFieldSet,
+    NfpmArchlinuxPackageFieldSet,
     NfpmDebPackageFieldSet,
     NfpmRpmPackageFieldSet,
 )
@@ -15,6 +16,10 @@ from pants.backend.nfpm.fields.all import (
     NfpmPackageNameField,
 )
 from pants.backend.nfpm.fields.apk import NfpmApkDependsField, NfpmApkMaintainerField
+from pants.backend.nfpm.fields.archlinux import (
+    NfpmArchlinuxDependsField,
+    NfpmArchlinuxPackagerField,
+)
 from pants.backend.nfpm.fields.deb import (
     NfpmDebDependsField,
     NfpmDebFieldsField,
@@ -30,7 +35,12 @@ from pants.backend.nfpm.fields.rpm import (
 )
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.backend.nfpm.fields.version import NfpmVersionField
-from pants.backend.nfpm.target_types import NfpmApkPackage, NfpmDebPackage, NfpmRpmPackage
+from pants.backend.nfpm.target_types import (
+    NfpmApkPackage,
+    NfpmArchlinuxPackage,
+    NfpmDebPackage,
+    NfpmRpmPackage,
+)
 from pants.engine.addresses import Address
 from pants.engine.target import DescriptionField
 
@@ -80,6 +90,53 @@ def test_generate_nfpm_config_for_apk():
     }
 
     field_set = NfpmApkPackageFieldSet.create(tgt)
+    nfpm_config = field_set.nfpm_config(tgt, default_mtime=MTIME)
+    assert nfpm_config == expected_nfpm_config
+
+
+def test_generate_nfpm_config_for_archlinux():
+    depends = [
+        "git",
+        "tcpdump<5",
+        "foobar>=1.8.0",
+    ]
+    tgt = NfpmArchlinuxPackage(
+        {
+            NfpmPackageNameField.alias: "treasure",
+            NfpmVersionField.alias: "3.2.1",
+            DescriptionField.alias: "Black Beard's buried treasure.",
+            NfpmPackageScriptsField.alias: {
+                "preinstall": "hornswaggle",
+                "preupgrade": "plunder",
+            },
+            NfpmArchlinuxPackagerField.alias: "Black Beard <bb@jolly.roger.example.com",
+            NfpmHomepageField.alias: "https://jolly.roger.example.com",
+            NfpmLicenseField.alias: "MIT",
+            NfpmArchlinuxDependsField.alias: depends,
+        },
+        Address("", target_name="t"),
+    )
+    expected_nfpm_config = {
+        "disable_globbing": True,
+        "contents": [],
+        "mtime": MTIME,
+        "name": "treasure",
+        "arch": "amd64",  # default
+        "version": "3.2.1",
+        "version_schema": "semver",  # default
+        "release": 1,  # default
+        "homepage": "https://jolly.roger.example.com",
+        "license": "MIT",
+        "depends": tuple(depends),
+        "scripts": {"preinstall": "hornswaggle"},
+        "archlinux": {
+            "packager": "Black Beard <bb@jolly.roger.example.com",
+            "scripts": {"preupgrade": "plunder"},
+        },
+        "description": "Black Beard's buried treasure.",
+    }
+
+    field_set = NfpmArchlinuxPackageFieldSet.create(tgt)
     nfpm_config = field_set.nfpm_config(tgt, default_mtime=MTIME)
     assert nfpm_config == expected_nfpm_config
 

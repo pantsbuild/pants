@@ -28,7 +28,7 @@ from pants.backend.nfpm.fields.contents import (
 )
 from pants.backend.nfpm.fields.rpm import NfpmRpmGhostContents
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
-from pants.backend.nfpm.target_types import APK_FIELDS, DEB_FIELDS, RPM_FIELDS
+from pants.backend.nfpm.target_types import APK_FIELDS, ARCHLINUX_FIELDS, DEB_FIELDS, RPM_FIELDS
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.fs import FileEntry
 from pants.engine.rules import collect_rules
@@ -114,6 +114,15 @@ class NfpmApkPackageFieldSet(NfpmPackageFieldSet):
 
 # noinspection DuplicatedCode
 @dataclass(frozen=True)
+class NfpmArchlinuxPackageFieldSet(NfpmPackageFieldSet):
+    packager = "archlinux"
+    # NB: uses *.tar.zst (unlike the other packagers where packager == file extension)
+    extension = ".tar.zst"
+    required_fields = ARCHLINUX_FIELDS
+
+
+# noinspection DuplicatedCode
+@dataclass(frozen=True)
 class NfpmDebPackageFieldSet(NfpmPackageFieldSet):
     packager = "deb"
     extension = f".{packager}"
@@ -137,6 +146,7 @@ class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
 NFPM_PACKAGE_FIELD_SET_TYPES: FrozenOrderedSet[type[NfpmPackageFieldSet]] = FrozenOrderedSet(
     (
         NfpmApkPackageFieldSet,
+        NfpmArchlinuxPackageFieldSet,
         NfpmDebPackageFieldSet,
         NfpmRpmPackageFieldSet,
     )

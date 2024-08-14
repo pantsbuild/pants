@@ -124,7 +124,7 @@ class NfpmPlatformField(StringField):
         with the assumption that this is a GOOS value (since nFPM is part of the
         "goreleaser" project). But, nFPM does not do much with it.
 
-        For apk, the only valid value is 'linux'.
+        For archlinux and apk, the only valid value is 'linux'.
         For deb, this can be used as part of the 'Architecture' entry.
         For rpm, this populates the "OS" tag.
         """
@@ -140,7 +140,7 @@ class NfpmHomepageField(StringField):
 
         This field is named "{NfpmHomepageField.alias}" instead of "url" because
         that is the term used by nFPM, which adopted the term from deb packaging.
-        The term "url" is used by apk and rpm packaging.
+        The term "url" is used by apk, archlinux, and rpm packaging.
         """
     )
 

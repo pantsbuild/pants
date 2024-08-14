@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from pants.backend.nfpm.field_sets import (
     NfpmApkPackageFieldSet,
+    NfpmArchlinuxPackageFieldSet,
     NfpmDebPackageFieldSet,
     NfpmPackageFieldSet,
     NfpmRpmPackageFieldSet,
@@ -132,6 +133,14 @@ async def package_nfpm_package(
 
 @rule
 async def package_nfpm_apk_package(field_set: NfpmApkPackageFieldSet) -> BuiltPackage:
+    built_package: BuiltPackage = await package_nfpm_package(
+        NfpmPackageRequest(field_set), **implicitly()
+    )
+    return built_package
+
+
+@rule
+async def package_nfpm_archlinux_package(field_set: NfpmArchlinuxPackageFieldSet) -> BuiltPackage:
     built_package: BuiltPackage = await package_nfpm_package(
         NfpmPackageRequest(field_set), **implicitly()
     )
