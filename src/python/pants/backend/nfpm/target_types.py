@@ -113,6 +113,13 @@ class NfpmPackageTarget(Target):
     pass
 
 
+# NB: The <packager>_FIELDS constants are used as Nfpm<packager>PackageFieldSet.required_fields,
+# which is used when generating the nfpm config file. The field_set.nfpm_config method loops
+# over required_fields, using the nfpm_alias class var on each field to construct the cpnfig.
+# Some fields, like 'scripts' cannot rely on the nfpm_alias-based logic, however,
+# so they are NOT included in the <packager>_FIELDS constants and are handled separately.
+
+
 APK_FIELDS = (
     NfpmPackageNameField,
     NfpmArchField,
@@ -137,6 +144,7 @@ class NfpmApkPackage(NfpmPackageTarget):
     core_fields = (
         *COMMON_NFPM_PACKAGE_FIELDS,
         *APK_FIELDS,
+        # 'scripts' should not be in APK_FIELDS (see note above)
         NfpmApkScriptsField,
     )
     help = help_text(
@@ -178,6 +186,7 @@ class NfpmArchlinuxPackage(NfpmPackageTarget):
     core_fields = (
         *COMMON_NFPM_PACKAGE_FIELDS,
         *ARCHLINUX_FIELDS,
+        # 'scripts' should not be in ARCHLINUX_FIELDS (see note above)
         NfpmArchlinuxScriptsField,
     )
     help = help_text(
@@ -231,6 +240,7 @@ class NfpmDebPackage(NfpmPackageTarget):
     core_fields = (
         *COMMON_NFPM_PACKAGE_FIELDS,
         *DEB_FIELDS,
+        # 'scripts' should not be in DEB_FIELDS (see note above)
         NfpmDebScriptsField,
     )
     help = help_text(
@@ -281,6 +291,7 @@ class NfpmRpmPackage(NfpmPackageTarget):
     core_fields = (
         *COMMON_NFPM_PACKAGE_FIELDS,
         *RPM_FIELDS,
+        # 'scripts' and 'ghost_contents' should not be in RPM_FIELDS (see note above)
         NfpmRpmScriptsField,
         NfpmRpmGhostContents,
     )
