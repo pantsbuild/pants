@@ -95,6 +95,9 @@ remote = { path = "process_execution/remote" }
 pe_nailgun = { path = "process_execution/pe_nailgun" }
 
 [dev-dependencies]
+axum = { workspace = true }
+axum-server = { workspace = true }
+maplit = { workspace = true }
 testutil = { path = "./testutil" }
 fs = { path = "./fs" }
 env_logger = { workspace = true }
