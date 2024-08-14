@@ -81,9 +81,20 @@ def _mock_run(rule_runner: RuleRunner, ip: InteractiveProcess) -> InteractivePro
     return InteractiveProcessResult(0)
 
 
+def list_files_with_paths(directory):
+    file_paths = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            full_path = os.path.join(root, file)
+            file_paths.append(full_path)
+    return file_paths
+
+
 def run_export_rule(
-    rule_runner: RuleRunner, monkeypatch: MonkeyPatch, resolves: List[str]
+    rule_runner: RuleRunner, monkeypatch: MonkeyPatch,resolves: List[str] | None = None, binaries: List[str] | None = None
 ) -> Tuple[int, str]:
+    resolves = resolves or []
+    binaries = binaries or []
     union_membership = UnionMembership({ExportRequest: [MockExportRequest]})
     with open(os.path.join(rule_runner.build_root, "somefile"), "wb") as fp:
         fp.write(b"SOMEFILE")
@@ -93,7 +104,39 @@ def run_export_rule(
 
     monkeypatch.setattr("pants.engine.intrinsics.task_side_effected", noop)
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
-        digest = rule_runner.request(Digest, [CreateDigest([FileContent("foo/bar", b"BAR")])])
+
+        def do_mock_export(req: ExportRequest):
+            if resolves:
+                digest = rule_runner.request(
+                    Digest, [CreateDigest([FileContent("foo/bar", b"BAR")])]
+                )
+                return ExportResults(
+                    (
+                        mock_export(
+                            digest,
+                            (
+                                PostProcessingCommand(
+                                    ["cp", "{digest_root}/foo/bar", "{digest_root}/foo/bar1"]
+                                ),
+                                PostProcessingCommand(
+                                    ["cp", "{digest_root}/foo/bar", "{digest_root}/foo/bar2"]
+                                ),
+                            ),
+                            resolves[0],
+                        ),
+                    )
+                )
+            if binaries:
+                digest = rule_runner.request(
+                    Digest,
+                    [
+                        CreateDigest(
+                            [FileContent(f"bins/{binary}/{binary}", b"BAR") for binary in binaries]
+                        )
+                    ],
+                )
+                return ExportResults(mock_export(digest, (), binary) for binary in binaries)
+
         result: Export = run_rule_with_mocks(
             export,
             rule_args=[
@@ -103,28 +146,13 @@ def run_export_rule(
                 union_membership,
                 BuildRoot(),
                 DistDir(relpath=Path("dist")),
-                create_subsystem(ExportSubsystem, resolve=resolves),
+                create_subsystem(ExportSubsystem, resolve=resolves, bin=binaries),
             ],
             mock_gets=[
                 MockGet(
                     output_type=ExportResults,
                     input_types=(ExportRequest,),
-                    mock=lambda req: ExportResults(
-                        (
-                            mock_export(
-                                digest,
-                                (
-                                    PostProcessingCommand(
-                                        ["cp", "{digest_root}/foo/bar", "{digest_root}/foo/bar1"]
-                                    ),
-                                    PostProcessingCommand(
-                                        ["cp", "{digest_root}/foo/bar", "{digest_root}/foo/bar2"]
-                                    ),
-                                ),
-                                resolves[0],
-                            ),
-                        )
-                    ),
+                    mock=do_mock_export,
                 ),
                 rule_runner.do_not_use_mock(Digest, (MergeDigests,)),
                 rule_runner.do_not_use_mock(Digest, (AddPrefix,)),
@@ -141,7 +169,7 @@ def run_export_rule(
         return result.exit_code, stdio_reader.get_stdout()
 
 
-def test_run_export_rule(monkeypatch) -> None:
+def test_run_export_rule_resolve(monkeypatch) -> None:
     rule_runner = RuleRunner(
         rules=[
             UnionRule(ExportRequest, MockExportRequest),
@@ -151,14 +179,36 @@ def test_run_export_rule(monkeypatch) -> None:
         ],
         target_types=[MockTarget],
     )
-
-    exit_code, stdout = run_export_rule(rule_runner, monkeypatch, ["resolve"])
+    exit_code, stdout = run_export_rule(rule_runner, monkeypatch, resolves=["resolve"])
     assert exit_code == 0
     assert "Wrote mock export for resolve to dist/export/mock" in stdout
     for filename in ["bar", "bar1", "bar2"]:
         expected_dist_path = os.path.join(
             rule_runner.build_root, "dist", "export", "mock", "foo", filename
         )
+        assert os.path.isfile(expected_dist_path)
+        with open(expected_dist_path, "rb") as fp:
+            assert fp.read() == b"BAR"
+
+
+def test_run_export_rule_binary() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            UnionRule(ExportRequest, MockExportRequest),
+            QueryRule(Digest, [CreateDigest]),
+            QueryRule(EnvironmentVars, [EnvironmentVarsRequest]),
+            QueryRule(InteractiveProcessResult, [InteractiveProcess]),
+        ],
+        target_types=[MockTarget],
+    )
+    exit_code, stdout = run_export_rule(rule_runner, binaries=["mybin"])
+    assert exit_code == 0
+    assert "Wrote mock export for mybin to dist/export/mock" in stdout
+    for filename in ["mybin"]:
+        expected_dist_path = os.path.join(
+            rule_runner.build_root, "dist", "export", "mock", "bins", filename, filename
+        )
+
         assert os.path.isfile(expected_dist_path)
         with open(expected_dist_path, "rb") as fp:
             assert fp.read() == b"BAR"
