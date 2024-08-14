@@ -23,7 +23,7 @@ from pants.backend.nfpm.target_types import NfpmDebPackage
 from pants.engine.addresses import Address
 from pants.engine.target import DescriptionField
 
-mtime = NfpmPackageMtimeField.default
+MTIME = NfpmPackageMtimeField.default
 
 
 def test_generate_nfpm_config_for_deb():
@@ -54,7 +54,7 @@ def test_generate_nfpm_config_for_deb():
     expected_nfpm_config = {
         "disable_globbing": True,
         "contents": [],
-        "mtime": mtime,
+        "mtime": MTIME,
         "name": "treasure",
         "arch": "amd64",  # default
         "platform": "linux",  # default
@@ -78,5 +78,5 @@ def test_generate_nfpm_config_for_deb():
     }
 
     field_set = NfpmDebPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt, default_mtime=mtime)
+    nfpm_config = field_set.nfpm_config(tgt, default_mtime=MTIME)
     assert nfpm_config == expected_nfpm_config
