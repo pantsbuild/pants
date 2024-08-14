@@ -230,6 +230,13 @@ def rule_runner() -> RuleRunner:
             {},
             {"contents/sandbox-file.txt"},
         ),
+        (
+            "rpm",
+            NfpmRpmPackageFieldSet,
+            ["contents/sandbox-file.txt:sandbox_file"],
+            {},
+            {"contents/sandbox-file.txt"},
+        ),
         # codegen & package build
         (
             "apk",
@@ -245,6 +252,17 @@ def rule_runner() -> RuleRunner:
         (
             "deb",
             NfpmDebPackageFieldSet,
+            ["codegen:generated", "contents:files", "package:package"],
+            {},
+            {
+                "codegen/foobar.codegen.generated",
+                "contents/sandbox-file.txt",
+                "package/archive.tar",
+            },
+        ),
+        (
+            "rpm",
+            NfpmRpmPackageFieldSet,
             ["codegen:generated", "contents:files", "package:package"],
             {},
             {
