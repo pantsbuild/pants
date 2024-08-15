@@ -456,6 +456,8 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                 "opentelemetry-instrumentation-botocore",
                 "opentelemetry-instrumentation-botocore",
             ),
+            req("apache-airflow", "apache-airflow"),
+            req("apache-airflow-providers-apache-beam", "apache-airflow-providers-apache-beam"),
         ]
     )
     rule_runner.write_files({"BUILD": build_file})
@@ -482,6 +484,17 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                 ),
                 "default": FrozenDict(
                     {
+                        "airflow": (
+                            ModuleProvider(
+                                Address("", target_name="apache-airflow"), ModuleProviderType.IMPL
+                            ),
+                        ),
+                        "airflow.providers.apache.beam": (
+                            ModuleProvider(
+                                Address("", target_name="apache-airflow-providers-apache-beam"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
                         "azure.keyvault.secrets": (
                             ModuleProvider(
                                 Address("", target_name="azure-keyvault-secrets"),
@@ -975,6 +988,7 @@ def test_issue_15111(rule_runner: RuleRunner) -> None:
             ("dotenv",),
         ),
         ("oslo-service", ("oslo_service",)),
+        ("apache-airflow-providers-apache-beam", ("airflow.providers.apache.beam",)),
         ("pyopenssl", tuple()),
         ("", tuple()),
     ],
