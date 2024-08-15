@@ -409,9 +409,13 @@ struct PyIntrinsicsOptions(IntrinsicsOptions);
 #[pymethods]
 impl PyIntrinsicsOptions {
     #[new]
-    fn __new__(downloads_intrinsic_error_delay: &PyDelta) -> PyO3Result<Self> {
+    fn __new__(
+        downloads_intrinsic_error_delay: &PyDelta,
+        downloads_intrinsic_max_retries: usize,
+    ) -> PyO3Result<Self> {
         Ok(Self(IntrinsicsOptions {
             downloads_intrinsic_error_delay: downloads_intrinsic_error_delay.extract()?,
+            downloads_intrinsic_max_retries,
         }))
     }
 }

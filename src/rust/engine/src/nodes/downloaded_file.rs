@@ -80,6 +80,7 @@ impl DownloadedFile {
                 file_name,
                 digest,
                 core.downloads_intrinsic_error_delay,
+                core.downloads_intrinsic_max_retries,
             )
             .await?;
             // The value was successfully fetched and matched the digest: record in the ObservedUrls

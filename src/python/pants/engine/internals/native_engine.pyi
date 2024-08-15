@@ -980,7 +980,9 @@ class PyLocalStoreOptions:
     def __init__(self, **kwargs: Any) -> None: ...
 
 class PyIntrinsicsOptions:
-    def __init__(self, *, downloads_intrinsic_error_delay: timedelta) -> None: ...
+    def __init__(
+        self, *, downloads_intrinsic_error_delay: timedelta, downloads_intrinsic_max_retries: int
+    ) -> None: ...
 
 class PyScheduler:
     pass

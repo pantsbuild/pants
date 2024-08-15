@@ -130,7 +130,8 @@ class Scheduler:
         visualize_to_dir: str | None = None,
         validate_reachability: bool = True,
         watch_filesystem: bool = True,
-        downloads_intrinsic_error_delay: timedelta = timedelta(milliseconds=100),
+        downloads_intrinsic_error_delay: timedelta = timedelta(milliseconds=250),
+        downloads_intrinsic_max_retries: int = 4,
     ) -> None:
         """
         :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
@@ -235,6 +236,7 @@ class Scheduler:
         )
         intrinsics_options = PyIntrinsicsOptions(
             downloads_intrinsic_error_delay=downloads_intrinsic_error_delay,
+            downloads_intrinsic_max_retries=downloads_intrinsic_max_retries,
         )
 
         self._py_executor = executor

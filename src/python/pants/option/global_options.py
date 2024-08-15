@@ -1758,6 +1758,15 @@ class BootstrapOptions:
             """
         ),
     )
+    downloads_intrinsic_max_retries = IntOption(
+        default=4,
+        advanced=True,
+        help=softwrap(
+            """
+            Maximum number of times to retry "retryable" errors when downloading files via the downloads intrinsic rule.
+            """
+        ),
+    )
 
 
 # N.B. By subclassing BootstrapOptions, we inherit all of those options and are also able to extend

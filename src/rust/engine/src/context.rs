@@ -79,6 +79,7 @@ pub struct Core {
     pub immutable_inputs: ImmutableInputs,
     pub local_execution_root_dir: PathBuf,
     pub downloads_intrinsic_error_delay: Duration,
+    pub downloads_intrinsic_max_retries: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -172,6 +173,7 @@ impl From<&LocalStoreOptions> for store::LocalOptions {
 #[derive(Clone, Debug)]
 pub struct IntrinsicsOptions {
     pub downloads_intrinsic_error_delay: Duration,
+    pub downloads_intrinsic_max_retries: usize,
 }
 
 impl Core {
@@ -703,6 +705,7 @@ impl Core {
             immutable_inputs,
             local_execution_root_dir,
             downloads_intrinsic_error_delay: intrinsics_opts.downloads_intrinsic_error_delay,
+            downloads_intrinsic_max_retries: intrinsics_opts.downloads_intrinsic_max_retries,
         })
     }
 
