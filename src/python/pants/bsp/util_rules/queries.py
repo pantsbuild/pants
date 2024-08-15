@@ -11,6 +11,9 @@ from pants.engine.rules import QueryRule, Rule
 from pants.engine.unions import UnionRule
 
 
+# Compute QueryRule's for each handler request/response pair.
+# Note: These are necessary because the BSP support is an auxiliary goal that makes
+# synchronous requests into the engine.
 def compute_handler_query_rules(
     rules: Iterable[Rule | UnionRule | QueryRule],
 ) -> tuple[QueryRule, ...]:
