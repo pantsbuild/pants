@@ -10,7 +10,7 @@ import re
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path, PurePath
 from typing import Any, Callable, Type, TypeVar, cast
@@ -35,6 +35,7 @@ from pants.option.option_types import (
     BoolOption,
     DictOption,
     DirOption,
+    DurationOption,
     EnumOption,
     FloatOption,
     IntOption,
@@ -1489,8 +1490,8 @@ class BootstrapOptions:
         ),
         advanced=True,
     )
-    session_end_tasks_timeout = FloatOption(
-        default=3.0,
+    session_end_tasks_timeout = DurationOption(
+        default=timedelta(seconds=3.0),
         help=softwrap(
             """
             The time in seconds to wait for still-running "session end" tasks to complete before finishing

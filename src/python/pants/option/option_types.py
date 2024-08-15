@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
+from datetime import timedelta
 from enum import Enum
 from typing import Any, Callable, Generic, Iterator, TypeVar, Union, cast, overload
 
@@ -784,6 +785,18 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
 
     def _convert_(self, val: Any) -> dict[str, _ValueT]:
         return cast("dict[str, _ValueT]", val)
+
+
+# -----------------------------------------------------------------------------------------------
+# Duration Concrete Option Classes
+# -----------------------------------------------------------------------------------------------
+_DurationDefault = TypeVar("_DurationDefault", timedelta, None)
+
+
+class DurationOption(_OptionBase[timedelta, _DurationDefault]):
+    """An option representing a time duration (e.g., 50 milliseconds or 30 microseconds)."""
+
+    option_type: Any = custom_types.duration
 
 
 # -----------------------------------------------------------------------------------------------

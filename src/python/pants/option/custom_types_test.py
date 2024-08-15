@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from datetime import timedelta
 from textwrap import dedent
 from typing import Dict, List, Union
 
@@ -11,6 +12,7 @@ from pants.option.custom_types import (
     ListValueComponent,
     UnsetBool,
     _flatten_shlexed_list,
+    duration,
     memory_size,
 )
 from pants.option.errors import ParseError
@@ -62,6 +64,34 @@ def test_flatten_shlexed_list() -> None:
         "arg1=foo bar",
         "arg2=baz",
     ]
+
+
+@pytest.mark.parametrize(
+    "unit,key",
+    [
+        ("s", "seconds"),
+        ("second", "seconds"),
+        ("seconds", "seconds"),
+        ("ms", "milliseconds"),
+        ("milli", "milliseconds"),
+        ("millis", "milliseconds"),
+        ("millisecond", "milliseconds"),
+        ("milliseconds", "milliseconds"),
+        ("us", "microseconds"),
+        ("micro", "microseconds"),
+        ("micros", "microseconds"),
+        ("microsecond", "microseconds"),
+        ("microseconds", "microseconds"),
+        ("m", "minutes"),
+        ("minute", "minutes"),
+        ("minutes", "minutes"),
+        ("h", "hours"),
+        ("hour", "hours"),
+        ("hours", "hours"),
+    ],
+)
+def test_duration_accepts_units(unit, key) -> None:
+    assert duration(f"10{unit}") == timedelta(**{key: 10})
 
 
 class TestCustomTypes:
