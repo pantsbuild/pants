@@ -11,6 +11,7 @@ import re
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import timedelta
 from io import StringIO
 from pathlib import Path, PurePath
 from pprint import pformat
@@ -365,6 +366,7 @@ class RuleRunner:
                 ca_certs_path=ca_certs_path,
                 engine_visualize_to=None,
                 is_bootstrap=is_bootstrap,
+                downloads_intrinsic_error_delay=timedelta(milliseconds=100),
             ).scheduler
         )
 

@@ -1748,6 +1748,16 @@ class BootstrapOptions:
             """
         ),
     )
+    downloads_intrinsic_error_delay = FloatOption(
+        default=0.2,
+        advanced=True,
+        help=softwrap(
+            """
+            Set to the duration to use as the "period" for exponential backoff between download attempts
+            by the downloads intrinsinc rule when it encounters retryable errors.
+            """
+        ),
+    )
 
 
 # N.B. By subclassing BootstrapOptions, we inherit all of those options and are also able to extend

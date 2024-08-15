@@ -35,7 +35,7 @@ use pyo3::prelude::{
     pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
     PyResult as PyO3Result, Python, ToPyObject,
 };
-use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
+use pyo3::types::{PyBytes, PyDelta, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
@@ -47,6 +47,7 @@ use workunit_store::{
     WorkunitStoreHandle,
 };
 
+use crate::context::IntrinsicsOptions;
 use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
 use crate::externs::process::PyProcessExecutionEnvironment;
 use crate::intrinsics;
@@ -76,6 +77,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
     m.add_class::<PyExecutionRequest>()?;
     m.add_class::<PyExecutionStrategyOptions>()?;
+    m.add_class::<PyIntrinsicsOptions>()?;
     m.add_class::<PyLocalStoreOptions>()?;
     m.add_class::<PyNailgunServer>()?;
     m.add_class::<PyRemotingOptions>()?;
@@ -402,6 +404,19 @@ impl PyLocalStoreOptions {
 }
 
 #[pyclass]
+struct PyIntrinsicsOptions(IntrinsicsOptions);
+
+#[pymethods]
+impl PyIntrinsicsOptions {
+    #[new]
+    fn __new__(downloads_intrinsic_error_delay: &PyDelta) -> PyO3Result<Self> {
+        Ok(Self(IntrinsicsOptions {
+            downloads_intrinsic_error_delay: downloads_intrinsic_error_delay.extract()?,
+        }))
+    }
+}
+
+#[pyclass]
 struct PySession(Session);
 
 #[pymethods]
@@ -702,6 +717,7 @@ fn scheduler_create(
     remoting_options: &PyRemotingOptions,
     local_store_options: &PyLocalStoreOptions,
     exec_strategy_opts: &PyExecutionStrategyOptions,
+    intrinsics_options: &PyIntrinsicsOptions,
     ca_certs_path: Option<PathBuf>,
 ) -> PyO3Result<PyScheduler> {
     match fs::increase_limits() {
@@ -736,6 +752,7 @@ fn scheduler_create(
                     local_store_options.0.clone(),
                     remoting_options.0.clone(),
                     exec_strategy_opts.0.clone(),
+                    intrinsics_options.0.clone(),
                 )
                 .await
             })
