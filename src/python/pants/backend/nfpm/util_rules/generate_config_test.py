@@ -83,16 +83,16 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     ),
     (
         # no dependencies
-        pytest.param("apk", NfpmApkPackageFieldSet, [], {}, [], {}, None),
-        pytest.param("archlinux", NfpmArchlinuxPackageFieldSet, [], {}, [], {}, None),
-        pytest.param("deb", NfpmDebPackageFieldSet, [], {}, [], {}, None),
-        pytest.param("rpm", NfpmRpmPackageFieldSet, [], {}, [], {}, None),
-        pytest.param("rpm", NfpmRpmPackageFieldSet, [], {}, [], {"ghost_contents": ["/var/log/pkg.log"]}, None),
+        pytest.param("apk", NfpmApkPackageFieldSet, [], {}, [], {}, None, id="apk-no-deps"),
+        pytest.param("archlinux", NfpmArchlinuxPackageFieldSet, [], {}, [], {}, None, id="archlinux-no-deps"),
+        pytest.param("deb", NfpmDebPackageFieldSet, [], {}, [], {}, None, id="deb-no-deps"),
+        pytest.param("rpm", NfpmRpmPackageFieldSet, [], {}, [], {}, None, id="rpm-no-deps"),
+        pytest.param("rpm", NfpmRpmPackageFieldSet, [], {}, [], {"ghost_contents": ["/var/log/pkg.log"]}, None, id="rpm-no-deps-with-ghost"),
         # no dependencies (extra file does not cause errors)
-        pytest.param("apk", NfpmApkPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
-        pytest.param("archlinux", NfpmArchlinuxPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
-        pytest.param("deb", NfpmDebPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
-        pytest.param("rpm", NfpmRpmPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None),
+        pytest.param("apk", NfpmApkPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None, id="apk-no-deps-with-extra-file"),
+        pytest.param("archlinux", NfpmArchlinuxPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None, id="archlinux-no-deps-with-extra-file"),
+        pytest.param("deb", NfpmDebPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None, id="deb-no-deps-with-extra-file"),
+        pytest.param("rpm", NfpmRpmPackageFieldSet, [], {}, ["contents/extra-file.txt"], {}, None, id="rpm-no-deps-with-extra-file"),
         pytest.param(
             "rpm",
             NfpmRpmPackageFieldSet,
@@ -101,6 +101,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             ["contents/extra-file.txt"],
             {"ghost_contents": ["/var/log/pkg.log"]},
             None,
+            id="rpm-no-deps-with-extra-file-and-ghost",
         ),
         # with dependencies
         pytest.param(
@@ -123,6 +124,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             ],
             {},
             None,
+            id="apk-with-deps",
         ),
         pytest.param(
             "archlinux",
@@ -144,6 +146,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             ],
             {},
             None,
+            id="archlinux-with-deps",
         ),
         pytest.param(
             "deb",
@@ -165,6 +168,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             ],
             {},
             None,
+            id="deb-with-deps",
         ),
         pytest.param(
             "rpm",
@@ -186,6 +190,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             ],
             {},
             None,
+            id="rpm-with-deps",
         ),
         pytest.param(
             "rpm",
@@ -207,6 +212,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             ],
             {"ghost_contents": ["/var/log/pkg.log"]},
             None,
+            id="rpm-with-deps-and-ghost",
         ),
         # with malformed dependency
         pytest.param(
@@ -217,6 +223,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             [],
             {},
             pytest.raises(ExecutionError),
+            id="apk-with-malformed-dep",
         ),
         pytest.param(
             "archlinux",
@@ -226,6 +233,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             [],
             {},
             pytest.raises(ExecutionError),
+            id="archlinux-with-malformed-dep",
         ),
         pytest.param(
             "deb",
@@ -235,6 +243,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             [],
             {},
             pytest.raises(ExecutionError),
+            id="deb-with-malformed-dep",
         ),
         pytest.param(
             "rpm",
@@ -244,6 +253,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             [],
             {},
             pytest.raises(ExecutionError),
+            id="rpm-with-malformed-dep",
         ),
         # with dependency file missing from sandbox
         pytest.param(
@@ -254,6 +264,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             [],
             {},
             pytest.raises(ExecutionError),
+            id="apk-missing-dep-file",
         ),
         pytest.param(
             "archlinux",
@@ -263,6 +274,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             [],
             {},
             pytest.raises(ExecutionError),
+            id="archlinux-missing-dep-file",
         ),
         pytest.param(
             "deb",
@@ -272,6 +284,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             [],
             {},
             pytest.raises(ExecutionError),
+            id="deb-missing-dep-file",
         ),
         pytest.param(
             "rpm",
@@ -281,6 +294,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             [],
             {},
             pytest.raises(ExecutionError),
+            id="rpm-missing-dep-file",
         ),
         # with script file missing from sandbox
         pytest.param(
@@ -291,6 +305,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             [],
             {},
             pytest.raises(ExecutionError),
+            id="apk-missing-script-file",
         ),
         pytest.param(
             "archlinux",
@@ -300,6 +315,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             [],
             {},
             pytest.raises(ExecutionError),
+            id="archlinux-missing-script-file",
         ),
         pytest.param(
             "deb",
@@ -309,6 +325,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             [],
             {},
             pytest.raises(ExecutionError),
+            id="deb-missing-script-file",
         ),
         pytest.param(
             "rpm",
@@ -318,6 +335,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             [],
             {},
             pytest.raises(ExecutionError),
+            id="rpm-missing-script-file",
         ),
     ),
 )
