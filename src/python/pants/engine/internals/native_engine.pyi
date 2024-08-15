@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import RawIOBase
 from typing import (
     Any,
@@ -863,7 +863,7 @@ def session_record_test_observation(
 ) -> None: ...
 def session_isolated_shallow_clone(session: PySession, build_id: str) -> PySession: ...
 def session_wait_for_tail_tasks(
-    scheduler: PyScheduler, session: PySession, timeout: float
+    scheduler: PyScheduler, session: PySession, timeout: timedelta
 ) -> None: ...
 def graph_len(scheduler: PyScheduler) -> int: ...
 def graph_visualize(scheduler: PyScheduler, session: PySession, path: str) -> None: ...

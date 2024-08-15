@@ -35,7 +35,7 @@ use pyo3::prelude::{
     pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
     PyResult as PyO3Result, Python, ToPyObject,
 };
-use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
+use pyo3::types::{PyBytes, PyDelta, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
@@ -1354,10 +1354,10 @@ fn session_wait_for_tail_tasks(
     py: Python,
     py_scheduler: &PyScheduler,
     py_session: &PySession,
-    timeout: f64,
+    timeout: &PyDelta,
 ) -> PyO3Result<()> {
     let core = &py_scheduler.0.core;
-    let timeout = Duration::from_secs_f64(timeout);
+    let timeout = timeout.extract()?;
     core.executor.enter(|| {
         py.allow_threads(|| {
             core.executor

@@ -7,6 +7,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import PurePath
 from types import CoroutineType
 from typing import Any, Callable, Dict, Iterable, NoReturn, Sequence, cast
@@ -661,7 +662,7 @@ class SchedulerSession:
     def cancel(self) -> None:
         self.py_session.cancel()
 
-    def wait_for_tail_tasks(self, timeout: float) -> None:
+    def wait_for_tail_tasks(self, timeout: timedelta) -> None:
         native_engine.session_wait_for_tail_tasks(self.py_scheduler, self.py_session, timeout)
 
 
