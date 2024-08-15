@@ -264,6 +264,8 @@ class RuleRunner:
         inherent_environment: EnvironmentName | None = EnvironmentName(None),
         is_bootstrap: bool = False,
         auxiliary_goals: Iterable[type[AuxiliaryGoal]] | None = None,
+        downloads_intrinsic_error_delay: timedelta = timedelta(milliseconds=10),
+        downloads_intrinsic_max_retries: int = 4,
     ) -> None:
         bootstrap_args = [*bootstrap_args]
 
@@ -366,7 +368,8 @@ class RuleRunner:
                 ca_certs_path=ca_certs_path,
                 engine_visualize_to=None,
                 is_bootstrap=is_bootstrap,
-                downloads_intrinsic_error_delay=timedelta(milliseconds=100),
+                downloads_intrinsic_error_delay=downloads_intrinsic_error_delay,
+                downloads_intrinsic_max_retries=downloads_intrinsic_max_retries,
             ).scheduler
         )
 

@@ -2,11 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import hashlib
+from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+import requests
 
 from pants.engine.download_file import URLDownloadHandler, download_file
 from pants.engine.fs import (
@@ -209,7 +211,23 @@ def test_query_string_included_in_cache_key() -> None:
     t.daemon = True
     t.start()
 
-    rule_runner = RuleRunner(rules=[QueryRule(DigestEntries, (Digest,))], isolated_local_store=True)
+    # Wait until the http server is operational.
+    wait_attempts_remaining = 4
+    while wait_attempts_remaining > 0:
+        r = requests.get(f"http://127.0.0.1:{port}/?val=test", timeout=0.1)
+        if r.status_code == 200:
+            break
+        wait_attempts_remaining -= 1
+
+    if wait_attempts_remaining == 0:
+        raise Exception("HTTP server thread did not startup.")
+
+    rule_runner = RuleRunner(
+        rules=[QueryRule(DigestEntries, (Digest,))],
+        isolated_local_store=True,
+        downloads_intrinsic_error_delay=timedelta(milliseconds=1),
+        downloads_intrinsic_max_retries=1,
+    )
 
     response = "world"
     expected_digest = FileDigest(hashlib.sha256(response.encode()).hexdigest(), len(response))
