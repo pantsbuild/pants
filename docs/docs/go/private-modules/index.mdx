@@ -1,0 +1,44 @@
+---
+    title: Private Modules
+    sidebar_position: 1
+---
+
+Use Golang modules from private repositories
+
+---
+# Using Private Modules in Golang
+
+Pants can build go binaries that use modules from private git repositories.
+To do this specify the private repo(s) in `GOPRIVATE` and provide credentials for the git repo in your `$HOME/.netrc`.
+
+Define the `GOPRIVATE` variable in the `subprocess_env_vars` section of your `pants.toml`. The example below shows the `.netrc` file so that git can authentcate. A simple `go.mod` shows the inclusion of the private module, nothing special here.
+
+
+```toml tab={"label":"pants.toml"}
+[GLOBAL]
+backend_packages.add = [
+  "pants.backend.experimental.go",
+]
+
+
+[golang]
+subprocess_env_vars = [
+    'GOPRIVATE=github.com/your-user/your-module/*',
+    'HOME',
+]
+
+```
+
+```go tab={"label":"go.mod"}
+module consumer
+
+go 1.22.4
+
+require github.com/your-user/your-repo/your-module v0.0.1
+```
+
+``` tab={"label":".netrc"}
+machine github.com
+login your-user
+password your-token
+```
