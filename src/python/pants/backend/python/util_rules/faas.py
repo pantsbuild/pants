@@ -438,7 +438,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
             if version == (rt.major, rt.minor) and request.architecture.value == rt.architecture
         )
     except StopIteration:
-        # Not a known runtime, so fallback to just passing a platform
+        # No known runtime, so prompt the user to specify
         version_modifier = "[inferred from interpreter constraints]" if inferred_from_ics else ""
         version_adjective = "inferred" if inferred_from_ics else "specified"
         known_runtimes_str = ", ".join(
