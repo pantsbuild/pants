@@ -460,7 +460,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
                 To fix, please generate a `complete_platforms` file for the given Python version and
                 machine architecture, or specify a runtime that is known to Pants.
 
-                You can follow the instructions at {doc_url('docs/python/overview/pex#setting-the-target-platforms-for-a-pex')}
+                You can follow the instructions at {doc_url('docs/python/integrations/faas')}
                 to generate a `complete_platforms` file for your Python version and machine
                 architecture.
                 """
