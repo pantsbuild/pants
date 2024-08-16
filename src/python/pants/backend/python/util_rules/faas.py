@@ -445,6 +445,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
             FrozenOrderedSet(r.name for r in request.runtime.known_runtimes)
         )
         warn_or_error(
+            # Replace this with an unconditional `InvalidTargetException`
             "2.26.0.dev0",
             "implicitly resolving platforms for unknown FaaS runtimes",
             softwrap(
