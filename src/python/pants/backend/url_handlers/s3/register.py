@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import timedelta
 from types import SimpleNamespace
 from typing import Any
 from urllib.parse import urlsplit
@@ -14,6 +15,7 @@ from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.util.strutil import softwrap
 
 CONTENT_TYPE = "binary/octet-stream"
@@ -63,8 +65,17 @@ class S3DownloadFile:
 
 
 @rule
-async def download_from_s3(request: S3DownloadFile, aws_credentials: AWSCredentials) -> Digest:
+async def download_from_s3(
+    request: S3DownloadFile, aws_credentials: AWSCredentials, global_options: GlobalOptions
+) -> Digest:
     from botocore import auth, compat, exceptions  # pants: no-infer-dep
+
+    retry_delay_duration = timedelta(seconds=global_options.downloads_intrinsic_retry_delay)
+    max_attempts = global_options.downloads_intrinsic_max_attempts
+    if max_attempts < 1:
+        raise ValueError(
+            "Global option `--downloads-intrinsic-max-attempts must a positive integer greater than or equal to 1, got {max_attempts}"
+        )
 
     # NB: The URL for auth is expected to be in path-style
     path_style_url = "https://s3"
@@ -102,6 +113,8 @@ async def download_from_s3(request: S3DownloadFile, aws_credentials: AWSCredenti
             url=virtual_hosted_url,
             expected_digest=request.expected_digest,
             auth_headers=http_request.headers,
+            retry_delay_duration=retry_delay_duration,
+            max_attempts=max_attempts,
         ),
     )
 
