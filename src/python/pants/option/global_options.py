@@ -10,7 +10,7 @@ import re
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path, PurePath
 from typing import Any, Callable, Type, TypeVar, cast
@@ -1748,7 +1748,7 @@ class BootstrapOptions:
             """
         ),
     )
-    downloads_intrinsic_retry_delay = FloatOption(
+    _downloads_intrinsic_retry_delay = FloatOption(
         default=0.2,
         advanced=True,
         help=softwrap(
@@ -1758,7 +1758,7 @@ class BootstrapOptions:
             """
         ),
     )
-    downloads_intrinsic_max_attempts = IntOption(
+    _downloads_intrinsic_max_attempts = IntOption(
         default=4,
         advanced=True,
         help=softwrap(
@@ -1768,6 +1768,24 @@ class BootstrapOptions:
             """
         ),
     )
+
+    @property
+    def downloads_intrinsic_retry_delay(self) -> timedelta:
+        value = self._downloads_intrinsic_retry_delay
+        if value <= 0.0:
+            raise ValueError(
+                f"Global option `--downloads-intrinsic-retry-delay` must a positive number, got {value}"
+            )
+        return timedelta(seconds=value)
+
+    @property
+    def downloads_intrinsic_max_attempts(self) -> int:
+        value = self._downloads_intrinsic_max_attempts
+        if value < 1:
+            raise ValueError(
+                f"Global option `--downloads-intrinsic-max-attempts` must be at least 1, got {value}"
+            )
+        return value
 
 
 # N.B. By subclassing BootstrapOptions, we inherit all of those options and are also able to extend

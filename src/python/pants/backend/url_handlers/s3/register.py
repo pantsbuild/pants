@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
 from types import SimpleNamespace
 from typing import Any
 from urllib.parse import urlsplit
@@ -70,13 +69,6 @@ async def download_from_s3(
 ) -> Digest:
     from botocore import auth, compat, exceptions  # pants: no-infer-dep
 
-    retry_delay_duration = timedelta(seconds=global_options.downloads_intrinsic_retry_delay)
-    max_attempts = global_options.downloads_intrinsic_max_attempts
-    if max_attempts < 1:
-        raise ValueError(
-            "Global option `--downloads-intrinsic-max-attempts must a positive integer greater than or equal to 1, got {max_attempts}"
-        )
-
     # NB: The URL for auth is expected to be in path-style
     path_style_url = "https://s3"
     if request.region:
@@ -113,8 +105,8 @@ async def download_from_s3(
             url=virtual_hosted_url,
             expected_digest=request.expected_digest,
             auth_headers=http_request.headers,
-            retry_delay_duration=retry_delay_duration,
-            max_attempts=max_attempts,
+            retry_delay_duration=global_options.downloads_intrinsic_retry_delay,
+            max_attempts=global_options.downloads_intrinsic_max_attempts,
         ),
     )
 

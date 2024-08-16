@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from datetime import timedelta
 from fnmatch import fnmatch
 from typing import ClassVar, Optional
 from urllib.parse import urlparse
@@ -72,12 +71,6 @@ async def download_file(
     global_options: GlobalOptions,
 ) -> Digest:
     parsed_url = urlparse(request.url)
-    retry_delay_duration = timedelta(seconds=global_options.downloads_intrinsic_retry_delay)
-    max_attempts = global_options.downloads_intrinsic_max_attempts
-    if max_attempts < 1:
-        raise ValueError(
-            "Global option `--downloads-intrinsic-max-attempts must a positive integer greater than or equal to 1, got {max_attempts}"
-        )
 
     handlers = union_membership.get(URLDownloadHandler)
     matched_handlers = []
@@ -111,8 +104,8 @@ async def download_file(
         NativeDownloadFile(
             request.url,
             request.expected_digest,
-            retry_delay_duration=retry_delay_duration,
-            max_attempts=max_attempts,
+            retry_delay_duration=global_options.downloads_intrinsic_retry_delay,
+            max_attempts=global_options.downloads_intrinsic_max_attempts,
         ),
     )
 
