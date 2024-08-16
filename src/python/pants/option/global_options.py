@@ -1748,7 +1748,7 @@ class BootstrapOptions:
             """
         ),
     )
-    downloads_intrinsic_error_delay = FloatOption(
+    downloads_intrinsic_retry_delay = FloatOption(
         default=0.2,
         advanced=True,
         help=softwrap(
@@ -1758,12 +1758,13 @@ class BootstrapOptions:
             """
         ),
     )
-    downloads_intrinsic_max_retries = IntOption(
+    downloads_intrinsic_max_attempts = IntOption(
         default=4,
         advanced=True,
         help=softwrap(
             """
-            Maximum number of times to retry "retryable" errors when downloading files via the downloads intrinsic rule.
+            Maximum number of times to attempt to download files via the engine's downloads intrinsic rule. The engine
+            will retry downloads whenever it encounters "retryable" HTTP errors.
             """
         ),
     )
