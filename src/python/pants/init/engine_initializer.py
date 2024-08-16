@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
 from pathlib import Path
 from typing import Any, ClassVar, Iterable, Mapping, cast
 
@@ -211,10 +210,6 @@ class EngineInitializer:
             engine_visualize_to=bootstrap_options.engine_visualize_to,
             watch_filesystem=bootstrap_options.watch_filesystem,
             is_bootstrap=is_bootstrap,
-            downloads_intrinsic_error_delay=timedelta(
-                seconds=bootstrap_options.downloads_intrinsic_error_delay
-            ),
-            downloads_intrinsic_max_retries=bootstrap_options.downloads_intrinsic_max_retries,
         )
 
     @staticmethod
@@ -234,8 +229,6 @@ class EngineInitializer:
         engine_visualize_to: str | None = None,
         watch_filesystem: bool = True,
         is_bootstrap: bool = False,
-        downloads_intrinsic_error_delay: timedelta = timedelta(milliseconds=250),
-        downloads_intrinsic_max_retries: int = 4,
     ) -> GraphScheduler:
         build_root_path = build_root or get_buildroot()
 
@@ -365,8 +358,6 @@ class EngineInitializer:
             include_trace_on_error=include_trace_on_error,
             visualize_to_dir=engine_visualize_to,
             watch_filesystem=watch_filesystem,
-            downloads_intrinsic_error_delay=downloads_intrinsic_error_delay,
-            downloads_intrinsic_max_retries=downloads_intrinsic_max_retries,
         )
 
         return GraphScheduler(scheduler, goal_map)

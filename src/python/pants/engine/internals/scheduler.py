@@ -7,7 +7,6 @@ import logging
 import os
 import time
 from dataclasses import dataclass
-from datetime import timedelta
 from pathlib import PurePath
 from types import CoroutineType
 from typing import Any, Callable, Dict, Iterable, NoReturn, Sequence, cast
@@ -48,7 +47,6 @@ from pants.engine.internals.native_engine import (
     PyExecutionRequest,
     PyExecutionStrategyOptions,
     PyExecutor,
-    PyIntrinsicsOptions,
     PyLocalStoreOptions,
     PyRemotingOptions,
     PyScheduler,
@@ -130,8 +128,6 @@ class Scheduler:
         visualize_to_dir: str | None = None,
         validate_reachability: bool = True,
         watch_filesystem: bool = True,
-        downloads_intrinsic_error_delay: timedelta = timedelta(milliseconds=250),
-        downloads_intrinsic_max_retries: int = 4,
     ) -> None:
         """
         :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
@@ -234,10 +230,6 @@ class Scheduler:
             child_default_memory=execution_options.process_per_child_memory_usage,
             graceful_shutdown_timeout=execution_options.process_execution_graceful_shutdown_timeout,
         )
-        intrinsics_options = PyIntrinsicsOptions(
-            downloads_intrinsic_error_delay=downloads_intrinsic_error_delay,
-            downloads_intrinsic_max_retries=downloads_intrinsic_max_retries,
-        )
 
         self._py_executor = executor
         self._py_scheduler = native_engine.scheduler_create(
@@ -253,7 +245,6 @@ class Scheduler:
             remoting_options,
             py_local_store_options,
             exec_strategy_opts,
-            intrinsics_options,
             ca_certs_path,
         )
 

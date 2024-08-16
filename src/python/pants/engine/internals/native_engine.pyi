@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from io import RawIOBase
 from typing import (
     Any,
@@ -837,7 +837,6 @@ def scheduler_create(
     remoting_options: PyRemotingOptions,
     local_store_options: PyLocalStoreOptions,
     exec_strategy_opts: PyExecutionStrategyOptions,
-    intrinsics_options: PyIntrinsicsOptions,
     ca_certs_path: str | None,
 ) -> PyScheduler: ...
 def scheduler_execute(
@@ -978,11 +977,6 @@ class PyRemotingOptions:
 
 class PyLocalStoreOptions:
     def __init__(self, **kwargs: Any) -> None: ...
-
-class PyIntrinsicsOptions:
-    def __init__(
-        self, *, downloads_intrinsic_error_delay: timedelta, downloads_intrinsic_max_retries: int
-    ) -> None: ...
 
 class PyScheduler:
     pass

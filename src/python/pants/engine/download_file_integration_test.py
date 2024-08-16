@@ -22,6 +22,8 @@ from pants.engine.fs import (
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.engine.unions import UnionMembership
+from pants.option.global_options import GlobalOptions
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
 
 DOWNLOADS_FILE_DIGEST = FileDigest(
@@ -32,13 +34,21 @@ DOWNLOADS_EXPECTED_DIRECTORY_DIGEST = Digest(
 )
 
 
-def test_no_union_members() -> None:
+@pytest.fixture
+def global_options() -> GlobalOptions:
+    return create_subsystem(
+        GlobalOptions, downloads_intrinsic_error_delay=0.01, downloads_intrinsic_max_retries=2
+    )
+
+
+def test_no_union_members(global_options: GlobalOptions) -> None:
     union_membership = UnionMembership({})
     digest = run_rule_with_mocks(
         download_file,
         rule_args=[
             DownloadFile("http://pantsbuild.com/file.txt", DOWNLOADS_FILE_DIGEST),
             union_membership,
+            global_options,
         ],
         mock_gets=[
             MockGet(
@@ -79,7 +89,7 @@ def test_no_union_members() -> None:
         ("http*", "*.pantsbuild.com", "http://awesome.pantsbuild.com/file.txt"),
     ],
 )
-def test_matches(scheme, authority, url) -> None:
+def test_matches(scheme, authority, url, global_options: GlobalOptions) -> None:
     class UnionMember(URLDownloadHandler):
         match_scheme = scheme
         match_authority = authority
@@ -95,6 +105,7 @@ def test_matches(scheme, authority, url) -> None:
         rule_args=[
             DownloadFile(url, DOWNLOADS_FILE_DIGEST),
             union_membership,
+            global_options,
         ],
         mock_gets=[
             MockGet(
@@ -128,7 +139,7 @@ def test_matches(scheme, authority, url) -> None:
         ("https", "*.pantsbuild.com", "https://pantsbuild.com/file.txt"),
     ],
 )
-def test_doesnt_match(scheme, authority, url) -> None:
+def test_doesnt_match(scheme, authority, url, global_options: GlobalOptions) -> None:
     class UnionMember(URLDownloadHandler):
         match_scheme = scheme
         match_authority = authority
@@ -140,6 +151,7 @@ def test_doesnt_match(scheme, authority, url) -> None:
         rule_args=[
             DownloadFile(url, DOWNLOADS_FILE_DIGEST),
             union_membership,
+            global_options,
         ],
         mock_gets=[
             MockGet(
@@ -158,7 +170,7 @@ def test_doesnt_match(scheme, authority, url) -> None:
     assert digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
 
 
-def test_too_many_matches() -> None:
+def test_too_many_matches(global_options: GlobalOptions) -> None:
     class AuthorityMatcher(URLDownloadHandler):
         match_authority = "pantsbuild.com"
 
@@ -173,6 +185,7 @@ def test_too_many_matches() -> None:
             rule_args=[
                 DownloadFile("http://pantsbuild.com/file.txt", DOWNLOADS_FILE_DIGEST),
                 union_membership,
+                global_options,
             ],
             mock_gets=[
                 MockGet(
@@ -225,8 +238,6 @@ def test_query_string_included_in_cache_key() -> None:
     rule_runner = RuleRunner(
         rules=[QueryRule(DigestEntries, (Digest,))],
         isolated_local_store=True,
-        downloads_intrinsic_error_delay=timedelta(milliseconds=1),
-        downloads_intrinsic_max_retries=1,
     )
 
     response = "world"
@@ -236,7 +247,10 @@ def test_query_string_included_in_cache_key() -> None:
         Digest,
         [
             NativeDownloadFile(
-                f"http://127.0.0.1:{port}/hello?val={response}", expected_digest=expected_digest
+                f"http://127.0.0.1:{port}/hello?val={response}",
+                expected_digest=expected_digest,
+                retry_delay_duration=timedelta(milliseconds=1),
+                max_attempts=2,
             )
         ],
     )
@@ -255,7 +269,10 @@ def test_query_string_included_in_cache_key() -> None:
             Digest,
             [
                 NativeDownloadFile(
-                    f"http://127.0.0.1:{port}/hello?val=galaxy", expected_digest=expected_digest
+                    f"http://127.0.0.1:{port}/hello?val=galaxy",
+                    expected_digest=expected_digest,
+                    retry_delay_duration=timedelta(milliseconds=1),
+                    max_attempts=2,
                 )
             ],
         )

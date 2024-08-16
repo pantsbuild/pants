@@ -78,8 +78,6 @@ pub struct Core {
     pub named_caches: NamedCaches,
     pub immutable_inputs: ImmutableInputs,
     pub local_execution_root_dir: PathBuf,
-    pub downloads_intrinsic_error_delay: Duration,
-    pub downloads_intrinsic_max_retries: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -168,12 +166,6 @@ impl From<&LocalStoreOptions> for store::LocalOptions {
             shard_count: lso.shard_count,
         }
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct IntrinsicsOptions {
-    pub downloads_intrinsic_error_delay: Duration,
-    pub downloads_intrinsic_max_retries: usize,
 }
 
 impl Core {
@@ -535,7 +527,6 @@ impl Core {
         local_store_options: LocalStoreOptions,
         remoting_opts: RemotingOptions,
         exec_strategy_opts: ExecutionStrategyOptions,
-        intrinsics_opts: IntrinsicsOptions,
     ) -> Result<Core, String> {
         // We re-use these certs for both the execution and store service; they're generally tied together.
         let root_ca_certs = if let Some(ref path) = remoting_opts.root_ca_certs_path {
@@ -704,8 +695,6 @@ impl Core {
             named_caches,
             immutable_inputs,
             local_execution_root_dir,
-            downloads_intrinsic_error_delay: intrinsics_opts.downloads_intrinsic_error_delay,
-            downloads_intrinsic_max_retries: intrinsics_opts.downloads_intrinsic_max_retries,
         })
     }
 
