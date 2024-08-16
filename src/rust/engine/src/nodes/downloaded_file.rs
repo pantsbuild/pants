@@ -72,7 +72,15 @@ impl DownloadedFile {
                 .is_ok());
 
         if !usable_in_store {
-            downloads::download(core.clone(), url, auth_headers, file_name, digest).await?;
+            downloads::download(
+                &core.http_client,
+                core.store(),
+                url,
+                auth_headers,
+                file_name,
+                digest,
+            )
+            .await?;
             // The value was successfully fetched and matched the digest: record in the ObservedUrls
             // cache.
             core.local_cache.store(&url_key, Bytes::from("")).await?;

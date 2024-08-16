@@ -100,6 +100,7 @@ DEFAULT_MODULE_PATTERN_MAPPING: Dict[re.Pattern, List[Callable[[Match[str]], str
     ],
     re.compile(r"""^oslo-.+"""): [all_hyphen_to_underscore],
     re.compile(r"""^python-(.+)"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^apache-(airflow-providers-.+)"""): [first_group_hyphen_to_dot],
 }
 
 DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {

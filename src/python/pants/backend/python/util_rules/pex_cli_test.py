@@ -42,3 +42,13 @@ def test_custom_ca_certs(tmp_path: Path, rule_runner: RuleRunner) -> None:
     chrooted_certs_file = [f for f in files if f.path == "certsfile"]
     assert len(chrooted_certs_file) == 1
     assert b"Some fake cert" == chrooted_certs_file[0].content
+
+
+def test_pass_global_args_to_pex_cli_subsystem(tmp_path: Path, rule_runner: RuleRunner) -> None:
+    """Test that arbitrary global arguments can be passed to the pex tool process."""
+    rule_runner.set_options(["--pex-cli-global-args='--foo=bar --baz --spam=eggs'"])
+    proc = rule_runner.request(
+        Process,
+        [PexCliProcess(subcommand=(), extra_args=(), description="")],
+    )
+    assert "--foo=bar --baz --spam=eggs" in proc.argv
