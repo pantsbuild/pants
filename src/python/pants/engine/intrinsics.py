@@ -39,6 +39,7 @@ from pants.engine.process import (
     ProcessExecutionEnvironment,
 )
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
+from pants.util.docutil import git_url
 
 
 @rule
@@ -143,7 +144,7 @@ async def _interactive_process(
             "process)` directly. This will cause restarting logic not to be applied. "
             "Use `await run_interactive_process(process)` or `await "
             "run_interactive_process_in_environment(process, environment_name)` instead. "
-            "See src/python/pants/engine/intrinsics.py for more details."
+            f"See {git_url('src/python/pants/engine/intrinsics.py')} for more details."
         )
     return await native_engine.interactive_process(process, process_execution_environment)
 
