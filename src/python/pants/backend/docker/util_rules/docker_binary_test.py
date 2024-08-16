@@ -1,7 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import typing
 from hashlib import sha256
 from unittest import mock
 
@@ -174,7 +173,7 @@ def test_get_docker_with_tools(rule_runner: RuleRunner) -> None:
     def mock_get_binary_shims(request: BinaryShimsRequest) -> BinaryShims:
         return BinaryShims(EMPTY_DIGEST, "cache_name")
 
-    def run(tools: list[str], optional_tools: list[str]) -> DockerBinary:
+    def run(tools: list[str], optional_tools: list[str]) -> None:
         docker_options = create_subsystem(
             DockerOptions,
             experimental_enable_podman=False,
@@ -186,7 +185,7 @@ def test_get_docker_with_tools(rule_runner: RuleRunner) -> None:
         nonlocal mock_get_binary_path
         nonlocal mock_get_binary_shims
 
-        result = run_rule_with_mocks(
+        run_rule_with_mocks(
             get_docker,
             rule_args=[docker_options, docker_options_env_aware],
             mock_gets=[
@@ -202,8 +201,6 @@ def test_get_docker_with_tools(rule_runner: RuleRunner) -> None:
                 ),
             ],
         )
-
-        return typing.cast(DockerBinary, result)
 
     run(tools=["real-tool"], optional_tools=[])
 
