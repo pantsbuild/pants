@@ -2,9 +2,9 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::BTreeMap;
+use std::fmt;
 use std::io::{self, Write};
 use std::pin::Pin;
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes};
@@ -13,17 +13,29 @@ use hashing::Digest;
 use humansize::{file_size_opts, FileSize};
 use reqwest::header::{HeaderMap, HeaderName};
 use reqwest::Error;
+use store::Store;
 use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tokio_retry::RetryIf;
 use url::Url;
 
-use crate::context::Core;
 use workunit_store::{in_workunit, Level};
 
+#[derive(Debug)]
 enum StreamingError {
     Retryable(String),
     Permanent(String),
 }
+
+impl fmt::Display for StreamingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StreamingError::Retryable(inner) => write!(f, "{} (retryable)", inner.as_str()),
+            StreamingError::Permanent(inner) => write!(f, "{} (unretryable)", inner.as_str()),
+        }
+    }
+}
+
+impl std::error::Error for StreamingError {}
 
 impl From<StreamingError> for String {
     fn from(err: StreamingError) -> Self {
@@ -44,7 +56,7 @@ struct NetDownload {
 
 impl NetDownload {
     async fn start(
-        core: &Arc<Core>,
+        http_client: &reqwest::Client,
         url: Url,
         auth_headers: BTreeMap<String, String>,
         file_name: String,
@@ -57,8 +69,7 @@ impl NetDownload {
             );
         }
 
-        let response = core
-      .http_client
+        let response = http_client
       .get(url.clone())
       .headers(headers)
       .send()
@@ -132,7 +143,7 @@ impl StreamingDownload for FileDownload {
 }
 
 async fn attempt_download(
-    core: &Arc<Core>,
+    http_client: &reqwest::Client,
     url: &Url,
     auth_headers: &BTreeMap<String, String>,
     file_name: String,
@@ -152,7 +163,10 @@ async fn attempt_download(
             }
             Box::new(FileDownload::start(url.path(), file_name).await?)
         } else {
-            Box::new(NetDownload::start(core, url.clone(), auth_headers.clone(), file_name).await?)
+            Box::new(
+                NetDownload::start(http_client, url.clone(), auth_headers.clone(), file_name)
+                    .await?,
+            )
         }
     };
 
@@ -201,13 +215,14 @@ async fn attempt_download(
 }
 
 pub async fn download(
-    core: Arc<Core>,
+    http_client: &reqwest::Client,
+    store: Store,
     url: Url,
     auth_headers: BTreeMap<String, String>,
     file_name: String,
     expected_digest: hashing::Digest,
 ) -> Result<(), String> {
-    let core2 = core.clone();
+    let mut attempt_number = 0;
     let (actual_digest, bytes) = in_workunit!(
         "download_file",
         Level::Debug,
@@ -225,15 +240,22 @@ pub async fn download(
             RetryIf::spawn(
                 retry_strategy,
                 || {
+                    attempt_number += 1;
+                    log::debug!("Downloading {} (attempt #{})", &url, &attempt_number);
+
                     attempt_download(
-                        &core2,
+                        http_client,
                         &url,
                         &auth_headers,
                         file_name.clone(),
                         expected_digest,
                     )
                 },
-                |err: &StreamingError| matches!(err, StreamingError::Retryable(_)),
+                |err: &StreamingError| {
+                    let is_retryable = matches!(err, StreamingError::Retryable(_));
+                    log::debug!("Error while downloading {}: {}", &url, err);
+                    is_retryable
+                },
             )
             .await
         }
@@ -246,6 +268,145 @@ pub async fn download(
         ));
     }
 
-    let _ = core.store().store_file_bytes(bytes, true).await?;
+    let _ = store.store_file_bytes(bytes, true).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::{BTreeMap, HashSet},
+        net::SocketAddr,
+        sync::{
+            atomic::{AtomicU32, Ordering},
+            Arc,
+        },
+    };
+
+    use axum::{extract::State, response::IntoResponse, routing::get, Router};
+    use hashing::Digest;
+    use maplit::hashset;
+    use reqwest::StatusCode;
+    use store::Store;
+    use tempfile::TempDir;
+    use url::Url;
+    use workunit_store::WorkunitStore;
+
+    use super::download;
+
+    const TEST_RESPONSE: &[u8] = b"xyzzy";
+
+    #[tokio::test]
+    async fn test_download_intrinsic_basic() {
+        let (_workunit_store, _workunit) = WorkunitStore::setup_for_tests();
+
+        let dir = TempDir::new().unwrap();
+        let store = Store::local_only(task_executor::Executor::new(), dir.path()).unwrap();
+
+        let bind_addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
+        let listener = std::net::TcpListener::bind(bind_addr).unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let router = Router::new().route("/foo.txt", get(|| async { TEST_RESPONSE }));
+
+        tokio::spawn(async move {
+            axum::Server::from_tcp(listener)
+                .unwrap()
+                .serve(router.into_make_service())
+                .await
+                .unwrap();
+        });
+
+        let http_client = reqwest::Client::new();
+        let url = Url::parse(&format!("http://127.0.0.1:{}/foo.txt", addr.port())).unwrap();
+        let auth_headers = BTreeMap::new();
+        let expected_digest = Digest::of_bytes(TEST_RESPONSE);
+        download(
+            &http_client,
+            store.clone(),
+            url,
+            auth_headers,
+            "foo.txt".into(),
+            expected_digest,
+        )
+        .await
+        .unwrap();
+
+        let file_digests_set = hashset!(expected_digest);
+        store
+            .ensure_downloaded(file_digests_set, HashSet::new())
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_download_intrinsic_retries() {
+        let (_workunit_store, _workunit) = WorkunitStore::setup_for_tests();
+
+        let dir = TempDir::new().unwrap();
+        let store = Store::local_only(task_executor::Executor::new(), dir.path()).unwrap();
+
+        let bind_addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
+        let listener = std::net::TcpListener::bind(bind_addr).unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        #[derive(Clone)]
+        struct HandlerState {
+            attempt: Arc<AtomicU32>,
+        }
+
+        let attempt = Arc::new(AtomicU32::new(0));
+        let router = Router::new()
+            .route(
+                "/foo.txt",
+                get(move |State(state): State<HandlerState>| async move {
+                    let attempt = state
+                        .attempt
+                        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    if attempt == 0 {
+                        // This error code is retryable.
+                        (StatusCode::BAD_GATEWAY, "502").into_response()
+                    } else if attempt == 1 {
+                        (StatusCode::OK, TEST_RESPONSE).into_response()
+                    } else {
+                        (StatusCode::INTERNAL_SERVER_ERROR, "unexpected").into_response()
+                    }
+                }),
+            )
+            .with_state(HandlerState {
+                attempt: Arc::clone(&attempt),
+            });
+
+        tokio::spawn(async move {
+            axum::Server::from_tcp(listener)
+                .unwrap()
+                .serve(router.into_make_service())
+                .await
+                .unwrap();
+        });
+
+        let http_client = reqwest::Client::new();
+        let url = Url::parse(&format!("http://127.0.0.1:{}/foo.txt", addr.port())).unwrap();
+        let auth_headers = BTreeMap::new();
+        let expected_digest = Digest::of_bytes(TEST_RESPONSE);
+        download(
+            &http_client,
+            store.clone(),
+            url,
+            auth_headers,
+            "foo.txt".into(),
+            expected_digest,
+        )
+        .await
+        .unwrap();
+
+        let final_count = attempt.load(Ordering::SeqCst);
+        assert_eq!(final_count, 2);
+
+        let file_digests_set = hashset!(expected_digest);
+        store
+            .ensure_downloaded(file_digests_set, HashSet::new())
+            .await
+            .unwrap();
+    }
 }
