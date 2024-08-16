@@ -1,4 +1,4 @@
-# Creating a `complete_platforms` File for Python FaaS Environments
+# Creating a `complete_platforms` file for Python FaaS Environments
 
 When building Python artifacts for Function-as-a-Service (FaaS) environments like AWS Lambda or Google Cloud Functions, it's often helpful to use a `complete_platforms` file to specify exactly the Python versions and machine architectures that are supported by the environment.
 
@@ -18,19 +18,11 @@ If generating complete platforms for a different platform, you'll need to genera
 
 ### Using PEX in a Docker container
 
-If your target platform publishes Docker image containing the appropriate Python runtime, then you can use the `pex` package inside a Docker container to generate the file. This is much more convenient than running a cloud function, and should be preferred if possible.
-
-Once you have the Docker repo and tag corresponding to your target environment, you can start a container with the appropriate image and run the PEX tool inside it to generate the file:
-
-```sh
-docker run --entrypoint='/bin/sh' -it --rm <docker_repo>:<image_tag> -c "python -m pip install --target=/tmp/pex pex >/dev/null 2>&1 && PYTHONPATH=/tmp/pex/bin/pex3 interpreter inspect --markers --tags --indent=2" > complete_platforms.json
-```
-
-This command will output a JSON string containing a generated `complete_platforms` file, and store it in a file named `complete_platforms.json` inside the current directory.
+See [the PEX overview docs](../overview/pex.mdx#generating-the-complete_platforms-file) for details on how to generate the `complete_platforms` file inside a Docker container.
 
 ### Using PEX in a cloud function execution environment
 
-Alternatively, if there is no Docker image published for the FaaS environment, then the only way to generate the `complete_platforms` file might be to run a cloud function and output the file contents. This will likely vary by FaaS provider, but for AWS Lambda, a handler to generate the file might look like this:
+Alternatively, if there is no Docker image published for the FaaS environment, then the only way to generate the `complete_platforms` file might be to run a cloud function and output the file contents. This will vary by FaaS provider, but for AWS Lambda, a handler to generate the file might look like this:
 
    ```python
    import subprocess
