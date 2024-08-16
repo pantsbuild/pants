@@ -66,6 +66,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.docutil import doc_url
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text, softwrap
 
@@ -452,15 +453,14 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
                 f"""
                 Could not find a known runtime for the {version_adjective} Python version and machine architecture!
 
-                Python version: {version} {version_modifier}
-                Machine architecture: {request.architecture.value}
-
-                Known runtime values: {known_runtimes_str}
+                * Python version: {version} {version_modifier}
+                * Machine architecture: {request.architecture.value}
+                * Known runtime values: {known_runtimes_str}
 
                 To fix, please generate a `complete_platforms` file for the given Python version and
                 machine architecture, or specify a runtime that is known to Pants.
 
-                You can follow the instructions at https://github.com/pantsbuild/pants/discussions/18756
+                You can follow the instructions at {doc_url('docs/python/overview/pex#setting-the-target-platforms-for-a-pex')}
                 to generate a `complete_platforms` file for your Python version and machine
                 architecture.
                 """
