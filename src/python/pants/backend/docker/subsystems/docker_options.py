@@ -243,6 +243,17 @@ class DockerOptions(Subsystem):
         advanced=True,
     )
 
+    _optional_tools = StrListOption(
+        help=softwrap(
+            """
+            List any additional executables which are not mandatory for Docker to work, but which
+            should be included if available. The paths to these tools will be included in the
+            PATH used in the execution sandbox, so that they may be used by the Docker client.
+            """
+        ),
+        advanced=True,
+    )
+
     tailor = BoolOption(
         default=True,
         help="If true, add `docker_image` targets with the `tailor` goal.",
@@ -256,6 +267,10 @@ class DockerOptions(Subsystem):
     @property
     def tools(self) -> tuple[str, ...]:
         return tuple(sorted(set(self._tools)))
+
+    @property
+    def optional_tools(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self._optional_tools)))
 
     @memoized_method
     def registries(self) -> DockerRegistries:
