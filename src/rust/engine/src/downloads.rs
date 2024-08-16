@@ -335,7 +335,7 @@ mod tests {
             "foo.txt".into(),
             expected_digest,
             Duration::from_millis(10),
-            NonZeroUsize::from(1),
+            NonZeroUsize::new(1).unwrap(),
         )
         .await
         .unwrap();
@@ -405,7 +405,7 @@ mod tests {
             "foo.txt".into(),
             expected_digest,
             Duration::from_millis(10),
-            NonZeroUsize::from(3),
+            NonZeroUsize::new(3).unwrap(),
         )
         .await
         .unwrap();
