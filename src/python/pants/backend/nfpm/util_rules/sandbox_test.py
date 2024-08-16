@@ -72,42 +72,93 @@ _RPM_PKG = NfpmRpmPackage({"package_name": _PKG_NAME, "version": _PKG_VERSION}, 
 @pytest.mark.parametrize(
     "tgt,field_set_type,expected",
     (
-        (NfpmContentDir({"dst": "/foo"}, _A), NfpmPackageFieldSet, _DepCategory.ignore),
-        (
+        pytest.param(
+            NfpmContentDir({"dst": "/foo"}, _A),
+            NfpmPackageFieldSet,
+            _DepCategory.ignore,
+            id="content_dir",
+        ),
+        pytest.param(
             NfpmContentSymlink({"dst": "/foo", "src": "/bar"}, _A),
             NfpmPackageFieldSet,  # does not matter
             _DepCategory.ignore,
+            id="content_symlink",
         ),
-        (
+        pytest.param(
             NfpmContentFile({"dst": "/foo", "src": "bar", "dependencies": [":bar"]}, _A),
             NfpmPackageFieldSet,  # does not matter
             _DepCategory.nfpm_content_from_dependency,
+            id="content_file-from-dep",
         ),
-        (
+        pytest.param(
             NfpmContentFile({"dst": "/foo", "source": "bar"}, _A),
             NfpmPackageFieldSet,  # does not matter
             _DepCategory.nfpm_content_from_source,
+            id="content_file-from-source",
         ),
-        (_APK_PKG, NfpmApkPackageFieldSet, _DepCategory.nfpm_package),
-        (_APK_PKG, NfpmArchlinuxPackageFieldSet, _DepCategory.ignore),
-        (_APK_PKG, NfpmDebPackageFieldSet, _DepCategory.ignore),
-        (_APK_PKG, NfpmRpmPackageFieldSet, _DepCategory.ignore),
-        (_ARCHLINUX_PKG, NfpmApkPackageFieldSet, _DepCategory.ignore),
-        (_ARCHLINUX_PKG, NfpmArchlinuxPackageFieldSet, _DepCategory.nfpm_package),
-        (_ARCHLINUX_PKG, NfpmDebPackageFieldSet, _DepCategory.ignore),
-        (_ARCHLINUX_PKG, NfpmRpmPackageFieldSet, _DepCategory.ignore),
-        (_DEB_PKG, NfpmApkPackageFieldSet, _DepCategory.ignore),
-        (_DEB_PKG, NfpmArchlinuxPackageFieldSet, _DepCategory.ignore),
-        (_DEB_PKG, NfpmDebPackageFieldSet, _DepCategory.nfpm_package),
-        (_DEB_PKG, NfpmRpmPackageFieldSet, _DepCategory.ignore),
-        (_RPM_PKG, NfpmApkPackageFieldSet, _DepCategory.ignore),
-        (_RPM_PKG, NfpmArchlinuxPackageFieldSet, _DepCategory.ignore),
-        (_RPM_PKG, NfpmDebPackageFieldSet, _DepCategory.ignore),
-        (_RPM_PKG, NfpmRpmPackageFieldSet, _DepCategory.nfpm_package),
-        (GenericTarget({}, _A), NfpmPackageFieldSet, _DepCategory.remaining),
-        (FileTarget({"source": "foo"}, _A), NfpmPackageFieldSet, _DepCategory.remaining),
-        (ResourceTarget({"source": "foo"}, _A), NfpmPackageFieldSet, _DepCategory.remaining),
-        (ArchiveTarget({"format": "zip"}, _A), NfpmPackageFieldSet, _DepCategory.remaining),
+        pytest.param(
+            _APK_PKG, NfpmApkPackageFieldSet, _DepCategory.nfpm_package, id="pkgs-apk-apk"
+        ),
+        pytest.param(
+            _APK_PKG, NfpmArchlinuxPackageFieldSet, _DepCategory.ignore, id="pkgs-apk-archlinux"
+        ),
+        pytest.param(_APK_PKG, NfpmDebPackageFieldSet, _DepCategory.ignore, id="pkgs-apk-deb"),
+        pytest.param(_APK_PKG, NfpmRpmPackageFieldSet, _DepCategory.ignore, id="pkgs-apk-rpm"),
+        pytest.param(
+            _ARCHLINUX_PKG, NfpmApkPackageFieldSet, _DepCategory.ignore, id="pkgs-archlinux-apk"
+        ),
+        pytest.param(
+            _ARCHLINUX_PKG,
+            NfpmArchlinuxPackageFieldSet,
+            _DepCategory.nfpm_package,
+            id="pkgs-archlinux-archlinux",
+        ),
+        pytest.param(
+            _ARCHLINUX_PKG, NfpmDebPackageFieldSet, _DepCategory.ignore, id="pkgs-archlinux-deb"
+        ),
+        pytest.param(
+            _ARCHLINUX_PKG, NfpmRpmPackageFieldSet, _DepCategory.ignore, id="pkgs-archlinux-rpm"
+        ),
+        pytest.param(_DEB_PKG, NfpmApkPackageFieldSet, _DepCategory.ignore, id="pkgs-deb-apk"),
+        pytest.param(
+            _DEB_PKG, NfpmArchlinuxPackageFieldSet, _DepCategory.ignore, id="pkgs-deb-archlinux"
+        ),
+        pytest.param(
+            _DEB_PKG, NfpmDebPackageFieldSet, _DepCategory.nfpm_package, id="pkgs-deb-deb"
+        ),
+        pytest.param(_DEB_PKG, NfpmRpmPackageFieldSet, _DepCategory.ignore, id="pkgs-deb-rpm"),
+        pytest.param(_RPM_PKG, NfpmApkPackageFieldSet, _DepCategory.ignore, id="pkgs-rpm-apk"),
+        pytest.param(
+            _RPM_PKG, NfpmArchlinuxPackageFieldSet, _DepCategory.ignore, id="pkgs-rpm-archlinux"
+        ),
+        pytest.param(_RPM_PKG, NfpmDebPackageFieldSet, _DepCategory.ignore, id="pkgs-rpm-deb"),
+        pytest.param(
+            _RPM_PKG, NfpmRpmPackageFieldSet, _DepCategory.nfpm_package, id="pkgs-rpm-rpm"
+        ),
+        pytest.param(
+            GenericTarget({}, _A),
+            NfpmPackageFieldSet,
+            _DepCategory.remaining,
+            id="generic_target",
+        ),
+        pytest.param(
+            FileTarget({"source": "foo"}, _A),
+            NfpmPackageFieldSet,
+            _DepCategory.remaining,
+            id="file",
+        ),
+        pytest.param(
+            ResourceTarget({"source": "foo"}, _A),
+            NfpmPackageFieldSet,
+            _DepCategory.remaining,
+            id="resource",
+        ),
+        pytest.param(
+            ArchiveTarget({"format": "zip"}, _A),
+            NfpmPackageFieldSet,
+            _DepCategory.remaining,
+            id="archive",
+        ),
     ),
 )
 def test_dep_category_for_target(
@@ -178,12 +229,14 @@ def rule_runner() -> RuleRunner:
     "packager,field_set_type,dependencies,scripts,expected",
     (
         # empty digest
-        ("apk", NfpmApkPackageFieldSet, [], {}, set()),
-        ("archlinux", NfpmArchlinuxPackageFieldSet, [], {}, set()),
-        ("deb", NfpmDebPackageFieldSet, [], {}, set()),
-        ("rpm", NfpmRpmPackageFieldSet, [], {}, set()),
+        pytest.param("apk", NfpmApkPackageFieldSet, [], {}, set(), id="apk-empty-digest"),
+        pytest.param(
+            "archlinux", NfpmArchlinuxPackageFieldSet, [], {}, set(), id="archlinux-empty-digest"
+        ),
+        pytest.param("deb", NfpmDebPackageFieldSet, [], {}, set(), id="deb-empty-digest"),
+        pytest.param("rpm", NfpmRpmPackageFieldSet, [], {}, set(), id="rpm-empty-digest"),
         # non-empty digest
-        (
+        pytest.param(
             "apk",
             NfpmApkPackageFieldSet,
             ["contents:files", "contents:file"],
@@ -194,8 +247,9 @@ def rule_runner() -> RuleRunner:
                 "scripts/postinstall.sh",
                 "scripts/apk-postupgrade.sh",
             },
+            id="apk-non-empty-digest",
         ),
-        (
+        pytest.param(
             "archlinux",
             NfpmArchlinuxPackageFieldSet,
             ["contents:files", "contents:file"],
@@ -206,8 +260,9 @@ def rule_runner() -> RuleRunner:
                 "scripts/postinstall.sh",
                 "scripts/arch-postupgrade.sh",
             },
+            id="archlinux-non-empty-digest",
         ),
-        (
+        pytest.param(
             "deb",
             NfpmDebPackageFieldSet,
             ["contents:files", "contents:file"],
@@ -218,8 +273,9 @@ def rule_runner() -> RuleRunner:
                 "scripts/postinstall.sh",
                 "scripts/deb-config.sh",
             },
+            id="deb-non-empty-digest",
         ),
-        (
+        pytest.param(
             "rpm",
             NfpmRpmPackageFieldSet,
             ["contents:files", "contents:file"],
@@ -230,39 +286,44 @@ def rule_runner() -> RuleRunner:
                 "scripts/postinstall.sh",
                 "scripts/rpm-verify.sh",
             },
+            id="rpm-non-empty-digest",
         ),
         # dependency on file w/o intermediate nfpm_content_file target
         # should have the file in the sandbox, though config won't include it.
-        (
+        pytest.param(
             "apk",
             NfpmApkPackageFieldSet,
             ["contents/sandbox-file.txt:sandbox_file"],
             {},
             {"contents/sandbox-file.txt"},
+            id="apk-plain-file",
         ),
-        (
+        pytest.param(
             "archlinux",
             NfpmArchlinuxPackageFieldSet,
             ["contents/sandbox-file.txt:sandbox_file"],
             {},
             {"contents/sandbox-file.txt"},
+            id="archlinux-plain-file",
         ),
-        (
+        pytest.param(
             "deb",
             NfpmDebPackageFieldSet,
             ["contents/sandbox-file.txt:sandbox_file"],
             {},
             {"contents/sandbox-file.txt"},
+            id="deb-plain-file",
         ),
-        (
+        pytest.param(
             "rpm",
             NfpmRpmPackageFieldSet,
             ["contents/sandbox-file.txt:sandbox_file"],
             {},
             {"contents/sandbox-file.txt"},
+            id="rpm-plain-file",
         ),
         # codegen & package build
-        (
+        pytest.param(
             "apk",
             NfpmApkPackageFieldSet,
             ["codegen:generated", "contents:files", "package:package"],
@@ -272,8 +333,9 @@ def rule_runner() -> RuleRunner:
                 "contents/sandbox-file.txt",
                 "package/archive.tar",
             },
+            id="apk-codegen-and-package",
         ),
-        (
+        pytest.param(
             "archlinux",
             NfpmArchlinuxPackageFieldSet,
             ["codegen:generated", "contents:files", "package:package"],
@@ -283,8 +345,9 @@ def rule_runner() -> RuleRunner:
                 "contents/sandbox-file.txt",
                 "package/archive.tar",
             },
+            id="archlinux-codegen-and-package",
         ),
-        (
+        pytest.param(
             "deb",
             NfpmDebPackageFieldSet,
             ["codegen:generated", "contents:files", "package:package"],
@@ -294,8 +357,9 @@ def rule_runner() -> RuleRunner:
                 "contents/sandbox-file.txt",
                 "package/archive.tar",
             },
+            id="deb-codegen-and-package",
         ),
-        (
+        pytest.param(
             "rpm",
             NfpmRpmPackageFieldSet,
             ["codegen:generated", "contents:files", "package:package"],
@@ -305,35 +369,40 @@ def rule_runner() -> RuleRunner:
                 "contents/sandbox-file.txt",
                 "package/archive.tar",
             },
+            id="rpm-codegen-and-package",
         ),
         # error finding script
-        (
+        pytest.param(
             "apk",
             NfpmApkPackageFieldSet,
             ["contents:files", "contents:file"],
             {"postinstall": "scripts/missing.sh"},
             pytest.raises(ExecutionError),
+            id="apk-missing-script-file",
         ),
-        (
+        pytest.param(
             "archlinux",
             NfpmArchlinuxPackageFieldSet,
             ["contents:files", "contents:file"],
             {"postinstall": "scripts/missing.sh"},
             pytest.raises(ExecutionError),
+            id="archlinux-missing-script-file",
         ),
-        (
+        pytest.param(
             "deb",
             NfpmDebPackageFieldSet,
             ["contents:files", "contents:file"],
             {"postinstall": "scripts/missing.sh"},
             pytest.raises(ExecutionError),
+            id="deb-missing-script-file",
         ),
-        (
+        pytest.param(
             "rpm",
             NfpmRpmPackageFieldSet,
             ["contents:files", "contents:file"],
             {"postinstall": "scripts/missing.sh"},
             pytest.raises(ExecutionError),
+            id="rpm-missing-script-file",
         ),
     ),
 )
