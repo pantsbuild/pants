@@ -113,6 +113,11 @@ class NfpmPackageTarget(Target):
     pass
 
 
+# NB: The <packager>_FIELDS constants are used as Nfpm<packager>PackageFieldSet.required_fields,
+# which is used when generating the nfpm config file. The field_set.nfpm_config method loops
+# over required_fields, using the nfpm_alias class var on each field to construct the config.
+
+
 APK_FIELDS = (
     NfpmPackageNameField,
     NfpmArchField,
@@ -129,6 +134,8 @@ APK_FIELDS = (
     NfpmApkReplacesField,
     NfpmApkProvidesField,
     NfpmApkDependsField,
+    # content-related fields
+    NfpmApkScriptsField,
 )
 
 
@@ -137,7 +144,6 @@ class NfpmApkPackage(NfpmPackageTarget):
     core_fields = (
         *COMMON_NFPM_PACKAGE_FIELDS,
         *APK_FIELDS,
-        NfpmApkScriptsField,
     )
     help = help_text(
         f"""
@@ -170,6 +176,8 @@ ARCHLINUX_FIELDS = (
     NfpmArchlinuxProvidesField,
     NfpmArchlinuxDependsField,
     NfpmArchlinuxConflictsField,
+    # content-related fields
+    NfpmArchlinuxScriptsField,
 )
 
 
@@ -178,7 +186,6 @@ class NfpmArchlinuxPackage(NfpmPackageTarget):
     core_fields = (
         *COMMON_NFPM_PACKAGE_FIELDS,
         *ARCHLINUX_FIELDS,
-        NfpmArchlinuxScriptsField,
     )
     help = help_text(
         f"""
@@ -223,6 +230,8 @@ DEB_FIELDS = (
     NfpmDebBreaksField,
     # how to build the package
     NfpmDebCompressionField,
+    # content-related fields
+    NfpmDebScriptsField,
 )
 
 
@@ -231,7 +240,6 @@ class NfpmDebPackage(NfpmPackageTarget):
     core_fields = (
         *COMMON_NFPM_PACKAGE_FIELDS,
         *DEB_FIELDS,
-        NfpmDebScriptsField,
     )
     help = help_text(
         f"""
@@ -273,6 +281,9 @@ RPM_FIELDS = (
     NfpmRpmConflictsField,
     # how to build the package
     NfpmRpmCompressionField,
+    # content-related fields
+    NfpmRpmScriptsField,
+    NfpmRpmGhostContents,
 )
 
 
@@ -281,8 +292,6 @@ class NfpmRpmPackage(NfpmPackageTarget):
     core_fields = (
         *COMMON_NFPM_PACKAGE_FIELDS,
         *RPM_FIELDS,
-        NfpmRpmScriptsField,
-        NfpmRpmGhostContents,
     )
     help = help_text(
         f"""
