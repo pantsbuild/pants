@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::BTreeMap;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -44,7 +45,7 @@ impl DownloadedFile {
         auth_headers: BTreeMap<String, String>,
         digest: hashing::Digest,
         retry_delay_duration: Duration,
-        max_attempts: usize,
+        max_attempts: NonZeroUsize,
     ) -> Result<store::Snapshot, String> {
         let file_name = url
             .path_segments()
@@ -106,7 +107,8 @@ impl DownloadedFile {
                     externs::getattr(py_download_file, "expected_digest")?;
                 let retry_delay_duration: Duration =
                     externs::getattr(py_download_file, "retry_error_duration")?;
-                let max_attempts: usize = externs::getattr(py_download_file, "max_attempts")?;
+                let max_attempts: NonZeroUsize =
+                    externs::getattr(py_download_file, "max_attempts")?;
                 Ok::<_, String>((
                     url_str,
                     py_file_digest.0,
