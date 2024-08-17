@@ -6,17 +6,21 @@ from collections import defaultdict
 from typing import DefaultDict, Mapping, Tuple
 
 from pants.backend.openapi.codegen.java.extra_fields import (
-    OpenApiJavaApiPackageField,
     OpenApiJavaModelPackageField,
 )
+from pants.backend.openapi.codegen.python.extra_fields import OpenApiPythonAdditionalPropertiesField
 from pants.backend.openapi.target_types import AllOpenApiDocumentTargets
+from pants.backend.python.dependency_inference.module_mapper import (
+    FirstPartyPythonMappingImpl,
+    FirstPartyPythonTargetsMappingMarker,
+)
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import PythonResolveField
 from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import MutableTrieNode
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartyMappingRequest, SymbolMap
-from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import OrderedSet
 
 _ResolveName = str
@@ -31,17 +35,22 @@ _DEFAULT_MODEL_PACKAGE = "org.openapitools.client.model"
 
 
 @rule
-async def map_first_party_openapi_java_targets_to_symbols(
-    _: FirstPartyOpenAPIJavaTargetsMappingRequest,
+async def map_openapi_documents_to_python_modules(
     all_openapi_document_targets: AllOpenApiDocumentTargets,
-    jvm: JvmSubsystem,
-) -> SymbolMap:
+    python_setup: PythonSetup,
+    _: FirstPartyPythonTargetsMappingMarker,
+) -> FirstPartyPythonMappingImpl:
     package_mapping: DefaultDict[Tuple[_ResolveName, str], OrderedSet[Address]] = defaultdict(
         OrderedSet
     )
     for target in all_openapi_document_targets:
-        resolve_name = target[JvmResolveField].normalized_value(jvm)
-        api_package = target[OpenApiJavaApiPackageField].value or _DEFAULT_API_PACKAGE
+        resolve_name = target[PythonResolveField].normalized_value(python_setup)
+        package_name = (target[OpenApiPythonAdditionalPropertiesField].value or {}).get(
+            "packageName"
+        )
+        if package_name is None:
+            continue
+
         model_package = target[OpenApiJavaModelPackageField].value or _DEFAULT_MODEL_PACKAGE
 
         package_mapping[(resolve_name, api_package)].add(target.address)

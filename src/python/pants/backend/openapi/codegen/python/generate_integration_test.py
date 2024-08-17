@@ -8,15 +8,14 @@ from typing import Iterable
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
+from pants.backend.python.register import rules as python_backend_rules
+from pants.backend.python.target_types import (
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
 )
-from pants.backend.experimental.java.register import rules as java_backend_rules
-from pants.backend.java.compile.javac import CompileJavaSourceRequest
-from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSourceTarget
-from pants.backend.openapi.codegen.java.rules import GenerateJavaFromOpenAPIRequest
-from pants.backend.openapi.codegen.java.rules import rules as java_codegen_rules
+from pants.backend.openapi.codegen.python.rules import GeneratePythonFromOpenAPIRequest
+from pants.backend.openapi.codegen.python.rules import rules as python_codegen_rules
 from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
 from pants.backend.openapi.target_types import (
     OpenApiDocumentDependenciesField,
@@ -36,14 +35,6 @@ from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
 )
-from pants.jvm import testutil
-from pants.jvm.target_types import JvmArtifactTarget
-from pants.jvm.testutil import (
-    RenderedClasspath,
-    expect_single_expanded_coarsened_target,
-    make_resolve,
-    maybe_skip_jdk_test,
-)
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 
@@ -51,24 +42,22 @@ from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunn
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         target_types=[
-            JvmArtifactTarget,
-            JavaSourceTarget,
-            JavaSourcesGeneratorTarget,
+            PythonRequirementTarget,
+            PythonSourceTarget,
+            PythonSourcesGeneratorTarget,
             OpenApiSourceTarget,
             OpenApiSourceGeneratorTarget,
             OpenApiDocumentTarget,
             OpenApiDocumentGeneratorTarget,
         ],
         rules=[
-            *java_backend_rules(),
-            *java_codegen_rules(),
+            *python_backend_rules(),
+            *python_codegen_rules(),
             *openapi_bundle.rules(),
             *target_types_rules(),
-            *testutil.rules(),
             QueryRule(HydratedSources, (HydrateSourcesRequest,)),
-            QueryRule(GeneratedSources, (GenerateJavaFromOpenAPIRequest,)),
+            QueryRule(GeneratedSources, (GeneratePythonFromOpenAPIRequest,)),
             QueryRule(Addresses, (DependenciesRequest,)),
-            QueryRule(RenderedClasspath, (CompileJavaSourceRequest,)),
         ],
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
@@ -76,8 +65,8 @@ def rule_runner() -> RuleRunner:
 
 
 @pytest.fixture
-def openapi_lockfile_def() -> JVMLockfileFixtureDefinition:
-    return JVMLockfileFixtureDefinition(
+def openapi_lockfile_def() -> PythonLockfileFixtureDefinition:
+    return PythonLockfileFixtureDefinition(
         "openapi.test.lock",
         [
             "org.apache.commons:commons-lang3:3.12.0",
@@ -96,8 +85,8 @@ def openapi_lockfile_def() -> JVMLockfileFixtureDefinition:
 
 @pytest.fixture
 def openapi_lockfile(
-    openapi_lockfile_def: JVMLockfileFixtureDefinition, request
-) -> JVMLockfileFixture:
+    openapi_lockfile_def: PythonLockfileFixtureDefinition, request
+) -> PythonLockfileFixture:
     return openapi_lockfile_def.load(request)
 
 
@@ -120,18 +109,17 @@ def _assert_generated_files(
         HydratedSources, [HydrateSourcesRequest(tgt[OpenApiDocumentField])]
     )
     generated_sources = rule_runner.request(
-        GeneratedSources, [GenerateJavaFromOpenAPIRequest(protocol_sources.snapshot, tgt)]
+        GeneratedSources, [GeneratePythonFromOpenAPIRequest(protocol_sources.snapshot, tgt)]
     )
 
     # We only assert expected files are a subset of all generated since the generator creates a lot of support classes
     assert set(expected_files).intersection(generated_sources.snapshot.files) == set(expected_files)
 
 
-@maybe_skip_jdk_test
-def test_skip_generate_java(rule_runner: RuleRunner) -> None:
+def test_skip_generate_python(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "BUILD": "openapi_document(name='petstore', source='petstore_spec.yaml', skip_java=True)",
+            "BUILD": "openapi_document(name='petstore', source='petstore_spec.yaml', skip_python=True)",
             "petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
         }
     )
@@ -149,14 +137,13 @@ def test_skip_generate_java(rule_runner: RuleRunner) -> None:
     assert not runtime_dependencies
 
 
-@maybe_skip_jdk_test
-def test_generate_java_sources(
-    rule_runner: RuleRunner, openapi_lockfile: JVMLockfileFixture
+def test_generate_python_sources(
+    rule_runner: RuleRunner, openapi_lockfile: PythonLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": openapi_lockfile.serialized_lockfile,
-            "3rdparty/jvm/BUILD": openapi_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/python/default.lock": openapi_lockfile.serialized_lockfile,
+            "3rdparty/python/BUILD": openapi_lockfile.requirements_as_python_artifact_targets(),
             "src/openapi/BUILD": "openapi_document(name='petstore', source='petstore_spec.yaml')",
             "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
         }
@@ -171,9 +158,9 @@ def test_generate_java_sources(
     assert_gen(
         tgt_address,
         [
-            "src/openapi/org/openapitools/client/api/PetsApi.java",
-            "src/openapi/org/openapitools/client/model/Pet.java",
-            "src/openapi/org/openapitools/client/model/Error.java",
+            "src/openapi/org/openapitools/client/api/PetsApi.python",
+            "src/openapi/org/openapitools/client/model/Pet.python",
+            "src/openapi/org/openapitools/client/model/Error.python",
         ],
     )
 
@@ -184,15 +171,14 @@ def test_generate_java_sources(
     assert runtime_dependencies
 
 
-@maybe_skip_jdk_test
-def test_generate_java_sources_using_custom_model_package(
-    rule_runner: RuleRunner, openapi_lockfile: JVMLockfileFixture
+def test_generate_python_sources_using_custom_model_package(
+    rule_runner: RuleRunner, openapi_lockfile: PythonLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": openapi_lockfile.serialized_lockfile,
-            "3rdparty/jvm/BUILD": openapi_lockfile.requirements_as_jvm_artifact_targets(),
-            "src/openapi/BUILD": "openapi_document(name='petstore', source='petstore_spec.yaml', java_model_package='org.mycompany')",
+            "3rdparty/python/default.lock": openapi_lockfile.serialized_lockfile,
+            "3rdparty/python/BUILD": openapi_lockfile.requirements_as_python_artifact_targets(),
+            "src/openapi/BUILD": "openapi_document(name='petstore', source='petstore_spec.yaml', python_model_package='org.mycompany')",
             "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
         }
     )
@@ -205,21 +191,20 @@ def test_generate_java_sources_using_custom_model_package(
     assert_gen(
         Address("src/openapi", target_name="petstore"),
         [
-            "src/openapi/org/mycompany/Pet.java",
-            "src/openapi/org/mycompany/Error.java",
+            "src/openapi/org/mycompany/Pet.python",
+            "src/openapi/org/mycompany/Error.python",
         ],
     )
 
 
-@maybe_skip_jdk_test
-def test_generate_java_sources_using_custom_api_package(
-    rule_runner: RuleRunner, openapi_lockfile: JVMLockfileFixture
+def test_generate_python_sources_using_custom_api_package(
+    rule_runner: RuleRunner, openapi_lockfile: PythonLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": openapi_lockfile.serialized_lockfile,
-            "3rdparty/jvm/BUILD": openapi_lockfile.requirements_as_jvm_artifact_targets(),
-            "src/openapi/BUILD": "openapi_document(name='petstore', source='petstore_spec.yaml', java_api_package='org.mycompany')",
+            "3rdparty/python/default.lock": openapi_lockfile.serialized_lockfile,
+            "3rdparty/python/BUILD": openapi_lockfile.requirements_as_python_artifact_targets(),
+            "src/openapi/BUILD": "openapi_document(name='petstore', source='petstore_spec.yaml', python_api_package='org.mycompany')",
             "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
         }
     )
@@ -232,34 +217,33 @@ def test_generate_java_sources_using_custom_api_package(
     assert_gen(
         Address("src/openapi", target_name="petstore"),
         [
-            "src/openapi/org/mycompany/PetsApi.java",
+            "src/openapi/org/mycompany/PetsApi.python",
         ],
     )
 
 
-@maybe_skip_jdk_test
-def test_java_dependency_inference(
-    rule_runner: RuleRunner, openapi_lockfile: JVMLockfileFixture
+def test_python_dependency_inference(
+    rule_runner: RuleRunner, openapi_lockfile: PythonLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": openapi_lockfile.serialized_lockfile,
-            "3rdparty/jvm/BUILD": openapi_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/python/default.lock": openapi_lockfile.serialized_lockfile,
+            "3rdparty/python/BUILD": openapi_lockfile.requirements_as_python_artifact_targets(),
             "src/openapi/BUILD": dedent(
                 """\
                 openapi_document(
                     name="petstore",
                     source="petstore_spec.yaml",
-                    java_api_package="org.mycompany.api",
-                    java_model_package="org.mycompany.model",
+                    python_api_package="org.mycompany.api",
+                    python_model_package="org.mycompany.model",
                 )
                 """
             ),
             "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
-            "src/java/BUILD": "java_sources()",
-            "src/java/Example.java": dedent(
+            "src/python/BUILD": "python_sources()",
+            "src/python/Example.python": dedent(
                 """\
-                package org.pantsbuild.java.example;
+                package org.pantsbuild.python.example;
 
                 import org.mycompany.api.PetsApi;
                 import org.mycompany.model.Pet;
@@ -273,14 +257,6 @@ def test_java_dependency_inference(
         }
     )
 
-    tgt = rule_runner.get_target(Address("src/java", relative_file_path="Example.java"))
+    tgt = rule_runner.get_target(Address("src/python", relative_file_path="Example.python"))
     dependencies = rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
     assert Address("src/openapi", target_name="petstore") in dependencies
-
-    coarsened_target = expect_single_expanded_coarsened_target(
-        rule_runner, Address(spec_path="src/java")
-    )
-    _ = rule_runner.request(
-        RenderedClasspath,
-        [CompileJavaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
-    )
