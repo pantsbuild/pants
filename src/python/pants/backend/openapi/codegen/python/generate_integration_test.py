@@ -3,12 +3,12 @@
 
 from __future__ import annotations
 
+from pants.core.util_rules.config_files import rules as config_files_rules
 from typing import Iterable
 
 import pytest
 
 from pants.backend.openapi.codegen.python.generate import GeneratePythonFromOpenAPIRequest
-from pants.backend.openapi.codegen.python.generate import rules as generate_rules
 from pants.backend.openapi.codegen.python.rules import rules as python_codegen_rules
 from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
 from pants.backend.openapi.target_types import (
@@ -22,7 +22,6 @@ from pants.backend.openapi.target_types import (
 from pants.backend.openapi.target_types import rules as target_types_rules
 from pants.backend.openapi.util_rules import openapi_bundle
 from pants.backend.python.register import rules as python_backend_rules
-from pants.core.goals.test import rules as core_test_rules
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     DependenciesRequest,
@@ -31,6 +30,8 @@ from pants.engine.target import (
     HydrateSourcesRequest,
 )
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+
+from pants.core.goals.test import rules as test_rules
 
 
 @pytest.fixture
@@ -44,10 +45,10 @@ def rule_runner() -> RuleRunner:
             OpenApiDocumentGeneratorTarget,
         ],
         rules=[
-            *core_test_rules(),
+            *test_rules(),
+            *config_files_rules(),
             *python_backend_rules(),
             *python_codegen_rules(),
-            *generate_rules(),
             *openapi_bundle.rules(),
             *target_types_rules(),
             QueryRule(HydratedSources, (HydrateSourcesRequest,)),
