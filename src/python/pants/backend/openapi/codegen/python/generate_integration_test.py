@@ -2,10 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
-from textwrap import dedent
-from importlib import resources
 
-from pants.core.util_rules.config_files import rules as config_files_rules
+from importlib import resources
+from textwrap import dedent
 from typing import Iterable
 
 import pytest
@@ -24,6 +23,9 @@ from pants.backend.openapi.target_types import (
 from pants.backend.openapi.target_types import rules as target_types_rules
 from pants.backend.openapi.util_rules import openapi_bundle
 from pants.backend.python.register import rules as python_backend_rules
+from pants.backend.python.register import target_types as python_target_types
+from pants.core.goals.test import rules as test_rules
+from pants.core.util_rules.config_files import rules as config_files_rules
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     Dependencies,
@@ -33,9 +35,6 @@ from pants.engine.target import (
     HydrateSourcesRequest,
 )
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
-
-from pants.core.goals.test import rules as test_rules
-from pants.backend.python.register import target_types as python_target_types
 
 
 @pytest.fixture
@@ -113,7 +112,8 @@ def test_skip_generate_python(rule_runner: RuleRunner) -> None:
 
 @pytest.fixture
 def requirements_text() -> str:
-    return dedent("""\
+    return dedent(
+        """\
         python_requirement(
             name="urllib3",
             requirements=["urllib3"],
@@ -126,7 +126,8 @@ def requirements_text() -> str:
             name="setuptools",
             requirements=["setuptools"],
         )
-    """)
+    """
+    )
 
 
 def test_generate_python_sources(rule_runner: RuleRunner, requirements_text: str) -> None:
@@ -136,13 +137,15 @@ def test_generate_python_sources(rule_runner: RuleRunner, requirements_text: str
             .joinpath("openapi.test.lock")
             .read_text(),
             "3rdparty/python/BUILD": requirements_text,
-            "src/openapi/BUILD": dedent("""\
+            "src/openapi/BUILD": dedent(
+                """\
                 openapi_document(
                     name="petstore",
                     source="petstore_spec.yaml",
                     python_generator_name="python",
                 )
-            """),
+            """
+            ),
             "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
         }
     )
@@ -198,7 +201,8 @@ def test_generate_python_sources_using_custom_package_name(
             .joinpath("openapi.test.lock")
             .read_text(),
             "3rdparty/python/BUILD": requirements_text,
-            "src/openapi/BUILD": dedent("""\
+            "src/openapi/BUILD": dedent(
+                """\
                 openapi_document(
                     name="petstore",
                     source="petstore_spec.yaml",
@@ -207,7 +211,8 @@ def test_generate_python_sources_using_custom_package_name(
                         "packageName": "petstore_client",
                     },
                 )
-            """),
+            """
+            ),
             "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
         }
     )
@@ -253,7 +258,8 @@ def test_python_dependency_inference(rule_runner: RuleRunner, requirements_text:
             .joinpath("openapi.test.lock")
             .read_text(),
             "3rdparty/python/BUILD": requirements_text,
-            "src/openapi/BUILD": dedent("""\
+            "src/openapi/BUILD": dedent(
+                """\
                 openapi_document(
                     name="petstore",
                     source="petstore_spec.yaml",
@@ -262,12 +268,15 @@ def test_python_dependency_inference(rule_runner: RuleRunner, requirements_text:
                         "packageName": "petstore_client",
                     },
                 )
-            """),
+            """
+            ),
             "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
             "src/python/BUILD": "python_sources()",
-            "src/python/example.py": dedent("""\
+            "src/python/example.py": dedent(
+                """\
                 from petstore_client.api_client import ApiClient
-            """),
+            """
+            ),
         }
     )
 
