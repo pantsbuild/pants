@@ -26,6 +26,7 @@ from pants.backend.openapi.util_rules import openapi_bundle
 from pants.backend.python.register import rules as python_backend_rules
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
+    Dependencies,
     DependenciesRequest,
     GeneratedSources,
     HydratedSources,
@@ -110,32 +111,37 @@ def test_skip_generate_python(rule_runner: RuleRunner) -> None:
     assert not runtime_dependencies
 
 
-def test_generate_python_sources(rule_runner: RuleRunner) -> None:
+@pytest.fixture
+def requirements_text() -> str:
+    return dedent("""\
+        python_requirement(
+            name="urllib3",
+            requirements=["urllib3"],
+        )
+        python_requirement(
+            name="python-dateutil",
+            requirements=["python-dateutil"],
+        )
+        python_requirement(
+            name="setuptools",
+            requirements=["setuptools"],
+        )
+    """)
+
+
+def test_generate_python_sources(rule_runner: RuleRunner, requirements_text: str) -> None:
     rule_runner.write_files(
         {
             "3rdparty/python/default.lock": resources.files(__package__)
             .joinpath("openapi.test.lock")
             .read_text(),
-            "3rdparty/python/BUILD": dedent("""\
-            python_requirement(
-                name="urllib3",
-                requirements=["urllib3"],
-            )
-            python_requirement(
-                name="python-dateutil",
-                requirements=["python-dateutil"],
-            )
-            python_requirement(
-                name="setuptools",
-                requirements=["setuptools"],
-            )
-            """),
+            "3rdparty/python/BUILD": requirements_text,
             "src/openapi/BUILD": dedent("""\
-            openapi_document(
-                name="petstore",
-                source="petstore_spec.yaml",
-                python_generator_name="python",
-            )
+                openapi_document(
+                    name="petstore",
+                    source="petstore_spec.yaml",
+                    python_generator_name="python",
+                )
             """),
             "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
         }
@@ -150,6 +156,8 @@ def test_generate_python_sources(rule_runner: RuleRunner) -> None:
     assert_gen(
         tgt_address,
         [
+            # The list might change because it depends on openapi template.
+            # TODO Vendor template?
             "src/openapi/openapi_client/__init__.py",
             "src/openapi/openapi_client/api/__init__.py",
             "src/openapi/openapi_client/api/pets_api.py",
@@ -180,92 +188,89 @@ def test_generate_python_sources(rule_runner: RuleRunner) -> None:
     assert runtime_dependencies
 
 
-# def test_generate_python_sources_using_custom_model_package(
-#     rule_runner: RuleRunner, openapi_lockfile: PythonLockfileFixture
-# ) -> None:
-#     rule_runner.write_files(
-#         {
-#             "3rdparty/python/default.lock": openapi_lockfile.serialized_lockfile,
-#             "3rdparty/python/BUILD": openapi_lockfile.requirements_as_python_artifact_targets(),
-#             "src/openapi/BUILD": "openapi_document(name='petstore', source='petstore_spec.yaml', python_model_package='org.mycompany')",
-#             "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
-#         }
-#     )
-#
-#     def assert_gen(address: Address, expected: Iterable[str]) -> None:
-#         _assert_generated_files(
-#             rule_runner, address, source_roots=["src/openapi"], expected_files=expected
-#         )
-#
-#     assert_gen(
-#         Address("src/openapi", target_name="petstore"),
-#         [
-#             "src/openapi/org/mycompany/Pet.python",
-#             "src/openapi/org/mycompany/Error.python",
-#         ],
-#     )
-#
-#
-# def test_generate_python_sources_using_custom_api_package(
-#     rule_runner: RuleRunner, openapi_lockfile: PythonLockfileFixture
-# ) -> None:
-#     rule_runner.write_files(
-#         {
-#             "3rdparty/python/default.lock": openapi_lockfile.serialized_lockfile,
-#             "3rdparty/python/BUILD": openapi_lockfile.requirements_as_python_artifact_targets(),
-#             "src/openapi/BUILD": "openapi_document(name='petstore', source='petstore_spec.yaml', python_api_package='org.mycompany')",
-#             "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
-#         }
-#     )
-#
-#     def assert_gen(address: Address, expected: Iterable[str]) -> None:
-#         _assert_generated_files(
-#             rule_runner, address, source_roots=["src/openapi"], expected_files=expected
-#         )
-#
-#     assert_gen(
-#         Address("src/openapi", target_name="petstore"),
-#         [
-#             "src/openapi/org/mycompany/PetsApi.python",
-#         ],
-#     )
-#
-#
-# def test_python_dependency_inference(
-#     rule_runner: RuleRunner, openapi_lockfile: PythonLockfileFixture
-# ) -> None:
-#     rule_runner.write_files(
-#         {
-#             "3rdparty/python/default.lock": openapi_lockfile.serialized_lockfile,
-#             "3rdparty/python/BUILD": openapi_lockfile.requirements_as_python_artifact_targets(),
-#             "src/openapi/BUILD": dedent(
-#                 """\
-#                 openapi_document(
-#                     name="petstore",
-#                     source="petstore_spec.yaml",
-#                     python_api_package="org.mycompany.api",
-#                     python_model_package="org.mycompany.model",
-#                 )
-#                 """
-#             ),
-#             "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
-#             "src/python/BUILD": "python_sources()",
-#             "src/python/Example.python": dedent(
-#                 """\
-#                 package org.pantsbuild.python.example;
-#
-#                 import org.mycompany.api.PetsApi;
-#                 import org.mycompany.model.Pet;
-#
-#                 public class Example {
-#                     PetsApi api;
-#                     Pet pet;
-#                 }
-#                 """
-#             ),
-#         }
-#     )
-#
-#     tgt = rule_runner.get_target(Address("src/python", relative_file_path="Example.python"))
-#     dependencies = rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
-#     assert Address("src/openapi", target_name="petstore") in dependencies
+def test_generate_python_sources_using_custom_package_name(
+    rule_runner: RuleRunner,
+    requirements_text: str,
+) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/python/default.lock": resources.files(__package__)
+            .joinpath("openapi.test.lock")
+            .read_text(),
+            "3rdparty/python/BUILD": requirements_text,
+            "src/openapi/BUILD": dedent("""\
+                openapi_document(
+                    name="petstore",
+                    source="petstore_spec.yaml",
+                    python_generator_name="python",
+                    python_additional_properties={
+                        "packageName": "petstore_client",
+                    },
+                )
+            """),
+            "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
+        }
+    )
+
+    def assert_gen(address: Address, expected: Iterable[str]) -> None:
+        _assert_generated_files(
+            rule_runner, address, source_roots=["src/openapi"], expected_files=expected
+        )
+
+    assert_gen(
+        Address("src/openapi", target_name="petstore"),
+        [
+            # The list might change because it depends on openapi template.
+            # TODO Vendor template?
+            "src/openapi/petstore_client/__init__.py",
+            "src/openapi/petstore_client/api/__init__.py",
+            "src/openapi/petstore_client/api/pets_api.py",
+            "src/openapi/petstore_client/api_client.py",
+            "src/openapi/petstore_client/apis/__init__.py",
+            "src/openapi/petstore_client/configuration.py",
+            "src/openapi/petstore_client/exceptions.py",
+            "src/openapi/petstore_client/model/__init__.py",
+            "src/openapi/petstore_client/model/error.py",
+            "src/openapi/petstore_client/model/pet.py",
+            "src/openapi/petstore_client/model/pets.py",
+            "src/openapi/petstore_client/model_utils.py",
+            "src/openapi/petstore_client/models/__init__.py",
+            "src/openapi/petstore_client/rest.py",
+            "src/openapi/setup.py",
+            "src/openapi/test/__init__.py",
+            "src/openapi/test/test_error.py",
+            "src/openapi/test/test_pet.py",
+            "src/openapi/test/test_pets.py",
+            "src/openapi/test/test_pets_api.py",
+        ],
+    )
+
+
+def test_python_dependency_inference(rule_runner: RuleRunner, requirements_text: str) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/python/default.lock": resources.files(__package__)
+            .joinpath("openapi.test.lock")
+            .read_text(),
+            "3rdparty/python/BUILD": requirements_text,
+            "src/openapi/BUILD": dedent("""\
+                openapi_document(
+                    name="petstore",
+                    source="petstore_spec.yaml",
+                    python_generator_name="python",
+                    python_additional_properties={
+                        "packageName": "petstore_client",
+                    },
+                )
+            """),
+            "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
+            "src/python/BUILD": "python_sources()",
+            "src/python/example.py": dedent("""\
+                from petstore_client.api_client import ApiClient
+            """),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/python", relative_file_path="example.py"))
+    dependencies = rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
+    assert Address("src/openapi", target_name="petstore") in dependencies
