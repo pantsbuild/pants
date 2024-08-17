@@ -2,38 +2,37 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
+
+import itertools
+import logging
+from collections import defaultdict
+from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Tuple
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
-from collections import defaultdict
-from collections.abc import Iterable
-from pants.backend.codegen.utils import (
-    MissingPythonCodegenRuntimeLibrary,
-)
-from pants.engine.internals.native_engine import Address
-from pants.util.requirements import parse_requirements_file
-from dataclasses import dataclass
-import itertools
 
-from pants.backend.python.target_types import (
-    PrefixedPythonResolveField,
-    PythonRequirementResolveField,
-    PythonRequirementsField,
-    PythonSourceField,
-)
+from pants.backend.codegen.utils import MissingPythonCodegenRuntimeLibrary
 from pants.backend.openapi.codegen.python.extra_fields import (
     OpenApiPythonAdditionalPropertiesField,
     OpenApiPythonGeneratorNameField,
     OpenApiPythonSkipField,
 )
+from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
 from pants.backend.openapi.subsystems.openapi_generator import OpenAPIGenerator
 from pants.backend.openapi.target_types import (
     OpenApiDocumentDependenciesField,
     OpenApiDocumentField,
     OpenApiSourceField,
 )
-from pants.backend.openapi.util_rules.generator_process import (
-    OpenAPIGeneratorProcess,
+from pants.backend.openapi.util_rules.generator_process import OpenAPIGeneratorProcess
+from pants.backend.python.dependency_inference.module_mapper import AllPythonTargets
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import (
+    PrefixedPythonResolveField,
+    PythonRequirementResolveField,
+    PythonRequirementsField,
+    PythonSourceField,
 )
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
@@ -49,6 +48,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.internals.native_engine import Address
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -64,16 +64,10 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
-from pants.util.logging import LogLevel
-import logging
-
 from pants.util.frozendict import FrozenDict
-from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
-from pants.backend.python.dependency_inference.module_mapper import (
-    AllPythonTargets,
-)
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.util.logging import LogLevel
 from pants.util.pip_requirement import PipRequirement
+from pants.util.requirements import parse_requirements_file
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)

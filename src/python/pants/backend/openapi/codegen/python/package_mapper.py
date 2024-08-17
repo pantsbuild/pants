@@ -2,69 +2,77 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
-from typing import DefaultDict, Mapping, Tuple
+from pathlib import PurePath
+from typing import DefaultDict
 
-from pants.backend.openapi.codegen.java.extra_fields import (
-    OpenApiJavaModelPackageField,
-)
-from pants.backend.openapi.codegen.python.extra_fields import OpenApiPythonAdditionalPropertiesField
-from pants.backend.openapi.target_types import AllOpenApiDocumentTargets
+from pants.backend.openapi.target_types import AllOpenApiDocumentTargets, OpenApiDocumentField
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonMappingImpl,
-    FirstPartyPythonTargetsMappingMarker,
+    FirstPartyPythonMappingImplMarker,
+    ModuleProvider,
+    ModuleProviderType,
+    ResolveName,
+    module_from_stripped_path,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonResolveField
-from pants.engine.addresses import Address
+from pants.backend.python.target_types import PythonResolveField, PythonSourceField
+from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
+from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.unions import UnionRule
-from pants.jvm.dependency_inference.artifact_mapper import MutableTrieNode
-from pants.jvm.dependency_inference.symbol_mapper import FirstPartyMappingRequest, SymbolMap
-from pants.util.ordered_set import OrderedSet
 
-_ResolveName = str
+logger = logging.getLogger(__name__)
 
 
-class FirstPartyOpenAPIJavaTargetsMappingRequest(FirstPartyMappingRequest):
+class PythonOpenApiMappingMarker(FirstPartyPythonMappingImplMarker):
     pass
-
-
-_DEFAULT_API_PACKAGE = "org.openapitools.client.api"
-_DEFAULT_MODEL_PACKAGE = "org.openapitools.client.model"
 
 
 @rule
 async def map_openapi_documents_to_python_modules(
     all_openapi_document_targets: AllOpenApiDocumentTargets,
     python_setup: PythonSetup,
-    _: FirstPartyPythonTargetsMappingMarker,
+    _: PythonOpenApiMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
-    package_mapping: DefaultDict[Tuple[_ResolveName, str], OrderedSet[Address]] = defaultdict(
-        OrderedSet
-    )
-    for target in all_openapi_document_targets:
-        resolve_name = target[PythonResolveField].normalized_value(python_setup)
-        package_name = (target[OpenApiPythonAdditionalPropertiesField].value or {}).get(
-            "packageName"
+    python_sources = await MultiGet(
+        Get(
+            HydratedSources,
+            HydrateSourcesRequest(
+                target[OpenApiDocumentField],
+                for_sources_types=(PythonSourceField,),
+                enable_codegen=True,
+            ),
         )
-        if package_name is None:
-            continue
+        for target in all_openapi_document_targets
+    )
 
-        model_package = target[OpenApiJavaModelPackageField].value or _DEFAULT_MODEL_PACKAGE
+    stripped_file_per_target_sources = await MultiGet(
+        MultiGet(
+            Get(StrippedFileName, StrippedFileNameRequest(file)) for file in sources.snapshot.files
+        )
+        for sources in python_sources
+    )
 
-        package_mapping[(resolve_name, api_package)].add(target.address)
-        package_mapping[(resolve_name, model_package)].add(target.address)
+    resolves_to_modules_to_providers: DefaultDict[
+        ResolveName, DefaultDict[str, list[ModuleProvider]]
+    ] = defaultdict(lambda: defaultdict(list))
 
-    symbol_map: Mapping[_ResolveName, MutableTrieNode] = defaultdict(MutableTrieNode)
-    for (resolve, package), addresses in package_mapping.items():
-        symbol_map[resolve].insert(package, addresses, first_party=True, recursive=True)
+    for target, files in zip(all_openapi_document_targets, stripped_file_per_target_sources):
+        resolve_name = target[PythonResolveField].normalized_value(python_setup)
+        provider = ModuleProvider(target.address, ModuleProviderType.IMPL)
+        for stripped_file in files:
+            stripped_f = PurePath(stripped_file.value)
+            module = module_from_stripped_path(stripped_f)
+            resolves_to_modules_to_providers[resolve_name][module].append(provider)
 
-    return SymbolMap((resolve, node.frozen()) for resolve, node in symbol_map.items())
+    return FirstPartyPythonMappingImpl.create(resolves_to_modules_to_providers)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FirstPartyMappingRequest, FirstPartyOpenAPIJavaTargetsMappingRequest),
+        UnionRule(FirstPartyPythonMappingImplMarker, PythonOpenApiMappingMarker),
     ]

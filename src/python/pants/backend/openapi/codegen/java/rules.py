@@ -21,9 +21,7 @@ from pants.backend.openapi.target_types import (
     OpenApiSourceField,
 )
 from pants.backend.openapi.util_rules import generator_process, pom_parser
-from pants.backend.openapi.util_rules.generator_process import (
-    OpenAPIGeneratorProcess,
-)
+from pants.backend.openapi.util_rules.generator_process import OpenAPIGeneratorProcess
 from pants.backend.openapi.util_rules.pom_parser import AnalysePomRequest, PomReport
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
@@ -105,7 +103,7 @@ async def compile_openapi_into_java(
     merged_digests = await Get(Digest, MergeDigests([request.input_digest, output_digest]))
 
     process = OpenAPIGeneratorProcess(
-        generator_name='java',
+        generator_name="java",
         argv=[
             *(
                 ("--additional-properties", f"apiPackage={request.api_package}")
