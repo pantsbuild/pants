@@ -3,10 +3,6 @@
 
 python_sources()
 
-python_tests(
-    name="tests",
-    dependencies=[":lockfiles"],
-    timeout=600,
-)
+python_tests(name="tests", dependencies=[":lockfiles"])
 
 resources(name="lockfiles", sources=["*.test.lock"])
