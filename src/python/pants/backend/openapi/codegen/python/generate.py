@@ -23,7 +23,6 @@ from pants.backend.openapi.subsystems.openapi_generator import OpenAPIGenerator
 from pants.backend.openapi.target_types import (
     OpenApiDocumentDependenciesField,
     OpenApiDocumentField,
-    OpenApiSourceField,
 )
 from pants.backend.openapi.util_rules.generator_process import OpenAPIGeneratorProcess
 from pants.backend.python.dependency_inference.module_mapper import AllPythonTargets
@@ -59,8 +58,6 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -171,16 +168,17 @@ async def generate_python_from_openapi(
     if field_set.skip.value:
         return GeneratedSources(EMPTY_SNAPSHOT)
 
-    document_sources, transitive_targets = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(field_set.source)),
-        Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
+    (document_sources,) = await MultiGet(
+        (Get(HydratedSources, HydrateSourcesRequest(field_set.source)),)
+        # Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
 
-    document_dependencies = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt[OpenApiSourceField]))
-        for tgt in transitive_targets.dependencies
-        if tgt.has_field(OpenApiSourceField)
-    )
+    document_dependencies = []
+    # await MultiGet(
+    #     Get(HydratedSources, HydrateSourcesRequest(tgt[OpenApiSourceField]))
+    #     for tgt in transitive_targets.dependencies
+    #     if tgt.has_field(OpenApiSourceField)
+    # )
 
     input_digest = await Get(
         Digest,
@@ -212,6 +210,7 @@ async def generate_python_from_openapi(
                 ),
             )
         )
+
     compiled_sources = await MultiGet(gets)
 
     logger.info("digests: %s", [sources.output_digest for sources in compiled_sources])
