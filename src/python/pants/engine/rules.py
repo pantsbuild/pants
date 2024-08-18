@@ -538,7 +538,7 @@ class RuleIndex:
     union_rules: FrozenOrderedSet[UnionRule]
 
     @classmethod
-    def create(cls, rule_entries: Iterable[Rule | UnionRule]) -> RuleIndex:
+    def create(cls, rule_entries: Iterable[Rule | UnionRule | DeleteRule]) -> RuleIndex:
         """Creates a RuleIndex with tasks indexed by their output type."""
         rules: OrderedSet[TaskRule] = OrderedSet()
         delete_rules: OrderedSet[DeleteRule] = OrderedSet()

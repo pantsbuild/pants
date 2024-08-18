@@ -14,7 +14,7 @@ from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.util_rules.environments import EnvironmentsSubsystem
 from pants.engine.goal import GoalSubsystem
-from pants.engine.rules import Rule, RuleIndex, TaskRule
+from pants.engine.rules import DeleteRule, Rule, RuleIndex, TaskRule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.option.alias import CliOptions
@@ -216,7 +216,9 @@ class BuildConfiguration:
             for subsystem in subsystems:
                 self._subsystem_to_providers[subsystem].append(plugin_or_backend)
 
-        def register_rules(self, plugin_or_backend: str, rules: Iterable[Rule | UnionRule]):
+        def register_rules(
+            self, plugin_or_backend: str, rules: Iterable[Rule | UnionRule | DeleteRule]
+        ):
             """Registers the given rules."""
             if not isinstance(rules, Iterable):
                 raise TypeError(f"The rules must be an iterable, given {rules!r}")
