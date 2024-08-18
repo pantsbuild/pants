@@ -1,0 +1,51 @@
+---
+    title: Delete rules (advanced)
+    sidebar_position: 8
+---
+
+Delete builtin rules and define your own to override behavior.
+
+---
+
+Sometimes you might want to change the behavior of some existing backend in a way that is not supported by the backend. `DeleteRule` allows you to remove a single rule from the backend, then you can implement your own version of the same rule.
+
+For example, you might want to change the behavior of the `list` goal, here is how you do it:
+
+
+```python title="pants-plugins/custom_list/register.py"
+from pants.backend.project_info.list_targets import List, ListSubsystem
+from pants.backend.project_info.list_targets import list_targets as original_rule
+from pants.engine.addresses import Addresses
+from pants.engine.console import Console
+from pants.engine.rules import DeleteRule, collect_rules, goal_rule
+
+
+@goal_rule
+async def list_targets(addresses: Addresses, list_subsystem: ListSubsystem, console: Console) -> List:
+    with list_subsystem.line_oriented(console) as print_stdout:
+        print_stdout("ha cool")
+    return List(exit_code=0)
+
+
+def target_types():
+    return []
+
+
+def rules():
+    return (
+        *collect_rules(),
+        DeleteRule.create(original_rule),
+    )
+```
+
+```python title="pants.toml"
+[GLOBAL]
+...
+backend_packages = [
+    ...
+    "custom_list",
+]
+```
+
+```python title="pants-plugins/custom_list/__init__.py"
+```
