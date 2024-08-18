@@ -34,6 +34,8 @@ def rule_runner() -> RuleRunner:
     (
         # The available runtimes at the time of writing.
         # See https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html.
+        ["python3.6", 3, 6],
+        ["python3.7", 3, 7],
         ["python3.8", 3, 8],
         ["python3.9", 3, 9],
         ["python3.10", 3, 10],
