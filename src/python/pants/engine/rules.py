@@ -476,6 +476,13 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
 class DeleteRule:
     canonical_name: str
 
+    @classmethod
+    def create(cls, f: Any):
+        if not hasattr(f, "rule_id"):
+            raise ValueError(f"`{f.__qualname__}` is not a rule")
+
+        return DeleteRule(canonical_name=f.rule_id)
+
 
 @dataclass(frozen=True)
 class TaskRule:
