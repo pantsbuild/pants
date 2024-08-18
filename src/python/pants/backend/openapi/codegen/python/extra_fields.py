@@ -1,5 +1,6 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import itertools
 from pants.backend.openapi.target_types import OpenApiDocumentGeneratorTarget, OpenApiDocumentTarget
 from pants.backend.python.target_types import PrefixedPythonResolveField
 from pants.engine.target import BoolField, DictStringToStringField, StringField
@@ -24,15 +25,17 @@ class OpenApiPythonSkipField(BoolField):
 
 def rules():
     return [
-        OpenApiDocumentTarget.register_plugin_field(OpenApiPythonSkipField),
-        OpenApiDocumentTarget.register_plugin_field(OpenApiPythonGeneratorNameField),
-        OpenApiDocumentTarget.register_plugin_field(OpenApiPythonAdditionalPropertiesField),
-        OpenApiDocumentGeneratorTarget.register_plugin_field(OpenApiPythonSkipField),
-        OpenApiDocumentGeneratorTarget.register_plugin_field(
-            OpenApiPythonAdditionalPropertiesField
-        ),
-        OpenApiDocumentGeneratorTarget.register_plugin_field(OpenApiPythonGeneratorNameField),
-        # Default Pants python fields
-        OpenApiDocumentTarget.register_plugin_field(PrefixedPythonResolveField),
-        OpenApiDocumentGeneratorTarget.register_plugin_field(PrefixedPythonResolveField),
+        target.register_plugin_field(field)
+        for target, field in itertools.product(
+            (
+                OpenApiDocumentTarget,
+                OpenApiDocumentGeneratorTarget,
+            ),
+            (
+                OpenApiPythonSkipField,
+                OpenApiPythonGeneratorNameField,
+                OpenApiPythonAdditionalPropertiesField,
+                PrefixedPythonResolveField,
+            ),
+        )
     ]
