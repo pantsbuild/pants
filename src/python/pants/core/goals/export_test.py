@@ -18,7 +18,7 @@ from pants.core.goals.export import (
     ExportResults,
     ExportSubsystem,
     PostProcessingCommand,
-    export,
+    export, warn_exported_bin_conflicts,
 )
 from pants.core.goals.generate_lockfiles import KnownUserResolveNames, KnownUserResolveNamesRequest
 from pants.core.util_rules.distdir import DistDir
@@ -214,5 +214,17 @@ def test_run_export_rule_binary() -> None:
             assert fp.read() == b"BAR"
 
 
-def _e(path, env):
-    return make_target(path, path, env)
+def test_warn_exported_bin_conflict() -> None:
+    found_warnings = warn_exported_bin_conflicts(
+        {
+            "bin0": ["r0"],
+            "bin1": ["r1"],
+            "bin2": ["r0", "r1", "r2"],
+        }
+    )
+
+    assert len(found_warnings) == 1, "did not detect the right number of conflicts"
+
+    found_warning = found_warnings[0]
+    assert "r0 was exported" in found_warning, "did not export from the correct resolve"
+    assert "r1, r2" in found_warning, "did not report the other resolves correctly"

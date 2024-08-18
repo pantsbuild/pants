@@ -233,15 +233,9 @@ async def export(
             if ipr.exit_code:
                 raise ExportError(f"Failed to link binary {exported_bin.name} to bin directory")
 
-    for exported_bin_name, resolves in exported_bins.items():
-        if len(resolves) > 1:
-            msg = f"Exporting binary `{exported_bin_name}` had conflicts. "
-            succeeded_resolve, other_resolves = resolves[0], resolves[1:]
-            msg += (
-                f"The resolve {succeeded_resolve} was exported, but it conflicted with "
-                + ", ".join(other_resolves)
-            )
-            console.print_stderr(msg)
+    exported_bin_warnings = warn_exported_bin_conflicts(exported_bins)
+    for warning in exported_bin_warnings:
+        console.print_stderr(warning)
 
     unexported_resolves = sorted(
         (set(export_subsys.resolve) | set(export_subsys.binaries)) - resolves_exported
@@ -273,6 +267,23 @@ async def export(
         )
 
     return Export(exit_code=0)
+
+
+def warn_exported_bin_conflicts(exported_bins: dict[str, list[str]]) -> list[str]:
+    """Check that no bin was exported from multiple resolves"""
+    messages = []
+
+    for exported_bin_name, resolves in exported_bins.items():
+        if len(resolves) > 1:
+            msg = f"Exporting binary `{exported_bin_name}` had conflicts. "
+            succeeded_resolve, other_resolves = resolves[0], resolves[1:]
+            msg += (
+                    f"The resolve {succeeded_resolve} was exported, but it conflicted with "
+                    + ", ".join(other_resolves)
+            )
+            messages.append(msg)
+
+    return messages
 
 
 def rules():
