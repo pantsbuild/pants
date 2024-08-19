@@ -37,7 +37,7 @@ DOWNLOADS_EXPECTED_DIRECTORY_DIGEST = Digest(
 @pytest.fixture
 def global_options() -> GlobalOptions:
     return create_subsystem(
-        GlobalOptions, downloads_intrinsic_retry_delay=0.01, downloads_intrinsic_max_attempts=2
+        GlobalOptions, file_downloads_retry_delay=0.01, file_downloads_max_attempts=2
     )
 
 

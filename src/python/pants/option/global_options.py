@@ -1748,42 +1748,48 @@ class BootstrapOptions:
             """
         ),
     )
-    _downloads_intrinsic_retry_delay = FloatOption(
+    _file_downloads_retry_delay = FloatOption(
         default=0.2,
         advanced=True,
         help=softwrap(
             """
-            Set to the duration to use as the "period" for exponential backoff between download attempts
-            by the downloads intrinsinc rule when it encounters retryable errors.
+            When Pants downloads files (for example, for the `http_source` source), Pants will retry the download
+            if a "retryable" error occurs. Between each attempt, Pants will delay a random amount of time using an
+            exponential backoff algorithm.
+
+            This option sets the "base" duration in seconds used for calculating the retry delay.
             """
         ),
     )
-    _downloads_intrinsic_max_attempts = IntOption(
+    _file_downloads_max_attempts = IntOption(
         default=4,
         advanced=True,
         help=softwrap(
             """
-            Maximum number of times to attempt to download files via the engine's downloads intrinsic rule. The engine
-            will retry downloads whenever it encounters "retryable" HTTP errors.
+            When Pants downloads files (for example, for the `http_source` source), Pants will retry the download
+            if a "retryable" error occurs.
+
+            This option sets the maximum number of attempts Pants will make to try to download the file before giving up
+            with an error.
             """
         ),
     )
 
     @property
-    def downloads_intrinsic_retry_delay(self) -> timedelta:
-        value = self._downloads_intrinsic_retry_delay
+    def file_downloads_retry_delay(self) -> timedelta:
+        value = self._file_downloads_retry_delay
         if value <= 0.0:
             raise ValueError(
-                f"Global option `--downloads-intrinsic-retry-delay` must a positive number, got {value}"
+                f"Global option `--file-downloads-retry-delay` must a positive number, got {value}"
             )
         return timedelta(seconds=value)
 
     @property
-    def downloads_intrinsic_max_attempts(self) -> int:
-        value = self._downloads_intrinsic_max_attempts
+    def file_downloads_max_attempts(self) -> int:
+        value = self._file_downloads_max_attempts
         if value < 1:
             raise ValueError(
-                f"Global option `--downloads-intrinsic-max-attempts` must be at least 1, got {value}"
+                f"Global option `--file-downloads-max-attempts` must be at least 1, got {value}"
             )
         return value
 
