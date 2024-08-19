@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import itertools
 import os
+import shutil
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,7 +33,7 @@ from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import StrListOption
-from pants.util.dirutil import safe_rmtree
+from pants.util.dirutil import safe_mkdir, safe_rmtree
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
@@ -208,30 +209,9 @@ async def export(
             resolves_exported.add(result.resolve)
         console.print_stdout(f"Wrote {result.description} to {result_dir}")
 
-    exported_bins: dict[str, list[str]] = defaultdict(list)
-    for result in flattened_results:
-        for exported_bin in result.exported_binaries:
-            exported_bins[exported_bin.name].append(result.resolve or result.description)
-            if len(exported_bins[exported_bin.name]) > 1:
-                continue
-
-            ipr = await Effect(
-                InteractiveProcessResult,
-                InteractiveProcess(
-                    [
-                        "ln",
-                        "-sf",
-                        Path(
-                            build_root.path, output_dir, result.reldir, exported_bin.path_in_export
-                        ).as_posix(),
-                        Path(build_root.path, output_dir, "bin", exported_bin.name).as_posix(),
-                    ],
-                    env={"PATH": environment.get("PATH", "")},
-                    run_in_workspace=True,
-                ),
-            )
-            if ipr.exit_code:
-                raise ExportError(f"Failed to link binary {exported_bin.name} to bin directory")
+    exported_bins = await link_exported_executables(
+        build_root, environment, output_dir, flattened_results
+    )
 
     exported_bin_warnings = warn_exported_bin_conflicts(exported_bins)
     for warning in exported_bin_warnings:
@@ -269,8 +249,56 @@ async def export(
     return Export(exit_code=0)
 
 
+async def link_exported_executables(
+    build_root: BuildRoot,
+    environment: EnvironmentVars,
+    output_dir: str,
+    export_results: list[ExportResult],
+):
+    """Link the exported executables to the `bin` dir.
+
+    Multiple resolves might export the same executable. This will export the first one only but
+    track the collision.
+    """
+    bin_dir = Path(build_root.path, output_dir, "bin")
+    safe_mkdir(bin_dir)
+
+    exported_bins: dict[str, list[str]] = defaultdict(list)
+    for result in export_results:
+        for exported_bin in result.exported_binaries:
+            exported_bins[exported_bin.name].append(result.resolve or result.description)
+            if len(exported_bins[exported_bin.name]) > 1:
+                continue
+
+            ln_bin = shutil.which("ln")
+            if not ln_bin:
+                # I think ln_bin missing won't happen, but the error message otherwise is "No such file or directory (os error 2)" which isn't helpful
+                raise RuntimeError(
+                    "Could not locate `ln` bin to link exported binaries to the `bin` dir"
+                )
+
+            ipr = await Effect(
+                InteractiveProcessResult,
+                InteractiveProcess(
+                    [
+                        ln_bin,
+                        "-sf",
+                        Path(
+                            build_root.path, output_dir, result.reldir, exported_bin.path_in_export
+                        ).as_posix(),
+                        (bin_dir / exported_bin.name).as_posix(),
+                    ],
+                    env={"PATH": environment.get("PATH", "")},
+                    run_in_workspace=True,
+                ),
+            )
+            if ipr.exit_code:
+                raise ExportError(f"Failed to link binary {exported_bin.name} to bin directory")
+    return exported_bins
+
+
 def warn_exported_bin_conflicts(exported_bins: dict[str, list[str]]) -> list[str]:
-    """Check that no bin was exported from multiple resolves"""
+    """Check that no bin was exported from multiple resolves."""
     messages = []
 
     for exported_bin_name, resolves in exported_bins.items():
@@ -278,8 +306,8 @@ def warn_exported_bin_conflicts(exported_bins: dict[str, list[str]]) -> list[str
             msg = f"Exporting binary `{exported_bin_name}` had conflicts. "
             succeeded_resolve, other_resolves = resolves[0], resolves[1:]
             msg += (
-                    f"The resolve {succeeded_resolve} was exported, but it conflicted with "
-                    + ", ".join(other_resolves)
+                f"The resolve {succeeded_resolve} was exported, but it conflicted with "
+                + ", ".join(other_resolves)
             )
             messages.append(msg)
 

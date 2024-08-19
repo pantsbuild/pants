@@ -147,7 +147,10 @@ def rule_runner():
 
 
 def test_export(rule_runner):
-    """Tests export_external_tool. Ensures we locate the class and prepare the Digest correctly"""
+    """Tests export_external_tool.
+
+    Ensures we locate the class and prepare the Digest correctly
+    """
 
     platform = Platform.linux_x86_64
     union_membership = UnionMembership(
