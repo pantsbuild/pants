@@ -476,31 +476,71 @@ async def check_outputs(
     if outputs_match_mode is None:
         return
 
-    _filtered_for_output_files, _filtered_for_output_directories = await MultiGet(
+    filtered_output_files_digests = await MultiGet(
         Get(
             Digest,
             DigestSubset(
                 output_digest,
                 PathGlobs(
-                    output_files,
-                    glob_match_error_behavior=outputs_match_error_behavior,
-                    conjunction=outputs_match_mode,
-                    description_of_origin=f"the `output_files` field at `{description_of_origin}`",
+                    [output_file],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
                 ),
             ),
-        ),
+        )
+        for output_file in output_files
+    )
+
+    filtered_output_directory_digests = await MultiGet(
         Get(
             Digest,
             DigestSubset(
                 output_digest,
                 PathGlobs(
-                    output_directories,
-                    glob_match_error_behavior=outputs_match_error_behavior,
-                    conjunction=outputs_match_mode,
-                    description_of_origin=f"output_directories field at `{description_of_origin}`",
+                    [os.path.join(output_directory, "**")],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
                 ),
             ),
-        ),
+        )
+        for output_directory in output_directories
+    )
+
+    filtered_output_files = tuple(zip(output_files, filtered_output_files_digests))
+    filtered_output_directories = tuple(zip(output_directories, filtered_output_directory_digests))
+
+    unused_output_files = tuple(
+        f"{output_file} (from Output_files)"
+        for output_file, digest in filtered_output_files
+        if digest == EMPTY_DIGEST
+    )
+    unused_output_directories = tuple(
+        f"{output_directory} (from output_directories)"
+        for output_directory, digest in filtered_output_directories
+        if digest == EMPTY_DIGEST
+    )
+
+    def warn_or_raise(message: str) -> None:
+        unused_globs_str = ", ".join([*unused_output_files, *unused_output_directories])
+        message = f"{message}\n\nThe following output globs were unused: {unused_globs_str}"
+        if outputs_match_error_behavior == GlobMatchErrorBehavior.error:
+            raise ValueError(message)
+        else:
+            logger.warning(message)
+
+    if outputs_match_mode == GlobExpansionConjunction.all_match:
+        if not unused_output_files and not unused_output_directories:
+            return
+
+        warn_or_raise(
+            f"The `{description_of_origin}` is configured with `outputs_match_mode` set to `all` which requires all output globs to actually match an output."
+        )
+
+    # Otherwise it is `GlobExpansionConjunction.any_match` which means only at least one glob must match.
+    total_count = len(filtered_output_files) + len(filtered_output_directories)
+    unused_count = len(unused_output_files) + len(unused_output_directories)
+    if total_count == 0 or unused_count < total_count:
+        return
+    warn_or_raise(
+        f"The {description_of_origin}` is configured with `outputs_match_mode` set to `any` which requires at least one output glob to actually match an output."
     )
 
 
@@ -545,6 +585,7 @@ async def run_adhoc_process(
     )
     extra_contents = {i: j for i, j in extras if i}
 
+    # Check the outputs (if configured) to ensure any required glob matches in fact occurred.
     output_digest = result.output_digest
     output_files: list[str] = list(request.output_files)
     output_directories: list[str] = list(request.output_directories)
@@ -555,7 +596,6 @@ async def run_adhoc_process(
         output_directories = [
             os.path.normpath(os.path.join(working_directory, od)) for od in output_directories
         ]
-        print(f"updated to output_files={output_files}, output_directories={output_directories}")
     await check_outputs(
         output_digest=output_digest,
         output_files=output_files,

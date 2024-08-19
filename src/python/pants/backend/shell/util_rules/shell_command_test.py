@@ -995,18 +995,69 @@ def test_shell_command_path_env_modify_mode(rule_runner: RuleRunner) -> None:
 
 
 def test_shell_command_check_outputs(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({
-        "BUILD": dedent(
-            """\
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
             shell_command(
                 name="allow_empty",
                 command="true",
                 output_files=["non-existent-file"],
                 output_directories=["non-existent-dir"],
-                # outputs_match_mode="allow_empty",
+                outputs_match_mode="allow_empty",
+            )
+            shell_command(
+                name="all_with_present_file",
+                command="touch some-file",
+                tools=["touch"],
+                output_files=["some-file"],
+                output_directories=["some-directory"],
+                outputs_match_mode="all",
+            )
+            shell_command(
+                name="all_with_present_directory",
+                command="mkdir some-directory",
+                tools=["mkdir"],
+                output_files=["some-file"],
+                output_directories=["some-directory"],
+                outputs_match_mode="all",
+            )
+            shell_command(
+                name="any_with_present_file",
+                command="touch some-file",
+                tools=["touch"],
+                output_files=["some-file"],
+                output_directories=["some-directory"],
+                outputs_match_mode="any",
+            )
+            shell_command(
+                name="any_with_present_directory",
+                command="mkdir some-directory && touch some-directory/foo.txt",
+                tools=["mkdir", "touch"],
+                output_files=["some-file"],
+                output_directories=["some-directory"],
+                outputs_match_mode="any",
             )
             """
-        )
-    })
+            )
+        }
+    )
 
     assert_shell_command_result(rule_runner, Address("", target_name="allow_empty"), {})
+
+    with pytest.raises(ExecutionError) as exc_info:
+        execute_shell_command(rule_runner, Address("", target_name="all_with_present_file"))
+    assert "some-directory" in str(exc_info)
+
+    with pytest.raises(ExecutionError) as exc_info:
+        execute_shell_command(rule_runner, Address("", target_name="all_with_present_directory"))
+    assert "some-file" in str(exc_info)
+
+    assert_shell_command_result(
+        rule_runner, Address("", target_name="any_with_present_file"), {"some-file": ""}
+    )
+    assert_shell_command_result(
+        rule_runner,
+        Address("", target_name="any_with_present_directory"),
+        {"some-directory/foo.txt": ""},
+    )

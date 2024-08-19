@@ -310,11 +310,10 @@ class AdhocToolOutputsMatchErrorBehavior(StringField):
         Valid values are:
 
         - `error`: Raise an error if none of the proided globs matched.
-        - `warning`: Log a warning if none of the provided globs matched.
-        - `ignore`: Ignore any lack of a matches for the provided globs.
+        - `warn`: Log a warning if none of the provided globs matched.
         """
     )
-    valid_choices = GlobMatchErrorBehavior
+    valid_choices = (GlobMatchErrorBehavior.error.value, GlobMatchErrorBehavior.warn.value)
 
     @property
     def enum_value(self) -> GlobMatchErrorBehavior:
@@ -331,10 +330,10 @@ class AdhocToolOutputsMatchMode(StringField):
         Valid values are:
 
         - `all`: All globs provided in the `output_files` and `output_directories` fields must match or else Pants
-        will error.
+        will error or warn (as configured by the `outputs_match_error_behavior` field).
 
         - `any`: At least one glob provided in the `output_files` and `output_directories` fields must match or
-        else Pants will error.
+        else Pants will error or warn (as configured by the `outputs_match_error_behavior` field).
 
         - `allow_empty`: Allow empty digests (which means nothing was captured)
         """
@@ -350,10 +349,6 @@ class AdhocToolOutputsMatchMode(StringField):
             return GlobExpansionConjunction.any_match
         else:
             return None
-
-    # @property
-    # def allow_empty(self) -> bool:
-    #     return self.value == "allow_empty"
 
 
 class AdhocToolTarget(Target):
