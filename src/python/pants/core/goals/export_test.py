@@ -18,7 +18,8 @@ from pants.core.goals.export import (
     ExportResults,
     ExportSubsystem,
     PostProcessingCommand,
-    export, warn_exported_bin_conflicts,
+    export,
+    warn_exported_bin_conflicts,
 )
 from pants.core.goals.generate_lockfiles import KnownUserResolveNames, KnownUserResolveNamesRequest
 from pants.core.util_rules.distdir import DistDir
