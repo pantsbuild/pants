@@ -518,9 +518,13 @@ async def check_outputs(
         if digest == EMPTY_DIGEST
     )
 
-    def warn_or_raise(message: str) -> None:
+    def warn_or_raise(message: str, snapshot: Snapshot) -> None:
         unused_globs_str = ", ".join([*unused_output_files, *unused_output_directories])
         message = f"{message}\n\nThe following output globs were unused: {unused_globs_str}"
+        if snapshot.dirs:
+            message += f"\n\nDirectories in output: {', '.join(snapshot.dirs)}"
+        if snapshot.files:
+            message += f"\n\nFiles in output: {', '.join(snapshot.files)}"
         if outputs_match_error_behavior == GlobMatchErrorBehavior.error:
             raise ValueError(message)
         else:
@@ -530,8 +534,11 @@ async def check_outputs(
         if not unused_output_files and not unused_output_directories:
             return
 
+        snapshot = await Get(Snapshot, Digest, output_digest)
         warn_or_raise(
-            f"The `{description_of_origin}` is configured with `outputs_match_mode` set to `all` which requires all output globs to actually match an output."
+            f"The `{description_of_origin}` is configured with `outputs_match_mode` set to `all` "
+            "which requires all output globs to actually match an output.",
+            snapshot,
         )
 
     # Otherwise it is `GlobExpansionConjunction.any_match` which means only at least one glob must match.
@@ -539,8 +546,11 @@ async def check_outputs(
     unused_count = len(unused_output_files) + len(unused_output_directories)
     if total_count == 0 or unused_count < total_count:
         return
+    snapshot = await Get(Snapshot, Digest, output_digest)
     warn_or_raise(
-        f"The {description_of_origin}` is configured with `outputs_match_mode` set to `any` which requires at least one output glob to actually match an output."
+        f"The {description_of_origin}` is configured with `outputs_match_mode` set to `any` "
+        "which requires at least one output glob to actually match an output.",
+        snapshot,
     )
 
 
