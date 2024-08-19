@@ -4,7 +4,9 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io::{self, Write};
+use std::num::NonZeroUsize;
 use std::pin::Pin;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes};
@@ -221,6 +223,8 @@ pub async fn download(
     auth_headers: BTreeMap<String, String>,
     file_name: String,
     expected_digest: hashing::Digest,
+    error_delay: Duration,
+    max_attempts: NonZeroUsize,
 ) -> Result<(), String> {
     let mut attempt_number = 0;
     let (actual_digest, bytes) = in_workunit!(
@@ -234,9 +238,9 @@ pub async fn download(
                 .unwrap()
         )),
         |_workunit| async move {
-            // TODO: Allow the retry strategy to be configurable?
-            // For now we retry after 10ms, 100ms, 1s, and 10s.
-            let retry_strategy = ExponentialBackoff::from_millis(10).map(jitter).take(4);
+            let retry_strategy = ExponentialBackoff::from_millis(error_delay.as_millis() as u64)
+                .map(jitter)
+                .take(max_attempts.get() - 1);
             RetryIf::spawn(
                 retry_strategy,
                 || {
@@ -277,10 +281,12 @@ mod tests {
     use std::{
         collections::{BTreeMap, HashSet},
         net::SocketAddr,
+        num::NonZeroUsize,
         sync::{
             atomic::{AtomicU32, Ordering},
             Arc,
         },
+        time::Duration,
     };
 
     use axum::{extract::State, response::IntoResponse, routing::get, Router};
@@ -328,6 +334,8 @@ mod tests {
             auth_headers,
             "foo.txt".into(),
             expected_digest,
+            Duration::from_millis(10),
+            NonZeroUsize::new(1).unwrap(),
         )
         .await
         .unwrap();
@@ -396,6 +404,8 @@ mod tests {
             auth_headers,
             "foo.txt".into(),
             expected_digest,
+            Duration::from_millis(10),
+            NonZeroUsize::new(3).unwrap(),
         )
         .await
         .unwrap();
