@@ -40,7 +40,7 @@ shell_command(
     command="tar -xf act.tar.gz",
     tools=["tar", "gzip"],
     execution_dependencies=[":downloaded-act"],
-    output_directories=["act"],
+    output_files=["act"],
 )
 
 file(
