@@ -40,13 +40,9 @@ from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.session import RunId
-from pants.engine.process import (
-    FallibleProcessResult,
-    InteractiveProcess,
-    InteractiveProcessResult,
-    ProcessResultMetadata,
-)
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.intrinsics import run_interactive_process_in_environment
+from pants.engine.process import FallibleProcessResult, InteractiveProcess, ProcessResultMetadata
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -875,12 +871,8 @@ async def _run_debug_tests(
                 )
             )
 
-        debug_result = await Effect(
-            InteractiveProcessResult,
-            {
-                debug_request.process: InteractiveProcess,
-                environment_name: EnvironmentName,
-            },
+        debug_result = await run_interactive_process_in_environment(
+            debug_request.process, environment_name
         )
         if debug_result.exit_code != 0:
             exit_code = debug_result.exit_code
@@ -1045,9 +1037,8 @@ async def run_tests(
                 OpenFiles, OpenFilesRequest(coverage_report_files, error_if_open_not_found=False)
             )
             for process in open_files.processes:
-                _ = await Effect(
-                    InteractiveProcessResult,
-                    {process: InteractiveProcess, local_environment_name.val: EnvironmentName},
+                _ = await run_interactive_process_in_environment(
+                    process, local_environment_name.val
                 )
 
         for coverage_reports in coverage_reports_collections:

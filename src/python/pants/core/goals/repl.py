@@ -14,8 +14,9 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, collect_rules, goal_rule
+from pants.engine.intrinsics import run_interactive_process
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import ArgsListOption, BoolOption, StrOption
@@ -147,8 +148,7 @@ async def run_repl(
 
     env = {**complete_env, **request.extra_env}
 
-    result = await Effect(
-        InteractiveProcessResult,
+    result = await run_interactive_process(
         InteractiveProcess(
             argv=(*request.args, *repl_subsystem.args),
             env=env,

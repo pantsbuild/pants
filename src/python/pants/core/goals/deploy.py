@@ -14,8 +14,9 @@ from pants.core.goals.publish import PublishFieldSet, PublishProcesses, PublishP
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.intrinsics import run_interactive_process
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -163,7 +164,7 @@ async def _invoke_process(
         return 0, tuple(results)
 
     logger.debug(f"Execute {process}")
-    res = await Effect(InteractiveProcessResult, InteractiveProcess, process)
+    res = await run_interactive_process(process)
     if res.exit_code == 0:
         sigil = console.sigil_succeeded()
         status = success_status
