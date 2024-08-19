@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Iterable, List, Tuple
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 
 from pants.base.build_root import BuildRoot
 from pants.core.goals.export import (
@@ -86,10 +87,17 @@ def _mock_run(rule_runner: RuleRunner, ip: InteractiveProcess) -> InteractivePro
     return InteractiveProcessResult(0)
 
 
-def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int, str]:
+def run_export_rule(
+    rule_runner: RuleRunner, monkeypatch: MonkeyPatch, targets: List[Target]
+) -> Tuple[int, str]:
     union_membership = UnionMembership({ExportRequest: [MockExportRequest]})
     with open(os.path.join(rule_runner.build_root, "somefile"), "wb") as fp:
         fp.write(b"SOMEFILE")
+
+    def noop():
+        pass
+
+    monkeypatch.setattr("pants.engine.intrinsics.task_side_effected", noop)
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         digest = rule_runner.request(Digest, [CreateDigest([FileContent("foo/bar", b"BAR")])])
         result: Export = run_rule_with_mocks(
@@ -144,7 +152,7 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
         return result.exit_code, stdio_reader.get_stdout()
 
 
-def test_run_export_rule() -> None:
+def test_run_export_rule(monkeypatch) -> None:
     rule_runner = RuleRunner(
         rules=[
             UnionRule(ExportRequest, MockExportRequest),
@@ -154,7 +162,7 @@ def test_run_export_rule() -> None:
         ],
         target_types=[MockTarget],
     )
-    exit_code, stdout = run_export_rule(rule_runner, [make_target("foo/bar", "baz")])
+    exit_code, stdout = run_export_rule(rule_runner, monkeypatch, [make_target("foo/bar", "baz")])
     assert exit_code == 0
     assert "Wrote mock export for foo/bar:baz to dist/export/mock" in stdout
     for filename in ["bar", "bar1", "bar2"]:
