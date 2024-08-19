@@ -8,6 +8,7 @@ import sys
 from typing import Iterable, Mapping, cast
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 
 from pants.core.goals.run import (
     Run,
@@ -81,6 +82,7 @@ A_FIELD_SET = TestRunFieldSet.create(A_TARGET)
 
 def single_target_run(
     rule_runner: RuleRunner,
+    monkeypatch: MonkeyPatch,
     *,
     program_text: bytes,
     targets_to_field_sets: Mapping[Target, Iterable[FieldSet]] = FrozenDict(
@@ -89,6 +91,10 @@ def single_target_run(
 ) -> Run:
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
 
+    def noop():
+        pass
+
+    monkeypatch.setattr("pants.engine.intrinsics.task_side_effected", noop)
     with mock_console(rule_runner.options_bootstrapper) as (console, _):
         return run_rule_with_mocks(
             run,
@@ -139,16 +145,17 @@ def single_target_run(
         )
 
 
-def test_normal_run(rule_runner: RuleRunner) -> None:
+def test_normal_run(rule_runner: RuleRunner, monkeypatch: MonkeyPatch) -> None:
     program_text = f'#!{sys.executable}\nprint("hello")'.encode()
     res = single_target_run(
         rule_runner,
+        monkeypatch,
         program_text=program_text,
     )
     assert res.exit_code == 0
 
 
-def test_materialize_input_files(rule_runner: RuleRunner) -> None:
+def test_materialize_input_files(rule_runner: RuleRunner, monkeypatch: MonkeyPatch) -> None:
     program_text = f'#!{sys.executable}\nprint("hello")'.encode()
     binary = create_mock_run_request(rule_runner, program_text)
     with mock_console(rule_runner.options_bootstrapper):
@@ -162,13 +169,13 @@ def test_materialize_input_files(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
 
 
-def test_failed_run(rule_runner: RuleRunner) -> None:
+def test_failed_run(rule_runner: RuleRunner, monkeypatch: MonkeyPatch) -> None:
     program_text = f'#!{sys.executable}\nraise RuntimeError("foo")'.encode()
-    res = single_target_run(rule_runner, program_text=program_text)
+    res = single_target_run(rule_runner, monkeypatch, program_text=program_text)
     assert res.exit_code == 1
 
 
-def test_multi_target_error(rule_runner: RuleRunner) -> None:
+def test_multi_target_error(rule_runner: RuleRunner, monkeypatch: MonkeyPatch) -> None:
     program_text = f'#!{sys.executable}\nprint("hello")'.encode()
     t1 = TestBinaryTarget({}, Address("some/addr"))
     t1_fs = TestRunFieldSet.create(t1)
@@ -176,16 +183,22 @@ def test_multi_target_error(rule_runner: RuleRunner) -> None:
     t2_fs = TestRunFieldSet.create(t2)
     with pytest.raises(TooManyTargetsException):
         single_target_run(
-            rule_runner, program_text=program_text, targets_to_field_sets={t1: [t1_fs], t2: [t2_fs]}
+            rule_runner,
+            monkeypatch,
+            program_text=program_text,
+            targets_to_field_sets={t1: [t1_fs], t2: [t2_fs]},
         )
 
 
-def test_multi_field_set_error(rule_runner: RuleRunner) -> None:
+def test_multi_field_set_error(rule_runner: RuleRunner, monkeypatch: MonkeyPatch) -> None:
     program_text = f'#!{sys.executable}\nprint("hello")'.encode()
     target = TestBinaryTarget({}, Address("some/addr"))
     fs1 = TestRunFieldSet.create(target)
     fs2 = TestRunFieldSet.create(target)
     with pytest.raises(AmbiguousImplementationsException):
         single_target_run(
-            rule_runner, program_text=program_text, targets_to_field_sets={target: [fs1, fs2]}
+            rule_runner,
+            monkeypatch,
+            program_text=program_text,
+            targets_to_field_sets={target: [fs1, fs2]},
         )

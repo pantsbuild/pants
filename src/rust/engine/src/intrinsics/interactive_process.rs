@@ -18,12 +18,11 @@ use workunit_store::{in_workunit, Level};
 
 use crate::context::Context;
 use crate::externs::{self, PyGeneratorResponseNativeCall};
-use crate::nodes::{task_get_context, task_side_effected, ExecuteProcess, NodeResult};
+use crate::nodes::{task_get_context, ExecuteProcess, NodeResult};
 use crate::python::{Failure, Value};
 
 pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(interactive_process, m)?)?;
-
     Ok(())
 }
 
@@ -79,18 +78,17 @@ pub async fn interactive_process_inner(
     let mut process = ExecuteProcess::lift(&context.core.store(), py_process, process_config)
         .await?
         .process;
-    let (run_in_workspace, restartable, keep_sandboxes) = Python::with_gil(|py| {
+    let (run_in_workspace, keep_sandboxes) = Python::with_gil(|py| {
         let py_interactive_process_obj = py_interactive_process.to_object(py);
         let py_interactive_process = py_interactive_process_obj.as_ref(py);
         let run_in_workspace: bool =
             externs::getattr(py_interactive_process, "run_in_workspace").unwrap();
-        let restartable: bool = externs::getattr(py_interactive_process, "restartable").unwrap();
         let keep_sandboxes_value: &PyAny =
             externs::getattr(py_interactive_process, "keep_sandboxes").unwrap();
         let keep_sandboxes =
             KeepSandboxes::from_str(externs::getattr(keep_sandboxes_value, "value").unwrap())
                 .unwrap();
-        (run_in_workspace, restartable, keep_sandboxes)
+        (run_in_workspace, keep_sandboxes)
     });
 
     let session = context.session.clone();
@@ -137,10 +135,6 @@ pub async fn interactive_process_inner(
 
     command.env_clear();
     command.envs(&process.env);
-
-    if !restartable {
-        task_side_effected()?;
-    }
 
     let exit_status = session.clone()
 .with_console_ui_disabled(async move {
