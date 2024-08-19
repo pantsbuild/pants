@@ -11,6 +11,7 @@ from textwrap import dedent
 from typing import Any, Iterable
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinary, PythonSourcesGeneratorTarget
@@ -602,7 +603,11 @@ def test_format_rerun_command(results: list[TestResult], expected: None | str) -
     assert expected == _format_test_rerun_command(results)
 
 
-def test_debug_target(rule_runner: PythonRuleRunner) -> None:
+def test_debug_target(rule_runner: PythonRuleRunner, monkeypatch: MonkeyPatch) -> None:
+    def noop():
+        pass
+
+    monkeypatch.setattr("pants.engine.intrinsics.task_side_effected", noop)
     exit_code, _ = run_test_rule(
         rule_runner,
         request_type=SuccessfulRequest,
