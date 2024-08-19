@@ -6,108 +6,266 @@
 # {
 #   "version": 1,
 #   "generated_with_requirements": [
-#     "com.pinterest:ktlint:0.45.2,url=not_provided,jar=not_provided"
+#     "com.pinterest.ktlint:ktlint-cli:1.3.1,url=not_provided,jar=not_provided"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
 
 [[entries]]
-file_name = "ch.qos.logback_logback-classic_1.2.9.jar"
+file_name = "ch.qos.logback_logback-classic_1.3.14.jar"
 [[entries.directDependencies]]
 group = "ch.qos.logback"
 artifact = "logback-core"
-version = "1.2.9"
+version = "1.3.14"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.slf4j"
 artifact = "slf4j-api"
-version = "1.7.32"
+version = "2.0.7"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "ch.qos.logback"
 artifact = "logback-core"
-version = "1.2.9"
+version = "1.3.14"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.slf4j"
 artifact = "slf4j-api"
-version = "1.7.32"
+version = "2.0.7"
 packaging = "jar"
 
 
 [entries.coord]
 group = "ch.qos.logback"
 artifact = "logback-classic"
-version = "1.2.9"
+version = "1.3.14"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "ad745cc243805800d1ebbf5b7deba03b37c95885e6bce71335a73f7d6d0f14ee"
-serialized_bytes_length = 233855
+fingerprint = "f9b07a6dba4df3899381df7e597df450134e1879b1f3a757456b3cd1c8d94e2f"
+serialized_bytes_length = 277829
 [[entries]]
 directDependencies = []
 dependencies = []
-file_name = "ch.qos.logback_logback-core_1.2.9.jar"
+file_name = "ch.qos.logback_logback-core_1.3.14.jar"
 
 [entries.coord]
 group = "ch.qos.logback"
 artifact = "logback-core"
-version = "1.2.9"
+version = "1.3.14"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "4a9ef7ed809b1fbc6992bf87d404087c247e7a9766e25bb84377b58ed5c9eb58"
-serialized_bytes_length = 454201
+fingerprint = "9f53159af18a9d438bc398c970db3bb7e17ddb07b04bbb3b01dfe3454dd18862"
+serialized_bytes_length = 579673
 [[entries]]
-directDependencies = []
-dependencies = []
-file_name = "com.github.shyiko.klob_klob_0.2.1.jar"
-
-[entries.coord]
-group = "com.github.shyiko.klob"
-artifact = "klob"
-version = "0.2.1"
-packaging = "jar"
-[entries.file_digest]
-fingerprint = "2f6174e3049008f263fd832813390df645ac5c7cfa79f170ace58690810476f2"
-serialized_bytes_length = 26003
-[[entries]]
-file_name = "com.pinterest.ktlint_ktlint-core_0.45.2.jar"
+file_name = "com.github.ajalt.clikt_clikt-jvm_4.4.0.jar"
 [[entries.directDependencies]]
-group = "io.github.microutils"
-artifact = "kotlin-logging-jvm"
-version = "2.1.21"
-packaging = "jar"
-
-[[entries.directDependencies]]
-group = "org.ec4j.core"
-artifact = "ec4j-core"
-version = "0.3.0"
+group = "com.github.ajalt.mordant"
+artifact = "mordant-jvm"
+version = "2.5.0"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
-artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.directDependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "io.github.microutils"
-artifact = "kotlin-logging-jvm"
-version = "2.1.21"
+group = "com.github.ajalt.colormath"
+artifact = "colormath-jvm"
+version = "3.5.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.github.ajalt.mordant"
+artifact = "mordant-jvm"
+version = "2.5.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "it.unimi.dsi"
+artifact = "fastutil-core"
+version = "8.5.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "net.java.dev.jna"
 artifact = "jna"
-version = "5.6.0"
+version = "5.14.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains"
+artifact = "markdown-jvm"
+version = "0.7.0"
+packaging = "jar"
+
+
+[entries.coord]
+group = "com.github.ajalt.clikt"
+artifact = "clikt-jvm"
+version = "4.4.0"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "dd424c7c4113c114efc103da3fab82ccbee7484970129c0764a4578b58677371"
+serialized_bytes_length = 622185
+[[entries]]
+file_name = "com.github.ajalt.colormath_colormath-jvm_3.5.0.jar"
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+
+[entries.coord]
+group = "com.github.ajalt.colormath"
+artifact = "colormath-jvm"
+version = "3.5.0"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "43935db06558b4aac3dd900a775be3e89b54c9f488601457df27d2a1743167b0"
+serialized_bytes_length = 370636
+[[entries]]
+file_name = "com.github.ajalt.mordant_mordant-jvm_2.5.0.jar"
+[[entries.directDependencies]]
+group = "com.github.ajalt.colormath"
+artifact = "colormath-jvm"
+version = "3.5.0"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "net.java.dev.jna"
+artifact = "jna"
+version = "5.14.0"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.jetbrains"
+artifact = "markdown-jvm"
+version = "0.7.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.github.ajalt.colormath"
+artifact = "colormath-jvm"
+version = "3.5.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "it.unimi.dsi"
+artifact = "fastutil-core"
+version = "8.5.12"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "net.java.dev.jna"
+artifact = "jna"
+version = "5.14.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains"
+artifact = "markdown-jvm"
+version = "0.7.0"
+packaging = "jar"
+
+
+[entries.coord]
+group = "com.github.ajalt.mordant"
+artifact = "mordant-jvm"
+version = "2.5.0"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "13dc1d15407490cfa3e9bc54010f031d6a5c52b735d3415cc7144f0b4680aad7"
+serialized_bytes_length = 677092
+[[entries]]
+file_name = "com.pinterest.ktlint_ktlint-cli-reporter-baseline_1.3.1.jar"
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-logger"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-rule-engine-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-logger"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-rule-engine-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "io.github.oshai"
+artifact = "kotlin-logging-jvm"
+version = "6.0.9"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -125,49 +283,31 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-reflect"
-version = "1.6.20"
+version = "1.6.10"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-script-runtime"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -176,111 +316,51 @@ artifact = "annotations"
 version = "13.0"
 packaging = "jar"
 
-[[entries.dependencies]]
-group = "org.slf4j"
-artifact = "slf4j-api"
-version = "1.7.32"
-packaging = "jar"
-
 
 [entries.coord]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-baseline"
+version = "1.3.1"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "383e463ee7d1b082db7928110522925cc06389af1bec65da526a52d113d393f6"
-serialized_bytes_length = 223161
+fingerprint = "e419edc06f6bf4504b001f7eb00d90f88742f2b99dc620b54daa13b346e74f7e"
+serialized_bytes_length = 24704
 [[entries]]
-file_name = "com.pinterest.ktlint_ktlint-reporter-baseline_0.45.2.jar"
+file_name = "com.pinterest.ktlint_ktlint-cli-reporter-checkstyle_1.3.1.jar"
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "io.github.microutils"
-artifact = "kotlin-logging-jvm"
-version = "2.1.21"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "net.java.dev.jna"
-artifact = "jna"
-version = "5.6.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.ec4j.core"
-artifact = "ec4j-core"
-version = "0.3.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.intellij.deps"
-artifact = "trove4j"
-version = "1.0.20200330"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-reflect"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-script-runtime"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -289,111 +369,39 @@ artifact = "annotations"
 version = "13.0"
 packaging = "jar"
 
-[[entries.dependencies]]
-group = "org.slf4j"
-artifact = "slf4j-api"
-version = "1.7.32"
-packaging = "jar"
-
 
 [entries.coord]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-baseline"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-checkstyle"
+version = "1.3.1"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "05262e8ab61191abf36ab481d2cde0fdd5b4e620ddde8e4c547af5937b9c60e0"
-serialized_bytes_length = 7127
+fingerprint = "25afaffea3ed5d300715972eedfc13e1fe66cf81a796c8ec9aeea55964f9f48a"
+serialized_bytes_length = 7361
 [[entries]]
-file_name = "com.pinterest.ktlint_ktlint-reporter-checkstyle_0.45.2.jar"
+file_name = "com.pinterest.ktlint_ktlint-cli-reporter-core_1.3.1.jar"
 [[entries.directDependencies]]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "io.github.microutils"
-artifact = "kotlin-logging-jvm"
-version = "2.1.21"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "net.java.dev.jna"
-artifact = "jna"
-version = "5.6.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.ec4j.core"
-artifact = "ec4j-core"
-version = "0.3.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.intellij.deps"
-artifact = "trove4j"
-version = "1.0.20200330"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-reflect"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-script-runtime"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -402,111 +410,51 @@ artifact = "annotations"
 version = "13.0"
 packaging = "jar"
 
-[[entries.dependencies]]
-group = "org.slf4j"
-artifact = "slf4j-api"
-version = "1.7.32"
-packaging = "jar"
-
 
 [entries.coord]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-checkstyle"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "f587225e2a0a16673184e96aa7e52bebd1bb838376d683b602509da43841dd34"
-serialized_bytes_length = 6927
+fingerprint = "d12b5891c338cafc0c790116c14cb3bbb8218d21ea2f5aa886556466f39893a9"
+serialized_bytes_length = 8183
 [[entries]]
-file_name = "com.pinterest.ktlint_ktlint-reporter-html_0.45.2.jar"
+file_name = "com.pinterest.ktlint_ktlint-cli-reporter-format_1.3.1.jar"
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "io.github.microutils"
-artifact = "kotlin-logging-jvm"
-version = "2.1.21"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "net.java.dev.jna"
-artifact = "jna"
-version = "5.6.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.ec4j.core"
-artifact = "ec4j-core"
-version = "0.3.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.intellij.deps"
-artifact = "trove4j"
-version = "1.0.20200330"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-reflect"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-script-runtime"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -515,111 +463,51 @@ artifact = "annotations"
 version = "13.0"
 packaging = "jar"
 
-[[entries.dependencies]]
-group = "org.slf4j"
-artifact = "slf4j-api"
-version = "1.7.32"
-packaging = "jar"
-
 
 [entries.coord]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-html"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-format"
+version = "1.3.1"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "c3f8cc9dacc1e0d2816c6a23b66b3e4af742f3aad11f882924d2807502aea71b"
-serialized_bytes_length = 16343
+fingerprint = "c7cd804f4b9af9afcd6bac78f8a444ba6735d593480b1dd60aa57e2c39a84fde"
+serialized_bytes_length = 10244
 [[entries]]
-file_name = "com.pinterest.ktlint_ktlint-reporter-json_0.45.2.jar"
+file_name = "com.pinterest.ktlint_ktlint-cli-reporter-html_1.3.1.jar"
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "io.github.microutils"
-artifact = "kotlin-logging-jvm"
-version = "2.1.21"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "net.java.dev.jna"
-artifact = "jna"
-version = "5.6.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.ec4j.core"
-artifact = "ec4j-core"
-version = "0.3.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.intellij.deps"
-artifact = "trove4j"
-version = "1.0.20200330"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-reflect"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-script-runtime"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -628,111 +516,51 @@ artifact = "annotations"
 version = "13.0"
 packaging = "jar"
 
-[[entries.dependencies]]
-group = "org.slf4j"
-artifact = "slf4j-api"
-version = "1.7.32"
-packaging = "jar"
-
 
 [entries.coord]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-json"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-html"
+version = "1.3.1"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "7dc12cd16914f42255b376fae5b176b2d80bb2957a05b501a27b8d3e9f464bdc"
-serialized_bytes_length = 6999
+fingerprint = "67acfb5361d5aabcafeb1eb32cb22c899679099f81bf316b3cf3386a9d22dbd6"
+serialized_bytes_length = 16976
 [[entries]]
-file_name = "com.pinterest.ktlint_ktlint-reporter-plain_0.45.2.jar"
+file_name = "com.pinterest.ktlint_ktlint-cli-reporter-json_1.3.1.jar"
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "io.github.microutils"
-artifact = "kotlin-logging-jvm"
-version = "2.1.21"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "net.java.dev.jna"
-artifact = "jna"
-version = "5.6.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.ec4j.core"
-artifact = "ec4j-core"
-version = "0.3.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.intellij.deps"
-artifact = "trove4j"
-version = "1.0.20200330"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-reflect"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-script-runtime"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -741,135 +569,199 @@ artifact = "annotations"
 version = "13.0"
 packaging = "jar"
 
+
+[entries.coord]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-json"
+version = "1.3.1"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "7177237a9231320b6827f6d8db200fb7b6464f073962c227d94667520941f02e"
+serialized_bytes_length = 7431
+[[entries]]
+file_name = "com.pinterest.ktlint_ktlint-cli-reporter-plain-summary_1.3.1.jar"
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
 [[entries.dependencies]]
-group = "org.slf4j"
-artifact = "slf4j-api"
-version = "1.7.32"
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains"
+artifact = "annotations"
+version = "13.0"
 packaging = "jar"
 
 
 [entries.coord]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-plain"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-plain-summary"
+version = "1.3.1"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "d957c8647146fc79493fca30df84d26c532a71e1ad312f31f50b8fcd00f2fbd3"
-serialized_bytes_length = 9968
+fingerprint = "f572957fd859e2d61013660ba189676735028f3a3543f67b931e5780596e42ee"
+serialized_bytes_length = 13158
 [[entries]]
-file_name = "com.pinterest.ktlint_ktlint-reporter-sarif_0.45.2.jar"
+file_name = "com.pinterest.ktlint_ktlint-cli-reporter-plain_1.3.1.jar"
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains"
+artifact = "annotations"
+version = "13.0"
+packaging = "jar"
+
+
+[entries.coord]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-plain"
+version = "1.3.1"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "dc039f4295a687d4f35dcb250ce8101ab73a5cc2addc86c3a416cbd6c7de43a3"
+serialized_bytes_length = 16957
+[[entries]]
+file_name = "com.pinterest.ktlint_ktlint-cli-reporter-sarif_1.3.1.jar"
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "io.github.detekt.sarif4k"
-artifact = "sarif4k"
-version = "0.0.1"
+artifact = "sarif4k-jvm"
+version = "0.6.0"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "io.github.detekt.sarif4k"
-artifact = "sarif4k"
-version = "0.0.1"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "io.github.microutils"
-artifact = "kotlin-logging-jvm"
-version = "2.1.21"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "net.java.dev.jna"
-artifact = "jna"
-version = "5.6.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.ec4j.core"
-artifact = "ec4j-core"
-version = "0.3.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.intellij.deps"
-artifact = "trove4j"
-version = "1.0.20200330"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-reflect"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-script-runtime"
-version = "1.6.20"
+artifact = "sarif4k-jvm"
+version = "0.6.0"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-common"
-version = "1.6.20"
+version = "1.7.20"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
+version = "1.7.20"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+version = "1.7.20"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlinx"
 artifact = "kotlinx-serialization-core-jvm"
-version = "1.1.0"
+version = "1.4.1"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlinx"
 artifact = "kotlinx-serialization-json-jvm"
-version = "1.1.0"
+version = "1.4.1"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -878,51 +770,57 @@ artifact = "annotations"
 version = "13.0"
 packaging = "jar"
 
-[[entries.dependencies]]
-group = "org.slf4j"
-artifact = "slf4j-api"
-version = "1.7.32"
-packaging = "jar"
-
 
 [entries.coord]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-sarif"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-sarif"
+version = "1.3.1"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "c2c8cb17e778516d57851ef8b1f604d472c07ecb635ef2115ed40de1fc63eb2e"
-serialized_bytes_length = 7537
+fingerprint = "b67bccdb596be8559ba6ddacf8673e09c9ca71f2925f805edf0a589d94409aa0"
+serialized_bytes_length = 7900
 [[entries]]
-file_name = "com.pinterest.ktlint_ktlint-ruleset-experimental_0.45.2.jar"
+file_name = "com.pinterest.ktlint_ktlint-cli-ruleset-core_1.3.1.jar"
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+artifact = "ktlint-rule-engine-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+artifact = "ktlint-logger"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "io.github.microutils"
+group = "com.pinterest.ktlint"
+artifact = "ktlint-rule-engine-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "io.github.oshai"
 artifact = "kotlin-logging-jvm"
-version = "2.1.21"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "net.java.dev.jna"
-artifact = "jna"
-version = "5.6.0"
+version = "6.0.9"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -940,49 +838,31 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-reflect"
-version = "1.6.20"
+version = "1.6.10"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-script-runtime"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -991,445 +871,255 @@ artifact = "annotations"
 version = "13.0"
 packaging = "jar"
 
-[[entries.dependencies]]
-group = "org.slf4j"
-artifact = "slf4j-api"
-version = "1.7.32"
-packaging = "jar"
-
 
 [entries.coord]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-ruleset-experimental"
-version = "0.45.2"
+artifact = "ktlint-cli-ruleset-core"
+version = "1.3.1"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "f9c886d091adbeb33317027a5b4ad8afd0bacdf902341925d75de698f9dd3f80"
-serialized_bytes_length = 122041
+fingerprint = "722a9ae9afddd317460e7838b731507bd0eb42f769dc4d36ead70c49bc2a41b0"
+serialized_bytes_length = 2315
 [[entries]]
-file_name = "com.pinterest.ktlint_ktlint-ruleset-standard_0.45.2.jar"
-[[entries.directDependencies]]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
-packaging = "jar"
-
-[[entries.directDependencies]]
-group = "io.github.microutils"
-artifact = "kotlin-logging-jvm"
-version = "2.1.21"
-packaging = "jar"
-
-[[entries.directDependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "io.github.microutils"
-artifact = "kotlin-logging-jvm"
-version = "2.1.21"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "net.java.dev.jna"
-artifact = "jna"
-version = "5.6.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.ec4j.core"
-artifact = "ec4j-core"
-version = "0.3.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.intellij.deps"
-artifact = "trove4j"
-version = "1.0.20200330"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-reflect"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-script-runtime"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains"
-artifact = "annotations"
-version = "13.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.slf4j"
-artifact = "slf4j-api"
-version = "1.7.32"
-packaging = "jar"
-
-
-[entries.coord]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-ruleset-standard"
-version = "0.45.2"
-packaging = "jar"
-[entries.file_digest]
-fingerprint = "68efb16811780b6060120834a8d75ebd609d487824612f4bfff80ba02066e61c"
-serialized_bytes_length = 290759
-[[entries]]
-file_name = "com.pinterest.ktlint_ktlint-ruleset-test_0.45.2.jar"
-[[entries.directDependencies]]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
-packaging = "jar"
-
-[[entries.directDependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "io.github.microutils"
-artifact = "kotlin-logging-jvm"
-version = "2.1.21"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "net.java.dev.jna"
-artifact = "jna"
-version = "5.6.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.ec4j.core"
-artifact = "ec4j-core"
-version = "0.3.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.intellij.deps"
-artifact = "trove4j"
-version = "1.0.20200330"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-reflect"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-script-runtime"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains"
-artifact = "annotations"
-version = "13.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.slf4j"
-artifact = "slf4j-api"
-version = "1.7.32"
-packaging = "jar"
-
-
-[entries.coord]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-ruleset-test"
-version = "0.45.2"
-packaging = "jar"
-[entries.file_digest]
-fingerprint = "6660e92d94041b887e85b9620e4b7427d14c18724284092b3b35b2abebe879c1"
-serialized_bytes_length = 10877
-[[entries]]
-file_name = "com.pinterest_ktlint_0.45.2.jar"
+file_name = "com.pinterest.ktlint_ktlint-cli_1.3.1.jar"
 [[entries.directDependencies]]
 group = "ch.qos.logback"
 artifact = "logback-classic"
-version = "1.2.9"
+version = "1.3.14"
 packaging = "jar"
 
 [[entries.directDependencies]]
-group = "com.github.shyiko.klob"
-artifact = "klob"
-version = "0.2.1"
-packaging = "jar"
-
-[[entries.directDependencies]]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+group = "com.github.ajalt.clikt"
+artifact = "clikt-jvm"
+version = "4.4.0"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-baseline"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-baseline"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-checkstyle"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-checkstyle"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-html"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-json"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-format"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-plain"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-html"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-sarif"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-json"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-ruleset-experimental"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-plain-summary"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-plain"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-sarif"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-logger"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-rule-engine"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "com.pinterest.ktlint"
 artifact = "ktlint-ruleset-standard"
-version = "0.45.2"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.directDependencies]]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-ruleset-test"
-version = "0.45.2"
-packaging = "jar"
-
-[[entries.directDependencies]]
-group = "info.picocli"
-artifact = "picocli"
-version = "3.9.6"
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
-artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.directDependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "ch.qos.logback"
 artifact = "logback-classic"
-version = "1.2.9"
+version = "1.3.14"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "ch.qos.logback"
 artifact = "logback-core"
-version = "1.2.9"
+version = "1.3.14"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.github.shyiko.klob"
-artifact = "klob"
-version = "0.2.1"
+group = "com.github.ajalt.clikt"
+artifact = "clikt-jvm"
+version = "4.4.0"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-core"
-version = "0.45.2"
+group = "com.github.ajalt.colormath"
+artifact = "colormath-jvm"
+version = "3.5.0"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-baseline"
-version = "0.45.2"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-checkstyle"
-version = "0.45.2"
+group = "com.github.ajalt.mordant"
+artifact = "mordant-jvm"
+version = "2.5.0"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-html"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-baseline"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-json"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-checkstyle"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-plain"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-core"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-reporter-sarif"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-format"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.pinterest.ktlint"
-artifact = "ktlint-ruleset-experimental"
-version = "0.45.2"
+artifact = "ktlint-cli-reporter-html"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-json"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-plain-summary"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-plain"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-reporter-sarif"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-ruleset-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-logger"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-rule-engine-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-rule-engine"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.pinterest.ktlint"
 artifact = "ktlint-ruleset-standard"
-version = "0.45.2"
+version = "1.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.pinterest.ktlint"
-artifact = "ktlint-ruleset-test"
-version = "0.45.2"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "info.picocli"
-artifact = "picocli"
-version = "3.9.6"
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "io.github.detekt.sarif4k"
-artifact = "sarif4k"
-version = "0.0.1"
+artifact = "sarif4k-jvm"
+version = "0.6.0"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "io.github.microutils"
+group = "io.github.oshai"
 artifact = "kotlin-logging-jvm"
-version = "2.1.21"
+version = "6.0.9"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "it.unimi.dsi"
+artifact = "fastutil-core"
+version = "8.5.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "net.java.dev.jna"
 artifact = "jna"
-version = "5.6.0"
+version = "5.14.0"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -1447,61 +1137,120 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-reflect"
-version = "1.6.20"
+version = "1.6.10"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-script-runtime"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-common"
-version = "1.6.20"
+version = "1.7.20"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
+version = "1.7.20"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+version = "1.7.20"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlinx"
 artifact = "kotlinx-serialization-core-jvm"
-version = "1.1.0"
+version = "1.4.1"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlinx"
 artifact = "kotlinx-serialization-json-jvm"
-version = "1.1.0"
+version = "1.4.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains"
+artifact = "markdown-jvm"
+version = "0.7.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.slf4j"
+artifact = "slf4j-api"
+version = "2.0.7"
+packaging = "jar"
+
+
+[entries.coord]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli"
+version = "1.3.1"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "e94e1c0e7c90ae395ddd2355d5042fb3f2be6d6cd99f5d3c25834320f4cd08c7"
+serialized_bytes_length = 155549
+[[entries]]
+file_name = "com.pinterest.ktlint_ktlint-logger_1.3.1.jar"
+[[entries.directDependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "io.github.oshai"
+artifact = "kotlin-logging-jvm"
+version = "6.0.9"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "io.github.oshai"
+artifact = "kotlin-logging-jvm"
+version = "6.0.9"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -1510,141 +1259,497 @@ artifact = "annotations"
 version = "13.0"
 packaging = "jar"
 
-[[entries.dependencies]]
-group = "org.slf4j"
-artifact = "slf4j-api"
-version = "1.7.32"
-packaging = "jar"
-
 
 [entries.coord]
-group = "com.pinterest"
-artifact = "ktlint"
-version = "0.45.2"
+group = "com.pinterest.ktlint"
+artifact = "ktlint-logger"
+version = "1.3.1"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "279905d78118e9db41182ce214ac27e00a88c228537633175a27bc36671e0296"
-serialized_bytes_length = 145829
+fingerprint = "ede9d48ce62e1fb1d6c4dd2a2ea95260a680baff5cfc9f9bb95e1dd1681f3bf4"
+serialized_bytes_length = 4759
 [[entries]]
-directDependencies = []
-dependencies = []
-file_name = "info.picocli_picocli_3.9.6.jar"
+file_name = "com.pinterest.ktlint_ktlint-rule-engine-core_1.3.1.jar"
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-logger"
+version = "1.3.1"
+packaging = "jar"
 
-[entries.coord]
-group = "info.picocli"
-artifact = "picocli"
-version = "3.9.6"
+[[entries.directDependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
 packaging = "jar"
-[entries.file_digest]
-fingerprint = "9442a6a18d869354a0d922ba37b40032aa1b0a172f414a7a644de39d1972f1f4"
-serialized_bytes_length = 264889
-[[entries]]
-file_name = "io.github.detekt.sarif4k_sarif4k_0.0.1.jar"
+
+[[entries.directDependencies]]
+group = "org.ec4j.core"
+artifact = "ec4j-core"
+version = "0.3.0"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-compiler-embeddable"
+version = "1.9.24"
+packaging = "jar"
+
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-logger"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "io.github.oshai"
+artifact = "kotlin-logging-jvm"
+version = "6.0.9"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.ec4j.core"
+artifact = "ec4j-core"
+version = "0.3.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.intellij.deps"
+artifact = "trove4j"
+version = "1.0.20200330"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-compiler-embeddable"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-daemon-embeddable"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-reflect"
+version = "1.6.10"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-script-runtime"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains"
+artifact = "annotations"
+version = "13.0"
+packaging = "jar"
+
+
+[entries.coord]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-rule-engine-core"
+version = "1.3.1"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "dd4094808cb06e2e886b100e1b6917d37cc5b8de057fff1db81bac8d2967f0be"
+serialized_bytes_length = 137047
+[[entries]]
+file_name = "com.pinterest.ktlint_ktlint-rule-engine_1.3.1.jar"
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-logger"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-rule-engine-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.ec4j.core"
+artifact = "ec4j-core"
+version = "0.3.0"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-compiler-embeddable"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-logger"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-rule-engine-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "io.github.oshai"
+artifact = "kotlin-logging-jvm"
+version = "6.0.9"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.ec4j.core"
+artifact = "ec4j-core"
+version = "0.3.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.intellij.deps"
+artifact = "trove4j"
+version = "1.0.20200330"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-compiler-embeddable"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-daemon-embeddable"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-reflect"
+version = "1.6.10"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-script-runtime"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains"
+artifact = "annotations"
+version = "13.0"
+packaging = "jar"
+
+
+[entries.coord]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-rule-engine"
+version = "1.3.1"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "72a2b8e0f3e412ec5af5a208df691a68c56c4742d5f0f1faf21a79d33170f9eb"
+serialized_bytes_length = 297957
+[[entries]]
+file_name = "com.pinterest.ktlint_ktlint-ruleset-standard_1.3.1.jar"
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-ruleset-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-logger"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-rule-engine-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-cli-ruleset-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-logger"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-rule-engine-core"
+version = "1.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "io.github.oshai"
+artifact = "kotlin-logging-jvm"
+version = "6.0.9"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.ec4j.core"
+artifact = "ec4j-core"
+version = "0.3.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.intellij.deps"
+artifact = "trove4j"
+version = "1.0.20200330"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-compiler-embeddable"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-daemon-embeddable"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-reflect"
+version = "1.6.10"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-script-runtime"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains"
+artifact = "annotations"
+version = "13.0"
+packaging = "jar"
+
+
+[entries.coord]
+group = "com.pinterest.ktlint"
+artifact = "ktlint-ruleset-standard"
+version = "1.3.1"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "8806510ffc0a30287aa9c45cff1dbdd658cd46ea472963e53a78f78c95c6dc7d"
+serialized_bytes_length = 1058655
+[[entries]]
+file_name = "dev.drewhamilton.poko_poko-annotations-jvm_0.15.3.jar"
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains"
+artifact = "annotations"
+version = "13.0"
+packaging = "jar"
+
+
+[entries.coord]
+group = "dev.drewhamilton.poko"
+artifact = "poko-annotations-jvm"
+version = "0.15.3"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "3bcb96770ac52075c431201e29fd5e67924435555df22f5e5ab2602b7b773635"
+serialized_bytes_length = 2458
+[[entries]]
+file_name = "io.github.detekt.sarif4k_sarif4k-jvm_0.6.0.jar"
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlinx"
 artifact = "kotlinx-serialization-json-jvm"
-version = "1.1.0"
+version = "1.4.1"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-common"
-version = "1.6.20"
+version = "1.7.20"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib-jdk7"
+version = "1.7.20"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib-jdk8"
+version = "1.7.20"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlinx"
 artifact = "kotlinx-serialization-core-jvm"
-version = "1.1.0"
+version = "1.4.1"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlinx"
 artifact = "kotlinx-serialization-json-jvm"
-version = "1.1.0"
+version = "1.4.1"
 packaging = "jar"
 
 
 [entries.coord]
 group = "io.github.detekt.sarif4k"
-artifact = "sarif4k"
-version = "0.0.1"
+artifact = "sarif4k-jvm"
+version = "0.6.0"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "41ec72cf2521783224581c76aaa7e97d4a50f396a66d642500ff4777b395a376"
-serialized_bytes_length = 444652
+fingerprint = "b3ac96dd97acba8318dbe26f6a432d6c6db91c46c780805e8928b8103e5763dc"
+serialized_bytes_length = 520788
 [[entries]]
-file_name = "io.github.microutils_kotlin-logging-jvm_2.1.21.jar"
+file_name = "io.github.oshai_kotlin-logging-jvm_6.0.9.jar"
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.directDependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.directDependencies]]
-group = "org.slf4j"
-artifact = "slf4j-api"
-version = "1.7.32"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.slf4j"
-artifact = "slf4j-api"
-version = "1.7.32"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
 packaging = "jar"
 
 
 [entries.coord]
-group = "io.github.microutils"
+group = "io.github.oshai"
 artifact = "kotlin-logging-jvm"
-version = "2.1.21"
+version = "6.0.9"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "7b15ccb488261de2a77004f13b2d4a00c92d1bbbb2ad79efb9b6c2e56c5a7ae6"
-serialized_bytes_length = 43729
+fingerprint = "b09d3dbcbd348e89e3e50e35402515981e6a79a647b10724836ef6c80eb8b14a"
+serialized_bytes_length = 148087
 [[entries]]
 directDependencies = []
 dependencies = []
-file_name = "net.java.dev.jna_jna_5.6.0.jar"
+file_name = "it.unimi.dsi_fastutil-core_8.5.12.jar"
+
+[entries.coord]
+group = "it.unimi.dsi"
+artifact = "fastutil-core"
+version = "8.5.12"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "f31c20f5b06312f3d5e06e6160a32e274d819aa6cebf27528b26b6b5c0c1df19"
+serialized_bytes_length = 6428331
+[[entries]]
+directDependencies = []
+dependencies = []
+file_name = "net.java.dev.jna_jna_5.14.0.jar"
 
 [entries.coord]
 group = "net.java.dev.jna"
 artifact = "jna"
-version = "5.6.0"
+version = "5.14.0"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "5557e235a8aa2f9766d5dc609d67948f2a8832c2d796cea9ef1d6cbe0b3b7eaf"
-serialized_bytes_length = 1509440
+fingerprint = "34ed1e1f27fa896bca50dbc4e99cf3732967cec387a7a0d5e3486c09673fe8c6"
+serialized_bytes_length = 1878533
 [[entries]]
 directDependencies = []
 dependencies = []
@@ -1672,13 +1777,7 @@ packaging = "jar"
 fingerprint = "c5fd725bffab51846bf3c77db1383c60aaaebfe1b7fe2f00d23fe1b7df0a439d"
 serialized_bytes_length = 572985
 [[entries]]
-file_name = "org.jetbrains.kotlin_kotlin-compiler-embeddable_1.6.20.jar"
-[[entries.directDependencies]]
-group = "net.java.dev.jna"
-artifact = "jna"
-version = "5.6.0"
-packaging = "jar"
-
+file_name = "org.jetbrains.kotlin_kotlin-compiler-embeddable_1.9.24.jar"
 [[entries.directDependencies]]
 group = "org.jetbrains.intellij.deps"
 artifact = "trove4j"
@@ -1688,31 +1787,25 @@ packaging = "jar"
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-reflect"
-version = "1.6.20"
+version = "1.6.10"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-script-runtime"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "net.java.dev.jna"
-artifact = "jna"
-version = "5.6.0"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -1724,31 +1817,25 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-reflect"
-version = "1.6.20"
+version = "1.6.10"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-script-runtime"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -1761,185 +1848,127 @@ packaging = "jar"
 [entries.coord]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-compiler-embeddable"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "be634faaafb56816b6ef6d583e57ab33e4d6e5180cde2f505ccf7d45dc738ef8"
-serialized_bytes_length = 51976423
+fingerprint = "e71ff19e6b141ab85a9328fd010941531a302543026bd4244c95adc208d501f6"
+serialized_bytes_length = 60181855
 [[entries]]
 directDependencies = []
 dependencies = []
-file_name = "org.jetbrains.kotlin_kotlin-daemon-embeddable_1.6.20.jar"
+file_name = "org.jetbrains.kotlin_kotlin-daemon-embeddable_1.9.24.jar"
 
 [entries.coord]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-daemon-embeddable"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "ff563a4b2b3cb6c215629d6d5c652ad92c3939313d05073d3f6fed0aae67834f"
-serialized_bytes_length = 724994
+fingerprint = "177bc8b2a4076dcce7878ad0d8fd07163af3178e3fa90ee63d4f733bb47bfdc9"
+serialized_bytes_length = 398746
 [[entries]]
-file_name = "org.jetbrains.kotlin_kotlin-reflect_1.6.20.jar"
-[[entries.directDependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains"
-artifact = "annotations"
-version = "13.0"
-packaging = "jar"
-
+directDependencies = []
+dependencies = []
+file_name = "org.jetbrains.kotlin_kotlin-reflect_1.6.10.jar"
 
 [entries.coord]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-reflect"
-version = "1.6.20"
+version = "1.6.10"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "234b60bd2c49b391ac550afee4ca9a92e485d8c5ae5faa98cdaf7feba1794042"
-serialized_bytes_length = 3058829
+fingerprint = "3277ac102ae17aad10a55abec75ff5696c8d109790396434b496e75087854203"
+serialized_bytes_length = 3038560
 [[entries]]
 directDependencies = []
 dependencies = []
-file_name = "org.jetbrains.kotlin_kotlin-script-runtime_1.6.20.jar"
+file_name = "org.jetbrains.kotlin_kotlin-script-runtime_1.9.24.jar"
 
 [entries.coord]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-script-runtime"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "3fee5cea54449e18ce5a770c3c4849f0f855d8b061f7d0bd2a032110922c0206"
-serialized_bytes_length = 42319
+fingerprint = "314c7d308fe750654365bac6144780613c9169cf3d9e1dafbab91cf80bdc357c"
+serialized_bytes_length = 43279
 [[entries]]
 directDependencies = []
 dependencies = []
-file_name = "org.jetbrains.kotlin_kotlin-stdlib-common_1.6.20.jar"
+file_name = "org.jetbrains.kotlin_kotlin-stdlib-common_1.7.20.jar"
 
 [entries.coord]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-common"
-version = "1.6.20"
+version = "1.7.20"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "8da40a2520d30dcb1012176fe93d24e82d08a3e346c37e0343b0fb6f64f6be01"
-serialized_bytes_length = 200631
+fingerprint = "e0e91962bc0007338bf5b1739f62927ac32d14ba3d827fa608ab4e5351729d5d"
+serialized_bytes_length = 212210
 [[entries]]
-file_name = "org.jetbrains.kotlin_kotlin-stdlib-jdk7_1.6.20.jar"
+file_name = "org.jetbrains.kotlin_kotlin-stdlib-jdk7_1.7.20.jar"
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains"
-artifact = "annotations"
-version = "13.0"
+version = "1.9.24"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
+version = "1.7.20"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "aa2fa2e81355c4d98dd97da2169bf401f842261378f5b1cbea1aa11855d67620"
-serialized_bytes_length = 23898
+fingerprint = "524da3c1a2ad56fd52c4ae2272ef3de421de8d2047ab1c51fc306d351243f2f5"
+serialized_bytes_length = 45709
 [[entries]]
-file_name = "org.jetbrains.kotlin_kotlin-stdlib-jdk8_1.6.20.jar"
+file_name = "org.jetbrains.kotlin_kotlin-stdlib-jdk8_1.7.20.jar"
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
+version = "1.7.20"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-jdk7"
-version = "1.6.20"
+version = "1.7.20"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains"
-artifact = "annotations"
-version = "13.0"
+version = "1.9.24"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-jdk8"
-version = "1.6.20"
+version = "1.7.20"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "fdab1bf120e2b5e7ab6d7888e9ebc024ec6b8ca729361296395dab634b213695"
-serialized_bytes_length = 17773
+fingerprint = "1da0d306c995945e1f807240ef64b5cd2dd5ac58612afb1a8596143d10b7ded5"
+serialized_bytes_length = 19805
 [[entries]]
-file_name = "org.jetbrains.kotlin_kotlin-stdlib_1.6.20.jar"
-[[entries.directDependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
-packaging = "jar"
-
+file_name = "org.jetbrains.kotlin_kotlin-stdlib_1.9.24.jar"
 [[entries.directDependencies]]
 group = "org.jetbrains"
 artifact = "annotations"
 version = "13.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.jetbrains.kotlin"
-artifact = "kotlin-stdlib-common"
-version = "1.6.20"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -1952,93 +1981,129 @@ packaging = "jar"
 [entries.coord]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "eeb51c2b67b26233fd81d0bc4f8044ec849718890905763ceffd84a31e2cb799"
-serialized_bytes_length = 1509405
+fingerprint = "858b902696da9cf585ab9d98ffc1c2712269828354dfe9107e3711b084a36468"
+serialized_bytes_length = 1718956
 [[entries]]
-file_name = "org.jetbrains.kotlinx_kotlinx-serialization-core-jvm_1.1.0.jar"
+file_name = "org.jetbrains.kotlinx_kotlinx-serialization-core-jvm_1.4.1.jar"
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-common"
-version = "1.6.20"
+version = "1.7.20"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib-jdk8"
+version = "1.7.20"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-common"
-version = "1.6.20"
+version = "1.7.20"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib-jdk7"
+version = "1.7.20"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib-jdk8"
+version = "1.7.20"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.jetbrains.kotlinx"
 artifact = "kotlinx-serialization-core-jvm"
-version = "1.1.0"
+version = "1.4.1"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "69d18c700cfdf207b3e9bf6f5d58e7de08482d9e34d7c2a0adcb1db8082df943"
-serialized_bytes_length = 319254
+fingerprint = "eba7f1c854296e4ce1418fb01360f8f10c5683e7c45aa3472018417a067636f3"
+serialized_bytes_length = 391429
 [[entries]]
-file_name = "org.jetbrains.kotlinx_kotlinx-serialization-json-jvm_1.1.0.jar"
+file_name = "org.jetbrains.kotlinx_kotlinx-serialization-json-jvm_1.4.1.jar"
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-common"
-version = "1.6.20"
+version = "1.7.20"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib-jdk8"
+version = "1.7.20"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.jetbrains.kotlinx"
 artifact = "kotlinx-serialization-core-jvm"
-version = "1.1.0"
+version = "1.4.1"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib-common"
-version = "1.6.20"
+version = "1.7.20"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib-jdk7"
+version = "1.7.20"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib-jdk8"
+version = "1.7.20"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlin"
 artifact = "kotlin-stdlib"
-version = "1.6.20"
+version = "1.9.24"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.jetbrains.kotlinx"
 artifact = "kotlinx-serialization-core-jvm"
-version = "1.1.0"
+version = "1.4.1"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.jetbrains.kotlinx"
 artifact = "kotlinx-serialization-json-jvm"
-version = "1.1.0"
+version = "1.4.1"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "cea6836d3a3990b7ac59f61a9534a0bf1c8d3932bd206080a3a13622ec7587d1"
-serialized_bytes_length = 157490
+fingerprint = "af604c46737121d4225fdb60ef0e17766a3c94b7c1c9ef76b4e3a5c7733d557e"
+serialized_bytes_length = 230125
 [[entries]]
 directDependencies = []
 dependencies = []
@@ -2053,15 +2118,50 @@ packaging = "jar"
 fingerprint = "ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478"
 serialized_bytes_length = 17536
 [[entries]]
+file_name = "org.jetbrains_markdown-jvm_0.7.0.jar"
+[[entries.directDependencies]]
+group = "it.unimi.dsi"
+artifact = "fastutil-core"
+version = "8.5.12"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "it.unimi.dsi"
+artifact = "fastutil-core"
+version = "8.5.12"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jetbrains.kotlin"
+artifact = "kotlin-stdlib"
+version = "1.9.24"
+packaging = "jar"
+
+
+[entries.coord]
+group = "org.jetbrains"
+artifact = "markdown-jvm"
+version = "0.7.0"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "c8b44be338598912e8bb8a4998b017df7dd198152cceffef01cf128a9900139e"
+serialized_bytes_length = 549818
+[[entries]]
 directDependencies = []
 dependencies = []
-file_name = "org.slf4j_slf4j-api_1.7.32.jar"
+file_name = "org.slf4j_slf4j-api_2.0.7.jar"
 
 [entries.coord]
 group = "org.slf4j"
 artifact = "slf4j-api"
-version = "1.7.32"
+version = "2.0.7"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "3624f8474c1af46d75f98bc097d7864a323c81b3808aa43689a6e1c601c027be"
-serialized_bytes_length = 41513
+fingerprint = "5d6298b93a1905c32cda6478808ac14c2d4a47e91535e53c41f7feeb85d946f4"
+serialized_bytes_length = 63635
