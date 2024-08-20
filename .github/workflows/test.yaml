@@ -79,7 +79,9 @@ jobs:
 
           src/python/pants/engine/internals/native_engine.so.metadata'
     - name: Bootstrap Pants
-      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
+      run: |
+        ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
+        sleep 3600
     - name: Run smoke tests
       run: './pants list ::
 
