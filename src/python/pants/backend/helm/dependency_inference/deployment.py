@@ -18,7 +18,6 @@ from pants.backend.helm.dependency_inference.subsystem import (
     UnownedHelmDependencyUsage,
 )
 from pants.backend.helm.subsystems import k8s_parser
-from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.subsystems.k8s_parser import ParsedKubeManifest, ParseKubeManifestRequest
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.backend.helm.target_types import rules as helm_target_types_rules
