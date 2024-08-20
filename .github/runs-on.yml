@@ -3,4 +3,4 @@ images:
     platform: "linux"
     arch: "arm64"
     owner: "408085265505"
-    ami: "ami-0d16a07627bf409b8"
+    ami: "ami-03799c9e952745a1b"
