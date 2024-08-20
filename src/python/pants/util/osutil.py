@@ -101,6 +101,9 @@ def _macos_major_version() -> None | int:
         return None
 
     version = platform.mac_ver()[0]
+    if not version:
+        return None
+
     return int(version.split(".", 1)[0])
 
 
