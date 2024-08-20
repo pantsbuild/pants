@@ -591,6 +591,7 @@ class Helper:
         return [
             *checkout(),
             *self.setup_primary_python(),
+            *self.expose_all_pythons(),
             *self.bootstrap_caches(),
             {
                 "name": "Bootstrap Pants",
