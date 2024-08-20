@@ -470,8 +470,6 @@ class Helper:
             ret["ARCHFLAGS"] = "-arch x86_64"
         if self.platform == Platform.MACOS11_ARM64:
             ret["ARCHFLAGS"] = "-arch arm64"
-        if self.platform == Platform.LINUX_ARM64:
-            ret["PANTS_CONFIG_FILES"] = "+['pants.ci.toml','pants.ci.aarch64.toml']"
         if self.platform == Platform.LINUX_X86_64:
             # Currently we run Linux x86_64 CI on GitHub Actions-hosted hardware, and
             # these are weak dual-core machines. Default parallelism on those machines
@@ -577,8 +575,8 @@ class Helper:
         if self.platform == Platform.LINUX_ARM64:
             ret.append(
                 {
-                    "name": "Expose primary python",
-                    "id": "expose-primary-python",
+                    "name": "Expose primary python .so",
+                    "id": "expose-primary-python-so",
                     "run": dedent(
                         f"""\
                 LD_LIBRARY_PATH="${{LD_LIBRARY_PATH}}:$(realpath $(which python${PYTHON_VERSION})/../../lib)"

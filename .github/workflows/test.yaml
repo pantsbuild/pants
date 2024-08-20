@@ -33,8 +33,8 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.9'
-    - id: expose-primary-python
-      name: Expose primary python
+    - id: expose-primary-python-so
+      name: Expose primary python .so
       run: 'LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:$(realpath $(which python$3.9)/../../lib)"
 
         echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> $GITHUB_ENV
@@ -356,12 +356,10 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
-    - env:
-        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+    - env: {}
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
-    - env:
-        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+    - env: {}
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -740,8 +738,7 @@ jobs:
     - id: set_merge_ok
       run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
   test_python_linux_arm64:
-    env:
-      PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+    env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-ARM64)
     needs:
@@ -767,8 +764,8 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.9'
-    - id: expose-primary-python
-      name: Expose primary python
+    - id: expose-primary-python-so
+      name: Expose primary python .so
       run: 'LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:$(realpath $(which python$3.9)/../../lib)"
 
         echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> $GITHUB_ENV
