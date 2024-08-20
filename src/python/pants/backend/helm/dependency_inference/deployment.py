@@ -279,7 +279,7 @@ class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
 @rule(desc="Find the dependencies needed by a Helm deployment")
 async def inject_deployment_dependencies(
     request: InferHelmDeploymentDependenciesRequest,
-    subsytem: HelmSubsystem,
+    infer_subsystem: HelmInferSubsystem,
 ) -> InferredDependencies:
     get_address = Get(Address, AddressInput, request.field_set.chart.to_address_input())
     get_explicit_deps = Get(
@@ -287,7 +287,7 @@ async def inject_deployment_dependencies(
         DependenciesRequest(request.field_set.dependencies),
     )
 
-    if subsytem.infer_docker_image_dependencies:
+    if infer_subsystem.deployment_dependencies:
         chart_address, explicitly_provided_deps, mapping = await MultiGet(
             get_address,
             get_explicit_deps,
