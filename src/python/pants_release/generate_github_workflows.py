@@ -84,6 +84,8 @@ class Platform(Enum):
 
 GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS12_X86_64}
 SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
+# We control these runners, so we preinstall and expose python on them.
+HAS_PYTHON = {Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
@@ -565,17 +567,13 @@ class Helper:
 
     def setup_primary_python(self) -> Sequence[Step]:
         ret = []
-        # We pre-install Python on our self-hosted platforms.
-        # We must set it up on Github-hosted platforms.
-        if self.platform in GITHUB_HOSTED:
+        if self.platform not in HAS_PYTHON:
             ret.append(install_python(PYTHON_VERSION))
         return ret
 
     def expose_all_pythons(self) -> Sequence[Step]:
         ret = []
-        # Self-hosted runners already have all relevant pythons exposed on their PATH, so we
-        # only use this action on the GitHub-hosted platforms.
-        if self.platform in GITHUB_HOSTED:
+        if self.platform not in HAS_PYTHON:
             ret.append(
                 {
                     "name": "Expose Pythons",
