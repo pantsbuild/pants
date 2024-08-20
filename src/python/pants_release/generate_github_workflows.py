@@ -26,11 +26,7 @@ def action(name: str, node16_compat: bool = False) -> str:
     # binaries for node >= v17.
     if node16_compat:
         version_map = {
-            # Force v3.0.2 rather than later v3 versions, to
-            # work around https://github.com/actions/checkout/issues/956.
-            # TODO: Relying on stale versions of actions is not sustainable, we will need to
-            # figure out a better solution for manylinux_2014.
-            "checkout": "actions/checkout@v3.0.2",
+            "checkout": "actions/checkout@v3",
             "upload-artifact": "actions/upload-artifact@v3",
             "setup-go": "actions/setup-go@v4",
         }
@@ -612,9 +608,8 @@ class Helper:
                 "name": "Bootstrap Pants",
                 # Check for a regression of https://github.com/pantsbuild/pants/issues/17470.
                 "run": self.wrap_cmd(
-                    "sleep 3600"
-                    #f"./pants version > {gha_expr('runner.temp')}/_pants_version.stdout && "
-                    #f"[[ -s {gha_expr('runner.temp')}/_pants_version.stdout ]]"
+                    f"./pants version > {gha_expr('runner.temp')}/_pants_version.stdout && "
+                    f"[[ -s {gha_expr('runner.temp')}/_pants_version.stdout ]]"
                 ),
             },
             {
@@ -782,7 +777,7 @@ def test_jobs(
             + ["--", "-m", "platform_specific_behavior"]
         )
     pants_args = ["./pants"] + pants_args
-    pants_args_str = " ".join(pants_args) + " || sleep 3600 " + "\n"
+    pants_args_str = " ".join(pants_args) + "\n"
 
     return {
         "name": human_readable_job_name,
@@ -889,7 +884,9 @@ def build_wheels_job(
     elif platform == Platform.LINUX_ARM64:
         # Unfortunately Equinix do not support the CentOS 7 image on the hardware we've been
         # generously given by the Works on ARM program. So we have to build in this image.
-        container = {"image": "ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf"}
+        # TODO: We're no longer on that hardware, so figure out if this is still necessary.
+        #container = {"image": "ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf"}
+        container = {"image": "quay.io/pypa/manylinux2014_aarch64:latest"}
     else:
         container = None
 

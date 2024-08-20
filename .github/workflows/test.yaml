@@ -75,7 +75,7 @@ jobs:
 
           src/python/pants/engine/internals/native_engine.so.metadata'
     - name: Bootstrap Pants
-      run: sleep 3600
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
       run: './pants list ::
 
@@ -113,7 +113,7 @@ jobs:
     timeout-minutes: 60
   build_wheels_linux_arm64:
     container:
-      image: ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf
+      image: quay.io/pypa/manylinux2014_aarch64:latest
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       MODE: debug
@@ -132,7 +132,7 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v3.0.2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -304,7 +304,9 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - name: Run Python tests
-      run: "./pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior || sleep 3600 \n"
+      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
+
+        '
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

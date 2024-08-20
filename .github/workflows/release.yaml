@@ -6,7 +6,7 @@
 jobs:
   build_wheels_linux_arm64:
     container:
-      image: ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf
+      image: quay.io/pypa/manylinux2014_aarch64:latest
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -23,7 +23,7 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v3.0.2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
