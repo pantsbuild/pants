@@ -69,7 +69,7 @@ Use [layout](../../../reference/targets/python_aws_lambda_function.mdx#layout) t
 
 When building an Lambda artifact, Pants and the underlying Pex tool need to know details about target runtime to be able to choose appropriate artifacts for third-party dependencies that have native code. These details can be inferred or provided in three ways, from highest precedence to lowest precedence:
 
-1. An explicit value for [the `complete_platforms` field](../../../reference/targets/python_aws_lambda_function.mdx#complete_platforms). The "complete platforms" are the underlying source of truth. For instructions on how to generate these files for Lambda, refer to [Update or create FaaS platforms files](../../contributions/development/maintenance-tasks-and-scripts.mdx#aws-lambda).
+1. An explicit value for [the `complete_platforms` field](../../../reference/targets/python_aws_lambda_function.mdx#complete_platforms). The "complete platforms" are the underlying source of truth.
     ```python title="BUILD"
     file(name="lambda-platform", source="lambda-platform.json")
 
@@ -81,7 +81,7 @@ When building an Lambda artifact, Pants and the underlying Pex tool need to know
     )
     ```
 
-    Alternatively, if the update script doesn't work, then the only way to generate the `complete_platforms` file might be to run a cloud function and output the file contents. For Lambda, a handler to generate the file might look like this:
+    You can generate the `complete_platforms` file for a specific Lambda runtime by running the below cloud function and outputting its file contents. For Lambda, a handler to generate the file might look like this:
 
    ```python
    import subprocess
@@ -90,12 +90,12 @@ When building an Lambda artifact, Pants and the underlying Pex tool need to know
    def lambda_handler(event, context):
        subprocess.run("pip install --target=/tmp/pex pex", shell=True)
        result = subprocess.run(
-           "PYTHONPATH=/tmp/pex /tmp/pex/bin/pex3 interpreter inspect --markers --tags",
+           "PYTHONPATH=/tmp/pex /tmp/pex/bin/pex3 interpreter inspect --markers --tags --indent=2",
            shell=True, capture_output=True, text=True
        )
        return {
            "statusCode": 200,
-           "body": json.dumps(json.loads(result.stdout), indent=2)
+           "body": result.stdout,
        }
    ```
 
