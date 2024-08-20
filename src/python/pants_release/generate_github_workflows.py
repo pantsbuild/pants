@@ -455,7 +455,7 @@ class Helper:
             ret += [
                 "runs-on",
                 "runner=4cpu-linux-arm64",
-                "image=gha-runner-ubuntu-arm64",
+                "image=ubuntu22-full-arm64-python3.9",
                 "run-id=${{ github.run_id }}",
             ]
         else:
