@@ -132,7 +132,7 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v3.0.2
       with:
         fetch-depth: 10
     - name: Configure Git

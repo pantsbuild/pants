@@ -26,7 +26,11 @@ def action(name: str, node16_compat: bool = False) -> str:
     # binaries for node >= v17.
     if node16_compat:
         version_map = {
-            "checkout": "actions/checkout@v3",
+            # Force v3.0.2 rather than later v3 versions, to
+            # work around https://github.com/actions/checkout/issues/956.
+            # TODO: Relying on stale versions of actions is not sustainable, we will need to
+            # figure out a better solution for manylinux_2014.
+            "checkout": "actions/checkout@v3.0.2",
             "upload-artifact": "actions/upload-artifact@v3",
             "setup-go": "actions/setup-go@v4",
         }
