@@ -450,7 +450,7 @@ class Helper:
         elif self.platform == Platform.LINUX_X86_64:
             ret += ["ubuntu-20.04"]
         elif self.platform == Platform.LINUX_ARM64:
-            ret += ["Linux", "ARM64"]
+            ret += ["runs-on", "runner=4cpu-linux-arm64", "run-id=${{ github.run_id }}"]
         else:
             raise ValueError(f"Unsupported platform: {self.platform_name()}")
         return ret
@@ -474,14 +474,6 @@ class Helper:
             # TODO: If we add a "redo timed out tests" feature, we can kill this.
             ret["PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM"] = "1"
         return ret
-
-    def maybe_append_cargo_test_parallelism(self, cmd: str) -> str:
-        if self.platform == Platform.LINUX_ARM64:
-            # TODO: The ARM64 runner has enough cores to reliably trigger #18191 using
-            # our default settings. We lower parallelism here as a bandaid to work around
-            # #18191 until it can be resolved.
-            return f"{cmd} --test-threads=8"
-        return cmd
 
     def wrap_cmd(self, cmd: str) -> str:
         if self.platform == Platform.MACOS11_ARM64:
@@ -689,11 +681,7 @@ def bootstrap_jobs(
         # We pass --tests to skip doc tests because our generated protos contain
         # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
         # pass on GHA MacOS containers.
-        step_cmd = helper.wrap_cmd(
-            helper.maybe_append_cargo_test_parallelism(
-                "./cargo test --locked --tests -- --nocapture"
-            )
-        )
+        step_cmd = helper.wrap_cmd("./cargo test --locked --tests -- --nocapture")
     elif rust_testing == RustTesting.ALL:
         human_readable_job_name += ", test and lint Rust"
         human_readable_step_name = "Test and lint Rust"
@@ -703,9 +691,7 @@ def bootstrap_jobs(
         step_cmd = "\n".join(
             [
                 "./build-support/bin/check_rust_pre_commit.sh",
-                helper.maybe_append_cargo_test_parallelism(
-                    "./cargo test --locked --all --tests --benches -- --nocapture"
-                ),
+                "./cargo test --locked --all --tests --benches -- --nocapture",
                 "./cargo doc",
             ]
         )

@@ -7,8 +7,9 @@ jobs:
   clean_linux_arm64:
     runs-on:
     - self-hosted
-    - Linux
-    - ARM64
+    - runs-on
+    - runner=4cpu-linux-arm64
+    - run-id=${{ github.run_id }}
     steps:
     - name: df before
       run: df -h

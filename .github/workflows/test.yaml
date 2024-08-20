@@ -20,8 +20,9 @@ jobs:
     - classify_changes
     runs-on:
     - self-hosted
-    - Linux
-    - ARM64
+    - runs-on
+    - runner=4cpu-linux-arm64
+    - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -99,7 +100,7 @@ jobs:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
-      run: ./cargo test --locked --tests -- --nocapture --test-threads=8
+      run: ./cargo test --locked --tests -- --nocapture
     timeout-minutes: 60
   bootstrap_pants_linux_x86_64:
     env:
@@ -312,8 +313,9 @@ jobs:
     - classify_changes
     runs-on:
     - self-hosted
-    - Linux
-    - ARM64
+    - runs-on
+    - runner=4cpu-linux-arm64
+    - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -733,8 +735,9 @@ jobs:
     - classify_changes
     runs-on:
     - self-hosted
-    - Linux
-    - ARM64
+    - runs-on
+    - runner=4cpu-linux-arm64
+    - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
       uses: actions/checkout@v4
