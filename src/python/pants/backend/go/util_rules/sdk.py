@@ -112,25 +112,17 @@ async def setup_go_sdk_process(
     request: GoSdkProcess,
     go_sdk_run: GoSdkRunSetup,
     bash: BashBinary,
-    git: GitBinary,
     golang_env_aware: GolangSubsystem.EnvironmentAware,
     goroot: GoRoot,
 ) -> Process:
-    binary_shims_get = Get(
-        BinaryShims,
-        BinaryShimsRequest,
-        BinaryShimsRequest.for_paths(
-            git,
-            rationale="run `git` for private go module download",
-        ),
-    )
-    input_digest, env_vars, binary_shims = await MultiGet(
+    search_path = golang_env_aware.executable_search_path
+
+    input_digest, env_vars = await MultiGet(
         Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest])),
         Get(
             EnvironmentVars,
             EnvironmentVarsRequest(golang_env_aware.env_vars_to_pass_to_subprocesses),
         ),
-        binary_shims_get,
     )
 
     env = {
@@ -138,8 +130,30 @@ async def setup_go_sdk_process(
         **request.env,
         GoSdkRunSetup.CHDIR_ENV: request.working_dir or "",
         "__PANTS_GO_SDK_CACHE_KEY": f"{goroot.full_version}/{goroot.goos}/{goroot.goarch}",
-        "PATH": binary_shims.path_component,
     }
+
+    immutable_input_digests = {}
+
+    # Add path to additional tools, such as git, that may be needed by the go tool
+    if golang_env_aware.extra_tools:
+        extra_tools = await Get(
+            BinaryShims,
+            BinaryShimsRequest,
+            BinaryShimsRequest.for_binaries(
+                *golang_env_aware.extra_tools,
+                rationale="allow additional tools for go tools",
+                search_path=search_path,
+            ),
+        )
+        # Append path to additional tools
+        if "PATH" in env:
+            env["PATH"] = f"{extra_tools.path_component}:{env['PATH']}"
+        else:
+            env["PATH"] = extra_tools.path_component
+        immutable_input_digests = {
+            **immutable_input_digests,
+            **extra_tools.immutable_input_digests,
+        }
 
     if request.replace_sandbox_root_in_args:
         env[GoSdkRunSetup.SANDBOX_ROOT_ENV] = "1"
@@ -156,7 +170,7 @@ async def setup_go_sdk_process(
     return Process(
         argv=[bash.path, go_sdk_run.script.path, *request.command],
         env=env,
-        immutable_input_digests=binary_shims.immutable_input_digests,
+        immutable_input_digests=immutable_input_digests,
         input_digest=input_digest,
         description=request.description,
         output_files=request.output_files,

@@ -7,6 +7,7 @@ import logging
 import os
 
 from pants.core.util_rules.asdf import AsdfPathString
+from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -23,7 +24,7 @@ class GolangSubsystem(Subsystem):
     options_scope = "golang"
     help = "Options for Golang support."
 
-    class EnvironmentAware(Subsystem.EnvironmentAware):
+    class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
         env_vars_used_by_options = ("PATH",)
 
         _go_search_paths = StrListOption(
@@ -69,6 +70,18 @@ class GolangSubsystem(Subsystem):
                 * `<PATH>`, the contents of the PATH environment variable
                 """
             ),
+        )
+
+        _extra_tools = StrListOption(
+            default=[],
+            help=softwrap(
+                """
+                List any additional executable tools required for the `go` tool to work.
+                The paths to these tools will be included in the PATH used in the execution sandbox.
+                E.g. `go mod download` may require the `git` tool to download private modules.
+                """
+            ),
+            advanced=True,
         )
 
         cgo_gcc_binary_name = StrOption(
@@ -163,6 +176,12 @@ class GolangSubsystem(Subsystem):
             ),
         )
 
+        executable_search_paths_help = softwrap(
+            """
+            The PATH value that will be used to find any extra tools required by `go` tooling.
+            """
+        )
+
         @property
         def raw_go_search_paths(self) -> tuple[str, ...]:
             return tuple(self._go_search_paths)
@@ -183,6 +202,10 @@ class GolangSubsystem(Subsystem):
                         yield entry
 
             return tuple(OrderedSet(iter_path_entries()))
+
+        @property
+        def extra_tools(self) -> tuple[str, ...]:
+            return tuple(sorted(set(self._extra_tools)))
 
     minimum_expected_version = StrOption(
         default="1.17",
