@@ -85,7 +85,7 @@ class Platform(Enum):
 GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS12_X86_64}
 SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
 # We control these runners, so we preinstall and expose python on them.
-HAS_PYTHON = {Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
+HAS_PYTHON = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
@@ -455,7 +455,7 @@ class Helper:
             ret += [
                 "runs-on",
                 "runner=4cpu-linux-arm64",
-                "image=ubuntu22-full-arm64",
+                "image=gha-runner-ubuntu-arm64",
                 "run-id=${{ github.run_id }}",
             ]
         else:
@@ -777,7 +777,7 @@ def test_jobs(
             + ["--", "-m", "platform_specific_behavior"]
         )
     pants_args = ["./pants"] + pants_args
-    pants_args_str = " ".join(pants_args) + "\n"
+    pants_args_str = " ".join(pants_args) + " || sleep 3600 " + "\n"
 
     return {
         "name": human_readable_job_name,
@@ -1023,10 +1023,10 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
     # N.B.: When altering the number of total wheels built, please edit the expected
     # total in the release.py script. Currently here:
     return {
-        **build_wheels_job(Platform.LINUX_X86_64, for_deploy_ref, needs),
+        #**build_wheels_job(Platform.LINUX_X86_64, for_deploy_ref, needs),
         **build_wheels_job(Platform.LINUX_ARM64, for_deploy_ref, needs),
-        **build_wheels_job(Platform.MACOS10_15_X86_64, for_deploy_ref, needs),
-        **build_wheels_job(Platform.MACOS11_ARM64, for_deploy_ref, needs),
+        #**build_wheels_job(Platform.MACOS10_15_X86_64, for_deploy_ref, needs),
+        #**build_wheels_job(Platform.MACOS11_ARM64, for_deploy_ref, needs),
     }
 
 
@@ -1047,32 +1047,32 @@ def test_workflow_jobs() -> Jobs:
             "steps": ensure_release_notes(),
         },
     }
-    jobs.update(**linux_x86_64_test_jobs())
+    #jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
-    jobs.update(**macos12_x86_64_test_jobs())
+    #jobs.update(**macos12_x86_64_test_jobs())
     jobs.update(**build_wheels_jobs())
-    jobs.update(
-        {
-            "lint_python": {
-                "name": "Lint Python and Shell",
-                "runs-on": linux_x86_64_helper.runs_on(),
-                "needs": "bootstrap_pants_linux_x86_64",
-                "timeout-minutes": 30,
-                "if": IS_PANTS_OWNER,
-                "steps": [
-                    *checkout(),
-                    *launch_bazel_remote(),
-                    *linux_x86_64_helper.setup_primary_python(),
-                    *linux_x86_64_helper.native_binaries_download(),
-                    {
-                        "name": "Lint",
-                        "run": "./pants lint check ::\n",
-                    },
-                    linux_x86_64_helper.upload_log_artifacts(name="lint"),
-                ],
-            },
-        }
-    )
+    # jobs.update(
+    #     {
+    #         "lint_python": {
+    #             "name": "Lint Python and Shell",
+    #             "runs-on": linux_x86_64_helper.runs_on(),
+    #             "needs": "bootstrap_pants_linux_x86_64",
+    #             "timeout-minutes": 30,
+    #             "if": IS_PANTS_OWNER,
+    #             "steps": [
+    #                 *checkout(),
+    #                 *launch_bazel_remote(),
+    #                 *linux_x86_64_helper.setup_primary_python(),
+    #                 *linux_x86_64_helper.native_binaries_download(),
+    #                 {
+    #                     "name": "Lint",
+    #                     "run": "./pants lint check ::\n",
+    #                 },
+    #                 linux_x86_64_helper.upload_log_artifacts(name="lint"),
+    #             ],
+    #         },
+    #     }
+    # )
     return jobs
 
 

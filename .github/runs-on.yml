@@ -1,0 +1,5 @@
+images:
+  otherimage gha-runner-ubuntu-arm64:
+    platform: "linux"
+    arch: "arm64"
+    ami: "ami-02ecabb49017dbdf8"
