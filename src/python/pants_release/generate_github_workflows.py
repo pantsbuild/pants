@@ -574,6 +574,16 @@ class Helper:
         ret = []
         if self.platform not in HAS_PYTHON:
             ret.append(install_python(PYTHON_VERSION))
+        if self.platform == Platform.LINUX_ARM64:
+            ret.append({
+                "name": "Expose primary python",
+                "id": "expose-primary-python",
+                "run": dedent(f"""\
+                LD_LIBRARY_PATH="${{LD_LIBRARY_PATH}}:$(realpath $(which python${PYTHON_VERSION})/../../lib)"
+                echo "LD_LIBRARY_PATH=${{LD_LIBRARY_PATH}}" >> $GITHUB_ENV
+                """),
+                "shell": "bash",
+            },)
         return ret
 
     def expose_all_pythons(self) -> Sequence[Step]:
@@ -591,7 +601,6 @@ class Helper:
         return [
             *checkout(),
             *self.setup_primary_python(),
-            *self.expose_all_pythons(),
             *self.bootstrap_caches(),
             {
                 "name": "Bootstrap Pants",
