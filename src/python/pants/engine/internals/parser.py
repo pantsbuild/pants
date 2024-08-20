@@ -67,8 +67,13 @@ class BuildFilePreludeSymbols(BuildFileSymbolsInfo):
     @classmethod
     def create(cls, ns: Mapping[str, Any], env_vars: Iterable[str]) -> BuildFilePreludeSymbols:
         info = {}
-        annotations = ns.get("__annotations__", {})
+        annotations_name = "__annotations__"
+        annotations = ns.get(annotations_name, {})
         for name, symb in ns.items():
+            if name == annotations_name:
+                # don't include the annotations themselves as a symbol
+                continue
+
             # We only need type hints via `annotations` for top-level values which doesn't work with `inspect`.
             info[name] = BuildFileSymbolInfo(name, symb, type_hints=annotations.get(name))
         return cls(info=FrozenDict(info), referenced_env_vars=tuple(sorted(env_vars)))
