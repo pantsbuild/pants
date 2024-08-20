@@ -450,7 +450,7 @@ class Helper:
         elif self.platform == Platform.LINUX_X86_64:
             ret += ["ubuntu-20.04"]
         elif self.platform == Platform.LINUX_ARM64:
-            ret += ["runs-on", "runner=4cpu-linux-arm64", "run-id=${{ github.run_id }}"]
+            ret += ["runs-on", "runner=4cpu-linux-arm64", "image=ubuntu22-full-arm64", "run-id=${{ github.run_id }}"]
         else:
             raise ValueError(f"Unsupported platform: {self.platform_name()}")
         return ret

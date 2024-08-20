@@ -22,6 +22,7 @@ jobs:
     - self-hosted
     - runs-on
     - runner=4cpu-linux-arm64
+    - image=ubuntu22-full-arm64
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
@@ -315,6 +316,7 @@ jobs:
     - self-hosted
     - runs-on
     - runner=4cpu-linux-arm64
+    - image=ubuntu22-full-arm64
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
@@ -737,6 +739,7 @@ jobs:
     - self-hosted
     - runs-on
     - runner=4cpu-linux-arm64
+    - image=ubuntu22-full-arm64
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
