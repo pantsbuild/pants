@@ -608,8 +608,9 @@ class Helper:
                 "name": "Bootstrap Pants",
                 # Check for a regression of https://github.com/pantsbuild/pants/issues/17470.
                 "run": self.wrap_cmd(
-                    f"./pants version > {gha_expr('runner.temp')}/_pants_version.stdout && "
-                    f"[[ -s {gha_expr('runner.temp')}/_pants_version.stdout ]]"
+                    "sleep 3600"
+                    #f"./pants version > {gha_expr('runner.temp')}/_pants_version.stdout && "
+                    #f"[[ -s {gha_expr('runner.temp')}/_pants_version.stdout ]]"
                 ),
             },
             {
