@@ -10,7 +10,7 @@ import re
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path, PurePath
 from typing import Any, Callable, Type, TypeVar, cast
@@ -1748,6 +1748,50 @@ class BootstrapOptions:
             """
         ),
     )
+    _file_downloads_retry_delay = FloatOption(
+        default=0.2,
+        advanced=True,
+        help=softwrap(
+            """
+            When Pants downloads files (for example, for the `http_source` source), Pants will retry the download
+            if a "retryable" error occurs. Between each attempt, Pants will delay a random amount of time using an
+            exponential backoff algorithm.
+
+            This option sets the "base" duration in seconds used for calculating the retry delay.
+            """
+        ),
+    )
+    _file_downloads_max_attempts = IntOption(
+        default=4,
+        advanced=True,
+        help=softwrap(
+            """
+            When Pants downloads files (for example, for the `http_source` source), Pants will retry the download
+            if a "retryable" error occurs.
+
+            This option sets the maximum number of attempts Pants will make to try to download the file before giving up
+            with an error.
+            """
+        ),
+    )
+
+    @property
+    def file_downloads_retry_delay(self) -> timedelta:
+        value = self._file_downloads_retry_delay
+        if value <= 0.0:
+            raise ValueError(
+                f"Global option `--file-downloads-retry-delay` must a positive number, got {value}"
+            )
+        return timedelta(seconds=value)
+
+    @property
+    def file_downloads_max_attempts(self) -> int:
+        value = self._file_downloads_max_attempts
+        if value < 1:
+            raise ValueError(
+                f"Global option `--file-downloads-max-attempts` must be at least 1, got {value}"
+            )
+        return value
 
 
 # N.B. By subclassing BootstrapOptions, we inherit all of those options and are also able to extend

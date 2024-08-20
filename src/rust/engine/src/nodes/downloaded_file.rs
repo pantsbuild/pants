@@ -2,7 +2,9 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::BTreeMap;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
+use std::time::Duration;
 
 use bytes::Bytes;
 use deepsize::DeepSizeOf;
@@ -42,6 +44,8 @@ impl DownloadedFile {
         url: Url,
         auth_headers: BTreeMap<String, String>,
         digest: hashing::Digest,
+        retry_delay_duration: Duration,
+        max_attempts: NonZeroUsize,
     ) -> Result<store::Snapshot, String> {
         let file_name = url
             .path_segments()
@@ -79,6 +83,8 @@ impl DownloadedFile {
                 auth_headers,
                 file_name,
                 digest,
+                retry_delay_duration,
+                max_attempts,
             )
             .await?;
             // The value was successfully fetched and matched the digest: record in the ObservedUrls
@@ -89,24 +95,41 @@ impl DownloadedFile {
     }
 
     pub(super) async fn run_node(self, context: Context) -> NodeResult<store::Snapshot> {
-        let (url_str, expected_digest, auth_headers) = Python::with_gil(|py| {
-            let py_download_file_val = self.0.to_value();
-            let py_download_file = (*py_download_file_val).as_ref(py);
-            let url_str: String = externs::getattr(py_download_file, "url")
-                .map_err(|e| format!("Failed to get `url` for field: {e}"))?;
-            let auth_headers =
-                externs::getattr_from_str_frozendict(py_download_file, "auth_headers");
-            let py_file_digest: PyFileDigest =
-                externs::getattr(py_download_file, "expected_digest")?;
-            let res: NodeResult<(String, Digest, BTreeMap<String, String>)> =
-                Ok((url_str, py_file_digest.0, auth_headers));
-            res
-        })?;
+        let (url_str, expected_digest, auth_headers, retry_delay_duration, max_attempts) =
+            Python::with_gil(|py| {
+                let py_download_file_val = self.0.to_value();
+                let py_download_file = (*py_download_file_val).as_ref(py);
+                let url_str: String = externs::getattr(py_download_file, "url")
+                    .map_err(|e| format!("Failed to get `url` for field: {e}"))?;
+                let auth_headers =
+                    externs::getattr_from_str_frozendict(py_download_file, "auth_headers");
+                let py_file_digest: PyFileDigest =
+                    externs::getattr(py_download_file, "expected_digest")?;
+                let retry_delay_duration: Duration =
+                    externs::getattr(py_download_file, "retry_error_duration")?;
+                let max_attempts: NonZeroUsize =
+                    externs::getattr(py_download_file, "max_attempts")?;
+                Ok::<_, String>((
+                    url_str,
+                    py_file_digest.0,
+                    auth_headers,
+                    retry_delay_duration,
+                    max_attempts,
+                ))
+            })?;
+
         let url = Url::parse(&url_str)
             .map_err(|err| throw(format!("Error parsing URL {url_str}: {err}")))?;
-        self.load_or_download(context.core.clone(), url, auth_headers, expected_digest)
-            .await
-            .map_err(throw)
+        self.load_or_download(
+            context.core.clone(),
+            url,
+            auth_headers,
+            expected_digest,
+            retry_delay_duration,
+            max_attempts,
+        )
+        .await
+        .map_err(throw)
     }
 }
 
