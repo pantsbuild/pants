@@ -572,20 +572,6 @@ class Helper:
         ret = []
         if self.platform not in HAS_PYTHON:
             ret.append(install_python(PYTHON_VERSION))
-        if self.platform == Platform.LINUX_ARM64:
-            ret.append(
-                {
-                    "name": "Expose primary python .so",
-                    "id": "expose-primary-python-so",
-                    "run": dedent(
-                        f"""\
-                LD_LIBRARY_PATH="${{LD_LIBRARY_PATH}}:$(realpath $(which python${PYTHON_VERSION})/../../lib)"
-                echo "LD_LIBRARY_PATH=${{LD_LIBRARY_PATH}}" >> $GITHUB_ENV
-                """
-                    ),
-                    "shell": "bash",
-                },
-            )
         return ret
 
     def expose_all_pythons(self) -> Sequence[Step]:
@@ -1021,10 +1007,10 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
     # N.B.: When altering the number of total wheels built, please edit the expected
     # total in the release.py script. Currently here:
     return {
-        #**build_wheels_job(Platform.LINUX_X86_64, for_deploy_ref, needs),
+        **build_wheels_job(Platform.LINUX_X86_64, for_deploy_ref, needs),
         **build_wheels_job(Platform.LINUX_ARM64, for_deploy_ref, needs),
-        #**build_wheels_job(Platform.MACOS10_15_X86_64, for_deploy_ref, needs),
-        #**build_wheels_job(Platform.MACOS11_ARM64, for_deploy_ref, needs),
+        **build_wheels_job(Platform.MACOS10_15_X86_64, for_deploy_ref, needs),
+        **build_wheels_job(Platform.MACOS11_ARM64, for_deploy_ref, needs),
     }
 
 
@@ -1045,32 +1031,32 @@ def test_workflow_jobs() -> Jobs:
             "steps": ensure_release_notes(),
         },
     }
-    #jobs.update(**linux_x86_64_test_jobs())
+    jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
-    #jobs.update(**macos12_x86_64_test_jobs())
+    jobs.update(**macos12_x86_64_test_jobs())
     jobs.update(**build_wheels_jobs())
-    # jobs.update(
-    #     {
-    #         "lint_python": {
-    #             "name": "Lint Python and Shell",
-    #             "runs-on": linux_x86_64_helper.runs_on(),
-    #             "needs": "bootstrap_pants_linux_x86_64",
-    #             "timeout-minutes": 30,
-    #             "if": IS_PANTS_OWNER,
-    #             "steps": [
-    #                 *checkout(),
-    #                 *launch_bazel_remote(),
-    #                 *linux_x86_64_helper.setup_primary_python(),
-    #                 *linux_x86_64_helper.native_binaries_download(),
-    #                 {
-    #                     "name": "Lint",
-    #                     "run": "./pants lint check ::\n",
-    #                 },
-    #                 linux_x86_64_helper.upload_log_artifacts(name="lint"),
-    #             ],
-    #         },
-    #     }
-    # )
+    jobs.update(
+        {
+            "lint_python": {
+                "name": "Lint Python and Shell",
+                "runs-on": linux_x86_64_helper.runs_on(),
+                "needs": "bootstrap_pants_linux_x86_64",
+                "timeout-minutes": 30,
+                "if": IS_PANTS_OWNER,
+                "steps": [
+                    *checkout(),
+                    *launch_bazel_remote(),
+                    *linux_x86_64_helper.setup_primary_python(),
+                    *linux_x86_64_helper.native_binaries_download(),
+                    {
+                        "name": "Lint",
+                        "run": "./pants lint check ::\n",
+                    },
+                    linux_x86_64_helper.upload_log_artifacts(name="lint"),
+                ],
+            },
+        }
+    )
     return jobs
 
 

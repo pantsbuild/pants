@@ -190,7 +190,6 @@ extra_env_vars = [
   "PYENV_ROOT",
   "HOME",
   "PATH",
-  "LD_LIBRARY_PATH",
   # We'd always like complete backtraces in tests.
   "RUST_BACKTRACE=1",
 ]
