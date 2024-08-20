@@ -284,7 +284,12 @@ def test_get_all_help_info():
         UnionMembership({}),
         fake_consumed_scopes_mapper,
         RegisteredTargetTypes({BazLibrary.alias: BazLibrary}),
-        BuildFileSymbolsInfo.from_info((BuildFileSymbolInfo("dummy", rule_info_test),)),
+        BuildFileSymbolsInfo.from_info(
+            (
+                BuildFileSymbolInfo("dummy", rule_info_test),
+                BuildFileSymbolInfo("private", 1, hide_from_help=True),
+            )
+        ),
         bc_builder.create(),
     )
 

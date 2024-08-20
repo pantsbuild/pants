@@ -350,22 +350,33 @@ def test_prelude_docstring_on_constant() -> None:
         """
     )
     result = run_prelude_parsing_rule(prelude_content)
-    assert {"MACRO_CONST", "ANON", "Number", "MULTI_HINTS", "untyped"} == set(result.info)
+    assert {"MACRO_CONST", "ANON", "Number", "MULTI_HINTS", "_PRIVATE", "untyped"} == set(
+        result.info
+    )
 
     info = result.info["MACRO_CONST"]
     assert info.value == "value"
     assert info.help == softwrap(macro_docstring)
     assert info.signature == ": str"
+    assert info.hide_from_help is False
 
     multi = result.info["MULTI_HINTS"]
     assert multi.value == 42
     assert multi.help == "this is it"
     assert multi.signature == ": Number"
+    assert multi.hide_from_help is False
 
     anon = result.info["ANON"]
     assert anon.value == "undocumented"
     assert anon.help is None
     assert anon.signature == ": str"
+    assert anon.hide_from_help is False
+
+    private = result.info["_PRIVATE"]
+    assert private.value == 42
+    assert private.help is None
+    assert private.signature == ": int"
+    assert private.hide_from_help is True
 
 
 def test_prelude_reference_env_vars() -> None:

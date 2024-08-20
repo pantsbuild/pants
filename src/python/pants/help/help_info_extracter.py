@@ -989,6 +989,9 @@ class HelpInfoExtracter:
             {
                 symbol.name: get_build_file_symbol_help_info_loader(symbol)
                 for symbol in build_symbols.info.values()
+                # (NB. we don't just check name.startswith("_") because there's symbols like
+                # __default__ that should appear in help & docs)
+                if not symbol.hide_from_help
             }
         )
 
