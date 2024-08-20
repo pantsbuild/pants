@@ -1749,6 +1749,20 @@ class BootstrapOptions:
         ),
     )
 
+    allow_deprecated_macos_before_12 = BoolOption(
+        default=False,
+        advanced=True,
+        help=softwrap(
+            f"""
+            Silence warnings about running Pants on macOS 10.15 - 11. In future versions, Pants will
+            only be supported on macOS 12 and newer.
+
+            If you have questions or concerns about this, please reach out to us at
+            {doc_url("community/getting-help")}.
+            """
+        ),
+    )
+
 
 # N.B. By subclassing BootstrapOptions, we inherit all of those options and are also able to extend
 # it with non-bootstrap options too.
