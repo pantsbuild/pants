@@ -455,7 +455,7 @@ class Helper:
             ret += [
                 "runs-on",
                 "runner=4cpu-linux-arm64",
-                "image=ubuntu22-full-arm64-python3.9",
+                "image=ubuntu22-full-arm64-python3.7-python3.8-python3.9",
                 "run-id=${{ github.run_id }}",
             ]
         else:
@@ -882,10 +882,6 @@ def build_wheels_job(
     if platform == Platform.LINUX_X86_64:
         container = {"image": "quay.io/pypa/manylinux2014_x86_64:latest"}
     elif platform == Platform.LINUX_ARM64:
-        # Unfortunately Equinix do not support the CentOS 7 image on the hardware we've been
-        # generously given by the Works on ARM program. So we have to build in this image.
-        # TODO: We're no longer on that hardware, so figure out if this is still necessary.
-        #container = {"image": "ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf"}
         container = {"image": "quay.io/pypa/manylinux2014_aarch64:latest"}
     else:
         container = None
