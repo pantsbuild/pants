@@ -400,9 +400,28 @@ def goal_rule(*args, **kwargs):
     return inner_rule(*args, **kwargs, rule_type=RuleType.goal_rule, cacheable=False)
 
 
+@overload
+def _uncacheable_rule(
+    func: Callable[P, Coroutine[Any, Any, R]]
+) -> Callable[P, Coroutine[Any, Any, R]]:
+    ...
+
+
+@overload
+def _uncacheable_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
+    ...
+
+
+@overload
+def _uncacheable_rule(
+    *args, func: None = None, **kwargs: Any
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]:
+    ...
+
+
 # This has a "private" name, as we don't (yet?) want it to be part of the rule API, at least
 # until we figure out the implications, and have a handle on the semantics and use-cases.
-def _uncacheable_rule(*args, **kwargs) -> AsyncRuleT | RuleDecorator:
+def _uncacheable_rule(*args, **kwargs):
     return inner_rule(*args, **kwargs, rule_type=RuleType.uncacheable_rule, cacheable=False)
 
 

@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import logging
+
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -26,7 +29,7 @@ from pants.engine.internals.native_dep_inference import (
     NativeParsedJavascriptDependencies,
     NativeParsedPythonDependencies,
 )
-from pants.engine.internals.native_engine import NativeDependenciesRequest
+from pants.engine.internals.native_engine import NativeDependenciesRequest, task_side_effected
 from pants.engine.internals.session import RunId, SessionValues
 from pants.engine.process import (
     FallibleProcessResult,
@@ -35,7 +38,8 @@ from pants.engine.process import (
     Process,
     ProcessExecutionEnvironment,
 )
-from pants.engine.rules import _uncacheable_rule, collect_rules, rule
+from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
+from pants.util.docutil import git_url
 
 
 @rule
@@ -120,11 +124,55 @@ async def run_id() -> RunId:
     return await native_engine.run_id()
 
 
+__SQUELCH_WARNING = "__squelch_warning"
+
+
+# NB: Call one of the helpers below, instead of calling this rule directly,
+#  to ensure correct application of restartable logic.
 @_uncacheable_rule
-async def interactive_process(
+async def _interactive_process(
     process: InteractiveProcess, process_execution_environment: ProcessExecutionEnvironment
 ) -> InteractiveProcessResult:
+    # This is a crafty way for a caller to signal into this function without a dedicated arg
+    # (which would confound the solver).  Note that we go via __dict__ instead of using
+    # setattr/delattr, because those error for frozen dataclasses.
+    if __SQUELCH_WARNING in process.__dict__:
+        del process.__dict__[__SQUELCH_WARNING]
+    else:
+        logging.warning(
+            "A plugin is calling `await Effect(InteractiveProcessResult, InteractiveProcess, "
+            "process)` directly. This will cause restarting logic not to be applied. "
+            "Use `await run_interactive_process(process)` or `await "
+            "run_interactive_process_in_environment(process, environment_name)` instead. "
+            f"See {git_url('src/python/pants/engine/intrinsics.py')} for more details."
+        )
     return await native_engine.interactive_process(process, process_execution_environment)
+
+
+async def run_interactive_process(process: InteractiveProcess) -> InteractiveProcessResult:
+    # NB: We must call task_side_effected() in this helper, rather than in a nested @rule call,
+    #  so that the Task for the @rule that calls this helper is the one marked as non-restartable.
+    if not process.restartable:
+        task_side_effected()
+
+    process.__dict__[__SQUELCH_WARNING] = True
+    ret: InteractiveProcessResult = await _interactive_process(process, **implicitly())
+    return ret
+
+
+async def run_interactive_process_in_environment(
+    process: InteractiveProcess, environment_name: EnvironmentName
+) -> InteractiveProcessResult:
+    # NB: We must call task_side_effected() in this helper, rather than in a nested @rule call,
+    #  so that the Task for the @rule that calls this helper is the one marked as non-restartable.
+    if not process.restartable:
+        task_side_effected()
+
+    process.__dict__[__SQUELCH_WARNING] = True
+    ret: InteractiveProcessResult = await _interactive_process(
+        process, **implicitly({environment_name: EnvironmentName})
+    )
+    return ret
 
 
 @rule

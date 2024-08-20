@@ -22,8 +22,9 @@ from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import Effect, Get, MultiGet
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.intrinsics import run_interactive_process
+from pants.engine.process import InteractiveProcess
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
@@ -177,7 +178,7 @@ async def export(
                 env={"PATH": environment.get("PATH", ""), **cmd.extra_env},
                 run_in_workspace=True,
             )
-            ipr = await Effect(InteractiveProcessResult, InteractiveProcess, ip)
+            ipr = await run_interactive_process(ip)
             if ipr.exit_code:
                 raise ExportError(f"Failed to write {result.description} to {result_dir}")
         if result.resolve:
