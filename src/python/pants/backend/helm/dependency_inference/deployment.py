@@ -300,7 +300,7 @@ async def inject_deployment_dependencies(
             await MultiGet(get_address, get_explicit_deps),
             FirstPartyHelmDeploymentMapping(
                 request.field_set.address,
-                MutableYamlIndex[Tuple[str, Address]]().frozen(),
+                FrozenYamlIndex.empty(),
             ),
         )
 
