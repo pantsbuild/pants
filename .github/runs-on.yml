@@ -1,0 +1,6 @@
+images:
+  ubuntu22-full-arm64-python3.7-python3.8-python3.9:
+    platform: "linux"
+    arch: "arm64"
+    owner: "408085265505"
+    ami: "ami-072f12824058aa801"
