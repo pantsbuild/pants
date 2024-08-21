@@ -6,7 +6,7 @@ use std::convert::Infallible;
 use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
-use std::net::TcpListener as StdTcpListener;
+use std::net::TcpListener;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -31,7 +31,7 @@ use remexec::{
     CacheCapabilities, ExecuteRequest, ExecutionCapabilities, GetActionResultRequest,
     GetCapabilitiesRequest, ServerCapabilities, UpdateActionResultRequest, WaitExecutionRequest,
 };
-use tokio::net::{TcpListener as TokioTcpListener, TcpStream};
+use tokio::net::TcpStream;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::metadata::MetadataMap;
 use tonic::transport::Server;
@@ -130,9 +130,10 @@ impl TestServer {
         let mock_responder2 = mock_responder.clone();
 
         let addr_str = format!("127.0.0.1:{}", port.unwrap_or(0));
-        let listener = StdTcpListener::bind(&addr_str).unwrap();
+        let listener = TcpListener::bind(addr_str).unwrap();
+        listener.set_nonblocking(true).unwrap();
         let local_addr = listener.local_addr().unwrap();
-        let listener = TokioTcpListener::from_std(listener).unwrap();
+        let listener = tokio::net::TcpListener::from_std(listener).unwrap();
 
         let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();
 

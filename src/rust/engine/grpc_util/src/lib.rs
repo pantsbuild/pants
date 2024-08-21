@@ -154,11 +154,11 @@ mod tests {
 
     use std::collections::BTreeMap;
     use std::convert::Infallible;
-    use std::net::TcpListener as StdTcpListener;
+    use std::time::Duration;
 
     use async_trait::async_trait;
     use futures::FutureExt;
-    use tokio::net::{TcpListener as TokioTcpListener, TcpStream};
+    use tokio::net::{TcpListener, TcpStream};
     use tokio::sync::oneshot;
     use tokio_stream::wrappers::UnboundedReceiverStream;
     use tonic::transport::Server;
@@ -168,6 +168,8 @@ mod tests {
 
     #[tokio::test]
     async fn user_agent_is_set_correctly() {
+        env_logger::init();
+
         const EXPECTED_USER_AGENT: &str = "testclient/0.0.1";
 
         #[derive(Clone)]
@@ -199,9 +201,8 @@ mod tests {
             }
         }
 
-        let listener = StdTcpListener::bind("127.0.0.1:0").unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let local_addr = listener.local_addr().unwrap();
-        let listener = TokioTcpListener::from_std(listener).unwrap();
 
         // Setup shutdown signal handler.
         let (_shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
@@ -226,6 +227,8 @@ mod tests {
                 .await
                 .unwrap();
         });
+
+        tokio::time::sleep(Duration::from_millis(500)).await;
 
         let headers = {
             let mut h = BTreeMap::new();

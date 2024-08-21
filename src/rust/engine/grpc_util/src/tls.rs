@@ -191,7 +191,7 @@ impl ServerCertVerifier for NoVerifier {
             message,
             cert,
             dss,
-            &rustls::crypto::ring::default_provider().signature_verification_algorithms,
+            &rustls::crypto::aws_lc_rs::default_provider().signature_verification_algorithms,
         )
     }
 
@@ -205,12 +205,12 @@ impl ServerCertVerifier for NoVerifier {
             message,
             cert,
             dss,
-            &rustls::crypto::ring::default_provider().signature_verification_algorithms,
+            &rustls::crypto::aws_lc_rs::default_provider().signature_verification_algorithms,
         )
     }
 
     fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
-        rustls::crypto::ring::default_provider()
+        rustls::crypto::aws_lc_rs::default_provider()
             .signature_verification_algorithms
             .supported_schemes()
     }
@@ -223,6 +223,8 @@ mod test {
 
     #[test]
     fn test_client_auth_cert_resolver_is_unconfigured_no_mtls() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
         let cert_pem = std::fs::read(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("test-certs")

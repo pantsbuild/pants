@@ -22,13 +22,7 @@ use tower_service::Service;
 #[derive(Clone, Debug)]
 pub enum Client {
     Plain(HyperClient<HttpConnector, BoxBody>),
-    Tls(
-        HyperClient<HttpsConnector<HttpConnector>, BoxBody>, // Arc<BoxService<
-                                                             //     Uri,
-                                                             //     hyper_rustls::MaybeHttpsStream<hyper_util::rt::TokioIo<tokio::net::TcpStream>>,
-                                                             //     Box<dyn Error + Send + Sync>,
-                                                             // >>,
-    ),
+    Tls(HyperClient<HttpsConnector<HttpConnector>, BoxBody>),
 }
 
 /// A communication channel which may either communicate using HTTP or HTTP over TLS. This
@@ -67,22 +61,6 @@ impl Channel {
                     .enable_http2()
                     .build();
 
-                // let tls_connector = tower::ServiceBuilder::new()
-                //     .layer_fn(move |s| {
-                //         let tls_config = tls_config.clone();
-
-                //         hyper_rustls::HttpsConnectorBuilder::new()
-                //             .with_tls_config(tls_config)
-                //             .https_or_http()
-                //             .enable_http2()
-                //             .wrap_connector(s)
-                //     })
-                //     // Since our cert is signed with `example.com` but we actually want to connect
-                //     // to a local server we will override the Uri passed from the `HttpsConnector`
-                //     // and map it to the correct `Uri` that will connect us directly to the local server.
-                //     .map_request(|_| Uri::from_static("https://[::1]:50051"))
-                //     .service(http);
-
                 Client::Tls(
                     HyperClient::builder(TokioExecutor::new())
                         .http2_only(true)
@@ -120,6 +98,7 @@ impl Service<http::Request<BoxBody>> for Channel {
             .unwrap();
         *req.uri_mut() = uri;
 
+        log::info!("sending request {:?}", &req);
         let client = self.client.clone();
         Box::pin(async move {
             match &client {
@@ -189,6 +168,8 @@ mod tests {
 
     #[tokio::test]
     async fn tls_client_request_test() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
         let config = RustlsConfig::from_pem_file(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("test-certs")
@@ -202,6 +183,7 @@ mod tests {
 
         let bind_addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
         let listener = std::net::TcpListener::bind(bind_addr).unwrap();
+        listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
 
         let server = axum_server::from_tcp_rustls(listener, config);
@@ -236,6 +218,8 @@ mod tests {
 
     #[tokio::test]
     async fn tls_mtls_client_request_test() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
         #[derive(Debug)]
         pub struct CertVerifierMock {
             saw_a_cert: std::sync::atomic::AtomicUsize,
@@ -272,7 +256,8 @@ mod tests {
                     message,
                     cert,
                     dss,
-                    &rustls::crypto::ring::default_provider().signature_verification_algorithms,
+                    &rustls::crypto::aws_lc_rs::default_provider()
+                        .signature_verification_algorithms,
                 )
             }
 
@@ -286,12 +271,13 @@ mod tests {
                     message,
                     cert,
                     dss,
-                    &rustls::crypto::ring::default_provider().signature_verification_algorithms,
+                    &rustls::crypto::aws_lc_rs::default_provider()
+                        .signature_verification_algorithms,
                 )
             }
 
             fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-                rustls::crypto::ring::default_provider()
+                rustls::crypto::aws_lc_rs::default_provider()
                     .signature_verification_algorithms
                     .supported_schemes()
             }

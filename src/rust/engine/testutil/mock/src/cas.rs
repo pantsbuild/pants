@@ -3,7 +3,6 @@
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::net::SocketAddr;
-use std::net::TcpListener as StdTcpListener;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
@@ -18,7 +17,7 @@ use remexec::action_cache_server::ActionCacheServer;
 use remexec::capabilities_server::CapabilitiesServer;
 use remexec::content_addressable_storage_server::ContentAddressableStorageServer;
 use testutil::data::{TestData, TestDirectory, TestTree};
-use tokio::net::{TcpListener as TokioTcpListener, TcpStream};
+use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::transport::Server;
 
@@ -202,9 +201,10 @@ impl StubCASBuilder {
             write_delay: self.ac_write_delay,
         };
 
-        let listener = StdTcpListener::bind("127.0.0.1:0").unwrap();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
         let local_addr = listener.local_addr().unwrap();
-        let listener = TokioTcpListener::from_std(listener).unwrap();
+        let listener = TcpListener::from_std(listener).unwrap();
 
         let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel();
 
