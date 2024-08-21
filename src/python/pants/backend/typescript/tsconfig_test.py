@@ -8,7 +8,12 @@ import pytest
 
 from pants.backend.typescript import tsconfig
 from pants.backend.typescript.target_types import TypeScriptSourceTarget
-from pants.backend.typescript.tsconfig import AllTSConfigs, TSConfig, TSConfigsRequest
+from pants.backend.typescript.tsconfig import (
+    AllTSConfigs,
+    TSConfig,
+    TSConfigsRequest,
+    _clean_tsconfig_contents,
+)
 from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -78,3 +83,59 @@ def test_parses_extended_tsconfig_with_overrides(rule_runner: RuleRunner) -> Non
         TSConfig("project/tsconfig.json", base_url="./"),
         TSConfig("project/lib/tsconfig.json", base_url="./src"),
     }
+
+
+def test_parses_tsconfig_non_json_standard() -> None:
+    # standard JSON
+    content = """
+    {"data": "foo"}
+    """
+    assert json.loads(_clean_tsconfig_contents(content)) == json.loads(content)
+
+    # single-line comment
+    content = """
+    // comment here
+    { // comment here
+        "data": "foo" // comment here
+    } // comment here
+    //// comment here
+    """
+    assert json.loads(_clean_tsconfig_contents(content)) == json.loads("""{"data": "foo"}""")
+
+    # multi-line comment
+    content = """
+    /*
+    * first line comment here
+    * second line comment here
+    */
+    {"data": "foo"} // single comment
+    /**
+    * first line comment here
+    * second line comment here
+    **/
+    """
+    assert json.loads(_clean_tsconfig_contents(content)) == json.loads("""{"data": "foo"}""")
+
+    # string literals with comment characters (such as URLs) are left untouched
+    content = """
+    // comment here
+    {"baseUrl": "http://foo/bar/baz"} // comment here
+    //// comment here
+    """
+    assert json.loads(_clean_tsconfig_contents(content)) == json.loads(
+        """{"baseUrl": "http://foo/bar/baz"}"""
+    )
+
+    # trailing comma
+    content = """
+    // comment here
+    {
+        "baseUrl": [
+            "http://foo/bar/baz",
+        ],
+    } // comment here
+    //// comment here
+    """
+    assert json.loads(_clean_tsconfig_contents(content)) == json.loads(
+        """{"baseUrl": ["http://foo/bar/baz"]}"""
+    )
