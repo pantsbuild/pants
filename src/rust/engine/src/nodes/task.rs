@@ -283,7 +283,13 @@ impl Task {
                     let res = if let Some(args) = args {
                         let args = args.value.extract::<&PyTuple>(py)?;
                         let kwargs = PyDict::new(py);
-                        for ((name, _), value) in self.task.args.iter().zip(deps.into_iter()) {
+                        for ((name, _), value) in self
+                            .task
+                            .args
+                            .iter()
+                            .skip(self.args_arity.into())
+                            .zip(deps.into_iter())
+                        {
                             kwargs.set_item(name, &value)?;
                         }
                         func.call(args, Some(kwargs))
