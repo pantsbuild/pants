@@ -20,8 +20,10 @@ jobs:
     - classify_changes
     runs-on:
     - self-hosted
-    - Linux
-    - ARM64
+    - runs-on
+    - runner=4cpu-linux-arm64
+    - image=ubuntu22-full-arm64-python3.7-python3.8-python3.9
+    - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -99,7 +101,7 @@ jobs:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
-      run: ./cargo test --locked --tests -- --nocapture --test-threads=8
+      run: ./cargo test --locked --tests -- --nocapture
     timeout-minutes: 60
   bootstrap_pants_linux_x86_64:
     env:
@@ -299,7 +301,7 @@ jobs:
     timeout-minutes: 60
   build_wheels_linux_arm64:
     container:
-      image: ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf
+      image: quay.io/pypa/manylinux2014_aarch64:latest
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       MODE: debug
@@ -312,8 +314,10 @@ jobs:
     - classify_changes
     runs-on:
     - self-hosted
-    - Linux
-    - ARM64
+    - runs-on
+    - runner=4cpu-linux-arm64
+    - image=ubuntu22-full-arm64-python3.7-python3.8-python3.9
+    - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -340,12 +344,10 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
-    - env:
-        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+    - env: {}
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
-    - env:
-        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+    - env: {}
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -700,8 +702,7 @@ jobs:
     - id: set_merge_ok
       run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
   test_python_linux_arm64:
-    env:
-      PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+    env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-ARM64)
     needs:
@@ -709,8 +710,10 @@ jobs:
     - classify_changes
     runs-on:
     - self-hosted
-    - Linux
-    - ARM64
+    - runs-on
+    - runner=4cpu-linux-arm64
+    - image=ubuntu22-full-arm64-python3.7-python3.8-python3.9
+    - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
       uses: actions/checkout@v4
