@@ -168,8 +168,6 @@ mod tests {
 
     #[tokio::test]
     async fn user_agent_is_set_correctly() {
-        env_logger::init();
-
         const EXPECTED_USER_AGENT: &str = "testclient/0.0.1";
 
         #[derive(Clone)]
