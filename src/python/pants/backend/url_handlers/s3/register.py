@@ -14,6 +14,7 @@ from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.util.strutil import softwrap
 
 CONTENT_TYPE = "binary/octet-stream"
@@ -63,7 +64,9 @@ class S3DownloadFile:
 
 
 @rule
-async def download_from_s3(request: S3DownloadFile, aws_credentials: AWSCredentials) -> Digest:
+async def download_from_s3(
+    request: S3DownloadFile, aws_credentials: AWSCredentials, global_options: GlobalOptions
+) -> Digest:
     from botocore import auth, compat, exceptions  # pants: no-infer-dep
 
     # NB: The URL for auth is expected to be in path-style
@@ -102,6 +105,8 @@ async def download_from_s3(request: S3DownloadFile, aws_credentials: AWSCredenti
             url=virtual_hosted_url,
             expected_digest=request.expected_digest,
             auth_headers=http_request.headers,
+            retry_delay_duration=global_options.file_downloads_retry_delay,
+            max_attempts=global_options.file_downloads_max_attempts,
         ),
     )
 

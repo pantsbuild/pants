@@ -2,11 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import hashlib
+from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+import requests
 
 from pants.engine.download_file import URLDownloadHandler, download_file
 from pants.engine.fs import (
@@ -20,6 +22,8 @@ from pants.engine.fs import (
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.engine.unions import UnionMembership
+from pants.option.global_options import GlobalOptions
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
 
 DOWNLOADS_FILE_DIGEST = FileDigest(
@@ -30,13 +34,21 @@ DOWNLOADS_EXPECTED_DIRECTORY_DIGEST = Digest(
 )
 
 
-def test_no_union_members() -> None:
+@pytest.fixture
+def global_options() -> GlobalOptions:
+    return create_subsystem(
+        GlobalOptions, file_downloads_retry_delay=0.01, file_downloads_max_attempts=2
+    )
+
+
+def test_no_union_members(global_options: GlobalOptions) -> None:
     union_membership = UnionMembership({})
     digest = run_rule_with_mocks(
         download_file,
         rule_args=[
             DownloadFile("http://pantsbuild.com/file.txt", DOWNLOADS_FILE_DIGEST),
             union_membership,
+            global_options,
         ],
         mock_gets=[
             MockGet(
@@ -77,7 +89,7 @@ def test_no_union_members() -> None:
         ("http*", "*.pantsbuild.com", "http://awesome.pantsbuild.com/file.txt"),
     ],
 )
-def test_matches(scheme, authority, url) -> None:
+def test_matches(scheme, authority, url, global_options: GlobalOptions) -> None:
     class UnionMember(URLDownloadHandler):
         match_scheme = scheme
         match_authority = authority
@@ -93,6 +105,7 @@ def test_matches(scheme, authority, url) -> None:
         rule_args=[
             DownloadFile(url, DOWNLOADS_FILE_DIGEST),
             union_membership,
+            global_options,
         ],
         mock_gets=[
             MockGet(
@@ -126,7 +139,7 @@ def test_matches(scheme, authority, url) -> None:
         ("https", "*.pantsbuild.com", "https://pantsbuild.com/file.txt"),
     ],
 )
-def test_doesnt_match(scheme, authority, url) -> None:
+def test_doesnt_match(scheme, authority, url, global_options: GlobalOptions) -> None:
     class UnionMember(URLDownloadHandler):
         match_scheme = scheme
         match_authority = authority
@@ -138,6 +151,7 @@ def test_doesnt_match(scheme, authority, url) -> None:
         rule_args=[
             DownloadFile(url, DOWNLOADS_FILE_DIGEST),
             union_membership,
+            global_options,
         ],
         mock_gets=[
             MockGet(
@@ -156,7 +170,7 @@ def test_doesnt_match(scheme, authority, url) -> None:
     assert digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
 
 
-def test_too_many_matches() -> None:
+def test_too_many_matches(global_options: GlobalOptions) -> None:
     class AuthorityMatcher(URLDownloadHandler):
         match_authority = "pantsbuild.com"
 
@@ -171,6 +185,7 @@ def test_too_many_matches() -> None:
             rule_args=[
                 DownloadFile("http://pantsbuild.com/file.txt", DOWNLOADS_FILE_DIGEST),
                 union_membership,
+                global_options,
             ],
             mock_gets=[
                 MockGet(
@@ -209,7 +224,21 @@ def test_query_string_included_in_cache_key() -> None:
     t.daemon = True
     t.start()
 
-    rule_runner = RuleRunner(rules=[QueryRule(DigestEntries, (Digest,))], isolated_local_store=True)
+    # Wait until the http server is operational.
+    wait_attempts_remaining = 4
+    while wait_attempts_remaining > 0:
+        r = requests.get(f"http://127.0.0.1:{port}/?val=test", timeout=0.1)
+        if r.status_code == 200:
+            break
+        wait_attempts_remaining -= 1
+
+    if wait_attempts_remaining == 0:
+        raise Exception("HTTP server thread did not startup.")
+
+    rule_runner = RuleRunner(
+        rules=[QueryRule(DigestEntries, (Digest,))],
+        isolated_local_store=True,
+    )
 
     response = "world"
     expected_digest = FileDigest(hashlib.sha256(response.encode()).hexdigest(), len(response))
@@ -218,7 +247,10 @@ def test_query_string_included_in_cache_key() -> None:
         Digest,
         [
             NativeDownloadFile(
-                f"http://127.0.0.1:{port}/hello?val={response}", expected_digest=expected_digest
+                f"http://127.0.0.1:{port}/hello?val={response}",
+                expected_digest=expected_digest,
+                retry_delay_duration=timedelta(milliseconds=1),
+                max_attempts=2,
             )
         ],
     )
@@ -237,7 +269,10 @@ def test_query_string_included_in_cache_key() -> None:
             Digest,
             [
                 NativeDownloadFile(
-                    f"http://127.0.0.1:{port}/hello?val=galaxy", expected_digest=expected_digest
+                    f"http://127.0.0.1:{port}/hello?val=galaxy",
+                    expected_digest=expected_digest,
+                    retry_delay_duration=timedelta(milliseconds=1),
+                    max_attempts=2,
                 )
             ],
         )

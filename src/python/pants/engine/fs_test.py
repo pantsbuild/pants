@@ -1076,6 +1076,9 @@ def test_download_body_error_retry(downloads_rule_runner: RuleRunner) -> None:
 
 def test_download_body_error_retry_eventually_fails(downloads_rule_runner: RuleRunner) -> None:
     # Returns one more error than the retry will allow.
+    downloads_rule_runner.set_options(
+        ["--file-downloads-max-attempts=4", "--file-downloads-retry-delay=0.001"]
+    )
     with http_server(stub_erroring_handler(5)) as port:
         with pytest.raises(Exception):
             _ = downloads_rule_runner.request(

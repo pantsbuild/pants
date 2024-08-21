@@ -1685,6 +1685,32 @@ class InvalidFieldTypeException(InvalidFieldException):
         )
 
 
+class InvalidFieldMemberTypeException(InvalidFieldException):
+    # based on InvalidFieldTypeException
+    def __init__(
+        self,
+        address: Address,
+        field_alias: str,
+        raw_value: Optional[Any],
+        *,
+        expected_type: str,
+        at_index: int,
+        wrong_element: Any,
+        description_of_origin: str | None = None,
+    ) -> None:
+        super().__init__(
+            softwrap(
+                f"""
+                The {repr(field_alias)} field in target {address} must be an iterable with
+                elements that have type {expected_type}. Encountered the element `{wrong_element}`
+                of type {type(wrong_element)} instead of {expected_type} at index {at_index}:
+                `{repr(raw_value)}`
+                """
+            ),
+            description_of_origin=description_of_origin,
+        )
+
+
 class RequiredFieldMissingException(InvalidFieldException):
     def __init__(
         self, address: Address, field_alias: str, *, description_of_origin: str | None = None
@@ -1922,6 +1948,62 @@ class SequenceField(Generic[T], Field):
                 expected_type=cls.expected_type_description,
             )
         return tuple(value_or_default)
+
+
+class TupleSequenceField(Generic[T], Field):
+    # this cannot be a SequenceField as compute_value's use of ensure_list
+    # does not work with expected_element_type=tuple when the value itself
+    # is already a tuple.
+    expected_element_type: ClassVar[Type]
+    expected_element_count: ClassVar[int]  # -1 for unlimited
+    expected_type_description: ClassVar[str]
+    expected_element_type_description: ClassVar[str]
+
+    value: Optional[Tuple[Tuple[T, ...], ...]]
+    default: ClassVar[Optional[Tuple[Tuple[T, ...], ...]]] = None  # type: ignore[misc]
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[Iterable[T]]], address: Address
+    ) -> Optional[tuple[tuple[T, ...], ...]]:
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default is None:
+            return value_or_default
+        if isinstance(value_or_default, str) or not isinstance(
+            value_or_default, collections.abc.Iterable
+        ):
+            raise InvalidFieldTypeException(
+                address,
+                cls.alias,
+                raw_value,
+                expected_type=cls.expected_type_description,
+            )
+
+        def invalid_member_exception(
+            at_index: int, wrong_element: Any
+        ) -> InvalidFieldMemberTypeException:
+            return InvalidFieldMemberTypeException(
+                address,
+                cls.alias,
+                raw_value,
+                expected_type=cls.expected_element_type_description,
+                wrong_element=wrong_element,
+                at_index=at_index,
+            )
+
+        validated: list[tuple[T, ...]] = []
+        for i, x in enumerate(value_or_default):
+            if isinstance(x, str) or not isinstance(x, collections.abc.Iterable):
+                raise invalid_member_exception(i, x)
+            element = tuple(x)
+            if cls.expected_element_count >= 0 and cls.expected_element_count != len(element):
+                raise invalid_member_exception(i, x)
+            for s in element:
+                if not isinstance(s, cls.expected_element_type):
+                    raise invalid_member_exception(i, x)
+            validated.append(cast(tuple[T, ...], element))
+
+        return tuple(validated)
 
 
 class StringSequenceField(SequenceField[str]):
