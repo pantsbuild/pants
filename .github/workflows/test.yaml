@@ -748,6 +748,10 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v5
+      with:
+        python-version: '2.7'
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -834,6 +838,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v5
+      with:
+        python-version: '2.7'
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
@@ -926,6 +934,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v5
+      with:
+        python-version: '2.7'
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
@@ -1018,6 +1030,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v5
+      with:
+        python-version: '2.7'
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
@@ -1110,6 +1126,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v5
+      with:
+        python-version: '2.7'
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
@@ -1202,6 +1222,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v5
+      with:
+        python-version: '2.7'
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
@@ -1294,6 +1318,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v5
+      with:
+        python-version: '2.7'
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
@@ -1386,6 +1414,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v5
+      with:
+        python-version: '2.7'
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
@@ -1478,6 +1510,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v5
+      with:
+        python-version: '2.7'
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
@@ -1570,6 +1606,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v5
+      with:
+        python-version: '2.7'
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
@@ -1662,6 +1702,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v5
+      with:
+        python-version: '2.7'
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
@@ -1721,6 +1765,10 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v5
+      with:
+        python-version: '2.7'
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:

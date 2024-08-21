@@ -783,6 +783,7 @@ def test_jobs(
                 # preinstalled on the self-hosted runners.
                 else []
             ),
+            install_python("2.7"),
             *helper.setup_primary_python(),
             *helper.expose_all_pythons(),
             *helper.native_binaries_download(),
