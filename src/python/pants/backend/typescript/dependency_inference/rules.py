@@ -143,15 +143,6 @@ async def infer_typescript_source_dependencies(
             if not addresses and not _is_node_builtin_module(string)
         ),
     )
-    _handle_unowned_imports(
-        request.field_set.address,
-        nodejs_infer.unowned_dependency_behavior,
-        frozenset(
-            string
-            for string, addresses in imports.items()
-            if not addresses and not _is_node_builtin_module(string)
-        ),
-    )
     return InferredDependencies(itertools.chain.from_iterable(imports.values()))
 
 

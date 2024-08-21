@@ -26,10 +26,11 @@ from pants.backend.typescript.target_types import (
     TypeScriptSourceTarget,
 )
 from pants.build_graph.address import Address
+from pants.core.util_rules.unowned_dependency_behavior import UnownedDependencyError
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import QueryRule
 from pants.engine.target import InferredDependencies
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, engine_error
 
 
 @pytest.fixture
@@ -145,3 +146,45 @@ def test_infers_typescript_file_imports_dependencies_parent_dirs(rule_runner: Ru
         Address("src/ts", relative_file_path="localModuleB.ts"),
         Address("src/ts/subdir1", relative_file_path="localModuleC.ts"),
     }
+
+
+def test_unmatched_ts_dependencies_error_unowned_behaviour(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--nodejs-infer-unowned-dependency-behavior=error"])
+    rule_runner.write_files(
+        {
+            "root/project/src/modA.ts": "",
+            "root/project/src/index.ts": dedent(
+                """\
+                import { foo } from "./bar";
+                import { something } from "./modA";
+                """
+            ),
+            "root/project/src/BUILD": "typescript_sources()",
+        }
+    )
+
+    root_index_tgt = rule_runner.get_target(
+        Address("root/project/src", relative_file_path="index.ts")
+    )
+
+    with engine_error(UnownedDependencyError, contains="./bar"):
+        rule_runner.request(
+            InferredDependencies,
+            [
+                InferTypeScriptDependenciesRequest(
+                    TypeScriptSourceInferenceFieldSet.create(root_index_tgt)
+                )
+            ],
+        )
+
+    # having unowned dependencies should not lead to errors
+    rule_runner.set_options(["--nodejs-infer-unowned-dependency-behavior=warning"])
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [
+            InferTypeScriptDependenciesRequest(
+                TypeScriptSourceInferenceFieldSet.create(root_index_tgt)
+            )
+        ],
+    ).include
+    assert list(addresses)[0].spec == Address("root/project/src/modA.ts").spec_path
