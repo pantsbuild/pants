@@ -448,7 +448,7 @@ class Helper:
         elif self.platform == Platform.MACOS10_15_X86_64:
             ret += ["macOS-10.15-X64"]
         elif self.platform == Platform.LINUX_X86_64:
-            ret += ["ubuntu-20.04"]
+            ret += ["ubuntu-latest"]
         elif self.platform == Platform.LINUX_ARM64:
             ret += ["Linux", "ARM64"]
         else:

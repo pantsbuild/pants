@@ -93,7 +93,7 @@ jobs:
     needs:
     - release_info
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-latest
     steps:
     - name: Check out code
       uses: actions/checkout@v3
