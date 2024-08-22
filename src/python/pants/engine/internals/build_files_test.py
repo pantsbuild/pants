@@ -315,7 +315,7 @@ def test_prelude_type_hint_code() -> None:
     assert 42 == ecr_docker_image.value()
 
 
-def test_prelude_docstrings() -> None:
+def test_prelude_docstring_on_function() -> None:
     macro_docstring = "This is the doc-string for `macro_func`."
     prelude_content = dedent(
         f"""
@@ -330,6 +330,42 @@ def test_prelude_docstrings() -> None:
     assert macro_docstring == info.help
     assert "(arg: int) -> str" == info.signature
     assert {"macro_func"} == set(result.info)
+
+
+def test_prelude_docstring_on_constant() -> None:
+    macro_docstring = """This is the doc-string for `MACRO_CONST`.
+
+    Use weird indentations.
+
+    On purpose.
+    """
+    prelude_content = dedent(
+        f"""
+        Number = NewType("Number", int)
+        MACRO_CONST: Annotated[str, Doc({macro_docstring!r})] = "value"
+        MULTI_HINTS: Annotated[Number, "unrelated", Doc("this is it"), 24] = 42
+        ANON: str = "undocumented"
+        _PRIVATE: int = 42
+        untyped = True
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    assert {"MACRO_CONST", "ANON", "Number", "MULTI_HINTS", "untyped"} == set(result.info)
+
+    info = result.info["MACRO_CONST"]
+    assert info.value == "value"
+    assert info.help == softwrap(macro_docstring)
+    assert info.signature == ": str"
+
+    multi = result.info["MULTI_HINTS"]
+    assert multi.value == 42
+    assert multi.help == "this is it"
+    assert multi.signature == ": Number"
+
+    anon = result.info["ANON"]
+    assert anon.value == "undocumented"
+    assert anon.help is None
+    assert anon.signature == ": str"
 
 
 def test_prelude_reference_env_vars() -> None:
@@ -655,6 +691,70 @@ def test_default_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> 
     assert targets == (
         (address.parametrize(dict(parametrize="a")), dict(tags=["from target"])),
         (address.parametrize(dict(parametrize="b")), dict(tags=("from b",))),
+    )
+
+
+def test_default_parametrized_groups_with_parametrizations(
+    target_adaptor_rule_runner: RuleRunner,
+) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """
+                __defaults__({
+                  mock_tgt: dict(
+                    **parametrize(
+                      "py310-compat",
+                      resolve="service-a",
+                      tags=[
+                        "CPython == 3.9.*",
+                        "CPython == 3.10.*",
+                      ]
+                    ),
+                    **parametrize(
+                      "py39-compat",
+                      resolve=parametrize(
+                        "service-b",
+                        "service-c",
+                        "service-d",
+                      ),
+                      tags=[
+                        "CPython == 3.9.*",
+                      ]
+                    )
+                  )
+                })
+                mock_tgt()
+                """
+            ),
+        }
+    )
+    address = Address("src")
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(address, description_of_origin="tests")],
+    )
+    targets = tuple(Parametrize.expand(address, target_adaptor.kwargs))
+    assert targets == (
+        (
+            address.parametrize(dict(parametrize="py310-compat")),
+            dict(
+                tags=("CPython == 3.9.*", "CPython == 3.10.*"),
+                resolve="service-a",
+            ),
+        ),
+        (
+            address.parametrize(dict(parametrize="py39-compat", resolve="service-b")),
+            dict(tags=("CPython == 3.9.*",), resolve="service-b"),
+        ),
+        (
+            address.parametrize(dict(parametrize="py39-compat", resolve="service-c")),
+            dict(tags=("CPython == 3.9.*",), resolve="service-c"),
+        ),
+        (
+            address.parametrize(dict(parametrize="py39-compat", resolve="service-d")),
+            dict(tags=("CPython == 3.9.*",), resolve="service-d"),
+        ),
     )
 
 

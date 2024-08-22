@@ -147,7 +147,7 @@ async def package_pyoxidizer_binary(
         config_template = digest_contents[0].content.decode("utf-8")
 
     config = PyOxidizerConfig(
-        executable_name=field_set.binary_name.value or field_set.address.target_name,
+        executable_name=field_set.binary_name.value_or_default(),
         entry_point=field_set.entry_point.value,
         wheels=wheel_paths,
         template=config_template,

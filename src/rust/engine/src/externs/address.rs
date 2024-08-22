@@ -680,9 +680,15 @@ impl Address {
         Ok(format!("{prefix}{path}{target}{generated}{params}"))
     }
 
-    fn parametrize(&self, parameters: BTreeMap<String, String>) -> Self {
-        let mut merged_parameters = self.parameters.clone();
-        merged_parameters.extend(parameters);
+    #[pyo3(signature = (parameters, replace=false))]
+    fn parametrize(&self, parameters: BTreeMap<String, String>, replace: bool) -> Self {
+        let merged_parameters = if replace {
+            parameters
+        } else {
+            let mut merged_parameters = parameters.clone();
+            merged_parameters.extend(parameters);
+            merged_parameters
+        };
 
         Self {
             spec_path: self.spec_path.clone(),

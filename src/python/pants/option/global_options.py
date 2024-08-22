@@ -10,7 +10,7 @@ import re
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path, PurePath
 from typing import Any, Callable, Type, TypeVar, cast
@@ -391,18 +391,11 @@ class DynamicRemoteOptions:
 
     @classmethod
     def _use_oauth_token(cls, bootstrap_options: OptionValueContainer) -> DynamicRemoteOptions:
-        if bootstrap_options.remote_oauth_bearer_token:
-            oauth_token = bootstrap_options.remote_oauth_bearer_token
-            description = "`remote_oauth_bearer_token` option"
-        else:
-            oauth_token = (
-                Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
-            )
-            description = f"`remote_oauth_bearer_token_path` option ({bootstrap_options.remote_oauth_bearer_token_path})"
+        oauth_token = bootstrap_options.remote_oauth_bearer_token
 
         if set(oauth_token).intersection({"\n", "\r"}):
             raise OptionsError(
-                f"OAuth bearer token from {description} must not contain multiple lines."
+                "OAuth bearer token from `remote_oauth_bearer_token` option must not contain multiple lines."
             )
 
         token_header = {"authorization": f"Bearer {oauth_token}"}
@@ -455,9 +448,6 @@ class DynamicRemoteOptions:
 
         sources = {
             str(remote_auth_plugin_func): bool(remote_auth_plugin_func),
-            "[GLOBAL].remote_oauth_bearer_token_path": bool(
-                bootstrap_options.remote_oauth_bearer_token_path
-            ),
             "[GLOBAL].remote_oauth_bearer_token": bool(bootstrap_options.remote_oauth_bearer_token),
         }
         enabled_sources = [name for name, enabled in sources.items() if enabled]
@@ -471,10 +461,7 @@ class DynamicRemoteOptions:
                     """
                 )
             )
-        if (
-            bootstrap_options.remote_oauth_bearer_token_path
-            or bootstrap_options.remote_oauth_bearer_token
-        ):
+        if bootstrap_options.remote_oauth_bearer_token:
             return cls._use_oauth_token(bootstrap_options), None
         if remote_auth_plugin_func is not None:
             return cls._use_auth_plugin(
@@ -1005,7 +992,9 @@ class BootstrapOptions:
             This option controls how to report discrepancies that arise.
 
             - `error`: Discrepancies will cause Pants to exit.
+
             - `warning`: Discrepancies will be logged but Pants will continue.
+
             - `ignore`: A last resort to turn off this check entirely.
 
             If you encounter discrepancies that are not easily resolvable, please reach out to
@@ -1605,23 +1594,6 @@ class BootstrapOptions:
             """
         ),
     )
-    remote_oauth_bearer_token_path = StrOption(
-        default=None,
-        advanced=True,
-        help=softwrap(
-            """
-            Path to a file containing an oauth token to use for gGRPC connections to
-            `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address`.
-
-            If specified, Pants will add a header in the format `authorization: Bearer <token>`.
-            You can also manually add this header via `[GLOBAL].remote_execution_headers` and
-            `[GLOBAL].remote_store_headers`, or use `[GLOBAL].remote_auth_plugin` to provide a plugin to
-            dynamically set the relevant headers. Otherwise, no authorization will be performed.
-            """
-        ),
-        removal_version="2.23.0.dev0",
-        removal_hint=f'use `[GLOBAL].remote_oauth_bearer_token = "@/path/to/token.txt"` instead, see {doc_url("reference/global-options#remote_oauth_bearer_token")}',
-    )
 
     remote_oauth_bearer_token = StrOption(
         default=None,
@@ -1776,6 +1748,64 @@ class BootstrapOptions:
             """
         ),
     )
+    _file_downloads_retry_delay = FloatOption(
+        default=0.2,
+        advanced=True,
+        help=softwrap(
+            """
+            When Pants downloads files (for example, for the `http_source` source), Pants will retry the download
+            if a "retryable" error occurs. Between each attempt, Pants will delay a random amount of time using an
+            exponential backoff algorithm.
+
+            This option sets the "base" duration in seconds used for calculating the retry delay.
+            """
+        ),
+    )
+    _file_downloads_max_attempts = IntOption(
+        default=4,
+        advanced=True,
+        help=softwrap(
+            """
+            When Pants downloads files (for example, for the `http_source` source), Pants will retry the download
+            if a "retryable" error occurs.
+
+            This option sets the maximum number of attempts Pants will make to try to download the file before giving up
+            with an error.
+            """
+        ),
+    )
+
+    @property
+    def file_downloads_retry_delay(self) -> timedelta:
+        value = self._file_downloads_retry_delay
+        if value <= 0.0:
+            raise ValueError(
+                f"Global option `--file-downloads-retry-delay` must a positive number, got {value}"
+            )
+        return timedelta(seconds=value)
+
+    @property
+    def file_downloads_max_attempts(self) -> int:
+        value = self._file_downloads_max_attempts
+        if value < 1:
+            raise ValueError(
+                f"Global option `--file-downloads-max-attempts` must be at least 1, got {value}"
+            )
+        return value
+
+    allow_deprecated_macos_before_12 = BoolOption(
+        default=False,
+        advanced=True,
+        help=softwrap(
+            f"""
+            Silence warnings about running Pants on macOS 10.15 - 11. In future versions, Pants will
+            only be supported on macOS 12 and newer.
+
+            If you have questions or concerns about this, please reach out to us at
+            {doc_url("community/getting-help")}.
+            """
+        ),
+    )
 
 
 # N.B. By subclassing BootstrapOptions, we inherit all of those options and are also able to extend
@@ -1887,6 +1917,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     )
     subproject_roots = StrListOption(
         help="Paths that correspond with build roots for any subproject that this project depends on.",
+        advanced=True,
+    )
+
+    enable_target_origin_sources_blocks = BoolOption(
+        default=False,
+        help="Enable fine grained target analysis based on line numbers.",
         advanced=True,
     )
 

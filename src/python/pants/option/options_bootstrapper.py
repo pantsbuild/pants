@@ -100,6 +100,7 @@ class OptionsBootstrapper:
             # We ignore validation to ensure bootstrapping succeeds.
             # The bootstrap options will be validated anyway when we parse the full options.
             native_options_validation=NativeOptionsValidation.ignore,
+            native_options_config_discovery=False,
         )
 
         for options_info in collect_options_info(BootstrapOptions):
@@ -184,11 +185,15 @@ class OptionsBootstrapper:
                 bootstrap_option_values.pants_bin_name, get_buildroot()
             )
 
-            env_tuples = tuple(
-                sorted(
-                    (item for item in env.items() if item[0].startswith("PANTS_")),
-                )
-            )
+            # TODO: We really only need the env vars starting with PANTS_, plus any env
+            #  vars used in env.FOO-style interpolation in config files.
+            #  Filtering to just those would allow OptionsBootstrapper to have a less
+            #  unwieldy __str__.
+            #  We used to filter all but PANTS_* (https://github.com/pantsbuild/pants/pull/7312),
+            #  but we can't now because of env interpolation in the native config file parser.
+            #  We can revisit this once the legacy python parser is no more, and we refactor
+            #  the OptionsBootstrapper and/or convert it to Rust.
+            env_tuples = tuple(sorted(env.items()))
             return cls(
                 env_tuples=env_tuples,
                 bootstrap_args=bargs,
@@ -255,6 +260,7 @@ class OptionsBootstrapper:
             bootstrap_option_values=bootstrap_option_values,
             allow_unknown_options=allow_unknown_options,
             native_options_validation=bootstrap_option_values.native_options_validation,
+            native_options_config_discovery=False,
         )
 
         distinct_subsystem_classes: set[type[Subsystem]] = set()

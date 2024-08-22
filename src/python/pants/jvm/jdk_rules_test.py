@@ -96,11 +96,8 @@ def test_java_binary_versions(rule_runner: RuleRunner) -> None:
     # default version is 1.11
     assert 'openjdk version "11.0' in run_javac_version(rule_runner)
 
-    rule_runner.set_options(["--jvm-tool-jdk=adopt:1.8"], env_inherit=PYTHON_BOOTSTRAP_ENV)
-    assert 'openjdk version "1.8' in run_javac_version(rule_runner)
-
-    rule_runner.set_options(["--jvm-tool-jdk=adopt:1.14"], env_inherit=PYTHON_BOOTSTRAP_ENV)
-    assert 'openjdk version "14"' in run_javac_version(rule_runner)
+    rule_runner.set_options(["--jvm-tool-jdk=temurin:1.17"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    assert 'openjdk version "17"' in run_javac_version(rule_runner)
 
     rule_runner.set_options(["--jvm-tool-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
@@ -163,7 +160,7 @@ def test_pass_jvm_options_to_java_program(rule_runner: RuleRunner) -> None:
 
     # Rely on JEP-330 to run a Java file from source so we don´t need a compile step.
     rule_runner.set_options(
-        ["--jvm-tool-jdk=adopt:1.11", f"--jvm-global-options={repr(global_jvm_options)}"],
+        ["--jvm-tool-jdk=temurin:1.11.0.23", f"--jvm-global-options={repr(global_jvm_options)}"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 

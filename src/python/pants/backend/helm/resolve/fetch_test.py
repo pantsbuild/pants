@@ -69,3 +69,38 @@ def test_fetch_single_artifact(rule_runner: RuleRunner) -> None:
 
     assert "Chart.yaml" in fetched_artifact.snapshot.files
     assert fetched_artifact.artifact == expected_resolved_artifact
+
+
+def test_fetch_oci_artifact(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/helm/BUILD": dedent(
+                """\
+                helm_artifact(
+                    name="wordpress",
+                    registry="oci://registry-1.docker.io/",
+                    repository="bitnamicharts",
+                    artifact="wordpress",
+                    version="17.1.17",
+                )
+                """
+            ),
+        }
+    )
+
+    target = rule_runner.get_target(Address("3rdparty/helm", target_name="wordpress"))
+
+    expected_resolved_artifact = rule_runner.request(
+        ResolvedHelmArtifact, [HelmArtifact.from_target(target)]
+    )
+    fetched_artifact = rule_runner.request(
+        FetchedHelmArtifact,
+        [
+            FetchHelmArtifactRequest.from_target(
+                target, description_of_origin="the test `test_fetch_single_artifact`"
+            )
+        ],
+    )
+
+    assert "Chart.yaml" in fetched_artifact.snapshot.files
+    assert fetched_artifact.artifact == expected_resolved_artifact

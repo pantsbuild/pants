@@ -11,6 +11,7 @@ from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionMembership, union
+from pants.option.global_options import GlobalOptions
 from pants.util.strutil import bullet_list, softwrap
 
 
@@ -67,8 +68,10 @@ class URLDownloadHandler:
 async def download_file(
     request: DownloadFile,
     union_membership: UnionMembership,
+    global_options: GlobalOptions,
 ) -> Digest:
     parsed_url = urlparse(request.url)
+
     handlers = union_membership.get(URLDownloadHandler)
     matched_handlers = []
     for handler in handlers:
@@ -96,7 +99,15 @@ async def download_file(
         handler = matched_handlers[0]
         return await Get(Digest, URLDownloadHandler, handler(request.url, request.expected_digest))
 
-    return await Get(Digest, NativeDownloadFile(request.url, request.expected_digest))
+    return await Get(
+        Digest,
+        NativeDownloadFile(
+            request.url,
+            request.expected_digest,
+            retry_delay_duration=global_options.file_downloads_retry_delay,
+            max_attempts=global_options.file_downloads_max_attempts,
+        ),
+    )
 
 
 def rules():

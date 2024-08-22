@@ -33,7 +33,7 @@ First, add your Cloud function in a Python file like you would [normally do with
 
 Then, in your BUILD file, make sure that you have a `python_source` or `python_sources` target with the handler file included in the `sources` field. You can use [`pants tailor ::`](../../getting-started/initial-configuration.mdx#5-generate-build-files) to automate this.
 
-Add a `python_google_cloud_function` target and define the `runtime`, `handler`, and `type` fields. The `type` should be either `"event"` or `"http"`. The `runtime` should be one of the values from [https://cloud.google.com/functions/docs/concepts/python-runtime](https://cloud.google.com/functions/docs/concepts/python-runtime). The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
+Add a `python_google_cloud_function` target and define `handler` and `type` fields. The `type` should be either `"event"` or `"http"`.  The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
 
 For example:
 
@@ -43,7 +43,6 @@ python_sources(name="lib")
 
 python_google_cloud_function(
     name="cloud_function",
-    runtime="python38",
     # Pants will convert this to `project.google_cloud_function_example:example_handler`.
     handler="google_cloud_function_example.py:example_handler",
     type="event",
@@ -66,6 +65,49 @@ Use [layout](../../../reference/targets/python_google_cloud_function.mdx#layout)
 :::caution Use `resource` instead of `file`
 `file` / `files` targets will not be included in the built Cloud Function because filesystem APIs like `open()` would not load them as expected. Instead, use the `resource` / `resources` target. See [Assets and archives](../../using-pants/assets-and-archives.mdx) for further explanation.
 :::
+
+### Specifying a runtime explicitly
+
+When building an Cloud function artifact, Pants and the underlying Pex tool need to know details about target runtime to be able to choose appropriate artifacts for third-party dependencies that have native code. These details can be inferred or provided in three ways, from highest precedence to lowest precedence:
+
+1. An explicit value for [the `complete_platforms` field](../../../reference/targets/python_google_cloud_function.mdx#complete_platforms). The "complete platforms" are the underlying source of truth.
+    ```python title="BUILD"
+    file(name="gcf-platform", source="gcf-platform.json")
+
+    python_google_cloud_function(
+        name="cloud_function",
+        handler="google_cloud_function_example.py:example_handler",
+        type="event",
+        # Explicit complete platforms:
+        complete_platforms=[":gcf-platform"],
+    )
+    ```
+2. An explicit value for [the `runtime` field](../../../reference/targets/python_google_cloud_function.mdx#runtime): Pants uses this to pick an appropriate "complete platforms" value, from options that Pants has pre-packaged. These are static exports from docker images provided by GCP, relying on the environment being relatively stable. (If Pants doesn't have an appropriate "complete platforms" default built-in, you will be prompted to use option 1 above.)
+    ```python title="BUILD"
+    python_google_cloud_function(
+        name="cloud_function",
+        handler="google_cloud_function_example.py:example_handler",
+        type="event",
+        # Explicit runtime, `complete_platforms` taken from Pants' built-in defaults:
+        runtime="python312",
+    )
+    ```
+3. Inferred from [the relevant interpreter constraints](../overview/interpreter-compatibility.mdx): the interpreter constraints may unambiguously imply a value for the `runtime` and thus `complete_platforms` fields. For example, `interpreter_constaints = ["==3.12.*"]` implies `runtime="python312"`. This only works with interpreter constraints that cover all patch versions of a given minor release series: `>=3.11,<3.13` is too wide (it covers both 3.11 and 3.12), while `==3.12.0` is too specific (GCF's `python312` runtime may not use that exact patch version).
+
+    ```toml tab={"label":"pants.toml"}
+    [python]
+    interpreter_constraints = ["==3.12.*"]
+    ```
+    ```python tab={"label":"project/BUILD"}
+    python_google_cloud_function(
+        name="cloud_function",
+        handler="google_cloud_function_example.py:example_handler",
+        type="event",
+        # `runtime` inferred and `complete_platforms` from built-in defaults
+    )
+    ```
+
+This guide is written using the last option, but you can add `runtime` or `complete_platforms` to any examples using the `python_google_cloud_function` target.
 
 ## Step 3: Run `package`
 
@@ -119,8 +161,8 @@ python_sources()
 pex_binary(
     name="gcf",
     entry_point="gcf_example.py",
-    # specify an appropriate platform(s) for the targeted GCF runtime (complete_platforms works too)
-    platforms=["linux_x86_64-cp39-cp39"],
+    # specify an appropriate platform for the targeted GCF runtime:
+    complete_platforms=["path/to:platform-json-target"],
 )
 ```
 

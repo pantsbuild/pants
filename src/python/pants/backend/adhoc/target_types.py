@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import ClassVar
 
+from pants.core.util_rules.adhoc_process_support import PathEnvModifyMode
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -253,6 +254,49 @@ class AdhocToolOutputRootDirField(StringField):
     )
 
 
+class AdhocToolWorkspaceInvalidationSourcesField(StringSequenceField):
+    alias: ClassVar[str] = "workspace_invalidation_sources"
+    help = help_text(
+        """
+        Path globs for source files on which this target depends and for which any changes should cause
+        this target's process to be re-executed. Unlike ordinary dependencies, the files referenced by
+        `workspace_invalidation_sources` globs are not materialized into any execution sandbox
+        and are referenced solely for cache invalidation purposes.
+
+        Note: This field is intended to work with the in-workspace execution environment configured by
+        the `workspace_environment` target type. It should only be used when the configured
+        environment for a target is a `workspace_environment`.
+
+        Implementation: Pants computes a digest of all of the files referenced by the provided globs
+        and injects that digest into the process as an environment variable. Since environment variables
+        are part of the cache key for a process's execution, any changes to the referenced files will
+        change the digest and thus force re-exection of the process.
+        """
+    )
+
+
+class AdhocToolPathEnvModifyModeField(StringField):
+    alias = "path_env_modify"
+    default = PathEnvModifyMode.PREPEND.value
+    help = help_text(
+        """
+        When executing the command of an `adhoc_tool` or `shell_command` target, Pants may augment the `PATH`
+        environment variable with the location of any binary shims created for `tools` and for
+        any runnable dependencies.
+
+        Modification of the `PATH` environment variable can be configured as follows:
+        - `prepend`: Prepend the extra path components to any existing `PATH` value.
+        - `append`: Append the extra path componenets to any existing `PATH` value.
+        - `off`: Do not modify the existing `PATH` value.
+        """
+    )
+    valid_choices = PathEnvModifyMode
+
+    @property
+    def enum_value(self) -> PathEnvModifyMode:
+        return PathEnvModifyMode(self.value)
+
+
 class AdhocToolTarget(Target):
     alias: ClassVar[str] = "adhoc_tool"
     core_fields = (
@@ -272,6 +316,8 @@ class AdhocToolTarget(Target):
         AdhocToolOutputRootDirField,
         AdhocToolStdoutFilenameField,
         AdhocToolStderrFilenameField,
+        AdhocToolWorkspaceInvalidationSourcesField,
+        AdhocToolPathEnvModifyModeField,
         EnvironmentField,
     )
     help = help_text(

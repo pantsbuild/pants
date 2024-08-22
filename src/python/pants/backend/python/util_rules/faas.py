@@ -9,6 +9,7 @@ import logging
 import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import ClassVar, Optional, cast
 
@@ -285,11 +286,18 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
     )
 
 
+class FaaSArchitecture(str, Enum):
+    X86_64 = "x86_64"
+    ARM64 = "arm64"
+
+
 @dataclass(frozen=True)
 class PythonFaaSKnownRuntime:
     major: int
     minor: int
+    docker_repo: str
     tag: str
+    architecture: FaaSArchitecture
 
     def file_name(self) -> str:
         return f"complete_platform_{self.tag}.json"
@@ -300,7 +308,6 @@ class PythonFaaSRuntimeField(StringField, ABC):
     default = None
 
     known_runtimes: ClassVar[tuple[PythonFaaSKnownRuntime, ...]] = ()
-    known_runtimes_docker_repo: ClassVar[str]
 
     @classmethod
     def known_runtimes_complete_platforms_module(cls) -> str:
@@ -352,6 +359,7 @@ class RuntimePlatformsRequest:
 
     runtime: PythonFaaSRuntimeField
     complete_platforms: PythonFaaSCompletePlatforms
+    architecture: FaaSArchitecture
 
 
 @dataclass(frozen=True)
@@ -422,7 +430,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         file_name = next(
             rt.file_name()
             for rt in request.runtime.known_runtimes
-            if version == (rt.major, rt.minor)
+            if version == (rt.major, rt.minor) and request.architecture.value == rt.architecture
         )
     except StopIteration:
         # Not a known runtime, so fallback to just passing a platform
@@ -452,6 +460,7 @@ class BuildPythonFaaSRequest:
     handler: None | PythonFaaSHandlerField
     output_path: OutputPathField
     runtime: PythonFaaSRuntimeField
+    architecture: FaaSArchitecture
     pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
     pex_build_extra_args: PythonFaaSPexBuildExtraArgs
     layout: PythonFaaSLayoutField
@@ -485,6 +494,7 @@ async def build_python_faas(
             address=request.address,
             target_name=request.target_name,
             runtime=request.runtime,
+            architecture=request.architecture,
             complete_platforms=request.complete_platforms,
         ),
     )
@@ -564,6 +574,9 @@ async def build_python_faas(
         extra_log_lines.append(
             f"    Runtime: {request.runtime.from_interpreter_version(*platforms.interpreter_version)}"
         )
+
+    if request.architecture is not None:
+        extra_log_lines.append(f"    Architecture: {request.architecture.value}")
 
     if reexported_handler_func is not None:
         if request.log_only_reexported_handler_func:

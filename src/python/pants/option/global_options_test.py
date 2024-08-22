@@ -43,7 +43,7 @@ def create_dynamic_remote_options(
         "--remote-instance-name=main",
     ]
     if token_path:
-        args.append(f"--remote-oauth-bearer-token-path={token_path}")
+        args.append(f"--remote-oauth-bearer-token=@{token_path}")
     if plugin:
         args.append(f"--backend-packages={plugin}")
     ob = create_options_bootstrapper(args)
@@ -56,7 +56,7 @@ def create_dynamic_remote_options(
     )[0]
 
 
-def test_dynamic_remote_options_oauth_bearer_token_path(tmp_path: Path) -> None:
+def test_dynamic_remote_options_oauth_bearer_token_with_path(tmp_path: Path) -> None:
     token_path = tmp_path / "token.txt"
     token_path.touch()
     token_path.write_text("my-token")

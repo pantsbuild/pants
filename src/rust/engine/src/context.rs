@@ -10,7 +10,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::intrinsics::Intrinsics;
 use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult};
 use crate::python::{throw, Failure};
 use crate::session::{Session, Sessions};
@@ -62,7 +61,6 @@ pub struct Core {
     pub tasks: Tasks,
     pub rule_graph: RuleGraph<Rule>,
     pub types: Types,
-    pub intrinsics: Intrinsics,
     pub executor: Executor,
     store: Store,
     /// The CommandRunners to use for execution, in ascending order of reliability (for the purposes
@@ -519,7 +517,6 @@ impl Core {
         executor: Executor,
         tasks: Tasks,
         types: Types,
-        intrinsics: Intrinsics,
         build_root: PathBuf,
         ignore_patterns: Vec<String>,
         use_gitignore: bool,
@@ -683,7 +680,6 @@ impl Core {
             tasks,
             rule_graph,
             types,
-            intrinsics,
             executor: executor.clone(),
             store,
             command_runners,

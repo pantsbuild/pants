@@ -42,7 +42,7 @@ def run_taplo(
     rule_runner.set_options(
         ["--backend-packages=pants.backend.tools.taplo", *(extra_args or ())],
     )
-    snapshot = rule_runner.request(Snapshot, [PathGlobs(["**"])])
+    snapshot = rule_runner.request(Snapshot, [PathGlobs(["**", "!BUILDROOT"])])
     partition = rule_runner.request(
         Partitions[Any], [TaploFmtRequest.PartitionRequest(snapshot.files)]
     )[0]

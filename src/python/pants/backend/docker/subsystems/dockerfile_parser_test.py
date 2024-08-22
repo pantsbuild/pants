@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import cast
 
 import pytest
 
@@ -19,8 +20,13 @@ from pants.testutil.pants_integration_test import run_pants
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
+@pytest.fixture(params=[pytest.param(True, id="rust"), pytest.param(False, id="legacy")])
+def use_rust_parser(request) -> bool:
+    return cast(bool, request.param)
+
+
 @pytest.fixture
-def rule_runner() -> RuleRunner:
+def rule_runner(use_rust_parser: bool) -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *dockerfile_rules(),
@@ -31,7 +37,7 @@ def rule_runner() -> RuleRunner:
         target_types=[DockerImageTarget, PexBinary],
     )
     rule_runner.set_options(
-        [],
+        [f"--dockerfile-parser-use-rust-parser={use_rust_parser}"],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     return rule_runner
@@ -59,10 +65,16 @@ def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunne
     dockerfile_content = dedent(
         """\
         ARG BASE_IMAGE=:base
+        ARG PEX_BIN=:hello
+        ARG PEX_BIN_DOTTED_PATH=dotted.path.as.arg/dpaa.pex
+        ARG OTHER_FILE=other/file
+        ARG NO_DEFAULT
         FROM $BASE_IMAGE
         COPY some.target/binary.pex some.target/tool.pex /bin
         COPY --from=scratch this.is/ignored.pex /opt
         COPY binary another/cli.pex tool /bin
+        COPY $NO_DEFAULT /app/not_references
+        COPY $OTHER_FILE ${PEX_BIN} ${PEX_BIN_DOTTED_PATH} :technically_a_file /app/hello.pex
         """
     )
 
@@ -73,12 +85,28 @@ def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunne
     addr = Address("test")
     info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
     assert info.from_image_build_args.to_dict() == {"BASE_IMAGE": ":base"}
+
+    # copy args
+    docker_copy_build_args = info.copy_build_args.to_dict()
+    assert docker_copy_build_args == {
+        "PEX_BIN": ":hello",
+        "PEX_BIN_DOTTED_PATH": "dotted.path.as.arg/dpaa.pex",
+        "OTHER_FILE": "other/file",
+    }
+    assert (
+        "NO_DEFAULT" not in docker_copy_build_args
+    ), "ARG with no value should not be included as it cannot be a reference to a target"
+    assert (
+        docker_copy_build_args.get("OTHER_FILE") == "other/file"
+    ), "A file reference should still be copied even if it isn't an output path or an obvious target"
+
     assert info.copy_source_paths == (
         "some.target/binary.pex",
         "some.target/tool.pex",
         "binary",
         "another/cli.pex",
         "tool",
+        ":technically_a_file",  # we don't resolve inline targets, since we'd need to rewrite the Dockerfile
     )
 
 
@@ -159,7 +187,7 @@ def test_copy_source_references(rule_runner: RuleRunner) -> None:
                 FROM base
                 COPY a b /
                 COPY --option c/d e/f/g /h
-                ADD ignored
+                ADD ignored ignored
                 COPY j k /
                 COPY
                 """
@@ -182,6 +210,7 @@ def test_baseimage_tags(rule_runner: RuleRunner) -> None:
                 "FROM gcr.io/tekton-releases/github.com/tektoncd/operator/cmd/kubernetes/operator:"
                 "v0.54.0@sha256:d1f0463b35135852308ea815c2ae54c1734b876d90288ce35828aeeff9899f9d\n"
                 "FROM $PYTHON_VERSION AS python\n"
+                "FROM python:$VERSION\n"
             ),
         }
     )
@@ -193,6 +222,7 @@ def test_baseimage_tags(rule_runner: RuleRunner) -> None:
         # Stage 2 is not pinned with a tag.
         "stage3 v0.54.0",
         "python build-arg:PYTHON_VERSION",  # Parse tag from build arg.
+        "stage5 $VERSION",
     )
 
 

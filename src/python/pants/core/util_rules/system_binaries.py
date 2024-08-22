@@ -7,6 +7,7 @@ import dataclasses
 import hashlib
 import logging
 import os
+import shlex
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
@@ -413,6 +414,10 @@ class FindBinary(BinaryPath):
     pass
 
 
+class GetentBinary(BinaryPath):
+    pass
+
+
 class GpgBinary(BinaryPath):
     pass
 
@@ -540,7 +545,7 @@ class GitBinary(BinaryPath):
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except OSError as e:
             # Binary DNE or is not executable
-            cmd_str = " ".join(cmd)
+            cmd_str = shlex.join(cmd)
             raise GitBinaryException(f"Failed to execute command {cmd_str}: {e!r}")
         out, err = process.communicate()
 
@@ -548,11 +553,10 @@ class GitBinary(BinaryPath):
 
         return out.decode().strip()
 
-    def _check_result(
-        self, cmd: Iterable[str], result: int, failure_msg: str | None = None
-    ) -> None:
-        if result != 0:
-            cmd_str = " ".join(cmd)
+    def _check_result(self, cmd: list[str], result: int, failure_msg: str | None = None) -> None:
+        # git diff --exit-code exits with 1 if there were differences.
+        if result != 0 and (result != 1 or "diff" not in cmd):
+            cmd_str = shlex.join(cmd)
             raise GitBinaryException(failure_msg or f"{cmd_str} failed with exit code {result}")
 
     def _log_call(self, cmd: Iterable[str]) -> None:
@@ -642,7 +646,15 @@ async def find_binary(
         bash = await Get(BashBinary)
         shebang = f"#!{bash.path}"
 
-    script_path = "./find_binary.sh"
+    # HACK: For workspace environments, the `find_binary.sh` will be mounted in the "chroot" directory
+    # which is not the current directory (since the process will execute in the workspace). Thus,
+    # adjust the path used as argv[0] to find the script.
+    script_name = "find_binary.sh"
+    sandbox_base_path = env_target.sandbox_base_path()
+    script_exec_path = (
+        f"./{script_name}" if not sandbox_base_path else f"{sandbox_base_path}/{script_name}"
+    )
+
     script_header = dedent(
         f"""\
         {shebang}
@@ -674,7 +686,7 @@ async def find_binary(
     script_content = script_header + script_body
     script_digest = await Get(
         Digest,
-        CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
+        CreateDigest([FileContent(script_name, script_content.encode(), is_executable=True)]),
     )
 
     # Some subtle notes about executing this script:
@@ -688,7 +700,7 @@ async def find_binary(
             description=f"Searching for `{request.binary_name}` on PATH={search_path}",
             level=LogLevel.DEBUG,
             input_digest=script_digest,
-            argv=[script_path, request.binary_name],
+            argv=[script_exec_path, request.binary_name],
             env={"PATH": search_path},
             cache_scope=env_target.executable_search_path_cache_scope(),
         ),
@@ -897,6 +909,16 @@ async def find_git(system_binaries: SystemBinariesSubsystem.EnvironmentAware) ->
         request, rationale="track changes to files in your build environment"
     )
     return GitBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `getent` binary", level=LogLevel.DEBUG)
+async def find_getent(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> GetentBinary:
+    request = BinaryPathRequest(
+        binary_name="getent", search_path=system_binaries.system_binary_paths
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="getent file")
+    return GetentBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `gpg` binary", level=LogLevel.DEBUG)

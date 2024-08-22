@@ -5,25 +5,34 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use bytes::Bytes;
+use dep_inference::dockerfile::ParsedDockerfileDependencies;
 use dep_inference::javascript::ParsedJavascriptDependencies;
 use dep_inference::python::ParsedPythonDependencies;
-use dep_inference::{javascript, python};
+use dep_inference::{dockerfile, javascript, python};
 use fs::{DirectoryDigest, Entry, SymlinkBehavior};
-use futures::future::{BoxFuture, FutureExt};
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
 use protos::gen::pants::cache::{
     dependency_inference_request, CacheKey, CacheKeyType, DependencyInferenceRequest,
 };
-use pyo3::{Python, ToPyObject};
+use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyResult, Python, ToPyObject};
+use pyo3::IntoPy;
 use store::Store;
 use workunit_store::{in_workunit, Level};
 
-use crate::context::Context;
 use crate::externs::dep_inference::PyNativeDependenciesRequest;
-use crate::nodes::NodeResult;
-use crate::python::Value;
+use crate::externs::{store_dict, PyGeneratorResponseNativeCall};
+use crate::nodes::{task_get_context, NodeResult};
+use crate::python::{Failure, Value};
 use crate::{externs, Core};
+
+pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(parse_dockerfile_info, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_python_deps, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_javascript_deps, m)?)?;
+
+    Ok(())
+}
 
 pub(crate) struct PreparedInferenceRequest {
     digest: Digest,
@@ -36,7 +45,7 @@ pub(crate) struct PreparedInferenceRequest {
 
 impl PreparedInferenceRequest {
     pub async fn prepare(
-        args: Vec<Value>,
+        deps_request: Value,
         store: &Store,
         backend: &str,
         impl_hash: &str,
@@ -44,7 +53,7 @@ impl PreparedInferenceRequest {
         let PyNativeDependenciesRequest {
             directory_digest,
             metadata,
-        } = Python::with_gil(|py| (*args[0]).as_ref(py).extract())?;
+        } = Python::with_gil(|py| deps_request.extract(py))?;
 
         let (path, digest) = Self::find_one_file(directory_digest, store, backend).await?;
         let str_path = path.display().to_string();
@@ -103,15 +112,76 @@ impl PreparedInferenceRequest {
     }
 }
 
-pub(crate) fn parse_python_deps(
-    context: Context,
-    args: Vec<Value>,
-) -> BoxFuture<'static, NodeResult<Value>> {
-    async move {
+#[pyfunction]
+fn parse_dockerfile_info(deps_request: Value) -> PyGeneratorResponseNativeCall {
+    PyGeneratorResponseNativeCall::new(async move {
+        let context = task_get_context();
+
+        let core = &context.core;
+        let store = core.store();
+        let prepared_inference_request = PreparedInferenceRequest::prepare(
+            deps_request,
+            &store,
+            "Dockerfile",
+            dockerfile::IMPL_HASH,
+        )
+        .await?;
+        in_workunit!(
+            "parse_dockerfile_info",
+            Level::Debug,
+            desc = Some(format!(
+                "Determine Dockerfile info for {:?}",
+                &prepared_inference_request.inner.input_file_path
+            )),
+            |_workunit| async move {
+                let result: ParsedDockerfileDependencies = get_or_create_inferred_dependencies(
+                    core,
+                    &store,
+                    prepared_inference_request,
+                    |content, request| {
+                        dockerfile::get_info(content, request.inner.input_file_path.into())
+                    },
+                )
+                .await?;
+
+                let result = Python::with_gil(|py| {
+                    externs::unsafe_call(
+                        py,
+                        core.types.parsed_dockerfile_info_result,
+                        &[
+                            result.path.to_object(py).into(),
+                            result.build_args.to_object(py).into(),
+                            result.copy_source_paths.to_object(py).into(),
+                            result.copy_build_args.to_object(py).into(),
+                            result.from_image_build_args.to_object(py).into(),
+                            result
+                                .version_tags
+                                .into_iter()
+                                .map(|(stage, tag)| format!("{stage} {tag}"))
+                                .collect::<Vec<_>>()
+                                .to_object(py)
+                                .into(),
+                        ],
+                    )
+                });
+
+                Ok::<_, Failure>(result)
+            }
+        )
+        .await
+    })
+}
+
+#[pyfunction]
+fn parse_python_deps(deps_request: Value) -> PyGeneratorResponseNativeCall {
+    PyGeneratorResponseNativeCall::new(async move {
+        let context = task_get_context();
+
         let core = &context.core;
         let store = core.store();
         let prepared_inference_request =
-            PreparedInferenceRequest::prepare(args, &store, "Python", python::IMPL_HASH).await?;
+            PreparedInferenceRequest::prepare(deps_request, &store, "Python", python::IMPL_HASH)
+                .await?;
         in_workunit!(
             "parse_python_dependencies",
             Level::Debug,
@@ -141,24 +211,27 @@ pub(crate) fn parse_python_deps(
                     )
                 });
 
-                Ok(result)
+                Ok::<_, Failure>(result)
             }
         )
         .await
-    }
-    .boxed()
+    })
 }
 
-pub(crate) fn parse_javascript_deps(
-    context: Context,
-    args: Vec<Value>,
-) -> BoxFuture<'static, NodeResult<Value>> {
-    async move {
+#[pyfunction]
+fn parse_javascript_deps(deps_request: Value) -> PyGeneratorResponseNativeCall {
+    PyGeneratorResponseNativeCall::new(async move {
+        let context = task_get_context();
+
         let core = &context.core;
         let store = core.store();
-        let prepared_inference_request =
-            PreparedInferenceRequest::prepare(args, &store, "Javascript", javascript::IMPL_HASH)
-                .await?;
+        let prepared_inference_request = PreparedInferenceRequest::prepare(
+            deps_request,
+            &store,
+            "Javascript",
+            javascript::IMPL_HASH,
+        )
+        .await?;
 
         in_workunit!(
             "parse_javascript_dependencies",
@@ -191,23 +264,33 @@ pub(crate) fn parse_javascript_deps(
                 )
                 .await?;
 
-                let result = Python::with_gil(|py| {
-                    externs::unsafe_call(
+                Python::with_gil(|py| {
+                    Ok(externs::unsafe_call(
                         py,
                         core.types.parsed_javascript_deps_result,
-                        &[
-                            result.file_imports.to_object(py).into(),
-                            result.package_imports.to_object(py).into(),
-                        ],
-                    )
-                });
-
-                Ok(result)
+                        &[store_dict(
+                            py,
+                            result.imports.into_iter().map(|(string, info)| {
+                                (
+                                    string.into_py(py).into(),
+                                    externs::unsafe_call(
+                                        py,
+                                        core.types.parsed_javascript_deps_candidate_result,
+                                        &[
+                                            info.file_imports.into_py(py).into(),
+                                            info.package_imports.into_py(py).into(),
+                                        ],
+                                    ),
+                                )
+                            }),
+                        )
+                        .map_err(|e| Failure::from_py_err_with_gil(py, e))?],
+                    ))
+                })
             }
         )
         .await
-    }
-    .boxed()
+    })
 }
 
 pub(crate) async fn get_or_create_inferred_dependencies<T, F>(

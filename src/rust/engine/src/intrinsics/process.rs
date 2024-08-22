@@ -3,32 +3,33 @@
 
 use std::time::Duration;
 
-use futures::future::{BoxFuture, FutureExt, TryFutureExt};
+use futures::future::TryFutureExt;
 use futures::try_join;
-use pyo3::{IntoPy, Python};
+use pyo3::prelude::{pyfunction, wrap_pyfunction, IntoPy, PyModule, PyResult, Python};
 
-use crate::context::Context;
-use crate::externs;
-use crate::nodes::{ExecuteProcess, NodeResult, Snapshot};
+use crate::externs::{self, PyGeneratorResponseNativeCall};
+use crate::nodes::{task_get_context, ExecuteProcess, NodeResult, Snapshot};
 use crate::python::Value;
 
-pub(crate) fn process_request_to_process_result(
-    context: Context,
-    mut args: Vec<Value>,
-) -> BoxFuture<'static, NodeResult<Value>> {
-    async move {
+pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(process_request_to_process_result, m)?)?;
+
+    Ok(())
+}
+
+#[pyfunction]
+fn process_request_to_process_result(
+    process: Value,
+    process_config: Value,
+) -> PyGeneratorResponseNativeCall {
+    PyGeneratorResponseNativeCall::new(async move {
+        let context = task_get_context();
+
         let process_config: externs::process::PyProcessExecutionEnvironment =
-            Python::with_gil(|py| {
-                args.pop()
-                    .unwrap()
-                    .as_ref()
-                    .extract(py)
-                    .map_err(|e| format!("{e}"))
-            })?;
-        let process_request =
-            ExecuteProcess::lift(&context.core.store(), args.pop().unwrap(), process_config)
-                .map_err(|e| e.enrich("Error lifting Process"))
-                .await?;
+            Python::with_gil(|py| process_config.extract(py)).map_err(|e| format!("{e}"))?;
+        let process_request = ExecuteProcess::lift(&context.core.store(), process, process_config)
+            .map_err(|e| e.enrich("Error lifting Process"))
+            .await?;
 
         let result = context.get(process_request).await?.result;
 
@@ -77,6 +78,5 @@ pub(crate) fn process_request_to_process_result(
                 ],
             ))
         })
-    }
-    .boxed()
+    })
 }

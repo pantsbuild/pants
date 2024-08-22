@@ -111,12 +111,14 @@ SCALA_LIB_SOURCE = dedent(
     """
 )
 
-SCALA_LIB_JDK12_SOURCE = dedent(
+SCALA_LIB_JDK17_SOURCE = dedent(
     """
     package org.pantsbuild.example.lib
 
+    import javax.lang.model.SourceVersion
+
     class C {
-        val hello = "hello!".indent(4)
+        val hello = "hello " + SourceVersion.RELEASE_17 + "!"
     }
     """
 )
@@ -185,7 +187,7 @@ def test_compile_no_deps(
 
 
 @maybe_skip_jdk_test
-def test_compile_no_deps_jdk_12(
+def test_compile_no_deps_jdk_17(
     rule_runner: RuleRunner, scala_stdlib_jvm_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
@@ -194,13 +196,13 @@ def test_compile_no_deps_jdk_12(
                 """\
                 scala_sources(
                     name = 'lib',
-                    jdk = 'adopt:1.12',
+                    jdk = 'temurin:1.17',
                 )
                 """
             ),
             "3rdparty/jvm/BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
             "3rdparty/jvm/default.lock": scala_stdlib_jvm_lockfile.serialized_lockfile,
-            "ExampleLib.scala": SCALA_LIB_JDK12_SOURCE,
+            "ExampleLib.scala": SCALA_LIB_JDK17_SOURCE,
         }
     )
     coarsened_target = expect_single_expanded_coarsened_target(
@@ -215,7 +217,7 @@ def test_compile_no_deps_jdk_12(
 
 @logging
 @maybe_skip_jdk_test
-def test_compile_jdk_12_file_fails_on_jdk_11(
+def test_compile_jdk_17_file_fails_on_jdk_11(
     rule_runner: RuleRunner, scala_stdlib_jvm_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
@@ -224,13 +226,13 @@ def test_compile_jdk_12_file_fails_on_jdk_11(
                 """\
                 scala_sources(
                     name = 'lib',
-                    jdk = 'adopt:1.11',
+                    jdk = 'temurin:1.11.0.23',
                 )
                 """
             ),
             "3rdparty/jvm/BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
             "3rdparty/jvm/default.lock": scala_stdlib_jvm_lockfile.serialized_lockfile,
-            "ExampleLib.scala": SCALA_LIB_JDK12_SOURCE,
+            "ExampleLib.scala": SCALA_LIB_JDK17_SOURCE,
         }
     )
     coarsened_target = expect_single_expanded_coarsened_target(
@@ -584,6 +586,7 @@ def test_compile_with_local_scalac_plugin(
 
                 scala_sources(
                     scalac_plugins=["acyclic"],
+                    dependencies=["3rdparty/jvm:com.lihaoyi_acyclic_2.13"],
                 )
                 """
             ),
@@ -1026,6 +1029,7 @@ def test_cross_compile_with_scalac_plugin(
                 scala_sources(
                     name="main",
                     scalac_plugins=["acyclic"],
+                    dependencies=["3rdparty/jvm:acyclic"],
                     resolve=parametrize("scala2.12", "scala2.13")
                 )
                 """

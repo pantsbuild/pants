@@ -128,7 +128,9 @@ async def _generate_requirements(
         normalized_proj_name = canonicalize_project_name(project_name)
         tgt_overrides = overrides.pop(normalized_proj_name, {})
         if Dependencies.alias in tgt_overrides:
-            tgt_overrides[Dependencies.alias] = list(tgt_overrides[Dependencies.alias]) + req_deps
+            tgt_overrides = tgt_overrides | {
+                Dependencies.alias: list(tgt_overrides[Dependencies.alias]) + req_deps
+            }
 
         return PythonRequirementTarget(
             {

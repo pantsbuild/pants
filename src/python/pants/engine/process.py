@@ -97,7 +97,9 @@ class Process:
 
         Usually, you will want to provide input files/directories via the parameter `input_digest`.
         The process will then be able to access these paths through relative paths. If you want to
-        give multiple input digests, first merge them with `await Get(Digest, MergeDigests)`.
+        give multiple input digests, first merge them with `await Get(Digest, MergeDigests)`. Files
+        larger than 512KB will be read-only unless they are globbed as part of either `output_files`
+        or `output_directories`.
 
         Often, you will want to capture the files/directories created in the process. To do this,
         you can either set `output_files` or `output_directories`. The specified paths should be
@@ -207,6 +209,8 @@ class ProcessResultMetadata:
     """Metadata for a ProcessResult, which is not included in its definition of equality."""
 
     class Source(Enum):
+        """This is public API as these values are part of the test result report file."""
+
         RAN = "ran"
         HIT_LOCALLY = "hit_locally"
         HIT_REMOTELY = "hit_remotely"
@@ -283,6 +287,18 @@ class ProcessExecutionFailure(Exception):
             )
         super().__init__("\n".join(err_strings))
 
+    @classmethod
+    def from_result(
+        cls, result: FallibleProcessResult, description: str, keep_sandboxes: KeepSandboxes
+    ) -> ProcessExecutionFailure:
+        return cls(
+            result.exit_code,
+            result.stdout,
+            result.stderr,
+            description,
+            keep_sandboxes=keep_sandboxes,
+        )
+
 
 @rule
 def get_multi_platform_request_description(req: Process) -> ProductDescription:
@@ -351,6 +367,7 @@ class InteractiveProcess(SideEffecting):
         argv: Iterable[str],
         *,
         env: Mapping[str, str] | None = None,
+        description: str = "Interactive process",
         input_digest: Digest = EMPTY_DIGEST,
         run_in_workspace: bool = False,
         forward_signals_to_process: bool = True,
@@ -375,7 +392,7 @@ class InteractiveProcess(SideEffecting):
             "process",
             Process(
                 argv,
-                description="Interactive process",
+                description=description,
                 env=env,
                 input_digest=input_digest,
                 append_only_caches=append_only_caches,
@@ -394,15 +411,18 @@ class InteractiveProcess(SideEffecting):
         *,
         forward_signals_to_process: bool = True,
         restartable: bool = False,
+        keep_sandboxes: KeepSandboxes = KeepSandboxes.never,
     ) -> InteractiveProcess:
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
+            description=process.description,
             input_digest=process.input_digest,
             forward_signals_to_process=forward_signals_to_process,
             restartable=restartable,
             append_only_caches=process.append_only_caches,
             immutable_input_digests=process.immutable_input_digests,
+            keep_sandboxes=keep_sandboxes,
         )
 
 

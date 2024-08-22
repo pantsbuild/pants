@@ -13,7 +13,8 @@ from pants.backend.helm.utils.yaml import YamlPath
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess, VenvPexRequest
+from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileEntry
 from pants.engine.process import FallibleProcessResult
@@ -52,7 +53,10 @@ class _HelmKubeParserTool:
 
 
 @rule
-async def build_k8s_parser_tool(k8s_parser: HelmKubeParserSubsystem) -> _HelmKubeParserTool:
+async def build_k8s_parser_tool(
+    k8s_parser: HelmKubeParserSubsystem,
+    pex_environment: PexEnvironment,
+) -> _HelmKubeParserTool:
     parser_sources = pkgutil.get_data(_HELM_K8S_PARSER_PACKAGE, _HELM_K8S_PARSER_SOURCE)
     if not parser_sources:
         raise ValueError(
@@ -64,11 +68,21 @@ async def build_k8s_parser_tool(k8s_parser: HelmKubeParserSubsystem) -> _HelmKub
     )
     parser_digest = await Get(Digest, CreateDigest([parser_file_content]))
 
+    # We use copies of site packages because hikaru gets confused with symlinked packages
+    # The core hikaru package tries to load the packages containing the kubernetes-versioned models
+    # using the __path__ attribute of the core package,
+    # which doesn't work when the packages are symlinked from inside the namespace-handling dirs in the PEX
+    use_site_packages_copies = True
+
     parser_pex = await Get(
         VenvPex,
-        PexRequest,
-        k8s_parser.to_pex_request(
-            main=EntryPoint(PurePath(parser_file_content.path).stem), sources=parser_digest
+        VenvPexRequest(
+            k8s_parser.to_pex_request(
+                main=EntryPoint(PurePath(parser_file_content.path).stem),
+                sources=parser_digest,
+            ),
+            pex_environment.in_sandbox(working_directory=None),
+            site_packages_copies=use_site_packages_copies,
         ),
     )
     return _HelmKubeParserTool(parser_pex)

@@ -1,5 +1,6 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import annotations
 
 import os
@@ -7,18 +8,22 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
+from pants.backend.python.util_rules.pex import PexProcess, create_pex
 from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.core.goals.lint import LintFilesRequest, LintResult
 from pants.core.util_rules.config_files import (
     GatherConfigFilesByDirectoriesRequest,
-    GatheredConfigFilesByDirectories,
+    gather_config_files_by_workspace_dir,
 )
 from pants.core.util_rules.partitions import Partition, Partitions
-from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs
+from pants.engine.fs import DigestSubset, MergeDigests, PathGlobs
 from pants.engine.internals.native_engine import FilespecMatcher, Snapshot
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import (
+    digest_to_snapshot,
+    merge_digests_request_to_digest,
+    process_request_to_process_result,
+)
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -51,14 +56,13 @@ async def partition_inputs(
         includes=yamllint.file_glob_include, excludes=yamllint.file_glob_exclude
     ).matches(request.files)
 
-    config_files = await Get(
-        GatheredConfigFilesByDirectories,
+    config_files = await gather_config_files_by_workspace_dir(
         GatherConfigFilesByDirectoriesRequest(
             tool_name=yamllint.name,
             config_filename=yamllint.config_file_name,
             filepaths=tuple(sorted(matching_filepaths)),
             orphan_filepath_behavior=yamllint.orphan_files_behavior,
-        ),
+        )
     )
 
     default_source_files: set[str] = set()
@@ -71,8 +75,10 @@ async def partition_inputs(
         else:
             default_source_files.update(files)
 
-    config_file_snapshots = await MultiGet(
-        Get(Snapshot, DigestSubset(config_files.snapshot.digest, PathGlobs([config_file])))
+    config_file_snapshots = await concurrently(
+        digest_to_snapshot(
+            **implicitly(DigestSubset(config_files.snapshot.digest, PathGlobs([config_file])))
+        )
         for config_file in source_files_by_config_file
     )
 
@@ -101,14 +107,11 @@ async def partition_inputs(
 async def run_yamllint(
     request: YamllintRequest.Batch[str, PartitionInfo], yamllint: Yamllint
 ) -> LintResult:
-    yamllint_bin = await Get(Pex, PexRequest, yamllint.to_pex_request())
-
     partition_info = request.partition_metadata
 
-    snapshot = await Get(Snapshot, PathGlobs(request.elements))
-
-    input_digest = await Get(
-        Digest,
+    yamllint_bin = await create_pex(yamllint.to_pex_request())
+    snapshot = await digest_to_snapshot(**implicitly(PathGlobs(request.elements)))
+    input_digest = await merge_digests_request_to_digest(
         MergeDigests(
             (
                 snapshot.digest,
@@ -119,26 +122,27 @@ async def run_yamllint(
                     else ()
                 ),
             )
-        ),
+        )
     )
 
-    process_result = await Get(
-        FallibleProcessResult,
-        PexProcess(
-            yamllint_bin,
-            argv=(
-                *(
-                    ("-c", partition_info.config_snapshot.files[0])
-                    if partition_info.config_snapshot
-                    else ()
+    process_result = await process_request_to_process_result(
+        **implicitly(
+            PexProcess(
+                yamllint_bin,
+                argv=(
+                    *(
+                        ("-c", partition_info.config_snapshot.files[0])
+                        if partition_info.config_snapshot
+                        else ()
+                    ),
+                    *yamllint.args,
+                    *snapshot.files,
                 ),
-                *yamllint.args,
-                *snapshot.files,
-            ),
-            input_digest=input_digest,
-            description=f"Run yamllint on {pluralize(len(request.elements), 'file')}.",
-            level=LogLevel.DEBUG,
-        ),
+                input_digest=input_digest,
+                description=f"Run yamllint on {pluralize(len(request.elements), 'file')}.",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
     return LintResult.create(request, process_result)
 

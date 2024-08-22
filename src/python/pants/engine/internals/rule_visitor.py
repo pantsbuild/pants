@@ -59,6 +59,12 @@ class _TypeStack:
         self.root = sys.modules[func.__module__]
         self.push(self.root)
         self._push_function_closures(func)
+        # To support recursive rules.
+        # TODO: This will not allow mutually recursive rules defined in the same module.
+        #  Doing so will require changes to the @rule decorator implementation so that we
+        #  gather all rules in a module and assign them ids, and only then run
+        #  collect_awaitables() on those rules.
+        self.push({func.__name__: func})
 
     def __getitem__(self, name: str) -> Any:
         for ns in reversed(self._stack):
@@ -299,9 +305,10 @@ class _AwaitableCollector(ast.NodeVisitor):
                 self.awaitables.append(
                     self._get_legacy_awaitable(call_node, is_effect=issubclass(func, Effect))
                 )
-            elif inspect.isfunction(func) and (rule := getattr(func, "rule", None)) is not None:
+            elif (
+                inspect.isfunction(func) and (rule_id := getattr(func, "rule_id", None)) is not None
+            ):
                 # Is a direct `@rule` call.
-                rule_id = rule.canonical_name
                 self.awaitables.append(self._get_byname_awaitable(rule_id, func, call_node))
             elif inspect.iscoroutinefunction(func) or _returns_awaitable(func):
                 # Is a call to a "rule helper".

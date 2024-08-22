@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Sequence
+from typing import Iterable, Optional, Sequence
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
@@ -14,11 +14,13 @@ from pants.backend.terraform.target_types import (
     TerraformBackendTarget,
     TerraformDependenciesField,
     TerraformDeploymentFieldSet,
+    TerraformLockfileTarget,
     TerraformModuleSourcesField,
     TerraformVarFileTarget,
 )
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import DirGlobSpec, DirLiteralSpec, RawSpecs
+from pants.core.target_types import LockfileTarget
 from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import Address, AddressInput
@@ -41,6 +43,7 @@ from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.resources import read_resource
+from pants.util.strutil import bullet_list, softwrap
 
 
 class TerraformHcl2Parser(PythonToolRequirementsBase):
@@ -107,48 +110,14 @@ async def setup_process_for_parse_terraform_module_sources(
 
 @dataclass(frozen=True)
 class TerraformModuleDependenciesInferenceFieldSet(FieldSet):
-    required_fields = (TerraformModuleSourcesField,)
+    required_fields = (TerraformModuleSourcesField, TerraformDependenciesField)
 
     sources: TerraformModuleSourcesField
+    dependencies: TerraformDependenciesField
 
 
 class InferTerraformModuleDependenciesRequest(InferDependenciesRequest):
     infer_from = TerraformModuleDependenciesInferenceFieldSet
-
-
-@rule
-async def infer_terraform_module_dependencies(
-    request: InferTerraformModuleDependenciesRequest,
-) -> InferredDependencies:
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources))
-
-    paths = OrderedSet(
-        filename for filename in hydrated_sources.snapshot.files if filename.endswith(".tf")
-    )
-    result = await Get(
-        ProcessResult,
-        ParseTerraformModuleSources(
-            sources_digest=hydrated_sources.snapshot.digest,
-            paths=tuple(paths),
-        ),
-    )
-    candidate_spec_paths = [line for line in result.stdout.decode("utf-8").split("\n") if line]
-
-    # For each path, see if there is a `terraform_module` target at the specified spec_path.
-    candidate_targets = await Get(
-        Targets,
-        RawSpecs(
-            dir_globs=tuple(DirGlobSpec(path) for path in candidate_spec_paths),
-            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
-            description_of_origin="the `terraform_module` dependency inference rule",
-        ),
-    )
-    # TODO: Need to either implement the standard ambiguous dependency logic or ban >1 terraform_module
-    # per directory.
-    terraform_module_addresses = [
-        tgt.address for tgt in candidate_targets if tgt.has_field(TerraformModuleSourcesField)
-    ]
-    return InferredDependencies(terraform_module_addresses)
 
 
 @dataclass(frozen=True)
@@ -181,6 +150,7 @@ class TerraformDeploymentInvocationFiles:
 
     backend_configs: tuple[TerraformBackendTarget, ...]
     vars_files: tuple[TerraformVarFileTarget, ...]
+    lockfile: Optional[LockfileTarget]
 
 
 @rule
@@ -205,6 +175,28 @@ async def get_terraform_backend_and_vars(
     return identify_terraform_backend_and_vars(explicit_deps_tgt, tgts_in_dir)
 
 
+class InvalidLockfileException(Exception):
+    @classmethod
+    def too_many_lockfiles(
+        cls, lockfiles: Iterable[TerraformLockfileTarget]
+    ) -> InvalidLockfileException:
+        addresses = sorted(tgt.address.spec for tgt in lockfiles)
+        return cls(
+            softwrap(
+                f"""\
+                A Terraform deployment has {len(addresses)} lockfiles supplied:
+                {bullet_list(addresses)}
+                Terraform requires at most 1 lockfile; it must be called `.terraform.lock.hcl`;
+                and it must be in the same directory as the root module.
+
+                Pants generates targets for Terraform lockfiles automatically.
+                If you manually added `{TerraformLockfileTarget.alias}` targets, removing them should resolve this error.
+                If you have not, please report this as a bug.
+                """
+            )
+        )
+
+
 def identify_terraform_backend_and_vars(
     explicit_deps: Sequence[Target], tgts_in_dir: Sequence[Target]
 ) -> TerraformDeploymentInvocationFiles:
@@ -221,7 +213,77 @@ def identify_terraform_backend_and_vars(
     else:
         vars_targets = has_explicit_var
 
-    return TerraformDeploymentInvocationFiles(backend_targets, vars_targets)
+    lockfiles = find_targets_of_type(tgts_in_dir, TerraformLockfileTarget)
+    if len(lockfiles) == 1:
+        lockfile = lockfiles[0]
+    elif len(lockfiles) > 1:
+        # Unlikely, since we generate them based on a constant filename.
+        # Indicates manual specification of targets
+        raise InvalidLockfileException.too_many_lockfiles(lockfiles)
+    else:
+        lockfile = None
+
+    return TerraformDeploymentInvocationFiles(backend_targets, vars_targets, lockfile)
+
+
+async def _infer_dependencies_from_sources(
+    request: InferTerraformModuleDependenciesRequest,
+) -> list[Address]:
+    """Parse the source code for references to other modules."""
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources))
+    paths = OrderedSet(
+        filename for filename in hydrated_sources.snapshot.files if filename.endswith(".tf")
+    )
+    result = await Get(
+        ProcessResult,
+        ParseTerraformModuleSources(
+            sources_digest=hydrated_sources.snapshot.digest,
+            paths=tuple(paths),
+        ),
+    )
+    candidate_spec_paths = [line for line in result.stdout.decode("utf-8").split("\n") if line]
+    # For each path, see if there is a `terraform_module` target at the specified spec_path.
+    candidate_targets = await Get(
+        Targets,
+        RawSpecs(
+            dir_globs=tuple(DirGlobSpec(path) for path in candidate_spec_paths),
+            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+            description_of_origin="the `terraform_module` dependency inference rule",
+        ),
+    )
+    # TODO: Need to either implement the standard ambiguous dependency logic or ban >1 terraform_module
+    # per directory.
+    terraform_module_addresses = [
+        tgt.address for tgt in candidate_targets if tgt.has_field(TerraformModuleSourcesField)
+    ]
+    return terraform_module_addresses
+
+
+async def _infer_lockfile(request: InferTerraformModuleDependenciesRequest) -> list[Address]:
+    """Pull in the lockfile for a Terraform module.
+
+    This is necessary for `terraform validate`.
+    """
+    invocation_files = await Get(
+        TerraformDeploymentInvocationFiles,
+        TerraformDeploymentInvocationFilesRequest(
+            request.field_set.address, request.field_set.dependencies
+        ),
+    )
+    if invocation_files.lockfile:
+        return [invocation_files.lockfile.address]
+    else:
+        return []
+
+
+@rule
+async def infer_terraform_module_dependencies(
+    request: InferTerraformModuleDependenciesRequest,
+) -> InferredDependencies:
+    terraform_module_addresses = await _infer_dependencies_from_sources(request)
+    lockfile_address = await _infer_lockfile(request)
+
+    return InferredDependencies([*terraform_module_addresses, *lockfile_address])
 
 
 @rule
@@ -240,6 +302,7 @@ async def infer_terraform_deployment_dependencies(
     )
     deps.extend(e.address for e in invocation_files.backend_configs)
     deps.extend(e.address for e in invocation_files.vars_files)
+    # lockfile is attached to the module itself
 
     return InferredDependencies(deps)
 

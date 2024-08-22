@@ -183,9 +183,10 @@ def test_structured_output(rule_runner: RuleRunner) -> None:
         },
     ]
 
-    with open("published.json") as fd:
-        data = json.load(fd)
-        assert data == expected
+    with rule_runner.pushd():
+        with open("published.json") as fd:
+            data = json.load(fd)
+            assert data == expected
 
 
 @pytest.mark.skip("Can not run interactive process from test..?")

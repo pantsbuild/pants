@@ -74,7 +74,7 @@ To override the default on a particular target, you can use the [`jdk=` field](.
 
 #### Kotlin version
 
-The Kotlin version to use is configured on a resolve-by-resolve basis (see the "Third-party dependencies" section below) using the [`[kotlin].version_for_resolve` option](../../reference/subsystems/kotlin.mdx#section-version_for_resolve). The default Kotlin version for your repository will thus be whichever Kotlin version is configured for the "default" resolve, which is configured by the [`[jvm].default_resolve` option](reference-jvm#section-default-resolve).
+The Kotlin version to use is configured on a resolve-by-resolve basis (see the "Third-party dependencies" section below) using the [`[kotlin].version_for_resolve` option](../../reference/subsystems/kotlin.mdx#section-version_for_resolve). The default Kotlin version for your repository will thus be whichever Kotlin version is configured for the "default" resolve, which is configured by the [`[jvm].default_resolve` option](../../reference/subsystems/jvm#default_resolve).
 
 Each resolve must contain the following jars for the Kotlin runtime with the version matching the version specified for the resolve in the `[kotlin].version_for_resolve` option:
 

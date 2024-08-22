@@ -112,27 +112,37 @@ def run_run_request(
 
 
 @pytest.mark.parametrize(
-    "global_default_value, field_value, run_uses_sandbox",
+    "global_default_value, field_value, run_uses_sandbox, importable_script_name",
     [
         # Nothing set -> True
-        (None, None, True),
+        (None, None, True, True),
+        (None, None, True, False),
         # Field set -> use field value
-        (None, True, True),
-        (None, False, False),
+        (None, True, True, True),
+        (None, True, True, False),
+        (None, False, False, True),
+        (None, False, False, False),
         # Global default set -> use default
-        (True, None, True),
-        (False, None, False),
+        (True, None, True, True),
+        (True, None, True, False),
+        (False, None, False, True),
+        (False, None, False, False),
         # Both set -> use field
-        (True, True, True),
-        (True, False, False),
-        (False, True, True),
-        (False, False, False),
+        (True, True, True, True),
+        (True, True, True, False),
+        (True, False, False, True),
+        (True, False, False, False),
+        (False, True, True, True),
+        (False, True, True, False),
+        (False, False, False, True),
+        (False, False, False, False),
     ],
 )
 def test_run_sample_script(
     global_default_value: bool | None,
     field_value: bool | None,
     run_uses_sandbox: bool,
+    importable_script_name: bool,
     rule_runner: PythonRuleRunner,
 ) -> None:
     """Test that we properly run a `python_source` target.
@@ -141,9 +151,11 @@ def test_run_sample_script(
     - We can handle source roots.
     - We run in-repo when requested, and handle codegen correctly.
     - We propagate the error code.
+    - We can handle scripts without importable file name.
     """
+    script_name = "app.py" if importable_script_name else "my-executable.py"
     sources = {
-        "src_root1/project/app.py": dedent(
+        f"src_root1/project/{script_name}": dedent(
             """\
             import sys
             from utils.strutil import my_file
@@ -200,7 +212,7 @@ def test_run_sample_script(
         ),
     ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
-    target = rule_runner.get_target(Address("src_root1/project", relative_file_path="app.py"))
+    target = rule_runner.get_target(Address("src_root1/project", relative_file_path=script_name))
     exit_code, stdout, stderr = run_run_request(rule_runner, target)
 
     assert "Hola, mundo.\n" in stderr
