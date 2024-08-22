@@ -11,3 +11,5 @@ import * as Sentry from '@sentry/react';
 // local file import
 import { dispatcher } from './dispatcher';
 import { receiver } from './receiver';
+
+import { generator } from './generator';

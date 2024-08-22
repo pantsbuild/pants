@@ -278,15 +278,31 @@ class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
 @rule(desc="Find the dependencies needed by a Helm deployment")
 async def inject_deployment_dependencies(
     request: InferHelmDeploymentDependenciesRequest,
+    infer_subsystem: HelmInferSubsystem,
 ) -> InferredDependencies:
-    chart_address, explicitly_provided_deps, mapping = await MultiGet(
-        Get(Address, AddressInput, request.field_set.chart.to_address_input()),
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(
-            FirstPartyHelmDeploymentMapping,
-            FirstPartyHelmDeploymentMappingRequest(request.field_set),
-        ),
+    get_address = Get(Address, AddressInput, request.field_set.chart.to_address_input())
+    get_explicit_deps = Get(
+        ExplicitlyProvidedDependencies,
+        DependenciesRequest(request.field_set.dependencies),
     )
+
+    if infer_subsystem.deployment_dependencies:
+        chart_address, explicitly_provided_deps, mapping = await MultiGet(
+            get_address,
+            get_explicit_deps,
+            Get(
+                FirstPartyHelmDeploymentMapping,
+                FirstPartyHelmDeploymentMappingRequest(request.field_set),
+            ),
+        )
+    else:
+        (chart_address, explicitly_provided_deps), mapping = (
+            await MultiGet(get_address, get_explicit_deps),
+            FirstPartyHelmDeploymentMapping(
+                request.field_set.address,
+                FrozenYamlIndex.empty(),
+            ),
+        )
 
     dependencies: OrderedSet[Address] = OrderedSet()
     dependencies.add(chart_address)
