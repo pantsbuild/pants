@@ -130,7 +130,7 @@ async def setup_go_sdk_process(
         "__PANTS_GO_SDK_CACHE_KEY": f"{goroot.full_version}/{goroot.goos}/{goroot.goarch}",
     }
 
-    immutable_input_digests = {}
+    immutable_input_digests: dict[str, Digest] = {}
 
     # Add path to additional tools, such as git, that may be needed by the go tool
     if golang_env_aware.extra_tools:
