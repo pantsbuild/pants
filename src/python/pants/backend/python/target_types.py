@@ -492,7 +492,7 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
         complete platform JSON as described by Pex
         (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
 
-        See {doc_url('docs/python/overview/pex')} for details.
+        See {doc_url('docs/python/overview/pex#generating-the-complete_platforms-file')} for details on how to create this file.
         """
     )
 
