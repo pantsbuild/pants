@@ -157,8 +157,7 @@ async def _prepare_inference_metadata(address: Address, file_path: str) -> Infer
     )
 
 
-def _add_extensions(file_imports: frozenset[str]) -> PathGlobs:
-    file_extensions = (*JS_FILE_EXTENSIONS, *JSX_FILE_EXTENSIONS)
+def _add_extensions(file_imports: frozenset[str], file_extensions: tuple[str, ...]) -> PathGlobs:
     extensions = file_extensions + tuple(f"/index{ext}" for ext in file_extensions)
     return PathGlobs(
         string
@@ -174,8 +173,14 @@ def _add_extensions(file_imports: frozenset[str]) -> PathGlobs:
 async def _determine_import_from_candidates(
     candidates: ParsedJavascriptDependencyCandidate,
     package_candidate_map: NodePackageCandidateMap,
+    file_extensions: tuple[str, ...],
 ) -> Addresses:
-    paths = await path_globs_to_paths(_add_extensions(candidates.file_imports))
+    paths = await path_globs_to_paths(
+        _add_extensions(
+            candidates.file_imports,
+            file_extensions,
+        )
+    )
     local_owners = await Get(Owners, OwnersRequest(paths.files))
 
     owning_targets = await Get(Targets, Addresses(local_owners))
@@ -250,7 +255,11 @@ async def infer_js_source_dependencies(
         zip(
             import_strings.imports,
             await concurrently(
-                _determine_import_from_candidates(candidates, candidate_pkgs)
+                _determine_import_from_candidates(
+                    candidates,
+                    candidate_pkgs,
+                    file_extensions=JS_FILE_EXTENSIONS + JSX_FILE_EXTENSIONS,
+                )
                 for string, candidates in import_strings.imports.items()
             ),
         )

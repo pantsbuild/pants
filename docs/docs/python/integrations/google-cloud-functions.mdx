@@ -82,6 +82,33 @@ When building an Cloud function artifact, Pants and the underlying Pex tool need
         complete_platforms=[":gcf-platform"],
     )
     ```
+
+    If needed, this file can be generated for a specific Cloud Function runtime using the function below:
+
+    ```python title="gcf-complete-platform-generator.py"
+    import subprocess
+    import json
+
+    import functions_framework
+
+    @functions_framework.http
+    def generate_pex_complete_platforms(request):
+        subprocess.run(
+            "python -m pip install --target=/tmp/pex pex",
+            shell=True,
+            check=True,
+        )
+        result = subprocess.run(
+            "PYTHONPATH=/tmp/pex /tmp/pex/bin/pex3 interpreter inspect --markers --tags",
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout
+    ```
+
+    If you run this function in the Cloud Function testing environment, it will print out a formatted JSON object to the console. You can then copy this JSON object and add it to a file named `gcf-platform.json`.
+
 2. An explicit value for [the `runtime` field](../../../reference/targets/python_google_cloud_function.mdx#runtime): Pants uses this to pick an appropriate "complete platforms" value, from options that Pants has pre-packaged. These are static exports from docker images provided by GCP, relying on the environment being relatively stable. (If Pants doesn't have an appropriate "complete platforms" default built-in, you will be prompted to use option 1 above.)
     ```python title="BUILD"
     python_google_cloud_function(
