@@ -149,7 +149,6 @@ async def _get_docker_tools_shims(
         tools_paths = await MultiGet(
             Get(BinaryPaths, BinaryPathRequest, tools_request) for tools_request in tools_requests
         )
-        print(f"tools_paths={tools_paths}")
 
         all_binary_first_paths.extend(
             [
@@ -168,7 +167,6 @@ async def _get_docker_tools_shims(
             Get(BinaryPaths, BinaryPathRequest, optional_tools_request)
             for optional_tools_request in optional_tools_requests
         )
-        print(f"optional_tools_paths={optional_tools_paths}")
 
         all_binary_first_paths.extend(
             [
@@ -177,8 +175,6 @@ async def _get_docker_tools_shims(
                 if path.paths
             ]
         )
-
-    print(f"all_binary_first_paths={all_binary_first_paths}")
 
     tools_shims = await Get(
         BinaryShims,
