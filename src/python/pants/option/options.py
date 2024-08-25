@@ -467,7 +467,7 @@ class Options:
                 log_func(
                     softwrap(
                         f"""
-                        Found differences between the new native options parser and the legacy 
+                        Found differences between the new native options parser and the legacy
                         options parser in scope [{scope_section}]:
 
                         {formatted_msgs}
@@ -485,7 +485,7 @@ class Options:
 
                         Note that there is a known issue with differences in the handling of backslash
                         escapes in config values of type list-of-string. The solution to this issue will
-                        be to change the escaping in your config values appropriately when switching to 
+                        be to change the escaping in your config values appropriately when switching to
                         2.23.x Typically this will mean removing superfluous escapes, and the new behavior
                         will be more ergonomic.
                         """
