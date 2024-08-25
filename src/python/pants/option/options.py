@@ -486,7 +486,7 @@ class Options:
                         Note that there is a known issue with differences in the handling of backslash
                         escapes in config values of type list-of-string. The solution to this issue will
                         be to change the escaping in your config values appropriately when switching to
-                        2.23.x Typically this will mean removing superfluous escapes, and the new behavior
+                        2.23.x. Typically this will mean removing superfluous escapes, and the new behavior
                         will be more ergonomic.
                         """
                     )
