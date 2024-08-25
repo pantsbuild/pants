@@ -92,6 +92,23 @@ def test_parses_tsconfig_non_json_standard() -> None:
     """
     assert json.loads(_clean_tsconfig_contents(content)) == json.loads(content)
 
+    # strings with internal escaping, e.g. "\"" or '\'' or even "\"//".
+    content = """{ "data1": "fo\\"o", "data2": "fo\'o", "data3": "fo\\"//o" }"""
+    assert json.loads(_clean_tsconfig_contents(content)) == json.loads(
+        """{ "data1": "fo\\"o", "data2": "fo\'o", "data3": "fo\\"//o" }"""
+    )
+
+    # comments with internal "strings"
+    content = """
+    // testing "quotes"
+    // and also "over
+    // multiple lines"
+    {"data": "foo"}
+    /* or this "way
+       over multiple" lines */
+    """
+    assert json.loads(_clean_tsconfig_contents(content)) == json.loads("""{"data": "foo"}""")
+
     # single-line comment
     content = """
     // comment here
@@ -116,6 +133,33 @@ def test_parses_tsconfig_non_json_standard() -> None:
     """
     assert json.loads(_clean_tsconfig_contents(content)) == json.loads("""{"data": "foo"}""")
 
+    # single and multi-line comments interaction
+    content = """
+        /** abc /* looking like a nested comment block that is not /* **/
+        /* abc /* looking like a nested comment block that is not /* */
+        {"data": // /*
+         "foo*/"
+        }
+        /* abc /* looking like a nested comment block that is not */
+    """
+    assert json.loads(_clean_tsconfig_contents(content)) == json.loads("""{"data": "foo*/"}""")
+
+    # multi-line comment /*...*/ with nested single-line comments
+    content = """
+    /*
+    * first line comment here
+    * // single comment
+    * second line comment here
+    */
+    {"data": "foo"} // single comment
+    /**
+    * first line comment here
+    * second line comment here
+    * // single comment
+    **/
+    """
+    assert json.loads(_clean_tsconfig_contents(content)) == json.loads("""{"data": "foo"}""")
+
     # string literals with comment characters (such as URLs) are left untouched
     content = """
     // comment here
@@ -133,9 +177,18 @@ def test_parses_tsconfig_non_json_standard() -> None:
         "baseUrl": [
             "http://foo/bar/baz",
         ],
+        "data": "foo",
     } // comment here
     //// comment here
     """
     assert json.loads(_clean_tsconfig_contents(content)) == json.loads(
-        """{"baseUrl": ["http://foo/bar/baz"]}"""
+        """{"baseUrl": ["http://foo/bar/baz"], "data": "foo"}"""
     )
+
+    # strings that look like they contain a trailing comma
+    content = """{
+        "data1": "foo,",
+        "data2": "foo,}",
+        "data3": "foo,]"
+        } """
+    assert json.loads(_clean_tsconfig_contents(content)) == json.loads(content)
