@@ -467,7 +467,8 @@ class Options:
                 log_func(
                     softwrap(
                         f"""
-                        Found differences between the new native options parser and the legacy options parser in scope [{scope_section}]:
+                        Found differences between the new native options parser and the legacy 
+                        options parser in scope [{scope_section}]:
 
                         {formatted_msgs}
 
@@ -481,6 +482,12 @@ class Options:
                         You can use the global native_options_validation option
                         ({doc_url('reference/global-options#native_options_validation')}) to
                         configure this check.
+
+                        Note that there is a known issue with differences in the handling of backslash
+                        escapes in config values of type list-of-string. The solution to this issue will
+                        be to change the escaping in your config values appropriately when switching to 
+                        2.23.x Typically this will mean removing superfluous escapes, and the new behavior
+                        will be more ergonomic.
                         """
                     )
                 )
