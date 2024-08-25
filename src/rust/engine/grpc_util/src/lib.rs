@@ -153,14 +153,13 @@ mod tests {
     }
 
     use std::collections::BTreeMap;
-    use std::convert::Infallible;
     use std::time::Duration;
 
     use async_trait::async_trait;
     use futures::FutureExt;
-    use tokio::net::{TcpListener, TcpStream};
+    use tokio::net::TcpListener;
     use tokio::sync::oneshot;
-    use tokio_stream::wrappers::UnboundedReceiverStream;
+    use tokio_stream::wrappers::TcpListenerStream;
     use tonic::transport::Server;
     use tonic::{Request, Response, Status};
 
@@ -205,19 +204,8 @@ mod tests {
         // Setup shutdown signal handler.
         let (_shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
 
-        // Setup incoming connection stream.
-        let (incoming_sender, incoming_receiver) =
-            tokio::sync::mpsc::unbounded_channel::<Result<TcpStream, Infallible>>();
-
         tokio::spawn(async move {
-            loop {
-                let (socket, _remote_addr) = listener.accept().await.unwrap();
-                incoming_sender.send(Ok::<_, Infallible>(socket)).unwrap();
-            }
-        });
-
-        tokio::spawn(async move {
-            let incoming_stream = UnboundedReceiverStream::new(incoming_receiver);
+            let incoming_stream = TcpListenerStream::new(listener);
             let mut server = Server::builder();
             let router = server.add_service(gen::test_server::TestServer::new(UserAgentResponder));
             router

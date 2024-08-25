@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::any::type_name;
 use std::collections::VecDeque;
-use std::convert::Infallible;
 use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
@@ -31,8 +30,7 @@ use remexec::{
     CacheCapabilities, ExecuteRequest, ExecutionCapabilities, GetActionResultRequest,
     GetCapabilitiesRequest, ServerCapabilities, UpdateActionResultRequest, WaitExecutionRequest,
 };
-use tokio::net::TcpStream;
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_stream::wrappers::TcpListenerStream;
 use tonic::metadata::MetadataMap;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
@@ -137,19 +135,8 @@ impl TestServer {
 
         let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();
 
-        // Setup incoming connection stream.
-        let (incoming_sender, incoming_receiver) =
-            tokio::sync::mpsc::unbounded_channel::<Result<TcpStream, Infallible>>();
-
         tokio::spawn(async move {
-            loop {
-                let (socket, _remote_addr) = listener.accept().await.unwrap();
-                incoming_sender.send(Ok::<_, Infallible>(socket)).unwrap();
-            }
-        });
-
-        tokio::spawn(async move {
-            let incoming_stream = UnboundedReceiverStream::new(incoming_receiver);
+            let incoming_stream = TcpListenerStream::new(listener);
             let mut server = Server::builder();
             let router = server
                 .add_service(ExecutionServer::new(mock_responder2.clone()))

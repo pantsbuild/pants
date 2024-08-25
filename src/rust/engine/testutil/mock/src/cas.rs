@@ -1,7 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::HashMap;
-use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -17,8 +16,8 @@ use remexec::action_cache_server::ActionCacheServer;
 use remexec::capabilities_server::CapabilitiesServer;
 use remexec::content_addressable_storage_server::ContentAddressableStorageServer;
 use testutil::data::{TestData, TestDirectory, TestTree};
-use tokio::net::{TcpListener, TcpStream};
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio::net::TcpListener;
+use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
 
 use crate::action_cache_service::{ActionCacheHandle, ActionCacheResponder};
@@ -208,19 +207,8 @@ impl StubCASBuilder {
 
         let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel();
 
-        // Setup incoming connection stream.
-        let (incoming_sender, incoming_receiver) =
-            tokio::sync::mpsc::unbounded_channel::<Result<TcpStream, Infallible>>();
-
         tokio::spawn(async move {
-            loop {
-                let (socket, _remote_addr) = listener.accept().await.unwrap();
-                incoming_sender.send(Ok::<_, Infallible>(socket)).unwrap();
-            }
-        });
-
-        tokio::spawn(async move {
-            let incoming_stream = UnboundedReceiverStream::new(incoming_receiver);
+            let incoming_stream = TcpListenerStream::new(listener);
             let mut server = Server::builder();
             let router = server
                 .add_service(ActionCacheServer::new(ac_responder.clone()))
