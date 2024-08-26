@@ -64,7 +64,10 @@ async def generate_python_from_setuptools_scm(
     # A MaybeGitWorktree is uncacheable, so this enclosing rule will run every time its result
     # is needed, and the process invocation below caches at session scope, meaning this rule
     # will always return a result based on the current underlying git state.
-    maybe_git_worktree = await Get(MaybeGitWorktree, GitWorktreeRequest())
+    maybe_git_worktree = await Get(
+        MaybeGitWorktree,
+        {GitWorktreeRequest(): GitWorktreeRequest, local_environment_name.val: EnvironmentName},
+    )
     if not maybe_git_worktree.git_worktree:
         raise VCSVersioningError(
             softwrap(
@@ -100,7 +103,13 @@ async def generate_python_from_setuptools_scm(
         ),
     )
 
-    setuptools_scm_pex_get = Get(VenvPex, PexRequest, setuptools_scm.to_pex_request())
+    setuptools_scm_pex_get = Get(
+        VenvPex,
+        {
+            setuptools_scm.to_pex_request(): PexRequest,
+            local_environment_name.val: EnvironmentName,
+        },
+    )
     setuptools_scm_pex, input_digest = await MultiGet(setuptools_scm_pex_get, input_digest_get)
 
     argv = ["--root", str(maybe_git_worktree.git_worktree.worktree), "--config", config_path]
