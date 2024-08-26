@@ -175,7 +175,7 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
                     name='lambda',
                     dependencies=[':lib'],
                     handler='foo.bar.hello_world:handler',
-                    runtime='python3.7',
+                    runtime='python3.8',
                 )
                 """
             ),
@@ -187,7 +187,7 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
         rule_runner,
         Address("src/py/project", target_name="lambda"),
         expected_extra_log_lines=(
-            "    Runtime: python3.7",
+            "    Runtime: python3.8",
             f"    Architecture: {FaaSArchitecture.X86_64.value}",
             "    Handler: lambda_function.handler",
         ),
@@ -390,7 +390,7 @@ def test_create_hello_world_layer(
 def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
     """A layer _must_ use 'dependencies', unlike most other targets."""
     rule_runner.write_files(
-        {"BUILD": "python_aws_lambda_layer(name='lambda', runtime='python3.7')"}
+        {"BUILD": "python_aws_lambda_layer(name='lambda', runtime='python3.8')"}
     )
     with pytest.raises(
         ExecutionError, match="The `dependencies` field in target //:lambda must be defined"
@@ -398,7 +398,7 @@ def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
         create_python_awslambda(
             rule_runner,
             Address("", target_name="lambda"),
-            expected_extra_log_lines=("    Runtime: python3.7",),
+            expected_extra_log_lines=("    Runtime: python3.8",),
             layer=True,
         )
 
