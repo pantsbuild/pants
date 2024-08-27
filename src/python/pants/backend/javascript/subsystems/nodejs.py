@@ -62,12 +62,12 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     options_scope = "nodejs"
     help = "The Node.js Javascript runtime (including Corepack)."
 
-    default_version = "v22.5.1"
+    default_version = "v22.7.0"
     default_known_versions = [
-        "v22.5.1|macos_arm64|7602384855f1e169b60e51c360e5a2c672b89a19ccda0199ce4675d68fefaaf2|45737013",
-        "v22.5.1|macos_x86_64|6acb4533bc0a43a468f90bbd49230aa16c7c57b2a3451efe02175feea346754d|47832563",
-        "v22.5.1|linux_arm64|8b88f7fb681d95f8a2ecb7cf87f2cefa6769d3e74ff7309806bf201816e7c136|27412148",
-        "v22.5.1|linux_x86_64|9d4747dbbc1a91b1324f43c77e13eeddc4d4c54685665540cd7b7ad82e1b2fbc|28512812",
+        "v22.7.0|macos_arm64|5c54b08ec6cab6ef1e4e3302e655794f791132e9148dfc7741c5cba4bba1f27b|46726460",
+        "v22.7.0|macos_x86_64|d8d0c2835bad13427cc5a8e1a9aed536f6dd25f3bb55b1f56b027a18d5aa964f|48829706",
+        "v22.7.0|linux_arm64|180dfe622cf3e15cd72f267f576c04ef29f236515248965e58c458cdce6a3ad4|28106420",
+        "v22.7.0|linux_x86_64|f230a6b7f3eb325e84583a209bbdc7406202d7e4e6b91a16e8b0e6769729029f|29252120",
     ]
 
     default_url_template = "https://nodejs.org/dist/{version}/node-{version}-{platform}.tar"
