@@ -37,7 +37,7 @@ class CompletionBuiltinGoal(BuiltinGoal):
         """
         Generates a completion script for the specified shell. The script is printed to stdout.
 
-        For example, `pants complete --zsh > pants-completions.zsh` will generate a zsh
+        For example, `pants complete --shell=zsh > pants-completions.zsh` will generate a zsh
         completion script and write it to the file `my-pants-completions.zsh`. You can then
         source this file in your `.zshrc` file to enable completion for Pants.
 

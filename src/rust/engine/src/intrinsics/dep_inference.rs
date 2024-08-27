@@ -16,11 +16,12 @@ use protos::gen::pants::cache::{
     dependency_inference_request, CacheKey, CacheKeyType, DependencyInferenceRequest,
 };
 use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyResult, Python, ToPyObject};
+use pyo3::IntoPy;
 use store::Store;
 use workunit_store::{in_workunit, Level};
 
 use crate::externs::dep_inference::PyNativeDependenciesRequest;
-use crate::externs::PyGeneratorResponseNativeCall;
+use crate::externs::{store_dict, PyGeneratorResponseNativeCall};
 use crate::nodes::{task_get_context, NodeResult};
 use crate::python::{Failure, Value};
 use crate::{externs, Core};
@@ -263,18 +264,29 @@ fn parse_javascript_deps(deps_request: Value) -> PyGeneratorResponseNativeCall {
                 )
                 .await?;
 
-                let result = Python::with_gil(|py| {
-                    externs::unsafe_call(
+                Python::with_gil(|py| {
+                    Ok(externs::unsafe_call(
                         py,
                         core.types.parsed_javascript_deps_result,
-                        &[
-                            result.file_imports.to_object(py).into(),
-                            result.package_imports.to_object(py).into(),
-                        ],
-                    )
-                });
-
-                Ok::<_, Failure>(result)
+                        &[store_dict(
+                            py,
+                            result.imports.into_iter().map(|(string, info)| {
+                                (
+                                    string.into_py(py).into(),
+                                    externs::unsafe_call(
+                                        py,
+                                        core.types.parsed_javascript_deps_candidate_result,
+                                        &[
+                                            info.file_imports.into_py(py).into(),
+                                            info.package_imports.into_py(py).into(),
+                                        ],
+                                    ),
+                                )
+                            }),
+                        )
+                        .map_err(|e| Failure::from_py_err_with_gil(py, e))?],
+                    ))
+                })
             }
         )
         .await

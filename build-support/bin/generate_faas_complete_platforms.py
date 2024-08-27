@@ -24,16 +24,16 @@ import sys
 from pathlib import Path
 
 from pants.backend.awslambda.python.target_types import PythonAwsLambdaRuntime
+from pants.backend.google_cloud_function.python.target_types import PythonGoogleCloudFunctionRuntime
 from pants.backend.python.util_rules.faas import FaaSArchitecture, PythonFaaSRuntimeField
 from pants.base.build_environment import get_buildroot
 
-COMMAND = "pip install pex 1>&2 && pex3 interpreter inspect --markers --tags"
-
-
-RUNTIME_FIELDS = [
-    PythonAwsLambdaRuntime,
-    # TODO: what docker images to use for GCF?
-]
+# GCF images throw permissions errors when trying to install pex in the default site-packages.
+# Additionally, some of the images are missing a `pip` alias, so we need to use `python -m pip`.
+COMMAND = (
+    "python -m pip install --target=/tmp/subdir pex 1>&2 && "
+    + "PYTHONPATH=/tmp/subdir /tmp/subdir/bin/pex3 interpreter inspect --markers --tags"
+)
 
 
 def extract_complete_platform(repo: str, architecture: FaaSArchitecture, tag: str) -> object:
@@ -67,7 +67,7 @@ def run(runtime_field: type[PythonFaaSRuntimeField], python_base: Path) -> None:
     print(f"Generating for {runtime_field.__name__}, writing to {cp_dir}", file=sys.stderr)
     for rt in runtime_field.known_runtimes:
         cp = extract_complete_platform(
-            runtime_field.known_runtimes_docker_repo,
+            rt.docker_repo,
             FaaSArchitecture(rt.architecture) if rt.architecture else FaaSArchitecture.X86_64,
             rt.tag,
         )
@@ -79,18 +79,32 @@ def run(runtime_field: type[PythonFaaSRuntimeField], python_base: Path) -> None:
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generates the complete platform JSON files for AWS Lambda and GCF"
+        description="Generates the complete platform JSON files for AWS Lambda and/or GCF"
+    )
+    parser.add_argument(
+        "--runtime",
+        choices=["lambda", "gcf", "all"],
+        default="all",
+        help="Choose which runtime(s) to generate complete platform files for",
     )
     return parser
 
 
 def main() -> None:
-    # The args are discarded, but the parser is useful
-    # to ensure that --help works.
-    create_parser().parse_args()
+    args = create_parser().parse_args()
 
     build_root = Path(get_buildroot()) / "src/python"
-    for runtime_field in RUNTIME_FIELDS:
+
+    # Type declaration needed for mypy
+    selected_runtimes: list[type[PythonFaaSRuntimeField]]
+    if args.runtime == "lambda":
+        selected_runtimes = [PythonAwsLambdaRuntime]
+    elif args.runtime == "gcf":
+        selected_runtimes = [PythonGoogleCloudFunctionRuntime]
+    else:
+        selected_runtimes = [PythonAwsLambdaRuntime, PythonGoogleCloudFunctionRuntime]
+
+    for runtime_field in selected_runtimes:
         run(runtime_field, build_root)
 
 

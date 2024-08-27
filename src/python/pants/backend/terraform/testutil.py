@@ -23,7 +23,8 @@ from pants.core.goals.deploy import DeployProcess
 from pants.core.register import rules as core_rules
 from pants.core.util_rules import source_files
 from pants.engine import process
-from pants.engine.internals.native_engine import Address
+from pants.engine.fs import DigestEntries
+from pants.engine.internals.native_engine import Address, Digest
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -50,6 +51,7 @@ def rule_runner_with_auto_approve() -> RuleRunner:
             *process.rules(),
             QueryRule(DeployProcess, (DeployTerraformFieldSet,)),
             QueryRule(TerraformInitResponse, (TerraformInitRequest,)),
+            QueryRule(DigestEntries, (Digest,)),
         ],
         preserve_tmpdirs=True,
     )
@@ -135,6 +137,7 @@ provider "registry.terraform.io/hashicorp/null" {
   version     = "3.2.2"
   constraints = "~> 3.2.0, <= 3.2.2"
   hashes = [
+    "h1:Gef5VGfobY5uokA5nV/zFvWeMNR2Pmq79DH94QnNZPM=",
     "h1:zT1ZbegaAYHwQa+QwIFugArWikRJI9dqohj8xb0GY88=",
     "zh:3248aae6a2198f3ec8394218d05bd5e42be59f43a3a7c0b71c66ec0df08b69e7",
     "zh:32b1aaa1c3013d33c245493f4a65465eab9436b454d250102729321a44c8ab9a",

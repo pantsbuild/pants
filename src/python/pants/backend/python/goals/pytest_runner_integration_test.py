@@ -671,13 +671,13 @@ class UnusedPlugin(PytestPluginSetupRequest):
 @rule
 async def used_plugin(_: UsedPlugin) -> PytestPluginSetup:
     digest = await Get(Digest, CreateDigest([FileContent("used.txt", b"")]))
-    return PytestPluginSetup(digest=digest)
+    return PytestPluginSetup(digest=digest, extra_sys_path=("sys/path/used",))
 
 
 @rule
 async def unused_plugin(_: UnusedPlugin) -> PytestPluginSetup:
     digest = await Get(Digest, CreateDigest([FileContent("unused.txt", b"")]))
-    return PytestPluginSetup(digest=digest)
+    return PytestPluginSetup(digest=digest, extra_sys_path=("sys/path/unused",))
 
 
 def test_setup_plugins_and_runtime_package_dependency(rule_runner: PythonRuleRunner) -> None:
@@ -700,6 +700,7 @@ def test_setup_plugins_and_runtime_package_dependency(rule_runner: PythonRuleRun
                 f"""\
                 import os.path
                 import subprocess
+                import sys
 
                 def test_embedded_binary():
                     assert os.path.exists("bin.pex")
@@ -710,9 +711,13 @@ def test_setup_plugins_and_runtime_package_dependency(rule_runner: PythonRuleRun
                     # normal dependencies.
                     assert not os.path.exists("{PACKAGE}/say_hello.py")
 
-                def test_additional_plugins():
+                def test_additional_plugins_digest():
                     assert os.path.exists("used.txt")
                     assert not os.path.exists("unused.txt")
+
+                def test_additional_plugins_extra_sys_path():
+                    assert "sys/path/used" in sys.path
+                    assert "sys/path/unused" not in sys.path
                 """
             ),
             f"{PACKAGE}/BUILD": dedent(
@@ -726,7 +731,7 @@ def test_setup_plugins_and_runtime_package_dependency(rule_runner: PythonRuleRun
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_binary_call.py"))
     result = run_pytest(rule_runner, [tgt])
-    assert result.exit_code == 0
+    assert result.exit_code == 0, f"pytest test failed:\n{result.stdout_bytes.decode()}"
 
 
 def test_local_dists(rule_runner: PythonRuleRunner) -> None:

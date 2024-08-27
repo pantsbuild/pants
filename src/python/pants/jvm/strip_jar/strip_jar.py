@@ -6,7 +6,7 @@ from typing import Tuple
 
 import pkg_resources
 
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, FileContent
 from pants.engine.internals.native_engine import MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, ProcessResult
@@ -14,16 +14,20 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
 
 _STRIP_JAR_BASENAME = "StripJar.java"
 _OUTPUT_PATH = "__stripped_jars"
 
 
-class StripJarToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = "strip-jar"
+class StripJarTool(JvmToolBase):
+    options_scope = "strip-jar"
+    help = "Reproducible Build Maven Plugin"
+
+    default_version = "0.16"
+    default_artifacts = ("io.github.zlika:reproducible-build-maven-plugin:{version}",)
+    default_lockfile_resource = ("pants.jvm.strip_jar", "strip_jar.lock")
 
 
 @dataclass(frozen=True)
@@ -47,6 +51,7 @@ async def strip_jar(
     processor_classfiles: StripJarCompiledClassfiles,
     jdk: InternalJdk,
     request: StripJarRequest,
+    tool: StripJarTool,
 ) -> Digest:
     filenames = list(request.filenames)
 
@@ -57,12 +62,10 @@ async def strip_jar(
     toolcp_relpath = "__toolcp"
     processorcp_relpath = "__processorcp"
 
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, StripJarToolLockfileSentinel())
-
     tool_classpath, prefixed_jars_digest = await MultiGet(
         Get(
             ToolClasspath,
-            ToolClasspathRequest(lockfile=lockfile_request),
+            ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(tool)),
         ),
         Get(Digest, AddPrefix(request.digest, input_path)),
     )
@@ -99,13 +102,14 @@ def _load_strip_jar_source() -> bytes:
 
 # TODO(13879): Consolidate compilation of wrapper binaries to common rules.
 @rule
-async def build_processors(jdk: InternalJdk) -> StripJarCompiledClassfiles:
+async def build_processors(jdk: InternalJdk, tool: StripJarTool) -> StripJarCompiledClassfiles:
     dest_dir = "classfiles"
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, StripJarToolLockfileSentinel())
     materialized_classpath, source_digest = await MultiGet(
         Get(
             ToolClasspath,
-            ToolClasspathRequest(prefix="__toolcp", lockfile=lockfile_request),
+            ToolClasspathRequest(
+                prefix="__toolcp", lockfile=GenerateJvmLockfileFromTool.create(tool)
+            ),
         ),
         Get(
             Digest,
@@ -158,30 +162,5 @@ async def build_processors(jdk: InternalJdk) -> StripJarCompiledClassfiles:
     return StripJarCompiledClassfiles(digest=stripped_classfiles_digest)
 
 
-@rule
-def generate_strip_jar_lockfile_request(
-    _: StripJarToolLockfileSentinel,
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool(
-        artifact_inputs=FrozenOrderedSet(
-            {
-                "io.github.zlika:reproducible-build-maven-plugin:0.16",
-            }
-        ),
-        artifact_option_name="n/a",
-        lockfile_option_name="n/a",
-        resolve_name=StripJarToolLockfileSentinel.resolve_name,
-        read_lockfile_dest=DEFAULT_TOOL_LOCKFILE,
-        write_lockfile_dest="src/python/pants/jvm/strip_jar/strip_jar.lock",
-        default_lockfile_resource=(
-            "pants.jvm.strip_jar",
-            "strip_jar.lock",
-        ),
-    )
-
-
 def rules():
-    return [
-        *collect_rules(),
-        UnionRule(GenerateToolLockfileSentinel, StripJarToolLockfileSentinel),
-    ]
+    return (*collect_rules(), UnionRule(ExportableTool, StripJarTool))

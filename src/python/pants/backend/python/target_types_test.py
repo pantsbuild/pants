@@ -10,7 +10,7 @@ from typing import Iterable
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.dependency_inference.rules import UnownedDependencyError, import_rules
+from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -39,6 +39,7 @@ from pants.backend.python.target_types_rules import (
 )
 from pants.backend.python.util_rules import python_sources
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.core.util_rules.unowned_dependency_behavior import UnownedDependencyError
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError

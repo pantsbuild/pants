@@ -376,6 +376,37 @@ def test_adhoc_tool_workspace_invalidation_sources(rule_runner: PythonRuleRunner
     assert result1.snapshot != result3.snapshot
 
 
+def test_adhoc_tool_workspace_output_capture_base(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+            system_binary(name="bash", binary_name="bash")
+            system_binary(name="cp", binary_name="cp")
+            adhoc_tool(
+                name="make-file",
+                runnable=":bash",
+                args=["-c", "pwd && [ -r ./foo.txt ] && cp ./foo.txt {chroot}/bar.txt"],
+                output_files=["bar.txt"],
+                environment="workspace",
+                workdir="subdir",
+                execution_dependencies=[":cp"],
+            )
+            experimental_workspace_environment(name="workspace")
+            """
+            ),
+            "subdir/foo.txt": "xyzzy",
+        }
+    )
+    rule_runner.set_options(
+        ["--environments-preview-names={'workspace': '//:workspace'}"], env_inherit={"PATH"}
+    )
+
+    assert_adhoc_tool_result(
+        rule_runner, Address("", target_name="make-file"), {"bar.txt": "xyzzy"}
+    )
+
+
 def test_adhoc_tool_path_env_modify_mode(rule_runner: PythonRuleRunner) -> None:
     expected_path = "/bin:/usr/bin"
     rule_runner.write_files(

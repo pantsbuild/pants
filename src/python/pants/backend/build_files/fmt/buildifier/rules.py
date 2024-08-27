@@ -3,7 +3,7 @@
 
 from pants.backend.build_files.fmt.base import FmtBuildFilesRequest
 from pants.backend.build_files.fmt.buildifier.subsystem import Buildifier
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import AbstractFmtRequest, FmtResult
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.intrinsics import merge_digests_request_to_digest
@@ -18,9 +18,8 @@ class BuildifierRequest(FmtBuildFilesRequest):
     tool_subsystem = Buildifier
 
 
-@rule(desc="Format with Buildifier", level=LogLevel.DEBUG)
-async def buildfier_fmt(
-    request: BuildifierRequest.Batch, buildifier: Buildifier, platform: Platform
+async def _run_buildifier_fmt(
+    request: AbstractFmtRequest.Batch, buildifier: Buildifier, platform: Platform
 ) -> FmtResult:
     buildifier_tool = await download_external_tool(buildifier.get_request(platform))
     input_digest = await merge_digests_request_to_digest(
@@ -32,12 +31,20 @@ async def buildfier_fmt(
                 argv=[buildifier_tool.exe, "-type=build", *request.files],
                 input_digest=input_digest,
                 output_files=request.files,
-                description=f"Run buildifier on {pluralize(len(request.files), 'file')}.",
+                description=f"Run {Buildifier.options_scope} on {pluralize(len(request.files), 'file')}.",
                 level=LogLevel.DEBUG,
             )
         ),
     )
     return await FmtResult.create(request, result)
+
+
+@rule(desc="Format with Buildifier", level=LogLevel.DEBUG)
+async def buildifier_fmt(
+    request: BuildifierRequest.Batch, buildifier: Buildifier, platform: Platform
+) -> FmtResult:
+    result = await _run_buildifier_fmt(request, buildifier, platform)
+    return result
 
 
 def rules():
