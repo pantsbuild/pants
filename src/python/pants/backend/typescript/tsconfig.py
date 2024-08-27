@@ -79,7 +79,8 @@ async def _read_parent_config(
 
 
 def _clean_tsconfig_contents(content: str) -> str:
-    """The tsconfig.json uses a format similar to JSON ("JSON with comments"), but there are some important differences:
+    """The tsconfig.json uses a format similar to JSON ("JSON with comments"), but there are some
+    important differences:
 
     * tsconfig.json allows both single-line (`// comment`) and multi-line comments (`/* comment */`) to be added
     anywhere in the file.
