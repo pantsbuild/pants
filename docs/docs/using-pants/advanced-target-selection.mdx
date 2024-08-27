@@ -38,6 +38,10 @@ By default, `--changed-since` will only run over files directly changed. Often, 
   test
 ```
 
+:::note Hint: Pants does not understand transitive third-party dependencies in this context.
+All of the `--changed-*` filters apply only to first party dependencies in your codebase.
+:::
+
 ## `filter` options
 
 Use filters to operate on only targets that match the predicate, e.g. only running Python tests.
