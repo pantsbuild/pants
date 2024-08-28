@@ -79,6 +79,11 @@ class ExportedBinary:
     """Binaries exposed by an export.
 
     These will be added under the "bin" folder.
+    The `name` is the name that will be linked as in the `bin` folder.
+    The `path_in_export` is the path within the exported digest to link to.
+    These can be used to abstract details from the name of the tool and avoid the other files in the tool's digest.
+    For example, "my-tool" might have a downloaded file of "my_tool/my_tool_linux_x86-64.bin" and a readme.
+    We would use `ExportedBinary(name="my-tool", path_in_export=my_tool/my_tool_linux_x86-64.bin"`
     """
 
     name: str
@@ -178,6 +183,7 @@ async def export(
 
     requests = tuple(request_type(targets) for request_type in request_types)
     all_results = await MultiGet(Get(ExportResults, ExportRequest, request) for request in requests)
+    # TODO: sort
     flattened_results = [res for results in all_results for res in results]
 
     prefixed_digests = await MultiGet(
