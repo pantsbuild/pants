@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from typing import ClassVar, Iterable, Tuple
 
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
@@ -22,6 +23,7 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.option_types import StrListOption, StrOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -339,4 +341,5 @@ def rules():
     return [
         *collect_rules(),
         *external_tool.rules(),
+        UnionRule(ExportableTool, Coursier),
     ]

@@ -26,9 +26,9 @@ from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Effect, Get, MultiGet
 from pants.engine.intrinsics import run_interactive_process
-from pants.engine.process import InteractiveProcess
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
@@ -78,12 +78,14 @@ class PostProcessingCommand:
 class ExportedBinary:
     """Binaries exposed by an export.
 
-    These will be added under the "bin" folder.
-    The `name` is the name that will be linked as in the `bin` folder.
-    The `path_in_export` is the path within the exported digest to link to.
-    These can be used to abstract details from the name of the tool and avoid the other files in the tool's digest.
-    For example, "my-tool" might have a downloaded file of "my_tool/my_tool_linux_x86-64.bin" and a readme.
-    We would use `ExportedBinary(name="my-tool", path_in_export=my_tool/my_tool_linux_x86-64.bin"`
+    These will be added under the "bin" folder. The `name` is the name that will be linked as in the
+    `bin` folder. The `path_in_export` is the path within the exported digest to link to. These can
+    be used to abstract details from the name of the tool and avoid the other files in the tool's
+    digest.
+
+    For example, "my-tool" might have a downloaded file of
+    "my_tool/my_tool_linux_x86-64.bin" and a readme. We would use `ExportedBinary(name="my-tool",
+    path_in_export=my_tool/my_tool_linux_x86-64.bin"`
     """
 
     name: str

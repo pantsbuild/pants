@@ -1,9 +1,9 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
+from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 
 
@@ -51,3 +51,7 @@ class Protoc(TemplatedExternalTool):
 
     def generate_exe(self, plat: Platform) -> str:
         return "./bin/protoc"
+
+
+def rules():
+    return UnionRule(ExportableTool, Protoc)

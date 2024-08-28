@@ -13,6 +13,7 @@ from pants.backend.python.subsystems.python_native_code import PythonNativeCodeS
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex_environment
 from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexSubsystem
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import adhoc_binaries, external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
@@ -25,6 +26,7 @@ from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
 from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
@@ -239,4 +241,5 @@ def rules():
         *external_tool.rules(),
         *pex_environment.rules(),
         *adhoc_binaries.rules(),
+        UnionRule(ExportableTool, PexCli),
     ]
