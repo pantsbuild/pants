@@ -257,6 +257,7 @@ def test_get_all_help_info():
     options = Options.create(
         env={},
         config=Config.load([]),
+        native_options_config_discovery=False,
         known_scope_infos=[Global.get_scope_info(), Foo.get_scope_info(), Bar.get_scope_info()],
         args=["./pants", "--backend-packages=['internal_plugins.releases']"],
         bootstrap_option_values=None,
@@ -283,7 +284,12 @@ def test_get_all_help_info():
         UnionMembership({}),
         fake_consumed_scopes_mapper,
         RegisteredTargetTypes({BazLibrary.alias: BazLibrary}),
-        BuildFileSymbolsInfo.from_info((BuildFileSymbolInfo("dummy", rule_info_test),)),
+        BuildFileSymbolsInfo.from_info(
+            (
+                BuildFileSymbolInfo("dummy", rule_info_test),
+                BuildFileSymbolInfo("private", 1, hide_from_help=True),
+            )
+        ),
         bc_builder.create(),
     )
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import cast
 
 import pytest
 
@@ -19,8 +20,13 @@ from pants.testutil.pants_integration_test import run_pants
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
+@pytest.fixture(params=[pytest.param(True, id="rust"), pytest.param(False, id="legacy")])
+def use_rust_parser(request) -> bool:
+    return cast(bool, request.param)
+
+
 @pytest.fixture
-def rule_runner() -> RuleRunner:
+def rule_runner(use_rust_parser: bool) -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *dockerfile_rules(),
@@ -31,7 +37,7 @@ def rule_runner() -> RuleRunner:
         target_types=[DockerImageTarget, PexBinary],
     )
     rule_runner.set_options(
-        [],
+        [f"--dockerfile-parser-use-rust-parser={use_rust_parser}"],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     return rule_runner
@@ -181,7 +187,7 @@ def test_copy_source_references(rule_runner: RuleRunner) -> None:
                 FROM base
                 COPY a b /
                 COPY --option c/d e/f/g /h
-                ADD ignored
+                ADD ignored ignored
                 COPY j k /
                 COPY
                 """
@@ -204,6 +210,7 @@ def test_baseimage_tags(rule_runner: RuleRunner) -> None:
                 "FROM gcr.io/tekton-releases/github.com/tektoncd/operator/cmd/kubernetes/operator:"
                 "v0.54.0@sha256:d1f0463b35135852308ea815c2ae54c1734b876d90288ce35828aeeff9899f9d\n"
                 "FROM $PYTHON_VERSION AS python\n"
+                "FROM python:$VERSION\n"
             ),
         }
     )
@@ -215,6 +222,7 @@ def test_baseimage_tags(rule_runner: RuleRunner) -> None:
         # Stage 2 is not pinned with a tag.
         "stage3 v0.54.0",
         "python build-arg:PYTHON_VERSION",  # Parse tag from build arg.
+        "stage5 $VERSION",
     )
 
 

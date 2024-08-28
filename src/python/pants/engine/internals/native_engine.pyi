@@ -37,6 +37,7 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
+    NativeParsedDockerfileInfo,
     NativeParsedJavascriptDependencies,
     NativeParsedPythonDependencies,
 )
@@ -565,6 +566,9 @@ async def interactive_process(
     process: InteractiveProcess, process_execution_environment: ProcessExecutionEnvironment
 ) -> InteractiveProcessResult: ...
 async def docker_resolve_image(request: DockerResolveImageRequest) -> DockerResolveImageResult: ...
+async def parse_dockerfile_info(
+    deps_request: NativeDependenciesRequest,
+) -> NativeParsedDockerfileInfo: ...
 async def parse_python_deps(
     deps_request: NativeDependenciesRequest,
 ) -> NativeParsedPythonDependencies: ...
@@ -703,7 +707,10 @@ class PyStubCAS:
 class InferenceMetadata:
     @staticmethod
     def javascript(
-        package_root: str, import_patterns: dict[str, list[str]]
+        package_root: str,
+        import_patterns: dict[str, Sequence[str]],
+        config_root: str | None,
+        paths: dict[str, Sequence[str]],
     ) -> InferenceMetadata: ...
     def __eq__(self, other: InferenceMetadata | Any) -> bool: ...
     def __hash__(self) -> int: ...
@@ -890,6 +897,10 @@ _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
 
 class PyGeneratorResponseCall:
+    output_type: type
+    input_types: Sequence[type]
+    inputs: Sequence[Any]
+
     @overload
     def __init__(
         self,

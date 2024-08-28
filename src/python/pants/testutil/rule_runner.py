@@ -46,13 +46,14 @@ from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import ProcessExecutionEnvironment, PyExecutor
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
-from pants.engine.internals.selectors import Effect, Get, Params
+from pants.engine.internals.selectors import Call, Effect, Get, Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule as QueryRule
 from pants.engine.target import AllTargets, Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.goal.auxiliary_goal import AuxiliaryGoal
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
 from pants.option.global_options import (
@@ -261,6 +262,7 @@ class RuleRunner:
         max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
         inherent_environment: EnvironmentName | None = EnvironmentName(None),
         is_bootstrap: bool = False,
+        auxiliary_goals: Iterable[type[AuxiliaryGoal]] | None = None,
     ) -> None:
         bootstrap_args = [*bootstrap_args]
 
@@ -308,6 +310,7 @@ class RuleRunner:
 
         build_config_builder.register_rules("_dummy_for_test_", all_rules)
         build_config_builder.register_target_types("_dummy_for_test_", target_types or ())
+        build_config_builder.register_auxiliary_goals("_dummy_for_test_", auxiliary_goals or ())
         self.build_config = build_config_builder.create()
 
         self.environment = CompleteEnvironmentVars({})
@@ -737,7 +740,7 @@ def run_rule_with_mocks(
     if not isinstance(res, (Coroutine, Generator)):
         return res
 
-    def get(res: Get | Effect):
+    def get(res: Get | Effect | Call):
         provider = next(
             (
                 mock_get.mock
@@ -767,7 +770,7 @@ def run_rule_with_mocks(
     while True:
         try:
             res = rule_coroutine.send(rule_input)
-            if isinstance(res, (Get, Effect)):
+            if isinstance(res, (Get, Effect, Call)):
                 rule_input = get(res)
             elif type(res) in (tuple, list):
                 rule_input = [get(g) for g in res]  # type: ignore[union-attr]

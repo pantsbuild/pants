@@ -11,6 +11,7 @@ from textwrap import dedent
 from typing import Any, Iterable
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinary, PythonSourcesGeneratorTarget
@@ -267,6 +268,7 @@ def run_test_rule(
     targets: list[Target],
     debug: bool = False,
     use_coverage: bool = False,
+    experimental_report_test_result_info: bool = False,
     report: bool = False,
     report_dir: str = TestSubsystem.default_report_path,
     output: ShowOutput = ShowOutput.ALL,
@@ -279,6 +281,7 @@ def run_test_rule(
         debug=debug,
         debug_adapter=False,
         use_coverage=use_coverage,
+        experimental_report_test_result_info=experimental_report_test_result_info,
         report=report,
         report_dir=report_dir,
         xml_dir=None,
@@ -600,7 +603,11 @@ def test_format_rerun_command(results: list[TestResult], expected: None | str) -
     assert expected == _format_test_rerun_command(results)
 
 
-def test_debug_target(rule_runner: PythonRuleRunner) -> None:
+def test_debug_target(rule_runner: PythonRuleRunner, monkeypatch: MonkeyPatch) -> None:
+    def noop():
+        pass
+
+    monkeypatch.setattr("pants.engine.intrinsics.task_side_effected", noop)
     exit_code, _ = run_test_rule(
         rule_runner,
         request_type=SuccessfulRequest,

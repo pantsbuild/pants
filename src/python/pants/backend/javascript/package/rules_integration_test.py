@@ -19,7 +19,8 @@ from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSo
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FileTarget, ResourceTarget
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, Snapshot
+from pants.engine.fs import DigestEntries
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, RemovePrefix, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources
 from pants.testutil.rule_runner import RuleRunner
@@ -34,6 +35,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(GeneratedSources, (GenerateResourcesFromNodeBuildScriptRequest,)),
             QueryRule(BuiltPackage, (NodeBuildScriptPackageFieldSet,)),
             QueryRule(Snapshot, (Digest,)),
+            QueryRule(DigestEntries, (Digest,)),
         ],
         target_types=[
             *package_json.target_types(),
@@ -160,15 +162,13 @@ def test_packages_sources_as_resource_using_build_tool(rule_runner: RuleRunner) 
 def test_packages_sources_as_package_using_build_tool(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("src/js/ham", generated_name="build"))
     result = rule_runner.request(BuiltPackage, [NodeBuildScriptPackageFieldSet.create(tgt)])
-    rule_runner.write_digest(result.digest)
+
+    output_digest = rule_runner.request(Digest, [RemovePrefix(result.digest, "src.js.ham/build")])
+    entries = rule_runner.request(DigestEntries, [output_digest])
 
     assert result.artifacts[0].relpath == "dist"
 
-    result_path = Path(rule_runner.build_root) / "ham" / "dist"
-
-    assert sorted(
-        str(path.relative_to(rule_runner.build_root)) for path in result_path.iterdir()
-    ) == [
+    assert sorted(entry.path for entry in entries) == [
         "ham/dist/index.css",
         "ham/dist/index.css.map",
         "ham/dist/index.js",

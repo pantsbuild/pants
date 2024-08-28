@@ -209,6 +209,8 @@ class ProcessResultMetadata:
     """Metadata for a ProcessResult, which is not included in its definition of equality."""
 
     class Source(Enum):
+        """This is public API as these values are part of the test result report file."""
+
         RAN = "ran"
         HIT_LOCALLY = "hit_locally"
         HIT_REMOTELY = "hit_remotely"
@@ -284,6 +286,18 @@ class ProcessExecutionFailure(Exception):
                 "\n\nUse `--keep-sandboxes=on_failure` to preserve the process chroot for inspection."
             )
         super().__init__("\n".join(err_strings))
+
+    @classmethod
+    def from_result(
+        cls, result: FallibleProcessResult, description: str, keep_sandboxes: KeepSandboxes
+    ) -> ProcessExecutionFailure:
+        return cls(
+            result.exit_code,
+            result.stdout,
+            result.stderr,
+            description,
+            keep_sandboxes=keep_sandboxes,
+        )
 
 
 @rule

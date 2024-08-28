@@ -68,3 +68,4 @@ GTAGS
 /.venv
 .tool-versions
 TAGS
+node_modules

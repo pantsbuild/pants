@@ -22,7 +22,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentError,
     DockerBuildEnvironmentRequest,
 )
-from pants.backend.docker.utils import suggest_renames
+from pants.backend.docker.utils import image_ref_regexp, suggest_renames
 from pants.backend.docker.value_interpolation import DockerBuildArgsInterpolationValue
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
@@ -44,7 +44,6 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.util.meta import classproperty
 from pants.util.strutil import softwrap, stable_hash
 from pants.util.value_interpolation import InterpolationContext, InterpolationValue
 
@@ -161,24 +160,6 @@ class DockerBuildContext:
             stages=tuple(sorted(stage_names)),
         )
 
-    @classproperty
-    def _image_ref_regexp(cls):
-        return re.compile(
-            r"""
-            ^
-            # Optional registry.
-            ((?P<registry>[^/:_ ]+:?[^/:_ ]*)/)?
-            # Repository.
-            (?P<repository>[^:@ \t\n\r\f\v]+)
-            # Optionally with `:tag`.
-            (:(?P<tag>[^@ ]+))?
-            # Optionally with `@digest`.
-            (@(?P<digest>\S+))?
-            $
-            """,
-            re.VERBOSE,
-        )
-
     @classmethod
     def _get_stages_and_tags(
         cls, dockerfile_info: DockerfileInfo, build_args: Mapping[str, str]
@@ -198,7 +179,7 @@ class DockerBuildContext:
                         f"Failed to parse Dockerfile baseimage tag for stage {stage} in "
                         f"{dockerfile_info.address} target, unknown build ARG: {build_arg!r}."
                     )
-                parsed = re.match(cls._image_ref_regexp, image_ref.strip("\"'"))
+                parsed = re.match(image_ref_regexp, image_ref.strip("\"'"))
                 tag = parsed.group("tag") or (parsed.group("digest") and "latest") if parsed else ""
                 if not tag:
                     raise DockerBuildContextError(

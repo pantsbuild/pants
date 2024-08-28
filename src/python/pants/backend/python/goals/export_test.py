@@ -103,7 +103,9 @@ def test_export_venv_new_codepath(
     )
 
     format_flag = f"--export-py-resolve-format={py_resolve_format.value}"
-    hermetic_flags = [] if py_hermetic_scripts else ["--export-py-hermetic-scripts=false"]
+    hermetic_flags = (
+        [] if py_hermetic_scripts else ["--export-py-non-hermetic-scripts-in-resolve=['a', 'b']"]
+    )
     rule_runner.set_options(
         [
             *pants_args_for_python_lockfiles,

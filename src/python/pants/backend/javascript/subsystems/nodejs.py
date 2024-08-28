@@ -41,10 +41,11 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, DownloadFile
 from pants.engine.internals.native_engine import FileDigest, MergeDigests
+from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, Rule, collect_rules, rule
+from pants.engine.rules import Get, Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import DictOption, ShellStrListOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -61,12 +62,12 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     options_scope = "nodejs"
     help = "The Node.js Javascript runtime (including Corepack)."
 
-    default_version = "v18.20.3"
+    default_version = "v20.15.1"
     default_known_versions = [
-        "v18.20.3|macos_arm64|99328b985f7336a8fcfb62fda382155d210979fcca928e2dd75b7148d9bba636|40077062",
-        "v18.20.3|macos_x86_64|317a4607390c923610303e8583972e23fb656e9d348d3740bde0f1a94cdb7e0c|41659714",
-        "v18.20.3|linux_arm64|3c497c19ddbf75bab7fecb36ddf1738622f0ba244aa1e0aebc70e46daf1a0794|23242684",
-        "v18.20.3|linux_x86_64|ffd6147c263b81016742dc1e72dc68885a3ca9b441d9744f9b76cad362d0cc5f|23995872",
+        "v20.15.1|macos_arm64|4743bc042f90ba5d9edf09403207290a9cdd2f6061bdccf7caaa0bbfd49f343e|41888895",
+        "v20.15.1|macos_x86_64|f5379772ffae1404cfd1fcc8cf0c6c5971306b8fb2090d348019047306de39dc|43531593",
+        "v20.15.1|linux_arm64|10d47a46ef208b3e4b226e4d595a82659123b22397ed77b7975d989114ec317e|24781292",
+        "v20.15.1|linux_x86_64|26700f8d3e78112ad4a2618a9c8e2816e38a49ecf0213ece80e54c38cb02563f|25627852",
     ]
 
     default_url_template = "https://nodejs.org/dist/{version}/node-{version}-{platform}.tar"
@@ -390,7 +391,11 @@ class NodeJSBootstrap:
 async def _get_nvm_root() -> str | None:
     """See https://github.com/nvm-sh/nvm#installing-and-updating."""
 
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")))
+    env = await environment_vars_subset(
+        **implicitly(
+            {EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")): EnvironmentVarsRequest}
+        )
+    )
     nvm_dir = env.get("NVM_DIR")
     default_dir = env.get("XDG_CONFIG_HOME", env.get("HOME"))
     if nvm_dir:

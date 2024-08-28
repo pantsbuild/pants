@@ -16,6 +16,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
+    AdhocToolPathEnvModifyModeField,
     AdhocToolRunnableDependenciesField,
     AdhocToolTimeoutField,
     AdhocToolWorkdirField,
@@ -384,6 +385,10 @@ class ShellCommandWorkspaceInvalidationSourcesField(AdhocToolWorkspaceInvalidati
     pass
 
 
+class ShellCommandPathEnvModifyModeField(AdhocToolPathEnvModifyModeField):
+    pass
+
+
 class SkipShellCommandTestsField(BoolField):
     alias = "skip_tests"
     default = False
@@ -409,6 +414,7 @@ class ShellCommandTarget(Target):
         ShellCommandNamedCachesField,
         ShellCommandOutputRootDirField,
         ShellCommandWorkspaceInvalidationSourcesField,
+        ShellCommandPathEnvModifyModeField,
         EnvironmentField,
     )
     help = help_text(
@@ -478,6 +484,7 @@ class ShellCommandTestTarget(Target):
         ShellCommandTimeoutField,
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
+        ShellCommandPathEnvModifyModeField,
         EnvironmentField,
         SkipShellCommandTestsField,
         ShellCommandWorkdirField,

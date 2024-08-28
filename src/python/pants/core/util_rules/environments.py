@@ -197,7 +197,7 @@ class LocalWorkspaceEnvironmentTarget(Target):
         LocalWorkspaceCompatiblePlatformsField,
     )
     help = help_text(
-        """
+        f"""
         Configuration of a "workspace" execution environment for specific platforms.
 
         A "workspace" environment is a local environment which executes build processes within
@@ -584,6 +584,12 @@ class EnvironmentTarget:
             return ProcessCacheScope.PER_SESSION
         else:
             return ProcessCacheScope.SUCCESSFUL
+
+    @property
+    def use_working_directory_as_base_for_output_captures(self) -> bool:
+        if self.val and self.val.has_field(LocalWorkspaceCompatiblePlatformsField):
+            return False
+        return True
 
 
 def _compute_env_field(field_set: FieldSet) -> EnvironmentField:

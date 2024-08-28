@@ -206,6 +206,8 @@ impl PyTypes {
         docker_resolve_image_result: &PyType,
         parsed_python_deps_result: &PyType,
         parsed_javascript_deps_result: &PyType,
+        parsed_dockerfile_info_result: &PyType,
+        parsed_javascript_deps_candidate_result: &PyType,
         py: Python,
     ) -> Self {
         Self(RefCell::new(Some(Types {
@@ -245,6 +247,10 @@ impl PyTypes {
             docker_resolve_image_result: TypeId::new(docker_resolve_image_result),
             parsed_python_deps_result: TypeId::new(parsed_python_deps_result),
             parsed_javascript_deps_result: TypeId::new(parsed_javascript_deps_result),
+            parsed_dockerfile_info_result: TypeId::new(parsed_dockerfile_info_result),
+            parsed_javascript_deps_candidate_result: TypeId::new(
+                parsed_javascript_deps_candidate_result,
+            ),
             deps_request: TypeId::new(
                 py.get_type::<externs::dep_inference::PyNativeDependenciesRequest>(),
             ),
@@ -919,7 +925,7 @@ async fn workunit_to_py_value(
             let mut metrics = workunit_store.get_metrics();
 
             metrics.insert("DEPRECATED_ConsumeGlobalCountersInstead", 0);
-            let counters_entries = metrics
+            let counters_entries: Vec<_> = metrics
                 .into_iter()
                 .map(|(counter_name, counter_value)| {
                     (

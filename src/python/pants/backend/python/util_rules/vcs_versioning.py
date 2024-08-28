@@ -30,11 +30,13 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import ProcessCacheScope, ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.intrinsics import process_request_to_process_result
+from pants.engine.process import ProcessCacheScope
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import AllTargets, GeneratedSources, GenerateSourcesRequest, Targets
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -57,17 +59,21 @@ class GeneratePythonFromSetuptoolsSCMRequest(GenerateSourcesRequest):
 async def generate_python_from_setuptools_scm(
     request: GeneratePythonFromSetuptoolsSCMRequest,
     setuptools_scm: SetuptoolsSCM,
+    local_environment_name: ChosenLocalEnvironmentName,
 ) -> GeneratedSources:
     # A MaybeGitWorktree is uncacheable, so this enclosing rule will run every time its result
     # is needed, and the process invocation below caches at session scope, meaning this rule
     # will always return a result based on the current underlying git state.
-    maybe_git_worktree = await Get(MaybeGitWorktree, GitWorktreeRequest())
+    maybe_git_worktree = await Get(
+        MaybeGitWorktree,
+        {GitWorktreeRequest(): GitWorktreeRequest, local_environment_name.val: EnvironmentName},
+    )
     if not maybe_git_worktree.git_worktree:
         raise VCSVersioningError(
             softwrap(
                 f"""
                 Trying to determine the version for the {request.protocol_target.address} target at
-                {request.protocol_target.address}, but you are not running in a git worktree.
+                {request.protocol_target.address}, but {maybe_git_worktree.failure_reason}.
                 """
             )
         )
@@ -97,20 +103,30 @@ async def generate_python_from_setuptools_scm(
         ),
     )
 
-    setuptools_scm_pex_get = Get(VenvPex, PexRequest, setuptools_scm.to_pex_request())
+    setuptools_scm_pex_get = Get(
+        VenvPex,
+        {
+            setuptools_scm.to_pex_request(): PexRequest,
+            local_environment_name.val: EnvironmentName,
+        },
+    )
     setuptools_scm_pex, input_digest = await MultiGet(setuptools_scm_pex_get, input_digest_get)
 
     argv = ["--root", str(maybe_git_worktree.git_worktree.worktree), "--config", config_path]
 
-    result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            setuptools_scm_pex,
-            argv=argv,
-            input_digest=input_digest,
-            description=f"Run setuptools_scm for {request.protocol_target.address.spec}",
-            level=LogLevel.INFO,
-            cache_scope=ProcessCacheScope.PER_SESSION,
+    result = await process_request_to_process_result(
+        **implicitly(
+            {
+                VenvPexProcess(
+                    setuptools_scm_pex,
+                    argv=argv,
+                    input_digest=input_digest,
+                    description=f"Run setuptools_scm for {request.protocol_target.address.spec}",
+                    level=LogLevel.INFO,
+                    cache_scope=ProcessCacheScope.PER_SESSION,
+                ): VenvPexProcess,
+                local_environment_name.val: EnvironmentName,
+            }
         ),
     )
     version = result.stdout.decode().strip()

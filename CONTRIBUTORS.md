@@ -169,6 +169,7 @@ Created as part of the release process.
 + John Sirois
 + John Townsend
 + Jon Boulle
++ Jonas Rauber
 + Jonas Stendahl
 + Jonathan Coveney
 + Jonathan D. Simms
