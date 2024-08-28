@@ -150,8 +150,8 @@ A lockfile will contain dependencies for all requested Python versions. By defau
 You can use the following options to affect how the lockfile generator resolves dependencies for each resolve:
 
 - [\[python\].resolves_to_constraints_file](../../../reference/subsystems/python.mdx#resolves_to_constraints_file): For each resolve, a path to a [Pip constraints file](https://pip.pypa.io/en/stable/user_guide/#constraints-files) to use when resolving that lockfile.
-- [\[python\].resolve_to_no_binary](../../../reference/subsystems/python.mdx#resolve_to_no_binary): For each resolve, a list of projects that must only resolve to sdists and not wheels. Use the value `[":all:"]` to disable wheels for all packages.
-- [\[python\].resolve_to_only_binary](../../../reference/subsystems/python.mdx#resolve_to_only_binary): For each resolve, a list of projects that must only resolve to wheels and not sdists. Use the value `[":all:"]` to disable sdists for all packages.
+- [\[python\].resolves_to_no_binary](../../../reference/subsystems/python.mdx#resolves_to_no_binary): For each resolve, a list of projects that must only resolve to sdists and not wheels. Use the value `[":all:"]` to disable wheels for all packages.
+- [\[python\].resolves_to_only_binary](../../../reference/subsystems/python.mdx#resolves_to_only_binary): For each resolve, a list of projects that must only resolve to wheels and not sdists. Use the value `[":all:"]` to disable sdists for all packages.
 
 You can use the key `__default__` to set the value for all resolves at once.
 

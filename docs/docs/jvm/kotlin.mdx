@@ -68,13 +68,13 @@ Pants supports choosing the JDK and Kotlin versions per target in your repositor
 
 #### JDK
 
-JDKs used by Pants are automatically fetched using [Coursier](https://get-coursier.io/), and are chosen using the [`[jvm].jdk` option](../../reference/subsystems/jvm.mdx#section-jdk) to set a repository-wide default.
+JDKs used by Pants are automatically fetched using [Coursier](https://get-coursier.io/), and are chosen using the [`[jvm].jdk` option](../../reference/subsystems/jvm.mdx#jdk) to set a repository-wide default.
 
 To override the default on a particular target, you can use the [`jdk=` field](../../reference/targets/kotlin_source.mdx#jdk). It can be useful to use the [`parametrize` builtin](../using-pants/key-concepts/targets-and-build-files.mdx#parametrizing-targets) with the `jdk=` field, particularly to run test targets under multiple JDKs.
 
 #### Kotlin version
 
-The Kotlin version to use is configured on a resolve-by-resolve basis (see the "Third-party dependencies" section below) using the [`[kotlin].version_for_resolve` option](../../reference/subsystems/kotlin.mdx#section-version_for_resolve). The default Kotlin version for your repository will thus be whichever Kotlin version is configured for the "default" resolve, which is configured by the [`[jvm].default_resolve` option](../../reference/subsystems/jvm#default_resolve).
+The Kotlin version to use is configured on a resolve-by-resolve basis (see the "Third-party dependencies" section below) using the [`[kotlin].version_for_resolve` option](../../reference/subsystems/kotlin.mdx#version_for_resolve). The default Kotlin version for your repository will thus be whichever Kotlin version is configured for the "default" resolve, which is configured by the [`[jvm].default_resolve` option](../../reference/subsystems/jvm#default_resolve).
 
 Each resolve must contain the following jars for the Kotlin runtime with the version matching the version specified for the resolve in the `[kotlin].version_for_resolve` option:
 
@@ -110,7 +110,7 @@ jvm_artifact(
 )
 ```
 
-Pants requires use of a lockfile for third-party dependencies. After adding or editing `jvm_artifact` targets, you will need to update affected lockfiles by running `pants generate-lockfiles`. The default lockfile is located at `3rdparty/jvm/default.lock`, but it can be relocated (as well as additional resolves declared) via the [`[jvm].resolves` option](../../reference/subsystems/jvm.mdx#section-resolves).
+Pants requires use of a lockfile for third-party dependencies. After adding or editing `jvm_artifact` targets, you will need to update affected lockfiles by running `pants generate-lockfiles`. The default lockfile is located at `3rdparty/jvm/default.lock`, but it can be relocated (as well as additional resolves declared) via the [`[jvm].resolves` option](../../reference/subsystems/jvm.mdx#resolves).
 
 :::note Thirdparty symbols and the `packages` argument
 To efficiently determine which symbols are provided by third-party code (i.e., without hitting the network in order to compute dependencies in the common case), Pants relies on a static mapping of which artifacts provide which symbols, and defaults to treating each `jvm_artifact` as providing symbols within its `group`.
