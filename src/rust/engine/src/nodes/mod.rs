@@ -113,7 +113,11 @@ impl Vfs<Failure> for Context {
     }
 
     async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, Failure> {
-        self.get(PathMetadataNode::new(path)?).await
+        let subject_path = {
+            let relpath = RelativePath::new(&path).map_err(|e| Self::mk_error(&e))?;
+            SubjectPath::Workspace(relpath)
+        };
+        self.get(PathMetadataNode::new(subject_path)?).await
     }
 
     fn is_ignored(&self, stat: &fs::Stat) -> bool {

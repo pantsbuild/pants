@@ -47,7 +47,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.native_engine import PathMetadata, PathMetadataKind
+from pants.engine.internals.native_engine import PathMetadata, PathMetadataKind, PathNamespace
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, goal_rule, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -1589,7 +1589,9 @@ def test_path_metadata_request(rule_runner: RuleRunner) -> None:
 
 def test_local_system_watch_requests(rule_runner: RuleRunner) -> None:
     def get_metadata(path: str) -> PathMetadata | None:
-        result = rule_runner.request(PathMetadataResult, [PathMetadataRequest(path)])
+        result = rule_runner.request(
+            PathMetadataResult, [PathMetadataRequest(path, PathNamespace.SYSTEM)]
+        )
         return result.metadata
 
     with temporary_dir() as non_buildroot_dir:

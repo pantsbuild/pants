@@ -1,10 +1,9 @@
 // Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use deepsize::DeepSizeOf;
-use fs::RelativePath;
 use graph::CompoundNode;
 
 use super::{NodeKey, NodeOutput, NodeResult, SubjectPath};
@@ -20,8 +19,7 @@ pub struct PathMetadata {
 }
 
 impl PathMetadata {
-    pub fn new(path: PathBuf) -> Result<Self, String> {
-        let subject_path = SubjectPath::Workspace(RelativePath::new(path)?);
+    pub fn new(subject_path: SubjectPath) -> Result<Self, String> {
         Ok(Self { subject_path })
     }
 
