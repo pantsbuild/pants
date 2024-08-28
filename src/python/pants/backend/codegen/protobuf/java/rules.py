@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePath
 
+from pants.backend.codegen.protobuf import protoc
 from pants.backend.codegen.protobuf.java import dependency_inference, symbol_mapper
 from pants.backend.codegen.protobuf.java.subsystem import JavaProtobufGrpcSubsystem
 from pants.backend.codegen.protobuf.protoc import Protoc
@@ -204,6 +205,7 @@ def rules():
         *collect_rules(),
         *dependency_inference.rules(),
         *symbol_mapper.rules(),
+        *protoc.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromProtobufRequest),
         UnionRule(ExportableTool, JavaProtobufGrpcSubsystem),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),

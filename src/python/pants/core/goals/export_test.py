@@ -92,7 +92,10 @@ def list_files_with_paths(directory):
 
 
 def run_export_rule(
-    rule_runner: RuleRunner, monkeypatch: MonkeyPatch,resolves: List[str] | None = None, binaries: List[str] | None = None
+    rule_runner: RuleRunner,
+    monkeypatch: MonkeyPatch,
+    resolves: List[str] | None = None,
+    binaries: List[str] | None = None,
 ) -> Tuple[int, str]:
     resolves = resolves or []
     binaries = binaries or []

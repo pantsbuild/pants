@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -16,6 +17,7 @@ from pants.engine.intrinsics import remove_prefix
 from pants.engine.platform import Platform
 from pants.engine.process import execute_process_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
@@ -110,4 +112,5 @@ def rules() -> Iterable[Rule]:
     return (
         *collect_rules(),
         *external_tool.rules(),
+        UnionRule(ExportableTool, MakeselfTool),
     )

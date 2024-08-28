@@ -7,6 +7,9 @@ from pants.backend.experimental.helm.register import rules as helm_rules
 from pants.backend.experimental.helm.register import target_types as helm_target_types
 from pants.backend.helm.check.kubeconform.chart import rules as chart_rules
 from pants.backend.helm.check.kubeconform.deployment import rules as deployment_rules
+from pants.backend.helm.check.kubeconform.subsystem import KubeconformSubsystem
+from pants.core.goals.resolves import ExportableTool
+from pants.engine.unions import UnionRule
 
 
 def target_types():
@@ -14,4 +17,9 @@ def target_types():
 
 
 def rules():
-    return [*helm_rules(), *chart_rules(), *deployment_rules()]
+    return [
+        *helm_rules(),
+        *chart_rules(),
+        *deployment_rules(),
+        UnionRule(ExportableTool, KubeconformSubsystem),
+    ]

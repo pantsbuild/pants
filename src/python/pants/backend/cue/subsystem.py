@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
 from pants.util.strutil import help_text
 
@@ -42,3 +44,7 @@ class Cue(TemplatedExternalTool):
 
     def generate_exe(self, plat: Platform) -> str:
         return "cue"
+
+
+def rules():
+    return (UnionRule(ExportableTool, Cue),)
