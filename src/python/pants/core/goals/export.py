@@ -221,7 +221,7 @@ async def export(
         build_root, environment, output_dir, flattened_results
     )
     iprs = await MultiGet(
-        Effect(InteractiveProcessResult, InteractiveProcess, link_requests) for link_requests in link_requests
+        run_interactive_process(link_request) for link_request in link_requests
     )
 
     errors_linking_bins = [
