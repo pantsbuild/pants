@@ -217,11 +217,20 @@ async def export(
             resolves_exported.add(result.resolve)
         console.print_stdout(f"Wrote {result.description} to {result_dir}")
 
-    exported_bins = await link_exported_executables(
+    exported_bins_by_exporting_resolve, link_requests = await link_exported_executables(
         build_root, environment, output_dir, flattened_results
     )
+    iprs = await MultiGet(
+        Effect(InteractiveProcessResult, InteractiveProcess, link_requests) for link_requests in link_requests
+    )
 
-    exported_bin_warnings = warn_exported_bin_conflicts(exported_bins)
+    errors_linking_bins = [
+        proc.description for ipr, proc in zip(iprs, link_requests) if ipr.exit_code
+    ]
+    if errors_linking_bins:
+        raise ExportError("; ".join(f"Failed in porcess \"{description}\"" for description in errors_linking_bins))
+
+    exported_bin_warnings = warn_exported_bin_conflicts(exported_bins_by_exporting_resolve)
     for warning in exported_bin_warnings:
         console.print_stderr(warning)
 
@@ -271,11 +280,12 @@ async def link_exported_executables(
     bin_dir = Path(build_root.path, output_dir, "bin")
     safe_mkdir(bin_dir)
 
-    exported_bins: dict[str, list[str]] = defaultdict(list)
+    exported_bins_by_exporting_resolve: dict[str, list[str]] = defaultdict(list)
+    link_requests = []
     for result in export_results:
         for exported_bin in result.exported_binaries:
-            exported_bins[exported_bin.name].append(result.resolve or result.description)
-            if len(exported_bins[exported_bin.name]) > 1:
+            exported_bins_by_exporting_resolve[exported_bin.name].append(result.resolve or result.description)
+            if len(exported_bins_by_exporting_resolve[exported_bin.name]) > 1:
                 continue
 
             ln_bin = shutil.which("ln")
@@ -285,9 +295,7 @@ async def link_exported_executables(
                     "Could not locate `ln` bin to link exported binaries to the `bin` dir"
                 )
 
-            ipr = await Effect(
-                InteractiveProcessResult,
-                InteractiveProcess(
+            link_request = InteractiveProcess(
                     [
                         ln_bin,
                         "-sf",
@@ -298,11 +306,10 @@ async def link_exported_executables(
                     ],
                     env={"PATH": environment.get("PATH", "")},
                     run_in_workspace=True,
-                ),
-            )
-            if ipr.exit_code:
-                raise ExportError(f"Failed to link binary {exported_bin.name} to bin directory")
-    return exported_bins
+                    description=f"link binary {exported_bin.name} to bin directory"
+                )
+            link_requests.append(link_request)
+    return exported_bins_by_exporting_resolve, link_requests
 
 
 def warn_exported_bin_conflicts(exported_bins: dict[str, list[str]]) -> list[str]:
