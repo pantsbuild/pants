@@ -54,4 +54,4 @@ class Protoc(TemplatedExternalTool):
 
 
 def rules():
-    return UnionRule(ExportableTool, Protoc)
+    return (UnionRule(ExportableTool, Protoc),)
