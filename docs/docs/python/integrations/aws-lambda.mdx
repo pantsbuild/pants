@@ -278,6 +278,6 @@ Pants implemented a new way to package Lambda functions in 2.17, which became th
 - In Pants 2.18, the new behaviour is now the default behaviour. Layers can now be built using Pants, and this addition includes renaming the `python_awslambda` target to `python_aws_lambda_function`.
 - In Pants 2.19 and later, the old Lambdex behaviour has been entirely removed.
 
-If your code can be packaged without warnings using Pants 2.18, no change is required when upgrading to Pants 2.19 (except removing the `[lambdex]` section in `pants.toml` if that still remains). If not, [follow its instructions](/v2.18/docs/awslambda-python#migrating-from-pants-216-and-earlier) to upgrade to Pants 2.18 fully first, and upgrade to Pants 2.19 after that.
+If your code can be packaged without warnings using Pants 2.18, no change is required when upgrading to Pants 2.19 (except removing the `[lambdex]` section in `pants.toml` if that still remains). If not, [follow its instructions](/2.18/docs/python/integrations/aws-lambda#migrating-from-pants-216-and-earlier) to upgrade to Pants 2.18 fully first, and upgrade to Pants 2.19 after that.
 
 If you encounter a bug with the new behaviour, [please let us know](https://github.com/pantsbuild/pants/issues/new/choose). If you require advanced PEX features, [switch to using `pex_binary` directly](#advanced-using-pex-directly).
