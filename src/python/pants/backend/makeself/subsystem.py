@@ -108,7 +108,7 @@ async def extract_makeself_distribution(
     return MakeselfTool(digest=digest, exe="makeself.sh")
 
 
-def rules() -> Iterable[Rule]:
+def rules() -> Iterable[Rule, UnionRule]:
     return (
         *collect_rules(),
         *external_tool.rules(),
