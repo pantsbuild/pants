@@ -162,11 +162,11 @@ def run_export_rule(
                 rule_runner.do_not_use_mock(Digest, (AddPrefix,)),
                 rule_runner.do_not_use_mock(EnvironmentVars, (EnvironmentVarsRequest,)),
                 rule_runner.do_not_use_mock(KnownUserResolveNames, (KnownUserResolveNamesRequest,)),
-                MockEffect(
+                MockGet(
                     output_type=InteractiveProcessResult,
                     input_types=(InteractiveProcess,),
                     mock=lambda ip: _mock_run(rule_runner, ip),
-                ),
+                )
             ],
             union_membership=union_membership,
         )
@@ -195,7 +195,7 @@ def test_run_export_rule_resolve(monkeypatch) -> None:
             assert fp.read() == b"BAR"
 
 
-def test_run_export_rule_binary() -> None:
+def test_run_export_rule_binary(monkeypatch) -> None:
     rule_runner = RuleRunner(
         rules=[
             UnionRule(ExportRequest, MockExportRequest),
@@ -205,7 +205,7 @@ def test_run_export_rule_binary() -> None:
         ],
         target_types=[MockTarget],
     )
-    exit_code, stdout = run_export_rule(rule_runner, binaries=["mybin"])
+    exit_code, stdout = run_export_rule(rule_runner, monkeypatch, binaries=["mybin"])
     assert exit_code == 0
     assert "Wrote mock export for mybin to dist/export/mock" in stdout
     for filename in ["mybin"]:
