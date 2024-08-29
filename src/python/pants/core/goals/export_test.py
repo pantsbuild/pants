@@ -32,13 +32,7 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target, Targets
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import (
-    MockEffect,
-    MockGet,
-    RuleRunner,
-    mock_console,
-    run_rule_with_mocks,
-)
+from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 
 
 class MockTarget(Target):
@@ -166,7 +160,7 @@ def run_export_rule(
                     output_type=InteractiveProcessResult,
                     input_types=(InteractiveProcess,),
                     mock=lambda ip: _mock_run(rule_runner, ip),
-                )
+                ),
             ],
             union_membership=union_membership,
         )

@@ -26,9 +26,9 @@ from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import Effect, Get, MultiGet
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.intrinsics import run_interactive_process
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.process import InteractiveProcess
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
@@ -220,15 +220,15 @@ async def export(
     exported_bins_by_exporting_resolve, link_requests = await link_exported_executables(
         build_root, environment, output_dir, flattened_results
     )
-    iprs = await MultiGet(
-        run_interactive_process(link_request) for link_request in link_requests
-    )
+    iprs = await MultiGet(run_interactive_process(link_request) for link_request in link_requests)
 
     errors_linking_bins = [
         proc.description for ipr, proc in zip(iprs, link_requests) if ipr.exit_code
     ]
     if errors_linking_bins:
-        raise ExportError("; ".join(f"Failed in porcess \"{description}\"" for description in errors_linking_bins))
+        raise ExportError(
+            "; ".join(f'Failed in porcess "{description}"' for description in errors_linking_bins)
+        )
 
     exported_bin_warnings = warn_exported_bin_conflicts(exported_bins_by_exporting_resolve)
     for warning in exported_bin_warnings:
@@ -284,7 +284,9 @@ async def link_exported_executables(
     link_requests = []
     for result in export_results:
         for exported_bin in result.exported_binaries:
-            exported_bins_by_exporting_resolve[exported_bin.name].append(result.resolve or result.description)
+            exported_bins_by_exporting_resolve[exported_bin.name].append(
+                result.resolve or result.description
+            )
             if len(exported_bins_by_exporting_resolve[exported_bin.name]) > 1:
                 continue
 
@@ -296,18 +298,18 @@ async def link_exported_executables(
                 )
 
             link_request = InteractiveProcess(
-                    [
-                        ln_bin,
-                        "-sf",
-                        Path(
-                            build_root.path, output_dir, result.reldir, exported_bin.path_in_export
-                        ).as_posix(),
-                        (bin_dir / exported_bin.name).as_posix(),
-                    ],
-                    env={"PATH": environment.get("PATH", "")},
-                    run_in_workspace=True,
-                    description=f"link binary {exported_bin.name} to bin directory"
-                )
+                [
+                    ln_bin,
+                    "-sf",
+                    Path(
+                        build_root.path, output_dir, result.reldir, exported_bin.path_in_export
+                    ).as_posix(),
+                    (bin_dir / exported_bin.name).as_posix(),
+                ],
+                env={"PATH": environment.get("PATH", "")},
+                run_in_workspace=True,
+                description=f"link binary {exported_bin.name} to bin directory",
+            )
             link_requests.append(link_request)
     return exported_bins_by_exporting_resolve, link_requests
 
