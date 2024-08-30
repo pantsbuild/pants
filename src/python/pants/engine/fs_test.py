@@ -69,6 +69,12 @@ def rule_runner() -> RuleRunner:
             QueryRule(Snapshot, [PathGlobs]),
             QueryRule(PathMetadataResult, [PathMetadataRequest]),
         ],
+        bootstrap_args=[
+            "-ldebug",
+            "--log-show-rust-3rdparty",
+            "--show-log-target",
+        ],
+        preserve_tmpdirs=True,
         isolated_local_store=True,
     )
     rr.set_options(["-ldebug", "--log-show-rust-3rdparty"])
@@ -1604,3 +1610,14 @@ def test_local_system_watch_requests(rule_runner: RuleRunner) -> None:
         assert m is not None
         assert m.path == str(path1)
         assert m.kind == PathMetadataKind.FILE
+
+        new_path = base_path / "xyzzy"
+        m2 = get_metadata(str(new_path))
+        assert m2 is None
+        new_path.write_bytes(b"is found")
+
+        def check_metadata_exists() -> None:
+            m = get_metadata(str(new_path))
+            assert m is not None
+
+        retry_failed_assertions(check_metadata_exists, 3, 1)

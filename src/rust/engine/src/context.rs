@@ -70,6 +70,7 @@ pub struct Core {
     pub http_client: reqwest::Client,
     pub local_cache: PersistentCache,
     pub vfs: PosixFS,
+    pub vfs_system: PosixFS,
     pub buildroot_watcher: Option<Arc<InvalidationWatcher>>,
     pub local_system_watcher: Option<Arc<InvalidationWatcher>>,
     pub build_root: PathBuf,
@@ -705,8 +706,10 @@ impl Core {
             command_runners,
             http_client,
             local_cache,
-            vfs: PosixFS::new(&build_root, ignorer, executor)
+            vfs: PosixFS::new(&build_root, ignorer, executor.clone())
                 .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,
+            vfs_system: PosixFS::new(Path::new("/"), GitignoreStyleExcludes::empty(), executor)
+                .map_err(|e| format!("Could not initialize Vfs for local system: {e:?}"))?,
             build_root,
             buildroot_watcher,
             local_system_watcher,
@@ -769,12 +772,12 @@ fn caller_to_logging_info(caller: InvalidateCaller) -> (Level, &'static str) {
 
 impl Invalidatable for InvalidatableGraph {
     fn invalidate(&self, paths: &HashSet<PathBuf>, caller: InvalidateCaller) -> usize {
-        eprintln!("invalidate path = {paths:?}");
+        log::debug!("invalidate path = {paths:?}");
         let InvalidationResult { cleared, dirtied } =
             self.invalidate_from_roots(false, move |node| {
                 if let Some(fs_subject) = node.fs_subject() {
                     let path = fs_subject.to_path_in_workspace(&self.build_root);
-                    eprintln!("path: {fs_subject:?} -> {path:?}");
+                    log::debug!("path: {fs_subject:?} -> {path:?} ?");
                     paths.contains(&path)
                 } else {
                     false

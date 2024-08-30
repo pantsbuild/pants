@@ -34,6 +34,7 @@ struct Inner {
     // is to allow for testing of the background thread.
     background_task_inputs: Option<WatcherTaskInputs>,
     precise_watches: bool,
+    path_sender: tokio::sync::broadcast::Sender<PathBuf>,
 }
 
 type WatcherTaskInputs = (
@@ -41,6 +42,7 @@ type WatcherTaskInputs = (
     PathBuf,
     crossbeam_channel::Sender<String>,
     Receiver<notify::Result<Event>>,
+    tokio::sync::broadcast::Sender<PathBuf>,
 );
 
 pub struct InvalidationWatcher(Mutex<Inner>);
@@ -88,6 +90,9 @@ impl InvalidationWatcher {
                 })?
         }
 
+        let (path_sender, path_receiver) = tokio::sync::broadcast::channel(100);
+        drop(path_receiver);
+
         Ok(Arc::new(InvalidationWatcher(Mutex::new(Inner {
             watcher,
             executor,
@@ -97,9 +102,17 @@ impl InvalidationWatcher {
                 canonical_build_root,
                 liveness_sender,
                 watch_receiver,
+                path_sender.clone(),
             )),
             precise_watches,
+            path_sender,
         }))))
+    }
+
+    /// Subscribe to paths changed in the filesystem.
+    pub fn subscribe_to_path_changes(&self) -> tokio::sync::broadcast::Receiver<PathBuf> {
+        let inner = self.0.lock();
+        inner.path_sender.subscribe()
     }
 
     ///
@@ -107,7 +120,7 @@ impl InvalidationWatcher {
     ///
     pub fn start<I: Invalidatable>(&self, invalidatable: &Arc<I>) -> Result<(), String> {
         let mut inner = self.0.lock();
-        let (ignorer, canonical_build_root, liveness_sender, watch_receiver) = inner
+        let (ignorer, canonical_build_root, liveness_sender, watch_receiver, path_sender) = inner
             .background_task_inputs
             .take()
             .expect("An InvalidationWatcher can only be started once.");
@@ -118,6 +131,7 @@ impl InvalidationWatcher {
             canonical_build_root,
             liveness_sender,
             watch_receiver,
+            path_sender,
         )?;
 
         Ok(())
@@ -130,6 +144,7 @@ impl InvalidationWatcher {
         canonical_build_root: PathBuf,
         liveness_sender: crossbeam_channel::Sender<String>,
         watch_receiver: Receiver<notify::Result<Event>>,
+        path_sender: tokio::sync::broadcast::Sender<PathBuf>,
     ) -> Result<thread::JoinHandle<()>, String> {
         thread::Builder::new()
             .name("fs-watcher".to_owned())
@@ -144,6 +159,10 @@ impl InvalidationWatcher {
                     };
                     match event_res {
                         Ok(Ok(ev)) => {
+                            for path in &ev.paths {
+                                // Ignore any errors due to no receivers being connected.
+                                let _ = path_sender.send(path.to_path_buf());
+                            }
                             Self::handle_event(&*invalidatable, &ignorer, &canonical_build_root, ev)
                         }
                         Ok(Err(err)) => {

@@ -114,12 +114,15 @@ async fn liveness_watch_error() {
     let _watcher = setup_watch(ignorer.clone(), build_root.clone(), file_path.clone()).await;
     let (liveness_sender, liveness_receiver) = crossbeam_channel::unbounded();
     let (event_sender, event_receiver) = crossbeam_channel::unbounded();
+    let (path_sender, _path_receiver) = tokio::sync::broadcast::channel(1);
+    drop(_path_receiver);
     let join_handle = InvalidationWatcher::start_background_thread(
         Arc::downgrade(&invalidatable),
         ignorer,
         build_root,
         liveness_sender,
         event_receiver,
+        path_sender,
     )
     .unwrap();
 
@@ -139,6 +142,52 @@ async fn liveness_watch_error() {
         .recv_timeout(Duration::from_millis(1000))
         .is_ok());
     join_handle.join().unwrap();
+}
+
+#[tokio::test]
+async fn precise_events_mode() {
+    let tempdir = tempfile::TempDir::new().unwrap();
+    let base_path = tempdir.path();
+
+    let invalidatable = Arc::new(TestInvalidatable::default());
+    let executor = Executor::new();
+
+    let watcher = InvalidationWatcher::new(
+        executor,
+        base_path.to_path_buf(),
+        GitignoreStyleExcludes::empty(),
+        true,
+    )
+    .expect("Couldn't create InvalidationWatcher");
+    watcher.start(&invalidatable).expect("watcher started");
+
+    let mut path_changes = watcher.subscribe_to_path_changes();
+
+    let file_path = base_path.join("foo.txt");
+    
+    watcher.watch(base_path.to_path_buf()).await.unwrap();
+
+    // Clear out any prior paths.
+    loop {
+        match tokio::time::timeout(Duration::from_millis(200), path_changes.recv()).await  {
+            Ok(_) => (),
+            Err(_) => break,
+        }
+    }
+
+    // Now create a file in the watched directory.
+    make_file(&file_path, b"xyzzy", 0o600);
+
+    // Wait for the change notification for that new file.
+    let changed_path = tokio::time::timeout(Duration::from_millis(200), path_changes.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(&changed_path, &file_path);
+
+    let invalidated_paths: Vec<PathBuf> = invalidatable.calls.lock().iter().flat_map(|set| set.iter()).cloned().collect();
+    println!("invalidated_paths = {:?}", &invalidated_paths);
+    assert!(invalidatable.was_invalidated(Path::new("foo.txt")));
 }
 
 #[derive(Default)]

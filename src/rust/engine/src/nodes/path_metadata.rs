@@ -32,14 +32,25 @@ impl PathMetadata {
 
     pub(super) async fn run_node(self, context: Context) -> NodeResult<Option<fs::PathMetadata>> {
         let node = self;
-        let path = node
-            .subject_path
-            .to_path_in_workspace(&context.core.build_root);
-        context
-            .core
-            .vfs
-            .path_metadata(path)
+        let (vfs, path) = match &node.subject_path {
+            SubjectPath::Workspace(relpath) => (&context.core.vfs, relpath.as_path()),
+            SubjectPath::LocalSystem(abspath) => (&context.core.vfs_system, abspath.as_path()),
+        };
+
+        vfs.path_metadata(path.to_path_buf())
             .await
+            // .map(|metadata| {
+            //     metadata.map(|mut m| {
+            //         match &node.subject_path {
+            //             SubjectPath::Workspace(_) => {
+            //                 if m.path.starts_with(&context.core.build_root) {
+            //                 }
+            //                 m
+            //             }
+            //             _ => m,
+            //         }
+            //     })
+            // })
             .map_err(|e| throw(format!("{e}")))
     }
 }
