@@ -301,7 +301,7 @@ class AdhocToolPathEnvModifyModeField(StringField):
 
 class AdhocToolOutputsMatchErrorBehavior(StringField):
     alias = "outputs_match_error_behavior"
-    default = GlobMatchErrorBehavior.error.value
+    default = GlobMatchErrorBehavior.warn.value
     help = help_text(
         """
         Configure whether to check the outputs expected to be captured by this `adhoc_tool` were
