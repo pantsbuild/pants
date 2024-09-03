@@ -1013,6 +1013,7 @@ def test_shell_command_check_outputs(rule_runner: RuleRunner) -> None:
                 output_files=["some-file"],
                 output_directories=["some-directory"],
                 outputs_match_mode="all",
+                outputs_match_error_behavior="error",
             )
             shell_command(
                 name="all_with_present_directory",
@@ -1021,6 +1022,7 @@ def test_shell_command_check_outputs(rule_runner: RuleRunner) -> None:
                 output_files=["some-file"],
                 output_directories=["some-directory"],
                 outputs_match_mode="all",
+                outputs_match_error_behavior="error",
             )
             shell_command(
                 name="any_with_present_file",
@@ -1029,6 +1031,7 @@ def test_shell_command_check_outputs(rule_runner: RuleRunner) -> None:
                 output_files=["some-file"],
                 output_directories=["some-directory"],
                 outputs_match_mode="any",
+                outputs_match_error_behavior="error",
             )
             shell_command(
                 name="any_with_present_directory",
@@ -1037,6 +1040,7 @@ def test_shell_command_check_outputs(rule_runner: RuleRunner) -> None:
                 output_files=["some-file"],
                 output_directories=["some-directory"],
                 outputs_match_mode="any",
+                outputs_match_error_behavior="error",
             )
             """
             )

@@ -501,7 +501,7 @@ async def check_outputs(
             DigestSubset(
                 output_digest,
                 PathGlobs(
-                    [os.path.join(output_directory, "**")],
+                    [output_directory, os.path.join(output_directory, "**")],
                     glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
                 ),
             ),
