@@ -85,7 +85,7 @@ When you run `pants check ::`, Pants will skip any files belonging to skipped ta
 :::caution MyPy may still try to check the skipped files!
 The `skip_mypy` field only tells Pants not to provide the skipped files as direct input to MyPy. But MyPy, by default, will still try to check files that are [dependencies of the direct inputs](https://mypy.readthedocs.io/en/stable/running_mypy.html#following-imports). So if your skipped files are dependencies of unskipped files, they may still be checked.
 
-To change this behavior, use MyPy's [`--follow-imports` option](https://mypy.readthedocs.io/en/stable/command_line.html#cmdoption-mypy-follow-imports), typically by setting it to `silent`. You can do so either by adding it to the [`args` option](../../../reference/subsystems/mypy.mdx#section-args) in the `[mypy]` section of your Pants config file, or by setting it in [`mypy.ini`](https://mypy.readthedocs.io/en/stable/config_file.html).
+To change this behavior, use MyPy's [`--follow-imports` option](https://mypy.readthedocs.io/en/stable/command_line.html#cmdoption-mypy-follow-imports), typically by setting it to `silent`. You can do so either by adding it to the [`args` option](../../../reference/subsystems/mypy.mdx#args) in the `[mypy]` section of your Pants config file, or by setting it in [`mypy.ini`](https://mypy.readthedocs.io/en/stable/config_file.html).
 :::
 
 ### First-party type stubs (`.pyi` files)

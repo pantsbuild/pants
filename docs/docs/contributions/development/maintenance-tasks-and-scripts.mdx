@@ -75,7 +75,10 @@ Example: [#21004](https://github.com/pantsbuild/pants/pull/21004).
 
 ### Google Cloud Functions
 
-Complete platforms are not provided for GCF yet: [#18195](https://github.com/pantsbuild/pants/issues/18195).
+1. Adjust `PythonGoogleCloudFunctionRuntime.known_runtimes` as required
+2. Run `build-support/bin/generate_faas_complete_platforms.py` to create any new files and update the existing ones, using GCF's published docker images
+
+Example: [#21248](https://github.com/pantsbuild/pants/pull/21248).
 
 ## Cherry-pick a pull request to an older version
 

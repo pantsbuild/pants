@@ -80,6 +80,26 @@ When building an Lambda artifact, Pants and the underlying Pex tool need to know
         complete_platforms=[":lambda-platform"],
     )
     ```
+
+    You can generate the `complete_platforms` file for a specific Lambda runtime by running the below cloud function and outputting its file contents. For Lambda, a handler to generate the file might look like this:
+
+   ```python
+   import subprocess
+   import json
+
+   def lambda_handler(event, context):
+       subprocess.run("pip install --target=/tmp/pex pex", shell=True)
+       result = subprocess.run(
+           "PYTHONPATH=/tmp/pex /tmp/pex/bin/pex3 interpreter inspect --markers --tags --indent=2",
+           shell=True, capture_output=True, text=True
+       )
+       return {
+           "statusCode": 200,
+           "body": result.stdout,
+       }
+   ```
+
+   Deploy and invoke the function, then retrieve the output to use as your `complete_platforms` file.
 2. An explicit value for [the `runtime` field](../../../reference/targets/python_aws_lambda_function.mdx#runtime) and, optionally, [the `architecture` field](../../../reference/targets/python_aws_lambda_function.mdx#architecture): Pants uses these to pick an appropriate "complete platforms" value, from options that Pants has pre-packaged. These are static exports from docker images provided by AWS, relying on the environment being relatively stable. (If Pants doesn't have an appropriate "complete platforms" default built-in, you will be prompted to use option 1 above.)
     ```python title="BUILD"
     python_aws_lambda_function(
@@ -258,6 +278,6 @@ Pants implemented a new way to package Lambda functions in 2.17, which became th
 - In Pants 2.18, the new behaviour is now the default behaviour. Layers can now be built using Pants, and this addition includes renaming the `python_awslambda` target to `python_aws_lambda_function`.
 - In Pants 2.19 and later, the old Lambdex behaviour has been entirely removed.
 
-If your code can be packaged without warnings using Pants 2.18, no change is required when upgrading to Pants 2.19 (except removing the `[lambdex]` section in `pants.toml` if that still remains). If not, [follow its instructions](/v2.18/docs/awslambda-python#migrating-from-pants-216-and-earlier) to upgrade to Pants 2.18 fully first, and upgrade to Pants 2.19 after that.
+If your code can be packaged without warnings using Pants 2.18, no change is required when upgrading to Pants 2.19 (except removing the `[lambdex]` section in `pants.toml` if that still remains). If not, [follow its instructions](/2.18/docs/python/integrations/aws-lambda#migrating-from-pants-216-and-earlier) to upgrade to Pants 2.18 fully first, and upgrade to Pants 2.19 after that.
 
 If you encounter a bug with the new behaviour, [please let us know](https://github.com/pantsbuild/pants/issues/new/choose). If you require advanced PEX features, [switch to using `pex_binary` directly](#advanced-using-pex-directly).

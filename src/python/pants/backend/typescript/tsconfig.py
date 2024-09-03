@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, Literal
@@ -77,8 +78,40 @@ async def _read_parent_config(
     )
 
 
+def _clean_tsconfig_contents(content: str) -> str:
+    """The tsconfig.json uses a format similar to JSON ("JSON with comments"), but there are some
+    important differences:
+
+    * tsconfig.json allows both single-line (`// comment`) and multi-line comments (`/* comment */`) to be added
+    anywhere in the file.
+    * Trailing commas in arrays and objects are permitted.
+
+    TypeScript uses its own parser to read the file; in standard JSON, trailing commas or comments are not allowed.
+    """
+    # This pattern matches:
+    # 1. Strings: "..." or '...'
+    # 2. Single-line comments: //...
+    # 3. Multi-line comments: /*...*/
+    # 4. Everything else (including potential trailing commas)
+    pattern = r'("(?:\\.|[^"\\])*")|(\'(?:\\.|[^\'\\])*\')|(//.*?$)|(/\*.*?\*/)|,(\s*[\]}])'
+
+    def replace(match):
+        if match.group(1) or match.group(2):  # It's a string
+            return match.group(0)  # Return the string as is
+        elif match.group(3) or match.group(4):  # It's a comment
+            return ""  # Remove the comment
+        elif match.group(5):  # It's a trailing comma
+            return match.group(5)  # Remove the comma keeping the closing brace/bracket
+        return match.group(0)
+
+    cleaned_content = re.sub(pattern, replace, content, flags=re.DOTALL | re.MULTILINE)
+    return cleaned_content
+
+
 def _parse_config_from_content(content: FileContent) -> tuple[TSConfig, str | None]:
-    parsed_ts_config_json = FrozenDict.deep_freeze(json.loads(content.content))
+    cleaned_tsconfig_contents = _clean_tsconfig_contents(content.content.decode("utf-8"))
+    parsed_ts_config_json = FrozenDict.deep_freeze(json.loads(cleaned_tsconfig_contents))
+
     compiler_options = parsed_ts_config_json.get("compilerOptions", FrozenDict())
     return TSConfig(
         content.path,
