@@ -57,6 +57,8 @@ from pants.engine.target import (
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
+    WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.util.frozendict import FrozenDict
 
@@ -471,8 +473,11 @@ async def check_outputs(
     output_directories: Iterable[str],
     outputs_match_error_behavior: GlobMatchErrorBehavior,
     outputs_match_mode: GlobExpansionConjunction | None,
-    description_of_origin: str,
+    address: Address,
 ) -> None:
+    """Check an output digest from adhoc/shell backends to ensure that the outputs expected by the
+    user do in fact exist."""
+
     if outputs_match_mode is None:
         return
 
@@ -508,12 +513,12 @@ async def check_outputs(
     filtered_output_directories = tuple(zip(output_directories, filtered_output_directory_digests))
 
     unused_output_files = tuple(
-        f"{output_file} (from Output_files)"
+        f"{output_file} (from `output_files` field)"
         for output_file, digest in filtered_output_files
         if digest == EMPTY_DIGEST
     )
     unused_output_directories = tuple(
-        f"{output_directory} (from output_directories)"
+        f"{output_directory} (from `output_directories` field)"
         for output_directory, digest in filtered_output_directories
         if digest == EMPTY_DIGEST
     )
@@ -521,10 +526,23 @@ async def check_outputs(
     def warn_or_raise(message: str, snapshot: Snapshot) -> None:
         unused_globs_str = ", ".join([*unused_output_files, *unused_output_directories])
         message = f"{message}\n\nThe following output globs were unused: {unused_globs_str}"
+
         if snapshot.dirs:
-            message += f"\n\nDirectories in output: {', '.join(snapshot.dirs)}"
+            message += f"\n\nDirectories in output ({len(snapshot.dirs)} total):"
+            dirs = sorted(snapshot.dirs, key=lambda x: x.count(os.pathsep))
+            if len(dirs) > 15:
+                message += f" {', ' .join(dirs[0:15])}, ... (trimmed for brevity)"
+            else:
+                message += f" {', ' .join(dirs)}"
+
         if snapshot.files:
-            message += f"\n\nFiles in output: {', '.join(snapshot.files)}"
+            message += f"\n\nFiles in output ({len(snapshot.files)} total):"
+            files = sorted(snapshot.files, key=lambda x: x.count(os.pathsep))
+            if len(files) > 15:
+                message += f" {', ' .join(files[0:15])}, ... (trimmed for brevity)"
+            else:
+                message += f" {', ' .join(files)}"
+
         if outputs_match_error_behavior == GlobMatchErrorBehavior.error:
             raise ValueError(message)
         else:
@@ -534,9 +552,12 @@ async def check_outputs(
         if not unused_output_files and not unused_output_directories:
             return
 
-        snapshot = await Get(Snapshot, Digest, output_digest)
+        snapshot, wrapped_tgt = await MultiGet(
+            Get(Snapshot, Digest, output_digest),
+            Get(WrappedTarget, WrappedTargetRequest(address, "adhoc_process_support rule")),
+        )
         warn_or_raise(
-            f"The `{description_of_origin}` is configured with `outputs_match_mode` set to `all` "
+            f"The `{wrapped_tgt.target.alias}` target at `{address}` is configured with `outputs_match_mode` set to `all` "
             "which requires all output globs to actually match an output.",
             snapshot,
         )
@@ -546,9 +567,12 @@ async def check_outputs(
     unused_count = len(unused_output_files) + len(unused_output_directories)
     if total_count == 0 or unused_count < total_count:
         return
-    snapshot = await Get(Snapshot, Digest, output_digest)
+    snapshot, wrapped_tgt = await MultiGet(
+        Get(Snapshot, Digest, output_digest),
+        Get(WrappedTarget, WrappedTargetRequest(address, "adhoc_process_support rule")),
+    )
     warn_or_raise(
-        f"The {description_of_origin}` is configured with `outputs_match_mode` set to `any` "
+        f"The `{wrapped_tgt.target.alias}` target at `{address}` is configured with `outputs_match_mode` set to `any` "
         "which requires at least one output glob to actually match an output.",
         snapshot,
     )
@@ -612,7 +636,7 @@ async def run_adhoc_process(
         output_directories=output_directories,
         outputs_match_error_behavior=request.outputs_match_error_behavior,
         outputs_match_mode=request.outputs_match_mode,
-        description_of_origin=f"{request.address}",
+        address=request.address,
     )
 
     if extra_contents:
