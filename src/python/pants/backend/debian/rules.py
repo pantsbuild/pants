@@ -22,7 +22,7 @@ from pants.core.util_rules.system_binaries import BinaryPathRequest, TarBinary, 
 from pants.engine.fs import CreateDigest, FileEntry
 from pants.engine.internals.graph import hydrate_sources
 from pants.engine.intrinsics import create_digest, get_digest_entries
-from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.process import Process, execute_process_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import HydrateSourcesRequest
 from pants.engine.unions import UnionRule
@@ -63,7 +63,7 @@ async def package_debian_package(
     # snapshot.files isn't empty.
     sources_directory_name = PurePath(hydrated_sources.snapshot.files[0]).parts[0]
 
-    result = await fallible_to_exec_result_or_raise(
+    result = await execute_process_or_raise(
         **implicitly(
             Process(
                 argv=(

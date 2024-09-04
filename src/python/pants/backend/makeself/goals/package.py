@@ -39,7 +39,7 @@ from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.graph import find_valid_field_sets, hydrate_sources, resolve_targets
 from pants.engine.internals.native_engine import AddPrefix
 from pants.engine.intrinsics import add_prefix, digest_to_snapshot, merge_digests
-from pants.engine.process import Process, ProcessCacheScope, fallible_to_exec_result_or_raise
+from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSetsPerTargetRequest, HydrateSourcesRequest, SourcesField
 from pants.engine.unions import UnionRule
@@ -180,7 +180,7 @@ async def package_makeself_binary(field_set: MakeselfArchiveFieldSet) -> BuiltPa
 
     output_path = PurePath(field_set.output_path.value_or_default(file_ending="run"))
     output_filename = output_path.name
-    result = await fallible_to_exec_result_or_raise(
+    result = await execute_process_or_raise(
         **implicitly(
             CreateMakeselfArchive(
                 archive_dir=archive_dir,
