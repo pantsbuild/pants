@@ -85,7 +85,7 @@ def test_execute_process_with_package_manager(
     "package_manager, version",
     [
         pytest.param("yarn", "1.22.22", id="yarn"),
-        pytest.param("npm", "10.8.1", id="npm"),
+        pytest.param("npm", "10.8.2", id="npm"),
         pytest.param("pnpm", "9.5.0", id="pnpm"),
     ],
 )
@@ -115,7 +115,7 @@ def test_execute_process_with_package_manager_version_from_configuration(
         pytest.param(Path(__file__).parent / "yarn.lock", "yarn", "1.22.22", id="yarn_resolve"),
         pytest.param(Path(__file__).parent / "pnpm-lock.yaml", "pnpm", "9.5.0", id="pnpm_resolve"),
         pytest.param(
-            Path(__file__).parent / "package-lock.json", "npm", "10.8.1", id="npm_resolve"
+            Path(__file__).parent / "package-lock.json", "npm", "10.8.2", id="npm_resolve"
         ),
     ],
 )
