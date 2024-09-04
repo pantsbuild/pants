@@ -21,7 +21,7 @@ from typing import Iterable, Literal
 from pants.engine.collection import Collection
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.selectors import Get, concurrently
-from pants.engine.intrinsics import directory_digest_to_digest_contents, path_globs_to_digest
+from pants.engine.intrinsics import get_digest_contents, path_globs_to_digest
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.util.frozendict import FrozenDict
 
@@ -148,7 +148,7 @@ class TSConfigsRequest:
 @rule
 async def construct_effective_ts_configs(req: TSConfigsRequest) -> AllTSConfigs:
     all_files = await path_globs_to_digest(PathGlobs([f"**/{req.target_file}"]))
-    digest_contents = await directory_digest_to_digest_contents(all_files)
+    digest_contents = await get_digest_contents(all_files)
 
     return AllTSConfigs(
         await concurrently(

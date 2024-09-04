@@ -12,7 +12,7 @@ from pants.core.util_rules.external_tool import (
     download_external_tool,
 )
 from pants.engine.fs import Digest, RemovePrefix
-from pants.engine.intrinsics import remove_prefix_request_to_digest
+from pants.engine.intrinsics import remove_prefix
 from pants.engine.platform import Platform
 from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
@@ -102,7 +102,7 @@ async def extract_makeself_distribution(
             )
         )
     )
-    digest = await remove_prefix_request_to_digest(RemovePrefix(result.output_digest, out))
+    digest = await remove_prefix(RemovePrefix(result.output_digest, out))
     return MakeselfTool(digest=digest, exe="makeself.sh")
 
 

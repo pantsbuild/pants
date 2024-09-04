@@ -34,7 +34,7 @@ from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.intrinsics import process_request_to_process_result
+from pants.engine.intrinsics import execute_process
 from pants.engine.process import ProcessCacheScope
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import AllTargets, GeneratedSources, GenerateSourcesRequest, Targets
@@ -114,7 +114,7 @@ async def generate_python_from_setuptools_scm(
 
     argv = ["--root", str(maybe_git_worktree.git_worktree.worktree), "--config", config_path]
 
-    result = await process_request_to_process_result(
+    result = await execute_process(
         **implicitly(
             {
                 VenvPexProcess(
