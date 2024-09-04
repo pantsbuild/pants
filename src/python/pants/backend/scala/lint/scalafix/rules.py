@@ -27,11 +27,11 @@ from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.intrinsics import (
-    add_prefix_request_to_digest,
+    add_prefix,
     digest_subset_to_digest,
     digest_to_snapshot,
-    merge_digests_request_to_digest,
-    process_request_to_process_result,
+    execute_process,
+    merge_digests,
 )
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
@@ -278,7 +278,7 @@ async def _restore_source_roots(source_roots_result: SourceRootsResult, digest: 
     )
 
     restored_digests = await concurrently(
-        add_prefix_request_to_digest(AddPrefix(digest, source_root))
+        add_prefix(AddPrefix(digest, source_root))
         for digest, source_root in zip(digest_subsets, source_roots_to_files.keys())
     )
     return await digest_to_snapshot(**implicitly(MergeDigests(restored_digests)))
@@ -297,11 +297,11 @@ async def _run_scalafix_process(
 ) -> FallibleProcessResult:
     partition_info = request.partition_info
 
-    merged_digest = await merge_digests_request_to_digest(
+    merged_digest = await merge_digests(
         MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest])
     )
 
-    return await process_request_to_process_result(
+    return await execute_process(
         **implicitly(
             JvmProcess(
                 jdk=jdk,

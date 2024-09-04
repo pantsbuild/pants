@@ -21,7 +21,7 @@ from pants.core.goals.package import (
 from pants.core.util_rules.system_binaries import BinaryPathRequest, TarBinary, find_binary
 from pants.engine.fs import CreateDigest, FileEntry
 from pants.engine.internals.graph import hydrate_sources
-from pants.engine.intrinsics import create_digest_to_digest, directory_digest_to_digest_entries
+from pants.engine.intrinsics import create_digest, get_digest_entries
 from pants.engine.process import Process, fallible_to_exec_result_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import HydrateSourcesRequest
@@ -83,13 +83,13 @@ async def package_debian_package(
     output_filename = field_set.output_path.value_or_default(
         file_ending="deb",
     )
-    digest_entries = await directory_digest_to_digest_entries(result.output_digest)
+    digest_entries = await get_digest_entries(result.output_digest)
     assert len(digest_entries) == 1
     result_file_entry = digest_entries[0]
     assert isinstance(result_file_entry, FileEntry)
     new_file = FileEntry(output_filename, result_file_entry.file_digest)
 
-    final_result = await create_digest_to_digest(CreateDigest([new_file]))
+    final_result = await create_digest(CreateDigest([new_file]))
     return BuiltPackage(final_result, artifacts=(BuiltPackageArtifact(output_filename),))
 
 

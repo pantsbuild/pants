@@ -18,11 +18,7 @@ from pants.core.util_rules.config_files import (
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.engine.fs import DigestSubset, MergeDigests, PathGlobs
 from pants.engine.internals.native_engine import FilespecMatcher, Snapshot
-from pants.engine.intrinsics import (
-    digest_to_snapshot,
-    merge_digests_request_to_digest,
-    process_request_to_process_result,
-)
+from pants.engine.intrinsics import digest_to_snapshot, execute_process, merge_digests
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
@@ -111,7 +107,7 @@ async def run_yamllint(
 
     yamllint_bin = await create_pex(yamllint.to_pex_request())
     snapshot = await digest_to_snapshot(**implicitly(PathGlobs(request.elements)))
-    input_digest = await merge_digests_request_to_digest(
+    input_digest = await merge_digests(
         MergeDigests(
             (
                 snapshot.digest,
@@ -125,7 +121,7 @@ async def run_yamllint(
         )
     )
 
-    process_result = await process_request_to_process_result(
+    process_result = await execute_process(
         **implicitly(
             PexProcess(
                 yamllint_bin,
