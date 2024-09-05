@@ -1,5 +1,6 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
@@ -108,7 +109,7 @@ async def extract_makeself_distribution(
     return MakeselfTool(digest=digest, exe="makeself.sh")
 
 
-def rules() -> Iterable[Rule, UnionRule]:
+def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         *external_tool.rules(),
