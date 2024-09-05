@@ -32,7 +32,7 @@ from pants.engine.internals.native_engine import AddPrefix, RemovePrefix
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, digest_to_snapshot, merge_digests, remove_prefix
 from pants.engine.platform import Platform
-from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.process import Process, execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 
@@ -88,7 +88,7 @@ async def package_nfpm_package(
         )
     )
 
-    result = await fallible_to_exec_result_or_raise(
+    result = await execute_process_or_raise(
         **implicitly(
             Process(
                 argv=(
