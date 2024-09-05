@@ -339,5 +339,5 @@ def rules():
     return [
         *collect_rules(),
         *external_tool.rules(),
-        UnionRule(ExportableTool, Coursier),
+        UnionRule(ExportableTool, CoursierSubsystem),
     ]
