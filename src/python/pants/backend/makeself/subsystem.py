@@ -113,5 +113,5 @@ def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         *external_tool.rules(),
-        UnionRule(ExportableTool, MakeselfTool),
+        UnionRule(ExportableTool, MakeselfSubsystem),
     )
