@@ -9,7 +9,7 @@ from pants.backend.kotlin.target_types import KotlinSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.process import execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -60,7 +60,7 @@ async def ktlint_fmt(
         *request.files,
     ]
 
-    result = await fallible_to_exec_result_or_raise(
+    result = await execute_process_or_raise(
         **implicitly(
             JvmProcess(
                 jdk=jdk,

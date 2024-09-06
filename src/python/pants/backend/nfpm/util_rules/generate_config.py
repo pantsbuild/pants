@@ -22,7 +22,7 @@ from pants.engine.fs import CreateDigest, FileContent, FileEntry
 from pants.engine.internals.graph import find_valid_field_sets
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.internals.native_engine import Digest
-from pants.engine.intrinsics import create_digest_to_digest, directory_digest_to_digest_entries
+from pants.engine.intrinsics import create_digest, get_digest_entries
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSetsPerTarget,
@@ -79,9 +79,7 @@ async def generate_nfpm_yaml(
     # Second, gather package contents from hydrated deps.
     contents: list[NfpmContent] = config["contents"]
 
-    content_sandbox_entries = await directory_digest_to_digest_entries(
-        request.content_sandbox_digest
-    )
+    content_sandbox_entries = await get_digest_entries(request.content_sandbox_digest)
     content_sandbox_files = {
         entry.path: entry for entry in content_sandbox_entries if isinstance(entry, FileEntry)
     }
@@ -163,7 +161,7 @@ async def generate_nfpm_yaml(
     nfpm_yaml += yaml.safe_dump(config)
     nfpm_yaml_content = FileContent("nfpm.yaml", nfpm_yaml.encode("utf-8"))
 
-    digest = await create_digest_to_digest(CreateDigest([nfpm_yaml_content]))
+    digest = await create_digest(CreateDigest([nfpm_yaml_content]))
     return NfpmPackageConfig(digest)
 
 

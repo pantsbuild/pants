@@ -19,8 +19,8 @@ from pants.core.util_rules.config_files import (
 from pants.core.util_rules.partitions import Partition
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.selectors import concurrently
-from pants.engine.intrinsics import digest_to_snapshot, merge_digests_request_to_digest
-from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.intrinsics import digest_to_snapshot, merge_digests
+from pants.engine.process import execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -134,11 +134,11 @@ async def scalafmt_fmt(
     request: ScalafmtRequest.Batch, jdk: InternalJdk, tool: ScalafmtSubsystem
 ) -> FmtResult:
     partition_info = cast(PartitionInfo, request.partition_metadata)
-    merged_digest = await merge_digests_request_to_digest(
+    merged_digest = await merge_digests(
         MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest])
     )
 
-    result = await fallible_to_exec_result_or_raise(
+    result = await execute_process_or_raise(
         **implicitly(
             JvmProcess(
                 jdk=jdk,
