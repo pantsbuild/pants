@@ -16,7 +16,6 @@ from pants.backend.adhoc.target_types import (
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
-    AdhocToolOutputsMatchErrorBehavior,
     AdhocToolOutputsMatchMode,
     AdhocToolPathEnvModifyModeField,
     AdhocToolRunnableDependenciesField,
@@ -391,10 +390,6 @@ class ShellCommandPathEnvModifyModeField(AdhocToolPathEnvModifyModeField):
     pass
 
 
-class ShellCommandOutputsMatchErrorBehavior(AdhocToolOutputsMatchErrorBehavior):
-    pass
-
-
 class ShellCommandOutputsMatchMode(AdhocToolOutputsMatchMode):
     pass
 
@@ -425,7 +420,6 @@ class ShellCommandTarget(Target):
         ShellCommandOutputRootDirField,
         ShellCommandWorkspaceInvalidationSourcesField,
         ShellCommandPathEnvModifyModeField,
-        ShellCommandOutputsMatchErrorBehavior,
         ShellCommandOutputsMatchMode,
         EnvironmentField,
     )

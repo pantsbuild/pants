@@ -87,7 +87,7 @@ class AdhocProcessRequest:
     cache_scope: ProcessCacheScope | None = None
     use_working_directory_as_base_for_output_captures: bool = True
     outputs_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error
-    outputs_match_mode: GlobExpansionConjunction | None = GlobExpansionConjunction.all_match
+    outputs_match_conjunction: GlobExpansionConjunction | None = GlobExpansionConjunction.all_match
 
 
 @dataclass(frozen=True)
@@ -635,7 +635,7 @@ async def run_adhoc_process(
         output_files=output_files,
         output_directories=output_directories,
         outputs_match_error_behavior=request.outputs_match_error_behavior,
-        outputs_match_mode=request.outputs_match_mode,
+        outputs_match_mode=request.outputs_match_conjunction,
         address=request.address,
     )
 

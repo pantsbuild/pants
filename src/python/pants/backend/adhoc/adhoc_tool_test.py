@@ -509,7 +509,6 @@ def test_adhoc_tool_check_outputs(rule_runner: PythonRuleRunner) -> None:
                 output_files=["some-file"],
                 output_directories=["some-directory"],
                 outputs_match_mode="all",
-                outputs_match_error_behavior="error",
             )
             adhoc_tool(
                 name="all_with_present_directory",
@@ -519,27 +518,24 @@ def test_adhoc_tool_check_outputs(rule_runner: PythonRuleRunner) -> None:
                 output_files=["some-file"],
                 output_directories=["some-directory"],
                 outputs_match_mode="all",
-                outputs_match_error_behavior="error",
             )
             adhoc_tool(
-                name="any_with_present_file",
+                name="at_least_one_with_present_file",
                 runnable=":bash",
                 args=["-c", "touch some-file"],
                 runnable_dependencies=[":touch"],
                 output_files=["some-file"],
                 output_directories=["some-directory"],
-                outputs_match_mode="any",
-                outputs_match_error_behavior="error",
+                outputs_match_mode="at_least_one",
             )
             adhoc_tool(
-                name="any_with_present_directory",
+                name="at_least_one_with_present_directory",
                 runnable=":bash",
                 args=["-c", "mkdir some-directory && touch some-directory/foo.txt"],
                 runnable_dependencies=[":mkdir", ":touch"],
                 output_files=["some-file"],
                 output_directories=["some-directory"],
-                outputs_match_mode="any",
-                outputs_match_error_behavior="error",
+                outputs_match_mode="at_least_one",
             )
             """
             )
@@ -557,10 +553,10 @@ def test_adhoc_tool_check_outputs(rule_runner: PythonRuleRunner) -> None:
     assert "some-file" in str(exc_info)
 
     assert_adhoc_tool_result(
-        rule_runner, Address("", target_name="any_with_present_file"), {"some-file": ""}
+        rule_runner, Address("", target_name="at_least_one_with_present_file"), {"some-file": ""}
     )
     assert_adhoc_tool_result(
         rule_runner,
-        Address("", target_name="any_with_present_directory"),
+        Address("", target_name="at_least_one_with_present_directory"),
         {"some-directory/foo.txt": ""},
     )

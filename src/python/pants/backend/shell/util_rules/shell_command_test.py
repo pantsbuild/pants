@@ -1013,7 +1013,6 @@ def test_shell_command_check_outputs(rule_runner: RuleRunner) -> None:
                 output_files=["some-file"],
                 output_directories=["some-directory"],
                 outputs_match_mode="all",
-                outputs_match_error_behavior="error",
             )
             shell_command(
                 name="all_with_present_directory",
@@ -1022,25 +1021,22 @@ def test_shell_command_check_outputs(rule_runner: RuleRunner) -> None:
                 output_files=["some-file"],
                 output_directories=["some-directory"],
                 outputs_match_mode="all",
-                outputs_match_error_behavior="error",
             )
             shell_command(
-                name="any_with_present_file",
+                name="at_least_one_with_present_file",
                 command="touch some-file",
                 tools=["touch"],
                 output_files=["some-file"],
                 output_directories=["some-directory"],
-                outputs_match_mode="any",
-                outputs_match_error_behavior="error",
+                outputs_match_mode="at_least_one",
             )
             shell_command(
-                name="any_with_present_directory",
+                name="at_least_one_with_present_directory",
                 command="mkdir some-directory && touch some-directory/foo.txt",
                 tools=["mkdir", "touch"],
                 output_files=["some-file"],
                 output_directories=["some-directory"],
-                outputs_match_mode="any",
-                outputs_match_error_behavior="error",
+                outputs_match_mode="at_least_one",
             )
             """
             )
@@ -1058,10 +1054,10 @@ def test_shell_command_check_outputs(rule_runner: RuleRunner) -> None:
     assert "some-file" in str(exc_info)
 
     assert_shell_command_result(
-        rule_runner, Address("", target_name="any_with_present_file"), {"some-file": ""}
+        rule_runner, Address("", target_name="at_least_one_with_present_file"), {"some-file": ""}
     )
     assert_shell_command_result(
         rule_runner,
-        Address("", target_name="any_with_present_directory"),
+        Address("", target_name="at_least_one_with_present_directory"),
         {"some-directory/foo.txt": ""},
     )
