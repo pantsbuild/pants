@@ -1,25 +1,38 @@
-from functools import partial
-import logging
-from pathlib import PurePath
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.python.macros.common_fields import ModuleMappingField, RequirementsOverrideField, TypeStubsModuleMappingField
+import logging
+from functools import partial
+from pathlib import PurePath
+from typing import Iterator
+
+from pants.backend.python.macros.common_fields import (
+    ModuleMappingField,
+    RequirementsOverrideField,
+    TypeStubsModuleMappingField,
+)
 from pants.backend.python.macros.common_requirements_rule import _generate_requirements
 from pants.backend.python.macros.poetry_requirements import PyProjectToml
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementTarget
 from pants.base.build_root import BuildRoot
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import COMMON_TARGET_FIELDS, GenerateTargetsRequest, GeneratedTargets, SingleSourceField, TargetGenerator
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    GeneratedTargets,
+    GenerateTargetsRequest,
+    SingleSourceField,
+    TargetGenerator,
+)
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
 from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
-
 logger = logging.getLogger(__name__)
 
 
-def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[PipRequirement]:
+def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> Iterator[PipRequirement]:
     parsed = pyproject_toml.parse()
     try:
         uv_vals = parsed["tool"]["uv"]
@@ -49,19 +62,23 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[PipRequirement]:
             )
         )
 
-    return set(
-        PipRequirement.parse(line) for line in dev_dependencies.items()
-    )
+    for dep in dev_dependencies:
+        dep = dep.strip()
+        if not dep or dep.startswith("#"):
+            continue
+        yield PipRequirement.parse(dep, description_of_origin=str(pyproject_toml.toml_relpath))
 
 
 def parse_uv_requirements(
     build_root: BuildRoot, file_contents: bytes, file_path: str
 ) -> set[PipRequirement]:
-    return parse_pyproject_toml(
-        PyProjectToml(
-            build_root=PurePath(build_root.path),
-            toml_relpath=PurePath(file_path),
-            toml_contents=file_contents.decode(),
+    return set(
+        parse_pyproject_toml(
+            PyProjectToml(
+                build_root=PurePath(build_root.path),
+                toml_relpath=PurePath(file_path),
+                toml_contents=file_contents.decode(),
+            )
         )
     )
 
