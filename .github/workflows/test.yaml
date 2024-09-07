@@ -839,7 +839,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -931,7 +931,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1023,7 +1023,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1115,7 +1115,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1207,7 +1207,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1299,7 +1299,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1391,7 +1391,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1483,7 +1483,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1575,7 +1575,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1667,7 +1667,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1726,7 +1726,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
