@@ -33,12 +33,12 @@ def rule_runner() -> RuleRunner:
 def assert_uv_requirements(
     rule_runner: RuleRunner,
     build_file_entry: str,
-    requirements_txt: str,
+    pyproject_toml: str,
     *,
     expected_targets: set[Target],
-    requirements_txt_relpath: str = "requirements.txt",
+    pyproject_toml_relpath: str = "pyproject.toml",
 ) -> None:
-    rule_runner.write_files({"BUILD": build_file_entry, requirements_txt_relpath: requirements_txt})
+    rule_runner.write_files({"BUILD": build_file_entry, pyproject_toml_relpath: pyproject_toml})
     result = rule_runner.request(
         _TargetParametrizations,
         [
@@ -155,7 +155,6 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
             ),
             TargetGeneratorSourcesHelperTarget({"source": "pyproject.toml"}, file_addr),
         },
-        requirements_txt_relpath="pyproject.toml",
     )
 
 
@@ -167,5 +166,4 @@ def test_invalid_req_pyproject_toml(rule_runner: RuleRunner) -> None:
             "uv_requirements(name='reqs', source='pyproject.toml')",
             """[tool.uv]\ndev-dependencies = ["Not A Valid Req == 3.7"]""",
             expected_targets=set(),
-            requirements_txt_relpath="pyproject.toml",
         )
