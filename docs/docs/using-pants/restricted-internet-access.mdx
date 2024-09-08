@@ -67,7 +67,7 @@ Pants downloads the various JVM-related tools it uses from [Maven Central](https
 
 If you use JVM code but cannot access Maven Central directly, then you probably have an internal mirror or a custom JVM package repository. So all you have to do is configure Pants to access this custom repository, and ensure that the tools it needs are available there.
 
-To do so, set the [`repos`](../../reference/subsystems/coursier.mdx#section-repos) option on the `[coursier]` scope. E.g.,
+To do so, set the [`repos`](../../reference/subsystems/coursier.mdx#repos) option on the `[coursier]` scope. E.g.,
 
 ```text title="pants.toml"
 [coursier]

@@ -76,7 +76,7 @@ Alternatively, you can stop populating `pants_ignore` from your `.gitignore` by 
 
 ## Import errors and missing dependencies
 
-Because Pants runs processes in hermetic sandboxes (temporary directories), Pants must properly know about your [dependencies](./key-concepts/targets-and-build-files.mdx#dependencies-and-dependency-inference) to avoid import errors.
+Because Pants runs processes in hermetic sandboxes (temporary directories), Pants must properly know about your [dependencies](../introduction/how-does-pants-work#dependency-inference) to avoid import errors.
 
 Usually, you do not need to tell Pants about your dependencies thanks to dependency inference, but sometimes dependency inference is not set up properly or cannot work.
 
@@ -226,7 +226,7 @@ To temporarily run a single test at a time (albeit with reduced performance), yo
 pants --process-execution-local-parallelism=1 test ::
 ```
 
-A more sustainable solution for shared resources is to use the [`[pytest].execution_slot_var`](../../reference/subsystems/pytest.mdx#section-execution-slot-var) option, which sets an environment variable which test runs can consume to determine which copy of a resource to consume.
+A more sustainable solution for shared resources is to use the [`[pytest].execution_slot_var`](../../reference/subsystems/pytest.mdx#execution_slot_var) option, which sets an environment variable which test runs can consume to determine which copy of a resource to consume.
 
 ## Snap-based Docker
 
