@@ -389,35 +389,35 @@ class Options:
         :raises pants.option.errors.ConfigValidationError: if the scope is unknown.
         """
 
-        values_builder = OptionValueContainerBuilder()
-        flags_in_scope = self._scope_to_flags.get(scope, [])
-        parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
-        legacy_values = self.get_parser(scope).parse_args(
-            parse_args_request, log_warnings=log_parser_warnings
-        )
+        native_values = self.get_parser(scope).parse_args_native(self._native_parser)
         native_mismatch_msgs = []
 
         if self._native_options_validation == NativeOptionsValidation.ignore:
-            native_values = None
+            legacy_values = None
         else:
             try:
-                native_values = self.get_parser(scope).parse_args_native(self._native_parser)
+                values_builder = OptionValueContainerBuilder()
+                flags_in_scope = self._scope_to_flags.get(scope, [])
+                parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
+                legacy_values = self.get_parser(scope).parse_args(
+                    parse_args_request, log_warnings=log_parser_warnings
+                )
             except Exception as e:
                 native_mismatch_msgs.append(
                     f"Failed to parse options with native parser due to error:\n    {e}"
                 )
-                native_values = None
+                legacy_values = None
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
-            values_builder = legacy_values.to_builder()
-            self._check_and_apply_deprecations(scope, values_builder)
-            legacy_values = values_builder.build()
+            native_values_builder = native_values.to_builder()
+            self._check_and_apply_deprecations(scope, native_values_builder)
+            native_values = native_values_builder.build()
 
-            if native_values:
-                native_values_builder = native_values.to_builder()
-                self._check_and_apply_deprecations(scope, native_values_builder)
-                native_values = native_values_builder.build()
+            if legacy_values:
+                values_builder = legacy_values.to_builder()
+                self._check_and_apply_deprecations(scope, values_builder)
+                legacy_values = values_builder.build()
 
         def listify_tuples(x):
             # Sequence values from the legacy parser can be tuple or list, but those coming from
@@ -429,7 +429,7 @@ class Options:
             else:
                 return x
 
-        if native_values:
+        if legacy_values:
 
             def legacy_val_info(k):
                 if k in legacy_values:
@@ -475,7 +475,7 @@ class Options:
                         If you can't resolve this discrepancy, please reach out to the Pants
                         development team: {doc_url('/community/getting-help')}.
 
-                        The native parser will become the default in 2.23.x, and the legacy parser
+                        The native parser is the default in 2.23.x, and the legacy parser
                         will be removed in 2.24.x. So it is imperative that we find out about any
                         discrepancies during this transition period.
 
@@ -499,8 +499,7 @@ class Options:
                 raise Exception(
                     "Option value mismatches detected, see logs above for details. Aborting."
                 )
-        # TODO: In a future release, switch to the native_values as authoritative.
-        return legacy_values
+        return native_values
 
     def get_fingerprintable_for_scope(
         self,
