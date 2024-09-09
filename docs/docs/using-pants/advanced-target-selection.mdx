@@ -39,7 +39,10 @@ By default, `--changed-since` will only run over files directly changed. Often, 
 ```
 
 :::note Hint: Pants does not understand transitive third-party dependencies in this context.
-All of the `--changed-*` filters apply only to first party dependencies in your codebase.
+Changes to third-party dependencies (particularly, dependencies of dependencies) may not be
+surfaced as you expect via `--changed-*`. In particular, any change to a single dependency
+within a lockfile or a target generator (such as `python_requirements`) will consider all
+users of _any_ dependency changed, transitively.
 :::
 
 ## `filter` options
