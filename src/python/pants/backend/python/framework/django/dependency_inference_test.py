@@ -21,7 +21,6 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import InferredDependencies
 from pants.testutil.python_interpreter_selection import (
     skip_unless_python27_present,
-    skip_unless_python37_present,
     skip_unless_python38_present,
     skip_unless_python39_present,
 )
@@ -175,12 +174,6 @@ def do_test_implicit_app_dependencies(rule_runner: RuleRunner, constraints: str)
 def test_works_with_python2(rule_runner: RuleRunner) -> None:
     do_test_migration_dependencies(rule_runner, constraints="CPython==2.7.*")
     do_test_implicit_app_dependencies(rule_runner, constraints="CPython==2.7.*")
-
-
-@skip_unless_python37_present
-def test_works_with_python37(rule_runner: RuleRunner) -> None:
-    do_test_migration_dependencies(rule_runner, constraints="CPython==3.7.*")
-    do_test_implicit_app_dependencies(rule_runner, constraints="CPython==3.7.*")
 
 
 @skip_unless_python38_present
