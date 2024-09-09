@@ -25,11 +25,13 @@ from pants.backend.python.macros import (
     pipenv_requirements,
     poetry_requirements,
     python_requirements,
+    uv_requirements,
 )
 from pants.backend.python.macros.pipenv_requirements import PipenvRequirementsTargetGenerator
 from pants.backend.python.macros.poetry_requirements import PoetryRequirementsTargetGenerator
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
+from pants.backend.python.macros.uv_requirements import UvRequirementsTargetGenerator
 from pants.backend.python.subsystems import debugpy
 from pants.backend.python.target_types import (
     PexBinariesGeneratorTarget,
@@ -91,6 +93,7 @@ def rules():
         *pipenv_requirements.rules(),
         *poetry_requirements.rules(),
         *python_requirements.rules(),
+        *uv_requirements.rules(),
         *wrap_python.rules,
     )
 
@@ -111,5 +114,6 @@ def target_types():
         PipenvRequirementsTargetGenerator,
         PoetryRequirementsTargetGenerator,
         PythonRequirementsTargetGenerator,
+        UvRequirementsTargetGenerator,
         *wrap_python.target_types,
     )
