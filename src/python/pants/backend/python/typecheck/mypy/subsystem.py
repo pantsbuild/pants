@@ -70,7 +70,10 @@ class MyPy(PythonToolBase):
     help_short = "The MyPy Python type checker (http://mypy-lang.org/)."
 
     default_main = ConsoleScript("mypy")
-    default_requirements = ["mypy>=0.961,<2"]
+    # Temporary upper bounds until one or both of:
+    # https://github.com/pantsbuild/pants/pull/21158
+    # https://github.com/pantsbuild/pants/pull/21387
+    default_requirements = ["mypy>=0.961,<1.5"]
 
     # See `mypy/rules.py`. We only use these default constraints in some situations.
     register_interpreter_constraints = True
