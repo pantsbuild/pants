@@ -1,7 +1,6 @@
 // Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 
@@ -11,6 +10,8 @@ use options::{
 };
 
 use std::collections::HashMap;
+
+pyo3::import_exception!(pants.option.errors, ParseError);
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
     m.add_class::<PyOptionId>()?;
@@ -88,7 +89,7 @@ pub(crate) fn py_object_to_val(obj: &PyAny) -> Result<Val, PyErr> {
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     } else {
-        Err(PyValueError::new_err(format!(
+        Err(ParseError::new_err(format!(
             "Unsupported Python type in option default: {}",
             obj.get_type().name()?
         )))
@@ -112,14 +113,14 @@ impl PyOptionId {
             Some(switch) if switch.len() == 1 => switch.chars().next(),
             None => None,
             Some(s) => {
-                return Err(PyValueError::new_err(format!(
+                return Err(ParseError::new_err(format!(
                     "Switch value should contain a single character, but was: {}",
                     s
                 )))
             }
         };
         let option_id =
-            OptionId::new(scope, components.into_iter(), switch).map_err(PyValueError::new_err)?;
+            OptionId::new(scope, components.into_iter(), switch).map_err(ParseError::new_err)?;
         Ok(Self(option_id))
     }
 }
@@ -144,7 +145,7 @@ struct PyOptionParser(OptionParser);
 type RankedVal<T> = (T, isize);
 
 fn to_py<T>(res: Result<OptionalOptionValue<T>, String>) -> PyResult<RankedVal<Option<T>>> {
-    let val = res.map_err(PyException::new_err)?;
+    let val = res.map_err(ParseError::new_err)?;
     Ok((val.value, val.source.rank() as isize))
 }
 
@@ -160,7 +161,7 @@ impl PyOptionParser {
             Vec<T::Owned>,
         ) -> Result<ListOptionValue<T::Owned>, String>,
     ) -> PyResult<(Vec<T::Owned>, isize)> {
-        let opt_val = getter(&self.0, &option_id.0, default).map_err(PyException::new_err)?;
+        let opt_val = getter(&self.0, &option_id.0, default).map_err(ParseError::new_err)?;
         Ok((opt_val.value, opt_val.source.rank() as isize))
     }
 }
@@ -189,7 +190,7 @@ impl PyOptionParser {
             false,
             None,
         )
-        .map_err(PyValueError::new_err)?;
+        .map_err(ParseError::new_err)?;
         Ok(Self(option_parser))
     }
 
@@ -282,7 +283,7 @@ impl PyOptionParser {
         let opt_val = self
             .0
             .parse_dict(&option_id.0, default)
-            .map_err(PyException::new_err)?;
+            .map_err(ParseError::new_err)?;
         let opt_val_py = opt_val
             .value
             .into_iter()

@@ -7,15 +7,18 @@ import inspect
 import logging
 import shlex
 from enum import Enum
+from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence, Tuple
 
+from pants.base.build_environment import get_buildroot
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PyConfigSource
 from pants.option.config import ConfigSource
-from pants.option.custom_types import _flatten_shlexed_list, shell_str
-from pants.option.errors import OptionsError
+from pants.option.custom_types import _flatten_shlexed_list, dir_option, file_option, shell_str
+from pants.option.errors import BooleanOptionNameWithNo, OptionsError, ParseError
 from pants.option.ranked_value import Rank
-from pants.util.strutil import get_strict_env
+from pants.option.scope import GLOBAL_SCOPE
+from pants.util.strutil import get_strict_env, softwrap
 
 logger = logging.getLogger()
 
@@ -65,11 +68,34 @@ class NativeOptionParser:
         }
 
     def get(
-        self, *, scope, flags, default, option_type, member_type=None, passthrough=False
+        self,
+        *,
+        scope,
+        dest,
+        flags,
+        default,
+        option_type,
+        member_type=None,
+        choices=None,
+        passthrough=False,
     ) -> Tuple[Any, Rank]:
+        def scope_str() -> str:
+            return "global scope" if scope == GLOBAL_SCOPE else f"scope '{scope}'"
+
         def is_enum(typ):
             # TODO: When we switch to Python 3.11, use: return isinstance(typ, EnumType)
             return inspect.isclass(typ) and issubclass(typ, Enum)
+
+        def apply_callable(callable_type, val_str):
+            try:
+                return callable_type(val_str)
+            except (TypeError, ValueError) as e:
+                if is_enum(callable_type):
+                    choices_str = ", ".join(f"{choice.value}" for choice in callable_type)
+                    raise ParseError(f"Invalid choice '{val_str}'. Choose from: {choices_str}")
+                raise ParseError(
+                    f"Error applying type '{callable_type.__name__}' to option value '{val_str}': {e}"
+                )
 
         # '--foo.bar-baz' -> ['foo', 'bar', 'baz']
         name_parts = flags[-1][2:].replace(".", "-").split("-")
@@ -79,7 +105,10 @@ class NativeOptionParser:
         rust_option_type = option_type
         rust_member_type = member_type
 
-        if option_type is dict:
+        if option_type is bool:
+            if name_parts[0] == "no":
+                raise BooleanOptionNameWithNo(scope, dest)
+        elif option_type is dict:
             # The Python code allows registering default=None for dicts/lists, and forces it to
             # an empty dict/list at registration. Since here we only have access to what the user
             # provided, we do the same.
@@ -129,12 +158,62 @@ class NativeOptionParser:
                 if member_type == shell_str:
                     val = _flatten_shlexed_list(val)
                 elif callable(member_type):
-                    val = [member_type(x) for x in val]
+                    val = [apply_callable(member_type, x) for x in val]
                 if passthrough:
                     val += self._native_parser.get_passthrough_args() or []
-            elif is_enum(option_type):
-                val = option_type(val)
             elif callable(option_type):
-                val = option_type(val)
+                val = apply_callable(option_type, val)
+
+            # Validate the value.
+
+            def check_scalar_value(val, choices):
+                if choices is None and is_enum(option_type):
+                    choices = list(option_type)
+                if choices is not None and val not in choices:
+                    raise ParseError(
+                        softwrap(
+                            f"""
+                            `{val}` is not an allowed value for option {dest} in {scope_str()}.
+                            Must be one of: {choices}
+                            """
+                        )
+                    )
+                elif option_type == file_option:
+                    check_file_exists(val, dest, scope_str())
+                elif option_type == dir_option:
+                    check_dir_exists(val, dest, scope_str())
+
+            if isinstance(val, list):
+                for component in val:
+                    check_scalar_value(component, choices)
+                if is_enum(member_type) and len(val) != len(set(val)):
+                    raise ParseError(f"Duplicate enum values specified in list: {val}")
+            elif isinstance(val, dict):
+                for component in val.values():
+                    check_scalar_value(component, choices)
+            else:
+                check_scalar_value(val, choices)
 
         return (val, rank)
+
+
+def check_file_exists(val: str, dest: str, scope: str) -> None:
+    error_prefix = f"File value `{val}` for option `{dest}` in `{scope}`"
+    try:
+        path = Path(val)
+        path_with_buildroot = Path(get_buildroot(), val)
+    except TypeError:
+        raise ParseError(f"{error_prefix} cannot be parsed as a file path.")
+    if not path.is_file() and not path_with_buildroot.is_file():
+        raise ParseError(f"{error_prefix} does not exist.")
+
+
+def check_dir_exists(val: str, dest: str, scope: str) -> None:
+    error_prefix = f"Directory value `{val}` for option `{dest}` in `{scope}`"
+    try:
+        path = Path(val)
+        path_with_buildroot = Path(get_buildroot(), val)
+    except TypeError:
+        raise ParseError(f"{error_prefix} cannot be parsed as a directory path.")
+    if not path.is_dir() and not path_with_buildroot.is_dir():
+        raise ParseError(f"{error_prefix} does not exist.")

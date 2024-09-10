@@ -404,7 +404,7 @@ class Options:
                 )
             except Exception as e:
                 native_mismatch_msgs.append(
-                    f"Failed to parse options with native parser due to error:\n    {e}"
+                    f"Failed to parse options with legacy parser due to error:\n    {e}"
                 )
                 legacy_values = None
 
