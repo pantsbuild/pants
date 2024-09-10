@@ -522,7 +522,7 @@ def warn_on_python2_usage_in_interpreter_constraints(
     interpreter_constraints: Iterable[str], *, description_of_origin: str
 ) -> None:
     @memoized
-    def inner(interpreter_constraints: tuple[str]) -> None:
+    def inner(interpreter_constraints: tuple[str, ...]) -> None:
         ics = InterpreterConstraints(interpreter_constraints)
         if ics.includes_python2():
             logger.warning(
