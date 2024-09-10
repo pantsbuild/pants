@@ -523,8 +523,8 @@ def warn_on_python2_usage_in_interpreter_constraints(
 ) -> None:
     ics = InterpreterConstraints(interpreter_constraints)
     if not ics.includes_python2():
-        logger.warn(
+        logger.warning(
             f"The Python interpreter constraints from {description_of_origin} includes Python 2.x as a selected Python version. "
             "Please note that Pants will no longer be proactively tested with Python 2.x starting with Pants v2.24.x because "
-            "Python 2 supported ended on 1 January 2020. Please consider upgrading to Python 3.x for your code."
+            "Python 2 support ended on 1 January 2020. Please consider upgrading to Python 3.x for your code."
         )
