@@ -452,6 +452,16 @@ class SystemBinaryFingerprintDependenciesField(AdhocToolRunnableDependenciesFiel
     )
 
 
+class SystemBinaryLogFingerprintingErrorsField(BoolField):
+    alias = "log_fingerprinting_errors"
+    default = True
+    help = help_text(
+        """
+        If True, then any errors encountered while fingerprinting candidate binaries will be logged as a warning.
+        """
+    )
+
+
 class SystemBinaryTarget(Target):
     alias: ClassVar[str] = "system_binary"
     core_fields = (
@@ -461,6 +471,7 @@ class SystemBinaryTarget(Target):
         SystemBinaryFingerprintPattern,
         SystemBinaryFingerprintArgsField,
         SystemBinaryFingerprintDependenciesField,
+        SystemBinaryLogFingerprintingErrorsField,
     )
     help = help_text(
         lambda: f"""
