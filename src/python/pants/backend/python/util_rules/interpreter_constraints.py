@@ -522,7 +522,7 @@ def warn_on_python2_usage_in_interpreter_constraints(
     interpreter_constraints: Iterable[str], *, description_of_origin: str
 ) -> None:
     ics = InterpreterConstraints(interpreter_constraints)
-    if not ics.includes_python2():
+    if ics.includes_python2():
         logger.warning(
             f"The Python interpreter constraints from {description_of_origin} includes Python 2.x as a selected Python version. "
             "Please note that Pants will no longer be proactively tested with Python 2.x starting with Pants v2.24.x because "
