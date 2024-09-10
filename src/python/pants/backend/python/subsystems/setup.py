@@ -81,6 +81,20 @@ class PythonSetup(Subsystem):
         metavar="<requirement>",
     )
 
+    warn_on_python2_usage = BoolOption(
+        default=True,
+        advanced=True,
+        help=softwrap(
+            """\
+            True if Pants should generate a deprecation warning when Python 2.x is used in interpreter constraints.
+
+            As of Pants v2.24.x and later, Pants will no longer be tested regularly with Python 2.7.x. As such, going
+            forward, Pants may or may not work with Python 2.7. This option allows disabling the deprecation
+            warning announcing this policy change.
+            """
+        ),
+    )
+
     @memoized_property
     def interpreter_constraints(self) -> tuple[str, ...]:
         if not self._interpreter_constraints:
@@ -111,6 +125,20 @@ class PythonSetup(Subsystem):
                     """
                 ),
             )
+
+        # Warn if Python 2.x is still in use. This warning should only be displayed once since this
+        # function is memoized.
+        if self.warn_on_python2_usage:
+            # Side-step import cycle.
+            from pants.backend.python.util_rules.interpreter_constraints import (
+                warn_on_python2_usage_in_interpreter_constraints,
+            )
+
+            warn_on_python2_usage_in_interpreter_constraints(
+                self._interpreter_constraints,
+                description_of_origin="the `[python].interpreter_constraints` option",
+            )
+
         return self._interpreter_constraints
 
     interpreter_versions_universe = StrListOption(
