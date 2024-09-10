@@ -608,6 +608,17 @@ class PythonSetup(Subsystem):
         for resolve, ics in self._resolves_to_interpreter_constraints.items():
             if resolve not in self.resolves:
                 unrecognized_resolves.append(resolve)
+            if ics and self.warn_on_python2_usage:
+                # Side-step import cycle.
+                from pants.backend.python.util_rules.interpreter_constraints import (
+                    warn_on_python2_usage_in_interpreter_constraints,
+                )
+
+                warn_on_python2_usage_in_interpreter_constraints(
+                    ics,
+                    description_of_origin=f"the `[python].resolves_to_interpreter_constraints` option for resolve {resolve}",
+                )
+
             result[resolve] = tuple(ics)
         if unrecognized_resolves:
             raise UnrecognizedResolveNamesError(
