@@ -518,6 +518,7 @@ def _major_minor_version_when_single_and_entire(ics: InterpreterConstraints) -> 
     raise _NonSimpleMajorMinor()
 
 
+@memoized
 def warn_on_python2_usage_in_interpreter_constraints(
     interpreter_constraints: Iterable[str], *, description_of_origin: str
 ) -> None:
