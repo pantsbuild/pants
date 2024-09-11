@@ -9,9 +9,9 @@ import os
 import subprocess
 from pathlib import Path
 
-# @TODO:
-import github  # pants: no-infer-dep
+import github
 import requests
+from github.GitReleaseAsset import GitReleaseAsset
 
 VERSIONS_PATH = Path(__file__).parent.parent / "versions_info.json"
 
@@ -45,7 +45,7 @@ def main() -> None:
     pbs_repo = github.get_repo("indygreg/python-build-standalone")
     releases = pbs_repo.get_releases()
 
-    asset_map: dict[str, github.GitReleaseAsset.GitReleaseAsset] = {}
+    asset_map: dict[str, GitReleaseAsset] = {}
     sha256_map: dict[str, str] = {}
     for release in releases.reversed:
         tag_name = release.tag_name

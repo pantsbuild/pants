@@ -114,9 +114,9 @@ class PBSPythonProviderSubsystem(Subsystem):
 
         for version_info in self.known_python_versions or []:
             try:
-                pyversion, platform, sha256, filesize, url = [
+                pyversion, platform, sha256, filesize, url = (
                     x.strip() for x in version_info.split("|")
-                ]
+                )
             except ValueError:
                 raise ExternalToolError(
                     f"Bad value for [{PBSPythonProviderSubsystem.options_scope}].known_python_versions: {version_info}"
