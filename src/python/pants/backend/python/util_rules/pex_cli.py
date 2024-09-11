@@ -26,9 +26,11 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
+from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +40,21 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.3.1"
+    default_version = "v2.16.2"
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
     version_constraints = ">=2.3.0,<3.0"
+
+    # extra args to be passed to the pex tool; note that they
+    # are going to apply to all invocations of the pex tool.
+    global_args = ArgsListOption(
+        example="--check=error --no-compile",
+        extra_help=softwrap(
+            """
+            Note that these apply to all invocations of the pex tool, including building `pex_binary`
+            targets, preparing `python_test` targets to run, and generating lockfiles.
+            """
+        ),
+    )
 
     @classproperty
     def default_known_versions(cls):
@@ -49,8 +63,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "71690e672871b55323f5d6ef9a3fe9705f1668662652c4081080e7ab27d44de3",
-                    "4124530",
+                    "f2ec29dda754c71a8b662e3b4a9071aef269a9991ae920666567669472dcd556",
+                    "4284448",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
@@ -123,6 +137,7 @@ async def setup_pex_cli_process(
     python_native_code: PythonNativeCodeSubsystem.EnvironmentAware,
     global_options: GlobalOptions,
     pex_subsystem: PexSubsystem,
+    pex_cli_subsystem: PexCli,
     python_setup: PythonSetup,
 ) -> Process:
     tmpdir = ".tmp"
@@ -179,6 +194,7 @@ async def setup_pex_cli_process(
         *warnings_args,
         *pip_version_args,
         *resolve_args,
+        *pex_cli_subsystem.global_args,
         # NB: This comes at the end because it may use `--` passthrough args, # which must come at
         # the end.
         *request.extra_args,

@@ -291,7 +291,8 @@ def test_resolve_local_platforms(pex_executable: str, rule_runner: PythonRuleRun
 
 
 @skip_unless_python38_present
-def test_complete_platforms(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize("target_type", ["files", "resources"])
+def test_complete_platforms(rule_runner: PythonRuleRunner, target_type: str) -> None:
     linux_complete_platform = pkgutil.get_data(__name__, "platform-linux-py38.json")
     assert linux_complete_platform is not None
 
@@ -303,9 +304,9 @@ def test_complete_platforms(rule_runner: PythonRuleRunner) -> None:
             "src/py/project/platform-linux-py38.json": linux_complete_platform,
             "src/py/project/platform-mac-py38.json": mac_complete_platform,
             "src/py/project/BUILD": dedent(
-                """\
+                f"""\
                 python_requirement(name="p537", requirements=["p537==1.0.6"])
-                files(name="platforms", sources=["platform*.json"])
+                {target_type}(name="platforms", sources=["platform*.json"])
                 pex_binary(
                     dependencies=[":p537"],
                     complete_platforms=[":platforms"],

@@ -3,42 +3,48 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use fs::{
     DigestTrie, DirectoryDigest, GlobMatching, PathStat, RelativePath, SymlinkBehavior, TypedPath,
 };
 use hashing::{Digest, EMPTY_DIGEST};
 use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyRef, PyResult, Python};
+use pyo3::types::PyTuple;
+use pyo3::IntoPy;
 use store::{SnapshotOps, SubsetParams};
 
 use crate::externs;
-use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyMergeDigests, PyRemovePrefix};
+use crate::externs::fs::{
+    PyAddPrefix, PyFileDigest, PyMergeDigests, PyPathMetadata, PyRemovePrefix,
+};
 use crate::externs::PyGeneratorResponseNativeCall;
 use crate::nodes::{
     lift_directory_digest, task_get_context, unmatched_globs_additional_context, DownloadedFile,
-    NodeResult, Snapshot,
+    NodeResult, PathMetadataNode, Snapshot,
 };
 use crate::python::{throw, Key, Value};
 use crate::Failure;
 
 pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(add_prefix_request_to_digest, m)?)?;
-    m.add_function(wrap_pyfunction!(create_digest_to_digest, m)?)?;
+    m.add_function(wrap_pyfunction!(add_prefix, m)?)?;
+    m.add_function(wrap_pyfunction!(create_digest, m)?)?;
     m.add_function(wrap_pyfunction!(digest_subset_to_digest, m)?)?;
     m.add_function(wrap_pyfunction!(digest_to_snapshot, m)?)?;
-    m.add_function(wrap_pyfunction!(directory_digest_to_digest_contents, m)?)?;
-    m.add_function(wrap_pyfunction!(directory_digest_to_digest_entries, m)?)?;
-    m.add_function(wrap_pyfunction!(download_file_to_digest, m)?)?;
-    m.add_function(wrap_pyfunction!(merge_digests_request_to_digest, m)?)?;
+    m.add_function(wrap_pyfunction!(get_digest_contents, m)?)?;
+    m.add_function(wrap_pyfunction!(get_digest_entries, m)?)?;
+    m.add_function(wrap_pyfunction!(download_file, m)?)?;
+    m.add_function(wrap_pyfunction!(merge_digests, m)?)?;
     m.add_function(wrap_pyfunction!(path_globs_to_digest, m)?)?;
     m.add_function(wrap_pyfunction!(path_globs_to_paths, m)?)?;
-    m.add_function(wrap_pyfunction!(remove_prefix_request_to_digest, m)?)?;
+    m.add_function(wrap_pyfunction!(remove_prefix, m)?)?;
+    m.add_function(wrap_pyfunction!(path_metadata_request, m)?)?;
 
     Ok(())
 }
 
 #[pyfunction]
-fn directory_digest_to_digest_contents(digest: Value) -> PyGeneratorResponseNativeCall {
+fn get_digest_contents(digest: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
@@ -56,7 +62,7 @@ fn directory_digest_to_digest_contents(digest: Value) -> PyGeneratorResponseNati
 }
 
 #[pyfunction]
-fn directory_digest_to_digest_entries(digest: Value) -> PyGeneratorResponseNativeCall {
+fn get_digest_entries(digest: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
@@ -72,7 +78,7 @@ fn directory_digest_to_digest_entries(digest: Value) -> PyGeneratorResponseNativ
 }
 
 #[pyfunction]
-fn remove_prefix_request_to_digest(remove_prefix: Value) -> PyGeneratorResponseNativeCall {
+fn remove_prefix(remove_prefix: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
@@ -95,7 +101,7 @@ fn remove_prefix_request_to_digest(remove_prefix: Value) -> PyGeneratorResponseN
 }
 
 #[pyfunction]
-fn add_prefix_request_to_digest(add_prefix: Value) -> PyGeneratorResponseNativeCall {
+fn add_prefix(add_prefix: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
@@ -136,7 +142,7 @@ fn digest_to_snapshot(digest: Value) -> PyGeneratorResponseNativeCall {
 }
 
 #[pyfunction]
-fn merge_digests_request_to_digest(digests: Value) -> PyGeneratorResponseNativeCall {
+fn merge_digests(digests: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
@@ -159,7 +165,7 @@ fn merge_digests_request_to_digest(digests: Value) -> PyGeneratorResponseNativeC
 }
 
 #[pyfunction]
-fn download_file_to_digest(download_file: Value) -> PyGeneratorResponseNativeCall {
+fn download_file(download_file: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
@@ -245,7 +251,7 @@ enum CreateDigestItem {
 }
 
 #[pyfunction]
-fn create_digest_to_digest(py: Python, create_digest: Value) -> PyGeneratorResponseNativeCall {
+fn create_digest(py: Python, create_digest: Value) -> PyGeneratorResponseNativeCall {
     let (items_to_store, trie) = py.allow_threads(|| {
         let mut new_file_count = 0;
 
@@ -352,5 +358,41 @@ fn digest_subset_to_digest(digest_subset: Value) -> PyGeneratorResponseNativeCal
         Ok::<_, Failure>(Python::with_gil(|py| {
             Snapshot::store_directory_digest(py, digest)
         })?)
+    })
+}
+
+#[pyfunction]
+fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
+    PyGeneratorResponseNativeCall::new(async move {
+        let path = Python::with_gil(|py| {
+            let arg = (*single_path).as_ref(py);
+            externs::getattr_as_optional_string(arg, "path")
+                .map_err(|e| format!("Failed to get `path` for field: {e}"))
+        })?
+        .expect("path field for intrinsic");
+
+        let context = task_get_context();
+        let metadata_opt = context
+            .get(PathMetadataNode::new(PathBuf::from_str(&path).unwrap()))
+            .await?
+            .map(PyPathMetadata);
+
+        Ok(Python::with_gil(|py| {
+            let path_metadata_opt = match metadata_opt {
+                Some(m) => m.into_py(py),
+                None => py.None(),
+            };
+
+            let py_type = context.core.types.path_metadata_result.as_py_type(py);
+            let args_tuple = PyTuple::new_bound(py, &[path_metadata_opt]);
+            let res = py_type.call1(args_tuple).unwrap_or_else(|e| {
+                panic!(
+                    "Core type constructor `{}` failed: {:?}",
+                    py_type.name().unwrap(),
+                    e
+                );
+            });
+            Value::new(res.into_py(py))
+        }))
     })
 }

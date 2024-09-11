@@ -1138,7 +1138,7 @@ impl<R: Rule> Builder<R> {
                 // affect our identity) rather than dependents.
                 #[allow(clippy::comparison_chain)]
                 let chosen_edges = {
-                    let mut minimum_param_set_size = ::std::usize::MAX;
+                    let mut minimum_param_set_size = usize::MAX;
                     let mut chosen_edges = Vec::new();
                     for edge_ref in relevant_edge_refs {
                         let param_set_size = graph[edge_ref.target()].0.in_set.len();

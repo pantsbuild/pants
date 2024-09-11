@@ -324,7 +324,7 @@ def test_workspace_execution_support() -> None:
     )
     rule_runner.write_files(
         {
-            "BUILD": "workspace_environment(name='workspace')",
+            "BUILD": "experimental_workspace_environment(name='workspace')",
         }
     )
     rule_runner.set_options(

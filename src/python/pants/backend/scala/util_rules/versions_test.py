@@ -22,9 +22,6 @@ def test_scala_version_parser(
     assert str(parsed) == version_str
     assert parsed.binary == expected_binary
     assert parsed.crossversion(ScalaCrossVersionMode.FULL) == version_str
-    assert parsed.crossversion(ScalaCrossVersionMode.PARTIAL) == parsed.crossversion(
-        ScalaCrossVersionMode.BINARY
-    )
 
 
 @pytest.mark.parametrize(

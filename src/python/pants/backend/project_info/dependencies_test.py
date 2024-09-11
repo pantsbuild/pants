@@ -109,11 +109,12 @@ def assert_dependencies(
             assert json.loads(result.stdout) == expected
     else:
         assert not result.stdout
-        with open(output_file) as f:
-            if output_format == DependenciesOutputFormat.text:
-                assert f.read().splitlines() == expected
-            elif output_format == DependenciesOutputFormat.json:
-                assert json.load(f) == expected
+        with rule_runner.pushd():
+            with open(output_file) as f:
+                if output_format == DependenciesOutputFormat.text:
+                    assert f.read().splitlines() == expected
+                elif output_format == DependenciesOutputFormat.json:
+                    assert json.load(f) == expected
 
 
 def test_no_target(rule_runner: PythonRuleRunner) -> None:

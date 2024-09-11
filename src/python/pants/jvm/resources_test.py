@@ -129,3 +129,54 @@ def test_resources_jar_is_deterministic(rule_runner: RuleRunner) -> None:
     z = ZipFile(BytesIO(contents[0].content))
     for info in z.infolist():
         assert info.date_time == (1980, 1, 1, 0, 0, 0)
+
+
+@maybe_skip_jdk_test
+def test_resources_reproducible_jars(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--jvm-reproducible-jars"])
+    rule_runner.write_files(
+        {
+            "BUILD": "resources(name='root', sources=['**/*.txt'])",
+            "one.txt": "",
+            "two.txt": "",
+            "three/four.txt": "",
+            "three/five.txt": "",
+            "three/six/seven/eight.txt": "",
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
+        }
+    )
+
+    # Building the generator target should exclude the individual files and result in a single jar
+    # for the generator.
+    classpath = rule_runner.request(
+        Classpath, [Addresses([Address(spec_path="", target_name="root")])]
+    )
+
+    contents = rule_runner.request(DigestContents, list(classpath.digests()))
+    assert contents[0].path == ".root.resources.jar"
+    resources_filenames = set(filenames_from_zip(contents[0]))
+    expected = {
+        "one.txt",
+        "two.txt",
+        "three/",
+        "three/four.txt",
+        "three/five.txt",
+        "three/six/",
+        "three/six/seven/",
+        "three/six/seven/eight.txt",
+    }
+
+    assert resources_filenames == expected
+
+    # But requesting a single file should individually package it.
+    classpath = rule_runner.request(
+        Classpath,
+        [Addresses([Address(spec_path="", target_name="root", relative_file_path="one.txt")])],
+    )
+    contents = rule_runner.request(DigestContents, list(classpath.digests()))
+    assert contents[0].path == ".one.txt.root.resources.jar"
+    assert filenames_from_zip(contents[0]) == ["one.txt"]
+
+    z = ZipFile(BytesIO(contents[0].content))
+    for info in z.infolist():
+        assert info.date_time == (2000, 1, 1, 0, 0, 0)

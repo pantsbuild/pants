@@ -3,4 +3,10 @@
 
 python_sources()
 
-python_tests(name="tests", timeout=180)
+python_tests(
+    name="tests",
+    timeout=180,
+    overrides={
+        "list_targets_test.py": {"dependencies": ["//BUILD_ROOT:files"]},
+    },
+)

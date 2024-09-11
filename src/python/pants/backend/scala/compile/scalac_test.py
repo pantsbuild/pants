@@ -586,6 +586,7 @@ def test_compile_with_local_scalac_plugin(
 
                 scala_sources(
                     scalac_plugins=["acyclic"],
+                    dependencies=["3rdparty/jvm:com.lihaoyi_acyclic_2.13"],
                 )
                 """
             ),
@@ -1028,6 +1029,7 @@ def test_cross_compile_with_scalac_plugin(
                 scala_sources(
                     name="main",
                     scalac_plugins=["acyclic"],
+                    dependencies=["3rdparty/jvm:acyclic"],
                     resolve=parametrize("scala2.12", "scala2.13")
                 )
                 """

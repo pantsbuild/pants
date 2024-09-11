@@ -38,7 +38,7 @@ Options for `registries` in `pants.toml`:
   registry.
 
 - `repository` - Format the repository part of the image name for this image. See [Setting a
-  repository name](doc:tagging-docker-images#setting-a-repository-name) for details of this option.
+  repository name](#setting-a-repository-name) for details of this option.
 
 - `skip_push` - Do not push images to this registry during `pants publish`.
 
@@ -143,16 +143,16 @@ by allowing you to omit the `repository` field on each `docker_image`. But you c
 this field on specific `docker_image` targets, of course. In fact, you can use these placeholders in
 the `repository` field as well, if you find that helpful.
 
-See [String interpolation using placeholder values](./tagging-docker-images.mdx#string-interpolation-using-placeholder-values) for more information.
+See [String interpolation using placeholder values](#string-interpolation-using-placeholder-values) for more information.
 
 ## Tagging images
 
 When Docker builds images, it can tag them with a set of tags. Pants will apply the tags listed in
 the `image_tags` field of `docker_image`, and any additional tags if defined from the registry
-configuration (see [Configuring registries](./tagging-docker-images.mdx#configuring-registries)).
+configuration (see [Configuring registries](#configuring-registries)).
 
 (Note that the field is named `image_tags` and not just `tags`, because Pants has [its own tags
-concept](doc:reference-target#tags), which is unrelated.)
+concept](../../reference/targets/target#tags), which is unrelated.)
 
 ```python title="src/example/BUILD"
 docker_image(
@@ -193,7 +193,7 @@ This way you can specify a version just once, on the base image, and the derived
 automatically acquire the same version.
 
 You may also use any Docker build arguments (when configured as described in [Docker build
-arguments](doc:docker#build-arguments)) for interpolation into the `image_tags` in the corresponding
+arguments](../docker#build-arguments)) for interpolation into the `image_tags` in the corresponding
 `docker_image`:
 
 ```python title="src/example/BUILD"
@@ -302,7 +302,7 @@ The interpolation context (the available placeholder values) depends on which fi
 - `{build_args.ARG_NAME}`: Each defined Docker build arg is available for interpolation under the `build_args.` prefix.
 - `{pants.hash}`: This is a unique hash value calculated from all input sources and the `Dockerfile`. It is effectively a hash of the Docker build context. See note below regarding its stability guarantee.
 
-See [Setting a repository name](./tagging-docker-images.mdx#setting-a-repository-name) for placeholders specific to the `repository` field.
+See [Setting a repository name](#setting-a-repository-name) for placeholders specific to the `repository` field.
 
 :::note The `{pants.hash}` stability guarantee
 The calculated hash value _may_ change between stable versions of Pants for the otherwise same input sources.

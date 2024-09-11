@@ -1779,7 +1779,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
         HydratedSources,
         [HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass])],
     )
-    assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
+    assert hydrated_valid_sources.snapshot.files == ("BUILDROOT", "f1.f95")
     assert hydrated_valid_sources.sources_type == SourcesSubclass
 
     valid_single_sources = SingleSourceSubclass("f1.f95", addr)
