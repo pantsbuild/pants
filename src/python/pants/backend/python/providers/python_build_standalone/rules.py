@@ -36,8 +36,8 @@ from pants.util.logging import LogLevel
 from pants.util.resources import read_sibling_resource
 from pants.util.strutil import softwrap
 
-PBS_SANDBOX_NAME = ".python-build-standalone"
-PBS_NAMED_CACHE_NAME = "python-build-standalone"
+PBS_SANDBOX_NAME = ".python_build_standalone"
+PBS_NAMED_CACHE_NAME = "python_build_standalone"
 PBS_APPEND_ONLY_CACHES = FrozenDict({PBS_NAMED_CACHE_NAME: PBS_SANDBOX_NAME})
 
 
