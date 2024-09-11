@@ -56,7 +56,7 @@ def load_pbs_pythons() -> dict[str, dict[str, PBSPythonInfo]]:
 
 
 class PBSPythonProviderSubsystem(Subsystem):
-    options_scope = "python-build-standalone-python-provider"
+    options_scope = "pbs-python-provider"
     name = "python-build-standalone"
     help = softwrap(
         """
@@ -70,7 +70,7 @@ class PBSPythonProviderSubsystem(Subsystem):
         ensure they remain hermetic across runs of different tools and code.
 
         The Pythons themselves are stored in your `named_caches_dir`: https://www.pantsbuild.org/docs/reference-global#named_caches_dir
-        under `python-build-standalone/<version>`. Wiping the relevant version directory
+        under `python_build_standalone/<version>`. Wiping the relevant version directory
         (with `sudo rm -rf`) will force a re-download of Python.
 
         WARNING: PBS does have some behavior quirks, most notably that it has some hardcoded references
