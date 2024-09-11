@@ -19,6 +19,7 @@ use process_execution::{self, ProcessCacheScope};
 use pyo3::prelude::{PyAny, Python};
 use rule_graph::{DependencyKey, Query};
 use store::{self, StoreFileByDigest};
+use watch::funky_log;
 use workunit_store::{in_workunit, Level};
 
 use crate::context::{Context, SessionCore};
@@ -425,12 +426,16 @@ impl NodeKey {
                 } else {
                     context.core.build_root.join(path)
                 };
+                funky_log!("maybe_watch: {} (workspace)", abs_path.display());
                 (context.core.buildroot_watcher.as_ref(), abs_path)
             }
-            Some(SubjectPath::LocalSystem(path)) => (
-                context.core.local_system_watcher.as_ref(),
-                path.to_path_buf(),
-            ),
+            Some(SubjectPath::LocalSystem(path)) => {
+                funky_log!("maybe_watch: {} (system)", path.display());
+                (
+                    context.core.local_system_watcher.as_ref(),
+                    path.to_path_buf(),
+                )
+            }
             None => return Ok(()),
         };
 
