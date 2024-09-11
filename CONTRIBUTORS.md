@@ -69,6 +69,7 @@ Created as part of the release process.
 + Dan Harrison
 + Daniel Anderson
 + Daniel Bentley
++ Daniel Cavazos
 + Daniel Goldman
 + Daniel Moran
 + Daniel Peebles
@@ -76,6 +77,7 @@ Created as part of the release process.
 + Danny McClanahan
 + Dave Brewster
 + David Katz
++ David Singleton
 + David Taylor
 + David Turner
 + Derek Young
@@ -122,6 +124,7 @@ Created as part of the release process.
 + Guy Marom
 + Harley Cooper
 + HeetVekariya
++ Henri Parfait
 + Henry Fuller
 + Herbert Rusznak
 + Huon Wilson
@@ -332,6 +335,7 @@ Created as part of the release process.
 + Tom Dimiduk
 + Tom Dyas
 + Tom Howland
++ Tom Most
 + Tom Solberg
 + Tomasz Godzik
 + Tomasz Pasternak
