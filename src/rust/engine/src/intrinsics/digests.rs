@@ -27,24 +27,24 @@ use crate::python::{throw, Key, Value};
 use crate::Failure;
 
 pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(add_prefix_request_to_digest, m)?)?;
-    m.add_function(wrap_pyfunction!(create_digest_to_digest, m)?)?;
+    m.add_function(wrap_pyfunction!(add_prefix, m)?)?;
+    m.add_function(wrap_pyfunction!(create_digest, m)?)?;
     m.add_function(wrap_pyfunction!(digest_subset_to_digest, m)?)?;
     m.add_function(wrap_pyfunction!(digest_to_snapshot, m)?)?;
-    m.add_function(wrap_pyfunction!(directory_digest_to_digest_contents, m)?)?;
-    m.add_function(wrap_pyfunction!(directory_digest_to_digest_entries, m)?)?;
-    m.add_function(wrap_pyfunction!(download_file_to_digest, m)?)?;
-    m.add_function(wrap_pyfunction!(merge_digests_request_to_digest, m)?)?;
+    m.add_function(wrap_pyfunction!(get_digest_contents, m)?)?;
+    m.add_function(wrap_pyfunction!(get_digest_entries, m)?)?;
+    m.add_function(wrap_pyfunction!(download_file, m)?)?;
+    m.add_function(wrap_pyfunction!(merge_digests, m)?)?;
     m.add_function(wrap_pyfunction!(path_globs_to_digest, m)?)?;
     m.add_function(wrap_pyfunction!(path_globs_to_paths, m)?)?;
-    m.add_function(wrap_pyfunction!(remove_prefix_request_to_digest, m)?)?;
+    m.add_function(wrap_pyfunction!(remove_prefix, m)?)?;
     m.add_function(wrap_pyfunction!(path_metadata_request, m)?)?;
 
     Ok(())
 }
 
 #[pyfunction]
-fn directory_digest_to_digest_contents(digest: Value) -> PyGeneratorResponseNativeCall {
+fn get_digest_contents(digest: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
@@ -62,7 +62,7 @@ fn directory_digest_to_digest_contents(digest: Value) -> PyGeneratorResponseNati
 }
 
 #[pyfunction]
-fn directory_digest_to_digest_entries(digest: Value) -> PyGeneratorResponseNativeCall {
+fn get_digest_entries(digest: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
@@ -78,7 +78,7 @@ fn directory_digest_to_digest_entries(digest: Value) -> PyGeneratorResponseNativ
 }
 
 #[pyfunction]
-fn remove_prefix_request_to_digest(remove_prefix: Value) -> PyGeneratorResponseNativeCall {
+fn remove_prefix(remove_prefix: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
@@ -101,7 +101,7 @@ fn remove_prefix_request_to_digest(remove_prefix: Value) -> PyGeneratorResponseN
 }
 
 #[pyfunction]
-fn add_prefix_request_to_digest(add_prefix: Value) -> PyGeneratorResponseNativeCall {
+fn add_prefix(add_prefix: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
@@ -142,7 +142,7 @@ fn digest_to_snapshot(digest: Value) -> PyGeneratorResponseNativeCall {
 }
 
 #[pyfunction]
-fn merge_digests_request_to_digest(digests: Value) -> PyGeneratorResponseNativeCall {
+fn merge_digests(digests: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
@@ -165,7 +165,7 @@ fn merge_digests_request_to_digest(digests: Value) -> PyGeneratorResponseNativeC
 }
 
 #[pyfunction]
-fn download_file_to_digest(download_file: Value) -> PyGeneratorResponseNativeCall {
+fn download_file(download_file: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
@@ -251,7 +251,7 @@ enum CreateDigestItem {
 }
 
 #[pyfunction]
-fn create_digest_to_digest(py: Python, create_digest: Value) -> PyGeneratorResponseNativeCall {
+fn create_digest(py: Python, create_digest: Value) -> PyGeneratorResponseNativeCall {
     let (items_to_store, trie) = py.allow_threads(|| {
         let mut new_file_count = 0;
 

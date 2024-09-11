@@ -36,7 +36,7 @@ def action(name: str, node16_compat: bool = False) -> str:
             "cache": "actions/cache@v4",
             "checkout": "actions/checkout@v4",
             "download-artifact": "actions/download-artifact@v4",
-            "expose-pythons": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
+            "expose-pythons": "pantsbuild/actions/expose-pythons@v9",
             "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
             "rust-cache": "benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1",
             "setup-go": "actions/setup-go@v5",

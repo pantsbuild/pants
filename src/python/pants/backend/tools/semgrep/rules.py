@@ -17,11 +17,11 @@ from pants.core.util_rules.source_files import SourceFilesRequest, determine_sou
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, FileContent, MergeDigests, PathGlobs, Paths
 from pants.engine.intrinsics import (
-    create_digest_to_digest,
+    create_digest,
     digest_to_snapshot,
-    merge_digests_request_to_digest,
+    execute_process,
+    merge_digests,
     path_globs_to_paths,
-    process_request_to_process_result,
 )
 from pants.engine.process import ProcessCacheScope
 from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
@@ -185,10 +185,10 @@ async def lint(
         determine_source_files(
             SourceFilesRequest(field_set.source for field_set in request.elements)
         ),
-        create_digest_to_digest(CreateDigest([_DEFAULT_SETTINGS])),
+        create_digest(CreateDigest([_DEFAULT_SETTINGS])),
     )
 
-    input_digest = await merge_digests_request_to_digest(
+    input_digest = await merge_digests(
         MergeDigests(
             (
                 input_files.snapshot.digest,
@@ -204,7 +204,7 @@ async def lint(
     # TODO: https://github.com/pantsbuild/pants/issues/18430 support running this with --autofix
     # under the fix goal... but not all rules have fixes, so we need to be running with
     # --error/checking exit codes, which FixResult doesn't currently support.
-    result = await process_request_to_process_result(
+    result = await execute_process(
         **implicitly(
             VenvPexProcess(
                 semgrep_pex,

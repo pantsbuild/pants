@@ -9,7 +9,7 @@
 //     "CPython==3.9.*"
 //   ],
 //   "generated_with_requirements": [
-//     "PyGithub==2.0.0rc1",
+//     "PyGithub==2.4.0",
 //     "PyYAML<7.0,>=6.0",
 //     "ansicolors==1.1.8",
 //     "beautifulsoup4==4.11.1",
@@ -1246,25 +1246,26 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0b6c327fe24f02712c3f8eb9eb45558c00b74ae3275498a4b3dc9ad9abc1ca62",
-              "url": "https://files.pythonhosted.org/packages/ca/23/84ea685ce77b8c34f9ad24372fa22218f0a6b82ad61cdd754eef41bfae73/PyGithub-2.0.0rc1-py3-none-any.whl"
+              "hash": "81935aa4bdc939fba98fee1cb47422c09157c56a27966476ff92775602b9ee24",
+              "url": "https://files.pythonhosted.org/packages/0a/f3/e185613c411757c0c18b904ea2db173f2872397eddf444a3fe8cdde47077/PyGithub-2.4.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "10aeb79aaab677a1f12d15530b964bf0fbfa69f5417da77fc7bc7f4a1c48eef1",
-              "url": "https://files.pythonhosted.org/packages/4e/90/d233f45d08243401ec8e3c033ea1970ba5495ff7b8bb85fc761db8d48f6b/PyGithub-2.0.0rc1.tar.gz"
+              "hash": "6601e22627e87bac192f1e2e39c6e6f69a43152cfb8f307cee575879320b3051",
+              "url": "https://files.pythonhosted.org/packages/f1/a0/1e8b8ca88df9857836f5bf8e3ee15dfb810d19814ef700b12f99ce11f691/pygithub-2.4.0.tar.gz"
             }
           ],
           "project_name": "pygithub",
           "requires_dists": [
-            "deprecated",
+            "Deprecated",
             "pyjwt[crypto]>=2.4.0",
             "pynacl>=1.4.0",
-            "python-dateutil",
-            "requests>=2.14.0"
+            "requests>=2.14.0",
+            "typing-extensions>=4.0.0",
+            "urllib3>=1.26.0"
           ],
-          "requires_python": ">=3.7",
-          "version": "2.0.0rc1"
+          "requires_python": ">=3.8",
+          "version": "2.4.0"
         },
         {
           "artifacts": [
@@ -2386,7 +2387,7 @@
   "pip_version": "24.2",
   "prefer_older_binary": false,
   "requirements": [
-    "PyGithub==2.0.0rc1",
+    "PyGithub==2.4.0",
     "PyYAML<7.0,>=6.0",
     "ansicolors==1.1.8",
     "beautifulsoup4==4.11.1",

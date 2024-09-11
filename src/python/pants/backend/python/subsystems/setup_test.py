@@ -16,6 +16,7 @@ def test_resolves_to_interpreter_constraints_validation() -> None:
             PythonSetup,
             resolves={"a": "a.lock"},
             resolves_to_interpreter_constraints=resolves_to_ics,
+            warn_on_python2_usage=False,
         ).resolves_to_interpreter_constraints
 
     assert create({"a": ["==3.7.*"]}) == {"a": ("==3.7.*",)}
@@ -29,6 +30,7 @@ def test_resolves_to_constraints_file() -> None:
             PythonSetup,
             resolves={"a": "a.lock", "tool1": "tool1.lock", "tool2": "tool2.lock"},
             resolves_to_constraints_file=resolves_to_constraints_file,
+            warn_on_python2_usage=False,
         ).resolves_to_constraints_file()
 
     assert create({"a": "c1.txt", "tool1": "c2.txt"}) == {"a": "c1.txt", "tool1": "c2.txt"}
@@ -48,6 +50,7 @@ def test_resolves_to_no_binary_and_only_binary() -> None:
             resolves={"a": "a.lock", "tool1": "tool1.lock", "tool2": "tool2.lock"},
             resolves_to_no_binary=resolves_to_projects,
             resolves_to_only_binary=resolves_to_projects,
+            warn_on_python2_usage=False,
         )
         only_binary = subsystem.resolves_to_only_binary()
         no_binary = subsystem.resolves_to_no_binary()
