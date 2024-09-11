@@ -50,7 +50,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import PathMetadata, PathMetadataKind, PathNamespace
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, goal_rule, rule
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
 from pants.util.dirutil import relative_symlink, safe_file_dump
@@ -77,7 +77,7 @@ def rule_runner() -> RuleRunner:
         preserve_tmpdirs=True,
         isolated_local_store=True,
     )
-    rr.set_options(["-ldebug", "--log-show-rust-3rdparty"])
+    rr.set_options(["-ldebug", "--log-show-rust-3rdparty", "--show-log-target"], env_inherit={"PATH", "RUST_LOG"})
     return rr
 
 
@@ -1600,10 +1600,11 @@ def test_local_system_watch_requests(rule_runner: RuleRunner) -> None:
         )
         return result.metadata
 
-    with temporary_dir() as non_buildroot_dir:
+    with temporary_dir() as non_buildroot_dir, mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         assert not non_buildroot_dir.startswith(rule_runner.build_root)
         base_path = Path(non_buildroot_dir)
-        path1 = base_path / "foo.txt"
+        path1 = base_path / "local-system-test" / "xyzzy1.txt"
+        path1.parent.mkdir(parents=True, exist_ok=True)
         path1.write_text("This is a test.")
 
         m = get_metadata(str(path1))
@@ -1611,13 +1612,16 @@ def test_local_system_watch_requests(rule_runner: RuleRunner) -> None:
         assert m.path == str(path1)
         assert m.kind == PathMetadataKind.FILE
 
-        new_path = base_path / "xyzzy"
+        new_path = base_path / "local-system-test" / "xyzzy2.txt"
         m2 = get_metadata(str(new_path))
         assert m2 is None
         new_path.write_bytes(b"is found")
 
         def check_metadata_exists() -> None:
             m = get_metadata(str(new_path))
+            print(f"m={m}")
             assert m is not None
 
-        retry_failed_assertions(check_metadata_exists, 3, 1)
+        retry_failed_assertions(check_metadata_exists, 3, 2)
+        print(f"STDOUT:\n{stdio_reader.get_stdout()}")
+        print(f"STDERR:\n{stdio_reader.get_stderr()}")

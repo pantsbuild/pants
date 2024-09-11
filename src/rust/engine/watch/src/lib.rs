@@ -18,6 +18,18 @@ use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use task_executor::Executor;
 
+
+macro_rules! funky_log {
+    ($($arg:tt)+) => {
+      {
+        use ::std::io::Write;
+        let mut f = ::std::fs::OpenOptions::new().create(true).append(true).open("/tmp/funky.log").unwrap();
+        writeln!(f, $($arg)+).unwrap()
+      }
+    };
+}
+
+
 ///
 /// An InvalidationWatcher maintains a Thread that receives events from a notify Watcher.
 ///
@@ -62,10 +74,12 @@ impl InvalidationWatcher {
             std::fs::canonicalize(build_root.as_path()).map_err(|e| format!("{e:?}"))?;
         let (watch_sender, watch_receiver) = crossbeam_channel::unbounded();
         let mut watcher: RecommendedWatcher = notify::recommended_watcher(move |ev| {
+            funky_log!("Got event: {:?}", &ev);
             if watch_sender.send(ev).is_err() {
                 // The watch thread shutting down first is ok, because it can exit when the Invalidatable
                 // is dropped.
                 debug!("Watch thread has shutdown, but Watcher is still running.");
+                funky_log!("Watch thread has shutdown, but Watcher is still running.");
             }
         })
         .and_then(|mut watcher| {
@@ -151,12 +165,14 @@ impl InvalidationWatcher {
             .spawn(move || {
                 let exit_msg = loop {
                     let event_res = watch_receiver.recv_timeout(Duration::from_millis(10));
+                    funky_log!("fs-watcher: recv: {:?}", &event_res);
                     let invalidatable = if let Some(g) = invalidatable.upgrade() {
                         g
                     } else {
                         // The Invalidatable has been dropped: we're done.
                         break "The watcher was shut down.".to_string();
                     };
+                    funky_log!("fs-watcher: upgraded invalidatable");
                     match event_res {
                         Ok(Ok(ev)) => {
                             for path in &ev.paths {
@@ -182,6 +198,7 @@ impl InvalidationWatcher {
 
                 // Log and send the exit code.
                 warn!("File watcher exiting with: {}", exit_msg);
+                funky_log!("File watcher exiting with: {}", exit_msg);
                 let _ = liveness_sender.send(exit_msg);
             })
             .map_err(|e| format!("Failed to start fs-watcher thread: {e}"))
@@ -199,6 +216,7 @@ impl InvalidationWatcher {
         canonical_build_root: &Path,
         ev: Event,
     ) {
+        funky_log!("handle_event: {:?}", &ev);
         if matches!(ev.kind, EventKind::Modify(ModifyKind::Metadata(mk)) if mk != MetadataKind::Permissions)
         {
             // (Other than permissions, which include the executable bit) if only the metadata
@@ -208,10 +226,12 @@ impl InvalidationWatcher {
             // One could argue if the ownership changed Pants would care, but until the
             // name/data changes (which would be a separate event) the substance of the file in Pants'
             // eyes is the same.
+            funky_log!("handle_event: early return due to metata-only change");
             return;
         }
 
         let is_data_only_event = matches!(ev.kind, EventKind::Modify(ModifyKind::Data(_)));
+        funky_log!("handle_event: is_data_only_event={is_data_only_event}");
         let flag = ev.flag();
 
         let paths: HashSet<_> = ev
@@ -240,12 +260,14 @@ impl InvalidationWatcher {
                     /* is_dir */ false,
                 ) {
                     trace!("notify ignoring {:?}", path_relative_to_build_root);
+                    funky_log!("notify ignoring {:?}", path_relative_to_build_root);
                     None
                 } else {
                     Some(path_relative_to_build_root)
                 }
             })
             .flat_map(|path_relative_to_build_root| {
+                funky_log!("path_relative_to_build_root={:?}", path_relative_to_build_root.display());
                 let mut paths_to_invalidate: Vec<PathBuf> = Vec::with_capacity(2);
                 if !is_data_only_event {
                     // If the event is anything other than a data change event (a change to the content of
@@ -255,15 +277,20 @@ impl InvalidationWatcher {
                     }
                 }
                 paths_to_invalidate.push(path_relative_to_build_root);
+                funky_log!("paths_to_invalidate={:?}", &paths_to_invalidate);
                 paths_to_invalidate
             })
             .collect();
 
+        funky_log!("handle_event: paths={:?}", &paths);
+
         if flag == Some(Flag::Rescan) {
             debug!("notify queue overflowed: invalidating all paths");
+            funky_log!("notify queue overflowed: invalidating all paths");
             invalidatable.invalidate_all(InvalidateCaller::Notify);
         } else if !paths.is_empty() {
             debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
+            funky_log!("notify invalidating {:?} because of {:?}", paths, ev.kind);
             invalidatable.invalidate(&paths, InvalidateCaller::Notify);
         }
     }
@@ -300,6 +327,13 @@ impl InvalidationWatcher {
     /// Add a path to the set of paths being watched by this invalidation watcher, non-recursively.
     ///
     pub async fn watch(self: &Arc<Self>, path: PathBuf) -> Result<(), String> {
+        funky_log!("Watching: {}", path.display());
+        // if let Some(Component::Normal(os_str)) = path.components().last() {
+        //     if os_str == OsStr::new("foo") {
+        //         return Err("Called during the test.".to_string());
+        //     }
+        // }
+
         if cfg!(target_os = "macos") && !self.0.lock().precise_watches {
             // Short circuit here if we are on a Darwin platform because we should be watching
             // the entire build root recursively already and have not been configured to use

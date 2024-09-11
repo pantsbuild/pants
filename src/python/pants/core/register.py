@@ -23,6 +23,7 @@ from pants.core.goals import (
     tailor,
     test,
     update_build_files,
+    x_metadata,
 )
 from pants.core.target_types import (
     ArchiveTarget,
@@ -101,6 +102,7 @@ def rules():
         *system_binaries.rules(),
         *target_type_rules(),
         *wrap_as_resources.rules,
+        *x_metadata.rules(),
     ]
 
 

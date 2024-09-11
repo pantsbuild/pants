@@ -231,6 +231,9 @@ class EngineInitializer:
     ) -> GraphScheduler:
         build_root_path = build_root or get_buildroot()
 
+        if not watch_filesystem:
+            raise ValueError("watch_filesystem is False")
+
         rules = build_configuration.rules
         union_membership: UnionMembership
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)

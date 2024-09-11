@@ -213,7 +213,7 @@ EXECUTOR = PyExecutor(
     # be run by Pants using an appropriate Parallelism. We must set max_threads > core_threads; so
     # 2 is the minimum, but, via trial and error, 3 minimizes test times on average.
     core_threads=1,
-    max_threads=3,
+    max_threads=5,
 )
 atexit.register(lambda: EXECUTOR.shutdown(5))
 
