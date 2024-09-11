@@ -113,7 +113,7 @@ async def _find_binary(
             if log_fingerprinting_errors:
                 logger.warning(
                     f"Error occurred while fingerprinting candidate binary `{binary.path}` "
-                    f"for binary `{binary_name}`.\n\n"
+                    f"for binary `{binary_name}` (exit code {test.exit_code}):\n\n"
                     f"stdout:\n{test.stdout.decode(errors='ignore')}\n"
                     f"stderr:\n{test.stderr.decode(errors='ignore')}"
                 )
