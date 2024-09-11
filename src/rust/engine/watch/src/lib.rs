@@ -19,6 +19,7 @@ use parking_lot::Mutex;
 use task_executor::Executor;
 
 
+#[macro_export]
 macro_rules! funky_log {
     ($($arg:tt)+) => {
       {
@@ -47,6 +48,7 @@ struct Inner {
     background_task_inputs: Option<WatcherTaskInputs>,
     precise_watches: bool,
     path_sender: tokio::sync::broadcast::Sender<PathBuf>,
+    base_path: PathBuf,
 }
 
 type WatcherTaskInputs = (
@@ -113,13 +115,14 @@ impl InvalidationWatcher {
             liveness: liveness_receiver,
             background_task_inputs: Some((
                 ignorer,
-                canonical_build_root,
+                canonical_build_root.clone(),
                 liveness_sender,
                 watch_receiver,
                 path_sender.clone(),
             )),
             precise_watches,
             path_sender,
+            base_path: canonical_build_root,
         }))))
     }
 
@@ -165,25 +168,25 @@ impl InvalidationWatcher {
             .spawn(move || {
                 let exit_msg = loop {
                     let event_res = watch_receiver.recv_timeout(Duration::from_millis(10));
-                    funky_log!("fs-watcher: recv: {:?}", &event_res);
                     let invalidatable = if let Some(g) = invalidatable.upgrade() {
                         g
                     } else {
                         // The Invalidatable has been dropped: we're done.
                         break "The watcher was shut down.".to_string();
                     };
-                    funky_log!("fs-watcher: upgraded invalidatable");
                     match event_res {
                         Ok(Ok(ev)) => {
                             for path in &ev.paths {
                                 // Ignore any errors due to no receivers being connected.
                                 let _ = path_sender.send(path.to_path_buf());
                             }
+                            funky_log!("calling handle_event: canonical_build_root={:?}, {:?}", canonical_build_root.display(), &ev);
                             Self::handle_event(&*invalidatable, &ignorer, &canonical_build_root, ev)
                         }
                         Ok(Err(err)) => {
                             if let notify::ErrorKind::PathNotFound = err.kind {
                                 warn!("Path(s) did not exist: {:?}", err.paths);
+                                funky_log!("Path(s) did not exist: {:?}", err.paths);
                                 continue;
                             } else {
                                 break format!("Watch error: {err}");
@@ -327,7 +330,8 @@ impl InvalidationWatcher {
     /// Add a path to the set of paths being watched by this invalidation watcher, non-recursively.
     ///
     pub async fn watch(self: &Arc<Self>, path: PathBuf) -> Result<(), String> {
-        funky_log!("Watching: {}", path.display());
+        funky_log!("Watching: {} (base_path={})", path.display(), self.0.lock().base_path.display());
+
         // if let Some(Component::Normal(os_str)) = path.components().last() {
         //     if os_str == OsStr::new("foo") {
         //         return Err("Called during the test.".to_string());
