@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<4,>=3.7"
+//     "CPython<4,>=3.8"
 //   ],
 //   "generated_with_requirements": [
 //     "flake8<7,>=5.0.4"
@@ -24,6 +24,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "excluded": [],
   "locked_resolves": [
     {
       "locked_requirements": [
@@ -49,42 +50,6 @@
           ],
           "requires_python": ">=3.6.1",
           "version": "5.0.4"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "057e92c15bc8d9e8109738a48db0ccb31b4d9d5cfbee5a8670879a30be66304b",
-              "url": "https://files.pythonhosted.org/packages/22/51/52442c59db26637681148c21f8984eed58c9db67053a0a4783a047010c98/importlib_metadata-4.2.0-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "b7e52a1f8dec14a75ea73e0891f3060099ca1d8e6a462a4dff11c3e119ea1b31",
-              "url": "https://files.pythonhosted.org/packages/c7/7c/126a8686399ebe256b5e4343ea80b6f2ee91549969da2eef0bb2891b8d24/importlib_metadata-4.2.0.tar.gz"
-            }
-          ],
-          "project_name": "importlib-metadata",
-          "requires_dists": [
-            "flufl.flake8; extra == \"testing\"",
-            "importlib-resources>=1.3; python_version < \"3.9\" and extra == \"testing\"",
-            "jaraco.packaging>=8.2; extra == \"docs\"",
-            "packaging; extra == \"testing\"",
-            "pep517; extra == \"testing\"",
-            "pyfakefs; extra == \"testing\"",
-            "pytest-black>=0.3.7; (platform_python_implementation != \"PyPy\" and python_version < \"3.10\") and extra == \"testing\"",
-            "pytest-checkdocs>=2.4; extra == \"testing\"",
-            "pytest-cov; extra == \"testing\"",
-            "pytest-enabler>=1.0.1; extra == \"testing\"",
-            "pytest-flake8; extra == \"testing\"",
-            "pytest-mypy; (platform_python_implementation != \"PyPy\" and python_version < \"3.10\") and extra == \"testing\"",
-            "pytest>=4.6; extra == \"testing\"",
-            "rst.linker>=1.9; extra == \"docs\"",
-            "sphinx; extra == \"docs\"",
-            "typing-extensions>=3.6.4; python_version < \"3.8\"",
-            "zipp>=0.5"
-          ],
-          "requires_python": ">=3.6",
-          "version": "4.2.0"
         },
         {
           "artifacts": [
@@ -139,61 +104,6 @@
           "requires_dists": [],
           "requires_python": ">=3.6",
           "version": "2.5.0"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "440d5dd3af93b060174bf433bccd69b0babc3b15b1a8dca43789fd7f61514b36",
-              "url": "https://files.pythonhosted.org/packages/ec/6b/63cc3df74987c36fe26157ee12e09e8f9db4de771e0f3404263117e75b95/typing_extensions-4.7.1-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "b75ddc264f0ba5615db7ba217daeb99701ad295353c45f9e95963337ceeeffb2",
-              "url": "https://files.pythonhosted.org/packages/3c/8b/0111dd7d6c1478bf83baa1cab85c686426c7a6274119aceb2bd9d35395ad/typing_extensions-4.7.1.tar.gz"
-            }
-          ],
-          "project_name": "typing-extensions",
-          "requires_dists": [],
-          "requires_python": ">=3.7",
-          "version": "4.7.1"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "48904fc76a60e542af151aded95726c1a5c34ed43ab4134b597665c86d7ad556",
-              "url": "https://files.pythonhosted.org/packages/5b/fa/c9e82bbe1af6266adf08afb563905eb87cab83fde00a0a08963510621047/zipp-3.15.0-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "112929ad649da941c23de50f356a2b5570c954b65150642bccdd66bf194d224b",
-              "url": "https://files.pythonhosted.org/packages/00/27/f0ac6b846684cecce1ee93d32450c45ab607f65c2e0255f0092032d91f07/zipp-3.15.0.tar.gz"
-            }
-          ],
-          "project_name": "zipp",
-          "requires_dists": [
-            "big-O; extra == \"testing\"",
-            "flake8<5; extra == \"testing\"",
-            "furo; extra == \"docs\"",
-            "jaraco.functools; extra == \"testing\"",
-            "jaraco.itertools; extra == \"testing\"",
-            "jaraco.packaging>=9; extra == \"docs\"",
-            "jaraco.tidelift>=1.4; extra == \"docs\"",
-            "more-itertools; extra == \"testing\"",
-            "pytest-black>=0.3.7; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
-            "pytest-checkdocs>=2.4; extra == \"testing\"",
-            "pytest-cov; extra == \"testing\"",
-            "pytest-enabler>=1.3; extra == \"testing\"",
-            "pytest-flake8; python_version < \"3.12\" and extra == \"testing\"",
-            "pytest-mypy>=0.9.1; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
-            "pytest>=6; extra == \"testing\"",
-            "rst.linker>=1.9; extra == \"docs\"",
-            "sphinx-lint; extra == \"docs\"",
-            "sphinx>=3.5; extra == \"docs\""
-          ],
-          "requires_python": ">=3.7",
-          "version": "3.15.0"
         }
       ],
       "platform_tag": null
@@ -201,15 +111,16 @@
   ],
   "only_builds": [],
   "only_wheels": [],
+  "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.2.1",
-  "pip_version": "24.0",
+  "pex_version": "2.16.2",
+  "pip_version": "24.2",
   "prefer_older_binary": false,
   "requirements": [
     "flake8<7,>=5.0.4"
   ],
   "requires_python": [
-    "<4,>=3.7"
+    "<4,>=3.8"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

@@ -24,6 +24,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "excluded": [],
   "locked_resolves": [
     {
       "locked_requirements": [
@@ -61,9 +62,10 @@
   ],
   "only_builds": [],
   "only_wheels": [],
+  "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.2.1",
-  "pip_version": "24.0",
+  "pex_version": "2.16.2",
+  "pip_version": "24.2",
   "prefer_older_binary": false,
   "requirements": [
     "pyoxidizer<1,>=0.18.0"
