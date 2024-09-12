@@ -20,6 +20,7 @@ from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
@@ -72,17 +73,20 @@ class RuffFixRequest(FixTargetsRequest):
 
 
 @rule(desc="Fix with `ruff check --fix`", level=LogLevel.DEBUG)
-async def ruff_fix(request: RuffFixRequest.Batch, ruff: Ruff) -> FixResult:
+async def ruff_fix(request: RuffFixRequest.Batch, ruff: Ruff, platform: Platform) -> FixResult:
     result = await run_ruff(
         RunRuffRequest(snapshot=request.snapshot, mode=RuffMode.FIX),
         ruff,
+        platform,
     )
     return await FixResult.create(request, result)
 
 
 @rule(desc="Lint with `ruff check`", level=LogLevel.DEBUG)
 async def ruff_lint(
-    request: RuffLintRequest.Batch[RuffCheckFieldSet, Any], ruff: Ruff
+    request: RuffLintRequest.Batch[RuffCheckFieldSet, Any],
+    ruff: Ruff,
+    platform: Platform,
 ) -> LintResult:
     source_files = await Get(
         SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
@@ -90,6 +94,7 @@ async def ruff_lint(
     result = await run_ruff(
         RunRuffRequest(snapshot=source_files.snapshot, mode=RuffMode.LINT),
         ruff,
+        platform,
     )
     return LintResult.create(request, result)
 
