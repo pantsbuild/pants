@@ -360,7 +360,7 @@ class AdhocToolOutputsMatchMode(StringField):
 
 class AdhocToolCacheScopeField(StringField):
     alias = "cache_scope"
-    default = "default"
+    default = "from_environment"
     help = help_text(
         f"""
         Set the "cache scope" of the executed process to provided value. The cache scope determines for how long
@@ -369,7 +369,9 @@ class AdhocToolCacheScopeField(StringField):
 
         The valid values are:
 
-        - `default`: Use the default cache scope for the applicable environment in which the process will execute.
+        - `from_environment`: Use the default cache scope for the applicable environment in which the process will execute.
+        This is `success` for all environments except for `experimental_workspace_environment`, in which case `session`
+        cache scope will be used.
 
         - `success`: Cache successful executions of the process.
 
@@ -380,7 +382,7 @@ class AdhocToolCacheScopeField(StringField):
         `{bin_name()}` tool.
         """
     )
-    valid_choices = ("default", "success", "success_per_pantsd_restart", "session")
+    valid_choices = ("from_environment", "success", "success_per_pantsd_restart", "session")
 
     @property
     def enum_value(self) -> ProcessCacheScope | None:
@@ -391,6 +393,9 @@ class AdhocToolCacheScopeField(StringField):
             return ProcessCacheScope.PER_RESTART_SUCCESSFUL
         elif value == "session":
             return ProcessCacheScope.PER_SESSION
+        else:
+            # Default case `from_environment`
+            return None
 
 
 class AdhocToolTarget(Target):
