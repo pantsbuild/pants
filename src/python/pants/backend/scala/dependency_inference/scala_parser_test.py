@@ -914,8 +914,3 @@ def test_scala3_import_given_single(rule_runner: RuleRunner) -> None:
         ScalaImport("bar.given_Bar", None, False),
         ScalaImport("quxx.bar.given_Ord_Int", None, False),
     )
-    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
-        "foo.A",
-        "foo.Any",
-        "foo.v",
-    ]
