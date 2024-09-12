@@ -70,6 +70,7 @@ pub struct Core {
     pub http_client: reqwest::Client,
     pub local_cache: PersistentCache,
     pub vfs: PosixFS,
+    pub vfs_system: PosixFS,
     pub watcher: Option<Arc<InvalidationWatcher>>,
     pub build_root: PathBuf,
     pub local_parallelism: usize,
@@ -687,8 +688,10 @@ impl Core {
             command_runners,
             http_client,
             local_cache,
-            vfs: PosixFS::new(&build_root, ignorer, executor)
+            vfs: PosixFS::new(&build_root, ignorer, executor.clone())
                 .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,
+            vfs_system: PosixFS::new(Path::new("/"), GitignoreStyleExcludes::empty(), executor)
+                .map_err(|e| format!("Could not initialize Vfs for local system: {e:?}"))?,
             build_root,
             watcher,
             local_parallelism: exec_strategy_opts.local_parallelism,
