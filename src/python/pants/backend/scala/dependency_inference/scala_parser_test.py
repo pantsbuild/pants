@@ -779,6 +779,7 @@ def test_self_types_on_same_package(rule_runner: RuleRunner) -> None:
         "foo.Foo",
     ]
 
+
 def test_typed_pattern_on_same_package(rule_runner: RuleRunner) -> None:
     analysis = _analyze(
         rule_runner,
@@ -794,7 +795,7 @@ def test_typed_pattern_on_same_package(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    
+
     assert sorted(analysis.fully_qualified_consumed_symbols()) == [
         "foo.A",
         "foo.Any",
@@ -846,7 +847,7 @@ def test_scala3_given_alias(rule_runner: RuleRunner) -> None:
             }
             given scala.Ord[Int] = ???
             """
-        )
+        ),
     )
 
     assert sorted(symbol.name for symbol in analysis.provided_symbols) == [
@@ -918,4 +919,3 @@ def test_scala3_import_given_single(rule_runner: RuleRunner) -> None:
         "foo.Any",
         "foo.v",
     ]
-
