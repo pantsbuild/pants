@@ -124,7 +124,7 @@ async def download_file_from_s3_scheme(request: DownloadS3SchemeURL) -> Digest:
             region="",
             bucket=split.netloc,
             key=split.path[1:],
-            query="",
+            query=split.query,
             expected_digest=request.expected_digest,
         ),
     )
