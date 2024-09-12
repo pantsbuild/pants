@@ -22,5 +22,5 @@ class PythonRuleRunner(RuleRunner):
         ):
             # We inject the test ICs via env and not args, because in a handful of cases
             # we have different behavior when the option is set via flag.
-            env["PANTS_PYTHON_INTERPRETER_CONSTRAINTS"] = "['>=3.7,<3.10',]"
+            env["PANTS_PYTHON_INTERPRETER_CONSTRAINTS"] = "['>=3.8,<3.10',]"
         return super().create_options_bootstrapper(args=args, env=env)

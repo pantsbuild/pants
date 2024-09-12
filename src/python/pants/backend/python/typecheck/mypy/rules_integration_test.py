@@ -460,7 +460,7 @@ def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
                     return x + y
                 """
             ),
-            f"{PACKAGE}/py3/BUILD": "python_sources(interpreter_constraints=['>=3.6'])",
+            f"{PACKAGE}/py3/BUILD": "python_sources(interpreter_constraints=['>=3.8'])",
             f"{PACKAGE}/__init__.py": "",
             f"{PACKAGE}/uses_py2.py": "from project.py2 import add\nassert add(2, 2) == 4\n",
             f"{PACKAGE}/uses_py3.py": "from project.py3 import add\nassert add(2, 2) == 4\n",
@@ -468,7 +468,7 @@ def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
                 """python_sources(
                 overrides={
                   'uses_py2.py': {'interpreter_constraints': ['==2.7.*']},
-                  'uses_py3.py': {'interpreter_constraints': ['>=3.6']},
+                  'uses_py3.py': {'interpreter_constraints': ['>=3.8']},
                 }
               )
             """
@@ -494,7 +494,7 @@ def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     assert "Success: no issues found" in py2_result.stdout
 
     assert py3_result.exit_code == 0
-    assert py3_result.partition_description == "['CPython>=3.6']"
+    assert py3_result.partition_description == "['CPython>=3.8']"
     assert "Success: no issues found" in py3_result.stdout
 
 
