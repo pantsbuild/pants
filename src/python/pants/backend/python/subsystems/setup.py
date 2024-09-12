@@ -77,7 +77,6 @@ class PythonSetup(Subsystem):
             constraint strings will be ORed together.
             """
         ),
-        advanced=True,
         metavar="<requirement>",
     )
 
@@ -103,7 +102,7 @@ class PythonSetup(Subsystem):
             #  We'll probably want to find and modify all those tests to set an explicit IC, but
             #  that will take time.
             if "PYTEST_CURRENT_TEST" in os.environ:
-                return (">=3.7,<4",)
+                return (">=3.8,<4",)
             raise OptionsError(
                 softwrap(
                     f"""\

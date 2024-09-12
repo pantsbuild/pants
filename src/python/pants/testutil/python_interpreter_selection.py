@@ -132,7 +132,6 @@ def all_major_minor_python_versions(
         # Please update this when new stable Python versions are released to CI.
         interpreter_universe=["2.7", "3.6", "3.7", "3.8", "3.9"]
     )
-
     return tuple(
         pytest.param(
             version,
