@@ -69,6 +69,7 @@ async def push_docker_images(
             [
                 PublishPackages(
                     names=tags,
+                    packages=request.packages,
                     description=f"(by `{request.field_set.skip_push.alias}` on {request.field_set.address})",
                 ),
             ]
@@ -98,6 +99,7 @@ async def push_docker_images(
         jobs.append(
             PublishPackages(
                 names=(ref,),
+                packages=request.packages,
                 process=process,
             )
         )
@@ -107,6 +109,7 @@ async def push_docker_images(
             jobs.append(
                 PublishPackages(
                     names=tuple(skip_tags),
+                    packages=request.packages,
                     description=f"(by `{reason}` on registry @{name})",
                 ),
             )
