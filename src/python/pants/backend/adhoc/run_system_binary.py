@@ -14,6 +14,7 @@ from pants.backend.adhoc.target_types import (
     SystemBinaryFingerprintArgsField,
     SystemBinaryFingerprintDependenciesField,
     SystemBinaryFingerprintPattern,
+    SystemBinaryLogFingerprintingErrorsField,
     SystemBinaryNameField,
 )
 from pants.build_graph.address import Address
@@ -48,6 +49,7 @@ class SystemBinaryFieldSet(RunFieldSet):
         SystemBinaryFingerprintPattern,
         SystemBinaryFingerprintArgsField,
         SystemBinaryFingerprintDependenciesField,
+        SystemBinaryLogFingerprintingErrorsField,
     )
 
     name: SystemBinaryNameField
@@ -55,6 +57,7 @@ class SystemBinaryFieldSet(RunFieldSet):
     fingerprint_pattern: SystemBinaryFingerprintPattern
     fingerprint_argv: SystemBinaryFingerprintArgsField
     fingerprint_dependencies: SystemBinaryFingerprintDependenciesField
+    log_fingerprinting_errors: SystemBinaryLogFingerprintingErrorsField
 
 
 async def _find_binary(
@@ -64,6 +67,7 @@ async def _find_binary(
     fingerprint_pattern: str | None,
     fingerprint_args: tuple[str, ...] | None,
     fingerprint_dependencies: tuple[str, ...] | None,
+    log_fingerprinting_errors: bool,
 ) -> BinaryPath:
     binaries = await Get(
         BinaryPaths,
@@ -106,6 +110,15 @@ async def _find_binary(
 
     for test, binary in zip(tests, binaries.paths):
         if test.exit_code != 0:
+            if log_fingerprinting_errors:
+                logger.warning(
+                    f"Error occurred while fingerprinting candidate binary `{binary.path}` "
+                    f"for binary `{binary_name}` (exit code {test.exit_code}) (use the `{SystemBinaryLogFingerprintingErrorsField.alias}` field to control this warning):\n\n"
+                    f"stdout:\n{test.stdout.decode(errors='ignore')}\n"
+                    f"stderr:\n{test.stderr.decode(errors='ignore')}"
+                )
+
+            # Skip this binary since fingerprinting failed.
             continue
 
         if fingerprint_pattern:
@@ -159,6 +172,7 @@ async def create_system_binary_run_request(
         field_set.fingerprint_pattern.value,
         field_set.fingerprint_argv.value,
         field_set.fingerprint_dependencies.value,
+        field_set.log_fingerprinting_errors.value,
     )
 
     return RunRequest(
