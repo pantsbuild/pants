@@ -19,13 +19,29 @@ class NativeParsedPythonDependencies:
 
 
 @dataclass(frozen=True)
-class NativeParsedJavascriptDependencies:
+class ParsedJavascriptDependencyCandidate:
     file_imports: frozenset[str]
     package_imports: frozenset[str]
 
-    def __init__(self, file_imports: set[str], package_imports: set[str]):
-        object.__setattr__(self, "file_imports", file_imports)
-        object.__setattr__(self, "package_imports", package_imports)
+
+@dataclass(frozen=True)
+class NativeParsedJavascriptDependencies:
+    imports: dict[str, ParsedJavascriptDependencyCandidate]
+
+    def __init__(self, imports: dict[str, ParsedJavascriptDependencyCandidate]):
+        object.__setattr__(self, "imports", imports)
+
+    @property
+    def file_imports(self) -> frozenset[str]:
+        return frozenset(
+            string for candidate in self.imports.values() for string in candidate.file_imports
+        )
+
+    @property
+    def package_imports(self) -> frozenset[str]:
+        return frozenset(
+            string for candidate in self.imports.values() for string in candidate.package_imports
+        )
 
 
 @dataclass(frozen=True)

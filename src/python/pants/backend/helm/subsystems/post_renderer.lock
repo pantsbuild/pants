@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<3.10,>=3.7"
+//     "CPython<3.10,>=3.8"
 //   ],
 //   "generated_with_requirements": [
 //     "ruamel.yaml!=0.17.0,!=0.17.1,!=0.17.2,!=0.17.5,<=0.17.21,>=0.15.96",
@@ -25,6 +25,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "excluded": [],
   "locked_resolves": [
     {
       "locked_requirements": [
@@ -32,13 +33,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9",
-              "url": "https://files.pythonhosted.org/packages/36/7a/87837f39d0296e723bb9b62bbb257d0355c7f6128853c78955f57342a56d/python_dateutil-2.8.2-py2.py3-none-any.whl"
+              "hash": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+              "url": "https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86",
-              "url": "https://files.pythonhosted.org/packages/4c/c4/13b4776ea2d76c115c1d1b84579f3764ee6d57204f6be27119f13a61d0a9/python-dateutil-2.8.2.tar.gz"
+              "hash": "37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3",
+              "url": "https://files.pythonhosted.org/packages/66/c0/0c8b6ad9f17a802ee498c46e004a0eb49bc148f2fd230864601a86dcf6db/python-dateutil-2.9.0.post0.tar.gz"
             }
           ],
           "project_name": "python-dateutil",
@@ -46,7 +47,7 @@
             "six>=1.5"
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7",
-          "version": "2.8.2"
+          "version": "2.9.0.post0"
         },
         {
           "artifacts": [
@@ -89,28 +90,8 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "4ecbf9c3e19f9562c7fdd462e8d18dd902a47ca046a2e64dba80699f0b6c09b7",
-              "url": "https://files.pythonhosted.org/packages/19/96/8d13a3f959c339ec86b01dafb2da3c34addbbed3a965bc4f3d08db44f297/ruamel.yaml.clib-0.2.8-cp37-cp37m-musllinux_1_1_i686.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "77159f5d5b5c14f7c34073862a6b7d34944075d9f93e681638f6d753606c6ce6",
-              "url": "https://files.pythonhosted.org/packages/1f/36/1626cfc675e6b254040147e4871adc00aa263a4a19cfe6216b55fbf35b9f/ruamel.yaml.clib-0.2.8-cp37-cp37m-manylinux_2_24_aarch64.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "700e4ebb569e59e16a976857c8798aee258dceac7c7d6b50cab63e080058df91",
               "url": "https://files.pythonhosted.org/packages/22/fa/b2a8fd49c92693e9b9b6b11eef4c2a8aedaca2b521ab3e020aa4778efc23/ruamel.yaml.clib-0.2.8-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "87ea5ff66d8064301a154b3933ae406b0863402a799b16e4a1d24d9fbbcbe0d3",
-              "url": "https://files.pythonhosted.org/packages/2d/91/b1e3eb36dbe2e338545893f3a05196549baa96208540f9866b2e46c0ee40/ruamel.yaml.clib-0.2.8-cp37-cp37m-musllinux_1_1_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "7f67a1ee819dc4562d444bbafb135832b0b909f81cc90f7aa00260968c9ca1b3",
-              "url": "https://files.pythonhosted.org/packages/38/bc/2399ac38b7badf795e1d8fe2a4ad32881401edf2d4a18372a5adecf67ce5/ruamel.yaml.clib-0.2.8-cp37-cp37m-manylinux_2_5_x86_64.manylinux1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
@@ -156,16 +137,6 @@
               "algorithm": "sha256",
               "hash": "bba64af9fa9cebe325a62fa398760f5c7206b215201b0ec825005f1b18b9bccf",
               "url": "https://files.pythonhosted.org/packages/b2/ed/f221e60a4cdc7996aae23643da44b12ef33f457c2a52d590236a6950ac8e/ruamel.yaml.clib-0.2.8-cp39-cp39-macosx_12_0_arm64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "f481f16baec5290e45aebdc2a5168ebc6d35189ae6fea7a58787613a25f6e875",
-              "url": "https://files.pythonhosted.org/packages/b9/68/0f84292041b15d1b89a6dabf5d54844d35948c4f6ce3757dcd130c001cbc/ruamel.yaml.clib-0.2.8-cp37-cp37m-macosx_12_0_arm64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "c58ecd827313af6864893e7af0a3bb85fd529f862b6adbefe14643947cfe2942",
-              "url": "https://files.pythonhosted.org/packages/d6/cf/7a97045dd4ece8b4ab692e9b4393edf811174ecd39dcaa0231f42099849b/ruamel.yaml.clib-0.2.8-cp37-cp37m-macosx_10_9_x86_64.whl"
             }
           ],
           "project_name": "ruamel-yaml-clib",
@@ -195,13 +166,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0aedcac1441ce629bedbef870ef6d21135a42c3033226162aea0a1366b76bdb7",
-              "url": "https://files.pythonhosted.org/packages/8e/4f/fad683f33fe92ee32f5995c5769f7ec9dbbbf4260acd6d1c223977e68d0e/yamlpath-3.8.1-py3-none-any.whl"
+              "hash": "b7d116359cd641e7bf9fe66c537d808af72aeeccfab287cecdd4d80f4ac823b1",
+              "url": "https://files.pythonhosted.org/packages/31/e1/7e05388333efcbc260a2577f50675f72dd2cfa7ef3be749fd4856fe4626c/yamlpath-3.8.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2f5e1e408a8ba189d812200ec53bc063820ba5a852b72d0bcec25fc08ea18ec2",
-              "url": "https://files.pythonhosted.org/packages/e0/f7/fed3fa5710f11e8776e4f9583aa1ad654678f4fc98b8584ecd43bc8e72ed/yamlpath-3.8.1.tar.gz"
+              "hash": "4f30cc214b5085d4b0e7756e06c3af3ae589ecde9650d2ada7e1d345ec4fda4f",
+              "url": "https://files.pythonhosted.org/packages/3a/a4/eb264493c967e5dabf310c8d5bad6f435c6830eae087f1651e51d93aa065/yamlpath-3.8.2.tar.gz"
             }
           ],
           "project_name": "yamlpath",
@@ -209,8 +180,8 @@
             "python-dateutil<=3",
             "ruamel.yaml!=0.17.18,<=0.17.21,>0.17.5"
           ],
-          "requires_python": ">3.6.0",
-          "version": "3.8.1"
+          "requires_python": ">3.7.0",
+          "version": "3.8.2"
         }
       ],
       "platform_tag": null
@@ -218,16 +189,17 @@
   ],
   "only_builds": [],
   "only_wheels": [],
+  "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.2.1",
-  "pip_version": "24.0",
+  "pex_version": "2.16.2",
+  "pip_version": "24.2",
   "prefer_older_binary": false,
   "requirements": [
     "ruamel.yaml!=0.17.0,!=0.17.1,!=0.17.2,!=0.17.5,<=0.17.21,>=0.15.96",
     "yamlpath<4,>=3.6.0"
   ],
   "requires_python": [
-    "<3.10,>=3.7"
+    "<3.10,>=3.8"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

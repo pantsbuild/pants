@@ -12,7 +12,7 @@ from pants.backend.build_files.fix.deprecations.subsystem import BUILDDeprecatio
 from pants.core.goals.fix import FixResult
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.selectors import concurrently
-from pants.engine.intrinsics import digest_to_snapshot, directory_digest_to_digest_contents
+from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.util.frozendict import FrozenDict
@@ -88,7 +88,7 @@ def fix_single(
 async def fix(
     request: RenameTargetsInFilesRequest.Batch,
 ) -> FixResult:
-    digest_contents = await directory_digest_to_digest_contents(request.snapshot.digest)
+    digest_contents = await get_digest_contents(request.snapshot.digest)
     fixed_contents = await concurrently(
         fix_single(
             RenameTargetsInFileRequest(file_content.path, file_content.content), **implicitly()

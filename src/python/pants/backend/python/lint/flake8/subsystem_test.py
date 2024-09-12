@@ -77,14 +77,35 @@ def test_first_party_plugins(rule_runner: PythonRuleRunner) -> None:
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
+
     first_party_plugins = rule_runner.request(Flake8FirstPartyPlugins, [])
+
     assert first_party_plugins.requirement_strings == FrozenOrderedSet(
         ["ansicolors", "flake8==2.11.1"]
     )
+
     assert first_party_plugins.interpreter_constraints_fields == FrozenOrderedSet(
         [
-            InterpreterConstraintsField(ic, Address("", target_name="tgt"))
-            for ic in (None, ["==3.9.*"], ["==3.8.*"])
+            InterpreterConstraintsField(
+                None,
+                Address(
+                    "flake8-plugins", target_name="flake8-plugins", relative_file_path="plugin.py"
+                ),
+            ),
+            InterpreterConstraintsField(
+                ["==3.9.*"],
+                Address(
+                    "flake8-plugins/subdir1", target_name="subdir1", relative_file_path="util.py"
+                ),
+            ),
+            InterpreterConstraintsField(
+                ["==3.8.*"],
+                Address(
+                    "flake8-plugins/subdir2",
+                    target_name="subdir2",
+                    relative_file_path="another_util.py",
+                ),
+            ),
         ]
     )
     assert (

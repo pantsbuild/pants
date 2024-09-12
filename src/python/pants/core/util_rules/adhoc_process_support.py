@@ -14,6 +14,7 @@ from enum import Enum
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, TypeVar, Union
 
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
@@ -28,8 +29,10 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
     Digest,
+    DigestSubset,
     Directory,
     FileContent,
+    GlobExpansionConjunction,
     MergeDigests,
     PathGlobs,
     PathMetadataRequest,
@@ -54,6 +57,8 @@ from pants.engine.target import (
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
+    WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.util.frozendict import FrozenDict
 
@@ -80,6 +85,9 @@ class AdhocProcessRequest:
     capture_stderr_file: str | None
     workspace_invalidation_globs: PathGlobs | None
     cache_scope: ProcessCacheScope | None = None
+    use_working_directory_as_base_for_output_captures: bool = True
+    outputs_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error
+    outputs_match_conjunction: GlobExpansionConjunction | None = GlobExpansionConjunction.all_match
 
 
 @dataclass(frozen=True)
@@ -459,6 +467,117 @@ async def create_tool_runner(
     )
 
 
+async def check_outputs(
+    output_digest: Digest,
+    output_files: Iterable[str],
+    output_directories: Iterable[str],
+    outputs_match_error_behavior: GlobMatchErrorBehavior,
+    outputs_match_mode: GlobExpansionConjunction | None,
+    address: Address,
+) -> None:
+    """Check an output digest from adhoc/shell backends to ensure that the outputs expected by the
+    user do in fact exist."""
+
+    if outputs_match_mode is None:
+        return
+
+    filtered_output_files_digests = await MultiGet(
+        Get(
+            Digest,
+            DigestSubset(
+                output_digest,
+                PathGlobs(
+                    [output_file],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+                ),
+            ),
+        )
+        for output_file in output_files
+    )
+
+    filtered_output_directory_digests = await MultiGet(
+        Get(
+            Digest,
+            DigestSubset(
+                output_digest,
+                PathGlobs(
+                    [output_directory, os.path.join(output_directory, "**")],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+                ),
+            ),
+        )
+        for output_directory in output_directories
+    )
+
+    filtered_output_files = tuple(zip(output_files, filtered_output_files_digests))
+    filtered_output_directories = tuple(zip(output_directories, filtered_output_directory_digests))
+
+    unused_output_files = tuple(
+        f"{output_file} (from `output_files` field)"
+        for output_file, digest in filtered_output_files
+        if digest == EMPTY_DIGEST
+    )
+    unused_output_directories = tuple(
+        f"{output_directory} (from `output_directories` field)"
+        for output_directory, digest in filtered_output_directories
+        if digest == EMPTY_DIGEST
+    )
+
+    def warn_or_raise(message: str, snapshot: Snapshot) -> None:
+        unused_globs_str = ", ".join([*unused_output_files, *unused_output_directories])
+        message = f"{message}\n\nThe following output globs were unused: {unused_globs_str}"
+
+        if snapshot.dirs:
+            message += f"\n\nDirectories in output ({len(snapshot.dirs)} total):"
+            dirs = sorted(snapshot.dirs, key=lambda x: x.count(os.pathsep))
+            if len(dirs) > 15:
+                message += f" {', ' .join(dirs[0:15])}, ... (trimmed for brevity)"
+            else:
+                message += f" {', ' .join(dirs)}"
+
+        if snapshot.files:
+            message += f"\n\nFiles in output ({len(snapshot.files)} total):"
+            files = sorted(snapshot.files, key=lambda x: x.count(os.pathsep))
+            if len(files) > 15:
+                message += f" {', ' .join(files[0:15])}, ... (trimmed for brevity)"
+            else:
+                message += f" {', ' .join(files)}"
+
+        if outputs_match_error_behavior == GlobMatchErrorBehavior.error:
+            raise ValueError(message)
+        else:
+            logger.warning(message)
+
+    if outputs_match_mode == GlobExpansionConjunction.all_match:
+        if not unused_output_files and not unused_output_directories:
+            return
+
+        snapshot, wrapped_tgt = await MultiGet(
+            Get(Snapshot, Digest, output_digest),
+            Get(WrappedTarget, WrappedTargetRequest(address, "adhoc_process_support rule")),
+        )
+        warn_or_raise(
+            f"The `{wrapped_tgt.target.alias}` target at `{address}` is configured with `outputs_match_mode` set to `all` "
+            "which requires all output globs to actually match an output.",
+            snapshot,
+        )
+
+    # Otherwise it is `GlobExpansionConjunction.any_match` which means only at least one glob must match.
+    total_count = len(filtered_output_files) + len(filtered_output_directories)
+    unused_count = len(unused_output_files) + len(unused_output_directories)
+    if total_count == 0 or unused_count < total_count:
+        return
+    snapshot, wrapped_tgt = await MultiGet(
+        Get(Snapshot, Digest, output_digest),
+        Get(WrappedTarget, WrappedTargetRequest(address, "adhoc_process_support rule")),
+    )
+    warn_or_raise(
+        f"The `{wrapped_tgt.target.alias}` target at `{address}` is configured with `outputs_match_mode` set to `any` "
+        "which requires at least one output glob to actually match an output.",
+        snapshot,
+    )
+
+
 @rule
 async def run_adhoc_process(
     request: AdhocProcessRequest,
@@ -487,9 +606,12 @@ async def run_adhoc_process(
             logger.warning(result.stderr.decode())
 
     working_directory = parse_relative_directory(request.working_directory, request.address)
-    root_output_directory = parse_relative_directory(
-        request.root_output_directory, working_directory
-    )
+
+    root_output_directory: str | None = None
+    if request.use_working_directory_as_base_for_output_captures:
+        root_output_directory = parse_relative_directory(
+            request.root_output_directory, working_directory
+        )
 
     extras = (
         (request.capture_stdout_file, result.stdout),
@@ -497,19 +619,48 @@ async def run_adhoc_process(
     )
     extra_contents = {i: j for i, j in extras if i}
 
+    # Check the outputs (if configured) to ensure any required glob matches in fact occurred.
     output_digest = result.output_digest
+    output_files: list[str] = list(request.output_files)
+    output_directories: list[str] = list(request.output_directories)
+    if request.use_working_directory_as_base_for_output_captures:
+        output_files = [
+            os.path.normpath(os.path.join(working_directory, of)) for of in output_files
+        ]
+        output_directories = [
+            os.path.normpath(os.path.join(working_directory, od)) for od in output_directories
+        ]
+    await check_outputs(
+        output_digest=output_digest,
+        output_files=output_files,
+        output_directories=output_directories,
+        outputs_match_error_behavior=request.outputs_match_error_behavior,
+        outputs_match_mode=request.outputs_match_conjunction,
+        address=request.address,
+    )
 
     if extra_contents:
-        extra_digest = await Get(
-            Digest,
-            CreateDigest(
-                FileContent(_parse_relative_file(name, working_directory), content)
-                for name, content in extra_contents.items()
-            ),
-        )
+        if request.use_working_directory_as_base_for_output_captures:
+            extra_digest = await Get(
+                Digest,
+                CreateDigest(
+                    FileContent(_parse_relative_file(name, working_directory), content)
+                    for name, content in extra_contents.items()
+                ),
+            )
+        else:
+            extra_digest = await Get(
+                Digest,
+                CreateDigest(
+                    FileContent(name, content) for name, content in extra_contents.items()
+                ),
+            )
+
         output_digest = await Get(Digest, MergeDigests((output_digest, extra_digest)))
 
-    adjusted = await Get(Digest, RemovePrefix(output_digest, root_output_directory))
+    adjusted: Digest = output_digest
+    if root_output_directory is not None:
+        adjusted = await Get(Digest, RemovePrefix(output_digest, root_output_directory))
 
     return AdhocProcessResult(result, adjusted)
 
@@ -612,7 +763,10 @@ async def prepare_adhoc_process(
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
 
-    return _output_at_build_root(proc, bash)
+    if request.use_working_directory_as_base_for_output_captures:
+        return _output_at_build_root(proc, bash)
+    else:
+        return proc
 
 
 class PathEnvModifyMode(Enum):

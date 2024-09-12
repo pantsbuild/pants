@@ -79,8 +79,14 @@ impl PantsLogger {
         let log_file = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(log_file_path)
-            .map_err(|err| format!("Error opening pantsd logfile: {err}"))?;
+            .open(&log_file_path)
+            .map_err(|err| {
+                format!(
+                    "Error opening pantsd logfile at '{}': {}",
+                    log_file_path.display(),
+                    err
+                )
+            })?;
 
         PANTS_LOGGER.0.store(Arc::new(Inner {
             per_run_logs: Mutex::default(),

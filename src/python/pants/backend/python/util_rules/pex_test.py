@@ -514,7 +514,7 @@ def test_local_requirements_and_path_mappings(
                 GeneratePythonLockfile(
                     requirements=FrozenOrderedSet([wheel_req_str]),
                     find_links=FrozenOrderedSet([]),
-                    interpreter_constraints=InterpreterConstraints([">=3.7,<4"]),
+                    interpreter_constraints=InterpreterConstraints([">=3.8,<4"]),
                     resolve_name="test",
                     lockfile_dest="test.lock",
                     diff=False,
@@ -622,7 +622,7 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
 def test_determine_pex_python_and_platforms() -> None:
     hardcoded_python = PythonExecutable("/hardcoded/python")
     discovered_python = PythonExecutable("/discovered/python")
-    ics = InterpreterConstraints(["==3.7"])
+    ics = InterpreterConstraints(["==3.8"])
 
     def assert_setup(
         *,
@@ -657,7 +657,7 @@ def test_determine_pex_python_and_platforms() -> None:
     assert_setup(expected=_BuildPexPythonSetup(None, []))
     assert_setup(
         interpreter_constraints=ics,
-        expected=_BuildPexPythonSetup(None, ["--interpreter-constraint", "CPython==3.7"]),
+        expected=_BuildPexPythonSetup(None, ["--interpreter-constraint", "CPython==3.8"]),
     )
     assert_setup(
         internal_only=True,

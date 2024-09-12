@@ -4,11 +4,6 @@
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
 
-use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::convert::TryInto;
-use std::fmt;
-
 use futures::future::{BoxFuture, Future};
 use futures::FutureExt;
 use lazy_static::lazy_static;
@@ -18,6 +13,11 @@ use pyo3::types::{PyBytes, PyDict, PySequence, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
 use pyo3::{FromPyObject, ToPyObject};
 use smallvec::{smallvec, SmallVec};
+use std::cell::{Ref, RefCell};
+use std::collections::BTreeMap;
+use std::convert::TryInto;
+use std::fmt;
+use std::ops::Deref;
 
 use logging::PythonLogLevel;
 use rule_graph::RuleId;
@@ -131,7 +131,10 @@ pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {
 }
 
 /// Store a slice containing 2-tuples of (key, value) as a Python dictionary.
-pub fn store_dict(py: Python, keys_and_values: Vec<(Value, Value)>) -> PyResult<Value> {
+pub fn store_dict(
+    py: Python,
+    keys_and_values: impl IntoIterator<Item = (Value, Value)>,
+) -> PyResult<Value> {
     let dict = PyDict::new(py);
     for (k, v) in keys_and_values {
         dict.set_item(k.consume_into_py_object(py), v.consume_into_py_object(py))?;
@@ -508,6 +511,16 @@ impl PyGeneratorResponseNativeCall {
 #[pyclass(subclass)]
 pub struct PyGeneratorResponseCall(RefCell<Option<Call>>);
 
+impl PyGeneratorResponseCall {
+    fn borrow_inner(&self) -> PyResult<impl Deref<Target = Call> + '_> {
+        Ref::filter_map(self.0.borrow(), |inner| inner.as_ref()).map_err(|_| {
+            PyException::new_err(
+                "A `Call` may not be consumed after being provided to the @rule engine.",
+            )
+        })
+    }
+}
+
 #[pymethods]
 impl PyGeneratorResponseCall {
     #[new]
@@ -540,6 +553,34 @@ impl PyGeneratorResponseCall {
             input_types,
             inputs,
         }))))
+    }
+
+    #[getter]
+    fn output_type<'p>(&'p self, py: Python<'p>) -> PyResult<&'p PyType> {
+        Ok(self.borrow_inner()?.output_type.as_py_type(py))
+    }
+
+    #[getter]
+    fn input_types<'p>(&'p self, py: Python<'p>) -> PyResult<Vec<&'p PyType>> {
+        Ok(self
+            .borrow_inner()?
+            .input_types
+            .iter()
+            .map(|t| t.as_py_type(py))
+            .collect())
+    }
+
+    #[getter]
+    fn inputs<'p>(&'p self, py: Python<'p>) -> PyResult<Vec<PyObject>> {
+        let inner = self.borrow_inner()?;
+        let args: Vec<PyObject> = inner.args.as_ref().map_or_else(
+            || Ok(Vec::default()),
+            |args| args.to_py_object().extract(py),
+        )?;
+        Ok(args
+            .into_iter()
+            .chain(inner.inputs.iter().map(Key::to_py_object))
+            .collect())
     }
 }
 
@@ -637,10 +678,7 @@ impl PyGeneratorResponseGet {
             })?
             .inputs
             .iter()
-            .map(|k| {
-                let pyo: PyObject = k.value.clone().into();
-                pyo
-            })
+            .map(Key::to_py_object)
             .collect())
     }
 

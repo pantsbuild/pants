@@ -146,10 +146,11 @@ class SourceAnalysisTraverser extends Traverser {
         val symbol = extractName(qual).map(_.qualify(name)).getOrElse(QualifiedName.of(name))
         Chain.one(symbol)
       }
-      case Type.Apply(tpe, args) =>
-        extractNamesFromTypeTree(tpe) ++ Chain.fromSeq(args).flatMap(extractNamesFromTypeTree(_))
+      case Type.Apply.After_4_6_0(tpe, argClause) =>
+        extractNamesFromTypeTree(tpe) ++ extractNamesFromTypeTree(argClause)
       case Type.ApplyInfix(lhs, _op, rhs) =>
         extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
+      case Type.ArgClause(args) => Chain.fromSeq(args).flatMap(extractNamesFromTypeTree(_))
       case Type.Function(params, res) =>
         Chain.fromSeq(params).flatMap(extractNamesFromTypeTree(_)) ++ extractNamesFromTypeTree(res)
       case Type.PolyFunction(_tparams, tpe) => extractNamesFromTypeTree(tpe)
@@ -430,6 +431,10 @@ class SourceAnalysisTraverser extends Traverser {
       extractNamesFromTypeTree(tpe).iterator.foreach(recordConsumedSymbol(_))
       argss.foreach(_.foreach(apply))
     }
+
+    case Term.ApplyType.After_4_6_0(fun, targClause) =>
+      apply(fun)
+      extractNamesFromTypeTree(targClause).iterator.foreach(recordConsumedSymbol(_))
 
     case Term.Param(mods, _name, decltpe, _default) => {
       visitMods(mods)

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Tuple, Union
 
@@ -273,12 +274,22 @@ class NativeDownloadFile:
     # authorization.
     auth_headers: FrozenDict[str, str]
 
+    retry_error_duration: timedelta
+    max_attempts: int
+
     def __init__(
-        self, url: str, expected_digest: FileDigest, auth_headers: Mapping[str, str] | None = None
+        self,
+        url: str,
+        expected_digest: FileDigest,
+        auth_headers: Mapping[str, str] | None = None,
+        retry_delay_duration: timedelta = timedelta(milliseconds=10),
+        max_attempts: int = 4,
     ) -> None:
         object.__setattr__(self, "url", url)
         object.__setattr__(self, "expected_digest", expected_digest)
         object.__setattr__(self, "auth_headers", FrozenDict(auth_headers or {}))
+        object.__setattr__(self, "retry_error_duration", retry_delay_duration)
+        object.__setattr__(self, "max_attempts", max_attempts)
 
 
 @dataclass(frozen=True)

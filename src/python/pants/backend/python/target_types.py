@@ -98,7 +98,7 @@ class PythonGeneratingSourcesBase(MultipleSourcesField):
     expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
 
 
-class InterpreterConstraintsField(StringSequenceField):
+class InterpreterConstraintsField(StringSequenceField, AsyncFieldMixin):
     alias = "interpreter_constraints"
     help = help_text(
         f"""
@@ -123,6 +123,17 @@ class InterpreterConstraintsField(StringSequenceField):
 
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
+        if self.value and python_setup.warn_on_python2_usage:
+            # Side-step import cycle.
+            from pants.backend.python.util_rules.interpreter_constraints import (
+                warn_on_python2_usage_in_interpreter_constraints,
+            )
+
+            warn_on_python2_usage_in_interpreter_constraints(
+                self.value,
+                description_of_origin=f"the `{self.alias}` field on target at `{self.address}`",
+            )
+
         return python_setup.compatibility_or_constraints(self.value)
 
 
@@ -492,7 +503,7 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
         complete platform JSON as described by Pex
         (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
 
-        See {doc_url('docs/python/overview/pex')} for details.
+        See {doc_url('docs/python/overview/pex#generating-the-complete_platforms-file')} for details on how to create this file.
         """
     )
 

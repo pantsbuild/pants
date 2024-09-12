@@ -67,12 +67,22 @@ class BuildFilePreludeSymbols(BuildFileSymbolsInfo):
     @classmethod
     def create(cls, ns: Mapping[str, Any], env_vars: Iterable[str]) -> BuildFilePreludeSymbols:
         info = {}
-        annotations = ns.get("__annotations__", {})
+        annotations_name = "__annotations__"
+        annotations = ns.get(annotations_name, {})
         for name, symb in ns.items():
-            if name.startswith("_"):
+            if name == annotations_name:
+                # don't include the annotations themselves as a symbol
                 continue
-            # We only need type hints via `annotations` for top-level values which doesn't work with `inspect`.
-            info[name] = BuildFileSymbolInfo(name, symb, type_hints=annotations.get(name))
+
+            info[name] = BuildFileSymbolInfo(
+                name,
+                symb,
+                # We only need type hints via `annotations` for top-level values which doesn't work with `inspect`.
+                type_hints=annotations.get(name),
+                # If the user has defined a _ symbol, we assume they don't want it in `pants help` output.
+                hide_from_help=name.startswith("_"),
+            )
+
         return cls(info=FrozenDict(info), referenced_env_vars=tuple(sorted(env_vars)))
 
 
@@ -83,6 +93,8 @@ class BuildFileSymbolInfo:
     help: str | None = field(default=None, compare=False)
     signature: str | None = field(default=None, compare=False, init=False)
     type_hints: InitVar[Any] = None
+
+    hide_from_help: bool = False
 
     def __post_init__(self, type_hints: Any) -> None:
         annotated_type: type = type(self.value)

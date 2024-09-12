@@ -3,10 +3,10 @@
 
 from enum import Enum, unique
 
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.rules import collect_rules, rule
+from pants.core.goals.resolves import ExportableTool
+from pants.engine.rules import collect_rules
 from pants.engine.unions import UnionRule
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
+from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.option.option_types import BoolOption, EnumOption
 
 
@@ -37,19 +37,8 @@ class JarJar(JvmToolBase):
     )
 
 
-class JarJarGeneratorLockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = JarJar.options_scope
-
-
-@rule
-async def generate_jarjar_lockfile_request(
-    _: JarJarGeneratorLockfileSentinel, jarjar: JarJar
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(jarjar)
-
-
 def rules():
     return [
         *collect_rules(),
-        UnionRule(GenerateToolLockfileSentinel, JarJarGeneratorLockfileSentinel),
+        UnionRule(ExportableTool, JarJar),
     ]

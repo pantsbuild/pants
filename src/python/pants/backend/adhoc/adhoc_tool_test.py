@@ -22,6 +22,7 @@ from pants.core.util_rules.environments import LocalWorkspaceEnvironmentTarget
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process
 from pants.engine.target import (
     GeneratedSources,
@@ -376,6 +377,37 @@ def test_adhoc_tool_workspace_invalidation_sources(rule_runner: PythonRuleRunner
     assert result1.snapshot != result3.snapshot
 
 
+def test_adhoc_tool_workspace_output_capture_base(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+            system_binary(name="bash", binary_name="bash")
+            system_binary(name="cp", binary_name="cp")
+            adhoc_tool(
+                name="make-file",
+                runnable=":bash",
+                args=["-c", "pwd && [ -r ./foo.txt ] && cp ./foo.txt {chroot}/bar.txt"],
+                output_files=["bar.txt"],
+                environment="workspace",
+                workdir="subdir",
+                execution_dependencies=[":cp"],
+            )
+            experimental_workspace_environment(name="workspace")
+            """
+            ),
+            "subdir/foo.txt": "xyzzy",
+        }
+    )
+    rule_runner.set_options(
+        ["--environments-preview-names={'workspace': '//:workspace'}"], env_inherit={"PATH"}
+    )
+
+    assert_adhoc_tool_result(
+        rule_runner, Address("", target_name="make-file"), {"bar.txt": "xyzzy"}
+    )
+
+
 def test_adhoc_tool_path_env_modify_mode(rule_runner: PythonRuleRunner) -> None:
     expected_path = "/bin:/usr/bin"
     rule_runner.write_files(
@@ -476,3 +508,88 @@ def test_adhoc_tool_cache_scope_session(rule_runner: PythonRuleRunner) -> None:
     rule_runner.set_options([])
     result3 = execute_adhoc_tool(rule_runner, address)
     assert result2.snapshot != result3.snapshot
+
+
+def test_adhoc_tool_check_outputs(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+            system_binary(name="bash", binary_name="bash")
+            system_binary(
+              name="touch",
+              binary_name="touch",
+              fingerprint_args=["{chroot}/foo"],
+            )
+            system_binary(
+              name="mkdir",
+              binary_name="mkdir",
+              fingerprint_args=["{chroot}/foo"],
+            )
+            adhoc_tool(
+                name="allow_empty",
+                runnable=":bash",
+                args=["-c", "true"],
+                output_files=["non-existent-file"],
+                output_directories=["non-existent-dir"],
+                outputs_match_mode="allow_empty",
+            )
+            adhoc_tool(
+                name="all_with_present_file",
+                runnable=":bash",
+                args=["-c", "touch some-file"],
+                runnable_dependencies=[":touch"],
+                output_files=["some-file"],
+                output_directories=["some-directory"],
+                outputs_match_mode="all",
+            )
+            adhoc_tool(
+                name="all_with_present_directory",
+                runnable=":bash",
+                args=["-c", "mkdir some-directory"],
+                runnable_dependencies=[":mkdir"],
+                output_files=["some-file"],
+                output_directories=["some-directory"],
+                outputs_match_mode="all",
+            )
+            adhoc_tool(
+                name="at_least_one_with_present_file",
+                runnable=":bash",
+                args=["-c", "touch some-file"],
+                runnable_dependencies=[":touch"],
+                output_files=["some-file"],
+                output_directories=["some-directory"],
+                outputs_match_mode="at_least_one",
+            )
+            adhoc_tool(
+                name="at_least_one_with_present_directory",
+                runnable=":bash",
+                args=["-c", "mkdir some-directory && touch some-directory/foo.txt"],
+                runnable_dependencies=[":mkdir", ":touch"],
+                output_files=["some-file"],
+                output_directories=["some-directory"],
+                outputs_match_mode="at_least_one",
+            )
+            """
+            )
+        }
+    )
+
+    assert_adhoc_tool_result(rule_runner, Address("", target_name="allow_empty"), {})
+
+    with pytest.raises(ExecutionError) as exc_info:
+        execute_adhoc_tool(rule_runner, Address("", target_name="all_with_present_file"))
+    assert "some-directory" in str(exc_info)
+
+    with pytest.raises(ExecutionError) as exc_info:
+        execute_adhoc_tool(rule_runner, Address("", target_name="all_with_present_directory"))
+    assert "some-file" in str(exc_info)
+
+    assert_adhoc_tool_result(
+        rule_runner, Address("", target_name="at_least_one_with_present_file"), {"some-file": ""}
+    )
+    assert_adhoc_tool_result(
+        rule_runner,
+        Address("", target_name="at_least_one_with_present_directory"),
+        {"some-directory/foo.txt": ""},
+    )

@@ -216,6 +216,7 @@ fn test_default_section_scalar() {
         99.88,
         ConfigReader::get_float,
     );
+    do_test("11", "22", "33", 11.0, 33.0, ConfigReader::get_float);
     do_test(
         "\"xx\"",
         "\"yy\"",

@@ -62,7 +62,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
     #  requirements that reflect any minimum capabilities Pants assumes about the tool.
     default_requirements: Sequence[str] = []
 
-    default_interpreter_constraints: ClassVar[Sequence[str]] = ["CPython>=3.7,<4"]
+    default_interpreter_constraints: ClassVar[Sequence[str]] = ["CPython>=3.8,<4"]
     register_interpreter_constraints: ClassVar[bool] = False
 
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
@@ -124,7 +124,9 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
             Values can be pip-style requirements (e.g., `tool` or `tool==1.2.3` or `tool>=1.2.3`),
             or addresses of `python_requirement` targets (or targets that generate or depend on
-            `python_requirement` targets).
+            `python_requirement` targets). Make sure to use the `//` prefix to refer to targets
+            using their full address from the root (e.g. `//3rdparty/python:tool`). This is necessary
+            to distinguish address specs from local or VCS requirements.
 
             The lockfile will be validated against the requirements - if a lockfile doesn't
             provide the requirement (at a suitable version, if the requirement specifies version
