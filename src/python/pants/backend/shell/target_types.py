@@ -391,11 +391,11 @@ class ShellCommandPathEnvModifyModeField(AdhocToolPathEnvModifyModeField):
     pass
 
 
-class ShellCommandCacheScopeField(AdhocToolCacheScopeField):
+class ShellCommandOutputsMatchMode(AdhocToolOutputsMatchMode):
     pass
 
 
-class ShellCommandOutputsMatchMode(AdhocToolOutputsMatchMode):
+class ShellCommandCacheScopeField(AdhocToolCacheScopeField):
     pass
 
 
@@ -425,8 +425,8 @@ class ShellCommandTarget(Target):
         ShellCommandOutputRootDirField,
         ShellCommandWorkspaceInvalidationSourcesField,
         ShellCommandPathEnvModifyModeField,
-        ShellCommandCacheScopeField,
         ShellCommandOutputsMatchMode,
+        ShellCommandCacheScopeField,
         EnvironmentField,
     )
     help = help_text(
