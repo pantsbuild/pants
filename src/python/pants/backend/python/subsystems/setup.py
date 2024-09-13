@@ -77,7 +77,6 @@ class PythonSetup(Subsystem):
             constraint strings will be ORed together.
             """
         ),
-        advanced=True,
         metavar="<requirement>",
     )
 
