@@ -194,7 +194,9 @@ class Parser:
                 flag_value_map[key].append(flag_val)
             return flag_value_map
 
-    def parse_args_native(self, native_parser: NativeOptionParser) -> OptionValueContainer:
+    def parse_args_native(
+        self, native_parser: NativeOptionParser, allow_unknown_flags: bool
+    ) -> OptionValueContainer:
         namespace = OptionValueContainerBuilder()
         for args, kwargs in self._option_registrations:
             self._validate(args, kwargs)
@@ -208,6 +210,11 @@ class Parser:
                 passthrough=kwargs.get("passthrough"),
             )
             setattr(namespace, dest, RankedValue(rank, val))
+
+        if not allow_unknown_flags:
+            unconsumed_flags = native_parser.get_unconsumed_flags(self.scope)
+            if unconsumed_flags:
+                raise UnknownFlagsError(tuple(unconsumed_flags), self.scope)
         return namespace.build()
 
     def parse_args(

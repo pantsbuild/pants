@@ -297,4 +297,8 @@ impl PyOptionParser {
     fn get_passthrough_args(&self) -> PyResult<Option<Vec<String>>> {
         Ok(self.0.get_passthrough_args().cloned())
     }
+
+    fn get_unconsumed_flags(&self, scope: &str) -> Vec<String> {
+        self.0.get_unconsumed_flags(scope)
+    }
 }
