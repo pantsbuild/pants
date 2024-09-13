@@ -6,24 +6,23 @@ import hashlib
 import itertools
 import json
 import os
-import subprocess
 from pathlib import Path
 
 import github
 import requests
 from github.GitReleaseAsset import GitReleaseAsset
 
-VERSIONS_PATH = Path(__file__).parent.parent / "versions_info.json"
+from pants.base.build_environment import get_buildroot
+
+VERSIONS_PATH = get_buildroot() / Path(
+    "src/python/pants/backend/python/providers/python_build_standalone/versions_info.json"
+)
 
 
 def _github():
+    # generate with `gh auth token`
     token = os.environ.get("GH_TOKEN")
-    if not token:
-        token = subprocess.run(
-            ["gh", "auth", "token"], check=True, text=True, capture_output=True
-        ).stdout.strip()
-
-    return github.Github(auth=github.Auth.Token(token))
+    return github.Github(auth=github.Auth.Token(token) if token else None)
 
 
 def _compute_sha256(url):
