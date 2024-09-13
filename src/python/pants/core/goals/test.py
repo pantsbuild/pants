@@ -1013,7 +1013,7 @@ async def run_tests(
         }
         coverage_collections = []
         for data_cls, data in itertools.groupby(all_coverage_data, lambda data: type(data)):
-            collection_cls = coverage_types_to_collection_types[data_cls]
+            collection_cls = coverage_types_to_collection_types[data_cls]  # type: ignore[index]
             coverage_collections.append(collection_cls(data))
         # We can create multiple reports for each coverage data (e.g., console, xml, html)
         coverage_reports_collections = await MultiGet(

@@ -709,7 +709,9 @@ async def find_binary(
     binary_paths = BinaryPaths(binary_name=request.binary_name)
     found_paths = result.stdout.decode().splitlines()
     if not request.test:
-        return dataclasses.replace(binary_paths, paths=[BinaryPath(path) for path in found_paths])
+        return dataclasses.replace(
+            binary_paths, paths=tuple(BinaryPath(path) for path in found_paths)
+        )
 
     results = await MultiGet(
         Get(
@@ -727,7 +729,7 @@ async def find_binary(
     )
     return dataclasses.replace(
         binary_paths,
-        paths=[
+        paths=tuple(
             (
                 BinaryPath.fingerprinted(path, result.stdout)
                 if request.test.fingerprint_stdout
@@ -735,7 +737,7 @@ async def find_binary(
             )
             for path, result in zip(found_paths, results)
             if result.exit_code == 0
-        ],
+        ),
     )
 
 

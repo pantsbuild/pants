@@ -229,7 +229,7 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
     ) -> PythonLockfileMetadataV3:
         v2_metadata = super()._from_json_dict(json_dict, lockfile_description, error_suffix)
         metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
-        manylinux = metadata("manylinux", str, lambda l: l)  # type: ignore[no-any-return]
+        manylinux = metadata("manylinux", str, lambda l: l)
         requirement_constraints = metadata(
             "requirement_constraints",
             Set[PipRequirement],
