@@ -13,6 +13,9 @@ from pants.backend.python.util_rules import pex
 from pants.core.util_rules import stripped_source_files
 from pants.engine.environment import EnvironmentName
 from pants.testutil.python_interpreter_selection import (
+    PY_38,
+    PY_39,
+    skip_unless_all_pythons_present,
     skip_unless_python37_present,
     skip_unless_python38_present,
     skip_unless_python39_present,
@@ -127,3 +130,8 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
 @skip_unless_python39_present
 def test_works_with_python39(rule_runner: RuleRunner) -> None:
     assert_apps_detected(rule_runner, constraints1="CPython==3.9.*")
+
+
+@skip_unless_all_pythons_present(PY_38, PY_39)
+def test_partitioning_by_ics(rule_runner: RuleRunner) -> None:
+    assert_apps_detected(rule_runner, constraints1="CPython==3.8.*", constraints2="CPython==3.9.*")
