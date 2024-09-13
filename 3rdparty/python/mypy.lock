@@ -11,7 +11,7 @@
 //   "generated_with_requirements": [
 //     "mypy-typing-asserts",
 //     "mypy==1.10.1",
-//     "strawberry-graphql==0.159.1"
+//     "strawberry-graphql==0.240.4"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -174,13 +174,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f16c3efcb3b33e8f35ddbbe640e61e67efeeeb05d313416ae10336b8d2c7a69b",
-              "url": "https://files.pythonhosted.org/packages/a2/cf/abbb0f44c059f61a562d386e79d1b8adb4def370a6e99f26033002caf2e2/strawberry_graphql-0.159.1-py3-none-any.whl"
+              "hash": "ebedacbf943463b222e15e628142fbf9121ef89a7c31176271f5a3ea2491fa4c",
+              "url": "https://files.pythonhosted.org/packages/4d/4c/fb5783b2bb45e614712d30bce2b771e6ef41c0e91cc4805d033c77033c38/strawberry_graphql-0.240.4-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "25b56e294ed032e69c066fe0ac802a724f4364c2d70d903e6a9b41d8c62f5add",
-              "url": "https://files.pythonhosted.org/packages/2b/49/90df8aca12c7e213ccb70712391b19b5bdc0607bef3ced15e2664acac0f2/strawberry_graphql-0.159.1.tar.gz"
+              "hash": "50c6436e02b3028b6fdcdd62e2756f7c5ec9a92f0dfc5ecf7fba00a6ce280eeb",
+              "url": "https://files.pythonhosted.org/packages/ab/0b/6b3504a9b5a9fdcc3ab3fee67741ae26c8494f02d7d8cbe57ec526ac8915/strawberry_graphql-0.240.4.tar.gz"
             }
           ],
           "project_name": "strawberry-graphql",
@@ -188,28 +188,32 @@
             "Django>=3.2; extra == \"django\"",
             "aiohttp<4.0.0,>=3.7.4.post0; extra == \"aiohttp\"",
             "asgiref<4.0,>=3.2; extra == \"django\" or extra == \"channels\"",
-            "backports.cached-property<2.0.0,>=1.0.2; python_version < \"3.8\"",
+            "astunparse<2.0.0,>=1.6.3; python_version < \"3.9\"",
             "chalice<2.0,>=1.22; extra == \"chalice\"",
             "channels>=3.0.5; extra == \"channels\"",
-            "click<9.0,>=7.0; extra == \"debug-server\" or extra == \"cli\"",
             "fastapi>=0.65.2; extra == \"fastapi\"",
             "flask>=1.1; extra == \"flask\"",
-            "graphql-core<3.3.0,>=3.2.0",
+            "graphlib_backport; python_version < \"3.9\" and extra == \"cli\"",
+            "graphql-core<3.4.0,>=3.2.0",
             "libcst>=0.4.7; extra == \"debug\" or extra == \"debug-server\" or extra == \"cli\"",
+            "litestar>=2; python_version >= \"3.8\" and extra == \"litestar\"",
             "opentelemetry-api<2; extra == \"opentelemetry\"",
             "opentelemetry-sdk<2; extra == \"opentelemetry\"",
-            "pydantic<2; extra == \"pydantic\"",
+            "pydantic>1.6.1; extra == \"pydantic\"",
             "pygments<3.0,>=2.3; extra == \"debug-server\" or extra == \"cli\"",
+            "pyinstrument>=4.0.0; extra == \"pyinstrument\"",
             "python-dateutil<3.0.0,>=2.7.0",
-            "python-multipart<0.0.6,>=0.0.5; extra == \"asgi\" or extra == \"debug-server\" or extra == \"fastapi\"",
+            "python-multipart>=0.0.7; extra == \"asgi\" or extra == \"debug-server\" or extra == \"fastapi\"",
+            "quart>=0.19.3; extra == \"quart\"",
             "rich>=12.0.0; extra == \"debug\" or extra == \"debug-server\" or extra == \"cli\"",
             "sanic>=20.12.2; extra == \"sanic\"",
-            "starlette>=0.13.6; extra == \"asgi\" or extra == \"debug-server\"",
-            "typing_extensions<5.0.0,>=3.7.4",
-            "uvicorn<0.21.0,>=0.11.6; extra == \"debug-server\""
+            "starlette>=0.18.0; extra == \"asgi\" or extra == \"debug-server\"",
+            "typer>=0.7.0; extra == \"debug-server\" or extra == \"cli\"",
+            "typing-extensions>=4.5.0",
+            "uvicorn>=0.11.6; extra == \"debug-server\""
           ],
-          "requires_python": "<4.0,>=3.7",
-          "version": "0.159.1"
+          "requires_python": "<4.0,>=3.8",
+          "version": "0.240.4"
         },
         {
           "artifacts": [
@@ -261,7 +265,7 @@
   "requirements": [
     "mypy-typing-asserts",
     "mypy==1.10.1",
-    "strawberry-graphql==0.159.1"
+    "strawberry-graphql==0.240.4"
   ],
   "requires_python": [
     "==3.9.*"
