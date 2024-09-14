@@ -21,6 +21,16 @@ def new_rule(request: IntRequest) -> int:
     return 42
 
 
+@dataclass(frozen=True)
+class WrapperUsingCallByNameRequest:
+    pass
+
+
+@rule
+async def wrapper_using_call_by_name(request: WrapperUsingCallByNameRequest) -> int:
+    return await original_rule(IntRequest())
+
+
 def test_delete() -> None:
     rule_runner = RuleRunner(
         target_types=[],
@@ -28,13 +38,14 @@ def test_delete() -> None:
             *collect_rules(
                 {
                     "original_rule": original_rule,
+                    "wrapper_using_call_by_name": wrapper_using_call_by_name,
                 }
             ),
-            QueryRule(int, [IntRequest]),
+            QueryRule(int, [WrapperUsingCallByNameRequest]),
         ],
     )
 
-    result = rule_runner.request(int, [IntRequest()])
+    result = rule_runner.request(int, [WrapperUsingCallByNameRequest()])
     assert result == 0
 
     rule_runner = RuleRunner(
@@ -43,13 +54,14 @@ def test_delete() -> None:
             *collect_rules(
                 {
                     "original_rule": original_rule,
+                    "wrapper_using_call_by_name": wrapper_using_call_by_name,
                     "new_rule": new_rule,
                 }
             ),
             DeleteRule.create(original_rule),
-            QueryRule(int, [IntRequest]),
+            QueryRule(int, [WrapperUsingCallByNameRequest]),
         ],
     )
 
-    result = rule_runner.request(int, [IntRequest()])
+    result = rule_runner.request(int, [WrapperUsingCallByNameRequest()])
     assert result == 42
