@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from pants.engine.rules import DeleteRule, collect_rules, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.engine.rules import Get
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,16 @@ async def original_rule(request: IntRequest) -> int:
 @rule
 def new_rule(request: IntRequest) -> int:
     return 42
+
+
+@dataclass(frozen=True)
+class WrapperUsingCallByTypeRequest:
+    pass
+
+
+@rule
+async def wrapper_using_call_by_type(request: WrapperUsingCallByTypeRequest) -> int:
+    return await Get(int, IntRequest())
 
 
 @dataclass(frozen=True)
@@ -38,13 +49,17 @@ def test_delete() -> None:
             *collect_rules(
                 {
                     "original_rule": original_rule,
+                    "wrapper_using_call_by_type": wrapper_using_call_by_type,
                     "wrapper_using_call_by_name": wrapper_using_call_by_name,
                 }
             ),
+            QueryRule(int, [WrapperUsingCallByTypeRequest]),
             QueryRule(int, [WrapperUsingCallByNameRequest]),
         ],
     )
 
+    result = rule_runner.request(int, [WrapperUsingCallByTypeRequest()])
+    assert result == 0
     result = rule_runner.request(int, [WrapperUsingCallByNameRequest()])
     assert result == 0
 
@@ -54,14 +69,18 @@ def test_delete() -> None:
             *collect_rules(
                 {
                     "original_rule": original_rule,
+                    "wrapper_using_call_by_type": wrapper_using_call_by_type,
                     "wrapper_using_call_by_name": wrapper_using_call_by_name,
                     "new_rule": new_rule,
                 }
             ),
             DeleteRule.create(original_rule),
+            QueryRule(int, [WrapperUsingCallByTypeRequest]),
             QueryRule(int, [WrapperUsingCallByNameRequest]),
         ],
     )
 
+    result = rule_runner.request(int, [WrapperUsingCallByTypeRequest()])
+    assert result == 42
     result = rule_runner.request(int, [WrapperUsingCallByNameRequest()])
     assert result == 42
