@@ -185,7 +185,9 @@ async def export(
 
     requests = tuple(request_type(targets) for request_type in request_types)
     all_results = await MultiGet(Get(ExportResults, ExportRequest, request) for request in requests)
-    flattened_results = sorted((res for results in all_results for res in results), key=lambda res: res.resolve)  # sorting provides predictable resolution in conflicts
+    flattened_results = sorted(
+        (res for results in all_results for res in results), key=lambda res: res.resolve
+    )  # sorting provides predictable resolution in conflicts
 
     prefixed_digests = await MultiGet(
         Get(Digest, AddPrefix(result.digest, result.reldir)) for result in flattened_results

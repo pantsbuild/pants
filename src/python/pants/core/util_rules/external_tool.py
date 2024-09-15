@@ -10,7 +10,6 @@ import textwrap
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
 
 from pkg_resources import Requirement
 
@@ -104,6 +103,16 @@ class ExternalToolOptionsMixin:
         Derived from the classname, but subclasses can override, e.g., with a classproperty.
         """
         return cls.__name__.lower()
+
+    @classproperty
+    def binary_name(cls):
+        """The name of the binary, as it normally known.
+
+        This allows renaming a built binary to what users expect, even when the name is different.
+        For example, the binary might be "taplo-linux-x86_64" and the name "Taplo", but users expect
+        just "taplo".
+        """
+        return cls.name.lower()
 
     # The default values for --version and --known-versions, and the supported versions.
     # Subclasses must set appropriately.
@@ -456,7 +465,7 @@ async def export_external_tool(
             reldir=dest,
             digest=downloaded_tool.digest,
             resolve=req.resolve,
-            exported_binaries=(ExportedBinary(name=Path(exe).name, path_in_export=exe),),
+            exported_binaries=(ExportedBinary(name=tool.binary_name, path_in_export=exe),),
         )
     )
 
