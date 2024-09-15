@@ -127,6 +127,8 @@ impl TestServer {
         let mock_responder = MockResponder::new(mock_execution);
         let mock_responder2 = mock_responder.clone();
 
+        // TODO: Refactor to just use `tokio::net::TcpListener` directly (but requries the method be async and
+        // all call sites updated).
         let addr_str = format!("127.0.0.1:{}", port.unwrap_or(0));
         let listener = TcpListener::bind(addr_str).unwrap();
         listener.set_nonblocking(true).unwrap();

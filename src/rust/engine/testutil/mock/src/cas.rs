@@ -200,6 +200,8 @@ impl StubCASBuilder {
             write_delay: self.ac_write_delay,
         };
 
+        // TODO: Refactor to just use `tokio::net::TcpListener` directly (but requries the method be async and
+        // all call sites updated).
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
         let local_addr = listener.local_addr().unwrap();
