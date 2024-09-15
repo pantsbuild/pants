@@ -139,5 +139,5 @@ class NativeOptionParser:
 
         return (val, rank)
 
-    def get_unconsumed_flags(self, scope: str) -> tuple[str, ...]:
-        return tuple(self._native_parser.get_unconsumed_flags(scope))
+    def get_unconsumed_flags(self) -> tuple[str, ...]:
+        return tuple(self._native_parser.get_unconsumed_flags())

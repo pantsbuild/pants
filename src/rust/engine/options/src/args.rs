@@ -10,7 +10,7 @@ use crate::parse::{ParseError, Parseable};
 use crate::ListEdit;
 use core::iter::once;
 use itertools::{chain, Itertools};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -146,37 +146,28 @@ impl Args {
 }
 
 pub(crate) struct ArgsTracker {
-    unconsumed_flags: Mutex<HashMap<Scope, HashSet<String>>>,
+    unconsumed_args: Mutex<HashSet<Arg>>,
 }
 
 impl ArgsTracker {
     fn new(args: &Args) -> Self {
-        let mut unconsumed_flags = HashMap::new();
-        for arg in &args.args {
-            unconsumed_flags
-                .entry(arg.context.clone())
-                .or_insert(HashSet::new())
-                .insert(arg.flag.to_string());
-        }
         Self {
-            unconsumed_flags: Mutex::new(unconsumed_flags),
+            unconsumed_args: Mutex::new(args.args.clone().into_iter().collect()),
         }
     }
 
     fn consume_arg(&self, arg: &Arg) {
-        if let Some(set) = self.unconsumed_flags.lock().unwrap().get_mut(&arg.context) {
-            set.remove(&arg.flag);
-        }
+        self.unconsumed_args.lock().unwrap().remove(arg);
     }
 
-    pub fn get_unconsumed_flags(&self, scope: &Scope) -> Vec<String> {
-        let mut ret: Vec<_> = self
-            .unconsumed_flags
+    pub fn get_unconsumed_flags(&self) -> Vec<String> {
+        let mut ret: Vec<String> = self
+            .unconsumed_args
             .lock()
             .unwrap()
-            .get(scope)
-            .map(|set| set.iter().map(String::clone).collect())
-            .unwrap_or_default();
+            .iter()
+            .map(|arg| arg.flag.clone())
+            .collect();
         ret.sort(); // For stability in tests and when reporting unconsumed args.
         ret
     }

@@ -210,11 +210,6 @@ class Parser:
                 passthrough=kwargs.get("passthrough"),
             )
             setattr(namespace, dest, RankedValue(rank, val))
-
-        if not allow_unknown_flags:
-            unconsumed_flags = native_parser.get_unconsumed_flags(self.scope)
-            if unconsumed_flags:
-                raise UnknownFlagsError(tuple(unconsumed_flags), self.scope)
         return namespace.build()
 
     def parse_args(

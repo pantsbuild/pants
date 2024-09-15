@@ -678,8 +678,8 @@ impl OptionParser {
         self.passthrough_args.as_ref()
     }
 
-    pub fn get_unconsumed_flags(&self, scope: &str) -> Vec<String> {
-        self.args_tracker.get_unconsumed_flags(&Scope::named(scope))
+    pub fn get_unconsumed_flags(&self) -> Vec<String> {
+        self.args_tracker.get_unconsumed_flags()
     }
 }
 
