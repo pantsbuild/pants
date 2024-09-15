@@ -10,8 +10,9 @@ use crate::parse::{ParseError, Parseable};
 use crate::ListEdit;
 use core::iter::once;
 use itertools::{chain, Itertools};
+use parking_lot::Mutex;
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct Arg {
@@ -157,14 +158,13 @@ impl ArgsTracker {
     }
 
     fn consume_arg(&self, arg: &Arg) {
-        self.unconsumed_args.lock().unwrap().remove(arg);
+        self.unconsumed_args.lock().remove(arg);
     }
 
     pub fn get_unconsumed_flags(&self) -> Vec<String> {
         let mut ret: Vec<String> = self
             .unconsumed_args
             .lock()
-            .unwrap()
             .iter()
             .map(|arg| arg.flag.clone())
             .collect();
