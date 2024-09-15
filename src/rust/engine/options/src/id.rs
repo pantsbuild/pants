@@ -7,7 +7,7 @@ use std::fmt::{Display, Formatter};
 
 use regex::Regex;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Scope {
     Global,
     Scope(String),
@@ -27,7 +27,7 @@ pub(crate) fn is_valid_scope_name(name: &str) -> bool {
 impl Scope {
     pub fn named(name: &str) -> Scope {
         match name {
-            "GLOBAL" => Scope::Global,
+            "" | "GLOBAL" => Scope::Global,
             scope => Scope::Scope(scope.to_owned()),
         }
     }

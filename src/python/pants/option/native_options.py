@@ -196,6 +196,9 @@ class NativeOptionParser:
 
         return (val, rank)
 
+    def get_unconsumed_flags(self) -> tuple[str, ...]:
+        return tuple(self._native_parser.get_unconsumed_flags())
+
 
 def check_file_exists(val: str, dest: str, scope: str) -> None:
     error_prefix = f"File value `{val}` for option `{dest}` in `{scope}`"
@@ -217,3 +220,4 @@ def check_dir_exists(val: str, dest: str, scope: str) -> None:
         raise ParseError(f"{error_prefix} cannot be parsed as a directory path.")
     if not path.is_dir() and not path_with_buildroot.is_dir():
         raise ParseError(f"{error_prefix} does not exist.")
+

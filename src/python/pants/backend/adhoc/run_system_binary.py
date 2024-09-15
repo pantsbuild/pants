@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from io import StringIO
 from typing import Mapping
 
 from pants.backend.adhoc.target_types import (
@@ -115,15 +116,30 @@ async def _find_binary(
 
         return binary
 
-    raise ValueError(
-        f"Could not find a binary with name `{binary_name}`"
-        + (
-            ""
-            if not fingerprint_pattern
-            else f" with output matching `{fingerprint_pattern}` when run with arguments `{' '.join(fingerprint_args or ())}`"
+    message = StringIO()
+    message.write(f"Could not find a binary with name `{binary_name}`")
+    if fingerprint_pattern:
+        message.write(
+            f" with output matching `{fingerprint_pattern}` when run with arguments `{' '.join(fingerprint_args or ())}`"
         )
-        + f". The following paths were searched: {', '.join(search_path)}."
-    )
+
+    message.write(". The following paths were searched:\n")
+    for sp in search_path:
+        message.write(f"- {sp}\n")
+
+    failed_tests = [
+        (test, binary) for test, binary in zip(tests, binaries.paths) if test.exit_code != 0
+    ]
+    if failed_tests:
+        message.write(
+            "\n\nThe following binaries were skipped because each binary returned an error when invoked:"
+        )
+        for failed_test, failed_binary in failed_tests:
+            message.write(f"\n\n- {failed_binary.path} (exit code {failed_test.exit_code})\n")
+            message.write(f"  stdout:\n{failed_test.stdout.decode(errors='ignore')}\n")
+            message.write(f"  stderr:\n{failed_test.stderr.decode(errors='ignore')}\n")
+
+    raise ValueError(message.getvalue())
 
 
 @rule(level=LogLevel.DEBUG)

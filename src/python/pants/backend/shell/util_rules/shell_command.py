@@ -19,6 +19,7 @@ from pants.backend.shell.target_types import (
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
+    ShellCommandOutputsMatchMode,
     ShellCommandPathEnvModifyModeField,
     ShellCommandRunnableDependenciesField,
     ShellCommandSourcesField,
@@ -171,6 +172,8 @@ async def _prepare_process_request_from_target(
             description_of_origin=f"`{ShellCommandWorkspaceInvalidationSourcesField.alias}` for `shell_command` target at `{shell_command.address}`",
         )
 
+    outputs_match_mode = shell_command.get(ShellCommandOutputsMatchMode).enum_value
+
     return AdhocProcessRequest(
         description=description,
         address=shell_command.address,
@@ -191,6 +194,8 @@ async def _prepare_process_request_from_target(
         workspace_invalidation_globs=workspace_invalidation_globs,
         cache_scope=cache_scope,
         use_working_directory_as_base_for_output_captures=env_target.use_working_directory_as_base_for_output_captures,
+        outputs_match_error_behavior=outputs_match_mode.glob_match_error_behavior,
+        outputs_match_conjunction=outputs_match_mode.glob_expansion_conjunction,
     )
 
 

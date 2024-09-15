@@ -389,7 +389,7 @@ class Options:
         :raises pants.option.errors.ConfigValidationError: if the scope is unknown.
         """
 
-        native_values = self.get_parser(scope).parse_args_native(self._native_parser)
+        native_values = self.get_parser(scope).parse_args_native(self._native_parser, self._allow_unknown_options)
         native_mismatch_msgs = []
 
         if self._native_options_validation == NativeOptionsValidation.ignore:
