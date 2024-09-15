@@ -78,24 +78,25 @@ def test_delete_call_by_type() -> None:
     result = rule_runner.request(int, [WrapperUsingCallByTypeRequest()])
     assert result == 42
 
+    assert 0
 
-@pytest.mark.xfail
+
 def test_delete_call_by_name() -> None:
-    rule_runner = RuleRunner(
-        target_types=[],
-        rules=[
-            *collect_rules(
-                {
-                    "original_rule": original_rule,
-                    "wrapper_using_call_by_name": wrapper_using_call_by_name,
-                }
-            ),
-            QueryRule(int, [WrapperUsingCallByNameRequest]),
-        ],
-    )
+    # rule_runner = RuleRunner(
+    #     target_types=[],
+    #     rules=[
+    #         *collect_rules(
+    #             {
+    #                 "original_rule": original_rule,
+    #                 "wrapper_using_call_by_name": wrapper_using_call_by_name,
+    #             }
+    #         ),
+    #         QueryRule(int, [WrapperUsingCallByNameRequest]),
+    #     ],
+    # )
 
-    result = rule_runner.request(int, [WrapperUsingCallByNameRequest()])
-    assert result == 0
+    # result = rule_runner.request(int, [WrapperUsingCallByNameRequest()])
+    # assert result == 0
 
     rule_runner = RuleRunner(
         target_types=[],

@@ -8,13 +8,13 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, DefaultDict
+from typing import Any, Callable, DefaultDict, FrozenSet
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.util_rules.environments import EnvironmentsSubsystem
 from pants.engine.goal import GoalSubsystem
-from pants.engine.rules import DeleteRule, Rule, RuleIndex, TaskRule
+from pants.engine.rules import DeleteRule, Rule, RuleIndex
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.option.alias import CliOptions
@@ -60,6 +60,7 @@ class BuildConfiguration:
     subsystem_to_providers: FrozenDict[type[Subsystem], tuple[str, ...]]
     target_type_to_providers: FrozenDict[type[Target], tuple[str, ...]]
     rule_to_providers: FrozenDict[Rule, tuple[str, ...]]
+    delete_rules: FrozenSet[DeleteRule]
     union_rule_to_providers: FrozenDict[UnionRule, tuple[str, ...]]
     allow_unknown_options: bool
     remote_auth_plugin_func: Callable | None
@@ -134,7 +135,7 @@ class BuildConfiguration:
             default_factory=lambda: defaultdict(list)
         )
         _rule_to_providers: dict[Rule, list[str]] = field(default_factory=lambda: defaultdict(list))
-        _delete_rules: set[str] = field(default_factory=set)
+        _delete_rules: set[DeleteRule] = field(default_factory=set)
         _union_rule_to_providers: dict[UnionRule, list[str]] = field(
             default_factory=lambda: defaultdict(list)
         )
@@ -190,9 +191,9 @@ class BuildConfiguration:
                     "Overwriting!".format(alias)
                 )
 
-            self._exposed_context_aware_object_factory_by_alias[
-                alias
-            ] = context_aware_object_factory
+            self._exposed_context_aware_object_factory_by_alias[alias] = (
+                context_aware_object_factory
+            )
 
         def register_subsystems(
             self, plugin_or_backend: str, subsystems: Iterable[type[Subsystem]]
@@ -229,7 +230,7 @@ class BuildConfiguration:
             for rule in rules_and_queries:
                 self._rule_to_providers[rule].append(plugin_or_backend)
             for delete_rule in rule_index.delete_rules:
-                self._delete_rules.add(delete_rule.canonical_name)
+                self._delete_rules.add(delete_rule)
             for union_rule in rule_index.union_rules:
                 self._union_rule_to_providers[union_rule].append(plugin_or_backend)
             self.register_subsystems(
@@ -314,10 +315,9 @@ class BuildConfiguration:
                     (k, tuple(v)) for k, v in self._target_type_to_providers.items()
                 ),
                 rule_to_providers=FrozenDict(
-                    (k, tuple(v))
-                    for k, v in self._rule_to_providers.items()
-                    if (not isinstance(k, TaskRule) or k.canonical_name not in self._delete_rules)
+                    (k, tuple(v)) for k, v in self._rule_to_providers.items()
                 ),
+                delete_rules=frozenset(self._delete_rules),
                 union_rule_to_providers=FrozenDict(
                     (k, tuple(v)) for k, v in self._union_rule_to_providers.items()
                 ),

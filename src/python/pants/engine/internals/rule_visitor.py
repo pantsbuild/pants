@@ -251,6 +251,13 @@ class _AwaitableCollector(ast.NodeVisitor):
             is_effect,
         )
 
+    def _get_input_types(self, input_nodes: Sequence[Any]) -> tuple[type, ...]:
+        input_nodes, input_type_nodes = self._get_inputs(input_nodes)
+        return tuple(
+            self._check_constraint_arg_type(input_type, input_node)
+            for input_type, input_node in zip(input_type_nodes, input_nodes)
+        )
+
     def _get_byname_awaitable(
         self, rule_id: str, rule_func: Callable, call_node: ast.Call
     ) -> AwaitableConstraints:
@@ -264,6 +271,9 @@ class _AwaitableCollector(ast.NodeVisitor):
         # TODO: To support keyword arguments, we would additionally need to begin recording the
         # argument names of kwargs. But positional-only callsites can avoid those allocations.
         explicit_args_arity = len(call_node.args)
+
+        # if "delete_rule_integration_test" in rule_id.split("."):
+        sys.stderr.write(f"{call_node=}\n")
 
         input_types: tuple[type, ...]
         if not call_node.keywords:
@@ -295,6 +305,7 @@ class _AwaitableCollector(ast.NodeVisitor):
             # TODO: Extract this from the callee? Currently only intrinsics can be Effects, so need
             # to figure out their new syntax first.
             is_effect=False,
+            rule_func=rule_func,
         )
 
     def visit_Call(self, call_node: ast.Call) -> None:

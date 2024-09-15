@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from itertools import chain
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,7 +35,7 @@ from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
-from pants.engine.rules import QueryRule, collect_rules, rule
+from pants.engine.rules import QueryRule, RuleIndex, collect_rules, rule
 from pants.engine.streaming_workunit_handler import rules as streaming_workunit_handler_rules
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership, UnionRule
@@ -335,6 +336,7 @@ class EngineInitializer:
                 return None
             return ensure_absolute_path(v)
 
+        rule_index = RuleIndex.create(chain(rules, build_configuration.delete_rules))
         scheduler = Scheduler(
             ignore_patterns=pants_ignore_patterns,
             use_gitignore=use_gitignore,
@@ -342,7 +344,7 @@ class EngineInitializer:
             local_execution_root_dir=ensure_absolute_path(local_execution_root_dir),
             named_caches_dir=ensure_absolute_path(named_caches_dir),
             ca_certs_path=ensure_optional_absolute_path(ca_certs_path),
-            rules=rules,
+            rule_index=rule_index,
             union_membership=union_membership,
             executor=executor,
             execution_options=execution_options,

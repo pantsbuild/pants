@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Coroutine,
     Generator,
     Generic,
@@ -62,6 +63,7 @@ class AwaitableConstraints:
     explicit_args_arity: int
     input_types: tuple[type, ...]
     is_effect: bool
+    rule_func: Callable | None = None
 
     def __repr__(self) -> str:
         name = "Effect" if self.is_effect else "Get"
@@ -192,9 +194,8 @@ _Out9 = TypeVar("_Out9")
 
 @overload
 async def MultiGet(
-    __gets: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]]
-) -> tuple[_Output, ...]:
-    ...
+    __gets: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]],
+) -> tuple[_Output, ...]: ...
 
 
 @overload
@@ -211,8 +212,7 @@ async def MultiGet(
     __get9: Get[_Output] | Coroutine[Any, Any, _Output],
     __get10: Get[_Output] | Coroutine[Any, Any, _Output],
     *__gets: Get[_Output] | Coroutine[Any, Any, _Output],
-) -> tuple[_Output, ...]:
-    ...
+) -> tuple[_Output, ...]: ...
 
 
 @overload
@@ -227,8 +227,7 @@ async def MultiGet(
     __get7: Get[_Out7] | Coroutine[Any, Any, _Out7],
     __get8: Get[_Out8] | Coroutine[Any, Any, _Out8],
     __get9: Get[_Out9] | Coroutine[Any, Any, _Out9],
-) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]: ...
 
 
 @overload
@@ -242,8 +241,7 @@ async def MultiGet(
     __get6: Get[_Out6] | Coroutine[Any, Any, _Out6],
     __get7: Get[_Out7] | Coroutine[Any, Any, _Out7],
     __get8: Get[_Out8] | Coroutine[Any, Any, _Out8],
-) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8]: ...
 
 
 @overload
@@ -256,8 +254,7 @@ async def MultiGet(
     __get5: Get[_Out5] | Coroutine[Any, Any, _Out5],
     __get6: Get[_Out6] | Coroutine[Any, Any, _Out6],
     __get7: Get[_Out7] | Coroutine[Any, Any, _Out7],
-) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7]: ...
 
 
 @overload
@@ -269,8 +266,7 @@ async def MultiGet(
     __get4: Get[_Out4] | Coroutine[Any, Any, _Out4],
     __get5: Get[_Out5] | Coroutine[Any, Any, _Out5],
     __get6: Get[_Out6] | Coroutine[Any, Any, _Out6],
-) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6]: ...
 
 
 @overload
@@ -281,8 +277,7 @@ async def MultiGet(
     __get3: Get[_Out3] | Coroutine[Any, Any, _Out3],
     __get4: Get[_Out4] | Coroutine[Any, Any, _Out4],
     __get5: Get[_Out5] | Coroutine[Any, Any, _Out5],
-) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5]: ...
 
 
 @overload
@@ -292,8 +287,7 @@ async def MultiGet(
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
     __get3: Get[_Out3] | Coroutine[Any, Any, _Out3],
     __get4: Get[_Out4] | Coroutine[Any, Any, _Out4],
-) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4]: ...
 
 
 @overload
@@ -302,8 +296,7 @@ async def MultiGet(
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
     __get3: Get[_Out3] | Coroutine[Any, Any, _Out3],
-) -> tuple[_Out0, _Out1, _Out2, _Out3]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3]: ...
 
 
 @overload
@@ -311,16 +304,14 @@ async def MultiGet(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
-) -> tuple[_Out0, _Out1, _Out2]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2]: ...
 
 
 @overload
 async def MultiGet(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
-) -> tuple[_Out0, _Out1]:
-    ...
+) -> tuple[_Out0, _Out1]: ...
 
 
 async def MultiGet(

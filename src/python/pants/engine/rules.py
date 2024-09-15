@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import traceback
 import functools
 import inspect
 import sys
@@ -357,20 +358,17 @@ def inner_rule(*args, **kwargs) -> AsyncRuleT | RuleDecorator:
 
 
 @overload
-def rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
-def rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
 def rule(
     *args, func: None = None, **kwargs: Any
-) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]:
-    ...
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]: ...
 
 
 def rule(*args, **kwargs):
@@ -378,20 +376,17 @@ def rule(*args, **kwargs):
 
 
 @overload
-def goal_rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def goal_rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
-def goal_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def goal_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
 def goal_rule(
     *args, func: None = None, **kwargs: Any
-) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]:
-    ...
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]: ...
 
 
 def goal_rule(*args, **kwargs):
@@ -402,21 +397,18 @@ def goal_rule(*args, **kwargs):
 
 @overload
 def _uncacheable_rule(
-    func: Callable[P, Coroutine[Any, Any, R]]
-) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+    func: Callable[P, Coroutine[Any, Any, R]],
+) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
-def _uncacheable_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def _uncacheable_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
 def _uncacheable_rule(
     *args, func: None = None, **kwargs: Any
-) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]:
-    ...
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]: ...
 
 
 # This has a "private" name, as we don't (yet?) want it to be part of the rule API, at least
@@ -474,14 +466,14 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
 
 @dataclass(frozen=True)
 class DeleteRule:
-    canonical_name: str
+    rule_id: str
 
     @classmethod
     def create(cls, f: Any):
         if not hasattr(f, "rule_id"):
             raise ValueError(f"`{f.__qualname__}` is not a rule")
 
-        return DeleteRule(canonical_name=f.rule_id)
+        return DeleteRule(rule_id=f.rule_id)
 
 
 @dataclass(frozen=True)
@@ -565,9 +557,12 @@ class RuleIndex:
                     "extend Rule or UnionRule, or are static functions decorated with @rule."
                 )
 
-        return RuleIndex(
+        rule_index = RuleIndex(
             rules=FrozenOrderedSet(rules),
             delete_rules=FrozenOrderedSet(delete_rules),
             queries=FrozenOrderedSet(queries),
             union_rules=FrozenOrderedSet(union_rules),
         )
+        sys.stderr.write(f"create {id(rule_index)=} with {delete_rules}\n")
+        # traceback.print_stack()
+        return rule_index

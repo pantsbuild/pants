@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 import logging
+import sys
 import os
 import time
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
-from typing import Any, Callable, Dict, Iterable, NoReturn, Sequence, cast
+from typing import Any, Callable, Dict, Iterable, NoReturn, Sequence, cast, get_type_hints
 
 from typing_extensions import TypedDict
 
@@ -66,7 +67,7 @@ from pants.engine.process import (
     Process,
     ProcessResultMetadata,
 )
-from pants.engine.rules import Rule, RuleIndex, TaskRule
+from pants.engine.rules import DeleteRule, RuleIndex, TaskRule
 from pants.engine.unions import UnionMembership, is_union, union_in_scope_types
 from pants.option.global_options import (
     LOCAL_STORE_LEASE_TIME_SECS,
@@ -119,7 +120,7 @@ class Scheduler:
         local_execution_root_dir: str,
         named_caches_dir: str,
         ca_certs_path: str | None,
-        rules: Iterable[Rule],
+        rule_index: RuleIndex,
         union_membership: UnionMembership,
         execution_options: ExecutionOptions,
         local_store_options: LocalStoreOptions,
@@ -150,7 +151,6 @@ class Scheduler:
         self._visualize_to_dir = visualize_to_dir
         self._visualize_run_count = 0
         # Validate and register all provided and intrinsic tasks.
-        rule_index = RuleIndex.create(rules)
         tasks = register_rules(rule_index, union_membership)
 
         # Create the native Scheduler and Session.
@@ -685,6 +685,12 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
         )
 
         for awaitable in rule.awaitables:
+            if "delete_rule_integration_test" in task_rule.canonical_name.split("."):
+                sys.stderr.write(f"{awaitable=}\n")
+                sys.stderr.write(f"  {awaitable.input_types=}\n")
+                sys.stderr.write(f"  {awaitable.output_type=}\n")
+                sys.stderr.write(f"  {awaitable.explicit_args_arity=}\n")
+
             unions = [t for t in awaitable.input_types if is_union(t)]
             if len(unions) == 1:
                 # Register the union by recording a copy of the Get for each union member.
@@ -702,6 +708,20 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                 raise TypeError(
                     "Only one @union may be used in a Get, but {awaitable} used: {unions}."
                 )
+            elif (
+                awaitable.rule_id is not None
+                and DeleteRule(awaitable.rule_id) in rule_index.delete_rules
+            ):
+                # This is a call to a known rule, but some plugin has deleted
+                # it, so it wants to override it with some other rule. We have
+                # to call it by type to make it possible.
+                awaitable.rule_id = None
+                native_engine.tasks_add_get(
+                    tasks,
+                    awaitable.output_type,
+                    [v for k, v in get_type_hints(awaitable.rule_func).items() if k != "return"],
+                )
+                sys.stderr.write(f"add_get for deleted {awaitable=}\n")
             elif awaitable.rule_id is not None:
                 # Is a call to a known rule.
                 native_engine.tasks_add_call(
@@ -718,7 +738,16 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
         native_engine.tasks_task_end(tasks)
 
     for task_rule in rule_index.rules:
-        register_task(task_rule)
+        do_register = DeleteRule(rule_id=task_rule.canonical_name) not in rule_index.delete_rules
+        if "delete_rule_integration_test" in task_rule.canonical_name.split("."):
+            sys.stderr.write(
+                f"register {task_rule.canonical_name=}, {task_rule.func=}: {do_register}\n"
+            )
+            for awaitable in task_rule.awaitables:
+                sys.stderr.write(f"  {awaitable=}\n")
+                sys.stderr.write(f"  {awaitable.rule_id=}\n")
+        if do_register:
+            register_task(task_rule)
     for query in rule_index.queries:
         native_engine.tasks_add_query(
             tasks,
