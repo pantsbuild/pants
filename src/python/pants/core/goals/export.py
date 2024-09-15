@@ -157,7 +157,7 @@ class ExportSubsystem(GoalSubsystem):
     binaries = StrListOption(
         flag_name="--bin",  # `bin` is a python builtin
         default=[],
-        help="Export the specified binaries.",
+        help="Export the specified binaries. To select a binary, provide its subsystem scope name, as used for setting its options.",
     )
 
 
@@ -261,7 +261,7 @@ async def export(
             unexported_resolves,
             all_valid_resolve_names,
             all_known_bin_names,
-            description_of_origin="the option --export-resolve",
+            description_of_origin="the options --export-resolve and/or --export-bin",
         )
 
     return Export(exit_code=0)
