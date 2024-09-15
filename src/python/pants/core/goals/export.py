@@ -185,8 +185,7 @@ async def export(
 
     requests = tuple(request_type(targets) for request_type in request_types)
     all_results = await MultiGet(Get(ExportResults, ExportRequest, request) for request in requests)
-    # TODO: sort
-    flattened_results = [res for results in all_results for res in results]
+    flattened_results = sorted((res for results in all_results for res in results), key=lambda res: res.resolve)  # sorting provides predictable resolution in conflicts
 
     prefixed_digests = await MultiGet(
         Get(Digest, AddPrefix(result.digest, result.reldir)) for result in flattened_results
@@ -227,7 +226,7 @@ async def export(
     ]
     if errors_linking_bins:
         raise ExportError(
-            "; ".join(f'Failed in porcess "{description}"' for description in errors_linking_bins)
+            "; ".join(f'Failed in process "{description}"' for description in errors_linking_bins)
         )
 
     exported_bin_warnings = warn_exported_bin_conflicts(exported_bins_by_exporting_resolve)
