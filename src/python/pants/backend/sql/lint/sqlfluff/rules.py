@@ -18,10 +18,7 @@ from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.fs import MergeDigests
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.intrinsics import (
-    merge_digests_request_to_digest,
-    process_request_to_process_result,
-)
+from pants.engine.intrinsics import execute_process, merge_digests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
 from pants.util.logging import LogLevel
@@ -72,7 +69,7 @@ async def run_sqlfluff(
     sqlfluff_pex_get = create_venv_pex(**implicitly({sqlfluff.to_pex_request(): PexRequest}))
     config_files_get = find_config_file(sqlfluff.config_request(request.snapshot.dirs))
     sqlfluff_pex, config_files = await concurrently(sqlfluff_pex_get, config_files_get)
-    input_digest = await merge_digests_request_to_digest(
+    input_digest = await merge_digests(
         MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
@@ -88,7 +85,7 @@ async def run_sqlfluff(
 
     conf_args = ["--config", sqlfluff.config] if sqlfluff.config else []
 
-    result = await process_request_to_process_result(
+    result = await execute_process(
         **implicitly(
             VenvPexProcess(
                 sqlfluff_pex,

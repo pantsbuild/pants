@@ -40,7 +40,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.80.1-*
+        path: '~/.rustup/toolchains/1.81.0-*
 
           ~/.rustup/update-hashes
 
@@ -112,7 +112,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -133,7 +133,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.80.1-*
+        path: '~/.rustup/toolchains/1.81.0-*
 
           ~/.rustup/update-hashes
 
@@ -236,7 +236,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS12-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.80.1-*
+        path: '~/.rustup/toolchains/1.81.0-*
 
           ~/.rustup/update-hashes
 
@@ -373,7 +373,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -451,7 +451,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.80.1-*
+        path: '~/.rustup/toolchains/1.81.0-*
 
           ~/.rustup/update-hashes
 
@@ -520,7 +520,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.80.1-*
+        path: '~/.rustup/toolchains/1.81.0-*
 
           ~/.rustup/update-hashes
 
@@ -563,7 +563,7 @@ jobs:
     if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has a category label
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -581,7 +581,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -608,7 +608,7 @@ jobs:
       release: ${{ steps.classify.outputs.release }}
       rust: ${{ steps.classify.outputs.rust }}
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -630,7 +630,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -684,7 +684,7 @@ jobs:
     needs:
     - set_merge_ok
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - run: "merge_ok=\"${{ needs.set_merge_ok.outputs.merge_ok }}\"\nif [[ \"${merge_ok}\" == \"true\" ]]; then\n    echo\
         \ \"Merge OK\"\n    exit 0\nelse\n    echo \"Merge NOT OK\"\n    exit 1\nfi\n"
@@ -721,7 +721,7 @@ jobs:
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - id: set_merge_ok
       run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
@@ -794,7 +794,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -847,7 +847,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -890,7 +890,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -943,7 +943,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -986,7 +986,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1039,7 +1039,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1082,7 +1082,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1135,7 +1135,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1178,7 +1178,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1231,7 +1231,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1274,7 +1274,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1327,7 +1327,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1370,7 +1370,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1423,7 +1423,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1466,7 +1466,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1519,7 +1519,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1562,7 +1562,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1615,7 +1615,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1658,7 +1658,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-latest
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1711,7 +1711,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1774,7 +1774,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:

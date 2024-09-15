@@ -62,7 +62,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
     #  requirements that reflect any minimum capabilities Pants assumes about the tool.
     default_requirements: Sequence[str] = []
 
-    default_interpreter_constraints: ClassVar[Sequence[str]] = ["CPython>=3.7,<4"]
+    default_interpreter_constraints: ClassVar[Sequence[str]] = ["CPython>=3.8,<4"]
     register_interpreter_constraints: ClassVar[bool] = False
 
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None

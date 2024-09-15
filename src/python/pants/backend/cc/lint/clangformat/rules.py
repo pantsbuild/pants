@@ -14,7 +14,7 @@ from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import MergeDigests
-from pants.engine.intrinsics import merge_digests_request_to_digest
+from pants.engine.intrinsics import merge_digests
 from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet
@@ -46,7 +46,7 @@ async def clangformat_fmt(request: ClangFormatRequest.Batch, clangformat: ClangF
     )
 
     # Merge source files, config files, and clang-format pex process
-    input_digest = await merge_digests_request_to_digest(
+    input_digest = await merge_digests(
         MergeDigests(
             [request.snapshot.digest, config_files.snapshot.digest, clangformat_pex.digest]
         )

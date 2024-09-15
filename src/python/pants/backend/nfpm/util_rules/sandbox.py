@@ -30,11 +30,7 @@ from pants.engine.internals.graph import find_valid_field_sets, hydrate_sources
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import concurrently
-from pants.engine.intrinsics import (
-    create_digest_to_digest,
-    directory_digest_to_digest_entries,
-    merge_digests_request_to_digest,
-)
+from pants.engine.intrinsics import create_digest, get_digest_entries, merge_digests
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSetsPerTargetRequest,
@@ -203,8 +199,7 @@ async def populate_nfpm_content_sandbox(
         for field, _ in nfpm_content_source_fields_to_relocate
     )
     relocated_source_entries = await concurrently(
-        directory_digest_to_digest_entries(hydrated.snapshot.digest)
-        for hydrated in hydrated_sources_to_relocate
+        get_digest_entries(hydrated.snapshot.digest) for hydrated in hydrated_sources_to_relocate
     )
     moved_entries: list[FileEntry | SymlinkEntry | Directory] = []
     digest_entries: DigestEntries
@@ -218,7 +213,7 @@ async def populate_nfpm_content_sandbox(
                 moved_entries.append(entry)
 
     nfpm_content_relocated_sources_digest, nfpm_content_sources = await concurrently(
-        create_digest_to_digest(CreateDigest(moved_entries)),
+        create_digest(CreateDigest(moved_entries)),
         # nfpm_content_file sources are simply files -- no codegen required.
         # anything more involved (like downloading http_source()) should use 'dependencies' instead
         # (for example, depend on a 'file(source=http_source(...))' target to download something).
@@ -265,7 +260,7 @@ async def populate_nfpm_content_sandbox(
 
     # This should include at least all files in 'src' fields of nfpm_content_file targets.
     # Other dependency files aren't required since nFPM will ignore anything not configured.
-    sandbox_digest = await merge_digests_request_to_digest(
+    sandbox_digest = await merge_digests(
         MergeDigests(
             [
                 *(package.digest for package in packages),

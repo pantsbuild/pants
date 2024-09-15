@@ -6,7 +6,7 @@ from pants.backend.build_files.fmt.buildifier.subsystem import Buildifier
 from pants.core.goals.fmt import AbstractFmtRequest, FmtResult
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.engine.internals.native_engine import MergeDigests
-from pants.engine.intrinsics import merge_digests_request_to_digest
+from pants.engine.intrinsics import merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import Process, fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -22,7 +22,7 @@ async def _run_buildifier_fmt(
     request: AbstractFmtRequest.Batch, buildifier: Buildifier, platform: Platform
 ) -> FmtResult:
     buildifier_tool = await download_external_tool(buildifier.get_request(platform))
-    input_digest = await merge_digests_request_to_digest(
+    input_digest = await merge_digests(
         MergeDigests((request.snapshot.digest, buildifier_tool.digest))
     )
     result = await fallible_to_exec_result_or_raise(

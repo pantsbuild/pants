@@ -208,14 +208,14 @@ Pants allows you to control its resource consumption. These options all have sen
 
 Concurrency options:
 
-- [`process_execution_local_parallelism`](../../reference/global-options.mdx#section-process-execution-local-parallelism): number of concurrent processes that may be executed locally.
-- [`rule_threads_core`](../../reference/global-options.mdx#section-rule-threads-core): number of threads to keep active to execute `@rule` logic.
-- [`rule_threads_max`](../../reference/global-options.mdx#section-rule-threads-max): maximum number of threads to use to execute `@rule` logic.
+- [`process_execution_local_parallelism`](../../reference/global-options.mdx#process_execution_local_parallelism): number of concurrent processes that may be executed locally.
+- [`rule_threads_core`](../../reference/global-options.mdx#rule_threads_core): number of threads to keep active to execute `@rule` logic.
+- [`rule_threads_max`](../../reference/global-options.mdx#rule_threads_max): maximum number of threads to use to execute `@rule` logic.
 
 Memory usage options:
 
-- [`pantsd`](../../reference/global-options.mdx#section-pantsd): enable or disable the Pants daemon, which uses an in-memory cache to speed up subsequent runs after the first run in CI.
-- [`pantsd_max_memory_usage`](../../reference/global-options.mdx#section-pantsd-max-memory-usage): reduce or increase the size of Pantsd's in-memory cache.
+- [`pantsd`](../../reference/global-options.mdx#pantsd): enable or disable the Pants daemon, which uses an in-memory cache to speed up subsequent runs after the first run in CI.
+- [`pantsd_max_memory_usage`](../../reference/global-options.mdx#pantsd_max_memory_usage): reduce or increase the size of Pantsd's in-memory cache.
 
 The default test runners for these CI providers have the following resources. If you are using a custom runner, e.g. enterprise, check with your CI provider.
 
