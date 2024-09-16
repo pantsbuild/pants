@@ -229,7 +229,9 @@ async def get_python(
     return PythonExecutable(
         path=str(python_path),
         fingerprint=None,
-        append_only_caches=PBS_APPEND_ONLY_CACHES,
+        # One would normally set append_only_caches=PBS_APPEND_ONLY_CACHES
+        # here, but it is already going to be injected into the pex
+        # environment by PythonBuildStandaloneBinary
     )
 
 

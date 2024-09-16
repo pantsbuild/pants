@@ -1281,18 +1281,13 @@ async def setup_venv_pex_process(
         if request.input_digest
         else venv_pex.digest
     )
+
     append_only_caches: FrozenDict[str, str] = FrozenDict(
-        {
-            **pex_environment.in_sandbox(
-                working_directory=request.working_directory
-            ).append_only_caches,
-            **request.append_only_caches,
-            **(
-                FrozenDict({})
-                if venv_pex.append_only_caches is None
-                else venv_pex.append_only_caches
-            ),
-        },
+        **pex_environment.in_sandbox(
+            working_directory=request.working_directory
+        ).append_only_caches,
+        **request.append_only_caches,
+        **(FrozenDict({}) if venv_pex.append_only_caches is None else venv_pex.append_only_caches),
     )
     return Process(
         argv=argv,
