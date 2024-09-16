@@ -3,7 +3,7 @@
 
 use std::convert::TryFrom;
 use std::fmt::Display;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -96,7 +96,7 @@ pub type NodeResult<T> = Result<T, Failure>;
 impl Vfs<Failure> for Context {
     async fn read_link(&self, link: &Link) -> Result<PathBuf, Failure> {
         let subject_path =
-            SubjectPath::Workspace(RelativePath::new(&link.path).map_err(|e| Self::mk_error(&e))?);
+            SubjectPath::new_workspace(&link.path).map_err(|e| Self::mk_error(&e))?;
         Ok(self
             .get(ReadLink {
                 link: link.clone(),
@@ -107,8 +107,7 @@ impl Vfs<Failure> for Context {
     }
 
     async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, Failure> {
-        let subject_path =
-            SubjectPath::Workspace(RelativePath::new(&dir.0).map_err(|e| Self::mk_error(&e))?);
+        let subject_path = SubjectPath::new_workspace(&dir.0).map_err(|e| Self::mk_error(&e))?;
         self.get(Scandir { dir, subject_path }).await
     }
 
@@ -132,13 +131,9 @@ impl StoreFileByDigest<Failure> for Context {
     ) -> future::BoxFuture<'static, Result<hashing::Digest, Failure>> {
         let context = self.clone();
         async move {
-            let relpath = RelativePath::new(&file.path).map_err(|e| Self::mk_error(&e))?;
-            context
-                .get(DigestFile {
-                    file,
-                    subject_path: SubjectPath::Workspace(relpath),
-                })
-                .await
+            let subject_path =
+                SubjectPath::new_workspace(&file.path).map_err(|e| Self::mk_error(&e))?;
+            context.get(DigestFile { file, subject_path }).await
         }
         .boxed()
     }
@@ -266,20 +261,39 @@ pub enum SubjectPath {
     /// Filesystem path in the workspace and relative to the buildroot.
     Workspace(RelativePath),
 
-    /// Filesystem path in the local system. Must be an absolute path.
+    /// Absolute filesystem path in the local system.
     LocalSystem(PathBuf),
 }
 
 impl SubjectPath {
-    pub fn parent(&self) -> Option<Self> {
+    pub fn new_workspace<P: AsRef<Path>>(path: P) -> Result<Self, String> {
+        let path = path.as_ref().to_path_buf();
+        let relpath = RelativePath::new(&path)?;
+        Ok(Self::Workspace(relpath))
+    }
+
+    pub fn new_system<P: AsRef<Path>>(path: P) -> Result<Self, String> {
+        let path = path.as_ref().to_path_buf();
+        if path.is_absolute() {
+            Ok(Self::LocalSystem(path))
+        } else {
+            Err(format!(
+                "System path was not absolute, got `{}`",
+                path.display()
+            ))
+        }
+    }
+
+    pub fn parent(&self) -> Result<Option<Self>, String> {
         match self {
-            SubjectPath::Workspace(relpath) => relpath.parent().map(|p| {
-                let new_relpath = RelativePath::new(p).expect("TODO");
-                SubjectPath::Workspace(new_relpath)
-            }),
-            SubjectPath::LocalSystem(path) => path
-                .parent()
-                .map(|p| SubjectPath::LocalSystem(p.to_path_buf())),
+            SubjectPath::Workspace(relpath) => match relpath.parent() {
+                Some(parent_relpath) => Ok(Some(Self::new_workspace(parent_relpath)?)),
+                None => Ok(None),
+            },
+            SubjectPath::LocalSystem(path) => match path.parent() {
+                Some(parent_path) => Ok(Some(Self::new_system(parent_path)?)),
+                None => Ok(None),
+            },
         }
     }
 }
@@ -319,7 +333,11 @@ impl NodeKey {
         match self {
             // For `PathMetadata`, watch the parent directory so that nonexistence of the path can be monitored
             // since creation/deletion events occur on the parent directory.
-            NodeKey::PathMetadata(fs) => fs.subject_path.parent().clone(),
+            NodeKey::PathMetadata(fs) => fs
+                .subject_path
+                .parent()
+                .clone()
+                .expect("Internal: Should always be able to get parent path."),
 
             // For all other node types, attach the watch to the actual path since the path is assumed or known to exist.
             _ => self.fs_subject().cloned(),

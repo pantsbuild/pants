@@ -4,7 +4,6 @@
 use std::path::{Path, PathBuf};
 
 use deepsize::DeepSizeOf;
-use fs::RelativePath;
 use graph::CompoundNode;
 
 use super::{NodeKey, NodeOutput, NodeResult, SubjectPath};
@@ -21,7 +20,7 @@ pub struct PathMetadata {
 
 impl PathMetadata {
     pub fn new(path: PathBuf) -> Result<Self, String> {
-        let subject_path = SubjectPath::Workspace(RelativePath::new(path)?);
+        let subject_path = SubjectPath::new_workspace(path)?;
         Ok(Self { subject_path })
     }
 
