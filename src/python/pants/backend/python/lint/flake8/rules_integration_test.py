@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from textwrap import dedent
 from typing import Any
 
 import pytest
@@ -20,10 +19,7 @@ from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.target import Target
-from pants.testutil.python_interpreter_selection import (
-    all_major_minor_python_versions,
-    skip_unless_python37_and_python39_present,
-)
+from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
 from pants.util.resources import read_sibling_resource
@@ -83,7 +79,7 @@ def assert_success(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(["CPython>=3.7,<4"]),
+    all_major_minor_python_versions(["CPython>=3.8,<4"]),
 )
 def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
@@ -118,48 +114,6 @@ def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     assert result[0].exit_code == 1
     assert "good.py" not in result[0].stdout
     assert "bad.py:1:1: F401" in result[0].stdout
-
-
-@skip_unless_python37_and_python39_present
-def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "f.py": "y = (x := 5)\n",
-            "BUILD": dedent(
-                """\
-                python_sources(name='py37', interpreter_constraints=['CPython==3.7.*'])
-                python_sources(name='py39', interpreter_constraints=['CPython==3.9.*'])
-                """
-            ),
-        }
-    )
-
-    py37_tgt = rule_runner.get_target(Address("", target_name="py37", relative_file_path="f.py"))
-    py37_result = run_flake8(rule_runner, [py37_tgt])
-    assert len(py37_result) == 1
-    assert py37_result[0].exit_code == 1
-    assert "f.py:1:8: E999 SyntaxError" in py37_result[0].stdout
-
-    py39_tgt = rule_runner.get_target(Address("", target_name="py39", relative_file_path="f.py"))
-    py39_result = run_flake8(rule_runner, [py39_tgt])
-    assert len(py39_result) == 1
-    assert py39_result[0].exit_code == 0
-    assert py39_result[0].stdout.strip() == ""
-
-    # Test that we partition incompatible targets when passed in a single batch. We expect Py37
-    # to still fail, but Py39 should pass.
-    combined_result = run_flake8(rule_runner, [py37_tgt, py39_tgt])
-    assert len(combined_result) == 2
-    batched_py39_result, batched_py37_result = sorted(
-        combined_result, key=lambda result: result.exit_code
-    )
-    assert batched_py37_result.exit_code == 1
-    assert batched_py37_result.partition_description == "['CPython==3.7.*']"
-    assert "f.py:1:8: E999 SyntaxError" in batched_py37_result.stdout
-
-    assert batched_py39_result.exit_code == 0
-    assert batched_py39_result.partition_description == "['CPython==3.9.*']"
-    assert batched_py39_result.stdout.strip() == ""
 
 
 @pytest.mark.parametrize(

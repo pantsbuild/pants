@@ -39,8 +39,6 @@ from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_all_pythons_present,
-    skip_unless_python27_and_python3_present,
-    skip_unless_python27_present,
     skip_unless_python38_present,
     skip_unless_python39_present,
 )
@@ -330,71 +328,6 @@ def test_transitive_dependencies(rule_runner: PythonRuleRunner) -> None:
     assert f"{PACKAGE}/math/add.py:5" in result[0].stdout
 
 
-@skip_unless_python27_present
-def test_works_with_python27(rule_runner: PythonRuleRunner) -> None:
-    """A regression test that we can properly handle Python 2-only third-party dependencies.
-
-    There was a bug that this would cause the runner PEX to fail to execute because it did not have
-    Python 3 distributions of the requirements.
-
-    Also note that this Python 2 support should be automatic: Pants will tell MyPy to run with
-    `--py2` by detecting its use in interpreter constraints.
-    """
-    rule_runner.write_files(
-        {
-            "mypy.lock": read_sibling_resource(__name__, "older_mypy_for_testing.lock"),
-            "BUILD": dedent(
-                """\
-                # Both requirements are a) typed and b) compatible with Py2 and Py3. However, `x690`
-                # has a distinct wheel for Py2 vs. Py3, whereas libumi has a universal wheel. We expect
-                # both to be usable, even though libumi is not compatible with Py3.
-
-                python_requirement(
-                    name="libumi",
-                    requirements=["libumi==0.0.2"],
-                )
-
-                python_requirement(
-                    name="x690",
-                    requirements=["x690==0.2.0"],
-                )
-                """
-            ),
-            f"{PACKAGE}/f.py": dedent(
-                """\
-                from libumi import hello_world
-                from x690 import types
-
-                print "Blast from the past!"
-                print hello_world() - 21  # MyPy should fail. You can't subtract an `int` from `bytes`.
-                """
-            ),
-            f"{PACKAGE}/BUILD": "python_sources(interpreter_constraints=['==2.7.*'])",
-        }
-    )
-    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    result = run_mypy(
-        rule_runner,
-        [tgt],
-        extra_args=[
-            "--python-resolves={'mypy':'mypy.lock'}",
-            "--mypy-install-from-resolve=mypy",
-        ],
-    )
-    assert len(result) == 1
-    assert result[0].exit_code == 1
-    assert f"{PACKAGE}/f.py:5: error: Unsupported operand types" in result[0].stdout
-    # Confirm original issues not showing up.
-    assert "Failed to execute PEX file" not in result[0].stderr
-    assert (
-        "Cannot find implementation or library stub for module named 'x690'" not in result[0].stdout
-    )
-    assert (
-        "Cannot find implementation or library stub for module named 'libumi'"
-        not in result[0].stdout
-    )
-
-
 @skip_unless_python38_present
 def test_works_with_python38(rule_runner: PythonRuleRunner) -> None:
     """MyPy's typed-ast dependency does not understand Python 3.8, so we must instead run MyPy with
@@ -433,69 +366,6 @@ def test_works_with_python39(rule_runner: PythonRuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     assert_success(rule_runner, tgt)
-
-
-@skip_unless_python27_and_python3_present
-def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
-    """We set `--python-version` automatically for the user, and also batch based on interpreter
-    constraints.
-
-    This batching must consider transitive dependencies, so we use a more complex setup where the
-    dependencies are what have specific constraints that influence the batching.
-    """
-    rule_runner.write_files(
-        {
-            "mypy.lock": read_sibling_resource(__name__, "older_mypy_for_testing.lock"),
-            f"{PACKAGE}/py2/__init__.py": dedent(
-                """\
-                def add(x, y):
-                    # type: (int, int) -> int
-                    return x + y
-                """
-            ),
-            f"{PACKAGE}/py2/BUILD": "python_sources(interpreter_constraints=['==2.7.*'])",
-            f"{PACKAGE}/py3/__init__.py": dedent(
-                """\
-                def add(x: int, y: int) -> int:
-                    return x + y
-                """
-            ),
-            f"{PACKAGE}/py3/BUILD": "python_sources(interpreter_constraints=['>=3.6'])",
-            f"{PACKAGE}/__init__.py": "",
-            f"{PACKAGE}/uses_py2.py": "from project.py2 import add\nassert add(2, 2) == 4\n",
-            f"{PACKAGE}/uses_py3.py": "from project.py3 import add\nassert add(2, 2) == 4\n",
-            f"{PACKAGE}/BUILD": dedent(
-                """python_sources(
-                overrides={
-                  'uses_py2.py': {'interpreter_constraints': ['==2.7.*']},
-                  'uses_py3.py': {'interpreter_constraints': ['>=3.6']},
-                }
-              )
-            """
-            ),
-        }
-    )
-    py2_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py2.py"))
-    py3_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py3.py"))
-
-    result = run_mypy(
-        rule_runner,
-        [py2_tgt, py3_tgt],
-        extra_args=[
-            "--python-resolves={'mypy':'mypy.lock'}",
-            "--mypy-install-from-resolve=mypy",
-        ],
-    )
-    assert len(result) == 2
-    py2_result, py3_result = sorted(result, key=lambda res: res.partition_description or "")
-
-    assert py2_result.exit_code == 0
-    assert py2_result.partition_description == "['CPython==2.7.*']"
-    assert "Success: no issues found" in py2_result.stdout
-
-    assert py3_result.exit_code == 0
-    assert py3_result.partition_description == "['CPython>=3.6']"
-    assert "Success: no issues found" in py3_result.stdout
 
 
 def test_run_only_on_specified_files(rule_runner: PythonRuleRunner) -> None:

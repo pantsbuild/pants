@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<4,>=3.7"
+//     "CPython<4,>=3.8"
 //   ],
 //   "generated_with_requirements": [
 //     "isort[colors,pyproject]<6.0,>=5.9.3"
@@ -24,6 +24,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "excluded": [],
   "locked_resolves": [
     {
       "locked_requirements": [
@@ -49,26 +50,21 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ba1d72fb2595a01c7895a5128f9585a5cc4b6d395f1c8d514989b9a7eb2a8746",
-              "url": "https://files.pythonhosted.org/packages/5f/f6/c55db45970fbd14de6ab72082f1b8a143c3a69aa031c1e0dd4b9ecc8d496/isort-5.11.5-py3-none-any.whl"
+              "hash": "8ca5e72a8d85860d5a3fa69b8745237f2939afe12dbf656afbcb47fe72d947a6",
+              "url": "https://files.pythonhosted.org/packages/d1/b3/8def84f539e7d2289a02f0524b944b15d7c75dab7628bedf1c4f0992029c/isort-5.13.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6be1f76a507cb2ecf16c7cf14a37e41609ca082330be4e3436a18ef74add55db",
-              "url": "https://files.pythonhosted.org/packages/67/63/18cc5c2f9084d3f91ce704f2b5c8e17bedd777244e7732c21a31992b0a78/isort-5.11.5.tar.gz"
+              "hash": "48fdfcb9face5d58a4f6dde2e72a1fb8dcaf8ab26f95ab49fab84c2ddefb0109",
+              "url": "https://files.pythonhosted.org/packages/87/f9/c1eb8635a24e87ade2efce21e3ce8cd6b8630bb685ddc9cdaca1349b2eb5/isort-5.13.2.tar.gz"
             }
           ],
           "project_name": "isort",
           "requires_dists": [
-            "colorama<0.5.0,>=0.4.3; extra == \"colors\"",
-            "pip-api; extra == \"requirements-deprecated-finder\"",
-            "pip-shims>=0.5.2; extra == \"pipfile-deprecated-finder\"",
-            "pipreqs; extra == \"pipfile-deprecated-finder\" or extra == \"requirements-deprecated-finder\"",
-            "requirementslib; extra == \"pipfile-deprecated-finder\"",
-            "setuptools; extra == \"plugins\""
+            "colorama>=0.4.6; extra == \"colors\""
           ],
-          "requires_python": ">=3.7.0",
-          "version": "5.11.5"
+          "requires_python": ">=3.8.0",
+          "version": "5.13.2"
         }
       ],
       "platform_tag": null
@@ -76,15 +72,16 @@
   ],
   "only_builds": [],
   "only_wheels": [],
+  "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.2.1",
-  "pip_version": "24.0",
+  "pex_version": "2.16.2",
+  "pip_version": "24.2",
   "prefer_older_binary": false,
   "requirements": [
     "isort[colors,pyproject]<6.0,>=5.9.3"
   ],
   "requires_python": [
-    "<4,>=3.7"
+    "<4,>=3.8"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

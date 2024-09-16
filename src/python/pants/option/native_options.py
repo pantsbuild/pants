@@ -220,4 +220,3 @@ def check_dir_exists(val: str, dest: str, scope: str) -> None:
         raise ParseError(f"{error_prefix} cannot be parsed as a directory path.")
     if not path.is_dir() and not path_with_buildroot.is_dir():
         raise ParseError(f"{error_prefix} does not exist.")
-
