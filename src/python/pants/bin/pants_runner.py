@@ -20,7 +20,7 @@ from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.docutil import doc_url
-from pants.util.osutil import is_macos_before_12
+from pants.util.osutil import is_macos_before_12, _macos_major_version
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -134,7 +134,7 @@ class PantsRunner:
                     softwrap(
                         f"""
                         Future versions of Pants will only run on macOS 12 and newer, but this machine
-                        appears older ({platform.platform()}).
+                        appears older ({platform.platform()} => major version {_macos_major_version()}).
 
                         You can temporarily silence this warning with the
                         `[GLOBAL].allow_deprecated_macos_before_12` option. If you have questions or
