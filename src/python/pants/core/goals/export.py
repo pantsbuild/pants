@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import itertools
 import os
-import shutil
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,7 +23,15 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Workspace
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    MergeDigests,
+    SymlinkEntry,
+    Workspace,
+)
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.intrinsics import run_interactive_process
@@ -219,17 +226,10 @@ async def export(
         console.print_stdout(f"Wrote {result.description} to {result_dir}")
 
     exported_bins_by_exporting_resolve, link_requests = await link_exported_executables(
-        build_root, environment, output_dir, flattened_results
+        build_root, output_dir, flattened_results
     )
-    iprs = await MultiGet(run_interactive_process(link_request) for link_request in link_requests)
-
-    errors_linking_bins = [
-        proc.description for ipr, proc in zip(iprs, link_requests) if ipr.exit_code
-    ]
-    if errors_linking_bins:
-        raise ExportError(
-            "; ".join(f'Failed in process "{description}"' for description in errors_linking_bins)
-        )
+    link_digest = await Get(Digest, CreateDigest, link_requests)
+    workspace.write_digest(link_digest)
 
     exported_bin_warnings = warn_exported_bin_conflicts(exported_bins_by_exporting_resolve)
     for warning in exported_bin_warnings:
@@ -269,17 +269,15 @@ async def export(
 
 async def link_exported_executables(
     build_root: BuildRoot,
-    environment: EnvironmentVars,
     output_dir: str,
     export_results: list[ExportResult],
-):
+) -> tuple[dict[str, list[str]], CreateDigest]:
     """Link the exported executables to the `bin` dir.
 
     Multiple resolves might export the same executable. This will export the first one only but
     track the collision.
     """
-    bin_dir = Path(build_root.path, output_dir, "bin")
-    safe_mkdir(bin_dir)
+    safe_mkdir(Path(output_dir, "bin"))
 
     exported_bins_by_exporting_resolve: dict[str, list[str]] = defaultdict(list)
     link_requests = []
@@ -291,28 +289,11 @@ async def link_exported_executables(
             if len(exported_bins_by_exporting_resolve[exported_bin.name]) > 1:
                 continue
 
-            ln_bin = shutil.which("ln")
-            if not ln_bin:
-                # I think ln_bin missing won't happen, but the error message otherwise is "No such file or directory (os error 2)" which isn't helpful
-                raise RuntimeError(
-                    "Could not locate `ln` bin to link exported binaries to the `bin` dir"
-                )
+            path = Path(output_dir, "bin", exported_bin.name)
+            target = Path(build_root.path, output_dir, result.reldir, exported_bin.path_in_export)
+            link_requests.append(SymlinkEntry(path.as_posix(), target.as_posix()))
 
-            link_request = InteractiveProcess(
-                [
-                    ln_bin,
-                    "-sf",
-                    Path(
-                        build_root.path, output_dir, result.reldir, exported_bin.path_in_export
-                    ).as_posix(),
-                    (bin_dir / exported_bin.name).as_posix(),
-                ],
-                env={"PATH": environment.get("PATH", "")},
-                run_in_workspace=True,
-                description=f"link binary {exported_bin.name} to bin directory",
-            )
-            link_requests.append(link_request)
-    return exported_bins_by_exporting_resolve, link_requests
+    return exported_bins_by_exporting_resolve, CreateDigest(link_requests)
 
 
 def warn_exported_bin_conflicts(exported_bins: dict[str, list[str]]) -> list[str]:

@@ -65,6 +65,7 @@ def mock_export(
 
 
 def _mock_run(rule_runner: RuleRunner, ip: InteractiveProcess) -> InteractiveProcessResult:
+    """This is still necessary for writing files, which uses a `cp` process."""
     subprocess.check_call(
         ip.process.argv,
         stderr=subprocess.STDOUT,
@@ -156,11 +157,12 @@ def run_export_rule(
                 rule_runner.do_not_use_mock(Digest, (AddPrefix,)),
                 rule_runner.do_not_use_mock(EnvironmentVars, (EnvironmentVarsRequest,)),
                 rule_runner.do_not_use_mock(KnownUserResolveNames, (KnownUserResolveNamesRequest,)),
+                rule_runner.do_not_use_mock(Digest, (CreateDigest,)),
                 MockGet(
                     output_type=InteractiveProcessResult,
                     input_types=(InteractiveProcess,),
                     mock=lambda ip: _mock_run(rule_runner, ip),
-                ),
+                ),  # for workspace.write_digest
             ],
             union_membership=union_membership,
         )
