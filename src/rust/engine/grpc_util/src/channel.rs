@@ -43,6 +43,8 @@ impl Channel {
         tls_config: Option<&ClientConfig>,
         uri: Uri,
     ) -> Result<Self, Box<dyn std::error::Error>> {
+        crate::initialize()?;
+
         let mut http = HttpConnector::new();
         http.enforce_http(false);
 
@@ -168,7 +170,7 @@ mod tests {
 
     #[tokio::test]
     async fn tls_client_request_test() {
-        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        crate::initialize().expect("init crate");
 
         let config = RustlsConfig::from_pem_file(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -218,7 +220,7 @@ mod tests {
 
     #[tokio::test]
     async fn tls_mtls_client_request_test() {
-        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        crate::initialize().expect("init crate");
 
         #[derive(Debug)]
         pub struct CertVerifierMock {

@@ -88,6 +88,8 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
     m.add_class::<PyThreadLocals>()?;
     m.add_class::<PyTypes>()?;
 
+    m.add_function(wrap_pyfunction!(initialize, m)?)?;
+
     m.add_function(wrap_pyfunction!(stdio_initialize, m)?)?;
     m.add_function(wrap_pyfunction!(stdio_thread_console_set, m)?)?;
     m.add_function(wrap_pyfunction!(stdio_thread_console_color_mode_set, m)?)?;
@@ -160,6 +162,12 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 }
 
 create_exception!(native_engine, PollTimeout, PyException);
+
+#[pyfunction]
+pub fn initialize() -> PyO3Result<()> {
+    grpc_util::initialize().expect("startup initialization failed");
+    Ok(())
+}
 
 #[pyclass]
 struct PyTasks(RefCell<Tasks>);

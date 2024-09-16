@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::iter::FromIterator;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -33,6 +33,19 @@ pub mod metrics;
 pub mod prost;
 pub mod retry;
 pub mod tls;
+
+/// Initialize process-wide libraries needed for gRPC.
+pub fn initialize() -> Result<(), String> {
+    static INIT: Once = Once::new();
+
+    INIT.call_once(|| {
+        rustls::crypto::aws_lc_rs::default_provider()
+            .install_default()
+            .expect("Failed to initialize cryptography library needed for gRPC operations");
+    });
+
+    Ok(())
+}
 
 // NB: Rather than boxing our tower/tonic services, we define a type alias that fully defines the
 // Service layers that we use universally. If this type becomes unwieldy, or our various Services

@@ -694,6 +694,7 @@ name = "client"
 version = "0.0.1"
 dependencies = [
  "env_logger",
+ "grpc_util",
  "log",
  "nailgun",
  "nix",

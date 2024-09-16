@@ -122,6 +122,8 @@ const PANTS_NO_NATIVE_CLIENT: &str = "PANTS_NO_NATIVE_CLIENT";
 
 #[tokio::main]
 async fn main() {
+    grpc_util::initialize().expect("grpc_util init");
+
     let start = SystemTime::now();
     let no_native_client =
         matches!(env::var_os(PANTS_NO_NATIVE_CLIENT), Some(value) if !value.is_empty());
