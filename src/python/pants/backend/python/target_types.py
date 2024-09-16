@@ -605,26 +605,6 @@ class PexEmitWarningsField(TriBoolField):
         return self.value
 
 
-class PexResolveLocalPlatformsField(TriBoolField):
-    alias = "resolve_local_platforms"
-    removal_version = "2.24.0.dev0"
-    removal_hint = softwrap(
-        f"""\
-        This {alias} field is no longer used now that the `platforms` field has been removed. Remove it.
-        """
-    )
-    help = help_text(
-        """
-        Now unused.
-        """
-    )
-
-    def value_or_global_default(self, pex_binary_defaults: PexBinaryDefaults) -> bool:
-        if self.value is None:
-            return pex_binary_defaults.resolve_local_platforms
-        return self.value
-
-
 class PexExecutionMode(Enum):
     ZIPAPP = "zipapp"
     VENV = "venv"
@@ -756,7 +736,6 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexBinaryDependenciesField,
     PexCheckField,
     PexCompletePlatformsField,
-    PexResolveLocalPlatformsField,
     PexInheritPathField,
     PexStripEnvField,
     PexIgnoreErrorsField,
@@ -899,21 +878,6 @@ class PexBinaryDefaults(Subsystem):
 
             Can be overridden by specifying the `emit_warnings` parameter of individual
             `pex_binary` targets
-            """
-        ),
-        advanced=True,
-    )
-    resolve_local_platforms = BoolOption(
-        default=False,
-        help=softwrap(
-            """
-            Now unused.
-            """
-        ),
-        removal_version="2.24.0.dev0",
-        removal_hint=softwrap(
-            """\
-            This `resolve_local_platforms` option is no longer used now that the `platforms` field has been removed. You can safely delete this setting.
             """
         ),
         advanced=True,
