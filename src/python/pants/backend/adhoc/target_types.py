@@ -10,6 +10,7 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.adhoc_process_support import PathEnvModifyMode
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.fs import GlobExpansionConjunction
+from pants.engine.process import ProcessCacheScope
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
@@ -23,6 +24,7 @@ from pants.engine.target import (
     Target,
     ValidNumbers,
 )
+from pants.util.docutil import bin_name
 from pants.util.strutil import help_text
 
 
@@ -356,6 +358,46 @@ class AdhocToolOutputsMatchMode(StringField):
         return OutputsMatchMode(self.value)
 
 
+class AdhocToolCacheScopeField(StringField):
+    alias = "cache_scope"
+    default = "from_environment"
+    help = help_text(
+        f"""
+        Set the "cache scope" of the executed process to provided value. The cache scope determines for how long
+        Pants will cache the result of the process execution (assuming no changes to files or dependencies
+        invalidate the result in the meantime).
+
+        The valid values are:
+
+        - `from_environment`: Use the default cache scope for the applicable environment in which the process will execute.
+        This is `success` for all environments except for `experimental_workspace_environment`, in which case `session`
+        cache scope will be used.
+
+        - `success`: Cache successful executions of the process.
+
+        - `success_per_pantsd_restart`: Cache successful executions of the process for the life of the
+         applicable pantsd process.
+
+        - `session`: Only cache the result for a single Pants session. This will usually be a single invocation of the
+        `{bin_name()}` tool.
+        """
+    )
+    valid_choices = ("from_environment", "success", "success_per_pantsd_restart", "session")
+
+    @property
+    def enum_value(self) -> ProcessCacheScope | None:
+        value = self.value
+        if value == "success":
+            return ProcessCacheScope.SUCCESSFUL
+        elif value == "success_per_pantsd_restart":
+            return ProcessCacheScope.PER_RESTART_SUCCESSFUL
+        elif value == "session":
+            return ProcessCacheScope.PER_SESSION
+        else:
+            # Default case `from_environment`
+            return None
+
+
 class AdhocToolTarget(Target):
     alias: ClassVar[str] = "adhoc_tool"
     core_fields = (
@@ -378,6 +420,7 @@ class AdhocToolTarget(Target):
         AdhocToolWorkspaceInvalidationSourcesField,
         AdhocToolPathEnvModifyModeField,
         AdhocToolOutputsMatchMode,
+        AdhocToolCacheScopeField,
         EnvironmentField,
     )
     help = help_text(
