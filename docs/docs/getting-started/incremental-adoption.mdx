@@ -19,7 +19,7 @@ We would love to help you with adopting Pants. Please reach out through [Slack](
 
 ### 1. A basic `pants.toml`
 
-Follow the [Getting Started](./index.mdx) guide to install Pants and [set up an initial `pants.toml`](./initial-configuration.mdx). Validate that running `pants count-loc ::` works properly. If you want to exclude a specific folder at first, you can use the [`pants_ignore`](../../reference/global-options.mdx#section-pants-ignore) option.
+Follow the [Getting Started](./index.mdx) guide to install Pants and [set up an initial `pants.toml`](./initial-configuration.mdx). Validate that running `pants count-loc ::` works properly. If you want to exclude a specific folder at first, you can use the [`pants_ignore`](../../reference/global-options.mdx#pants_ignore) option.
 
 Add the [relevant backends](../using-pants/key-concepts/backends.mdx) to `[GLOBAL].backend_packages`.
 
@@ -91,7 +91,7 @@ If you're migrating from another system that already uses the name `BUILD`, such
 
 First, by default Pants recognizes `BUILD.extension` for any `extension` as a valid BUILD file. So you can use a name like `BUILD.pants` without changing configuration.
 
-Second, you can [configure](../../reference/global-options.mdx#section-build-patterns) Pants to use a different set of file names entirely:
+Second, you can [configure](../../reference/global-options.mdx#build_patterns) Pants to use a different set of file names entirely:
 
 ```toml title="pants.toml"
 [GLOBAL]

@@ -98,7 +98,7 @@ class PythonGeneratingSourcesBase(MultipleSourcesField):
     expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
 
 
-class InterpreterConstraintsField(StringSequenceField):
+class InterpreterConstraintsField(StringSequenceField, AsyncFieldMixin):
     alias = "interpreter_constraints"
     help = help_text(
         f"""
@@ -123,6 +123,17 @@ class InterpreterConstraintsField(StringSequenceField):
 
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
+        if self.value and python_setup.warn_on_python2_usage:
+            # Side-step import cycle.
+            from pants.backend.python.util_rules.interpreter_constraints import (
+                warn_on_python2_usage_in_interpreter_constraints,
+            )
+
+            warn_on_python2_usage_in_interpreter_constraints(
+                self.value,
+                description_of_origin=f"the `{self.alias}` field on target at `{self.address}`",
+            )
+
         return python_setup.compatibility_or_constraints(self.value)
 
 
@@ -492,7 +503,7 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
         complete platform JSON as described by Pex
         (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
 
-        See {doc_url('docs/python/overview/pex')} for details.
+        See {doc_url('docs/python/overview/pex#generating-the-complete_platforms-file')} for details on how to create this file.
         """
     )
 
@@ -591,26 +602,6 @@ class PexEmitWarningsField(TriBoolField):
         if self.value is None:
             return pex_binary_defaults.emit_warnings
 
-        return self.value
-
-
-class PexResolveLocalPlatformsField(TriBoolField):
-    alias = "resolve_local_platforms"
-    removal_version = "2.24.0.dev0"
-    removal_hint = softwrap(
-        f"""\
-        This {alias} field is no longer used now that the `platforms` field has been removed. Remove it.
-        """
-    )
-    help = help_text(
-        """
-        Now unused.
-        """
-    )
-
-    def value_or_global_default(self, pex_binary_defaults: PexBinaryDefaults) -> bool:
-        if self.value is None:
-            return pex_binary_defaults.resolve_local_platforms
         return self.value
 
 
@@ -745,7 +736,6 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexBinaryDependenciesField,
     PexCheckField,
     PexCompletePlatformsField,
-    PexResolveLocalPlatformsField,
     PexInheritPathField,
     PexStripEnvField,
     PexIgnoreErrorsField,
@@ -888,21 +878,6 @@ class PexBinaryDefaults(Subsystem):
 
             Can be overridden by specifying the `emit_warnings` parameter of individual
             `pex_binary` targets
-            """
-        ),
-        advanced=True,
-    )
-    resolve_local_platforms = BoolOption(
-        default=False,
-        help=softwrap(
-            """
-            Now unused.
-            """
-        ),
-        removal_version="2.24.0.dev0",
-        removal_hint=softwrap(
-            """\
-            This `resolve_local_platforms` option is no longer used now that the `platforms` field has been removed. You can safely delete this setting.
             """
         ),
         advanced=True,

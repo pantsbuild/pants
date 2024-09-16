@@ -36,7 +36,7 @@ def action(name: str, node16_compat: bool = False) -> str:
             "cache": "actions/cache@v4",
             "checkout": "actions/checkout@v4",
             "download-artifact": "actions/download-artifact@v4",
-            "expose-pythons": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
+            "expose-pythons": "pantsbuild/actions/expose-pythons@v9",
             "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
             "rust-cache": "benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1",
             "setup-go": "actions/setup-go@v5",
@@ -84,6 +84,8 @@ class Platform(Enum):
 
 GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS12_X86_64}
 SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
+# We control these runners, so we preinstall and expose python on them.
+HAS_PYTHON = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
@@ -448,9 +450,14 @@ class Helper:
         elif self.platform == Platform.MACOS10_15_X86_64:
             ret += ["macOS-10.15-X64"]
         elif self.platform == Platform.LINUX_X86_64:
-            ret += ["ubuntu-20.04"]
+            ret += ["ubuntu-22.04"]
         elif self.platform == Platform.LINUX_ARM64:
-            ret += ["Linux", "ARM64"]
+            ret += [
+                "runs-on",
+                "runner=4cpu-linux-arm64",
+                "image=ubuntu22-full-arm64-python3.7-python3.8-python3.9",
+                "run-id=${{ github.run_id }}",
+            ]
         else:
             raise ValueError(f"Unsupported platform: {self.platform_name()}")
         return ret
@@ -463,8 +470,6 @@ class Helper:
             ret["ARCHFLAGS"] = "-arch x86_64"
         if self.platform == Platform.MACOS11_ARM64:
             ret["ARCHFLAGS"] = "-arch arm64"
-        if self.platform == Platform.LINUX_ARM64:
-            ret["PANTS_CONFIG_FILES"] = "+['pants.ci.toml','pants.ci.aarch64.toml']"
         if self.platform == Platform.LINUX_X86_64:
             # Currently we run Linux x86_64 CI on GitHub Actions-hosted hardware, and
             # these are weak dual-core machines. Default parallelism on those machines
@@ -474,14 +479,6 @@ class Helper:
             # TODO: If we add a "redo timed out tests" feature, we can kill this.
             ret["PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM"] = "1"
         return ret
-
-    def maybe_append_cargo_test_parallelism(self, cmd: str) -> str:
-        if self.platform == Platform.LINUX_ARM64:
-            # TODO: The ARM64 runner has enough cores to reliably trigger #18191 using
-            # our default settings. We lower parallelism here as a bandaid to work around
-            # #18191 until it can be resolved.
-            return f"{cmd} --test-threads=8"
-        return cmd
 
     def wrap_cmd(self, cmd: str) -> str:
         if self.platform == Platform.MACOS11_ARM64:
@@ -573,17 +570,13 @@ class Helper:
 
     def setup_primary_python(self) -> Sequence[Step]:
         ret = []
-        # We pre-install Python on our self-hosted platforms.
-        # We must set it up on Github-hosted platforms.
-        if self.platform in GITHUB_HOSTED:
+        if self.platform not in HAS_PYTHON:
             ret.append(install_python(PYTHON_VERSION))
         return ret
 
     def expose_all_pythons(self) -> Sequence[Step]:
         ret = []
-        # Self-hosted runners already have all relevant pythons exposed on their PATH, so we
-        # only use this action on the GitHub-hosted platforms.
-        if self.platform in GITHUB_HOSTED:
+        if self.platform not in HAS_PYTHON:
             ret.append(
                 {
                     "name": "Expose Pythons",
@@ -689,11 +682,7 @@ def bootstrap_jobs(
         # We pass --tests to skip doc tests because our generated protos contain
         # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
         # pass on GHA MacOS containers.
-        step_cmd = helper.wrap_cmd(
-            helper.maybe_append_cargo_test_parallelism(
-                "./cargo test --locked --tests -- --nocapture"
-            )
-        )
+        step_cmd = helper.wrap_cmd("./cargo test --locked --tests -- --nocapture")
     elif rust_testing == RustTesting.ALL:
         human_readable_job_name += ", test and lint Rust"
         human_readable_step_name = "Test and lint Rust"
@@ -703,9 +692,7 @@ def bootstrap_jobs(
         step_cmd = "\n".join(
             [
                 "./build-support/bin/check_rust_pre_commit.sh",
-                helper.maybe_append_cargo_test_parallelism(
-                    "./cargo test --locked --all --tests --benches -- --nocapture"
-                ),
+                "./cargo test --locked --all --tests --benches -- --nocapture",
                 "./cargo doc",
             ]
         )
@@ -881,9 +868,7 @@ def build_wheels_job(
     if platform == Platform.LINUX_X86_64:
         container = {"image": "quay.io/pypa/manylinux2014_x86_64:latest"}
     elif platform == Platform.LINUX_ARM64:
-        # Unfortunately Equinix do not support the CentOS 7 image on the hardware we've been
-        # generously given by the Works on ARM program. So we have to build in this image.
-        container = {"image": "ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf"}
+        container = {"image": "quay.io/pypa/manylinux2014_aarch64:latest"}
     else:
         container = None
 

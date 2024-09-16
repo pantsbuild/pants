@@ -7,6 +7,7 @@ import os
 
 from pants.backend.adhoc.target_types import (
     AdhocToolArgumentsField,
+    AdhocToolCacheScopeField,
     AdhocToolExecutionDependenciesField,
     AdhocToolExtraEnvVarsField,
     AdhocToolLogOutputField,
@@ -14,6 +15,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
+    AdhocToolOutputsMatchMode,
     AdhocToolPathEnvModifyModeField,
     AdhocToolRunnableDependenciesField,
     AdhocToolRunnableField,
@@ -86,6 +88,9 @@ async def run_in_sandbox_request(
     output_directories = target.get(AdhocToolOutputDirectoriesField).value or ()
 
     cache_scope = environment_target.default_cache_scope
+    maybe_override_cache_scope = target.get(AdhocToolCacheScopeField).enum_value
+    if maybe_override_cache_scope is not None:
+        cache_scope = maybe_override_cache_scope
 
     workspace_invalidation_globs: PathGlobs | None = None
     workspace_invalidation_sources = (
@@ -107,6 +112,8 @@ async def run_in_sandbox_request(
         description_of_origin=f"`{AdhocToolExtraEnvVarsField.alias}` for `adhoc_tool` target at `{target.address}`",
     )
 
+    outputs_match_mode = target.get(AdhocToolOutputsMatchMode).enum_value
+
     process_request = AdhocProcessRequest(
         description=description,
         address=target.address,
@@ -127,6 +134,8 @@ async def run_in_sandbox_request(
         workspace_invalidation_globs=workspace_invalidation_globs,
         cache_scope=cache_scope,
         use_working_directory_as_base_for_output_captures=environment_target.use_working_directory_as_base_for_output_captures,
+        outputs_match_error_behavior=outputs_match_mode.glob_match_error_behavior,
+        outputs_match_conjunction=outputs_match_mode.glob_expansion_conjunction,
     )
 
     adhoc_result = await Get(

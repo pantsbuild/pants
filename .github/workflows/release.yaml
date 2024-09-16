@@ -6,7 +6,7 @@
 jobs:
   build_wheels_linux_arm64:
     container:
-      image: ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf
+      image: quay.io/pypa/manylinux2014_aarch64:latest
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -17,8 +17,10 @@ jobs:
     - release_info
     runs-on:
     - self-hosted
-    - Linux
-    - ARM64
+    - runs-on
+    - runner=4cpu-linux-arm64
+    - image=ubuntu22-full-arm64-python3.7-python3.8-python3.9
+    - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -47,12 +49,10 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
-    - env:
-        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+    - env: {}
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
-    - env:
-        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+    - env: {}
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -93,7 +93,7 @@ jobs:
     needs:
     - release_info
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -197,7 +197,7 @@ jobs:
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.80.1-*
+        path: '~/.rustup/toolchains/1.81.0-*
 
           ~/.rustup/update-hashes
 
@@ -283,7 +283,7 @@ jobs:
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.80.1-*
+        path: '~/.rustup/toolchains/1.81.0-*
 
           ~/.rustup/update-hashes
 
@@ -363,7 +363,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+      uses: pantsbuild/actions/expose-pythons@v9
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -375,7 +375,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.80.1-*
+        path: '~/.rustup/toolchains/1.81.0-*
 
           ~/.rustup/update-hashes
 

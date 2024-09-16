@@ -43,10 +43,10 @@ from pants.util.docutil import git_url
 
 
 @rule
-async def create_digest_to_digest(
+async def create_digest(
     create_digest: CreateDigest,
 ) -> Digest:
-    return await native_engine.create_digest_to_digest(create_digest)
+    return await native_engine.create_digest(create_digest)
 
 
 @rule
@@ -64,10 +64,10 @@ async def path_globs_to_paths(
 
 
 @rule
-async def download_file_to_digest(
+async def download_file(
     native_download_file: NativeDownloadFile,
 ) -> Digest:
-    return await native_engine.download_file_to_digest(native_download_file)
+    return await native_engine.download_file(native_download_file)
 
 
 @rule
@@ -76,37 +76,35 @@ async def digest_to_snapshot(digest: Digest) -> Snapshot:
 
 
 @rule
-async def directory_digest_to_digest_contents(digest: Digest) -> DigestContents:
-    return await native_engine.directory_digest_to_digest_contents(digest)
+async def get_digest_contents(digest: Digest) -> DigestContents:
+    return await native_engine.get_digest_contents(digest)
 
 
 @rule
-async def directory_digest_to_digest_entries(digest: Digest) -> DigestEntries:
-    return await native_engine.directory_digest_to_digest_entries(digest)
+async def get_digest_entries(digest: Digest) -> DigestEntries:
+    return await native_engine.get_digest_entries(digest)
 
 
 @rule
-async def merge_digests_request_to_digest(merge_digests: MergeDigests) -> Digest:
-    return await native_engine.merge_digests_request_to_digest(merge_digests)
+async def merge_digests(merge_digests: MergeDigests) -> Digest:
+    return await native_engine.merge_digests(merge_digests)
 
 
 @rule
-async def remove_prefix_request_to_digest(remove_prefix: RemovePrefix) -> Digest:
-    return await native_engine.remove_prefix_request_to_digest(remove_prefix)
+async def remove_prefix(remove_prefix: RemovePrefix) -> Digest:
+    return await native_engine.remove_prefix(remove_prefix)
 
 
 @rule
-async def add_prefix_request_to_digest(add_prefix: AddPrefix) -> Digest:
-    return await native_engine.add_prefix_request_to_digest(add_prefix)
+async def add_prefix(add_prefix: AddPrefix) -> Digest:
+    return await native_engine.add_prefix(add_prefix)
 
 
 @rule
-async def process_request_to_process_result(
+async def execute_process(
     process: Process, process_execution_environment: ProcessExecutionEnvironment
 ) -> FallibleProcessResult:
-    return await native_engine.process_request_to_process_result(
-        process, process_execution_environment
-    )
+    return await native_engine.execute_process(process, process_execution_environment)
 
 
 @rule

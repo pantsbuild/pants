@@ -12,16 +12,13 @@ use crate::nodes::{task_get_context, ExecuteProcess, NodeResult, Snapshot};
 use crate::python::Value;
 
 pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(process_request_to_process_result, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_process, m)?)?;
 
     Ok(())
 }
 
 #[pyfunction]
-fn process_request_to_process_result(
-    process: Value,
-    process_config: Value,
-) -> PyGeneratorResponseNativeCall {
+fn execute_process(process: Value, process_config: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
