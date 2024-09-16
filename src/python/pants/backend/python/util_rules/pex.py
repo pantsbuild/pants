@@ -1281,7 +1281,6 @@ async def setup_venv_pex_process(
         if request.input_digest
         else venv_pex.digest
     )
-
     append_only_caches: FrozenDict[str, str] = FrozenDict(
         **pex_environment.in_sandbox(
             working_directory=request.working_directory
