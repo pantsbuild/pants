@@ -401,9 +401,7 @@ class Options:
             native_values = None
         else:
             try:
-                native_values = self.get_parser(scope).parse_args_native(
-                    self._native_parser, self._allow_unknown_options
-                )
+                native_values = self.get_parser(scope).parse_args_native(self._native_parser)
             except Exception as e:
                 native_mismatch_msgs.append(
                     f"Failed to parse options with native parser due to error:\n    {e}"
