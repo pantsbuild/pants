@@ -21,8 +21,7 @@ class Setuptools(PythonToolRequirementsBase):
     options_scope = "setuptools"
     help_short = "Python setuptools, used to package `python_distribution` targets."
 
-    default_requirements = ["setuptools>=63.1.0,<64.0", "wheel>=0.35.1,<0.38"]
-
+    default_requirements = ["setuptools>=70.0", "wheel>=0.40"]
     default_lockfile_resource = ("pants.backend.python.subsystems", "setuptools.lock")
 
 

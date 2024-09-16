@@ -35,6 +35,13 @@ typing-extensions~=4.12
 mypy-typing-asserts==0.1.1
 node-semver==0.9.0
 
+# In src/python/pants/backend/url_handlers/s3/register.py we advise adding
+# `botocore` to `[GLOBAL].plugins`, but `botocore` is particular about the
+# version of urllib3 used.  To make the s3 handler easier to use, constrain
+# urlib3 here.  Per the voluminous thread at
+# https://github.com/boto/botocore/issues/2926 this can likely be relaxed when
+# Pants itself is on a newer version of Python
+urllib3<2
 
 # These dependencies are only for debugging Pants itself (in VSCode/PyCharm respectively),
 # and should never be imported.
