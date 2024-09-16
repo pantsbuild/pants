@@ -473,6 +473,18 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
 
 
 @dataclass(frozen=True)
+class DeleteRule:
+    canonical_name: str
+
+    @classmethod
+    def create(cls, f: Any):
+        if not hasattr(f, "rule_id"):
+            raise ValueError(f"`{f.__qualname__}` is not a rule")
+
+        return DeleteRule(canonical_name=f.rule_id)
+
+
+@dataclass(frozen=True)
 class TaskRule:
     """A Rule that runs a task function when all of its input selectors are satisfied.
 
@@ -521,19 +533,23 @@ class RuleIndex:
     """Holds a normalized index of Rules used to instantiate Nodes."""
 
     rules: FrozenOrderedSet[TaskRule]
+    delete_rules: FrozenOrderedSet[DeleteRule]
     queries: FrozenOrderedSet[QueryRule]
     union_rules: FrozenOrderedSet[UnionRule]
 
     @classmethod
-    def create(cls, rule_entries: Iterable[Rule | UnionRule]) -> RuleIndex:
+    def create(cls, rule_entries: Iterable[Rule | UnionRule | DeleteRule]) -> RuleIndex:
         """Creates a RuleIndex with tasks indexed by their output type."""
         rules: OrderedSet[TaskRule] = OrderedSet()
+        delete_rules: OrderedSet[DeleteRule] = OrderedSet()
         queries: OrderedSet[QueryRule] = OrderedSet()
         union_rules: OrderedSet[UnionRule] = OrderedSet()
 
         for entry in rule_entries:
             if isinstance(entry, TaskRule):
                 rules.add(entry)
+            elif isinstance(entry, DeleteRule):
+                delete_rules.add(entry)
             elif isinstance(entry, UnionRule):
                 union_rules.add(entry)
             elif isinstance(entry, QueryRule):
@@ -551,6 +567,7 @@ class RuleIndex:
 
         return RuleIndex(
             rules=FrozenOrderedSet(rules),
+            delete_rules=FrozenOrderedSet(delete_rules),
             queries=FrozenOrderedSet(queries),
             union_rules=FrozenOrderedSet(union_rules),
         )
