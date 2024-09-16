@@ -112,7 +112,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -373,7 +373,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -563,7 +563,7 @@ jobs:
     if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has a category label
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -581,7 +581,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -608,7 +608,7 @@ jobs:
       release: ${{ steps.classify.outputs.release }}
       rust: ${{ steps.classify.outputs.rust }}
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -630,7 +630,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -684,7 +684,7 @@ jobs:
     needs:
     - set_merge_ok
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - run: "merge_ok=\"${{ needs.set_merge_ok.outputs.merge_ok }}\"\nif [[ \"${merge_ok}\" == \"true\" ]]; then\n    echo\
         \ \"Merge OK\"\n    exit 0\nelse\n    echo \"Merge NOT OK\"\n    exit 1\nfi\n"
@@ -721,7 +721,7 @@ jobs:
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - id: set_merge_ok
       run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
@@ -790,7 +790,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -882,7 +882,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -974,7 +974,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1066,7 +1066,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1158,7 +1158,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1250,7 +1250,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1342,7 +1342,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1434,7 +1434,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1526,7 +1526,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1618,7 +1618,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
