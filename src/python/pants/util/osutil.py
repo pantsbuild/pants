@@ -111,10 +111,9 @@ def is_macos_big_sur() -> bool:
     return _macos_major_version() == 11
 
 
-def is_macos_before_12() -> bool:
-    """MacOS 11 support ended Sep 2023."""
+def is_macos_before(major_version: int) -> bool:
     version = _macos_major_version()
-    return version is not None and version < 12
+    return version is not None and version < major_version
 
 
 def getuser() -> str:

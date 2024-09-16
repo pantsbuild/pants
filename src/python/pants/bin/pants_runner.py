@@ -28,6 +28,13 @@ logger = logging.getLogger(__name__)
 # Pants 2.18 is using a new distribution model, that's supported (sans bugs) in 0.10.0.
 MINIMUM_SCIE_PANTS_VERSION = Version("0.10.0")
 
+_PANTS_2_25_MACOS_VERSION_BY_ARCH = {
+    # macos-14 is the oldest github hosted runner for arm
+    "arm64": 14,
+    # macos-13 will soon be the oldest (and only) github hosted runner for x86-64 (see https://github.com/pantsbuild/pants/issues/21333)
+    "x86_64": 13,
+}
+
 
 @dataclass(frozen=True)
 class PantsRunner:
@@ -124,9 +131,8 @@ class PantsRunner:
                         ),
                     )
 
-            if (
-                not global_bootstrap_options.allow_deprecated_macos_before_12
-                and is_macos_before_12()
+            if not global_bootstrap_options.allow_deprecated_macos_before_12 and is_macos_before(
+                12
             ):
                 warn_or_error(
                     "2.24.0.dev0",
@@ -144,6 +150,24 @@ class PantsRunner:
                     ),
                 )
 
+            if not global_bootstrap_options.allow_deprecated_macos_ and is_macos_before(
+                pants_get_normalised
+            ):
+                warn_or_error(
+                    "2.25.0.dev0",
+                    "using Pants on macOS 12",
+                    softwrap(
+                        f"""
+                        Future versions of Pants will only run on macOS 13 and newer (on x86-64) and macOS 14 and newer (on arm64), but this machine
+                        appears older ({platform.platform()}).
+
+                        You can temporarily silence this warning with the
+                        `[GLOBAL].allow_deprecated_macos_before_12` option. If you have questions or
+                        concerns about this, please reach out to us at
+                        {doc_url("community/getting-help")}.
+                        """
+                    ),
+                )
             # N.B. We inline imports to speed up the python thin client run, and avoids importing
             # engine types until after the runner has had a chance to set __PANTS_BIN_NAME.
             if self._should_run_with_pantsd(global_bootstrap_options):
