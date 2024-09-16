@@ -3,7 +3,6 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use fs::{
     DigestTrie, DirectoryDigest, GlobMatching, PathStat, RelativePath, SymlinkBehavior, TypedPath,
@@ -373,19 +372,14 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
             let namespace: PyPathNamespace = externs::getattr(arg, "namespace")
                 .map_err(|e| format!("Failed to get `namespace` for field: {e}"))?;
             match namespace {
-                PyPathNamespace::Workspace => {
-                    let relpath = RelativePath::new(path)
-                        .map_err(|e| format!("path_metadata_request error: {e}"))?;
-                    Ok(SubjectPath::Workspace(relpath))
-                }
-                PyPathNamespace::System => {
-                    let path = PathBuf::from_str(&path).unwrap();
-                    if path.is_absolute() {
-                        Ok(SubjectPath::LocalSystem(path))
-                    } else {
-                        Err(format!("Path for PathNamespace.SYSTEM must an absolute path. Instead, got `{}`", path.display()))
-                    }
-                }
+                PyPathNamespace::Workspace => SubjectPath::new_workspace(&path).map_err(|_| {
+                    format!("path_metadata_request error: path for PathNamespace.WORKSPACE must be a relative path. Instead, got `{}`", path)
+                }),
+                PyPathNamespace::System => SubjectPath::new_system(&path).map_err(|_| {
+                    format!(
+                        "path_metadata_request error: path for PathNamespace.SYSTEM must an absolute path. Instead, got `{}`", path
+                    )
+                }),
             }
         })?;
 
