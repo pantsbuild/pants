@@ -373,7 +373,7 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
 
         let context = task_get_context();
         let metadata_opt = context
-            .get(PathMetadataNode::new(PathBuf::from_str(&path).unwrap()))
+            .get(PathMetadataNode::new(PathBuf::from_str(&path).unwrap())?)
             .await?
             .map(PyPathMetadata);
 
