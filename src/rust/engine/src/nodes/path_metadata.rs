@@ -1,7 +1,7 @@
 // Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use deepsize::DeepSizeOf;
 use graph::CompoundNode;
@@ -19,8 +19,7 @@ pub struct PathMetadata {
 }
 
 impl PathMetadata {
-    pub fn new(path: PathBuf) -> Result<Self, String> {
-        let subject_path = SubjectPath::new_workspace(path)?;
+    pub fn new(subject_path: SubjectPath) -> Result<Self, String> {
         Ok(Self { subject_path })
     }
 
@@ -34,11 +33,7 @@ impl PathMetadata {
     pub(super) async fn run_node(self, context: Context) -> NodeResult<Option<fs::PathMetadata>> {
         let (vfs, path) = match &self.subject_path {
             SubjectPath::Workspace(relpath) => (&context.core.vfs, relpath.as_path()),
-            SubjectPath::LocalSystem(_) => {
-                return Err(throw(
-                    "Path metadata lookups of system paths not supported yet.".into(),
-                ))
-            }
+            SubjectPath::LocalSystem(path) => (&context.core.vfs_system, path.as_path()),
         };
 
         vfs.path_metadata(path.to_path_buf())
