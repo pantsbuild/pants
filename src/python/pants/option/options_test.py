@@ -37,6 +37,7 @@ from pants.option.errors import (
     OptionAlreadyRegistered,
     OptionNameDoubleDash,
     ParseError,
+    UnknownFlagsError,
 )
 from pants.option.global_options import GlobalOptions
 from pants.option.option_types import StrOption
@@ -669,9 +670,6 @@ def test_arg_scoping() -> None:
     assert ["path/to/tgt"] == options.specs
     assert options.for_global_scope().level == "info"
 
-    with pytest.raises(ParseError):
-        _parse(flags="--unregistered-option compile").for_global_scope()
-
     # Scoping of different values of options with the same name in different scopes.
     options = _parse(flags="--num=11 anotherscope --num=22")
     assert 11 == options.for_global_scope().num
@@ -726,6 +724,11 @@ def test_arg_scoping() -> None:
                 flags=f'--file-listy="{fp1}" --file-listy="{fp2}"'
             ).for_global_scope()
             assert [fp1, fp2] == global_options.file_listy
+
+
+def test_unconsumed_args() -> None:
+    with pytest.raises(UnknownFlagsError):
+        _parse(flags="--unregistered-option compile").verify_args()
 
 
 def test_list_option() -> None:

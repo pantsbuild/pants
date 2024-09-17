@@ -12,7 +12,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter
 from pants.option.config import Config
-from pants.option.errors import ConfigValidationError
+from pants.option.errors import ConfigValidationError, UnknownFlagsError
 from pants.option.native_options import NativeOptionParser
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
@@ -272,6 +272,22 @@ class Options:
                 self.for_scope(scope, check_deprecations=False, log_parser_warnings=True)
             )
         global_config.verify(section_to_valid_options)
+
+    def verify_args(self):
+        # Consume all known args, and see if any are left.
+        # This will have the side-effect of precomputing (and memoizing) options for all scopes.
+        for scope in self.known_scope_to_info:
+            # Currently the legacy parser raises UnknownFlagsError in for_scope().
+            # When we switch to the native parser we will manually check get_unconsumed_flags().
+            self.for_scope(scope)
+        # TODO: Uncomment this when we switch to the native parser.
+        # unconsumed_flags = self._native_parser.get_unconsumed_flags()
+        # if unconsumed_flags:
+        #     # We may have unconsumed flags in multiple positional contexts, but our
+        #     # error handling expects just one, so pick the first one. After the user
+        #     # fixes that error we will show the next scope.
+        #     scope, flags = next(iter(unconsumed_flags))
+        #     raise UnknownFlagsError(flags, scope)
 
     def is_known_scope(self, scope: str) -> bool:
         """Whether the given scope is known by this instance.
