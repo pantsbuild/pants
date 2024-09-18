@@ -138,3 +138,6 @@ class NativeOptionParser:
                 val = option_type(val)
 
         return (val, rank)
+
+    def get_unconsumed_flags(self) -> tuple[str, ...]:
+        return tuple(self._native_parser.get_unconsumed_flags())
