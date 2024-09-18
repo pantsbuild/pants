@@ -11,7 +11,7 @@ use crate::ListEdit;
 use core::iter::once;
 use itertools::{chain, Itertools};
 use parking_lot::Mutex;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -161,14 +161,21 @@ impl ArgsTracker {
         self.unconsumed_args.lock().remove(arg);
     }
 
-    pub fn get_unconsumed_flags(&self) -> Vec<String> {
-        let mut ret: Vec<String> = self
-            .unconsumed_args
-            .lock()
-            .iter()
-            .map(|arg| arg.flag.clone())
-            .collect();
-        ret.sort(); // For stability in tests and when reporting unconsumed args.
+    pub fn get_unconsumed_flags(&self) -> HashMap<Scope, Vec<String>> {
+        // Map from positional context (GLOBAL or a goal name) to unconsumed flags encountered
+        // at that position in the CLI args.
+        let mut ret: HashMap<Scope, Vec<String>> = HashMap::new();
+        for arg in self.unconsumed_args.lock().iter() {
+            if let Some(flags_for_context) = ret.get_mut(&arg.context) {
+                flags_for_context.push(arg.flag.clone());
+            } else {
+                let flags_for_context = vec![arg.flag.clone()];
+                ret.insert(arg.context.clone(), flags_for_context);
+            };
+        }
+        for entry in ret.iter_mut() {
+            entry.1.sort(); // For stability in tests and when reporting unconsumed args.
+        }
         ret
     }
 }
