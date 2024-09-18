@@ -467,6 +467,7 @@ def _parse(
     config: dict[str, dict[str, Any]] | None = None,
     config2: dict[str, dict[str, Any]] | None = None,
     bootstrap_option_values=None,
+    allow_unknown_options=False,
 ) -> Options:
     args = ["./pants", *shlex.split(flags)]
     options = Options.create(
@@ -476,6 +477,7 @@ def _parse(
         known_scope_infos=_known_scope_infos,
         args=args,
         bootstrap_option_values=bootstrap_option_values,
+        allow_unknown_options=allow_unknown_options,
     )
     _register(options)
     return options
@@ -711,7 +713,9 @@ def test_arg_scoping() -> None:
 
 def test_unconsumed_args() -> None:
     with pytest.raises(UnknownFlagsError):
-        _parse(flags="--unregistered-option compile").verify_args()
+        # We set allow_unknown_options=True to ensure that it's the native
+        # parser that checks for unconsumed args, and not the legacy parser.
+        _parse(flags="--unregistered-option compile", allow_unknown_options=True).verify_args()
 
 
 def test_list_option() -> None:
