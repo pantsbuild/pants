@@ -47,7 +47,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.native_engine import PathMetadata, PathMetadataKind
+from pants.engine.internals.native_engine import PathMetadata, PathMetadataKind, PathNamespace
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, goal_rule, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -1541,7 +1541,7 @@ def retry_failed_assertions(
     raise last_exception
 
 
-def test_path_metadata_request(rule_runner: RuleRunner) -> None:
+def test_path_metadata_request_inside_buildroot(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "foo": b"xyzzy",
@@ -1583,3 +1583,44 @@ def test_path_metadata_request(rule_runner: RuleRunner) -> None:
     assert m5.path == "sub-dir"
     assert m5.kind == PathMetadataKind.DIRECTORY
     assert m5.symlink_target is None
+
+
+def test_path_metadata_request_outside_buildroot(rule_runner: RuleRunner) -> None:
+    with temporary_dir() as tmpdir:
+        assert not tmpdir.startswith(rule_runner.build_root)
+
+        def get_metadata(path: str) -> PathMetadata | None:
+            result = rule_runner.request(
+                PathMetadataResult,
+                [PathMetadataRequest(os.path.join(tmpdir, path), PathNamespace.SYSTEM)],
+            )
+            return result.metadata
+
+        base_path = Path(tmpdir)
+        (base_path / "foo").write_bytes(b"xyzzy")
+        (base_path / "sub-dir").mkdir(parents=True)
+        (base_path / "sub-dir" / "bar").write_bytes(b"12345")
+        os.symlink("foo", os.path.join(base_path, "bar"))
+
+        m1 = get_metadata("foo")
+        assert m1 is not None
+        assert m1.path == str(base_path / "foo")
+        assert m1.kind == PathMetadataKind.FILE
+        assert m1.length == len(b"xyzzy")
+        assert m1.symlink_target is None
+
+        m2 = get_metadata("not-found")
+        assert m2 is None
+
+        m4 = get_metadata("bar")
+        assert m4 is not None
+        assert m4.path == str(base_path / "bar")
+        assert m4.kind == PathMetadataKind.SYMLINK
+        assert m4.length == 3
+        assert m4.symlink_target == "foo"
+
+        m5 = get_metadata("sub-dir")
+        assert m5 is not None
+        assert m5.path == str(base_path / "sub-dir")
+        assert m5.kind == PathMetadataKind.DIRECTORY
+        assert m5.symlink_target is None
