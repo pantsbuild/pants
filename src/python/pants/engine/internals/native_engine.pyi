@@ -759,6 +759,7 @@ class RawFdRunner(Protocol):
         stderr_fileno: int,
     ) -> int: ...
 
+def initialize() -> None: ...
 def capture_snapshots(
     scheduler: PyScheduler,
     session: PySession,
