@@ -34,7 +34,7 @@ pub mod prost;
 pub mod retry;
 pub mod tls;
 
-/// Initialize process-wide libraries needed for gRPC.
+/// Initialize process-wide libraries needed for gRPC including the cryptography library used for rustls.
 pub fn initialize() -> Result<(), String> {
     static INIT: Once = Once::new();
 
@@ -226,8 +226,6 @@ mod tests {
                 .await
                 .unwrap();
         });
-
-        tokio::time::sleep(Duration::from_millis(500)).await;
 
         let headers = {
             let mut h = BTreeMap::new();
