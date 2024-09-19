@@ -194,7 +194,10 @@ class Parser:
                 flag_value_map[key].append(flag_val)
             return flag_value_map
 
-    def parse_args_native(self, native_parser: NativeOptionParser) -> OptionValueContainer:
+    def parse_args_native(
+        self,
+        native_parser: NativeOptionParser,
+    ) -> OptionValueContainer:
         namespace = OptionValueContainerBuilder()
         for args, kwargs in self._option_registrations:
             self._validate(args, kwargs)

@@ -7,7 +7,7 @@ use maplit::hashmap;
 use crate::args::{Args, ArgsReader};
 use crate::fromfile::test_util::write_fromfile;
 use crate::fromfile::FromfileExpander;
-use crate::{option_id, DictEdit, DictEditAction, Val};
+use crate::{option_id, DictEdit, DictEditAction, Scope, Val};
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource};
 
 fn mk_args<I>(args: I) -> ArgsReader
@@ -402,4 +402,82 @@ fn test_empty_passthrough_args() {
     let args = mk_args(["-ldebug", "--foo=bar", "--"]);
 
     assert_eq!(Some(&vec![]), args.get_passthrough_args());
+}
+
+#[test]
+fn test_tracker() {
+    let args = mk_args([
+        "-ldebug",
+        "--scope-flag1",
+        "--foo=bar",
+        "--no-scope-flag2",
+        "scope",
+        "--baz-qux",
+    ]);
+
+    assert_eq!(
+        hashmap! {
+            Scope::Global => vec![
+                "--foo".to_string(),
+                "--no-scope-flag2".to_string(),
+                "--scope-flag1".to_string(),
+                "-l".to_string()
+            ],
+            Scope::named("scope") => vec![
+                "--baz-qux".to_string(),
+            ],
+        },
+        args.get_tracker().get_unconsumed_flags()
+    );
+
+    args.get_string(&option_id!("foo")).unwrap();
+    assert_eq!(
+        hashmap! {
+            Scope::Global => vec![
+                "--no-scope-flag2".to_string(),
+                "--scope-flag1".to_string(),
+                "-l".to_string()
+            ],
+            Scope::named("scope") => vec![
+                "--baz-qux".to_string(),
+            ],
+        },
+        args.get_tracker().get_unconsumed_flags()
+    );
+
+    args.get_bool(&option_id!(["scope"], "baz", "qux")).unwrap();
+    assert_eq!(
+        hashmap! {
+            Scope::Global => vec![
+                "--no-scope-flag2".to_string(),
+                "--scope-flag1".to_string(),
+                "-l".to_string(),
+            ],
+        },
+        args.get_tracker().get_unconsumed_flags()
+    );
+
+    args.get_string(&option_id!(-'l', "level")).unwrap();
+    assert_eq!(
+        hashmap! {
+            Scope::Global => vec![
+                "--no-scope-flag2".to_string(),
+                "--scope-flag1".to_string(),
+            ],
+        },
+        args.get_tracker().get_unconsumed_flags()
+    );
+
+    args.get_bool(&option_id!(["scope"], "flag1")).unwrap();
+    assert_eq!(
+        hashmap! {
+            Scope::Global => vec![
+                "--no-scope-flag2".to_string(),
+            ],
+        },
+        args.get_tracker().get_unconsumed_flags()
+    );
+
+    args.get_bool(&option_id!(["scope"], "flag2")).unwrap();
+    assert_eq!(hashmap! {}, args.get_tracker().get_unconsumed_flags());
 }

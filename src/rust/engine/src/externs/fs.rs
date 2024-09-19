@@ -32,6 +32,7 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
     m.add_class::<PyFilespecMatcher>()?;
     m.add_class::<PyPathMetadataKind>()?;
     m.add_class::<PyPathMetadata>()?;
+    m.add_class::<PyPathNamespace>()?;
 
     m.add("EMPTY_DIGEST", PyDigest(EMPTY_DIRECTORY_DIGEST.clone()))?;
     m.add("EMPTY_FILE_DIGEST", PyFileDigest(EMPTY_DIGEST))?;
@@ -589,6 +590,27 @@ impl PyPathMetadata {
 
     fn __repr__(&self) -> String {
         format!("{:?}", self.0)
+    }
+}
+
+/// The path's namespace (to separate buildroot and system paths)
+#[pyclass(name = "PathNamespace", rename_all = "UPPERCASE")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum PyPathNamespace {
+    Workspace,
+    System,
+}
+
+#[pymethods]
+impl PyPathNamespace {
+    fn __eq__(&self, other: &PyPathNamespace) -> bool {
+        self == other
+    }
+
+    fn __hash__(&self) -> u64 {
+        let mut h = DefaultHasher::new();
+        self.hash(&mut h);
+        h.finish()
     }
 }
 

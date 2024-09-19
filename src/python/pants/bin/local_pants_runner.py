@@ -110,7 +110,9 @@ class LocalPantsRunner:
                     # Only compute values if there were any command line options presented.
                     options.for_scope(scope)
 
-        # Verify configs.
+        # Verify CLI flags and configs.
+        if not build_config.allow_unknown_options:
+            options.verify_args()
         if global_bootstrap_options.verify_config:
             options.verify_configs(options_bootstrapper.config)
 

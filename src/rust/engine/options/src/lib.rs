@@ -48,6 +48,7 @@ pub use self::config::ConfigSource;
 use self::config::{Config, ConfigReader};
 pub use self::env::Env;
 use self::env::EnvReader;
+use crate::args::ArgsTracker;
 use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 pub use build_root::BuildRoot;
@@ -268,6 +269,7 @@ pub struct OptionParser {
     sources: BTreeMap<Source, Arc<dyn OptionsSource>>,
     include_derivation: bool,
     passthrough_args: Option<Vec<String>>,
+    args_tracker: Arc<ArgsTracker>,
 }
 
 impl OptionParser {
@@ -294,6 +296,7 @@ impl OptionParser {
         );
 
         let args_reader = ArgsReader::new(args, fromfile_expander.clone());
+        let args_tracker = args_reader.get_tracker();
         let passthrough_args = args_reader.get_passthrough_args().cloned();
 
         let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
@@ -306,6 +309,7 @@ impl OptionParser {
             sources: sources.clone(),
             include_derivation: false,
             passthrough_args: None,
+            args_tracker: args_tracker.clone(),
         };
 
         fn path_join(prefix: &str, suffix: &str) -> String {
@@ -379,6 +383,7 @@ impl OptionParser {
             sources: sources.clone(),
             include_derivation: false,
             passthrough_args: None,
+            args_tracker: args_tracker.clone(),
         };
 
         if allow_pantsrc
@@ -415,6 +420,7 @@ impl OptionParser {
             sources,
             include_derivation,
             passthrough_args,
+            args_tracker,
         })
     }
 
@@ -670,6 +676,10 @@ impl OptionParser {
 
     pub fn get_passthrough_args(&self) -> Option<&Vec<String>> {
         self.passthrough_args.as_ref()
+    }
+
+    pub fn get_unconsumed_flags(&self) -> HashMap<Scope, Vec<String>> {
+        self.args_tracker.get_unconsumed_flags()
     }
 }
 

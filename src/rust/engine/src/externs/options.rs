@@ -297,4 +297,18 @@ impl PyOptionParser {
     fn get_passthrough_args(&self) -> PyResult<Option<Vec<String>>> {
         Ok(self.0.get_passthrough_args().cloned())
     }
+
+    fn get_unconsumed_flags(&self) -> HashMap<String, Vec<String>> {
+        // The python side expects an empty string to represent the GLOBAL scope.
+        self.0
+            .get_unconsumed_flags()
+            .into_iter()
+            .map(|(k, v)| {
+                (
+                    (if k.name() == "GLOBAL" { "" } else { k.name() }).to_string(),
+                    v,
+                )
+            })
+            .collect()
+    }
 }
