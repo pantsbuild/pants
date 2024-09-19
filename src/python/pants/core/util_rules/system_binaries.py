@@ -786,7 +786,7 @@ async def find_binary(
     )
     return BinaryPaths(
         binary_name=request.binary_name,
-        paths=(
+        paths=[
             (
                 BinaryPath.fingerprinted(path, result.stdout)
                 if request.test.fingerprint_stdout
@@ -794,7 +794,7 @@ async def find_binary(
             )
             for path, result in zip(found_paths, results)
             if result.exit_code == 0
-        ),
+        ],
     )
 
 
