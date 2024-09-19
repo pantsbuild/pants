@@ -278,13 +278,23 @@ class Options:
         # This will have the side-effect of precomputing (and memoizing) options for all scopes.
         for scope in self.known_scope_to_info:
             self.for_scope(scope)
-        unconsumed_flags = self._native_parser.get_unconsumed_flags()
-        if unconsumed_flags:
-            # We may have unconsumed flags in multiple positional contexts, but our
-            # error handling expects just one, so pick the first one. After the user
-            # fixes that error we will show the next scope.
-            scope, flags = next(iter(unconsumed_flags.items()))
-            raise UnknownFlagsError(flags, scope)
+        # We implement some global help flags, such as `-h`, `--help`, '-v', `--version`,
+        # as scope aliases (so `--help` is an alias for `help` and so on).
+        # There aren't consumed by the native parser, since they aren't registered as options,
+        # so we must account for them.
+        scope_aliases_that_look_like_flags = set()
+        for si in self.known_scope_to_info.values():
+            scope_aliases_that_look_like_flags.update(
+                sa for sa in si.scope_aliases if sa.startswith("-")
+            )
+
+        for scope, flags in self._native_parser.get_unconsumed_flags().items():
+            flags = tuple(flag for flag in flags if flag not in scope_aliases_that_look_like_flags)
+            if flags:
+                # We may have unconsumed flags in multiple positional contexts, but our
+                # error handling expects just one, so pick the first one. After the user
+                # fixes that error we will show the next scope.
+                raise UnknownFlagsError(flags, scope)
 
     def is_known_scope(self, scope: str) -> bool:
         """Whether the given scope is known by this instance.
