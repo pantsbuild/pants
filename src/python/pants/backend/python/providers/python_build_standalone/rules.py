@@ -56,7 +56,7 @@ def load_pbs_pythons() -> dict[str, dict[str, PBSPythonInfo]]:
 
 
 class PBSPythonProviderSubsystem(Subsystem):
-    options_scope = "pbs-python-provider"
+    options_scope = "python-build-standalone-python-provider"
     name = "python-build-standalone"
     help = softwrap(
         """
