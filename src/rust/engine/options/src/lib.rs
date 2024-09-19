@@ -678,7 +678,7 @@ impl OptionParser {
         self.passthrough_args.as_ref()
     }
 
-    pub fn get_unconsumed_flags(&self) -> Vec<String> {
+    pub fn get_unconsumed_flags(&self) -> HashMap<Scope, Vec<String>> {
         self.args_tracker.get_unconsumed_flags()
     }
 }
