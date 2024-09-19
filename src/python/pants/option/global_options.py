@@ -800,7 +800,7 @@ class LogLevelOption(EnumOption[LogLevel, LogLevel]):
 
     def __new__(cls) -> LogLevelOption:
         self = super().__new__(
-            cls,  # type: ignore[arg-type]
+            cls,
             default=LogLevel.INFO,
             daemon=True,
             help="Set the logging level.",

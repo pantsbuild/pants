@@ -25,7 +25,7 @@ class OnlyOption(StrListOption):
 
     def __new__(cls, tool_description: str, example1: str, example2: str):
         return super().__new__(
-            cls,  # type: ignore[arg-type]
+            cls,
             "--only",
             help=lambda cls: softwrap(
                 f"""
@@ -47,10 +47,10 @@ class BatchSizeOption(IntOption):
 
     def __new__(cls, uppercase: str, lowercase: str):
         return super().__new__(
-            cls,  # type: ignore[arg-type]
+            cls,
             "--batch-size",
             advanced=True,
-            default=128,  # type: ignore[arg-type]
+            default=128,
             help=softwrap(
                 f"""
                 The target number of files to be included in each {lowercase} batch.
