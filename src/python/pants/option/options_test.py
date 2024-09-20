@@ -27,7 +27,6 @@ from pants.option.errors import (
     BooleanConversionError,
     BooleanOptionNameWithNo,
     DefaultValueType,
-    FromfileError,
     HelpType,
     InvalidKwarg,
     InvalidMemberType,
@@ -176,12 +175,18 @@ def test_bool_config(val: bool) -> None:
         assert opts[opt] is val, f"option {opt} has value {opts[opt]} but expected {val}"
 
 
-@pytest.mark.parametrize("val", (11, "AlmostTrue"))
-def test_bool_invalid_value(val: Any) -> None:
+@pytest.mark.parametrize(
+    ("val", "err"),
+    (
+        (11, "Expected \\[GLOBAL\\] opt to be a bool but given 11"),
+        ("AlmostTrue", "Problem parsing \\[GLOBAL\\] opt bool value:"),
+    ),
+)
+def test_bool_invalid_value(val: Any, err: str) -> None:
     def register(opts: Options) -> None:
         opts.register(GLOBAL_SCOPE, "--opt", type=bool)
 
-    with pytest.raises(BooleanConversionError):
+    with pytest.raises(ParseError, match=err):
         create_options([GLOBAL_SCOPE], register, config={"GLOBAL": {"opt": val}}).for_global_scope()
 
 
@@ -443,28 +448,6 @@ def test_scope_deprecation(caplog) -> None:
     assert vals2.qux == "uu"
 
 
-def test_scope_deprecation_default_config_section(caplog) -> None:
-    # Confirms that a DEFAULT option does not trigger deprecation warnings for a deprecated scope.
-    class Subsystem1(Subsystem):
-        options_scope = "new"
-        deprecated_options_scope = "deprecated"
-        deprecated_options_scope_removal_version = "9999.9.9.dev0"
-
-    def register(opts: Options) -> None:
-        opts.register(Subsystem1.options_scope, "--foo")
-
-    opts = create_options(
-        [GLOBAL_SCOPE],
-        register,
-        [],
-        extra_scope_infos=[Subsystem1.get_scope_info()],
-        config={"DEFAULT": {"foo": "aa"}, Subsystem1.options_scope: {"foo": "xx"}},
-    )
-    caplog.clear()
-    assert opts.for_scope(Subsystem1.options_scope).foo == "xx"
-    assert not caplog.records
-
-
 def _create_config(
     config: dict[str, dict[str, str]] | None = None,
     config2: dict[str, dict[str, str]] | None = None,
@@ -484,6 +467,7 @@ def _parse(
     config: dict[str, dict[str, Any]] | None = None,
     config2: dict[str, dict[str, Any]] | None = None,
     bootstrap_option_values=None,
+    allow_unknown_options=False,
 ) -> Options:
     args = ["./pants", *shlex.split(flags)]
     options = Options.create(
@@ -493,6 +477,7 @@ def _parse(
         known_scope_infos=_known_scope_infos,
         args=args,
         bootstrap_option_values=bootstrap_option_values,
+        allow_unknown_options=allow_unknown_options,
     )
     _register(options)
     return options
@@ -728,7 +713,9 @@ def test_arg_scoping() -> None:
 
 def test_unconsumed_args() -> None:
     with pytest.raises(UnknownFlagsError):
-        _parse(flags="--unregistered-option compile").verify_args()
+        # We set allow_unknown_options=True to ensure that it's the native
+        # parser that checks for unconsumed args, and not the legacy parser.
+        _parse(flags="--unregistered-option compile", allow_unknown_options=True).verify_args()
 
 
 def test_list_option() -> None:
@@ -1197,19 +1184,14 @@ def test_enum_option_type_parse_error() -> None:
         options.for_scope("enum-opt")
 
     assert (
-        "Invalid choice 'invalid-value'."
-        + " Choose from: a-value, another-value, yet-another, one-more"
+        "Invalid choice 'invalid-value'. Choose from: a-value, another-value, yet-another, one-more"
     ) in str(exc.value)
 
 
 def test_non_enum_option_type_parse_error() -> None:
-    with pytest.raises(ParseError) as exc:
+    with pytest.raises(ParseError, match="Problem parsing --num int value:"):
         options = _parse(flags="--num=not-a-number")
         options.for_global_scope()
-
-    assert (
-        "Error applying type 'int' to option value 'not-a-number': invalid literal for int()"
-    ) in str(exc.value)
 
 
 def test_mutually_exclusive_options() -> None:
@@ -1349,7 +1331,7 @@ def assert_fromfile(parse_func, expected_append=None, append_contents=None):
     _do_assert_fromfile(dest="intvalue", expected=42, contents="42")
     _do_assert_fromfile(
         dest="dictvalue",
-        expected={"a": 42, "b": (1, 2)},
+        expected={"a": 42, "b": [1, 2]},
         contents=dedent(
             """
             {
@@ -1473,7 +1455,9 @@ def test_fromfile_relative_to_build_root() -> None:
 
 def test_fromfile_error() -> None:
     options = _parse(flags="fromfile --string=@/does/not/exist")
-    with pytest.raises(FromfileError):
+    with pytest.raises(
+        ParseError, match="Problem reading /does/not/exist for --string: No such file or directory"
+    ):
         options.for_scope("fromfile")
 
 
@@ -1584,7 +1568,10 @@ def test_list_of_enum_duplicates() -> None:
 
 def test_list_of_enum_invalid_value() -> None:
     options = _parse(flags="other-enum-scope --some-list-enum=\"['another-value', 'not-a-value']\"")
-    with pytest.raises(ParseError, match="Error computing value for --some-list-enum"):
+    with pytest.raises(
+        ParseError,
+        match="Invalid choice 'not-a-value'. Choose from: a-value, another-value, yet-another, one-more",
+    ):
         options.for_scope("other-enum-scope")
 
 

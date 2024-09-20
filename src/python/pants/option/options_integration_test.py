@@ -30,13 +30,13 @@ def test_invalid_options() -> None:
     # We error on invalid CLI options before validating the config file.
     result = run_pants(["--pytest-invalid=ALL", "help"], config=config)
     result.assert_failure()
-    assert "Unknown flags --invalid on scope pytest" in result.stderr
+    assert "Unknown flag --pytest-invalid in global context" in result.stdout
     for error in config_errors:
         assert error not in result.stderr
 
     result = run_pants(["help"], config=config)
     result.assert_failure()
-    assert "Unknown flags" not in result.stderr
+    assert "Unknown flags" not in result.stdout
     for error in config_errors:
         assert error in result.stderr
 
