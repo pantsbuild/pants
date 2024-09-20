@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import os
 import textwrap
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
@@ -12,13 +13,24 @@ from enum import Enum
 
 from pkg_resources import Requirement
 
+from pants.core.goals.export import (
+    ExportedBinary,
+    ExportRequest,
+    ExportResult,
+    ExportResults,
+    ExportSubsystem,
+)
+from pants.core.goals.resolves import ExportableTool, ExportMode
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, DigestEntries, DownloadFile, FileDigest, FileEntry
+from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import DictOption, EnumOption, StrListOption, StrOption
-from pants.option.subsystem import Subsystem
+from pants.option.subsystem import Subsystem, _construct_subsystem
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
@@ -92,6 +104,16 @@ class ExternalToolOptionsMixin:
         """
         return cls.__name__.lower()
 
+    @classproperty
+    def binary_name(cls):
+        """The name of the binary, as it normally known.
+
+        This allows renaming a built binary to what users expect, even when the name is different.
+        For example, the binary might be "taplo-linux-x86_64" and the name "Taplo", but users expect
+        just "taplo".
+        """
+        return cls.name.lower()
+
     # The default values for --version and --known-versions, and the supported versions.
     # Subclasses must set appropriately.
     default_version: str
@@ -139,7 +161,7 @@ class ExternalToolOptionsMixin:
     )
 
 
-class ExternalTool(Subsystem, ExternalToolOptionsMixin, metaclass=ABCMeta):
+class ExternalTool(Subsystem, ExportableTool, ExternalToolOptionsMixin, metaclass=ABCMeta):
     """Configuration for an invocable tool that we download from an external source.
 
     Subclass this to configure a specific tool.
@@ -178,6 +200,8 @@ class ExternalTool(Subsystem, ExternalToolOptionsMixin, metaclass=ABCMeta):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.check_version_constraints()
+
+    export_mode = ExportMode.binary
 
     use_unsupported_version = EnumOption(
         advanced=True,
@@ -392,5 +416,74 @@ async def download_external_tool(request: ExternalToolRequest) -> DownloadedExte
     return DownloadedExternalTool(digest, request.exe)
 
 
+@dataclass(frozen=True)
+class ExportExternalToolRequest(ExportRequest):
+    pass
+    # tool: type[ExternalTool]
+
+
+@dataclass(frozen=True)
+class _ExportExternalToolForResolveRequest(EngineAwareParameter):
+    resolve: str
+
+
+@dataclass(frozen=True)
+class MaybeExportResult:
+    result: ExportResult | None
+
+
+@rule(level=LogLevel.DEBUG)
+async def export_external_tool(
+    req: _ExportExternalToolForResolveRequest, platform: Platform, union_membership: UnionMembership
+) -> MaybeExportResult:
+    """Export a downloadable tool. Downloads all the tools to `bins`, and symlinks the primary exe
+    to the `bin` directory.
+
+    We use the last segment of the exe instead of the resolve because:
+    - it's probably the exe name people expect
+    - avoids clutter from the resolve name (ex "tfsec" instead of "terraform-tfsec")
+    """
+    exportables = ExportableTool.filter_for_subclasses(
+        union_membership,
+        ExternalTool,  # type:ignore[type-abstract]  # ExternalTool is abstract, and mypy doesn't like that we might return it
+    )
+    maybe_exportable = exportables.get(req.resolve)
+    if not maybe_exportable:
+        return MaybeExportResult(None)
+
+    tool = await _construct_subsystem(maybe_exportable)
+    downloaded_tool = await Get(
+        DownloadedExternalTool, ExternalToolRequest, tool.get_request(platform)
+    )
+
+    dest = os.path.join("bins", tool.name)
+
+    exe = tool.generate_exe(platform)
+    return MaybeExportResult(
+        ExportResult(
+            description=f"Export tool {req.resolve}",
+            reldir=dest,
+            digest=downloaded_tool.digest,
+            resolve=req.resolve,
+            exported_binaries=(ExportedBinary(name=tool.binary_name, path_in_export=exe),),
+        )
+    )
+
+
+@rule
+async def export_external_tools(
+    request: ExportExternalToolRequest, export: ExportSubsystem
+) -> ExportResults:
+    maybe_tools = await MultiGet(
+        Get(MaybeExportResult, _ExportExternalToolForResolveRequest(resolve))
+        for resolve in export.binaries
+    )
+    return ExportResults(tool.result for tool in maybe_tools if tool.result is not None)
+
+
 def rules():
-    return (*collect_rules(), *archive.rules())
+    return (
+        *collect_rules(),
+        *archive.rules(),
+        UnionRule(ExportRequest, ExportExternalToolRequest),
+    )

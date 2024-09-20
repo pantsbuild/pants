@@ -1,0 +1,61 @@
+---
+    title: Making a tool exportable
+    sidebar_position: 10
+---
+
+How to make a tool exportable with the `export` goal.
+
+---
+
+Backends that implement the `export` goal can indicate binaries that should be exported. These will have their contents exported to a subfolder in the `dist/bins` directory, and the binary itself will be linked in `dist/bin`.
+
+## Downloadable Tools
+
+Subclasses of `ExternalTool` (including `TemplatedExternalTool`) have the logic for exporting implemented. Tools are marked for export as follows:
+
+1. Implement `ExternalTool.generate_exe` if the default is not correct. For instance, a tool downloaded might include a binary, a readme, and a license. This method will point to the binary within the downloaded files.
+
+2. Register a `UnionRule` with `ExportableTool`. For example, `UnionRule(ExportableTool, FortranLint)`
+
+## Implementing for new backends
+
+Backends need to implement:
+
+1. A subclass of `ExportRequest`
+
+```python
+@dataclass(frozen=True)
+class ExportExternalToolRequest(ExportRequest):
+    pass
+```
+
+2. A rule from this subclass to `ExportResults`
+
+```python
+@rule
+async def export_external_tools(
+    request: ExportExternalToolRequest, export: ExportSubsystem
+) -> ExportResults:
+```
+
+3. Inside of that rule, fill the `ExportResult.exported_binaries` field.
+
+```python
+ExportResult(
+    description=f"Export tool {req.resolve}",
+    reldir=dest,
+    digest=downloaded_tool.digest,
+    resolve=req.resolve,
+    exported_binaries=(ExportedBinary(name=Path(exe).name, path_in_export=exe),),
+)
+```
+
+4. For every tool, mark it for export registering a `UnionRule` with `ExportableTool`.
+
+```python
+def rules():
+    return [
+        ...,
+        `UnionRule(ExportableTool, FortranLint)`,
+    ]
+```

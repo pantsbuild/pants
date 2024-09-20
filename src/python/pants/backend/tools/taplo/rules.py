@@ -5,12 +5,14 @@ from typing import Any
 
 from pants.backend.tools.taplo.subsystem import Taplo
 from pants.core.goals.fmt import FmtFilesRequest, FmtResult, Partitions
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.source.filespec import FilespecMatcher
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -76,4 +78,5 @@ def rules():
     return [
         *collect_rules(),
         *TaploFmtRequest.rules(),
+        UnionRule(ExportableTool, Taplo),
     ]

@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import logging
 
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
+from pants.engine.unions import UnionRule
 from pants.option.option_types import StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
@@ -97,4 +99,5 @@ def rules():
     return [
         *external_tool.rules(),
         *NfpmSubsystem.rules(),
+        UnionRule(ExportableTool, NfpmSubsystem),
     ]

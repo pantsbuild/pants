@@ -211,6 +211,7 @@ def rules():
     return [
       	*collect_rules(),
         ShellcheckRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        UnionRule(ExportableTool, Shellcheck),  # allows exporting the `shellcheck` binary
     ]
 ```
 
@@ -229,3 +230,7 @@ Now, when you run `pants lint ::`, your new linter should run.
 ## 4. Add tests (optional)
 
 Refer to [Testing rules](../the-rules-api/testing-plugins.mdx).
+
+## 5. Make the tool exportable (optional)
+
+Refer to [Allowing tool export](allowing-tool-export.mdx) to allow users to export the tool for use in external programs.

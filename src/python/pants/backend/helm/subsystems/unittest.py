@@ -8,6 +8,7 @@ from pants.backend.helm.util_rules.tool import (
     ExternalHelmPluginBinding,
     ExternalHelmPluginRequest,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -78,4 +79,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(ExternalHelmPluginBinding, HelmUnitTestPluginBinding),
+        UnionRule(ExportableTool, HelmUnitTestSubsystem),
     ]
