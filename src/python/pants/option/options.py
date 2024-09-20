@@ -425,6 +425,9 @@ class Options:
                 legacy_values = self.get_parser(scope).parse_args(
                     parse_args_request, log_warnings=log_parser_warnings
                 )
+            except UnknownFlagsError:
+                # Let the native parser handle unknown flags.
+                legacy_values = None
             except Exception as e:
                 native_mismatch_msgs.append(
                     f"Failed to parse options with legacy parser due to error:\n    {e}"

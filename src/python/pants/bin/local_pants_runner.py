@@ -105,14 +105,16 @@ class LocalPantsRunner:
         # Option values are usually computed lazily on demand, but command line options are
         # eagerly computed for validation.
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
+            # Verify CLI flags.
+            if not build_config.allow_unknown_options:
+                options.verify_args()
+
             for scope, values in options.scope_to_flags.items():
                 if values:
                     # Only compute values if there were any command line options presented.
                     options.for_scope(scope)
 
-        # Verify CLI flags and configs.
-        if not build_config.allow_unknown_options:
-            options.verify_args()
+        # Verify configs.
         if global_bootstrap_options.verify_config:
             options.verify_configs(options_bootstrapper.config)
 
