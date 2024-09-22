@@ -363,6 +363,7 @@ def test_relocated_resources() -> None:
     args = [
         "--backend-packages=pants.backend.python",
         "--source-root-patterns=['src/py']",
+        "--python-interpreter-constraints=['CPython>=3.9']",
         "run",
         "src/py/project:binary",
     ]
