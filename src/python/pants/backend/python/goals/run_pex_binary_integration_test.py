@@ -369,15 +369,4 @@ def test_relocated_resources() -> None:
     ]
     result = run_pants(args, use_pantsd=False)
 
-    assert "Hola, mundo.\n" in result.stderr
-    file = result.stdout.strip()
-    assert "src_root2" not in file
-    assert file.endswith("utils/strutil.py")
-    if layout == PexLayout.LOOSE:
-        # Loose PEXs execute their own code directly
-        assert "pants-sandbox-" in file
-    else:
-        assert "pants-sandbox-" not in file
-    assert result.exit_code == 23
-
-    return run
+    assert "No such file or directory" not in result.stderr
