@@ -4,13 +4,21 @@
 from __future__ import annotations
 
 import unittest.mock
+from datetime import timedelta
 from enum import Enum
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from pants.option.custom_types import dir_option, file_option, memory_size, shell_str, target_option
+from pants.option.custom_types import (
+    dir_option,
+    duration,
+    file_option,
+    memory_size,
+    shell_str,
+    target_option,
+)
 from pants.option.option_types import (
     ArgsListOption,
     BoolListOption,
@@ -18,6 +26,7 @@ from pants.option.option_types import (
     DictOption,
     DirListOption,
     DirOption,
+    DurationOption,
     EnumListOption,
     EnumOption,
     FileListOption,
@@ -68,6 +77,7 @@ def opt_info(*names, **options):
         (FileOption, "a str", ".", dict(type=file_option)),
         (ShellStrOption, "a str", "", dict(type=shell_str)),
         (MemorySizeOption, 20, 22, dict(type=memory_size)),
+        (DurationOption, "10s", timedelta(microseconds=10), dict(type=duration)),
         # List options
         (StrListOption, ["a str"], ["str1", "str2"], dict(type=list, member_type=str)),
         (IntListOption, [10], [1, 2], dict(type=list, member_type=int)),
@@ -314,6 +324,7 @@ def test_subsystem_option_ordering() -> None:
         FileOption,
         ShellStrOption,
         MemorySizeOption,
+        DurationOption,
         StrListOption,
         IntListOption,
         FloatListOption,

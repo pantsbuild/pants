@@ -7,6 +7,7 @@ import inspect
 import os
 import re
 import shlex
+from datetime import timedelta
 from enum import Enum
 from typing import Iterable, Pattern, Sequence
 
@@ -165,6 +166,44 @@ def memory_size(s: str | int | float) -> int:
         except TypeError:
             raise invalid
     raise invalid
+
+
+_DURATION_STR_RE = re.compile(r"^\s*([0-9.]+)\s*(\w*)\s*$")
+
+
+def duration(val: timedelta | str | int | float) -> timedelta:
+    if isinstance(val, timedelta):
+        return val
+
+    if isinstance(val, (float, int)):
+        if val <= 0:
+            raise ParseError("A duration must be positive.")
+        return timedelta(seconds=val)
+
+    # Is the value in the form of `NUMBER UNIT`?
+    m = _DURATION_STR_RE.fullmatch(val)
+    if not m:
+        raise ParseError(f"The duration value `{val}` must be in `NUMBER UNIT` format.")
+
+    magnitude = int(m.group(1)) if "." not in m.group(1) else float(m.group(1))
+
+    maybe_unit = m.group(2)
+    unit = maybe_unit if maybe_unit else "s"
+
+    if unit in ("s", "second", "seconds"):
+        key = "seconds"
+    elif unit in ("ms", "milli", "millis", "millisecond", "milliseconds"):
+        key = "milliseconds"
+    elif unit in ("us", "micro", "micros", "microsecond", "microseconds"):
+        key = "microseconds"
+    elif unit in ("m", "minute", "minutes"):
+        key = "minutes"
+    elif unit in ("h", "hour", "hours"):
+        key = "hours"
+    else:
+        raise ParseError(f"Did not recognize the duration unit `{unit}`.")
+
+    return timedelta(**{key: magnitude})
 
 
 def _convert(val, acceptable_types):

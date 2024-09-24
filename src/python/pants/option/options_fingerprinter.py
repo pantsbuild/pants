@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from collections import defaultdict
+from datetime import timedelta
 from enum import Enum
 from hashlib import sha1
 
@@ -21,6 +22,8 @@ class OptionEncoder(json.JSONEncoder):
         if isinstance(o, dict):
             # Sort by key to ensure that we don't invalidate if the insertion order changes.
             return {k: self.default(v) for k, v in sorted(o.items())}
+        if isinstance(o, timedelta):
+            return str(o)
         return super().default(o)
 
 

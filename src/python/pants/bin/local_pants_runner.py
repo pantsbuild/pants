@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import sys
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -53,7 +54,7 @@ class LocalPantsRunner:
 
     options: Options
     options_bootstrapper: OptionsBootstrapper
-    session_end_tasks_timeout: float
+    session_end_tasks_timeout: timedelta
     build_config: BuildConfiguration
     run_tracker: RunTracker
     specs: Specs
