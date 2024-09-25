@@ -2054,12 +2054,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                 )
             )
 
-        if not opts.watch_filesystem and (opts.pantsd or opts.loop):
+        if not opts.watch_filesystem and opts.loop:
             raise OptionsError(
                 softwrap(
                     """
                     The `--no-watch-filesystem` option may not be set if
-                    `--pantsd` or `--loop` is set.
+                    `--loop` is set.
                     """
                 )
             )
