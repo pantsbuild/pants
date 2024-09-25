@@ -458,7 +458,10 @@ async def setup_build_go_package_target_request(
         maybe_base_pkg_dep = await Get(
             FallibleBuildGoPackageRequest,
             BuildGoPackageTargetRequest(
-                request.address, for_tests=True, build_opts=request.build_opts
+                request.address,
+                for_tests=True,
+                with_coverage=request.with_coverage,
+                build_opts=request.build_opts,
             ),
         )
         if maybe_base_pkg_dep.request is None:
