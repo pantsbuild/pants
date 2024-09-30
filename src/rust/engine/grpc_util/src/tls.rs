@@ -95,7 +95,8 @@ impl TryFrom<Config> for ClientConfig {
             execution. Consider setting `--remote-ca-certs-path` instead to explicitly point to \
             the correct PEM file. Error(s):\n\n");
                                 for error in &native_root_certs_result.errors {
-                                    write!(&mut msg, "{}\n\n", &error).expect("write into mutable string");
+                                    write!(&mut msg, "{}\n\n", &error)
+                                        .expect("write into mutable string");
                                 }
                                 return Err(msg);
                             }
