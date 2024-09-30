@@ -1,5 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::fmt::Write;
 use std::io;
 use std::sync::Arc;
 
@@ -88,16 +89,20 @@ impl TryFrom<Config> for ClientConfig {
                             }
                         }
                         None => {
-                            let native_root_certs = rustls_native_certs::load_native_certs()
-                                .map_err(|err| {
-                                    format!(
-                "Could not discover root CA cert files to use TLS with remote caching and remote \
+                            let native_root_certs_result = rustls_native_certs::load_native_certs();
+                            if !native_root_certs_result.errors.is_empty() {
+                                let mut msg = String::from("Could not discover root CA cert files to use TLS with remote caching and remote \
             execution. Consider setting `--remote-ca-certs-path` instead to explicitly point to \
-            the correct PEM file.\n\n{err}",
-              )
-                                })?;
+            the correct PEM file. Error(s):\n\n");
+                                for error in &native_root_certs_result.errors {
+                                    write!(&mut msg, "{}\n\n", &error)
+                                        .expect("write into mutable string");
+                                }
+                                return Err(msg);
+                            }
 
-                            root_cert_store.add_parsable_certificates(native_root_certs);
+                            root_cert_store
+                                .add_parsable_certificates(native_root_certs_result.certs);
                         }
                     }
 
