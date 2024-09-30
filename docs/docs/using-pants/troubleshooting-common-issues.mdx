@@ -50,10 +50,7 @@ If you are using the latest stable version of Pants and still experience a cache
 
 To start with, first try using `--no-pantsd`. If that doesn't work, you can also try `--no-local-cache`.
 
-If `--no-pantsd` worked, you can restart `pantsd`, either by:
-
-- Killing the `pantsd` process associated with your workspace. You can use `ps aux | grep pants` to find the PID, the `kill -9 <pid>`.
-- Deleting the `<build root>/.pants.d/pids` directory.
+If `--no-pantsd` worked, you can stop pantsd so that it will restarted on the next invocation of pants. To do so, run `rm -r .pants.d/pids/`in the build root.
 
 If this resolves the issue, please report that on the ticket and attach the recent content of the `.pants.d/workdir/pantsd/pantsd.log` file.
 
