@@ -369,4 +369,4 @@ def test_relocated_resources() -> None:
     ]
     result = run_pants(args, use_pantsd=False)
 
-    assert "No such file or directory" not in result.stderr
+    assert "No such file or directory" not in result.stderr, result.stderr
