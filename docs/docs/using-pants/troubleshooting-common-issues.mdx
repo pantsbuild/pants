@@ -48,13 +48,11 @@ There is even a `__run.sh` script in the directory that will run the process usi
 
 If you are using the latest stable version of Pants and still experience a cache invalidation issue: we are sorry for the trouble. We have not yet added a comprehensive goal to "clear all caches", because we are very interested in coming up with coherent solutions to potential issues (see for more information). If you experience a cache issue, please absolutely [file a bug](https://github.com/pantsbuild/pants/issues/new) before proceeding to the following steps.
 
-To start with, first try using `--no-pantsd`. If that doesn't work, you can also try `--no-local-cache`.
-
-If `--no-pantsd` worked, you can stop pantsd so that it will restarted on the next invocation of pants. To do so, run `rm -r .pants.d/pids/`in the build root.
+To start with, first try using `--no-pantsd`. If `--no-pantsd` worked, you can stop pantsd so that it will restarted on the next invocation of pants. To do so, run `rm -r .pants.d/pids/`in the build root.
 
 If this resolves the issue, please report that on the ticket and attach the recent content of the `.pants.d/workdir/pantsd/pantsd.log` file.
 
-If restarting `pantsd` is not sufficient, you can also use `--no-local-cache` to ignore the persistent caches. If this resolves the issue, then it is possible that the contents of the cache (at `~/.cache/pants`) will be useful for debugging the ticket that you filed: please try to preserve the cache contents until it can be resolved.
+If restarting pantsd is not sufficient, you can also use `--no-local-cache` to ignore the persistent caches. If this resolves the issue, then it is possible that the contents of the cache (at `~/.cache/pants`) will be useful for debugging the ticket that you filed: please try to preserve the cache contents until it can be resolved.
 
 ## Pants cannot find a file in your project
 
