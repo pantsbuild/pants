@@ -71,6 +71,20 @@ pants_ignore.add = ["!folder/"]
 
 Alternatively, you can stop populating `pants_ignore` from your `.gitignore` by setting `pants_ignore_use_gitignore = false` in the `[GLOBAL]` scope.
 
+## Pants cannot find a required binary
+
+Pants may be unable to locate a required binary to execute a specified goal. This can manifest in an error message such as:
+
+```
+BinaryNotFoundError: Cannot find `required_binary` on `['/usr/bin/', '/bin', '/usr/local/bin', '/opt/homebrew/bin']`. Please ensure that it is installed so that Pants can interact with the required_binary.
+```
+
+Helpfully, the error message already contains the list of directories that pants searches for binaries. This list is controlled by the [`system_binary_paths`](../../reference/subsystems/system-binaries#system_binary_paths) setting in the system-binaries subsystem. Ensure that the directory that contains your binary is on the list.
+
+If `system_binary_paths` contains the special string `<PATH>`, note that the PATH variable can also be changed after the invocation of pants in [`.pants.bootstrap`](../..//docs/using-pants/key-concepts/options#pantsbootstrap-file).
+
+Pantsd caches the location of binaries and also negative hits. If you recently installed the binary or changed it's location, make sure to stop pantsd so that it will be restarted on the next invocation of pants. To do so, run `rm -r .pants.d/pids/`in the build root.
+
 ## Import errors and missing dependencies
 
 Because Pants runs processes in hermetic sandboxes (temporary directories), Pants must properly know about your [dependencies](../introduction/how-does-pants-work#dependency-inference) to avoid import errors.
