@@ -501,6 +501,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d4260bcc2e8fc9df1eac4919a720effeb63a3f0952f5bf4944adfa18897f09"
 dependencies = [
  "memchr",
+ "once_cell",
+ "regex-automata 0.1.10",
  "serde",
 ]
 
@@ -3331,9 +3333,15 @@ checksum = "38200e5ee88914975b69f657f0801b6f6dccafd44fd9326302a4aaeecfacb1d8"
 dependencies = [
  "aho-corasick 1.1.2",
  "memchr",
- "regex-automata",
+ "regex-automata 0.4.8",
  "regex-syntax",
 ]
+
+[[package]]
+name = "regex-automata"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c230d73fb8d8c1b9c0b3135c5142a8acee3a0558fb8db5cf1cb65f8d7862132"
 
 [[package]]
 name = "regex-automata"
@@ -3945,9 +3953,12 @@ dependencies = [
 
 [[package]]
 name = "shell-quote"
-version = "0.3.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab31b1e46a3f14300977ece8c355009deddc6c531de49d55951e795bbad42957"
+checksum = "ae4c63bdcc11eea49b562941b914d5ac30d42cad982e3f6e846a513ee6a3ce7e"
+dependencies = [
+ "bstr",
+]
 
 [[package]]
 name = "shellexpand"
