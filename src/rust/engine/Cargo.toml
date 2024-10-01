@@ -284,7 +284,7 @@ os_pipe = "1.1"
 parking_lot = "0.12"
 peg = "0.8"
 petgraph = "0.6"
-pin-project = "1.0.12"
+pin-project = "1.1.5"
 pin-project-lite = "0.2"
 prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messages-draft", version = "16", default-features = false, features = [
   "progress-tree",
