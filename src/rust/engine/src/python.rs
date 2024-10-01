@@ -131,8 +131,8 @@ unsafe impl Send for TypeId {}
 unsafe impl Sync for TypeId {}
 
 impl TypeId {
-    pub fn new(py_type: &PyType) -> Self {
-        py_type.into()
+    pub fn new(py_type: &Bound<'_, PyType>) -> Self {
+        Self(py_type.as_type_ptr())
     }
 
     pub fn as_py_type<'py>(&self, py: Python<'py>) -> &'py PyType {
@@ -150,7 +150,12 @@ impl TypeId {
         Python::with_gil(|py| {
             externs::union_in_scope_types(py, self.as_py_type(py))
                 .unwrap()
-                .map(|types| types.into_iter().map(TypeId::new).collect())
+                .map(|types| {
+                    types
+                        .into_iter()
+                        .map(|t| TypeId::new(&t.as_borrowed()))
+                        .collect()
+                })
         })
     }
 }
