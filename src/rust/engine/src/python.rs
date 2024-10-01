@@ -252,8 +252,8 @@ impl fmt::Display for Key {
     }
 }
 
-impl<'source> FromPyObject<'source> for Key {
-    fn extract(obj: &'source PyAny) -> PyResult<Self> {
+impl<'py> FromPyObject<'py> for Key {
+    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = obj.py();
         externs::INTERNS.key_insert(py, obj.into_py(py))
     }
@@ -353,8 +353,8 @@ impl fmt::Display for Value {
     }
 }
 
-impl<'source> FromPyObject<'source> for Value {
-    fn extract(obj: &'source PyAny) -> PyResult<Self> {
+impl<'py> FromPyObject<'py> for Value {
+    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = obj.py();
         Ok(obj.into_py(py).into())
     }
