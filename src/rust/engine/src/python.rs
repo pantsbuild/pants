@@ -313,7 +313,7 @@ impl Value {
         }
     }
 
-    /// Bind this value to the given Pythn context as a `pyo3::Bound` smart pointer.
+    /// Bind this value to the given Python GIL context as a `pyo3::Bound` smart pointer.
     pub fn bind<'py>(&self, py: Python<'py>) -> &Bound<'py, PyAny> {
         self.0.bind(py)
     }
