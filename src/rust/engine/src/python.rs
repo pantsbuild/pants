@@ -312,6 +312,11 @@ impl Value {
             Err(arc_handle) => arc_handle.clone_ref(py),
         }
     }
+
+    /// Bind this value to the given Pythn context as a `pyo3::Bound` smart pointer.
+    pub fn bind<'py>(&self, py: Python<'py>) -> &Bound<'py, PyAny> {
+        self.0.bind(py)
+    }
 }
 
 impl workunit_store::Value for Value {
