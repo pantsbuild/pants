@@ -72,13 +72,14 @@ impl PyProcessExecutionEnvironment {
 
     fn __richcmp__(
         &self,
-        other: &PyProcessExecutionEnvironment,
+        other: &Bound<'_, PyProcessExecutionEnvironment>,
         op: CompareOp,
         py: Python,
     ) -> PyObject {
+        let other = other.borrow();
         match op {
-            CompareOp::Eq => (self == other).into_py(py),
-            CompareOp::Ne => (self != other).into_py(py),
+            CompareOp::Eq => (*self == *other).into_py(py),
+            CompareOp::Ne => (*self != *other).into_py(py),
             _ => py.NotImplemented(),
         }
     }
