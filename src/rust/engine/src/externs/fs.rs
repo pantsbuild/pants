@@ -22,7 +22,7 @@ use store::Snapshot;
 
 use crate::Failure;
 
-pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDigest>()?;
     m.add_class::<PyFileDigest>()?;
     m.add_class::<PySnapshot>()?;

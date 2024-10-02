@@ -9,7 +9,7 @@ use pyo3::types::PyDict;
 use crate::externs::scheduler::PyExecutor;
 use task_executor::Executor;
 
-pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "PantsdConnectionException",
         py.get_type::<PantsdConnectionException>(),

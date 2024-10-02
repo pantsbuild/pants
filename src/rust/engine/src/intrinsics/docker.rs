@@ -4,13 +4,14 @@
 use docker::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
 use process_execution::Platform;
 use pyo3::prelude::{pyfunction, wrap_pyfunction, PyAny, PyModule, PyResult, Python, ToPyObject};
-use pyo3::types::PyString;
+use pyo3::types::{PyModuleMethods, PyString};
+use pyo3::Bound;
 
 use crate::externs::{self, PyGeneratorResponseNativeCall};
 use crate::nodes::task_get_context;
 use crate::python::{Failure, Value};
 
-pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(docker_resolve_image, m)?)?;
 
     Ok(())

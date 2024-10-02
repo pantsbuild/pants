@@ -9,8 +9,8 @@ use fs::{
 };
 use hashing::{Digest, EMPTY_DIGEST};
 use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyRef, PyResult, Python};
-use pyo3::types::PyTuple;
-use pyo3::IntoPy;
+use pyo3::types::{PyModuleMethods, PyTuple};
+use pyo3::{Bound, IntoPy};
 use store::{SnapshotOps, SubsetParams};
 
 use crate::externs;
@@ -25,7 +25,7 @@ use crate::nodes::{
 use crate::python::{throw, Key, Value};
 use crate::Failure;
 
-pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(add_prefix, m)?)?;
     m.add_function(wrap_pyfunction!(create_digest, m)?)?;
     m.add_function(wrap_pyfunction!(digest_subset_to_digest, m)?)?;

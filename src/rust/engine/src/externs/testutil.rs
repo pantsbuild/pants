@@ -13,7 +13,7 @@ use testutil_mock::{StubCAS, StubCASBuilder};
 use crate::externs::fs::{PyDigest, PyFileDigest};
 use crate::externs::scheduler::PyExecutor;
 
-pub fn register(m: &PyModule) -> PyResult<()> {
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyStubCAS>()?;
     m.add_class::<PyStubCASBuilder>()?;
     Ok(())

@@ -10,7 +10,7 @@ use pyo3::prelude::*;
 
 use process_execution::{Platform, ProcessExecutionEnvironment, ProcessExecutionStrategy};
 
-pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyProcessExecutionEnvironment>()?;
 
     Ok(())

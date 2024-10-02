@@ -5,13 +5,14 @@ use std::time::Duration;
 
 use futures::future::TryFutureExt;
 use futures::try_join;
-use pyo3::prelude::{pyfunction, wrap_pyfunction, IntoPy, PyModule, PyResult, Python};
+use pyo3::types::{PyModule, PyModuleMethods};
+use pyo3::{pyfunction, wrap_pyfunction, Bound, IntoPy, PyResult, Python};
 
 use crate::externs::{self, PyGeneratorResponseNativeCall};
 use crate::nodes::{task_get_context, ExecuteProcess, NodeResult, Snapshot};
 use crate::python::Value;
 
-pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(execute_process, m)?)?;
 
     Ok(())
