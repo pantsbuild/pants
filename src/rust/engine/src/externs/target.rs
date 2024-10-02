@@ -7,7 +7,6 @@ use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::pybacked::PyBackedStr;
 use pyo3::types::PyType;
 
 use crate::externs::address::Address;
@@ -48,18 +47,18 @@ impl Field {
     #[pyo3(signature = (raw_value, address))]
     fn __new__(
         cls: &Bound<'_, PyType>,
-        raw_value: Option<Bound<'_, PyObject>>,
+        raw_value: Option<&Bound<'_, PyAny>>,
         address: Bound<'_, Address>,
         py: Python,
     ) -> PyResult<Self> {
         // NB: The deprecation check relies on the presence of NoFieldValue to detect if
         //  the field was explicitly set, so this must come before we coerce the raw_value
         //  to None below.
-        Self::check_deprecated(cls, raw_value.as_ref(), &address, py)?;
+        Self::check_deprecated(cls, raw_value, &address, py)?;
 
         let raw_value = match raw_value {
             Some(value)
-                if value.extract::<NoFieldValue>(py).is_ok()
+                if value.extract::<NoFieldValue>().is_ok()
                     && !Self::cls_none_is_valid_value(cls)? =>
             {
                 None
@@ -85,34 +84,34 @@ impl Field {
     }
 
     #[classattr]
-    fn removal_version() -> Option<PyBackedStr> {
+    fn removal_version() -> Option<String> {
         None
     }
 
     #[classattr]
-    fn removal_hint() -> Option<PyBackedStr> {
+    fn removal_hint() -> Option<String> {
         None
     }
 
     #[classattr]
-    fn deprecated_alias() -> Option<PyBackedStr> {
+    fn deprecated_alias() -> Option<String> {
         None
     }
 
     #[classattr]
-    fn deprecated_alias_removal_version() -> Option<PyBackedStr> {
+    fn deprecated_alias_removal_version() -> Option<String> {
         None
     }
 
     #[classmethod]
     #[pyo3(signature = (raw_value, address))]
-    fn compute_value(
-        cls: &Bound<'_, PyType>,
-        raw_value: Option<Bound<'_, PyObject>>,
+    fn compute_value<'py>(
+        cls: &Bound<'py, PyType>,
+        raw_value: Option<&Bound<'py, PyAny>>,
         address: PyRef<Address>,
-        py: Python,
-    ) -> PyResult<PyObject> {
-        let default = || -> PyResult<PyObject> {
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let default = || -> PyResult<Bound<'_, PyAny>> {
             if Self::cls_required(cls)? {
                 // TODO: Should be `RequiredFieldMissingException`.
                 Err(PyValueError::new_err(format!(
@@ -127,18 +126,18 @@ impl Field {
 
         let none_is_valid_value = Self::cls_none_is_valid_value(cls)?;
         match raw_value {
-            Some(value) if none_is_valid_value && value.extract::<NoFieldValue>(py).is_ok() => {
+            Some(value) if none_is_valid_value && value.extract::<NoFieldValue>().is_ok() => {
                 default()
             }
-            None if none_is_valid_value => Ok(py.None()),
+            None if none_is_valid_value => Ok(py.None().into_bound(py)),
             None => default(),
-            Some(value) => Ok(value),
+            Some(value) => Ok(value.clone()),
         }
     }
 
     #[getter]
-    fn value(&self, py: Python) -> Bound<'_, PyObject> {
-        &self.value
+    fn value<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
+        self.value.bind(py).clone()
     }
 
     fn __hash__(self_: &Bound<'_, Self>, py: Python) -> PyResult<isize> {
@@ -196,41 +195,41 @@ impl Field {
         cls.getattr("none_is_valid_value")?.extract::<bool>()
     }
 
-    fn cls_default(cls: &Bound<'_, PyAny>) -> PyResult<PyObject> {
-        cls.getattr("default")?.extract()
+    fn cls_default<'py>(cls: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+        cls.getattr("default")
     }
 
     fn cls_required(cls: &Bound<'_, PyAny>) -> PyResult<bool> {
         cls.getattr("required")?.extract()
     }
 
-    fn cls_alias(cls: &Bound<'_, PyAny>) -> PyResult<PyBackedStr> {
+    fn cls_alias(cls: &Bound<'_, PyAny>) -> PyResult<String> {
         // TODO: All of these methods should use interned attr names.
         cls.getattr("alias")?.extract()
     }
 
-    fn cls_removal_version(cls: &Bound<'_, PyAny>) -> PyResult<Option<PyBackedStr>> {
+    fn cls_removal_version(cls: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
         cls.getattr("removal_version")?.extract()
     }
 
-    fn cls_removal_hint(cls: &Bound<'_, PyAny>) -> PyResult<Option<PyBackedStr>> {
+    fn cls_removal_hint(cls: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
         cls.getattr("removal_hint")?.extract()
     }
 
     fn check_deprecated(
         cls: &Bound<'_, PyType>,
-        raw_value: Option<Bound<'_, PyObject>>,
-        address: &Address,
+        raw_value: Option<&Bound<'_, PyAny>>,
+        address: &Bound<'_, Address>,
         py: Python,
     ) -> PyResult<()> {
-        if address.is_generated_target() {
+        if address.borrow().is_generated_target() {
             return Ok(());
         }
         let Some(removal_version) = Self::cls_removal_version(cls)? else {
             return Ok(());
         };
         match raw_value {
-            Some(value) if value.extract::<NoFieldValue>(py).is_ok() => return Ok(()),
+            Some(value) if value.extract::<NoFieldValue>().is_ok() => return Ok(()),
             _ => (),
         }
 
@@ -242,7 +241,7 @@ impl Field {
         };
 
         let alias = Self::cls_alias(cls)?;
-        let deprecated = PyModule::import(py, "pants.base.deprecated")?;
+        let deprecated = PyModule::import_bound(py, "pants.base.deprecated")?;
         deprecated.getattr("warn_or_error")?.call(
             (
                 removal_version,
