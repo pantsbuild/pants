@@ -34,10 +34,10 @@ struct PyNailgunClient {
 #[pymethods]
 impl PyNailgunClient {
     #[new]
-    fn __new__(port: u16, py_executor: &PyExecutor) -> Self {
+    fn __new__(port: u16, py_executor: &Bound<'_, PyExecutor>) -> Self {
         Self {
             port,
-            executor: py_executor.0.clone(),
+            executor: py_executor.borrow().0.clone(),
         }
     }
 
@@ -45,7 +45,7 @@ impl PyNailgunClient {
         &self,
         command: String,
         args: Vec<String>,
-        env: &PyDict,
+        env: &Bound<'_, PyDict>,
         py: Python,
     ) -> PyResult<i32> {
         use nailgun::NailgunClientError;
