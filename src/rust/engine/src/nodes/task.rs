@@ -331,7 +331,7 @@ impl Task {
 
         if self.task.engine_aware_return_type {
             Python::with_gil(|py| {
-                EngineAwareReturnType::update_workunit(workunit, (*result_val).as_ref(py))
+                EngineAwareReturnType::update_workunit(workunit, (*result_val).bind(py))
             })
         };
 
