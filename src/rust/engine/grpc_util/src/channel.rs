@@ -100,7 +100,6 @@ impl Service<http::Request<BoxBody>> for Channel {
             .unwrap();
         *req.uri_mut() = uri;
 
-        log::info!("sending request {:?}", &req);
         let client = self.client.clone();
         Box::pin(async move {
             match &client {
