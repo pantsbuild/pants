@@ -36,7 +36,7 @@ use pyo3::prelude::{
     PyResult as PyO3Result, Python, ToPyObject,
 };
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
-use pyo3::{create_exception, IntoPy, PyAny, PyRef};
+use pyo3::{create_exception, AsPyPointer, Bound, IntoPy, PyAny, PyNativeType, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, RuleGraph};
@@ -187,41 +187,41 @@ struct PyTypes(RefCell<Option<Types>>);
 impl PyTypes {
     #[new]
     fn __new__(
-        paths: &PyType,
-        path_metadata_request: &PyType,
-        path_metadata_result: &PyType,
-        file_content: &PyType,
-        file_entry: &PyType,
-        symlink_entry: &PyType,
-        directory: &PyType,
-        digest_contents: &PyType,
-        digest_entries: &PyType,
-        path_globs: &PyType,
-        create_digest: &PyType,
-        digest_subset: &PyType,
-        native_download_file: &PyType,
-        platform: &PyType,
-        process: &PyType,
-        process_result: &PyType,
-        process_result_metadata: &PyType,
-        coroutine: &PyType,
-        session_values: &PyType,
-        run_id: &PyType,
-        interactive_process: &PyType,
-        interactive_process_result: &PyType,
-        engine_aware_parameter: &PyType,
-        docker_resolve_image_request: &PyType,
-        docker_resolve_image_result: &PyType,
-        parsed_python_deps_result: &PyType,
-        parsed_javascript_deps_result: &PyType,
-        parsed_dockerfile_info_result: &PyType,
-        parsed_javascript_deps_candidate_result: &PyType,
+        paths: &Bound<'_, PyType>,
+        path_metadata_request: &Bound<'_, PyType>,
+        path_metadata_result: &Bound<'_, PyType>,
+        file_content: &Bound<'_, PyType>,
+        file_entry: &Bound<'_, PyType>,
+        symlink_entry: &Bound<'_, PyType>,
+        directory: &Bound<'_, PyType>,
+        digest_contents: &Bound<'_, PyType>,
+        digest_entries: &Bound<'_, PyType>,
+        path_globs: &Bound<'_, PyType>,
+        create_digest: &Bound<'_, PyType>,
+        digest_subset: &Bound<'_, PyType>,
+        native_download_file: &Bound<'_, PyType>,
+        platform: &Bound<'_, PyType>,
+        process: &Bound<'_, PyType>,
+        process_result: &Bound<'_, PyType>,
+        process_result_metadata: &Bound<'_, PyType>,
+        coroutine: &Bound<'_, PyType>,
+        session_values: &Bound<'_, PyType>,
+        run_id: &Bound<'_, PyType>,
+        interactive_process: &Bound<'_, PyType>,
+        interactive_process_result: &Bound<'_, PyType>,
+        engine_aware_parameter: &Bound<'_, PyType>,
+        docker_resolve_image_request: &Bound<'_, PyType>,
+        docker_resolve_image_result: &Bound<'_, PyType>,
+        parsed_python_deps_result: &Bound<'_, PyType>,
+        parsed_javascript_deps_result: &Bound<'_, PyType>,
+        parsed_dockerfile_info_result: &Bound<'_, PyType>,
+        parsed_javascript_deps_candidate_result: &Bound<'_, PyType>,
         py: Python,
     ) -> Self {
         Self(RefCell::new(Some(Types {
-            directory_digest: TypeId::new(py.get_type::<externs::fs::PyDigest>()),
-            file_digest: TypeId::new(py.get_type::<externs::fs::PyFileDigest>()),
-            snapshot: TypeId::new(py.get_type::<externs::fs::PySnapshot>()),
+            directory_digest: TypeId::new(&py.get_type_bound::<externs::fs::PyDigest>()),
+            file_digest: TypeId::new(&py.get_type_bound::<externs::fs::PyFileDigest>()),
+            snapshot: TypeId::new(&py.get_type_bound::<externs::fs::PySnapshot>()),
             paths: TypeId::new(paths),
             path_metadata_request: TypeId::new(path_metadata_request),
             path_metadata_result: TypeId::new(path_metadata_result),
@@ -232,9 +232,9 @@ impl PyTypes {
             digest_contents: TypeId::new(digest_contents),
             digest_entries: TypeId::new(digest_entries),
             path_globs: TypeId::new(path_globs),
-            merge_digests: TypeId::new(py.get_type::<externs::fs::PyMergeDigests>()),
-            add_prefix: TypeId::new(py.get_type::<externs::fs::PyAddPrefix>()),
-            remove_prefix: TypeId::new(py.get_type::<externs::fs::PyRemovePrefix>()),
+            merge_digests: TypeId::new(&py.get_type_bound::<externs::fs::PyMergeDigests>()),
+            add_prefix: TypeId::new(&py.get_type_bound::<externs::fs::PyAddPrefix>()),
+            remove_prefix: TypeId::new(&py.get_type_bound::<externs::fs::PyRemovePrefix>()),
             create_digest: TypeId::new(create_digest),
             digest_subset: TypeId::new(digest_subset),
             native_download_file: TypeId::new(native_download_file),
@@ -242,7 +242,7 @@ impl PyTypes {
             process: TypeId::new(process),
             process_result: TypeId::new(process_result),
             process_config_from_environment: TypeId::new(
-                py.get_type::<externs::process::PyProcessExecutionEnvironment>(),
+                &py.get_type_bound::<externs::process::PyProcessExecutionEnvironment>(),
             ),
             process_result_metadata: TypeId::new(process_result_metadata),
             coroutine: TypeId::new(coroutine),
@@ -260,7 +260,7 @@ impl PyTypes {
                 parsed_javascript_deps_candidate_result,
             ),
             deps_request: TypeId::new(
-                py.get_type::<externs::dep_inference::PyNativeDependenciesRequest>(),
+                &py.get_type_bound::<externs::dep_inference::PyNativeDependenciesRequest>(),
             ),
         })))
     }
@@ -1123,7 +1123,7 @@ fn execution_add_root_select(
     py_scheduler: &PyScheduler,
     py_execution_request: &PyExecutionRequest,
     param_vals: Vec<PyObject>,
-    product: &PyType,
+    product: &Bound<'_, PyType>,
 ) -> PyO3Result<()> {
     py_scheduler.0.core.executor.enter(|| {
         let product = TypeId::new(product);
@@ -1146,7 +1146,7 @@ fn execution_add_root_select(
 fn tasks_task_begin(
     py_tasks: &PyTasks,
     func: PyObject,
-    output_type: &PyType,
+    output_type: &Bound<'_, PyType>,
     arg_types: Vec<(String, &PyType)>,
     masked_types: Vec<&PyType>,
     side_effecting: bool,
@@ -1163,9 +1163,12 @@ fn tasks_task_begin(
     let output_type = TypeId::new(output_type);
     let arg_types = arg_types
         .into_iter()
-        .map(|(name, typ)| (name, TypeId::new(typ)))
+        .map(|(name, typ)| (name, TypeId::new(&typ.as_borrowed())))
         .collect();
-    let masked_types = masked_types.into_iter().map(TypeId::new).collect();
+    let masked_types = masked_types
+        .into_iter()
+        .map(|t| TypeId::new(&t.as_borrowed()))
+        .collect();
     let mut tasks = py_tasks.0.borrow_mut();
     tasks.task_begin(
         func,
@@ -1191,21 +1194,27 @@ fn tasks_task_end(py_tasks: &PyTasks) {
 #[pyfunction]
 fn tasks_add_call(
     py_tasks: &PyTasks,
-    output: &PyType,
+    output: &Bound<'_, PyType>,
     inputs: Vec<&PyType>,
     rule_id: String,
     explicit_args_arity: u16,
 ) {
     let output = TypeId::new(output);
-    let inputs = inputs.into_iter().map(TypeId::new).collect();
+    let inputs = inputs
+        .into_iter()
+        .map(|t| TypeId::new(&t.as_borrowed()))
+        .collect();
     let mut tasks = py_tasks.0.borrow_mut();
     tasks.add_call(output, inputs, rule_id, explicit_args_arity);
 }
 
 #[pyfunction]
-fn tasks_add_get(py_tasks: &PyTasks, output: &PyType, inputs: Vec<&PyType>) {
+fn tasks_add_get(py_tasks: &PyTasks, output: &Bound<'_, PyType>, inputs: Vec<&PyType>) {
     let output = TypeId::new(output);
-    let inputs = inputs.into_iter().map(TypeId::new).collect();
+    let inputs = inputs
+        .into_iter()
+        .map(|t| TypeId::new(&t.as_borrowed()))
+        .collect();
     let mut tasks = py_tasks.0.borrow_mut();
     tasks.add_get(output, inputs);
 }
@@ -1213,21 +1222,30 @@ fn tasks_add_get(py_tasks: &PyTasks, output: &PyType, inputs: Vec<&PyType>) {
 #[pyfunction]
 fn tasks_add_get_union(
     py_tasks: &PyTasks,
-    output_type: &PyType,
+    output_type: &Bound<'_, PyType>,
     input_types: Vec<&PyType>,
     in_scope_types: Vec<&PyType>,
 ) {
     let product = TypeId::new(output_type);
-    let input_types = input_types.into_iter().map(TypeId::new).collect();
-    let in_scope_types = in_scope_types.into_iter().map(TypeId::new).collect();
+    let input_types = input_types
+        .into_iter()
+        .map(|t| TypeId::new(&t.as_borrowed()))
+        .collect();
+    let in_scope_types = in_scope_types
+        .into_iter()
+        .map(|t| TypeId::new(&t.as_borrowed()))
+        .collect();
     let mut tasks = py_tasks.0.borrow_mut();
     tasks.add_get_union(product, input_types, in_scope_types);
 }
 
 #[pyfunction]
-fn tasks_add_query(py_tasks: &PyTasks, output_type: &PyType, input_types: Vec<&PyType>) {
+fn tasks_add_query(py_tasks: &PyTasks, output_type: &Bound<'_, PyType>, input_types: Vec<&PyType>) {
     let product = TypeId::new(output_type);
-    let params = input_types.into_iter().map(TypeId::new).collect();
+    let params = input_types
+        .into_iter()
+        .map(|t| TypeId::new(&t.as_borrowed()))
+        .collect();
     let mut tasks = py_tasks.0.borrow_mut();
     tasks.query_add(product, params);
 }
@@ -1390,11 +1408,14 @@ fn rule_graph_consumed_types<'py>(
     py: Python<'py>,
     py_scheduler: &PyScheduler,
     param_types: Vec<&PyType>,
-    product_type: &PyType,
+    product_type: &Bound<'_, PyType>,
 ) -> PyO3Result<Vec<&'py PyType>> {
     let core = &py_scheduler.0.core;
     core.executor.enter(|| {
-        let param_types = param_types.into_iter().map(TypeId::new).collect::<Vec<_>>();
+        let param_types = param_types
+            .into_iter()
+            .map(|t| TypeId::new(&t.as_borrowed()))
+            .collect::<Vec<_>>();
         let subgraph = core
             .rule_graph
             .subgraph(param_types, TypeId::new(product_type))
@@ -1468,11 +1489,14 @@ fn rule_graph_visualize(py_scheduler: &PyScheduler, path: PathBuf) -> PyO3Result
 fn rule_subgraph_visualize(
     py_scheduler: &PyScheduler,
     param_types: Vec<&PyType>,
-    product_type: &PyType,
+    product_type: &Bound<'_, PyType>,
     path: PathBuf,
 ) -> PyO3Result<()> {
     py_scheduler.0.core.executor.enter(|| {
-        let param_types = param_types.into_iter().map(TypeId::new).collect::<Vec<_>>();
+        let param_types = param_types
+            .into_iter()
+            .map(|t| TypeId::new(&t.as_borrowed()))
+            .collect::<Vec<_>>();
         let product_type = TypeId::new(product_type);
 
         // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!

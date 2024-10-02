@@ -11,7 +11,7 @@ use graph::CompoundNode;
 use internment::Intern;
 use pyo3::prelude::{PyErr, Python};
 use pyo3::types::{PyDict, PyTuple};
-use pyo3::{IntoPy, ToPyObject};
+use pyo3::{IntoPy, PyNativeType, ToPyObject};
 use rule_graph::DependencyKey;
 use workunit_store::{in_workunit, Level, RunningWorkunit};
 
@@ -299,7 +299,7 @@ impl Task {
                     };
 
                     res.map(|res| {
-                        let type_id = TypeId::new(res.get_type());
+                        let type_id = TypeId::new(&res.get_type().as_borrowed());
                         let val = Value::new(res.into_py(py));
                         (val, type_id)
                     })
