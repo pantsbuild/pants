@@ -167,7 +167,7 @@ pub fn store_bool(py: Python, val: bool) -> Value {
 ///
 /// Gets an attribute of the given value as the given type.
 ///
-pub fn getattr<'py, T>(value: &'py PyAny, field: &str) -> Result<T, String>
+pub fn getattr_bound<'py, T>(value: &Bound<'py, PyAny>, field: &str) -> Result<T, String>
 where
     T: FromPyObject<'py>,
 {
@@ -183,6 +183,13 @@ where
                 e
             )
         })
+}
+
+pub fn getattr<'py, T>(value: &'py PyAny, field: &str) -> Result<T, String>
+where
+    T: FromPyObject<'py>,
+{
+    getattr_bound(&value.as_borrowed(), field)
 }
 
 ///
@@ -212,17 +219,24 @@ pub fn collect_iterable(value: &PyAny) -> Result<Vec<&PyAny>, String> {
 }
 
 /// Read a `FrozenDict[str, T]`.
-pub fn getattr_from_str_frozendict<'p, T: FromPyObject<'p>>(
-    value: &'p PyAny,
+pub fn getattr_from_str_frozendict_bound<'py, T: FromPyObject<'py>>(
+    value: &Bound<'py, PyAny>,
     field: &str,
 ) -> BTreeMap<String, T> {
-    let frozendict = getattr(value, field).unwrap();
-    let pydict: &PyDict = getattr(frozendict, "_data").unwrap();
+    let frozendict: Bound<PyAny> = getattr_bound(value, field).unwrap();
+    let pydict: Bound<PyDict> = getattr_bound(&frozendict, "_data").unwrap();
     pydict
         .items()
         .into_iter()
         .map(|kv_pair| kv_pair.extract().unwrap())
         .collect()
+}
+
+pub fn getattr_from_str_frozendict<'py, T: FromPyObject<'py>>(
+    value: &'py PyAny,
+    field: &str,
+) -> BTreeMap<String, T> {
+    getattr_from_str_frozendict_bound(&value.as_borrowed(), field)
 }
 
 pub fn getattr_as_optional_string(value: &PyAny, field: &str) -> PyResult<Option<String>> {
