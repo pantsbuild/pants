@@ -21,7 +21,7 @@ use workunit_store::{ArtifactOutput, Level, RunningWorkunit, UserMetadataItem, W
 pub(crate) struct EngineAwareReturnType;
 
 impl EngineAwareReturnType {
-    pub(crate) fn update_workunit(workunit: &mut RunningWorkunit, task_result: &PyAny) {
+    pub(crate) fn update_workunit(workunit: &mut RunningWorkunit, task_result: &Bound<'_, PyAny>) {
         workunit.update_metadata(|old| {
             let new_level = Self::level(task_result);
 
@@ -45,15 +45,15 @@ impl EngineAwareReturnType {
         });
     }
 
-    fn level(obj: &PyAny) -> Option<Level> {
+    fn level(obj: &Bound<'_, PyAny>) -> Option<Level> {
         let level_val = obj.call_method0("level").ok()?;
         if level_val.is_none() {
             return None;
         }
-        externs::val_to_log_level(level_val).ok()
+        externs::val_to_log_level(level_val.as_gil_ref()).ok()
     }
 
-    fn message(obj: &PyAny) -> Option<String> {
+    fn message(obj: &Bound<'_, PyAny>) -> Option<String> {
         let msg_val = obj.call_method0("message").ok()?;
         if msg_val.is_none() {
             return None;
@@ -61,7 +61,7 @@ impl EngineAwareReturnType {
         msg_val.extract().ok()
     }
 
-    fn artifacts(obj: &PyAny) -> Option<Vec<(String, ArtifactOutput)>> {
+    fn artifacts(obj: &Bound<'_, PyAny>) -> Option<Vec<(String, ArtifactOutput)>> {
         let artifacts_val = obj.call_method0("artifacts").ok()?;
         if artifacts_val.is_none() {
             return None;
@@ -84,7 +84,7 @@ impl EngineAwareReturnType {
         Some(output)
     }
 
-    pub(crate) fn is_cacheable(obj: &PyAny) -> Option<bool> {
+    pub(crate) fn is_cacheable(obj: &Bound<'_, PyAny>) -> Option<bool> {
         obj.call_method0("cacheable").ok()?.extract().ok()
     }
 }
@@ -92,7 +92,7 @@ impl EngineAwareReturnType {
 pub struct EngineAwareParameter;
 
 impl EngineAwareParameter {
-    pub fn debug_hint(obj: &PyAny) -> Option<String> {
+    pub fn debug_hint(obj: &Bound<'_, PyAny>) -> Option<String> {
         let hint = obj.call_method0("debug_hint").ok()?;
         if hint.is_none() {
             return None;
@@ -100,12 +100,12 @@ impl EngineAwareParameter {
         hint.extract().ok()
     }
 
-    pub fn metadata(obj: &PyAny) -> Vec<(String, UserMetadataItem)> {
+    pub fn metadata(obj: &Bound<'_, PyAny>) -> Vec<(String, UserMetadataItem)> {
         metadata_for(obj).unwrap_or_default()
     }
 }
 
-fn metadata_for(obj: &PyAny) -> Option<Vec<(String, UserMetadataItem)>> {
+fn metadata_for(obj: &Bound<'_, PyAny>) -> Option<Vec<(String, UserMetadataItem)>> {
     let metadata_val = obj.call_method0("metadata").ok()?;
     if metadata_val.is_none() {
         return None;
