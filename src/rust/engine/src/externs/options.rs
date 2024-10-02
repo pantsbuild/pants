@@ -13,7 +13,7 @@ use std::collections::HashMap;
 
 pyo3::import_exception!(pants.option.errors, ParseError);
 
-pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyOptionId>()?;
     m.add_class::<PyConfigSource>()?;
     m.add_class::<PyOptionParser>()?;

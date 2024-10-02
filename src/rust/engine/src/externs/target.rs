@@ -11,7 +11,7 @@ use pyo3::types::PyType;
 
 use crate::externs::address::Address;
 
-pub fn register(m: &PyModule) -> PyResult<()> {
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Field>()?;
     m.add_class::<NoFieldValue>()?;
 

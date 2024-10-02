@@ -12,6 +12,8 @@ use process_execution::local::{
 };
 use process_execution::{ManagedChild, ProcessExecutionStrategy};
 use pyo3::prelude::{pyfunction, wrap_pyfunction, PyAny, PyModule, PyResult, Python, ToPyObject};
+use pyo3::types::PyModuleMethods;
+use pyo3::Bound;
 use stdio::TryCloneAsFile;
 use tokio::process;
 use workunit_store::{in_workunit, Level};
@@ -21,7 +23,7 @@ use crate::externs::{self, PyGeneratorResponseNativeCall};
 use crate::nodes::{task_get_context, ExecuteProcess, NodeResult};
 use crate::python::{Failure, Value};
 
-pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(interactive_process, m)?)?;
     Ok(())
 }

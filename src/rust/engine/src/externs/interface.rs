@@ -57,7 +57,7 @@ use crate::{
 };
 
 #[pymodule]
-fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
+fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     intrinsics::register(py, m)?;
     externs::register(py, m)?;
     externs::address::register(py, m)?;

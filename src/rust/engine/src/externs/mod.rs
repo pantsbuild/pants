@@ -42,7 +42,7 @@ mod target;
 pub mod testutil;
 pub mod workunits;
 
-pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFailure>()?;
     m.add_class::<PyGeneratorResponseNativeCall>()?;
     m.add_class::<PyGeneratorResponseCall>()?;

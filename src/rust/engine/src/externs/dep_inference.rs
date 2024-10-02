@@ -15,7 +15,7 @@ use protos::gen::pants::cache::{
 
 use crate::externs::fs::PyDigest;
 
-pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyNativeDependenciesRequest>()?;
     m.add_class::<PyInferenceMetadata>()
 }

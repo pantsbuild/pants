@@ -23,7 +23,7 @@ create_exception!(native_engine, InvalidTargetNameError, InvalidAddressError);
 create_exception!(native_engine, InvalidParametersError, InvalidAddressError);
 create_exception!(native_engine, UnsupportedWildcardError, InvalidAddressError);
 
-pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(address_spec_parse, m)?)?;
 
     m.add(
