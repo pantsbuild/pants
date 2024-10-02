@@ -78,6 +78,8 @@ fn test_bool() {
         "scope",
         "--no-quuxf",
         "--quuxt",
+        "path/to/target",
+        "--global-flag",
     ]);
 
     let assert_bool =
@@ -91,6 +93,7 @@ fn test_bool() {
     assert_bool(false, option_id!(["scope"], "quxf"));
     assert_bool(false, option_id!(["scope"], "quuxf"));
     assert_bool(true, option_id!(["scope"], "quuxt"));
+    assert_bool(true, option_id!("global", "flag"));
 
     assert!(args.get_bool(&option_id!("dne")).unwrap().is_none());
     assert!(args.get_passthrough_args().is_none());
