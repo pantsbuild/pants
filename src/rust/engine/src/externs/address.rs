@@ -28,24 +28,24 @@ pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
 
     m.add(
         "AddressParseException",
-        py.get_type::<AddressParseException>(),
+        py.get_type_bound::<AddressParseException>(),
     )?;
     m.add("InvalidAddressError", py.get_type::<InvalidAddressError>())?;
     m.add(
         "InvalidSpecPathError",
-        py.get_type::<InvalidSpecPathError>(),
+        py.get_type_bound::<InvalidSpecPathError>(),
     )?;
     m.add(
         "InvalidTargetNameError",
-        py.get_type::<InvalidTargetNameError>(),
+        py.get_type_bound::<InvalidTargetNameError>(),
     )?;
     m.add(
         "InvalidParametersError",
-        py.get_type::<InvalidParametersError>(),
+        py.get_type_bound::<InvalidParametersError>(),
     )?;
     m.add(
         "UnsupportedWildcardError",
-        py.get_type::<UnsupportedWildcardError>(),
+        py.get_type_bound::<UnsupportedWildcardError>(),
     )?;
 
     m.add_class::<AddressInput>()?;
@@ -53,15 +53,15 @@ pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
 
     m.add(
         "BANNED_CHARS_IN_TARGET_NAME",
-        PyFrozenSet::new(py, BANNED_CHARS_IN_TARGET_NAME.iter())?,
+        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_TARGET_NAME.iter())?,
     )?;
     m.add(
         "BANNED_CHARS_IN_GENERATED_NAME",
-        PyFrozenSet::new(py, BANNED_CHARS_IN_GENERATED_NAME.iter())?,
+        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_GENERATED_NAME.iter())?,
     )?;
     m.add(
         "BANNED_CHARS_IN_PARAMETERS",
-        PyFrozenSet::new(py, BANNED_CHARS_IN_PARAMETERS.iter())?,
+        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_PARAMETERS.iter())?,
     )?;
 
     Ok(())
@@ -150,7 +150,7 @@ impl AddressInput {
 
     #[classmethod]
     fn parse(
-        _cls: &PyType,
+        _cls: &Bound<'_, PyType>,
         spec: &str,
         description_of_origin: &str,
         relative_to: Option<&str>,
@@ -750,8 +750,8 @@ impl Address {
         self.spec()
     }
 
-    fn metadata<'p>(&self, py: Python<'p>) -> PyResult<&'p PyDict> {
-        let dict = PyDict::new(py);
+    fn metadata<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let dict = PyDict::new_bound(py);
         dict.set_item(pyo3::intern!(py, "address"), self.spec())?;
         Ok(dict)
     }
