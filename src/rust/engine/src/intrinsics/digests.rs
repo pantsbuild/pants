@@ -20,9 +20,8 @@ use crate::externs::fs::{
 };
 use crate::externs::PyGeneratorResponseNativeCall;
 use crate::nodes::{
-    lift_directory_digest_bound, task_get_context,
-    unmatched_globs_additional_context, DownloadedFile, NodeResult, PathMetadataNode, Snapshot,
-    SubjectPath,
+    lift_directory_digest_bound, task_get_context, unmatched_globs_additional_context,
+    DownloadedFile, NodeResult, PathMetadataNode, Snapshot, SubjectPath,
 };
 use crate::python::{throw, Key, Value};
 use crate::Failure;
