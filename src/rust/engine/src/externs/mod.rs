@@ -195,6 +195,31 @@ where
 ///
 /// Collect the Values contained within an outer Python Iterable PyObject.
 ///
+pub fn collect_iterable_bound<'py>(
+    value: &Bound<'py, PyAny>,
+) -> Result<Vec<Bound<'py, PyAny>>, String> {
+    match value.iter() {
+        Ok(py_iter) => py_iter
+            .enumerate()
+            .map(|(i, py_res)| {
+                py_res.map_err(|py_err| {
+                    format!(
+                        "Could not iterate {}, failed to extract {}th item: {:?}",
+                        val_to_str_bound(value),
+                        i,
+                        py_err
+                    )
+                })
+            })
+            .collect(),
+        Err(py_err) => Err(format!(
+            "Could not iterate {}: {:?}",
+            val_to_str_bound(value),
+            py_err
+        )),
+    }
+}
+
 pub fn collect_iterable(value: &PyAny) -> Result<Vec<&PyAny>, String> {
     match value.iter() {
         Ok(py_iter) => py_iter
@@ -219,7 +244,6 @@ pub fn collect_iterable(value: &PyAny) -> Result<Vec<&PyAny>, String> {
 }
 
 /// Read a `FrozenDict[str, T]`.
-// TODO: Rename this back to getattr_from_str_frozendict_bound once migration is complete.
 pub fn getattr_from_str_frozendict_bound<'py, T: FromPyObject<'py>>(
     value: &Bound<'py, PyAny>,
     field: &str,
@@ -240,10 +264,6 @@ pub fn getattr_as_optional_string_bound(
     // TODO: It's possible to view a python string as a `Cow<str>`, so we could avoid actually
     // cloning in some cases.
     value.getattr(field)?.extract()
-}
-
-pub fn getattr_as_optional_string(value: &PyAny, field: &str) -> PyResult<Option<String>> {
-    getattr_as_optional_string_bound(&value.as_borrowed(), field)
 }
 
 /// Call the equivalent of `str()` on an arbitrary Python object.
@@ -272,10 +292,6 @@ pub fn val_to_log_level_bound(obj: &Bound<'_, PyAny>) -> Result<log::Level, Stri
             })
     });
     res.map(|py_level| py_level.into())
-}
-
-pub fn val_to_log_level(obj: &PyAny) -> Result<log::Level, String> {
-    val_to_log_level_bound(&obj.as_borrowed())
 }
 
 /// Link to the Pants docs using the current version of Pants.

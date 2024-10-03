@@ -630,8 +630,8 @@ pub enum PyPathNamespace {
 
 #[pymethods]
 impl PyPathNamespace {
-    fn __eq__(&self, other: &PyPathNamespace) -> bool {
-        self == other
+    fn __eq__(&self, other: Bound<'_, PyPathNamespace>) -> bool {
+        *self == *other.borrow()
     }
 
     fn __hash__(&self) -> u64 {
