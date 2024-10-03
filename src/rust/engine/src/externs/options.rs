@@ -281,8 +281,8 @@ impl PyOptionParser {
             .items()
             .into_iter()
             .map(|kv_pair| {
-                let (k, v) = kv_pair.extract::<(String, &PyAny)>()?;
-                Ok::<(String, Val), PyErr>((k, py_object_to_val(&v.as_borrowed())?))
+                let (k, v) = kv_pair.extract::<(String, Bound<'_, PyAny>)>()?;
+                Ok::<(String, Val), PyErr>((k, py_object_to_val(&v)?))
             })
             .collect::<Result<HashMap<_, _>, _>>()?;
         let opt_val = self
