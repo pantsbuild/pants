@@ -219,6 +219,7 @@ pub fn collect_iterable(value: &PyAny) -> Result<Vec<&PyAny>, String> {
 }
 
 /// Read a `FrozenDict[str, T]`.
+// TODO: Rename this back to getattr_from_str_frozendict_bound once migration is complete.
 pub fn getattr_from_str_frozendict_bound<'py, T: FromPyObject<'py>>(
     value: &Bound<'py, PyAny>,
     field: &str,
@@ -232,37 +233,49 @@ pub fn getattr_from_str_frozendict_bound<'py, T: FromPyObject<'py>>(
         .collect()
 }
 
-pub fn getattr_from_str_frozendict<'py, T: FromPyObject<'py>>(
-    value: &'py PyAny,
+pub fn getattr_as_optional_string_bound(
+    value: &Bound<'_, PyAny>,
     field: &str,
-) -> BTreeMap<String, T> {
-    getattr_from_str_frozendict_bound(&value.as_borrowed(), field)
-}
-
-pub fn getattr_as_optional_string(value: &PyAny, field: &str) -> PyResult<Option<String>> {
+) -> PyResult<Option<String>> {
     // TODO: It's possible to view a python string as a `Cow<str>`, so we could avoid actually
     // cloning in some cases.
     value.getattr(field)?.extract()
 }
 
+pub fn getattr_as_optional_string(value: &PyAny, field: &str) -> PyResult<Option<String>> {
+    getattr_as_optional_string_bound(&value.as_borrowed(), field)
+}
+
 /// Call the equivalent of `str()` on an arbitrary Python object.
 ///
 /// Converts `None` to the empty string.
-pub fn val_to_str(obj: &PyAny) -> String {
+pub fn val_to_str_bound(obj: &Bound<'_, PyAny>) -> String {
     if obj.is_none() {
         return "".to_string();
     }
     obj.str().unwrap().extract().unwrap()
 }
 
-pub fn val_to_log_level(obj: &PyAny) -> Result<log::Level, String> {
-    let res: Result<PythonLogLevel, String> = getattr(obj, "_level").and_then(|n: u64| {
+pub fn val_to_str(obj: &PyAny) -> String {
+    val_to_str_bound(&obj.as_borrowed())
+}
+
+pub fn val_to_log_level_bound(obj: &Bound<'_, PyAny>) -> Result<log::Level, String> {
+    let res: Result<PythonLogLevel, String> = getattr_bound(obj, "_level").and_then(|n: u64| {
         n.try_into()
             .map_err(|e: num_enum::TryFromPrimitiveError<_>| {
-                format!("Could not parse {:?} as a LogLevel: {}", val_to_str(obj), e)
+                format!(
+                    "Could not parse {:?} as a LogLevel: {}",
+                    val_to_str_bound(obj),
+                    e
+                )
             })
     });
     res.map(|py_level| py_level.into())
+}
+
+pub fn val_to_log_level(obj: &PyAny) -> Result<log::Level, String> {
+    val_to_log_level_bound(&obj.as_borrowed())
 }
 
 /// Link to the Pants docs using the current version of Pants.
