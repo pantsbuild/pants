@@ -277,13 +277,14 @@ async def prepare_jdk_environment(
 
     # TODO: Locate `ln`.
     version_comment = "\n".join(f"# {line}" for line in java_version.splitlines())
+    ln_path = shlex.quote(ln.path)
     jdk_preparation_script = textwrap.dedent(  # noqa: PNT20
         f"""\
         # pants javac script using Coursier {coursier_jdk_option}. `java -version`:"
         {version_comment}
         set -eu
 
-        {ln} -s "$({java_home_command})" "${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{JdkEnvironment.java_home}"
+        {ln_path} -s "$({java_home_command})" "${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{JdkEnvironment.java_home}"
         exec "$@"
         """
     )
