@@ -9,9 +9,9 @@ use deepsize::DeepSizeOf;
 use futures::future::{self, BoxFuture, FutureExt};
 use graph::CompoundNode;
 use internment::Intern;
-use pyo3::prelude::{PyErr, Python};
-use pyo3::types::{PyDict, PyTuple};
-use pyo3::{IntoPy, PyNativeType, ToPyObject};
+use pyo3::prelude::{PyAnyMethods, PyErr, Python};
+use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use pyo3::{Bound, IntoPy, ToPyObject};
 use rule_graph::DependencyKey;
 use workunit_store::{in_workunit, Level, RunningWorkunit};
 
@@ -276,13 +276,13 @@ impl Task {
             &self.side_effected,
             async move {
                 Python::with_gil(|py| {
-                    let func = (*self.task.func.0.value).as_ref(py);
+                    let func = (*self.task.func.0.value).bind(py);
 
                     // If there are explicit positional arguments, apply any computed arguments as
                     // keywords. Otherwise, apply computed arguments as positional.
                     let res = if let Some(args) = args {
-                        let args = args.value.extract::<&PyTuple>(py)?;
-                        let kwargs = PyDict::new(py);
+                        let args = args.value.extract::<Bound<'_, PyTuple>>(py)?;
+                        let kwargs = PyDict::new_bound(py);
                         for ((name, _), value) in self
                             .task
                             .args
@@ -292,9 +292,10 @@ impl Task {
                         {
                             kwargs.set_item(name, &value)?;
                         }
-                        func.call(args, Some(kwargs))
+                        func.call(args, Some(&kwargs))
                     } else {
-                        let args_tuple = PyTuple::new(py, deps.iter().map(|v| v.to_object(py)));
+                        let args_tuple =
+                            PyTuple::new_bound(py, deps.iter().map(|v| v.to_object(py)));
                         func.call1(args_tuple)
                     };
 
