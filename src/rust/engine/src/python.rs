@@ -391,6 +391,12 @@ impl From<PyObject> for Value {
     }
 }
 
+impl<'py, T> From<&Bound<'py, T>> for Value {
+    fn from(value: &Bound<'py, T>) -> Self {
+        Value::new(value.clone().into_py(value.py()))
+    }
+}
+
 impl IntoPy<PyObject> for &Value {
     fn into_py(self, py: Python) -> PyObject {
         (*self.0).as_ref(py).into_py(py)
