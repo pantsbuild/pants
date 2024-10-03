@@ -127,6 +127,9 @@ impl Args {
                 });
             } else if is_valid_scope_name(&arg_str) {
                 scope = Scope::Scope(arg_str)
+            } else {
+                // The arg is a spec, so revert to global context for any trailing flags.
+                scope = Scope::Global;
             }
         }
 
