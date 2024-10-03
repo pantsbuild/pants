@@ -14,7 +14,7 @@ from enum import Enum
 from typing import ClassVar, Iterable, Mapping
 
 from pants.core.util_rules.environments import EnvironmentTarget
-from pants.core.util_rules.system_binaries import BashBinary
+from pants.core.util_rules.system_binaries import BashBinary, LnBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
@@ -201,6 +201,7 @@ async def prepare_jdk_environment(
     coursier: Coursier,
     nailgun_: Nailgun,
     bash: BashBinary,
+    ln: LnBinary,
     request: JdkRequest,
     env_target: EnvironmentTarget,
 ) -> JdkEnvironment:
@@ -282,7 +283,7 @@ async def prepare_jdk_environment(
         {version_comment}
         set -eu
 
-        /bin/ln -s "$({java_home_command})" "${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{JdkEnvironment.java_home}"
+        {ln} -s "$({java_home_command})" "${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{JdkEnvironment.java_home}"
         exec "$@"
         """
     )
