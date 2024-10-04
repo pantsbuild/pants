@@ -1676,7 +1676,7 @@ fn capture_snapshots(
 }
 
 #[pyfunction]
-fn ensure_remote_has_recursive<'py>(
+fn ensure_remote_has_recursive(
     py: Python<'_>,
     py_scheduler: &Bound<'_, PyScheduler>,
     py_digests: &Bound<'_, PyList>,
