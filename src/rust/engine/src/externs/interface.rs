@@ -1681,7 +1681,7 @@ fn ensure_remote_has_recursive(
     py_scheduler: &Bound<'_, PyScheduler>,
     py_digests: &Bound<'_, PyList>,
 ) -> PyO3Result<()> {
-    let core = py_scheduler.borrow().0.core.clone();
+    let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         // NB: Supports either a PyFileDigest or PyDigest as input.
         let digests: Vec<Digest> = py_digests
@@ -1709,7 +1709,7 @@ fn ensure_directory_digest_persisted(
     py_scheduler: &Bound<'_, PyScheduler>,
     py_digest: &Bound<'_, PyAny>,
 ) -> PyO3Result<()> {
-    let core = py_scheduler.borrow().0.core.clone();
+    let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         let digest =
             crate::nodes::lift_directory_digest_bound(py_digest).map_err(PyException::new_err)?;
@@ -1729,7 +1729,7 @@ fn single_file_digests_to_bytes<'py>(
     py_scheduler: &Bound<'py, PyScheduler>,
     py_file_digests: Vec<PyFileDigest>,
 ) -> PyO3Result<Bound<'py, PyList>> {
-    let core = py_scheduler.borrow().0.core.clone();
+    let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         let digest_futures = py_file_digests.into_iter().map(|py_file_digest| {
             let store = core.store();
@@ -1774,12 +1774,11 @@ fn write_digest(
     path_prefix: String,
     clear_paths: Vec<String>,
 ) -> PyO3Result<()> {
-    let core = py_scheduler.borrow().0.core.clone();
-    let store = core.store();
     let scheduler = &py_scheduler.borrow().0;
     let session = &py_session.borrow().0;
+    let store = scheduler.core.store();
 
-    core.clone().executor.enter(|| {
+    scheduler.core.executor.enter(|| {
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
 
@@ -1789,7 +1788,7 @@ fn write_digest(
         // Python will have already validated that path_prefix is a relative path.
         let path_prefix = Path::new(&path_prefix);
         let mut destination = PathBuf::new();
-        destination.push(&core.build_root);
+        destination.push(&scheduler.core.build_root);
         destination.push(path_prefix);
 
         for subpath in &clear_paths {
@@ -1806,7 +1805,7 @@ fn write_digest(
             store
                 .materialize_directory(
                     destination.clone(),
-                    &core.build_root,
+                    &scheduler.core.build_root,
                     lifted_digest.clone(),
                     true, // Force everything we write to be mutable
                     &BTreeSet::new(),
@@ -1936,7 +1935,7 @@ fn teardown_dynamic_ui<'py>(
     py_scheduler: &Bound<'py, PyScheduler>,
     py_session: &Bound<'py, PySession>,
 ) {
-    let core = py_scheduler.borrow().0.core.clone();
+    let core = &py_scheduler.borrow().0.core;
     let session = &py_session.borrow().0;
     core.executor.enter(|| {
         let _ = block_in_place_and_wait(py, || {
