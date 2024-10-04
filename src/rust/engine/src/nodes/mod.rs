@@ -234,10 +234,6 @@ pub fn lift_file_digest_bound(digest: &Bound<'_, PyAny>) -> Result<hashing::Dige
     Ok(py_file_digest.0)
 }
 
-pub fn lift_file_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
-    lift_file_digest_bound(&digest.as_borrowed())
-}
-
 pub fn unmatched_globs_additional_context() -> Option<String> {
     let url = Python::with_gil(|py| {
         externs::doc_url(

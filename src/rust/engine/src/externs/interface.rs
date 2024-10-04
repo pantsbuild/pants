@@ -35,7 +35,9 @@ use pyo3::prelude::{
     pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
     PyResult as PyO3Result, Python, ToPyObject,
 };
-use pyo3::types::{PyAnyMethods, PyBytes, PyDict, PyList, PyTuple, PyType};
+use pyo3::types::{
+    PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyTuple, PyType,
+};
 use pyo3::{create_exception, AsPyPointer, Bound, IntoPy, PyAny, PyNativeType, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
@@ -1260,57 +1262,63 @@ fn tasks_add_query(
 }
 
 #[pyfunction]
-fn graph_invalidate_paths(py: Python, py_scheduler: &PyScheduler, paths: HashSet<PathBuf>) -> u64 {
-    py_scheduler
-        .0
+fn graph_invalidate_paths(
+    py: Python,
+    py_scheduler: &Bound<'_, PyScheduler>,
+    paths: HashSet<PathBuf>,
+) -> u64 {
+    let scheduler = &py_scheduler.borrow().0;
+    scheduler
         .core
         .executor
-        .enter(|| py.allow_threads(|| py_scheduler.0.invalidate_paths(&paths) as u64))
+        .enter(|| py.allow_threads(|| scheduler.invalidate_paths(&paths) as u64))
 }
 
 #[pyfunction]
-fn graph_invalidate_all_paths(py: Python, py_scheduler: &PyScheduler) -> u64 {
-    py_scheduler
-        .0
+fn graph_invalidate_all_paths(py: Python, py_scheduler: &Bound<'_, PyScheduler>) -> u64 {
+    let scheduler = &py_scheduler.borrow().0;
+    scheduler
         .core
         .executor
-        .enter(|| py.allow_threads(|| py_scheduler.0.invalidate_all_paths() as u64))
+        .enter(|| py.allow_threads(|| scheduler.invalidate_all_paths() as u64))
 }
 
 #[pyfunction]
-fn graph_invalidate_all(py: Python, py_scheduler: &PyScheduler) {
-    py_scheduler
-        .0
+fn graph_invalidate_all(py: Python, py_scheduler: &Bound<'_, PyScheduler>) {
+    let scheduler = &py_scheduler.borrow().0;
+    scheduler
         .core
         .executor
-        .enter(|| py.allow_threads(|| py_scheduler.0.invalidate_all()))
+        .enter(|| py.allow_threads(|| scheduler.invalidate_all()))
 }
 
 #[pyfunction]
-fn check_invalidation_watcher_liveness(py_scheduler: &PyScheduler) -> PyO3Result<()> {
-    py_scheduler
-        .0
+fn check_invalidation_watcher_liveness(py_scheduler: &Bound<'_, PyScheduler>) -> PyO3Result<()> {
+    let scheduler = &py_scheduler.borrow().0;
+    scheduler
         .core
         .executor
-        .enter(|| py_scheduler.0.is_valid().map_err(PyException::new_err))
+        .enter(|| scheduler.is_valid().map_err(PyException::new_err))
 }
 
 #[pyfunction]
-fn graph_len(py: Python, py_scheduler: &PyScheduler) -> u64 {
-    let core = &py_scheduler.0.core;
+fn graph_len(py: Python, py_scheduler: &Bound<'_, PyScheduler>) -> u64 {
+    let core = &py_scheduler.borrow().0.core;
     core.executor
         .enter(|| py.allow_threads(|| core.graph.len() as u64))
 }
 
 #[pyfunction]
 fn graph_visualize(
-    py: Python,
-    py_scheduler: &PyScheduler,
-    py_session: &PySession,
+    py: Python<'_>,
+    py_scheduler: &Bound<'_, PyScheduler>,
+    py_session: &Bound<'_, PySession>,
     path: PathBuf,
 ) -> PyO3Result<()> {
-    py_scheduler.0.core.executor.enter(|| {
-        py.allow_threads(|| py_scheduler.0.visualize(&py_session.0, path.as_path()))
+    let scheduler = &py_scheduler.borrow().0;
+    let session = &py_session.borrow().0;
+    scheduler.core.executor.enter(|| {
+        py.allow_threads(|| scheduler.visualize(session, path.as_path()))
             .map_err(|e| {
                 PyException::new_err(format!(
                     "Failed to visualize to {}: {:?}",
@@ -1322,40 +1330,45 @@ fn graph_visualize(
 }
 
 #[pyfunction]
-fn session_new_run_id(py_session: &PySession) {
-    py_session.0.new_run_id();
+fn session_new_run_id(py_session: &Bound<'_, PySession>) {
+    py_session.borrow().0.new_run_id();
 }
 
 #[pyfunction]
-fn session_get_metrics(py: Python<'_>, py_session: &PySession) -> HashMap<&'static str, u64> {
-    py.allow_threads(|| py_session.0.workunit_store().get_metrics())
+fn session_get_metrics(
+    py: Python<'_>,
+    py_session: &Bound<'_, PySession>,
+) -> HashMap<&'static str, u64> {
+    let session = &py_session.borrow().0;
+    py.allow_threads(|| session.workunit_store().get_metrics())
 }
 
 #[pyfunction]
 fn session_get_observation_histograms<'py>(
     py: Python<'py>,
-    py_scheduler: &PyScheduler,
-    py_session: &PySession,
-) -> PyO3Result<&'py PyDict> {
+    py_scheduler: &Bound<'py, PyScheduler>,
+    py_session: &Bound<'py, PySession>,
+) -> PyO3Result<Bound<'py, PyDict>> {
     // Encoding version to return to callers. This should be bumped when the encoded histograms
     // are encoded in a backwards-incompatible manner.
     const OBSERVATIONS_VERSION: u64 = 0;
 
-    py_scheduler.0.core.executor.enter(|| {
+    let session = &py_session.borrow().0;
+    py_scheduler.borrow().0.core.executor.enter(|| {
         let observations = py.allow_threads(|| {
-            py_session
-                .0
+            session
                 .workunit_store()
                 .encode_observations()
                 .map_err(PyException::new_err)
         })?;
 
-        let encoded_observations = PyDict::new(py);
+        let encoded_observations = PyDict::new_bound(py);
         for (metric, encoded_histogram) in &observations {
-            encoded_observations.set_item(metric, PyBytes::new(py, &encoded_histogram[..]))?;
+            encoded_observations
+                .set_item(metric, PyBytes::new_bound(py, &encoded_histogram[..]))?;
         }
 
-        let result = PyDict::new(py);
+        let result = PyDict::new_bound(py);
         result.set_item("version", OBSERVATIONS_VERSION)?;
         result.set_item("histograms", encoded_observations)?;
         Ok(result)
@@ -1363,10 +1376,14 @@ fn session_get_observation_histograms<'py>(
 }
 
 #[pyfunction]
-fn session_record_test_observation(py_scheduler: &PyScheduler, py_session: &PySession, value: u64) {
-    py_scheduler.0.core.executor.enter(|| {
-        py_session
-            .0
+fn session_record_test_observation(
+    py_scheduler: &Bound<'_, PyScheduler>,
+    py_session: &Bound<'_, PySession>,
+    value: u64,
+) {
+    let session = &py_session.borrow().0;
+    py_scheduler.borrow().0.core.executor.enter(|| {
+        session
             .workunit_store()
             .record_observation(ObservationMetric::TestObservation, value);
     })
@@ -1374,10 +1391,11 @@ fn session_record_test_observation(py_scheduler: &PyScheduler, py_session: &PySe
 
 #[pyfunction]
 fn session_isolated_shallow_clone(
-    py_session: &PySession,
+    py_session: &Bound<'_, PySession>,
     build_id: String,
 ) -> PyO3Result<PySession> {
     let session_clone = py_session
+        .borrow()
         .0
         .isolated_shallow_clone(build_id)
         .map_err(PyException::new_err)?;
@@ -1386,25 +1404,26 @@ fn session_isolated_shallow_clone(
 
 #[pyfunction]
 fn session_wait_for_tail_tasks(
-    py: Python,
-    py_scheduler: &PyScheduler,
-    py_session: &PySession,
+    py: Python<'_>,
+    py_scheduler: &Bound<'_, PyScheduler>,
+    py_session: &Bound<'_, PySession>,
     timeout: f64,
 ) -> PyO3Result<()> {
-    let core = &py_scheduler.0.core;
+    let core = &py_scheduler.borrow().0.core;
     let timeout = Duration::from_secs_f64(timeout);
+    let session = &py_session.borrow().0;
+
     core.executor.enter(|| {
         py.allow_threads(|| {
-            core.executor
-                .block_on(py_session.0.tail_tasks().wait(timeout));
+            core.executor.block_on(session.tail_tasks().wait(timeout));
         })
     });
     Ok(())
 }
 
 #[pyfunction]
-fn validate_reachability(py_scheduler: &PyScheduler) -> PyO3Result<()> {
-    let core = &py_scheduler.0.core;
+fn validate_reachability(py_scheduler: &Bound<'_, PyScheduler>) -> PyO3Result<()> {
+    let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         core.rule_graph
             .validate_reachability()
@@ -1439,10 +1458,13 @@ fn rule_graph_consumed_types<'py>(
 }
 
 #[pyfunction]
-fn rule_graph_rule_gets<'p>(py: Python<'p>, py_scheduler: &PyScheduler) -> PyO3Result<&'p PyDict> {
-    let core = &py_scheduler.0.core;
+fn rule_graph_rule_gets<'py>(
+    py: Python<'py>,
+    py_scheduler: &Bound<'py, PyScheduler>,
+) -> PyO3Result<Bound<'py, PyDict>> {
+    let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
-        let result = PyDict::new(py);
+        let result = PyDict::new_bound(py);
         for (rule, rule_dependencies) in core.rule_graph.rule_dependencies() {
             let task = rule.0;
             let function = &task.func;
@@ -1480,8 +1502,8 @@ fn rule_graph_rule_gets<'p>(py: Python<'p>, py_scheduler: &PyScheduler) -> PyO3R
 }
 
 #[pyfunction]
-fn rule_graph_visualize(py_scheduler: &PyScheduler, path: PathBuf) -> PyO3Result<()> {
-    let core = &py_scheduler.0.core;
+fn rule_graph_visualize(py_scheduler: &Bound<'_, PyScheduler>, path: PathBuf) -> PyO3Result<()> {
+    let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
         write_to_file(path.as_path(), &core.rule_graph).map_err(|e| {
@@ -1496,12 +1518,14 @@ fn rule_graph_visualize(py_scheduler: &PyScheduler, path: PathBuf) -> PyO3Result
 
 #[pyfunction]
 fn rule_subgraph_visualize(
-    py_scheduler: &PyScheduler,
-    param_types: Vec<&PyType>,
+    py_scheduler: &Bound<'_, PyScheduler>,
+    param_types: Vec<Bound<'_, PyType>>,
     product_type: &Bound<'_, PyType>,
     path: PathBuf,
 ) -> PyO3Result<()> {
-    py_scheduler.0.core.executor.enter(|| {
+    let scheduler = &py_scheduler.borrow().0;
+
+    scheduler.core.executor.enter(|| {
         let param_types = param_types
             .into_iter()
             .map(|t| TypeId::new(&t.as_borrowed()))
@@ -1509,8 +1533,7 @@ fn rule_subgraph_visualize(
         let product_type = TypeId::new(product_type);
 
         // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
-        let subgraph = py_scheduler
-            .0
+        let subgraph = scheduler
             .core
             .rule_graph
             .subgraph(param_types, product_type)
@@ -1562,11 +1585,11 @@ fn maybe_set_panic_handler() {
 #[pyfunction]
 fn garbage_collect_store(
     py: Python,
-    py_scheduler: &PyScheduler,
+    py_scheduler: &Bound<'_, PyScheduler>,
     target_size_bytes: usize,
 ) -> PyO3Result<()> {
-    let core = &py_scheduler.0.core;
-    core.executor.enter(|| {
+    let core = py_scheduler.borrow().0.core.clone();
+    core.clone().executor.enter(|| {
         py.allow_threads(|| {
             core.executor.block_on(
                 core.store()
@@ -1580,13 +1603,16 @@ fn garbage_collect_store(
 #[pyfunction]
 fn lease_files_in_graph(
     py: Python,
-    py_scheduler: &PyScheduler,
-    py_session: &PySession,
+    py_scheduler: &Bound<'_, PyScheduler>,
+    py_session: &Bound<'_, PySession>,
 ) -> PyO3Result<()> {
-    let core = &py_scheduler.0.core;
+    let core = py_scheduler.borrow().0.core.clone();
+    let scheduler = &py_scheduler.borrow().0;
+    let session = &py_session.borrow().0;
+
     core.executor.enter(|| {
         py.allow_threads(|| {
-            let digests = py_scheduler.0.all_digests(&py_session.0);
+            let digests = scheduler.all_digests(session);
             core.executor
                 .block_on(core.store().lease_all_recursively(digests.iter()))
         })
@@ -1657,19 +1683,19 @@ fn capture_snapshots(
 
 #[pyfunction]
 fn ensure_remote_has_recursive(
-    py: Python,
-    py_scheduler: &PyScheduler,
-    py_digests: &PyList,
+    py: Python<'_>,
+    py_scheduler: &Bound<'_, PyScheduler>,
+    py_digests: &Bound<'_, PyList>,
 ) -> PyO3Result<()> {
-    let core = &py_scheduler.0.core;
+    let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         // NB: Supports either a PyFileDigest or PyDigest as input.
         let digests: Vec<Digest> = py_digests
             .iter()
             .map(|value| {
-                crate::nodes::lift_directory_digest(value)
+                crate::nodes::lift_directory_digest_bound(&value)
                     .map(|dd| dd.as_digest())
-                    .or_else(|_| crate::nodes::lift_file_digest(value))
+                    .or_else(|_| crate::nodes::lift_file_digest_bound(&value))
             })
             .collect::<Result<Vec<Digest>, _>>()
             .map_err(PyException::new_err)?;
@@ -1685,14 +1711,14 @@ fn ensure_remote_has_recursive(
 
 #[pyfunction]
 fn ensure_directory_digest_persisted(
-    py: Python,
-    py_scheduler: &PyScheduler,
-    py_digest: &PyAny,
+    py: Python<'_>,
+    py_scheduler: &Bound<'_, PyScheduler>,
+    py_digest: &Bound<'_, PyAny>,
 ) -> PyO3Result<()> {
-    let core = &py_scheduler.0.core;
+    let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         let digest =
-            crate::nodes::lift_directory_digest(py_digest).map_err(PyException::new_err)?;
+            crate::nodes::lift_directory_digest_bound(py_digest).map_err(PyException::new_err)?;
 
         py.allow_threads(|| {
             core.executor
@@ -1706,10 +1732,10 @@ fn ensure_directory_digest_persisted(
 #[pyfunction]
 fn single_file_digests_to_bytes<'py>(
     py: Python<'py>,
-    py_scheduler: &PyScheduler,
+    py_scheduler: &Bound<'py, PyScheduler>,
     py_file_digests: Vec<PyFileDigest>,
-) -> PyO3Result<&'py PyList> {
-    let core = &py_scheduler.0.core;
+) -> PyO3Result<Bound<'py, PyList>> {
+    let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         let digest_futures = py_file_digests.into_iter().map(|py_file_digest| {
             let store = core.store();
@@ -1727,7 +1753,7 @@ fn single_file_digests_to_bytes<'py>(
             .map(|values| values.into_iter().map(|val| val.into()).collect())
             .map_err(possible_store_missing_digest)?;
 
-        let output_list = PyList::new(py, &bytes_values);
+        let output_list = PyList::new_bound(py, &bytes_values);
         Ok(output_list)
     })
 }
@@ -1747,24 +1773,28 @@ fn ensure_path_doesnt_exist(path: &Path) -> io::Result<()> {
 
 #[pyfunction]
 fn write_digest(
-    py: Python,
-    py_scheduler: &PyScheduler,
-    py_session: &PySession,
-    digest: &PyAny,
+    py: Python<'_>,
+    py_scheduler: &Bound<'_, PyScheduler>,
+    py_session: &Bound<'_, PySession>,
+    digest: &Bound<'_, PyAny>,
     path_prefix: String,
     clear_paths: Vec<String>,
 ) -> PyO3Result<()> {
-    let core = &py_scheduler.0.core;
-    core.executor.enter(|| {
-        // TODO: A parent_id should be an explicit argument.
-        py_session.0.workunit_store().init_thread_state(None);
+    let scheduler = &py_scheduler.borrow().0;
+    let session = &py_session.borrow().0;
+    let store = scheduler.core.store();
 
-        let lifted_digest = nodes::lift_directory_digest(digest).map_err(PyValueError::new_err)?;
+    scheduler.core.executor.enter(|| {
+        // TODO: A parent_id should be an explicit argument.
+        session.workunit_store().init_thread_state(None);
+
+        let lifted_digest =
+            nodes::lift_directory_digest_bound(digest).map_err(PyValueError::new_err)?;
 
         // Python will have already validated that path_prefix is a relative path.
         let path_prefix = Path::new(&path_prefix);
         let mut destination = PathBuf::new();
-        destination.push(&core.build_root);
+        destination.push(&scheduler.core.build_root);
         destination.push(path_prefix);
 
         for subpath in &clear_paths {
@@ -1778,11 +1808,10 @@ fn write_digest(
         }
 
         block_in_place_and_wait(py, || async move {
-            let store = core.store();
             store
                 .materialize_directory(
                     destination.clone(),
-                    &core.build_root,
+                    &scheduler.core.build_root,
                     lifted_digest.clone(),
                     true, // Force everything we write to be mutable
                     &BTreeSet::new(),
@@ -1803,7 +1832,7 @@ fn write_digest(
                 .map(|p| path_prefix.join(p))
                 .collect();
 
-            py_scheduler.0.invalidate_paths(&changed_paths);
+            scheduler.invalidate_paths(&changed_paths);
 
             Ok(())
         })
@@ -1882,8 +1911,8 @@ fn stdio_thread_get_destination() -> PyStdioDestination {
 // TODO: Deprecated, but without easy access to the decorator. Use
 // `PyThreadLocals::set_for_current_thread` instead. Remove in Pants 2.17.0.dev0.
 #[pyfunction]
-fn stdio_thread_set_destination(stdio_destination: &PyStdioDestination) {
-    stdio_destination.0.set_for_current_thread();
+fn stdio_thread_set_destination(stdio_destination: &Bound<'_, PyStdioDestination>) {
+    stdio_destination.borrow().0.set_for_current_thread();
 }
 
 // TODO: Needs to be thread-local / associated with the Console.
@@ -1907,14 +1936,16 @@ fn task_side_effected() -> PyO3Result<()> {
 }
 
 #[pyfunction]
-fn teardown_dynamic_ui(py: Python, py_scheduler: &PyScheduler, py_session: &PySession) {
-    py_scheduler.0.core.executor.enter(|| {
+fn teardown_dynamic_ui<'py>(
+    py: Python<'py>,
+    py_scheduler: &Bound<'py, PyScheduler>,
+    py_session: &Bound<'py, PySession>,
+) {
+    let core = &py_scheduler.borrow().0.core;
+    let session = &py_session.borrow().0;
+    core.executor.enter(|| {
         let _ = block_in_place_and_wait(py, || {
-            py_session
-                .0
-                .maybe_display_teardown()
-                .unit_error()
-                .boxed_local()
+            session.maybe_display_teardown().unit_error().boxed_local()
         });
     })
 }
