@@ -672,7 +672,7 @@ def test_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> None:
     ) == _determenistic_parametrize_group_keys(
         dict(
             description="desc for a and b",
-            **Parametrize("a", tags=["opt-a"], resolve="lock-a"),  # type: ignore[arg-type]
+            **Parametrize("a", tags=["opt-a"], resolve="lock-a"),
             **Parametrize("b", tags=["opt-b"], resolve="lock-b"),
         )
     )

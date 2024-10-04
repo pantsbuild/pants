@@ -124,14 +124,15 @@ mod tests {
     use std::convert::Infallible;
     use std::sync::Arc;
 
-    use hyper::{Body, Request, Response};
     use tower::{ServiceBuilder, ServiceExt};
     use workunit_store::{Level, ObservationMetric, WorkunitStore};
 
     use super::NetworkMetricsLayer;
 
-    async fn handler(_: Request<Body>) -> Result<Response<Body>, Infallible> {
-        Ok(Response::new(Body::empty()))
+    async fn handler(
+        _: http::Request<http_body_util::Empty<bytes::Bytes>>,
+    ) -> Result<http::Response<http_body_util::Empty<bytes::Bytes>>, Infallible> {
+        Ok(http::Response::new(http_body_util::Empty::new()))
     }
 
     #[tokio::test]
@@ -152,18 +153,18 @@ mod tests {
             .layer(NetworkMetricsLayer::new(&metric_for_path))
             .service_fn(handler);
 
-        let req = Request::builder()
+        let req = http::Request::builder()
             .uri("/not-a-metric-path")
-            .body(Body::empty())
+            .body(http_body_util::Empty::new())
             .unwrap();
 
         let _ = svc.clone().oneshot(req).await.unwrap();
         let observations = ws.encode_observations().unwrap();
         assert_eq!(observations.len(), 0); // there should be no observations for `/not-a-metric-path`
 
-        let req = Request::builder()
+        let req = http::Request::builder()
             .uri("/this-is-a-metric-path")
-            .body(Body::empty())
+            .body(http_body_util::Empty::new())
             .unwrap();
 
         let _ = svc.clone().oneshot(req).await.unwrap();

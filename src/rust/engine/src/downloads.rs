@@ -316,8 +316,7 @@ mod tests {
         let router = Router::new().route("/foo.txt", get(|| async { TEST_RESPONSE }));
 
         tokio::spawn(async move {
-            axum::Server::from_tcp(listener)
-                .unwrap()
+            axum_server::Server::from_tcp(listener)
                 .serve(router.into_make_service())
                 .await
                 .unwrap();
@@ -373,11 +372,11 @@ mod tests {
                         .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     if attempt == 0 {
                         // This error code is retryable.
-                        (StatusCode::BAD_GATEWAY, "502").into_response()
+                        (StatusCode::BAD_GATEWAY, &b"502"[..]).into_response()
                     } else if attempt == 1 {
-                        (StatusCode::OK, TEST_RESPONSE).into_response()
+                        (StatusCode::OK, &TEST_RESPONSE[..]).into_response()
                     } else {
-                        (StatusCode::INTERNAL_SERVER_ERROR, "unexpected").into_response()
+                        (StatusCode::INTERNAL_SERVER_ERROR, &b"unexpected"[..]).into_response()
                     }
                 }),
             )
@@ -386,8 +385,7 @@ mod tests {
             });
 
         tokio::spawn(async move {
-            axum::Server::from_tcp(listener)
-                .unwrap()
+            axum_server::Server::from_tcp(listener)
                 .serve(router.into_make_service())
                 .await
                 .unwrap();

@@ -11,8 +11,10 @@ either = { workspace = true }
 futures = { workspace = true }
 http = { workspace = true }
 http-body = { workspace = true }
+http-body-util = { workspace = true }
 hyper = { workspace = true }
 hyper-rustls = { workspace = true, features = ["http2"] }
+hyper-util = { workspace = true }
 itertools = { workspace = true }
 lazy_static = { workspace = true }
 log = { workspace = true }
@@ -20,14 +22,16 @@ pin-project = { workspace = true }
 pin-project-lite = { workspace = true }
 prost = { workspace = true }
 rand = { workspace = true }
-rustls = { workspace = true, features = ["dangerous_configuration", 'logging'] }
+rustls = { workspace = true, features = ["logging"] }
+rustls-pki-types = { workspace = true }
 rustls-native-certs = { workspace = true }
 rustls-pemfile = { workspace = true }
 tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = { workspace = true }
+tokio-stream = { workspace = true }
 tokio-util = { workspace = true, features = ["codec"] }
 tonic = { workspace = true, features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
-tower = { workspace = true, features = ["limit"] }
+tower = { workspace = true, features = ["limit", "timeout"] }
 tower-layer = { workspace = true }
 tower-service = { workspace = true }
 webpki = { workspace = true }

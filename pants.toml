@@ -86,6 +86,10 @@ unmatched_build_file_globs = "error"
 #   https://github.com/pantsbuild/pants/issues/16096.
 cache_content_behavior = "fetch"
 
+# Our current macOS 10.15 and 11 infrastructure is working okay, so for now (i.e. 2.24 dev
+# releases), we'll just keep building on them:
+allow_deprecated_macos_before_12 = true
+
 [DEFAULT]
 # Tell `scie-pants` to use our `./pants` bootstrap script.
 delegate_bootstrap = true

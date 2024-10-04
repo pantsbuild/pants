@@ -329,8 +329,8 @@ def test_get_all_help_info():
                         "target_field_name": None,
                     },
                     {
-                        "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
-                        "comma_separated_display_args": "-l=<LogLevel>, --level=<LogLevel>",
+                        "display_args": ("-l<LogLevel>", "--level=<LogLevel>"),
+                        "comma_separated_display_args": "-l<LogLevel>, --level=<LogLevel>",
                         "scoped_cmd_line_args": ("-l", "--level"),
                         "unscoped_cmd_line_args": ("-l", "--level"),
                         "config_key": "level",
@@ -648,8 +648,8 @@ def test_get_all_help_info():
                 "target_field_name": None,
             },
             "PANTS_LEVEL": {
-                "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
-                "comma_separated_display_args": "-l=<LogLevel>, --level=<LogLevel>",
+                "display_args": ("-l<LogLevel>", "--level=<LogLevel>"),
+                "comma_separated_display_args": "-l<LogLevel>, --level=<LogLevel>",
                 "scoped_cmd_line_args": ("-l", "--level"),
                 "unscoped_cmd_line_args": ("-l", "--level"),
                 "config_key": "level",

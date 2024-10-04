@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 env_logger = { workspace = true }
+grpc_util = { path = "../grpc_util" }
 log = { workspace = true }
 nailgun = { path = "../nailgun" }
 nix = { workspace = true }

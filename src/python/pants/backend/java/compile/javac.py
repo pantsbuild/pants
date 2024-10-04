@@ -17,7 +17,7 @@ from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet,
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, SourcesField
 from pants.engine.unions import UnionRule
@@ -214,6 +214,7 @@ async def compile_java_source(
                 output_files=output_files,
                 description=f"Capture outputs of {request.component} for javac",
                 level=LogLevel.TRACE,
+                cache_scope=ProcessCacheScope.LOCAL_SUCCESSFUL,
             ),
         )
         jar_output_digest = jar_result.output_digest

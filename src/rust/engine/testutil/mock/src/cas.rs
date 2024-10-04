@@ -8,7 +8,6 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use futures::FutureExt;
-use grpc_util::hyper_util::AddrIncomingWithStream;
 use hashing::Fingerprint;
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -17,6 +16,8 @@ use remexec::action_cache_server::ActionCacheServer;
 use remexec::capabilities_server::CapabilitiesServer;
 use remexec::content_addressable_storage_server::ContentAddressableStorageServer;
 use testutil::data::{TestData, TestDirectory, TestTree};
+use tokio::net::TcpListener;
+use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
 
 use crate::action_cache_service::{ActionCacheHandle, ActionCacheResponder};
@@ -199,16 +200,17 @@ impl StubCASBuilder {
             write_delay: self.ac_write_delay,
         };
 
-        let addr = format!("127.0.0.1:{}", self.port.unwrap_or(0))
-            .parse()
-            .expect("failed to parse IP address");
-        let incoming = hyper::server::conn::AddrIncoming::bind(&addr).expect("failed to bind port");
-        let local_addr = incoming.local_addr();
-        let incoming = AddrIncomingWithStream(incoming);
+        // TODO: Refactor to just use `tokio::net::TcpListener` directly (but requries the method be async and
+        // all call sites updated).
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let local_addr = listener.local_addr().unwrap();
+        let listener = TcpListener::from_std(listener).unwrap();
 
         let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel();
 
         tokio::spawn(async move {
+            let incoming_stream = TcpListenerStream::new(listener);
             let mut server = Server::builder();
             let router = server
                 .add_service(ActionCacheServer::new(ac_responder.clone()))
@@ -217,7 +219,7 @@ impl StubCASBuilder {
                 .add_service(CapabilitiesServer::new(cas_responder));
 
             router
-                .serve_with_incoming_shutdown(incoming, shutdown_receiver.map(drop))
+                .serve_with_incoming_shutdown(incoming_stream, shutdown_receiver.map(drop))
                 .await
                 .unwrap();
         });

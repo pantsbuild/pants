@@ -56,6 +56,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -188,10 +189,12 @@ async def package_pyoxidizer_binary(
     process_with_caching = dataclasses.replace(
         pex_process,
         argv=(bash.path, runner_script.path, *pex_process.argv),
-        append_only_caches={
-            **pex_process.append_only_caches,
-            "pyoxidizer": runner_script.CACHE_PATH,
-        },
+        append_only_caches=FrozenDict(
+            {
+                **pex_process.append_only_caches,
+                "pyoxidizer": runner_script.CACHE_PATH,
+            }
+        ),
     )
 
     result = await Get(ProcessResult, Process, process_with_caching)

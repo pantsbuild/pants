@@ -270,7 +270,7 @@ async fn store_file_connection_error() {
         .await
         .expect_err("Want err");
     assert!(
-        error.contains("Unavailable: \"error trying to connect: dns error"),
+        error.contains("client error (Connect)"),
         "Bad error message, got: {error}"
     );
 }
@@ -415,7 +415,7 @@ async fn store_bytes_connection_error() {
         .await
         .expect_err("Want err");
     assert!(
-        error.contains("Unavailable: \"error trying to connect: dns error"),
+        error.contains("client error (Connect)"),
         "Bad error message, got: {error}"
     );
 }

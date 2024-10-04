@@ -35,6 +35,10 @@ class ProcessCacheScope(Enum):
     ALWAYS = "always"
     # Cached in all locations, but only if the process exits successfully.
     SUCCESSFUL = "successful"
+    # Cached only locally, regardless of success or failure.
+    LOCAL_ALWAYS = "local_always"
+
+    LOCAL_SUCCESSFUL = "local_successful"
     # Cached only in memory (i.e. memoized in pantsd), but never persistently, regardless of
     # success vs. failure.
     PER_RESTART_ALWAYS = "per_restart_always"

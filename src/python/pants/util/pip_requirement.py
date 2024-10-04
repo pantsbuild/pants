@@ -1,13 +1,17 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# mypy: disable-error-code="import-untyped"
+#   Disables checking of the `pkg_resources` below which was awkward to figure out how to disable
+#   with a `# type: ignore[import-untyped]` comment.
+
 from __future__ import annotations
 
 import logging
 import urllib.parse
 
 import pkg_resources
-from pkg_resources.extern.packaging.requirements import InvalidRequirement  # type: ignore[import]
+from pkg_resources.extern.packaging.requirements import InvalidRequirement
 
 logger = logging.getLogger(__name__)
 

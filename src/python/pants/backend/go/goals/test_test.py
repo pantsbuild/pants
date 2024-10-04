@@ -714,3 +714,45 @@ def test_profile_options_write_results(rule_runner: RuleRunner) -> None:
         "test_runner",
         "trace.out",
     ]
+
+
+def test_external_test_with_use_coverage(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """
+                package foo
+                func Add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+            "foo/add_test.go": textwrap.dedent(
+                """
+                package foo_test
+                import (
+                  "foo"
+                  "testing"
+                )
+                func TestAdd(t *testing.T) {
+                  if foo.Add(2, 3) != 5 {
+                    t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    rule_runner.set_options(
+        [
+            "--test-use-coverage",
+        ],
+        env_inherit={"PATH"},
+    )
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
+    assert result.exit_code == 0

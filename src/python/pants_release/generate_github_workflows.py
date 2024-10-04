@@ -76,16 +76,15 @@ Env = Dict[str, str]
 class Platform(Enum):
     LINUX_X86_64 = "Linux-x86_64"
     LINUX_ARM64 = "Linux-ARM64"
-    MACOS10_15_X86_64 = "macOS10-15-x86_64"
     # the oldest version of macOS supported by GitHub self-hosted runners
     MACOS12_X86_64 = "macOS12-x86_64"
     MACOS11_ARM64 = "macOS11-ARM64"
 
 
 GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS12_X86_64}
-SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
+SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS11_ARM64}
 # We control these runners, so we preinstall and expose python on them.
-HAS_PYTHON = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
+HAS_PYTHON = {Platform.LINUX_ARM64, Platform.MACOS11_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
@@ -447,8 +446,6 @@ class Helper:
             ret += ["macos-12"]
         elif self.platform == Platform.MACOS11_ARM64:
             ret += ["macOS-11-ARM64"]
-        elif self.platform == Platform.MACOS10_15_X86_64:
-            ret += ["macOS-10.15-X64"]
         elif self.platform == Platform.LINUX_X86_64:
             ret += ["ubuntu-22.04"]
         elif self.platform == Platform.LINUX_ARM64:
@@ -464,7 +461,7 @@ class Helper:
 
     def platform_env(self):
         ret = {}
-        if self.platform in {Platform.MACOS10_15_X86_64, Platform.MACOS12_X86_64}:
+        if self.platform in {Platform.MACOS12_X86_64}:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
             # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
             ret["ARCHFLAGS"] = "-arch x86_64"
@@ -1009,7 +1006,7 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
     return {
         **build_wheels_job(Platform.LINUX_X86_64, for_deploy_ref, needs),
         **build_wheels_job(Platform.LINUX_ARM64, for_deploy_ref, needs),
-        **build_wheels_job(Platform.MACOS10_15_X86_64, for_deploy_ref, needs),
+        **build_wheels_job(Platform.MACOS12_X86_64, for_deploy_ref, needs),
         **build_wheels_job(Platform.MACOS11_ARM64, for_deploy_ref, needs),
     }
 

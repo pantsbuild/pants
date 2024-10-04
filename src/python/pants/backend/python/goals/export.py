@@ -134,7 +134,7 @@ class ExportPluginOptions:
             """
         ),
         advanced=True,
-        removal_version="2.24.0.dev0",
+        removal_version="2.26.0.dev0",
         removal_hint=softwrap(
             """
             Use `--export-py-non-hermetic-scripts-in-resolve` instead.

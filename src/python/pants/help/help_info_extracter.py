@@ -1059,7 +1059,8 @@ class HelpInfoExtracter:
                     display_args.append(f"--[no-]{sa_2}")
             else:
                 metavar = self.compute_metavar(kwargs)
-                display_args.append(f"{scoped_arg}={metavar}")
+                separator = "" if is_short_arg else "="
+                display_args.append(f"{scoped_arg}{separator}{metavar}")
                 if kwargs.get("passthrough"):
                     type_str = self.stringify_type(kwargs.get("member_type", str))
                     display_args.append(f"... -- [{type_str} [{type_str} [...]]]")

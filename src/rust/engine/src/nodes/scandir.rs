@@ -7,7 +7,7 @@ use deepsize::DeepSizeOf;
 use fs::{Dir, DirectoryListing};
 use graph::CompoundNode;
 
-use super::{NodeKey, NodeOutput, NodeResult};
+use super::{NodeKey, NodeOutput, NodeResult, SubjectPath};
 use crate::context::Context;
 use crate::python::throw;
 
@@ -16,14 +16,17 @@ use crate::python::throw;
 /// entry (generally in one syscall). No symlinks are expanded.
 ///
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct Scandir(pub(super) Dir);
+pub struct Scandir {
+    pub(super) dir: Dir,
+    pub(super) subject_path: SubjectPath,
+}
 
 impl Scandir {
     pub(super) async fn run_node(self, context: Context) -> NodeResult<Arc<DirectoryListing>> {
         let directory_listing = context
             .core
             .vfs
-            .scandir(self.0)
+            .scandir(self.dir)
             .await
             .map_err(|e| throw(format!("{e}")))?;
         Ok(Arc::new(directory_listing))

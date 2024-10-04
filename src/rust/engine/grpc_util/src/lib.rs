@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::iter::FromIterator;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -29,11 +29,23 @@ use crate::metrics::{NetworkMetrics, NetworkMetricsLayer};
 
 pub mod channel;
 pub mod headers;
-pub mod hyper_util;
 pub mod metrics;
 pub mod prost;
 pub mod retry;
 pub mod tls;
+
+/// Initialize process-wide libraries needed for gRPC including the cryptography library used for rustls.
+pub fn initialize() -> Result<(), String> {
+    static INIT: Once = Once::new();
+
+    INIT.call_once(|| {
+        rustls::crypto::aws_lc_rs::default_provider()
+            .install_default()
+            .expect("Failed to initialize cryptography library needed for gRPC operations");
+    });
+
+    Ok(())
+}
 
 // NB: Rather than boxing our tower/tonic services, we define a type alias that fully defines the
 // Service layers that we use universally. If this type becomes unwieldy, or our various Services
@@ -157,11 +169,12 @@ mod tests {
 
     use async_trait::async_trait;
     use futures::FutureExt;
+    use tokio::net::TcpListener;
     use tokio::sync::oneshot;
+    use tokio_stream::wrappers::TcpListenerStream;
     use tonic::transport::Server;
     use tonic::{Request, Response, Status};
 
-    use crate::hyper_util::AddrIncomingWithStream;
     use crate::{headers_to_http_header_map, layered_service};
 
     #[tokio::test]
@@ -197,19 +210,18 @@ mod tests {
             }
         }
 
-        let addr = "127.0.0.1:0".parse().expect("failed to parse IP address");
-        let incoming = hyper::server::conn::AddrIncoming::bind(&addr).expect("failed to bind port");
-        let local_addr = incoming.local_addr();
-        let incoming = AddrIncomingWithStream(incoming);
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let local_addr = listener.local_addr().unwrap();
 
         // Setup shutdown signal handler.
         let (_shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
 
         tokio::spawn(async move {
+            let incoming_stream = TcpListenerStream::new(listener);
             let mut server = Server::builder();
             let router = server.add_service(gen::test_server::TestServer::new(UserAgentResponder));
             router
-                .serve_with_incoming_shutdown(incoming, shutdown_receiver.map(drop))
+                .serve_with_incoming_shutdown(incoming_stream, shutdown_receiver.map(drop))
                 .await
                 .unwrap();
         });

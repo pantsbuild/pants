@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_build::configure()
     .build_client(true)
     .build_server(true)
-    .compile_with_config(
+    .compile_protos_with_config(
       config,
       &[
         "protos/bazelbuild_remote-apis/build/bazel/remote/execution/v2/remote_execution.proto",

@@ -253,7 +253,7 @@ class PythonSetup(Subsystem):
         ),
     )
     pip_version = StrOption(
-        default="24.0",
+        default="24.2",
         help=softwrap(
             f"""
             Use this version of Pip for resolving requirements and generating lockfiles.

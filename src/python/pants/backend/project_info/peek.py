@@ -8,7 +8,7 @@ import collections.abc
 import json
 import logging
 from abc import ABCMeta
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass, replace
 from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
 
 from pants.core.goals.deploy import Deploy, DeployFieldSet
@@ -432,14 +432,9 @@ async def peek(
         # TargetData is frozen so we need to create a new collection
         tds = TargetDatas(
             [
-                TargetData(
-                    td.target,
-                    td.expanded_sources,
-                    td.expanded_dependencies,
-                    td.dependencies_rules,
-                    td.dependents_rules,
-                    td.applicable_dep_rules,
-                    target_alias_to_goals_map.get(td.target.alias),
+                replace(
+                    td,
+                    goals=target_alias_to_goals_map.get(td.target.alias),
                 )
                 for td in tds
             ]

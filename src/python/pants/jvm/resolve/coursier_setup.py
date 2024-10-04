@@ -17,7 +17,7 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
-from pants.core.util_rules.system_binaries import BashBinary
+from pants.core.util_rules.system_binaries import BashBinary, MkdirBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import Process
@@ -81,7 +81,7 @@ COURSIER_FETCH_WRAPPER_SCRIPT = textwrap.dedent(  # noqa: PNT20
     "$coursier_exe" fetch {repos_args} \
         --json-output-file="$json_output_file" \
         "${{@//{coursier_working_directory}/$working_dir}}"
-    /bin/mkdir -p classpath
+    {mkdir} -p classpath
     {python_path} {coursier_bin_dir}/coursier_post_processing_script.py "$json_output_file"
     """
 )
@@ -271,6 +271,7 @@ async def setup_coursier(
     coursier_subsystem: CoursierSubsystem,
     python: PythonBuildStandaloneBinary,
     platform: Platform,
+    mkdir: MkdirBinary,
 ) -> Coursier:
     repos_args = (
         " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.repos) + " --no-default"
@@ -280,6 +281,7 @@ async def setup_coursier(
         coursier_working_directory=Coursier.working_directory_placeholder,
         python_path=shlex.quote(python.path),
         coursier_bin_dir=shlex.quote(Coursier.bin_dir),
+        mkdir=shlex.quote(mkdir.path),
     )
 
     post_process_stderr = POST_PROCESS_COURSIER_STDERR_SCRIPT.format(python_path=python.path)

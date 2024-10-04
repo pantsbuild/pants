@@ -41,7 +41,9 @@ class FlagErrorHelpPrinter(MaybeColor):
                 possibilities.update(oshi.collect_scoped_flags())
 
         for flag in err.flags:
-            print(f"Unknown flag {self.maybe_red(flag)} on {err.arg_scope or 'global'} scope")
+            print(
+                f"Unknown flag {self.maybe_red(flag)} in {(err.arg_scope + ' goal') if err.arg_scope else 'global'} context"
+            )
             did_you_mean = difflib.get_close_matches(flag, possibilities)
             if err.arg_scope != GLOBAL_SCOPE and flag in global_flags:
                 # It's a common error to use a global flag in a goal scope, so we special-case it.

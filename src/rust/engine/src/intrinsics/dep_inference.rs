@@ -16,7 +16,8 @@ use protos::gen::pants::cache::{
     dependency_inference_request, CacheKey, CacheKeyType, DependencyInferenceRequest,
 };
 use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyResult, Python, ToPyObject};
-use pyo3::IntoPy;
+use pyo3::types::PyModuleMethods;
+use pyo3::{Bound, IntoPy};
 use store::Store;
 use workunit_store::{in_workunit, Level};
 
@@ -26,7 +27,7 @@ use crate::nodes::{task_get_context, NodeResult};
 use crate::python::{Failure, Value};
 use crate::{externs, Core};
 
-pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_dockerfile_info, m)?)?;
     m.add_function(wrap_pyfunction!(parse_python_deps, m)?)?;
     m.add_function(wrap_pyfunction!(parse_javascript_deps, m)?)?;

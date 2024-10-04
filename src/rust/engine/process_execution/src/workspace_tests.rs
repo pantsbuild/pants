@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use maplit::hashset;
-use shell_quote::bash;
+use shell_quote::Bash;
 use tempfile::TempDir;
 
 use fs::EMPTY_DIRECTORY_DIGEST;

@@ -3,30 +3,29 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use fs::{
     DigestTrie, DirectoryDigest, GlobMatching, PathStat, RelativePath, SymlinkBehavior, TypedPath,
 };
 use hashing::{Digest, EMPTY_DIGEST};
 use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyRef, PyResult, Python};
-use pyo3::types::PyTuple;
-use pyo3::IntoPy;
+use pyo3::types::{PyModuleMethods, PyTuple};
+use pyo3::{Bound, IntoPy};
 use store::{SnapshotOps, SubsetParams};
 
 use crate::externs;
 use crate::externs::fs::{
-    PyAddPrefix, PyFileDigest, PyMergeDigests, PyPathMetadata, PyRemovePrefix,
+    PyAddPrefix, PyFileDigest, PyMergeDigests, PyPathMetadata, PyPathNamespace, PyRemovePrefix,
 };
 use crate::externs::PyGeneratorResponseNativeCall;
 use crate::nodes::{
     lift_directory_digest, task_get_context, unmatched_globs_additional_context, DownloadedFile,
-    NodeResult, PathMetadataNode, Snapshot,
+    NodeResult, PathMetadataNode, Snapshot, SubjectPath,
 };
 use crate::python::{throw, Key, Value};
 use crate::Failure;
 
-pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(add_prefix, m)?)?;
     m.add_function(wrap_pyfunction!(create_digest, m)?)?;
     m.add_function(wrap_pyfunction!(digest_subset_to_digest, m)?)?;
@@ -364,16 +363,29 @@ fn digest_subset_to_digest(digest_subset: Value) -> PyGeneratorResponseNativeCal
 #[pyfunction]
 fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
-        let path = Python::with_gil(|py| {
+        let subject_path = Python::with_gil(|py| -> Result<_, String> {
             let arg = (*single_path).as_ref(py);
-            externs::getattr_as_optional_string(arg, "path")
-                .map_err(|e| format!("Failed to get `path` for field: {e}"))
-        })?
-        .expect("path field for intrinsic");
+            let path = externs::getattr_as_optional_string(arg, "path")
+                .map_err(|e| format!("Failed to get `path` for field: {e}"))?;
+            let path = path.ok_or_else(|| "Path must not be `None`.".to_string())?;
+
+            let namespace: PyPathNamespace = externs::getattr(arg, "namespace")
+                .map_err(|e| format!("Failed to get `namespace` for field: {e}"))?;
+            match namespace {
+                PyPathNamespace::Workspace => SubjectPath::new_workspace(&path).map_err(|_| {
+                    format!("path_metadata_request error: path for PathNamespace.WORKSPACE must be a relative path. Instead, got `{}`", path)
+                }),
+                PyPathNamespace::System => SubjectPath::new_system(&path).map_err(|_| {
+                    format!(
+                        "path_metadata_request error: path for PathNamespace.SYSTEM must an absolute path. Instead, got `{}`", path
+                    )
+                }),
+            }
+        })?;
 
         let context = task_get_context();
         let metadata_opt = context
-            .get(PathMetadataNode::new(PathBuf::from_str(&path).unwrap()))
+            .get(PathMetadataNode::new(subject_path)?)
             .await?
             .map(PyPathMetadata);
 

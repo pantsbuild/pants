@@ -29,7 +29,7 @@ from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, SourcesField
 from pants.engine.unions import UnionRule
@@ -240,6 +240,7 @@ async def compile_scala_source(
                 output_files=(output_file,),
                 description=f"Capture outputs of {request.component} for scalac",
                 level=LogLevel.TRACE,
+                cache_scope=ProcessCacheScope.LOCAL_SUCCESSFUL,
             ),
         )
         output_digest = jar_result.output_digest

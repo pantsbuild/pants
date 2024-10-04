@@ -24,7 +24,6 @@ from pants.backend.python.target_types import (
     PexInheritPathField,
     PexLayout,
     PexLayoutField,
-    PexResolveLocalPlatformsField,
     PexScriptField,
     PexShBootField,
     PexShebangField,
@@ -72,7 +71,6 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     shebang: PexShebangField
     strip_env: PexStripEnvField
     complete_platforms: PexCompletePlatformsField
-    resolve_local_platforms: PexResolveLocalPlatformsField
     layout: PexLayoutField
     execution_mode: PexExecutionModeField
     include_requirements: PexIncludeRequirementsField
@@ -94,8 +92,6 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append("--no-emit-warnings")
         elif self.emit_warnings.value_or_global_default(pex_binary_defaults) is True:
             args.append("--emit-warnings")
-        if self.resolve_local_platforms.value_or_global_default(pex_binary_defaults) is True:
-            args.append("--resolve-local-platforms")
         if self.ignore_errors.value is True:
             args.append("--ignore-errors")
         if self.inherit_path.value is not None:

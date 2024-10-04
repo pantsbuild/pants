@@ -10,8 +10,11 @@ from dataclasses import dataclass
 from threading import Thread
 from typing import Any, BinaryIO, Dict, Iterable, Tuple
 
-from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
-from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
+from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import-untyped]
+from pylsp_jsonrpc.streams import (  # type: ignore[import-untyped]
+    JsonRpcStreamReader,
+    JsonRpcStreamWriter,
+)
 
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection

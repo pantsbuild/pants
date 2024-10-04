@@ -16,6 +16,7 @@ from pants.bin.pants_env_vars import (
     RECURSION_LIMIT,
 )
 from pants.bin.pants_runner import PantsRunner
+from pants.engine.internals import native_engine
 from pants.util.strutil import softwrap
 
 
@@ -96,6 +97,7 @@ class PantsLoader:
 
     @classmethod
     def main(cls) -> None:
+        native_engine.initialize()
         cls.setup_warnings()
         cls.ensure_locale()
 
