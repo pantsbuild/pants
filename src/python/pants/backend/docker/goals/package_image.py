@@ -24,6 +24,8 @@ from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMultiValueMixin,
     DockerBuildOptionFieldValueMixin,
     DockerBuildOptionFlagFieldMixin,
+    DockerImageBuildImageOutputField,
+    DockerImageBuildPlatformOptionField,
     DockerImageContextRootField,
     DockerImageRegistriesField,
     DockerImageRepositoryField,
@@ -318,6 +320,8 @@ def get_build_options(
     global_build_no_cache_option: bool | None,
     use_buildx_option: bool,
     target: Target,
+    ignore_platforms: bool,
+    push_image: bool,
 ) -> Iterator[str]:
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
@@ -343,6 +347,16 @@ def get_build_options(
                 DockerBuildOptionFlagFieldMixin,
             ),
         ):
+            if ignore_platforms and field_type == DockerImageBuildPlatformOptionField:
+                # Should we drop the field or take the first value?
+                continue
+
+            if push_image and field_type == DockerImageBuildImageOutputField:
+                # Output supports a lot of options
+                # What combinations do we need to support?
+                # https://docs.docker.com/reference/cli/docker/buildx/build/#output
+                continue
+
             source = InterpolationContext.TextSource(
                 address=target.address, target_alias=target.alias, field_alias=field_type.alias
             )
@@ -377,17 +391,41 @@ def get_build_options(
     if global_build_no_cache_option:
         yield "--no-cache"
 
+    if push_image:
+        if use_buildx_option is not True:
+            raise DockerImageOptionValueError(
+                f"The `--push` flag was set on the command line, but buildx is not enabled. "
+                f"Buildx must be enabled via the Docker subsystem options in order to use this flag."
+            )
+        yield "--push"
+
+
+@dataclass(frozen=True)
+class DockerBuildSetupRequest:
+    field_set: DockerPackageFieldSet
+    ignore_platforms: bool
+    push_image: bool = False
+
+
+@dataclass(frozen=True)
+class DockerBuildSetup:
+    process: Process
+    context: DockerBuildContext
+    context_root: str
+    tags: tuple[str, ...]
+    image_refs: tuple[ImageRefRegistry, ...]
+
 
 @rule
-async def build_docker_image(
-    field_set: DockerPackageFieldSet,
+async def setup_build_docker_image(
+    request: DockerBuildSetupRequest,
     options: DockerOptions,
-    global_options: GlobalOptions,
     docker: DockerBinary,
-    keep_sandboxes: KeepSandboxes,
     union_membership: UnionMembership,
-) -> BuiltPackage:
+) -> DockerBuildSetup:
     """Build a Docker image using `docker build`."""
+    field_set = request.field_set
+
     context, wrapped_target = await MultiGet(
         Get(
             DockerBuildContext,
@@ -454,9 +492,45 @@ async def build_docker_image(
                 global_build_no_cache_option=options.build_no_cache,
                 use_buildx_option=options.use_buildx,
                 target=wrapped_target.target,
+                ignore_platforms=request.ignore_platforms,
+                push_image=request.push_image,
             )
         ),
     )
+
+    return DockerBuildSetup(
+        process=process,
+        context=context,
+        context_root=context_root,
+        tags=tags,
+        image_refs=image_refs,
+    )
+
+
+@rule
+async def build_docker_image(
+    field_set: DockerPackageFieldSet,
+    options: DockerOptions,
+    global_options: GlobalOptions,
+    docker: DockerBinary,
+    keep_sandboxes: KeepSandboxes,
+    union_membership: UnionMembership,
+) -> BuiltPackage:
+    """Build a Docker image using `docker build`."""
+    build_setup = await Get(
+        DockerBuildSetup,
+        DockerBuildSetupRequest(
+            field_set,
+            # Should this be conditional?
+            # Building multiple platforms is fine if containerd-snaphotter is used.
+            ignore_platforms=True,
+        ),
+    )
+    process = build_setup.process
+    context_root = build_setup.context_root
+    context = build_setup.context
+    tags = build_setup.tags
+    image_refs = build_setup.image_refs
     result = await Get(FallibleProcessResult, Process, process)
 
     if result.exit_code != 0:
