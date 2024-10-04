@@ -100,10 +100,15 @@ async def add_prefix(add_prefix: AddPrefix) -> Digest:
     return await native_engine.add_prefix(add_prefix)
 
 
+import dataclasses
+from pants.option.global_options import GlobalOptions
 @rule
 async def execute_process(
-    process: Process, process_execution_environment: ProcessExecutionEnvironment
+    process: Process,
+    process_execution_environment: ProcessExecutionEnvironment,
+    options: GlobalOptions,
 ) -> FallibleProcessResult:
+    process = dataclasses.replace(process, env={**process.env, **options.process_extra_env})
     return await native_engine.execute_process(process, process_execution_environment)
 
 

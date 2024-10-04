@@ -1998,6 +1998,15 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         default=[],
     )
 
+    process_extra_env = DictOption[str](
+        advanced=True,
+        help=softwrap(
+            """
+            Extra environment variables for every Process call.
+            """
+        )
+    )
+
     @classmethod
     def validate_instance(cls, opts):
         """Validates an instance of global options for cases that are not prohibited via
