@@ -35,7 +35,9 @@ use pyo3::prelude::{
     pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
     PyResult as PyO3Result, Python, ToPyObject,
 };
-use pyo3::types::{PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyTuple, PyType};
+use pyo3::types::{
+    PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyTuple, PyType,
+};
 use pyo3::{create_exception, AsPyPointer, Bound, IntoPy, PyAny, PyNativeType, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
