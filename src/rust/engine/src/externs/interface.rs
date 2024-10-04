@@ -35,7 +35,7 @@ use pyo3::prelude::{
     pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
     PyResult as PyO3Result, Python, ToPyObject,
 };
-use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
+use pyo3::types::{PyAnyMethods, PyBytes, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, AsPyPointer, Bound, IntoPy, PyAny, PyNativeType, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
@@ -1594,31 +1594,33 @@ fn lease_files_in_graph(
 
 #[pyfunction]
 fn capture_snapshots(
-    py: Python,
-    py_scheduler: &PyScheduler,
-    py_session: &PySession,
-    path_globs_and_root_tuple_wrapper: &PyAny,
+    py: Python<'_>,
+    py_scheduler: &Bound<'_, PyScheduler>,
+    py_session: &Bound<'_, PySession>,
+    path_globs_and_root_tuple_wrapper: &Bound<'_, PyAny>,
 ) -> PyO3Result<Vec<externs::fs::PySnapshot>> {
-    let core = &py_scheduler.0.core;
+    let core = &py_scheduler.borrow().0.core;
+    let session = &py_session.borrow().0;
     core.executor.enter(|| {
         // TODO: A parent_id should be an explicit argument.
-        py_session.0.workunit_store().init_thread_state(None);
+        session.workunit_store().init_thread_state(None);
 
-        let values = externs::collect_iterable(path_globs_and_root_tuple_wrapper).unwrap();
+        let values = externs::collect_iterable_bound(path_globs_and_root_tuple_wrapper).unwrap();
         let path_globs_and_roots = values
             .into_iter()
             .map(|value| {
-                let root: PathBuf = externs::getattr(value, "root")?;
-                let path_globs = nodes::Snapshot::lift_prepared_path_globs(externs::getattr(
-                    value,
+                let root: PathBuf = externs::getattr_bound(&value, "root")?;
+                let path_globs = nodes::Snapshot::lift_prepared_path_globs(externs::getattr_bound(
+                    &value,
                     "path_globs",
                 )?);
                 let digest_hint = {
-                    let maybe_digest: &PyAny = externs::getattr(value, "digest_hint")?;
+                    let maybe_digest: Bound<'_, PyAny> =
+                        externs::getattr_bound(&value, "digest_hint")?;
                     if maybe_digest.is_none() {
                         None
                     } else {
-                        Some(nodes::lift_directory_digest(maybe_digest)?)
+                        Some(nodes::lift_directory_digest_bound(&maybe_digest)?)
                     }
                 };
                 path_globs.map(|path_globs| (path_globs, root, digest_hint))

@@ -220,29 +220,6 @@ pub fn collect_iterable_bound<'py>(
     }
 }
 
-pub fn collect_iterable(value: &PyAny) -> Result<Vec<&PyAny>, String> {
-    match value.iter() {
-        Ok(py_iter) => py_iter
-            .enumerate()
-            .map(|(i, py_res)| {
-                py_res.map_err(|py_err| {
-                    format!(
-                        "Could not iterate {}, failed to extract {}th item: {:?}",
-                        val_to_str(value),
-                        i,
-                        py_err
-                    )
-                })
-            })
-            .collect(),
-        Err(py_err) => Err(format!(
-            "Could not iterate {}: {:?}",
-            val_to_str(value),
-            py_err
-        )),
-    }
-}
-
 /// Read a `FrozenDict[str, T]`.
 pub fn getattr_from_str_frozendict_bound<'py, T: FromPyObject<'py>>(
     value: &Bound<'py, PyAny>,
