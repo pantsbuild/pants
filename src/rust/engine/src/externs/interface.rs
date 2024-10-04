@@ -35,7 +35,7 @@ use pyo3::prelude::{
     pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
     PyResult as PyO3Result, Python, ToPyObject,
 };
-use pyo3::types::{PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyTuple, PyType};
+use pyo3::types::{PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyTuple, PyType};
 use pyo3::{create_exception, AsPyPointer, Bound, IntoPy, PyAny, PyNativeType, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
@@ -1099,21 +1099,24 @@ fn scheduler_shutdown(py: Python, py_scheduler: &Bound<'_, PyScheduler>, timeout
 
 #[pyfunction]
 fn scheduler_execute(
-    py: Python,
-    py_scheduler: &PyScheduler,
-    py_session: &PySession,
-    py_execution_request: &PyExecutionRequest,
+    py: Python<'_>,
+    py_scheduler: &Bound<'_, PyScheduler>,
+    py_session: &Bound<'_, PySession>,
+    py_execution_request: &Bound<'_, PyExecutionRequest>,
 ) -> PyO3Result<Vec<PyResult>> {
-    py_scheduler.0.core.executor.enter(|| {
-        // TODO: A parent_id should be an explicit argument.
-        py_session.0.workunit_store().init_thread_state(None);
+    let scheduler = &py_scheduler.borrow().0;
+    let session = &py_session.borrow().0;
+    let execution_request_cell = &mut py_execution_request.borrow_mut().0;
+    let execution_request: &mut ExecutionRequest = execution_request_cell.get_mut();
 
-        let execution_request: &mut ExecutionRequest = &mut py_execution_request.0.borrow_mut();
+    scheduler.core.executor.enter(|| {
+        // TODO: A parent_id should be an explicit argument.
+        session.workunit_store().init_thread_state(None);
+
         Ok(py
             .allow_threads(|| {
-                py_scheduler
-                    .0
-                    .execute(execution_request, &py_session.0)
+                scheduler
+                    .execute(execution_request, session)
                     .map_err(|e| match e {
                         ExecutionTermination::KeyboardInterrupt => PyKeyboardInterrupt::new_err(()),
                         ExecutionTermination::PollTimeout => PollTimeout::new_err(()),
@@ -1128,24 +1131,23 @@ fn scheduler_execute(
 
 #[pyfunction]
 fn execution_add_root_select(
-    py_scheduler: &PyScheduler,
-    py_execution_request: &PyExecutionRequest,
+    py_scheduler: &Bound<'_, PyScheduler>,
+    py_execution_request: &Bound<'_, PyExecutionRequest>,
     param_vals: Vec<PyObject>,
     product: &Bound<'_, PyType>,
 ) -> PyO3Result<()> {
-    py_scheduler.0.core.executor.enter(|| {
+    let scheduler = &py_scheduler.borrow().0;
+    let execution_request_cell = &mut py_execution_request.borrow_mut().0;
+    let execution_request: &mut ExecutionRequest = execution_request_cell.get_mut();
+
+    scheduler.core.executor.enter(|| {
         let product = TypeId::new(product);
         let keys = param_vals
             .into_iter()
             .map(|p| Key::from_value(p.into()))
             .collect::<Result<Vec<_>, _>>()?;
         Params::new(keys)
-            .and_then(|params| {
-                let mut execution_request = py_execution_request.0.borrow_mut();
-                py_scheduler
-                    .0
-                    .add_root_select(&mut execution_request, params, product)
-            })
+            .and_then(|params| scheduler.add_root_select(execution_request, params, product))
             .map_err(PyException::new_err)
     })
 }
@@ -1618,31 +1620,33 @@ fn lease_files_in_graph(
 
 #[pyfunction]
 fn capture_snapshots(
-    py: Python,
-    py_scheduler: &PyScheduler,
-    py_session: &PySession,
-    path_globs_and_root_tuple_wrapper: &PyAny,
+    py: Python<'_>,
+    py_scheduler: &Bound<'_, PyScheduler>,
+    py_session: &Bound<'_, PySession>,
+    path_globs_and_root_tuple_wrapper: &Bound<'_, PyAny>,
 ) -> PyO3Result<Vec<externs::fs::PySnapshot>> {
-    let core = &py_scheduler.0.core;
+    let core = &py_scheduler.borrow().0.core;
+    let session = &py_session.borrow().0;
     core.executor.enter(|| {
         // TODO: A parent_id should be an explicit argument.
-        py_session.0.workunit_store().init_thread_state(None);
+        session.workunit_store().init_thread_state(None);
 
-        let values = externs::collect_iterable(path_globs_and_root_tuple_wrapper).unwrap();
+        let values = externs::collect_iterable_bound(path_globs_and_root_tuple_wrapper).unwrap();
         let path_globs_and_roots = values
             .into_iter()
             .map(|value| {
-                let root: PathBuf = externs::getattr(value, "root")?;
-                let path_globs = nodes::Snapshot::lift_prepared_path_globs(externs::getattr(
-                    value,
+                let root: PathBuf = externs::getattr_bound(&value, "root")?;
+                let path_globs = nodes::Snapshot::lift_prepared_path_globs(externs::getattr_bound(
+                    &value,
                     "path_globs",
                 )?);
                 let digest_hint = {
-                    let maybe_digest: &PyAny = externs::getattr(value, "digest_hint")?;
+                    let maybe_digest: Bound<'_, PyAny> =
+                        externs::getattr_bound(&value, "digest_hint")?;
                     if maybe_digest.is_none() {
                         None
                     } else {
-                        Some(nodes::lift_directory_digest(maybe_digest)?)
+                        Some(nodes::lift_directory_digest_bound(&maybe_digest)?)
                     }
                 };
                 path_globs.map(|path_globs| (path_globs, root, digest_hint))

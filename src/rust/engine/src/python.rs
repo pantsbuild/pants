@@ -135,8 +135,15 @@ impl TypeId {
         Self(py_type.as_type_ptr())
     }
 
+    pub fn as_py_type_bound<'py>(&self, py: Python<'py>) -> Bound<'py, PyType> {
+        // SAFETY: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
+        // type is not unloaded. That is true today, but would not be if we implemented support for hot
+        // reloading of plugins.
+        unsafe { PyType::from_type_ptr(py, self.0).as_borrowed().to_owned() }
+    }
+
     pub fn as_py_type<'py>(&self, py: Python<'py>) -> &'py PyType {
-        // NB: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
+        // SAFETY: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
         // type is not unloaded. That is true today, but would not be if we implemented support for hot
         // reloading of plugins.
         unsafe { PyType::from_type_ptr(py, self.0) }

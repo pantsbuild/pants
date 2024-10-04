@@ -11,7 +11,7 @@ use process_execution::local::{
     apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
 };
 use process_execution::{ManagedChild, ProcessExecutionStrategy};
-use pyo3::prelude::{pyfunction, wrap_pyfunction, PyAny, PyModule, PyResult, Python, ToPyObject};
+use pyo3::prelude::{pyfunction, wrap_pyfunction, PyAny, PyModule, PyResult, Python};
 use pyo3::types::PyModuleMethods;
 use pyo3::Bound;
 use stdio::TryCloneAsFile;
@@ -81,15 +81,15 @@ pub async fn interactive_process_inner(
         .await?
         .process;
     let (run_in_workspace, keep_sandboxes) = Python::with_gil(|py| {
-        let py_interactive_process_obj = py_interactive_process.to_object(py);
-        let py_interactive_process = py_interactive_process_obj.as_ref(py);
+        let py_interactive_process = py_interactive_process.bind(py);
         let run_in_workspace: bool =
-            externs::getattr(py_interactive_process, "run_in_workspace").unwrap();
-        let keep_sandboxes_value: &PyAny =
-            externs::getattr(py_interactive_process, "keep_sandboxes").unwrap();
-        let keep_sandboxes =
-            KeepSandboxes::from_str(externs::getattr(keep_sandboxes_value, "value").unwrap())
-                .unwrap();
+            externs::getattr_bound(py_interactive_process, "run_in_workspace").unwrap();
+        let keep_sandboxes_value: Bound<'_, PyAny> =
+            externs::getattr_bound(py_interactive_process, "keep_sandboxes").unwrap();
+        let keep_sandboxes = KeepSandboxes::from_str(
+            externs::getattr_bound(&keep_sandboxes_value, "value").unwrap(),
+        )
+        .unwrap();
         (run_in_workspace, keep_sandboxes)
     });
 
