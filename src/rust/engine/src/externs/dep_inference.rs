@@ -15,7 +15,7 @@ use protos::gen::pants::cache::{
 
 use crate::externs::fs::PyDigest;
 
-pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyNativeDependenciesRequest>()?;
     m.add_class::<PyInferenceMetadata>()
 }
@@ -25,7 +25,7 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
 pub struct PyInferenceMetadata(pub dependency_inference_request::Metadata);
 
 fn as_import_patterns(
-    dict: &PyDict,
+    dict: &Bound<'_, PyDict>,
 ) -> PyResult<Vec<javascript_inference_metadata::ImportPattern>> {
     dict.iter()
         .map(|(key, value)| {
@@ -41,11 +41,11 @@ fn as_import_patterns(
 impl PyInferenceMetadata {
     #[staticmethod]
     #[pyo3(signature = (package_root, import_patterns, config_root, paths))]
-    fn javascript(
+    fn javascript<'py>(
         package_root: String,
-        import_patterns: &PyDict,
+        import_patterns: &Bound<'py, PyDict>,
         config_root: Option<String>,
-        paths: &PyDict,
+        paths: &Bound<'py, PyDict>,
     ) -> PyResult<Self> {
         let import_patterns = as_import_patterns(import_patterns)?;
         let paths = as_import_patterns(paths)?;

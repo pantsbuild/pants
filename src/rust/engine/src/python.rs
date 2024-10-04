@@ -131,8 +131,8 @@ unsafe impl Send for TypeId {}
 unsafe impl Sync for TypeId {}
 
 impl TypeId {
-    pub fn new(py_type: &PyType) -> Self {
-        py_type.into()
+    pub fn new(py_type: &Bound<'_, PyType>) -> Self {
+        Self(py_type.as_type_ptr())
     }
 
     pub fn as_py_type<'py>(&self, py: Python<'py>) -> &'py PyType {
@@ -150,7 +150,12 @@ impl TypeId {
         Python::with_gil(|py| {
             externs::union_in_scope_types(py, self.as_py_type(py))
                 .unwrap()
-                .map(|types| types.into_iter().map(TypeId::new).collect())
+                .map(|types| {
+                    types
+                        .into_iter()
+                        .map(|t| TypeId::new(&t.as_borrowed()))
+                        .collect()
+                })
         })
     }
 }
@@ -252,8 +257,8 @@ impl fmt::Display for Key {
     }
 }
 
-impl<'source> FromPyObject<'source> for Key {
-    fn extract(obj: &'source PyAny) -> PyResult<Self> {
+impl<'py> FromPyObject<'py> for Key {
+    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = obj.py();
         externs::INTERNS.key_insert(py, obj.into_py(py))
     }
@@ -307,6 +312,11 @@ impl Value {
             Err(arc_handle) => arc_handle.clone_ref(py),
         }
     }
+
+    /// Bind this value to the given Python GIL context as a `pyo3::Bound` smart pointer.
+    pub fn bind<'py>(&self, py: Python<'py>) -> &Bound<'py, PyAny> {
+        self.0.bind(py)
+    }
 }
 
 impl workunit_store::Value for Value {
@@ -353,8 +363,8 @@ impl fmt::Display for Value {
     }
 }
 
-impl<'source> FromPyObject<'source> for Value {
-    fn extract(obj: &'source PyAny) -> PyResult<Self> {
+impl<'py> FromPyObject<'py> for Value {
+    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = obj.py();
         Ok(obj.into_py(py).into())
     }
@@ -378,6 +388,12 @@ impl From<Value> for PyObject {
 impl From<PyObject> for Value {
     fn from(obj: PyObject) -> Self {
         Value::new(obj)
+    }
+}
+
+impl<'py, T> From<&Bound<'py, T>> for Value {
+    fn from(value: &Bound<'py, T>) -> Self {
+        Value::new(value.clone().into_py(value.py()))
     }
 }
 

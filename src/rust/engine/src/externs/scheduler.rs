@@ -7,7 +7,7 @@ use pyo3::exceptions::PyException;
 use pyo3::ffi;
 use pyo3::prelude::*;
 
-pub fn register(m: &PyModule) -> PyResult<()> {
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExecutor>()?;
     Ok(())
 }

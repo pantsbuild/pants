@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 
 use options::{Args, BuildRoot, Env, OptionParser};
 
-pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(pantsd_fingerprint_compute, m)?)?;
     Ok(())
 }
