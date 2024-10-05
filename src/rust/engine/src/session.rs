@@ -270,8 +270,9 @@ impl Session {
         roots.keys().map(|r| r.clone().into()).collect()
     }
 
-    pub fn session_values(&self) -> PyObject {
-        self.state.session_values.lock().clone()
+    pub fn session_values(&self, py: Python) -> PyObject {
+        let obj = self.state.session_values.lock();
+        obj.clone_ref(py)
     }
 
     pub fn preceding_graph_size(&self) -> usize {

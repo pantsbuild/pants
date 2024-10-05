@@ -36,9 +36,10 @@ use pyo3::prelude::{
     PyResult as PyO3Result, Python, ToPyObject,
 };
 use pyo3::types::{
-    PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyTuple, PyType,
+    PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyModuleMethods, PyTuple,
+    PyType,
 };
-use pyo3::{create_exception, AsPyPointer, Bound, IntoPy, PyAny, PyRef};
+use pyo3::{create_exception, Bound, IntoPy, PyAny, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, RuleGraph};
@@ -460,8 +461,8 @@ impl PySession {
     }
 
     #[getter]
-    fn session_values(&self) -> PyObject {
-        self.0.session_values()
+    fn session_values(&self, py: Python) -> PyObject {
+        self.0.session_values(py)
     }
 }
 

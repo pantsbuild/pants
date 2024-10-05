@@ -185,13 +185,6 @@ where
         })
 }
 
-pub fn getattr<'py, T>(value: &'py PyAny, field: &str) -> Result<T, String>
-where
-    T: FromPyObject<'py>,
-{
-    getattr_bound(&value.as_borrowed(), field)
-}
-
 ///
 /// Collect the Values contained within an outer Python Iterable PyObject.
 ///

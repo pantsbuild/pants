@@ -133,8 +133,8 @@ impl ExecuteProcess {
         let concurrency_available: usize = externs::getattr_bound(value, "concurrency_available")?;
 
         let cache_scope: ProcessCacheScope = {
-            let cache_scope_enum = externs::getattr_bound(value, "cache_scope")?;
-            externs::getattr::<String>(cache_scope_enum, "name")?.try_into()?
+            let cache_scope_enum: Bound<'_, PyAny> = externs::getattr_bound(value, "cache_scope")?;
+            externs::getattr_bound::<String>(&cache_scope_enum, "name")?.try_into()?
         };
 
         let remote_cache_speculation_delay = std::time::Duration::from_millis(

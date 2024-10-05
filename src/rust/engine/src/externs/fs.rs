@@ -507,7 +507,7 @@ impl PyFilespecMatcher {
 // -----------------------------------------------------------------------------
 
 /// The kind of path (e.g., file, directory, symlink) as identified in `PathMetadata`
-#[pyclass(name = "PathMetadataKind", rename_all = "UPPERCASE", eq, eq_int)]
+#[pyclass(name = "PathMetadataKind", rename_all = "UPPERCASE", eq)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PyPathMetadataKind {
     File,
@@ -624,24 +624,11 @@ impl PyPathMetadata {
 }
 
 /// The path's namespace (to separate buildroot and system paths)
-#[pyclass(name = "PathNamespace", rename_all = "UPPERCASE", eq, eq_int)]
+#[pyclass(name = "PathNamespace", rename_all = "UPPERCASE", frozen, eq, hash)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum PyPathNamespace {
     Workspace,
     System,
-}
-
-#[pymethods]
-impl PyPathNamespace {
-    fn __eq__(&self, other: Bound<'_, PyPathNamespace>) -> bool {
-        *self == *other.borrow()
-    }
-
-    fn __hash__(&self) -> u64 {
-        let mut h = DefaultHasher::new();
-        self.hash(&mut h);
-        h.finish()
-    }
 }
 
 // -----------------------------------------------------------------------------

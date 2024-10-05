@@ -3,6 +3,7 @@
 
 use deepsize::DeepSizeOf;
 use graph::CompoundNode;
+use pyo3::Python;
 
 use super::{NodeKey, NodeResult};
 use crate::context::Context;
@@ -13,7 +14,8 @@ pub struct SessionValues;
 
 impl SessionValues {
     pub(super) async fn run_node(self, context: Context) -> NodeResult<Value> {
-        Ok(Value::new(context.session.session_values()))
+        let session_values = Python::with_gil(|py| context.session.session_values(py));
+        Ok(Value::new(session_values))
     }
 }
 
