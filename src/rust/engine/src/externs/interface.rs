@@ -599,7 +599,7 @@ fn nailgun_server_create(
             Python::with_gil(|py| {
                 let result = runner.as_ref(py).call1((
                     exe.cmd.command,
-                    PyTuple::new(py, exe.cmd.args),
+                    PyTuple::new_bound(py, exe.cmd.args),
                     exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),
                     exe.cmd.working_dir,
                     PySessionCancellationLatch(exe.cancelled),
@@ -1084,7 +1084,10 @@ fn scheduler_live_items<'py>(
     let (items, sizes) = core
         .executor
         .enter(|| py.allow_threads(|| scheduler.live_items(session)));
-    let py_items = items.into_iter().map(|value| value.to_object(py)).collect();
+    let py_items = items
+        .into_iter()
+        .map(|value| value.bind(py).to_object(py))
+        .collect();
     (py_items, sizes)
 }
 
@@ -1434,15 +1437,15 @@ fn validate_reachability(py_scheduler: &Bound<'_, PyScheduler>) -> PyO3Result<()
 #[pyfunction]
 fn rule_graph_consumed_types<'py>(
     py: Python<'py>,
-    py_scheduler: &PyScheduler,
-    param_types: Vec<&PyType>,
+    py_scheduler: &Bound<'py, PyScheduler>,
+    param_types: Vec<Bound<'py, PyType>>,
     product_type: &Bound<'_, PyType>,
-) -> PyO3Result<Vec<&'py PyType>> {
-    let core = &py_scheduler.0.core;
+) -> PyO3Result<Vec<Bound<'py, PyType>>> {
+    let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         let param_types = param_types
             .into_iter()
-            .map(|t| TypeId::new(&t.as_borrowed()))
+            .map(|t| TypeId::new(&t))
             .collect::<Vec<_>>();
         let subgraph = core
             .rule_graph
@@ -1452,7 +1455,7 @@ fn rule_graph_consumed_types<'py>(
         Ok(subgraph
             .consumed_types()
             .into_iter()
-            .map(|type_id| type_id.as_py_type(py))
+            .map(|type_id| type_id.as_py_type_bound(py))
             .collect())
     })
 }
@@ -1484,10 +1487,10 @@ fn rule_graph_rule_gets<'py>(
                 let provided_params = dependency_key
                     .provided_params
                     .iter()
-                    .map(|p| p.as_py_type(py))
+                    .map(|p| p.as_py_type_bound(py))
                     .collect::<Vec<_>>();
                 dependencies.push((
-                    dependency_key.product.as_py_type(py),
+                    dependency_key.product.as_py_type_bound(py),
                     provided_params,
                     function.0.value.into_py(py),
                 ));
@@ -1638,10 +1641,11 @@ fn capture_snapshots(
             .into_iter()
             .map(|value| {
                 let root: PathBuf = externs::getattr_bound(&value, "root")?;
-                let path_globs = nodes::Snapshot::lift_prepared_path_globs(externs::getattr_bound(
-                    &value,
-                    "path_globs",
-                )?);
+                let path_globs = {
+                    let path_globs_py_value =
+                        externs::getattr_bound::<Bound<'_, PyAny>>(&value, "path_globs")?;
+                    nodes::Snapshot::lift_prepared_path_globs_bound(&path_globs_py_value)
+                };
                 let digest_hint = {
                     let maybe_digest: Bound<'_, PyAny> =
                         externs::getattr_bound(&value, "digest_hint")?;

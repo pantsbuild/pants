@@ -19,7 +19,7 @@ use workunit_store::{
     Metric, ObservationMetric, RunningWorkunit, UserMetadataItem, WorkunitMetadata,
 };
 
-use super::{lift_directory_digest, lift_directory_digest_bound, NodeKey, NodeOutput, NodeResult};
+use super::{lift_directory_digest_bound, NodeKey, NodeOutput, NodeResult};
 use crate::context::Context;
 use crate::externs;
 use crate::python::{throw, Value};
@@ -37,9 +37,13 @@ impl ExecuteProcess {
         value: &Value,
     ) -> Result<InputDigests, StoreError> {
         let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
-            let value = (**value).bind(py);
-            let input_files = lift_directory_digest(externs::getattr_bound(value, "input_digest")?)
-                .map_err(|err| format!("Error parsing input_digest {err}"))?;
+            let value = value.bind(py);
+            let input_files = {
+                let input_files_py_value: Bound<'_, PyAny> =
+                    externs::getattr_bound(value, "input_digest")?;
+                lift_directory_digest_bound(&input_files_py_value)
+                    .map_err(|err| format!("Error parsing input_digest {err}"))?
+            };
             let immutable_inputs = externs::getattr_from_str_frozendict_bound::<Bound<PyAny>>(
                 value,
                 "immutable_input_digests",
@@ -164,7 +168,7 @@ impl ExecuteProcess {
     ) -> Result<Self, StoreError> {
         let input_digests = Self::lift_process_input_digests(store, &value).await?;
         let process = Python::with_gil(|py| {
-            Self::lift_process_fields((*value).bind(py), input_digests, process_config)
+            Self::lift_process_fields(value.bind(py), input_digests, process_config)
         })?;
         Ok(Self { process })
     }
