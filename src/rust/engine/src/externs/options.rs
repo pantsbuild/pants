@@ -27,7 +27,7 @@ fn val_to_py_object(py: Python, val: &Val) -> PyResult<PyObject> {
         Val::Float(f) => f.into_py(py),
         Val::String(s) => s.into_py(py),
         Val::List(list) => {
-            let pylist = PyList::empty(py);
+            let pylist = PyList::empty_bound(py);
             for m in list {
                 pylist.append(val_to_py_object(py, m)?)?;
             }

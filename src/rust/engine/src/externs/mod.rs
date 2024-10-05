@@ -48,11 +48,11 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGeneratorResponseCall>()?;
     m.add_class::<PyGeneratorResponseGet>()?;
 
-    m.add("EngineError", py.get_type::<EngineError>())?;
-    m.add("IntrinsicError", py.get_type::<IntrinsicError>())?;
+    m.add("EngineError", py.get_type_bound::<EngineError>())?;
+    m.add("IntrinsicError", py.get_type_bound::<IntrinsicError>())?;
     m.add(
         "IncorrectProductError",
-        py.get_type::<IncorrectProductError>(),
+        py.get_type_bound::<IncorrectProductError>(),
     )?;
 
     Ok(())
@@ -144,7 +144,7 @@ pub fn store_dict(
 
 /// Store an opaque buffer of bytes to pass to Python. This will end up as a Python `bytes`.
 pub fn store_bytes(py: Python, bytes: &[u8]) -> Value {
-    Value::from(PyBytes::new(py, bytes).to_object(py))
+    Value::from(PyBytes::new_bound(py, bytes).to_object(py))
 }
 
 /// Store a buffer of utf8 bytes to pass to Python. This will end up as a Python `str`.
@@ -269,7 +269,7 @@ pub fn val_to_log_level_bound(obj: &Bound<'_, PyAny>) -> Result<log::Level, Stri
 
 /// Link to the Pants docs using the current version of Pants.
 pub fn doc_url(py: Python, slug: &str) -> String {
-    let docutil_module = py.import("pants.util.docutil").unwrap();
+    let docutil_module = py.import_bound("pants.util.docutil").unwrap();
     let doc_url_func = docutil_module.getattr("doc_url").unwrap();
     doc_url_func.call1((slug,)).unwrap().extract().unwrap()
 }
@@ -311,7 +311,7 @@ pub(crate) fn generator_send(
             let throw_method = generator.bind(py).getattr(intern!(py, "throw"))?;
             if err.is_instance_of::<NativeEngineFailure>(py) {
                 let throw = err
-                    .value(py)
+                    .value_bound(py)
                     .getattr(intern!(py, "failure"))?
                     .extract::<PyRef<PyFailure>>()?
                     .get_error(py);
@@ -334,12 +334,14 @@ pub(crate) fn generator_send(
     let response = match response_unhandled {
         Err(e) if e.is_instance_of::<PyStopIteration>(py) => {
             let value = e.into_value(py).getattr(py, intern!(py, "value"))?;
-            let type_id = TypeId::new(&value.as_ref(py).get_type().as_borrowed());
+            let type_id = TypeId::new(&value.bind(py).get_type());
             return Ok(GeneratorResponse::Break(Value::new(value), type_id));
         }
         Err(e) => {
             match (maybe_thrown, e.cause(py)) {
-                (Some((thrown, err)), Some(cause)) if thrown.value(py).is(cause.value(py)) => {
+                (Some((thrown, err)), Some(cause))
+                    if thrown.value_bound(py).is(cause.value_bound(py)) =>
+                {
                     // Preserve the engine traceback by using the wrapped failure error as cause. The cause
                     // will be swapped back again in `Failure::from_py_err_with_gil()` to preserve the python
                     // traceback.
