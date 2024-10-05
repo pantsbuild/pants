@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import dataclasses
 
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
@@ -39,6 +40,7 @@ from pants.engine.process import (
     ProcessExecutionEnvironment,
 )
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
+from pants.option.global_options import GlobalOptions
 from pants.util.docutil import git_url
 
 
@@ -100,8 +102,6 @@ async def add_prefix(add_prefix: AddPrefix) -> Digest:
     return await native_engine.add_prefix(add_prefix)
 
 
-import dataclasses
-from pants.option.global_options import GlobalOptions
 @rule
 async def execute_process(
     process: Process,
