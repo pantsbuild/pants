@@ -108,7 +108,8 @@ async def execute_process(
     process_execution_environment: ProcessExecutionEnvironment,
     options: GlobalOptions,
 ) -> FallibleProcessResult:
-    process = dataclasses.replace(process, env={**process.env, **options.process_extra_env})
+    if options.process_extra_env:
+        process = dataclasses.replace(process, env={**process.env, **options.process_extra_env})
     return await native_engine.execute_process(process, process_execution_environment)
 
 
