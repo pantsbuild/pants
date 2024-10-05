@@ -547,6 +547,7 @@ impl PyGeneratorResponseCall {
 #[pymethods]
 impl PyGeneratorResponseCall {
     #[new]
+    #[pyo3(signature = (rule_id, output_type, args, input_arg0=None, input_arg1=None))]
     fn __new__(
         py: Python,
         rule_id: String,
@@ -632,6 +633,7 @@ impl PyGeneratorResponseGet {
 #[pymethods]
 impl PyGeneratorResponseGet {
     #[new]
+    #[pyo3(signature = (product, input_arg0=None, input_arg1=None))]
     fn __new__(
         py: Python,
         product: &Bound<'_, PyAny>,

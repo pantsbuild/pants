@@ -38,7 +38,7 @@ use pyo3::prelude::{
 use pyo3::types::{
     PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyTuple, PyType,
 };
-use pyo3::{create_exception, AsPyPointer, Bound, IntoPy, PyAny, PyNativeType, PyRef};
+use pyo3::{create_exception, AsPyPointer, Bound, IntoPy, PyAny, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, RuleGraph};
@@ -324,6 +324,7 @@ struct PyRemotingOptions(RemotingOptions);
 #[pymethods]
 impl PyRemotingOptions {
     #[new]
+    #[pyo3(signature = (provider, execution_enable, store_headers, store_chunk_bytes, store_rpc_retries, store_rpc_concurrency, store_rpc_timeout_millis, store_batch_api_size_limit, cache_warnings_behavior, cache_content_behavior, cache_rpc_concurrency, cache_rpc_timeout_millis, execution_headers, execution_overall_deadline_secs, execution_rpc_concurrency, store_address=None, execution_address=None, execution_process_cache_namespace=None, instance_name=None, root_ca_certs_path=None, client_certs_path=None, client_key_path=None, append_only_caches_base_path=None))]
     fn __new__(
         provider: String,
         execution_enable: bool,
@@ -502,6 +503,7 @@ struct PyExecutionRequest(RefCell<ExecutionRequest>);
 #[pymethods]
 impl PyExecutionRequest {
     #[new]
+    #[pyo3(signature = (poll, poll_delay_in_ms=None, timeout_in_ms=None))]
     fn __new__(poll: bool, poll_delay_in_ms: Option<u64>, timeout_in_ms: Option<u64>) -> Self {
         let request = ExecutionRequest {
             poll,
@@ -699,6 +701,7 @@ fn hash_prefix_zero_bits(item: &str) -> u32 {
 /// affect the created Scheduler.
 ///
 #[pyfunction]
+#[pyo3(signature = (py_executor, py_tasks, types_ptr, build_root, local_execution_root_dir, named_caches_dir, ignore_patterns, use_gitignore, watch_filesystem, remoting_options, local_store_options, exec_strategy_opts, ca_certs_path=None))]
 fn scheduler_create(
     py_executor: &Bound<'_, externs::scheduler::PyExecutor>,
     py_tasks: &Bound<'_, PyTasks>,
@@ -1921,6 +1924,7 @@ fn stdio_thread_set_destination(stdio_destination: &Bound<'_, PyStdioDestination
 
 // TODO: Needs to be thread-local / associated with the Console.
 #[pyfunction]
+#[pyo3(signature = (log_path=None))]
 fn set_per_run_log_path(py: Python, log_path: Option<PathBuf>) {
     py.allow_threads(|| {
         PANTS_LOGGER.set_per_run_logs(log_path);
