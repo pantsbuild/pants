@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-import logging
 import dataclasses
+import logging
 
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
