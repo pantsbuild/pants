@@ -2004,7 +2004,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
             Extra environment variables for every Process call.
             """
-        )
+        ),
     )
 
     @classmethod
