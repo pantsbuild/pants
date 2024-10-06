@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import itertools
 import logging
 
 from pants.engine.environment import EnvironmentName
@@ -42,6 +43,7 @@ from pants.engine.process import (
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.docutil import git_url
+from pants.util.frozendict import FrozenDict
 
 
 @rule
@@ -109,7 +111,8 @@ async def execute_process(
     options: GlobalOptions,
 ) -> FallibleProcessResult:
     if options.process_extra_env:
-        process = dataclasses.replace(process, env={**process.env, **options.process_extra_env})
+        items = itertools.chain(process.env.items(), options.process_extra_env.items())
+        process = dataclasses.replace(process, env=FrozenDict(items))
     return await native_engine.execute_process(process, process_execution_environment)
 
 
