@@ -16,7 +16,7 @@ use protos::gen::pants::cache::{
     dependency_inference_request, CacheKey, CacheKeyType, DependencyInferenceRequest,
 };
 use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyResult, Python, ToPyObject};
-use pyo3::types::PyModuleMethods;
+use pyo3::types::{PyAnyMethods, PyModuleMethods};
 use pyo3::{Bound, IntoPy};
 use store::Store;
 use workunit_store::{in_workunit, Level};
@@ -54,7 +54,7 @@ impl PreparedInferenceRequest {
         let PyNativeDependenciesRequest {
             directory_digest,
             metadata,
-        } = Python::with_gil(|py| deps_request.extract(py))?;
+        } = Python::with_gil(|py| deps_request.bind(py).extract())?;
 
         let (path, digest) = Self::find_one_file(directory_digest, store, backend).await?;
         let str_path = path.display().to_string();

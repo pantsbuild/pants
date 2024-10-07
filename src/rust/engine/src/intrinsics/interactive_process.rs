@@ -12,7 +12,7 @@ use process_execution::local::{
 };
 use process_execution::{ManagedChild, ProcessExecutionStrategy};
 use pyo3::prelude::{pyfunction, wrap_pyfunction, PyAny, PyModule, PyResult, Python};
-use pyo3::types::PyModuleMethods;
+use pyo3::types::{PyAnyMethods, PyModuleMethods};
 use pyo3::Bound;
 use stdio::TryCloneAsFile;
 use tokio::process;
@@ -56,9 +56,9 @@ pub async fn interactive_process_inner(
         Value,
         externs::process::PyProcessExecutionEnvironment,
     ) = Python::with_gil(|py| {
-        let py_interactive_process = interactive_process.as_ref().as_ref(py);
-        let py_process: Value = externs::getattr(py_interactive_process, "process").unwrap();
-        let process_config = process_config.as_ref().as_ref(py).extract().unwrap();
+        let py_interactive_process = interactive_process.bind(py);
+        let py_process: Value = externs::getattr_bound(py_interactive_process, "process").unwrap();
+        let process_config = process_config.bind(py).extract().unwrap();
         (
             py_interactive_process.extract().unwrap(),
             py_process,

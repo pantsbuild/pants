@@ -276,12 +276,12 @@ impl Task {
             &self.side_effected,
             async move {
                 Python::with_gil(|py| {
-                    let func = (*self.task.func.0.value).bind(py);
+                    let func = self.task.func.0.value.bind(py);
 
                     // If there are explicit positional arguments, apply any computed arguments as
                     // keywords. Otherwise, apply computed arguments as positional.
                     let res = if let Some(args) = args {
-                        let args = args.value.extract::<Bound<'_, PyTuple>>(py)?;
+                        let args = args.value.bind(py).extract::<Bound<'_, PyTuple>>()?;
                         let kwargs = PyDict::new_bound(py);
                         for ((name, _), value) in self
                             .task
@@ -332,7 +332,7 @@ impl Task {
 
         if self.task.engine_aware_return_type {
             Python::with_gil(|py| {
-                EngineAwareReturnType::update_workunit(workunit, (*result_val).bind(py))
+                EngineAwareReturnType::update_workunit(workunit, result_val.bind(py))
             })
         };
 

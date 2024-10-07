@@ -11,7 +11,7 @@ use fs::{
 use futures::TryFutureExt;
 use graph::CompoundNode;
 use pyo3::prelude::{Py, PyAny, Python};
-use pyo3::{Bound, IntoPy, PyNativeType};
+use pyo3::{Bound, IntoPy};
 
 use super::{unmatched_globs_additional_context, NodeKey, NodeOutput, NodeResult};
 use crate::context::Context;
@@ -59,10 +59,6 @@ impl Snapshot {
         Ok(PathGlobs::new(globs, strict_glob_matching, conjunction))
     }
 
-    pub fn lift_path_globs(item: &PyAny) -> Result<PathGlobs, String> {
-        Self::lift_path_globs_bound(&item.as_borrowed())
-    }
-
     pub fn lift_prepared_path_globs_bound(
         item: &Bound<'_, PyAny>,
     ) -> Result<PreparedPathGlobs, String> {
@@ -70,10 +66,6 @@ impl Snapshot {
         path_globs
             .parse()
             .map_err(|e| format!("Failed to parse PathGlobs for globs({item:?}): {e}"))
-    }
-
-    pub fn lift_prepared_path_globs(item: &PyAny) -> Result<PreparedPathGlobs, String> {
-        Self::lift_prepared_path_globs_bound(&item.as_borrowed())
     }
 
     pub fn store_directory_digest(py: Python, item: DirectoryDigest) -> Result<Value, String> {
