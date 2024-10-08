@@ -74,7 +74,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     externs::workunits::register(m)?;
     externs::dep_inference::register(m)?;
 
-    m.add("PollTimeout", py.get_type::<PollTimeout>())?;
+    m.add("PollTimeout", py.get_type_bound::<PollTimeout>())?;
 
     m.add_class::<PyExecutionRequest>()?;
     m.add_class::<PyExecutionStrategyOptions>()?;
@@ -597,7 +597,7 @@ fn nailgun_server_create(
         let executor = py_executor.0.clone();
         nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
             Python::with_gil(|py| {
-                let result = runner.as_ref(py).call1((
+                let result = runner.bind(py).call1((
                     exe.cmd.command,
                     PyTuple::new_bound(py, exe.cmd.args),
                     exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),

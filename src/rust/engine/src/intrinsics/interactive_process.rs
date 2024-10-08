@@ -12,6 +12,7 @@ use process_execution::local::{
 };
 use process_execution::{ManagedChild, ProcessExecutionStrategy};
 use pyo3::prelude::{pyfunction, wrap_pyfunction, PyAny, PyModule, PyResult, Python};
+use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyAnyMethods, PyModuleMethods};
 use pyo3::Bound;
 use stdio::TryCloneAsFile;
@@ -87,7 +88,9 @@ pub async fn interactive_process_inner(
         let keep_sandboxes_value: Bound<'_, PyAny> =
             externs::getattr_bound(py_interactive_process, "keep_sandboxes").unwrap();
         let keep_sandboxes = KeepSandboxes::from_str(
-            externs::getattr_bound(&keep_sandboxes_value, "value").unwrap(),
+            externs::getattr_bound::<PyBackedStr>(&keep_sandboxes_value, "value")
+                .unwrap()
+                .as_ref(),
         )
         .unwrap();
         (run_in_workspace, keep_sandboxes)

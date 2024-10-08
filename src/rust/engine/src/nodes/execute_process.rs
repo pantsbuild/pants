@@ -13,6 +13,7 @@ use process_execution::{
     ProcessResultSource,
 };
 use pyo3::prelude::{PyAny, Python};
+use pyo3::pybacked::PyBackedStr;
 use pyo3::Bound;
 use store::{self, Store, StoreError};
 use workunit_store::{
@@ -113,9 +114,12 @@ impl ExecuteProcess {
         let level = externs::val_to_log_level_bound(&py_level)?;
 
         let append_only_caches =
-            externs::getattr_from_str_frozendict_bound::<&str>(value, "append_only_caches")
+            externs::getattr_from_str_frozendict_bound::<PyBackedStr>(value, "append_only_caches")
                 .into_iter()
-                .map(|(name, dest)| Ok((CacheName::new(name)?, RelativePath::new(dest)?)))
+                .map(|(name, dest)| {
+                    let path: &str = dest.as_ref();
+                    Ok((CacheName::new(name)?, RelativePath::new(path)?))
+                })
                 .collect::<Result<_, String>>()?;
 
         let jdk_home = externs::getattr_as_optional_string_bound(value, "jdk_home")

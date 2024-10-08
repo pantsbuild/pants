@@ -38,7 +38,7 @@ impl PyExecutor {
             let _ =
                 unsafe { ffi::PyThreadState_New(Python::with_gil(|_| PyInterpreterState_Main())) };
             Python::with_gil(|py| {
-                let _ = py.eval("__import__('debugpy').debug_this_thread()", None, None);
+                let _ = py.eval_bound("__import__('debugpy').debug_this_thread()", None, None);
             });
         })
         .map(PyExecutor)

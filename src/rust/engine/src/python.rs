@@ -137,7 +137,11 @@ impl TypeId {
         // SAFETY: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
         // type is not unloaded. That is true today, but would not be if we implemented support for hot
         // reloading of plugins.
-        unsafe { PyType::from_type_ptr(py, self.0).as_borrowed().to_owned() }
+        unsafe {
+            PyType::from_borrowed_type_ptr(py, self.0)
+                .as_borrowed()
+                .to_owned()
+        }
     }
 
     pub fn is_union(&self) -> bool {
@@ -378,7 +382,7 @@ impl<'py, T> From<&Bound<'py, T>> for Value {
 
 impl IntoPy<PyObject> for &Value {
     fn into_py(self, py: Python) -> PyObject {
-        (*self.0).as_ref(py).into_py(py)
+        (*self.0).bind(py).into_py(py)
     }
 }
 
@@ -473,13 +477,13 @@ impl Failure {
         };
 
         let maybe_ptraceback = py_err
-            .traceback(py)
+            .traceback_bound(py)
             .map(|traceback| traceback.to_object(py));
         let val = Value::from(py_err.into_py(py));
         let python_traceback = if let Some(tb) = maybe_ptraceback {
             let locals = PyDict::new_bound(py);
             locals
-                .set_item("traceback", py.import("traceback").unwrap())
+                .set_item("traceback", py.import_bound("traceback").unwrap())
                 .unwrap();
             locals.set_item("tb", tb).unwrap();
             locals.set_item("val", &val).unwrap();

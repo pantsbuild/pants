@@ -30,7 +30,10 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "AddressParseException",
         py.get_type_bound::<AddressParseException>(),
     )?;
-    m.add("InvalidAddressError", py.get_type::<InvalidAddressError>())?;
+    m.add(
+        "InvalidAddressError",
+        py.get_type_bound::<InvalidAddressError>(),
+    )?;
     m.add(
         "InvalidSpecPathError",
         py.get_type_bound::<InvalidSpecPathError>(),
@@ -153,12 +156,19 @@ impl AddressInput {
         _cls: &Bound<'_, PyType>,
         spec: &str,
         description_of_origin: &str,
-        relative_to: Option<&str>,
-        subproject_roots: Option<Vec<&str>>,
+        relative_to: Option<String>,
+        subproject_roots: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let subproject_info = subproject_roots
-            .zip(relative_to)
-            .and_then(|(roots, relative_to)| split_on_longest_dir_prefix(relative_to, &roots));
+        let roots_as_strs = subproject_roots
+            .as_deref()
+            .map(|roots| roots.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        let relative_to2 = relative_to.as_deref();
+        let subproject_info = match (roots_as_strs, relative_to2) {
+            (Some(roots), Some(relative_to)) => {
+                split_on_longest_dir_prefix(relative_to, &roots[..])
+            }
+            _ => None,
+        };
 
         let parsed_spec =
             address::parse_address_spec(spec).map_err(AddressParseException::new_err)?;
@@ -173,7 +183,7 @@ impl AddressInput {
         let normalized_relative_to = if let Some((_, normalized_relative_to)) = subproject_info {
             Some(normalized_relative_to)
         } else {
-            relative_to
+            relative_to.as_deref()
         };
 
         let mut path_component: Cow<str> = address.path.into();

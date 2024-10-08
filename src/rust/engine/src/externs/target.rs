@@ -141,7 +141,7 @@ impl Field {
     }
 
     fn __hash__(self_: &Bound<'_, Self>, py: Python) -> PyResult<isize> {
-        Ok(self_.get_type().hash()? & self_.borrow().value.as_ref(py).hash()?)
+        Ok(self_.get_type().hash()? & self_.borrow().value.bind(py).hash()?)
     }
 
     fn __repr__(self_: &Bound<'_, Self>) -> PyResult<String> {
@@ -180,7 +180,7 @@ impl Field {
             && self_
                 .borrow()
                 .value
-                .as_ref(py)
+                .bind(py)
                 .eq(&other.extract::<PyRef<Field>>()?.value)?;
         match op {
             CompareOp::Eq => Ok(is_eq.into_py(py)),
