@@ -16,7 +16,10 @@ class Docformatter(PythonToolBase):
     help_short = "The Python docformatter tool (https://github.com/myint/docformatter)."
 
     default_main = ConsoleScript("docformatter")
-    default_requirements = ["docformatter>=1.4,<1.5"]
+    # Upper bound requirement set because there is a bug in docformatter 1.7.1 that causes issues
+    # with Sphinx-style :param tags.
+    # https://github.com/PyCQA/docformatter/issues/264
+    default_requirements = ["docformatter==1.7.0"]
 
     register_interpreter_constraints = True
 
