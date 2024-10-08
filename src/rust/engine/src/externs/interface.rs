@@ -486,8 +486,9 @@ impl PySession {
     }
 
     #[getter]
-    fn session_values(&self, py: Python) -> PyObject {
-        self.0.session_values(py)
+    fn session_values<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
+        let session_values = self.0.session_values();
+        session_values.bind(py).to_owned()
     }
 }
 

@@ -82,7 +82,7 @@ struct SessionState {
     // A place to store info about workunits in rust part
     workunit_store: WorkunitStore,
     // Per-Session values that have been set for this session.
-    session_values: Mutex<PyObject>,
+    session_values: Mutex<Value>,
     // An id used to control the visibility of uncacheable rules. Generally this is identical for an
     // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
     // same Session while still observing new values for uncacheable rules like Goals.
@@ -181,7 +181,7 @@ impl Session {
                 preceding_graph_size,
                 roots: Mutex::new(HashMap::new()),
                 workunit_store,
-                session_values: Mutex::new(session_values),
+                session_values: Mutex::new(Value::new(session_values)),
                 run_id: AtomicU32::new(run_id.0),
                 tail_tasks: TailTasks::new(),
             }),
@@ -270,9 +270,9 @@ impl Session {
         roots.keys().map(|r| r.clone().into()).collect()
     }
 
-    pub fn session_values(&self, py: Python) -> PyObject {
+    pub fn session_values(&self) -> Value {
         let obj = self.state.session_values.lock();
-        obj.clone_ref(py)
+        obj.clone()
     }
 
     pub fn preceding_graph_size(&self) -> usize {
