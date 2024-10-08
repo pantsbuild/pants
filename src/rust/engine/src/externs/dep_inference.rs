@@ -88,7 +88,7 @@ pub struct PyNativeDependenciesRequest {
 #[pymethods]
 impl PyNativeDependenciesRequest {
     #[new]
-    #[pyo3(signature = (digest, metadata=None))]
+    #[pyo3(signature = (digest, metadata))]
     fn __new__(digest: PyDigest, metadata: Option<PyInferenceMetadata>) -> Self {
         Self {
             directory_digest: digest.0,

@@ -543,7 +543,17 @@ pub struct PyPathMetadata(pub fs::PathMetadata);
 #[pymethods]
 impl PyPathMetadata {
     #[new]
-    #[pyo3(signature = (path, kind, length, is_executable, unix_mode=None, accessed=None, created=None, modified=None, symlink_target=None))]
+    #[pyo3(signature = (
+        path,
+        kind,
+        length,
+        is_executable,
+        unix_mode,
+        accessed,
+        created,
+        modified,
+        symlink_target
+    ))]
     pub fn new(
         path: PathBuf,
         kind: PyPathMetadataKind,

@@ -325,7 +325,32 @@ struct PyRemotingOptions(RemotingOptions);
 #[pymethods]
 impl PyRemotingOptions {
     #[new]
-    #[pyo3(signature = (provider, execution_enable, store_headers, store_chunk_bytes, store_rpc_retries, store_rpc_concurrency, store_rpc_timeout_millis, store_batch_api_size_limit, cache_warnings_behavior, cache_content_behavior, cache_rpc_concurrency, cache_rpc_timeout_millis, execution_headers, execution_overall_deadline_secs, execution_rpc_concurrency, store_address=None, execution_address=None, execution_process_cache_namespace=None, instance_name=None, root_ca_certs_path=None, client_certs_path=None, client_key_path=None, append_only_caches_base_path=None))]
+    #[pyo3(signature = (
+        *
+        provider,
+        execution_enable,
+        store_headers,
+        store_chunk_bytes,
+        store_rpc_retries,
+        store_rpc_concurrency,
+        store_rpc_timeout_millis,
+        store_batch_api_size_limit,
+        cache_warnings_behavior,
+        cache_content_behavior,
+        cache_rpc_concurrency,
+        cache_rpc_timeout_millis,
+        execution_headers,
+        execution_overall_deadline_secs,
+        execution_rpc_concurrency,
+        store_address,
+        execution_address,
+        execution_process_cache_namespace,
+        instance_name,
+        root_ca_certs_path,
+        client_certs_path,
+        client_key_path,
+        append_only_caches_base_path
+    ))]
     fn __new__(
         provider: String,
         execution_enable: bool,

@@ -199,7 +199,7 @@ impl PyOptionParser {
         Ok(Self(option_parser))
     }
 
-    #[pyo3(signature = (option_id, default=None))]
+    #[pyo3(signature = (option_id, default))]
     fn get_bool(
         &self,
         option_id: &Bound<'_, PyOptionId>,
@@ -208,7 +208,7 @@ impl PyOptionParser {
         to_py(self.0.parse_bool_optional(&option_id.borrow().0, default))
     }
 
-    #[pyo3(signature = (option_id, default=None))]
+    #[pyo3(signature = (option_id, default))]
     fn get_int(
         &self,
         option_id: &Bound<'_, PyOptionId>,
@@ -217,7 +217,7 @@ impl PyOptionParser {
         to_py(self.0.parse_int_optional(&option_id.borrow().0, default))
     }
 
-    #[pyo3(signature = (option_id, default=None))]
+    #[pyo3(signature = (option_id, default))]
     fn get_float(
         &self,
         option_id: &Bound<'_, PyOptionId>,
@@ -226,7 +226,7 @@ impl PyOptionParser {
         to_py(self.0.parse_float_optional(&option_id.borrow().0, default))
     }
 
-    #[pyo3(signature = (option_id, default=None))]
+    #[pyo3(signature = (option_id, default))]
     fn get_string(
         &self,
         option_id: &Bound<'_, PyOptionId>,
