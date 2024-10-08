@@ -913,15 +913,19 @@ class PyGeneratorResponseCall:
     @overload
     def __init__(
         self,
+        rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
         input_arg0: dict[Any, type],
     ) -> None: ...
     @overload
-    def __init__(self, output_type: type, args: tuple[Any, ...], input_arg0: _Input) -> None: ...
+    def __init__(
+        self, rule_id: str, output_type: type, args: tuple[Any, ...], input_arg0: _Input
+    ) -> None: ...
     @overload
     def __init__(
         self,
+        rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
         input_arg0: type[_Input],
@@ -930,6 +934,7 @@ class PyGeneratorResponseCall:
     @overload
     def __init__(
         self,
+        rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
         input_arg0: type[_Input] | _Input,
