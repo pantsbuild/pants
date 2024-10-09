@@ -11,7 +11,8 @@ use pyo3::basic::CompareOp;
 use pyo3::create_exception;
 use pyo3::exceptions::{PyAssertionError, PyException};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyFrozenSet, PyString, PyType};
+use pyo3::pybacked::PyBackedStr;
+use pyo3::types::{PyDict, PyFrozenSet, PyType};
 
 use fnv::FnvHasher;
 use lazy_static::lazy_static;
@@ -167,20 +168,21 @@ impl AddressInput {
         relative_to=None,
         subproject_roots=None
     ))]
-    fn parse<'py>(
-        _cls: &Bound<'py, PyType>,
+    fn parse(
+        _cls: &Bound<'_, PyType>,
         spec: &str,
         description_of_origin: &str,
-        relative_to: Option<Bound<'py, PyString>>,
-        subproject_roots: Option<Vec<Bound<'py, PyString>>>,
+        relative_to: Option<PyBackedStr>,
+        subproject_roots: Option<Vec<PyBackedStr>>,
     ) -> PyResult<Self> {
-        let roots_as_strs = subproject_roots
-            .map(|roots| roots.iter().map(|s| s.to_cow()).collect::<Result<Vec<_>, _>>()).transpose()?;
-        let relative_to = relative_to.map(|s| s.to_str()).transpose()?;
-        
-        let subproject_info = match (roots_as_strs, relative_to) {
+        let subproject_roots: Option<Vec<&str>> = subproject_roots
+            .as_deref()
+            .map(|roots| roots.iter().map(|s| s.as_ref()).collect());
+        let relative_to: Option<&str> = relative_to.as_deref();
+
+        let subproject_info = match (subproject_roots, relative_to) {
             (Some(roots), Some(relative_to)) => {
-                split_on_longest_dir_prefix(relative_to.as_ref(), &roots[..])
+                split_on_longest_dir_prefix(relative_to, &roots[..])
             }
             _ => None,
         };
