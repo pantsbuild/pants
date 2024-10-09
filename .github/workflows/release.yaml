@@ -205,7 +205,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@e7378074b4a0233c99d32250e04a5cb343a177bd
+      uses: benjyw/rust-cache@61b5b2e17a28350779e9a535e353da2f8b00e832
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -292,7 +292,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@e7378074b4a0233c99d32250e04a5cb343a177bd
+      uses: benjyw/rust-cache@61b5b2e17a28350779e9a535e353da2f8b00e832
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -384,7 +384,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@e7378074b4a0233c99d32250e04a5cb343a177bd
+      uses: benjyw/rust-cache@61b5b2e17a28350779e9a535e353da2f8b00e832
       with:
         cache-bin: 'false'
         shared-key: engine
