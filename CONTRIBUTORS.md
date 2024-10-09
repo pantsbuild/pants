@@ -27,6 +27,7 @@ Created as part of the release process.
 + Bardur Arantsson
 + Bastian Wegge
 + Ben Limmer
++ Benjamin Dabelow
 + Benjy Weinberger
 + Berkay Öztürk
 + Bill Farner
@@ -197,6 +198,7 @@ Created as part of the release process.
 + Kevin Sweeney
 + Koki Nishihara
 + Kris Wilson
++ Krishna Vudata
 + Krishnan Chandra
 + Kushal Dave
 + Kyle Derr
