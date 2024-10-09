@@ -25,6 +25,15 @@ pub struct PyProcessExecutionEnvironment {
 #[pymethods]
 impl PyProcessExecutionEnvironment {
     #[new]
+    #[pyo3(signature = (
+        *,
+        platform,
+        remote_execution,
+        remote_execution_extra_platform_properties,
+        execute_in_workspace,
+        environment_name,
+        docker_image
+    ))]
     fn __new__(
         platform: String,
         remote_execution: bool,

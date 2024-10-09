@@ -13,7 +13,7 @@ pub struct SessionValues;
 
 impl SessionValues {
     pub(super) async fn run_node(self, context: Context) -> NodeResult<Value> {
-        Ok(Value::new(context.session.session_values()))
+        Ok(context.session.session_values())
     }
 }
 

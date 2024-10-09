@@ -94,6 +94,14 @@ pub struct AddressInput {
 #[pymethods]
 impl AddressInput {
     #[new]
+    #[pyo3(signature = (
+        original_spec,
+        path_component,
+        description_of_origin,
+        target_component=None,
+        generated_component=None,
+        parameters=None
+    ))]
     fn __new__(
         original_spec: String,
         path_component: PathBuf,
@@ -152,6 +160,13 @@ impl AddressInput {
     }
 
     #[classmethod]
+    #[pyo3(signature = (
+        spec,
+        *,
+        description_of_origin,
+        relative_to=None,
+        subproject_roots=None
+    ))]
     fn parse(
         _cls: &Bound<'_, PyType>,
         spec: &str,
@@ -432,6 +447,14 @@ pub struct Address {
 #[pymethods]
 impl Address {
     #[new]
+    #[pyo3(signature = (
+        spec_path,
+        *,
+        target_name=None,
+        parameters=None,
+        generated_name=None,
+        relative_file_path=None
+    ))]
     fn __new__(
         spec_path: PathBuf,
         target_name: Option<String>,

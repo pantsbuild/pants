@@ -185,13 +185,6 @@ where
         })
 }
 
-pub fn getattr<'py, T>(value: &'py PyAny, field: &str) -> Result<T, String>
-where
-    T: FromPyObject<'py>,
-{
-    getattr_bound(&value.as_borrowed(), field)
-}
-
 ///
 /// Collect the Values contained within an outer Python Iterable PyObject.
 ///
@@ -547,6 +540,7 @@ impl PyGeneratorResponseCall {
 #[pymethods]
 impl PyGeneratorResponseCall {
     #[new]
+    #[pyo3(signature = (rule_id, output_type, args, input_arg0=None, input_arg1=None))]
     fn __new__(
         py: Python,
         rule_id: String,
@@ -632,6 +626,7 @@ impl PyGeneratorResponseGet {
 #[pymethods]
 impl PyGeneratorResponseGet {
     #[new]
+    #[pyo3(signature = (product, input_arg0=None, input_arg1=None))]
     fn __new__(
         py: Python,
         product: &Bound<'_, PyAny>,
