@@ -11,6 +11,7 @@ use pyo3::basic::CompareOp;
 use pyo3::create_exception;
 use pyo3::exceptions::{PyAssertionError, PyException};
 use pyo3::prelude::*;
+use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyDict, PyFrozenSet, PyType};
 
 use fnv::FnvHasher;
@@ -171,14 +172,15 @@ impl AddressInput {
         _cls: &Bound<'_, PyType>,
         spec: &str,
         description_of_origin: &str,
-        relative_to: Option<String>,
-        subproject_roots: Option<Vec<String>>,
+        relative_to: Option<PyBackedStr>,
+        subproject_roots: Option<Vec<PyBackedStr>>,
     ) -> PyResult<Self> {
-        let roots_as_strs = subproject_roots
+        let subproject_roots: Option<Vec<&str>> = subproject_roots
             .as_deref()
-            .map(|roots| roots.iter().map(|s| s.as_str()).collect::<Vec<_>>());
-        let relative_to2 = relative_to.as_deref();
-        let subproject_info = match (roots_as_strs, relative_to2) {
+            .map(|roots| roots.iter().map(|s| s.as_ref()).collect());
+        let relative_to: Option<&str> = relative_to.as_deref();
+
+        let subproject_info = match (subproject_roots, relative_to) {
             (Some(roots), Some(relative_to)) => {
                 split_on_longest_dir_prefix(relative_to, &roots[..])
             }
@@ -198,7 +200,7 @@ impl AddressInput {
         let normalized_relative_to = if let Some((_, normalized_relative_to)) = subproject_info {
             Some(normalized_relative_to)
         } else {
-            relative_to.as_deref()
+            relative_to
         };
 
         let mut path_component: Cow<str> = address.path.into();
