@@ -326,7 +326,7 @@ struct PyRemotingOptions(RemotingOptions);
 impl PyRemotingOptions {
     #[new]
     #[pyo3(signature = (
-        *
+        *,
         provider,
         execution_enable,
         store_headers,
