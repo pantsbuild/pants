@@ -11,13 +11,13 @@ use std::time::SystemTime;
 
 use nix::unistd::execv;
 use strum::VariantNames;
-use strum_macros::{AsRefStr, EnumString, EnumVariantNames};
+use strum_macros::{AsRefStr, EnumString, VariantNames};
 
 use options::{option_id, render_choice, Args, BuildRoot, Env, OptionParser};
 use pantsd::find_pantsd;
 
 // TODO(John Sirois): Maybe consolidate with PythonLogLevel in src/rust/engine/logging/src/lib.rs.
-#[derive(AsRefStr, EnumString, EnumVariantNames)]
+#[derive(AsRefStr, EnumString, VariantNames)]
 #[strum(serialize_all = "snake_case")]
 enum PythonLogLevel {
     Trace,
