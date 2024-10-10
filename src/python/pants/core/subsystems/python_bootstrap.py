@@ -6,10 +6,9 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+import sys
 from dataclasses import dataclass
-from typing import Collection
-
-from pex.variables import Variables
+from typing import Collection, Optional
 
 from pants.core.util_rules import asdf, search_paths
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
@@ -226,13 +225,49 @@ async def _expand_interpreter_search_paths(
     return _SearchPaths(tuple(expanded))
 
 
+# This method is copied from the pex package, located at pex.variables.Variables._get_kv().
+# It is copied here to avoid a hard dependency on pex.
+def _get_kv(variable: str) -> Optional[list[str]]:
+    kv = variable.strip().split("=")
+    if len(list(filter(None, kv))) == 2:
+        return kv
+    else:
+        return None
+
+
+# This method is copied from the pex package, located at pex.variables.Variables.from_rc().
+# It is copied here to avoid a hard dependency on pex.
+def _read_pex_rc(rc: Optional[str] = None) -> dict[str, str]:
+    """Read pex runtime configuration variables from a pexrc file.
+
+    :param rc: an absolute path to a pexrc file.
+    :return: A dict of key value pairs found in processed pexrc files.
+    """
+    ret_vars = {}
+    rc_locations = [
+        os.path.join(os.sep, "etc", "pexrc"),
+        os.path.join("~", ".pexrc"),
+        os.path.join(os.path.dirname(sys.argv[0]), ".pexrc"),
+    ]
+    if rc:
+        rc_locations.append(rc)
+    for filename in rc_locations:
+        try:
+            with open(os.path.expanduser(filename)) as fh:
+                rc_items = map(_get_kv, fh)
+                ret_vars.update(dict(filter(None, rc_items)))
+        except OSError:
+            continue
+    return ret_vars
+
+
 def _get_pex_python_paths():
     """Returns a list of paths to Python interpreters as defined in a pexrc file.
 
     These are provided by a PEX_PYTHON_PATH in either of '/etc/pexrc', '~/.pexrc'. PEX_PYTHON_PATH
     defines a colon-separated list of paths to interpreters that a pex can be built and run against.
     """
-    ppp = Variables.from_rc().get("PEX_PYTHON_PATH")
+    ppp = _read_pex_rc().get("PEX_PYTHON_PATH")
     if ppp:
         return ppp.split(os.pathsep)
     else:
