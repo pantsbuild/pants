@@ -141,7 +141,7 @@ def plugin_resolution(
 
     # Default to resolving with whatever we're currently running with.
     interpreter_constraints = (
-        InterpreterConstraints([f"=={python_version}"]) if python_version else None
+        InterpreterConstraints([f"=={python_version}.*"]) if python_version else None
     )
     artifact_interpreter_constraints = interpreter_constraints or InterpreterConstraints(
         [f"=={'.'.join(map(str, sys.version_info[:3]))}"]
