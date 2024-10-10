@@ -2292,6 +2292,7 @@ dependencies = [
  "clap",
  "mock",
  "protos",
+ "tokio",
 ]
 
 [[package]]
