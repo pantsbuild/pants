@@ -28,7 +28,7 @@ async fn new_provider(cas: &StubCAS) -> Provider {
 
 #[tokio::test]
 async fn get_action_result_existing() {
-    let cas = StubCAS::empty();
+    let cas = StubCAS::empty().await;
     let provider = new_provider(&cas).await;
 
     let action_digest = Digest::of_bytes(b"get_action_cache test");
@@ -49,7 +49,7 @@ async fn get_action_result_existing() {
 
 #[tokio::test]
 async fn get_action_result_missing() {
-    let cas = StubCAS::empty();
+    let cas = StubCAS::empty().await;
     let provider = new_provider(&cas).await;
 
     let action_digest = Digest::of_bytes(b"update_action_cache test");
@@ -62,7 +62,7 @@ async fn get_action_result_missing() {
 
 #[tokio::test]
 async fn get_action_result_grpc_error() {
-    let cas = StubCAS::builder().ac_always_errors().build();
+    let cas = StubCAS::builder().ac_always_errors().build().await;
     let provider = new_provider(&cas).await;
 
     let action_digest = Digest::of_bytes(b"get_action_result_grpc_error test");
@@ -80,7 +80,7 @@ async fn get_action_result_grpc_error() {
 
 #[tokio::test]
 async fn update_action_cache() {
-    let cas = StubCAS::empty();
+    let cas = StubCAS::empty().await;
     let provider = new_provider(&cas).await;
 
     let action_digest = Digest::of_bytes(b"update_action_cache test");
@@ -102,7 +102,7 @@ async fn update_action_cache() {
 
 #[tokio::test]
 async fn update_action_cache_grpc_error() {
-    let cas = StubCAS::builder().ac_always_errors().build();
+    let cas = StubCAS::builder().ac_always_errors().build().await;
     let provider = new_provider(&cas).await;
 
     let action_digest = Digest::of_bytes(b"update_action_cache_grpc_error test");
