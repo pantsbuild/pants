@@ -2282,6 +2282,7 @@ dependencies = [
  "clap",
  "env_logger",
  "mock",
+ "tokio",
 ]
 
 [[package]]
