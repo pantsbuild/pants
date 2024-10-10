@@ -13,7 +13,6 @@ from textwrap import dedent
 from typing import Dict, Iterable, Sequence
 
 import pytest
-from pex.interpreter import PythonInterpreter
 from pkg_resources import Distribution, Requirement, WorkingSet
 
 from pants.backend.python.util_rules import pex
@@ -31,7 +30,6 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.python_interpreter_selection import (
     PY_38,
     PY_39,
-    python_interpreter_path,
     skip_unless_python38_and_python39_present,
 )
 from pants.testutil.rule_runner import EXECUTOR, QueryRule, RuleRunner
@@ -125,7 +123,7 @@ class Plugin:
 def plugin_resolution(
     rule_runner: RuleRunner,
     *,
-    interpreter: PythonInterpreter | None = None,
+    python_version: str | None = None,
     chroot: str | None = None,
     plugins: Sequence[Plugin] = (),
     requirements: Iterable[str] = (),
@@ -143,7 +141,7 @@ def plugin_resolution(
 
     # Default to resolving with whatever we're currently running with.
     interpreter_constraints = (
-        InterpreterConstraints([f"=={interpreter.identity.version_str}"]) if interpreter else None
+        InterpreterConstraints([f"=={python_version}"]) if python_version else None
     )
     artifact_interpreter_constraints = interpreter_constraints or InterpreterConstraints(
         [f"=={'.'.join(map(str, sys.version_info[:3]))}"]
@@ -301,12 +299,9 @@ def test_exact_requirements_interpreter_change_bdist(rule_runner: RuleRunner) ->
 
 
 def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdist: bool) -> None:
-    python38 = PythonInterpreter.from_binary(python_interpreter_path(PY_38))
-    python39 = PythonInterpreter.from_binary(python_interpreter_path(PY_39))
-
     with plugin_resolution(
         rule_runner,
-        interpreter=python38,
+        python_version=PY_38,
         plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         sdist=sdist,
     ) as results:
@@ -316,7 +311,7 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
         with pytest.raises(ExecutionError):
             with plugin_resolution(
                 rule_runner,
-                interpreter=python39,
+                python_version=PY_39,
                 chroot=chroot,
                 plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
             ):
@@ -333,7 +328,7 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
         # directly from the still in-tact cache.
         with plugin_resolution(
             rule_runner,
-            interpreter=python38,
+            python_version=PY_38,
             chroot=chroot,
             plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         ) as results2:
