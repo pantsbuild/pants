@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from pants.backend.codegen.protobuf import protoc
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.scala import dependency_inference, symbol_mapper
 from pants.backend.codegen.protobuf.scala.subsystem import PluginArtifactSpec, ScalaPBSubsystem
@@ -314,6 +315,7 @@ def rules():
         *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromProtobufRequest),
         UnionRule(ExportableTool, ScalaPBSubsystem),
+        *protoc.rules(),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),

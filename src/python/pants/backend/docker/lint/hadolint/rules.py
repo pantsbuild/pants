@@ -10,6 +10,7 @@ from pants.backend.docker.lint.hadolint.subsystem import Hadolint
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.partitions import PartitionerType
@@ -18,6 +19,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -106,4 +108,5 @@ def rules():
     return [
         *collect_rules(),
         *HadolintRequest.rules(),
+        UnionRule(ExportableTool, Hadolint),
     ]

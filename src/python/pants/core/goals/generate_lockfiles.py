@@ -295,9 +295,12 @@ class UnrecognizedResolveNamesError(Exception):
         self,
         unrecognized_resolve_names: list[str],
         all_valid_names: Iterable[str],
+        all_valid_binaries: Iterable[str] | None = None,
         *,
         description_of_origin: str,
     ) -> None:
+        all_valid_binaries = all_valid_binaries or set()
+
         # TODO(#12314): maybe implement "Did you mean?"
         if len(unrecognized_resolve_names) == 1:
             unrecognized_str = unrecognized_resolve_names[0]
@@ -305,16 +308,26 @@ class UnrecognizedResolveNamesError(Exception):
         else:
             unrecognized_str = str(sorted(unrecognized_resolve_names))
             name_description = "names"
-        super().__init__(
-            softwrap(
-                f"""
-                Unrecognized resolve {name_description} from {description_of_origin}:
-                {unrecognized_str}
 
-                All valid resolve names: {sorted(all_valid_names)}
-                """
-            )
-        )
+        message = [
+            f"Unrecognized resolve {name_description} from {description_of_origin}: {unrecognized_str}",
+            f"All valid resolve names: {sorted(all_valid_names)}",
+        ]
+        if all_valid_binaries:
+            message.append(f"All valid exportable binaries: {sorted(all_valid_binaries)}")
+
+        should_be_bins = set(unrecognized_resolve_names) & set(all_valid_binaries)
+        should_be_resolves = set(unrecognized_resolve_names) & set(all_valid_names)
+
+        if should_be_bins:
+            cmd = " ".join([f"--bin={e}" for e in should_be_bins])
+            message.append(f"HINT: Some resolves should be binaries, try with `{cmd}`")
+
+        if should_be_resolves:
+            cmd = " ".join([f"--resolve={e}" for e in should_be_resolves])
+            message.append(f"HINT: Some binaries should be resolves, try with `{cmd}`")
+
+        super().__init__(softwrap("\n\n".join(message)))
 
 
 class _ResolveProviderType(Enum):

@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import itertools
 import os
+from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Mapping, Sequence, cast
 
 from pants.base.build_root import BuildRoot
@@ -15,12 +17,21 @@ from pants.core.goals.generate_lockfiles import (
     KnownUserResolveNamesRequest,
     UnrecognizedResolveNamesError,
 )
+from pants.core.goals.resolves import ExportableTool, ExportMode
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Workspace
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    MergeDigests,
+    SymlinkEntry,
+    Workspace,
+)
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.intrinsics import run_interactive_process
@@ -29,7 +40,7 @@ from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import StrListOption
-from pants.util.dirutil import safe_rmtree
+from pants.util.dirutil import safe_mkdir, safe_rmtree
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
@@ -71,6 +82,24 @@ class PostProcessingCommand:
 
 
 @dataclass(frozen=True)
+class ExportedBinary:
+    """Binaries exposed by an export.
+
+    These will be added under the "bin" folder. The `name` is the name that will be linked as in the
+    `bin` folder. The `path_in_export` is the path within the exported digest to link to. These can
+    be used to abstract details from the name of the tool and avoid the other files in the tool's
+    digest.
+
+    For example, "my-tool" might have a downloaded file of
+    "my_tool/my_tool_linux_x86-64.bin" and a readme. We would use `ExportedBinary(name="my-tool",
+    path_in_export=my_tool/my_tool_linux_x86-64.bin"`
+    """
+
+    name: str
+    path_in_export: str
+
+
+@dataclass(frozen=True)
 class ExportResult:
     description: str
     # Materialize digests under this reldir.
@@ -82,6 +111,7 @@ class ExportResult:
     # Set for the common special case of exporting a resolve, and names that resolve.
     # Set to None for other export results.
     resolve: str | None
+    exported_binaries: tuple[ExportedBinary, ...]
 
     def __init__(
         self,
@@ -91,12 +121,14 @@ class ExportResult:
         digest: Digest = EMPTY_DIGEST,
         post_processing_cmds: Iterable[PostProcessingCommand] = tuple(),
         resolve: str | None = None,
+        exported_binaries: Iterable[ExportedBinary] = tuple(),
     ):
         object.__setattr__(self, "description", description)
         object.__setattr__(self, "reldir", reldir)
         object.__setattr__(self, "digest", digest)
         object.__setattr__(self, "post_processing_cmds", tuple(post_processing_cmds))
         object.__setattr__(self, "resolve", resolve)
+        object.__setattr__(self, "exported_binaries", tuple(exported_binaries))
 
 
 class ExportResults(Collection[ExportResult]):
@@ -129,6 +161,12 @@ class ExportSubsystem(GoalSubsystem):
         "e.g., Python resolves are exported as virtualenvs.",
     )
 
+    binaries = StrListOption(
+        flag_name="--bin",  # `bin` is a python builtin
+        default=[],
+        help="Export the specified binaries. To select a binary, provide its subsystem scope name, as used for setting its options.",
+    )
+
 
 class Export(Goal):
     subsystem_cls = ExportSubsystem
@@ -147,14 +185,16 @@ async def export(
 ) -> Export:
     request_types = cast("Iterable[type[ExportRequest]]", union_membership.get(ExportRequest))
 
-    if not export_subsys.options.resolve:
-        raise ExportError("Must specify at least one --resolve to export")
+    if not (export_subsys.resolve or export_subsys.options.bin):
+        raise ExportError("Must specify at least one `--resolve` or `--bin` to export")
     if targets:
         raise ExportError("The `export` goal does not take target specs.")
 
     requests = tuple(request_type(targets) for request_type in request_types)
     all_results = await MultiGet(Get(ExportResults, ExportRequest, request) for request in requests)
-    flattened_results = [res for results in all_results for res in results]
+    flattened_results = sorted(
+        (res for results in all_results for res in results), key=lambda res: res.resolve or ""
+    )  # sorting provides predictable resolution in conflicts
 
     prefixed_digests = await MultiGet(
         Get(Digest, AddPrefix(result.digest, result.reldir)) for result in flattened_results
@@ -185,12 +225,29 @@ async def export(
             resolves_exported.add(result.resolve)
         console.print_stdout(f"Wrote {result.description} to {result_dir}")
 
-    unexported_resolves = sorted(set(export_subsys.resolve) - resolves_exported)
+    exported_bins_by_exporting_resolve, link_requests = await link_exported_executables(
+        build_root, output_dir, flattened_results
+    )
+    link_digest = await Get(Digest, CreateDigest, link_requests)
+    workspace.write_digest(link_digest)
+
+    exported_bin_warnings = warn_exported_bin_conflicts(exported_bins_by_exporting_resolve)
+    for warning in exported_bin_warnings:
+        console.print_stderr(warning)
+
+    unexported_resolves = sorted(
+        (set(export_subsys.resolve) | set(export_subsys.binaries)) - resolves_exported
+    )
     if unexported_resolves:
         all_known_user_resolve_names = await MultiGet(
             Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
             for request in union_membership.get(KnownUserResolveNamesRequest)
         )
+        all_known_bin_names = [
+            e.options_scope
+            for e in union_membership.get(ExportableTool)
+            if e.export_mode == ExportMode.binary
+        ]
         all_valid_resolve_names = sorted(
             {
                 *itertools.chain.from_iterable(kurn.names for kurn in all_known_user_resolve_names),
@@ -203,10 +260,57 @@ async def export(
         raise UnrecognizedResolveNamesError(
             unexported_resolves,
             all_valid_resolve_names,
-            description_of_origin="the option --export-resolve",
+            all_known_bin_names,
+            description_of_origin="the options --export-resolve and/or --export-bin",
         )
 
     return Export(exit_code=0)
+
+
+async def link_exported_executables(
+    build_root: BuildRoot,
+    output_dir: str,
+    export_results: list[ExportResult],
+) -> tuple[dict[str, list[str]], CreateDigest]:
+    """Link the exported executables to the `bin` dir.
+
+    Multiple resolves might export the same executable. This will export the first one only but
+    track the collision.
+    """
+    safe_mkdir(Path(output_dir, "bin"))
+
+    exported_bins_by_exporting_resolve: dict[str, list[str]] = defaultdict(list)
+    link_requests = []
+    for result in export_results:
+        for exported_bin in result.exported_binaries:
+            exported_bins_by_exporting_resolve[exported_bin.name].append(
+                result.resolve or result.description
+            )
+            if len(exported_bins_by_exporting_resolve[exported_bin.name]) > 1:
+                continue
+
+            path = Path(output_dir, "bin", exported_bin.name)
+            target = Path(build_root.path, output_dir, result.reldir, exported_bin.path_in_export)
+            link_requests.append(SymlinkEntry(path.as_posix(), target.as_posix()))
+
+    return exported_bins_by_exporting_resolve, CreateDigest(link_requests)
+
+
+def warn_exported_bin_conflicts(exported_bins: dict[str, list[str]]) -> list[str]:
+    """Check that no bin was exported from multiple resolves."""
+    messages = []
+
+    for exported_bin_name, resolves in exported_bins.items():
+        if len(resolves) > 1:
+            msg = f"Exporting binary `{exported_bin_name}` had conflicts. "
+            succeeded_resolve, other_resolves = resolves[0], resolves[1:]
+            msg += (
+                f"The resolve {succeeded_resolve} was exported, but it conflicted with "
+                + ", ".join(other_resolves)
+            )
+            messages.append(msg)
+
+    return messages
 
 
 def rules():

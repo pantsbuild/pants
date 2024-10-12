@@ -9,6 +9,7 @@ import textwrap
 from collections import defaultdict
 from dataclasses import dataclass
 
+from pants.backend.codegen.protobuf import protoc
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import (
     AllProtobufTargets,
@@ -644,6 +645,7 @@ def rules():
         UnionRule(GoModuleImportPathsMappingsHook, ProtobufGoModuleImportPathsMappingsHook),
         ProtobufSourcesGeneratorTarget.register_plugin_field(GoOwningGoModAddressField),
         ProtobufSourceTarget.register_plugin_field(GoOwningGoModAddressField),
+        *protoc.rules(),
         # Rules needed for this to pass src/python/pants/init/load_backends_integration_test.py:
         *assembly.rules(),
         *build_pkg.rules(),
