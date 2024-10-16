@@ -25,25 +25,30 @@ AMI. To do so manually:
 
 ### Create a temporary EC2 instance on the standard AMI
 
-In the AWS web console, initiate instance creation, and when prompted for an AMI, search for the
-latest standard AMI, as described in the Runs On [images repo](https://github.com/runs-on/runner-images-for-aws).
-In practice this means using `runs-on-v2.2-ubuntu22-full-arm64` as the search term, and checking the results
-in the Community AMIs tab.
+In the AWS web console, initiate creation of a temporary instance that we use just to build the custom AMI.
 
-After selecting the AMI, open the Advanced section and set the instance's User Data to:
+- Any instance type will do, t4g.nano for example.
+- To select the base AMI for the instance, click on "Browse more AMIs", then the "Community AMIs" tab,
+then search for `runs-on-v2.2-ubuntu22-full-arm64` and pick the latest standard AMI, as described in
+the Runs On [images repo](https://github.com/runs-on/runner-images-for-aws).
+- Select `pantsbuild.org.bastion` as the instance's SSH keypair.
+- Allow the wizard to create a security group.
+- The default storage settings are fine.
+- Open the Advanced section, scroll all the way down, and set the instance's User Data to:
 
 ```bash
 #!/bin/bash
 systemctl start ssh
 ```
 
-to ensure that its SSH daemon runs on startup. Then choose "pantsbuild.org.bastion" as the
-instance's SSH keypair.
+to ensure that its SSH daemon runs on startup.
+
+- Click "Launch instance"
 
 ### SSH into the temporary EC2 instance
 
-Once the instance is running, click on "Connect" to get SSH instructions. You will need the
-`pantsbuild.org.bastion` private key, which is in our 1Password account.
+Once the instance is running, navigate to its details page and click on "Connect" to get SSH instructions.
+You will need the `pantsbuild.org.bastion` private key, which is in our 1Password account.
 
 ### Install Pythons on the instance
 
@@ -56,7 +61,11 @@ sudo apt update
 sudo apt install -y \
   python3.7 python3.7-dev python3.7-venv \
   python3.8 python3.8-dev python3.8-venv \
-  python3.9 python3.9-dev python3.9-venv
+  python3.9 python3.9-dev python3.9-venv \
+  python3.10 python3.10-dev python3.10-venv \
+  python3.11 python3.11-dev python3.11-venv \
+  python3.12 python3.12-dev python3.12-venv \
+  python3.13 python3.13-dev python3.13-venv
 ```
 
 to install the necessary Pythons.
@@ -64,11 +73,15 @@ to install the necessary Pythons.
 ### Create an AMI from the instance
 
 From the instance's actions menu in the web console select "Images" and then "Create image".
-The image name doesn't strictly matter, but `ubuntu22-full-arm64-python3.7-python3.8-python3.9`
+The image name doesn't strictly matter, but `ubuntu22-full-arm64-python3.7-3.13`
 is a good name for consistency (multiple AMIs may have the same name).
 
-We hope to [automate the above via Packer](https://runs-on.com/guides/building-custom-ami-with-packer/)
-at some point.
+### Terminate the temporary instance
+
+Once the AMI status shows as "Available", terminate the temporary instance and delete its security group
+(whose name will match launch-wizard-*).
+
+We hope to [automate the above via Packer](https://runs-on.com/guides/building-custom-ami-with-packer/) at some point.
 
 ### Update the Runs On config
 
