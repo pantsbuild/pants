@@ -123,7 +123,7 @@ NATIVE_FILES = [
 
 # We don't specify a patch version so that we get the latest, which comes pre-installed:
 #  https://github.com/actions/setup-python#available-versions-of-python
-PYTHON_VERSION = "3.9"
+PYTHON_VERSION = "3.11"
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
 DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true'"

@@ -181,7 +181,7 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
             "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
             "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
         ),
-        interpreter_constraints=InterpreterConstraints(["CPython>=3.6"]),
+        interpreter_constraints=InterpreterConstraints(["CPython>=3.8"]),
         env={"LANG": "es_PY.UTF-8"},
     )
 
@@ -232,7 +232,7 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
         pex_type=pex_type,
         main=EntryPoint("main"),
         sources=sources,
-        interpreter_constraints=InterpreterConstraints(["CPython>=3.6"]),
+        interpreter_constraints=InterpreterConstraints(["CPython>=3.8"]),
     )
 
     pex_process_type = PexProcess if isinstance(pex_data.pex, Pex) else VenvPexProcess
