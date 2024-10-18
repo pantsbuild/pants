@@ -123,7 +123,8 @@ NATIVE_FILES = [
 
 # We don't specify a patch version so that we get the latest, which comes pre-installed:
 #  https://github.com/actions/setup-python#available-versions-of-python
-PYTHON_VERSION = "3.9"
+# NOTE: The last entry becomes the default
+PYTHON_VERSIONS = ["3.9", "3.10", "3.12", "3.13", "3.11"]
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
 DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true'"
@@ -360,11 +361,18 @@ def install_rustup() -> Step:
     }
 
 
-def install_python(version: str) -> Step:
+def install_pythons(versions: list[str]) -> Step:
+    # See:
+    # https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md#specifying-multiple-pythonpypy-versions
+    # This is a list expressed as a newline delimited string instead of a... list
+    if len(versions) == 1:
+        version_yaml = versions[0]
+    else:
+        version_yaml = "|\n" + "\n".join(versions)
     return {
-        "name": f"Set up Python {version}",
+        "name": f"Set up Python {', '.join(versions)}",
         "uses": action("setup-python"),
-        "with": {"python-version": version},
+        "with": {"python-version": version_yaml},
     }
 
 
@@ -568,7 +576,7 @@ class Helper:
     def setup_primary_python(self) -> Sequence[Step]:
         ret = []
         if self.platform not in HAS_PYTHON:
-            ret.append(install_python(PYTHON_VERSION))
+            ret.append(install_pythons(PYTHON_VERSIONS))
         return ret
 
     def expose_all_pythons(self) -> Sequence[Step]:
@@ -1591,7 +1599,7 @@ def public_repos() -> PublicReposOutput:
             "permissions": {},
             "steps": [
                 *checkout(repository=repo.name, **repo.checkout_options),
-                install_python(repo.python_version),
+                install_pythons([repo.python_version]),
                 *([install_go()] if repo.install_go else []),
                 *([install_node(repo.node_version)] if repo.node_version else []),
                 *([download_apache_thrift()] if repo.install_thrift else []),
