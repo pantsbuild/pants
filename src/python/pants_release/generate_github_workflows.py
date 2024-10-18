@@ -368,7 +368,7 @@ def install_pythons(versions: list[str]) -> Step:
     return {
         "name": f"Set up Python {', '.join(versions)}",
         "uses": action("setup-python"),
-        "with": {"python-version": "\n".join(versions),
+        "with": {"python-version": "\n".join(versions)},
     }
 
 
