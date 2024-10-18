@@ -270,8 +270,6 @@ jobs:
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -371,8 +369,6 @@ jobs:
           3.13
 
           3.11'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:

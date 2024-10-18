@@ -23,8 +23,6 @@ jobs:
           3.13
 
           3.11'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
     - env:
         BASE_REF: ${{ github.event.inputs.base_ref }}
         BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
