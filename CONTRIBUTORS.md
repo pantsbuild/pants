@@ -253,6 +253,7 @@ Created as part of the release process.
 + Mohamed Abdi
 + Morten Hauge
 + Moses Nakamura
++ Muhammad Tsany Qudsi
 + Nadav Samet
 + Nathan Levesque
 + Navneeth Jayendran
