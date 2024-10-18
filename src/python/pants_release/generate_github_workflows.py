@@ -17,8 +17,6 @@ import toml
 import yaml
 from pants_release.common import die
 
-from pants.util.strutil import softwrap
-
 
 def action(name: str, node16_compat: bool = False) -> str:
     # Versions of actions compatible with node16 and the `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` setting.
