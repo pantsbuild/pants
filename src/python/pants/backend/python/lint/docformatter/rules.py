@@ -61,8 +61,6 @@ async def docformatter_fmt(
     # (All versions return 3 in check mode if any files would have changed, but that is
     # not an issue here).
     if result.exit_code not in [0, 3]:
-        # TODO(#12725):It would be more straightforward to force the exception with:
-        # result = await Get(ProcessResult, FallibleProcessResult, result)
         raise ProcessExecutionFailure(
             result.exit_code,
             result.stdout,
