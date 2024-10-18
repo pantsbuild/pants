@@ -365,14 +365,10 @@ def install_pythons(versions: list[str]) -> Step:
     # See:
     # https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md#specifying-multiple-pythonpypy-versions
     # This is a list expressed as a newline delimited string instead of a... list
-    if len(versions) == 1:
-        version_yaml = versions[0]
-    else:
-        version_yaml = "|\n" + "\n".join(versions)
     return {
         "name": f"Set up Python {', '.join(versions)}",
         "uses": action("setup-python"),
-        "with": {"python-version": version_yaml},
+        "with": {"python-version": "\n".join(versions),
     }
 
 
