@@ -577,13 +577,13 @@ class Helper:
 
     def expose_all_pythons(self) -> Sequence[Step]:
         ret = []
-        if self.platform not in HAS_PYTHON:
-            ret.append(
-                {
-                    "name": "Expose Pythons",
-                    "uses": action("expose-pythons"),
-                }
-            )
+        # if self.platform not in HAS_PYTHON:
+        #     ret.append(
+        #         {
+        #             "name": "Expose Pythons",
+        #             "uses": action("expose-pythons"),
+        #         }
+        #     )
         return ret
 
     def bootstrap_pants(self) -> Sequence[Step]:
