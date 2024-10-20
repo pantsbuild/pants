@@ -96,10 +96,8 @@ fn try_execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> 
 }
 
 fn execv_fallback_client(pants_server: OsString) -> Infallible {
-    if let Err(exit_code) = try_execv_fallback_client(pants_server) {
-        std::process::exit(exit_code);
-    }
-    unreachable!()
+    let Err(exit_code) = try_execv_fallback_client(pants_server);
+    std::process::exit(exit_code);
 }
 
 // The value is taken from this C precedent:
