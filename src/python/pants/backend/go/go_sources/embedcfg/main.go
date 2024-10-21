@@ -215,6 +215,12 @@ func resolveEmbed(pattern string, root *embedNode) (matchedPaths, matchedFiles [
 		}
 	}()
 
+	excludeHiddenNames := true
+	if strings.HasPrefix(pattern, "all:") {
+		pattern = pattern[len("all:"):]
+		excludeHiddenNames = false
+	}
+
 	// Check that the pattern has valid syntax.
 	if _, err := path.Match(pattern, ""); err != nil || !validEmbedPattern(pattern) {
 		return nil, nil, fmt.Errorf("invalid pattern syntax")
@@ -238,8 +244,10 @@ func resolveEmbed(pattern string, root *embedNode) (matchedPaths, matchedFiles [
 		// See golang/go#42328.
 		matchTreeErr := matchNode.walk(func(childRel string, childNode *embedNode) error {
 			if childRel != "" {
-				if base := path.Base(childRel); strings.HasPrefix(base, ".") || strings.HasPrefix(base, "_") {
-					return errSkip
+				if excludeHiddenNames {
+					if base := path.Base(childRel); strings.HasPrefix(base, ".") || strings.HasPrefix(base, "_") {
+						return errSkip
+					}
 				}
 			}
 			if !childNode.isDir() {
