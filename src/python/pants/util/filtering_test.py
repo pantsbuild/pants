@@ -67,3 +67,40 @@ def test_negated_filter() -> None:
     assert coprime_to_2_and_3(4) is False
     assert coprime_to_2_and_3(5) is True
     assert coprime_to_2_and_3(6) is False
+
+
+def test_merged_filter() -> None:
+    # This tests that multiple filters are merged into a single consistent filter
+    divisible_by_3_and_not_2 = and_filters(
+        create_filters(
+            ["-3", "-2", "+3"],
+            is_divisible_by,
+        )
+    )
+    assert divisible_by_3_and_not_2(2) is False
+    assert divisible_by_3_and_not_2(3) is True
+    assert divisible_by_3_and_not_2(4) is False
+    assert divisible_by_3_and_not_2(5) is False
+    assert divisible_by_3_and_not_2(6) is False
+    assert divisible_by_3_and_not_2(7) is False
+    assert divisible_by_3_and_not_2(8) is False
+    assert divisible_by_3_and_not_2(9) is True
+
+
+def test_merged_filter_coprime() -> None:
+    # This tests that multiple filters are merged into a single consistent filter
+    coprime_to_2_and_3_and_divisible_by_7 = and_filters(
+        create_filters(
+            ["-2,3", "+7"],
+            is_divisible_by,
+        )
+    )
+
+    assert coprime_to_2_and_3_and_divisible_by_7(1) is False
+    assert coprime_to_2_and_3_and_divisible_by_7(2) is False
+    assert coprime_to_2_and_3_and_divisible_by_7(3) is False
+    assert coprime_to_2_and_3_and_divisible_by_7(4) is False
+    assert coprime_to_2_and_3_and_divisible_by_7(5) is False
+    assert coprime_to_2_and_3_and_divisible_by_7(7) is True
+    assert coprime_to_2_and_3_and_divisible_by_7(34) is False
+    assert coprime_to_2_and_3_and_divisible_by_7(35) is True
