@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
+from pants.core.util_rules.subprocess_environment import SubprocessEnvironment, SubprocessEnvironmentVars
+from pants.core.util_rules import subprocess_environment
 
 import dataclasses
 import itertools
@@ -108,10 +110,10 @@ async def add_prefix(add_prefix: AddPrefix) -> Digest:
 async def execute_process(
     process: Process,
     process_execution_environment: ProcessExecutionEnvironment,
-    options: GlobalOptions,
+    env_vars: SubprocessEnvironmentVars,
 ) -> FallibleProcessResult:
-    if options.process_extra_env:
-        items = itertools.chain(process.env.items(), options.process_extra_env.items())
+    if env_vars.vars:
+        items = itertools.chain(process.env.items(), env_vars.vars.items())
         process = dataclasses.replace(process, env=FrozenDict(items))
     return await native_engine.execute_process(process, process_execution_environment)
 
@@ -216,4 +218,5 @@ async def path_metadata_request(request: PathMetadataRequest) -> PathMetadataRes
 def rules():
     return [
         *collect_rules(),
+        *subprocess_environment.rules(),
     ]
