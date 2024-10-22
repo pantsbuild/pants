@@ -46,6 +46,8 @@ from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rul
 from pants.option.global_options import GlobalOptions
 from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.internals.selectors import Get
 
 
 @rule
@@ -110,10 +112,12 @@ async def add_prefix(add_prefix: AddPrefix) -> Digest:
 async def execute_process(
     process: Process,
     process_execution_environment: ProcessExecutionEnvironment,
-    env_vars: SubprocessEnvironmentVars,
+    subproc_env: SubprocessEnvironment.EnvironmentAware,
 ) -> FallibleProcessResult:
-    if env_vars.vars:
-        items = itertools.chain(process.env.items(), env_vars.vars.items())
+    names = subproc_env.env_vars_to_pass_to_subprocesses
+    if names:
+        env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(names))
+        items = itertools.chain(process.env.items(), env_vars.items())
         process = dataclasses.replace(process, env=FrozenDict(items))
     return await native_engine.execute_process(process, process_execution_environment)
 
