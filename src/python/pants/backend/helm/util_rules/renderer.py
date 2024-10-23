@@ -97,7 +97,8 @@ class _HelmDeploymentProcessWrapper(EngineAwareParameter, EngineAwareReturnType)
     """Intermediate representation of a `HelmProcess` that will produce a fully rendered set of
     manifests from a given chart.
 
-    The encapsulated `process` will be side-effecting depending on the `cmd` that was originally requested.
+    The encapsulated `process` will be side-effecting depending on the `cmd` that was originally
+    requested.
 
     This is meant to only be used internally by this module.
     """

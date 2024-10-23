@@ -1,6 +1,5 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 """An OrderedSet is a set that remembers its insertion order, and a FrozenOrderedSet is one that is
 also immutable.
 

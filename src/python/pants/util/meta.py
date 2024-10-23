@@ -14,8 +14,7 @@ class SingletonMetaclass(type):
 
     Example class definition:
 
-      class Unicorn(metaclass=SingletonMetaclass):
-        pass
+    class Unicorn(metaclass=SingletonMetaclass):   pass
     """
 
     def __call__(cls, *args: Any, **kwargs: Any) -> Any:

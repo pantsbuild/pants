@@ -569,19 +569,18 @@ async def coursier_fetch_one_coord(
 ) -> ClasspathEntry:
     """Run `coursier fetch --intransitive` to fetch a single artifact.
 
-    This rule exists to permit efficient subsetting of a "global" classpath
-    in the form of a lockfile.  Callers can determine what subset of dependencies
-    from the lockfile are needed for a given target, then request those
-    lockfile entries individually.
+    This rule exists to permit efficient subsetting of a "global" classpath in the form of a
+    lockfile.  Callers can determine what subset of dependencies from the lockfile are needed for a
+    given target, then request those lockfile entries individually.
 
-    By fetching only one entry at a time, we maximize our cache efficiency.  If instead
-    we fetched the entire subset that the caller wanted, there would be a different cache
-    key for every possible subset.
+    By fetching only one entry at a time, we maximize our cache efficiency.  If instead we fetched
+    the entire subset that the caller wanted, there would be a different cache key for every
+    possible subset.
 
-    This rule also guarantees exact reproducibility.  If all caches have been
-    removed, `coursier fetch` will re-download the artifact, and this rule will
-    confirm that what was downloaded matches exactly (by content digest) what
-    was specified in the lockfile (what Coursier originally downloaded).
+    This rule also guarantees exact reproducibility.  If all caches have been removed, `coursier
+    fetch` will re-download the artifact, and this rule will confirm that what was downloaded
+    matches exactly (by content digest) what was specified in the lockfile (what Coursier originally
+    downloaded).
     """
 
     # Prepare any URL- or JAR-specifying entries for use with Coursier

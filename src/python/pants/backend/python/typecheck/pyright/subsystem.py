@@ -43,8 +43,8 @@ class Pyright(NodeJSToolBase):
         """Pyright will look for a `pyrightconfig.json` or a `pyproject.toml` (with a
         `[tool.pyright]` section) in the project root.
 
-        `pyrightconfig.json` takes precedence if both are present.
-        Pyright's configuration content is specified here:
+        `pyrightconfig.json` takes precedence if both are present. Pyright's configuration content
+        is specified here:
         https://github.com/microsoft/pyright/blob/main/docs/configuration.md.
 
         In order for Pants to work with Pyright, we modify the config file before

@@ -106,7 +106,8 @@ class Coordinate:
 
         The CLI input format uses trailing key-val attributes to specify `packaging`, `url`, etc.
 
-        See https://github.com/coursier/coursier/blob/b5d5429a909426f4465a9599d25c678189a54549/modules/coursier/shared/src/test/scala/coursier/parse/DependencyParserTests.scala#L7
+        See
+        https://github.com/coursier/coursier/blob/b5d5429a909426f4465a9599d25c678189a54549/modules/coursier/shared/src/test/scala/coursier/parse/DependencyParserTests.scala#L7
         """
         attrs = dict(extra_attrs or {})
         if self.packaging != "jar":

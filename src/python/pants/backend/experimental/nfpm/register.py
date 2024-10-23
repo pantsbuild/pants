@@ -1,6 +1,5 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 """Create apk, archlinux, deb, and rpm system packages.
 
 See https://nfpm.goreleaser.com/ for details on nFPM, including these descriptions of it:

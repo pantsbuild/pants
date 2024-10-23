@@ -602,8 +602,8 @@ class JvmRequiredMainClassNameField(JvmMainClassNameField):
 class JvmShadingRule(ABC):
     """Base class for defining JAR shading rules as valid aliases in BUILD files.
 
-    Subclasses need to provide with an `alias` and a `help` message. The `alias` represents
-    the name that will be used in BUILD files to instantiate the given subclass.
+    Subclasses need to provide with an `alias` and a `help` message. The `alias` represents the name
+    that will be used in BUILD files to instantiate the given subclass.
 
     Set the `help` class property with a description, which will be used in `./pants help`. For the
     best rendering, use soft wrapping (e.g. implicit string concatenation) within paragraphs, but

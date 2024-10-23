@@ -125,8 +125,7 @@ def engine_error(
 
     Use like this:
 
-        with engine_error(ValueError, contains="foo"):
-            rule_runner.request(OutputType, [input])
+    with engine_error(ValueError, contains="foo"):     rule_runner.request(OutputType, [input])
 
     Will raise AssertionError if no ExecutionError occurred.
 
@@ -476,8 +475,8 @@ class RuleRunner:
         to read arbitrary env vars. Any options that start with `PANTS_` will also be used to set
         options.
 
-        Environment variables listed in `env_inherit` and not in `env` will be inherited from the test
-        runner's environment (os.environ)
+        Environment variables listed in `env_inherit` and not in `env` will be inherited from the
+        test runner's environment (os.environ)
 
         This will override any previously configured values.
         """

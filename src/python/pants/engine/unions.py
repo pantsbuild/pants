@@ -40,11 +40,12 @@ def union(
 
     By default, in order to provide a stable extension API, when a `@union` is used in a `Get`,
     _only_ the provided parameter is available to callees, But in order to expand its API, a
-    `@union` declaration may optionally include additional "in_scope_types", which are types
-    which must already be in scope at callsites where the `@union` is used in a `Get`, and
-    which are propagated to the callee.
+    `@union` declaration may optionally include additional "in_scope_types", which are types which
+    must already be in scope at callsites where the `@union` is used in a `Get`, and which are
+    propagated to the callee.
 
-    See https://www.pantsbuild.org/docs/rules-api-unions.
+    See
+    https://www.pantsbuild.org/docs/rules-api-unions.
     """
 
     def decorator(cls: _T) -> _T:

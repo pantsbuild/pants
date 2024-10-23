@@ -135,8 +135,8 @@ class CreateDigest(Collection[Union[FileContent, FileEntry, SymlinkEntry, Direct
     values.
 
     The engine will create any parent directories necessary, e.g. `FileContent('a/b/c.txt')` will
-    result in `a/`, `a/b`, and `a/b/c.txt` being created. You only need to use `Directory` to
-    create an empty directory.
+    result in `a/`, `a/b`, and `a/b/c.txt` being created. You only need to use `Directory` to create
+    an empty directory.
 
     This does _not_ actually materialize the digest to the build root. You must use
     `engine.fs.Workspace` in a `@goal_rule` to save the resulting digest to disk.
@@ -259,13 +259,13 @@ class DownloadFile:
 class NativeDownloadFile:
     """Retrieve the contents of a file via an HTTP GET request or directly for local file:// URLs.
 
-    This request is handled directly by the native engine without any additional coercion by plugins,
-    and therefore should only be used in cases where the URL is known to be publicly accessible.
-    Otherwise, callers should use `DownloadFile`.
+    This request is handled directly by the native engine without any additional coercion by
+    plugins, and therefore should only be used in cases where the URL is known to be publicly
+    accessible. Otherwise, callers should use `DownloadFile`.
 
-    The auth_headers are part of this nodes' cache key for memoization (changing a header invalidates
-    prior results) but are not part of the underlying cache key for the local/remote cache (changing
-    a header won't re-download a file if the file was previously downloaded).
+    The auth_headers are part of this nodes' cache key for memoization (changing a header
+    invalidates prior results) but are not part of the underlying cache key for the local/remote
+    cache (changing a header won't re-download a file if the file was previously downloaded).
     """
 
     url: str

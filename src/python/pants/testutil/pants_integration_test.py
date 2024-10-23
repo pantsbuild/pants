@@ -263,11 +263,10 @@ def setup_tmpdir(
     with the tmpdir. The file content can use `{tmpdir}` to have it substituted with the actual
     tmpdir via a format string.
 
-    The `raw_files` parameter can be used to write binary files. These
-    files will not go through formatting in any way.
+    The `raw_files` parameter can be used to write binary files. These files will not go through
+    formatting in any way.
 
-
-    This is useful to set up controlled test environments, such as setting up source files and
+     This is useful to set up controlled test environments, such as setting up source files and
     BUILD files.
     """
 

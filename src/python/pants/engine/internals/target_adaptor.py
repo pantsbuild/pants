@@ -22,8 +22,8 @@ class SourceBlock:
 
     Lines are 1 indexed, `start` is inclusive, `end` is exclusive.
 
-    SourceBlock is used to describe a set of source lines that are owned by a Target,
-    thus it can't be empty, i.e. `start` must be less than `end`.
+    SourceBlock is used to describe a set of source lines that are owned by a Target, thus it can't
+    be empty, i.e. `start` must be less than `end`.
     """
 
     start: int

@@ -41,21 +41,21 @@ class UnparsedAddressInputs:
 
     You can convert these into fully normalized `Addresses` and `Targets` like this:
 
-        await Get(Addresses, UnparsedAddressInputs(["//:tgt1", "//:tgt2"], owning_address=None)
-        await Get(Targets, UnparsedAddressInputs([...], owning_address=Address("original"))
+    await Get(Addresses, UnparsedAddressInputs(["//:tgt1", "//:tgt2"], owning_address=None) await
+    Get(Targets, UnparsedAddressInputs([...], owning_address=Address("original"))
 
     This is intended for contexts where the user specifies addresses outside of the `dependencies`
     field, such as through an option or a special field on a target that is not normal
-    `dependencies`. You should not use this to resolve the `dependencies` field; use
-    `await Get(Addresses, DependenciesRequest)` for that.
+    `dependencies`. You should not use this to resolve the `dependencies` field; use `await
+    Get(Addresses, DependenciesRequest)` for that.
 
     If the addresses are coming from a target's fields, set `owning_address` so that relative
     references like `:sibling` work properly.
 
     Unlike the `dependencies` field, this type does not work with `!` and `!!` ignores.
 
-    Set `description_of_origin` to a value like "CLI arguments" or "the `dependencies` field
-    from {tgt.address}". It is used for better error messages.
+    Set `description_of_origin` to a value like "CLI arguments" or "the `dependencies` field from
+    {tgt.address}". It is used for better error messages.
     """
 
     values: tuple[str, ...]

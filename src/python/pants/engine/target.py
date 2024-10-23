@@ -507,12 +507,12 @@ class Target:
     def __getitem__(self, field: Type[_F]) -> _F:
         """Get the requested `Field` instance belonging to this target.
 
-        If the `Field` is not registered on this `Target` type, this method will raise a
-        `KeyError`. To avoid this, you should first call `tgt.has_field()` or `tgt.has_fields()`
-        to ensure that the field is registered, or, alternatively, use `Target.get()`.
+        If the `Field` is not registered on this `Target` type, this method will raise a `KeyError`.
+        To avoid this, you should first call `tgt.has_field()` or `tgt.has_fields()` to ensure that
+        the field is registered, or, alternatively, use `Target.get()`.
 
-        See the docstring for `Target.get()` for how this method handles subclasses of the
-        requested Field and for tips on how to use the returned value.
+        See the docstring for `Target.get()` for how this method handles subclasses of the requested
+        Field and for tips on how to use the returned value.
         """
         result = self._maybe_get(field)
         if result is not None:
@@ -529,19 +529,19 @@ class Target:
         """Get the requested `Field` instance belonging to this target.
 
         This will return an instance of the requested field type, e.g. an instance of
-        `InterpreterConstraints`, `SourcesField`, `EntryPoint`, etc. Usually, you will want to
-        grab the `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
+        `InterpreterConstraints`, `SourcesField`, `EntryPoint`, etc. Usually, you will want to grab
+        the `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
         `SourcesField`, you may need to hydrate the value.).
 
-        This works with subclasses of `Field`. For example, if you subclass `Tags`
-        to define a custom subclass `CustomTags`, both `tgt.get(Tags)` and
-        `tgt.get(CustomTags)` will return the same `CustomTags` instance.
+        This works with subclasses of `Field`. For example, if you subclass `Tags` to define a
+        custom subclass `CustomTags`, both `tgt.get(Tags)` and `tgt.get(CustomTags)` will return the
+        same `CustomTags` instance.
 
-        If the `Field` is not registered on this `Target` type, this will return an instance of
-        the requested Field by using `default_raw_value` to create the instance. Alternatively,
-        first call `tgt.has_field()` or `tgt.has_fields()` to ensure that the field is registered,
-        or, alternatively, use indexing (e.g. `tgt[Compatibility]`) to raise a KeyError when the
-        field is not registered.
+        If the `Field` is not registered on this `Target` type, this will return an instance of the
+        requested Field by using `default_raw_value` to create the instance. Alternatively, first
+        call `tgt.has_field()` or `tgt.has_fields()` to ensure that the field is registered, or,
+        alternatively, use indexing (e.g. `tgt[Compatibility]`) to raise a KeyError when the field
+        is not registered.
         """
         result = self._maybe_get(field)
         if result is not None:
@@ -1289,16 +1289,15 @@ def _generate_file_level_targets(
     Set `add_dependencies_on_all_siblings` to True so that each file-level target depends on all
     other generated targets from the target generator. This is useful if both are true:
 
-        a) file-level targets usually need their siblings to be present to work. Most target types
-          (Python, Java, Shell, etc) meet this, except for `files` and `resources` which have no
-          concept of "imports"
-        b) dependency inference cannot infer dependencies on sibling files.
+    a) file-level targets usually need their siblings to be present to work. Most target types
+    (Python, Java, Shell, etc) meet this, except for `files` and `resources` which have no   concept
+    of "imports" b) dependency inference cannot infer dependencies on sibling files.
 
-    Otherwise, set `add_dependencies_on_all_siblings` to `False` so that dependencies are
-    finer-grained.
+    Otherwise, set `add_dependencies_on_all_siblings` to `False` so that dependencies are finer-
+    grained.
 
-    `overrides` allows changing the fields for particular targets. It expects the full file path
-     as the key.
+    `overrides` allows changing the fields for particular targets. It expects the full file path  as
+    the key.
     """
 
     # Paths will have already been globbed, so they should be escaped. See
@@ -1619,7 +1618,7 @@ class InvalidTargetException(Exception):
 
     Suggested template:
 
-         f"The `{alias!r}` target {address} ..."
+    f"The `{alias!r}` target {address} ..."
     """
 
     def __init__(self, message: Any, *, description_of_origin: str | None = None) -> None:
@@ -1646,7 +1645,7 @@ class InvalidFieldException(Exception):
 
     Suggested template:
 
-         f"The {alias!r} field in target {address} must ..., but ..."
+    f"The {alias!r} field in target {address} must ..., but ..."
     """
 
     def __init__(self, message: Any, *, description_of_origin: str | None = None) -> None:
@@ -2267,17 +2266,11 @@ class SourcesField(AsyncFieldMixin, Field):
         and the engine will generate the sources if possible or will return an instance of
         HydratedSources with an empty snapshot if not possible:
 
-            await Get(
-                HydratedSources,
-                HydrateSourcesRequest(
-                    sources_field,
-                    for_sources_types=[FortranSources],
-                    enable_codegen=True,
-                )
-            )
+        await Get(     HydratedSources,     HydrateSourcesRequest(         sources_field,
+        for_sources_types=[FortranSources],         enable_codegen=True,     ) )
 
-        This method is useful when you need to filter targets before hydrating them, such as how
-        you may filter targets via `tgt.has_field(MyField)`.
+        This method is useful when you need to filter targets before hydrating them, such as how you
+        may filter targets via `tgt.has_field(MyField)`.
         """
         generate_request_types = union_membership.get(GenerateSourcesRequest)
         return any(
@@ -2723,9 +2716,8 @@ class ExplicitlyProvidedDependencies:
     """The literal addresses from a BUILD file `dependencies` field.
 
     Almost always, you should use `await Get(Addresses, DependenciesRequest)` instead, which will
-    consider dependency inference and apply ignores. However, this type can be
-    useful particularly within inference rules to see if a user already explicitly
-    provided a dependency.
+    consider dependency inference and apply ignores. However, this type can be useful particularly
+    within inference rules to see if a user already explicitly provided a dependency.
 
     Resolve using `await Get(ExplicitlyProvidedDependencies, DependenciesRequest)`.
 
@@ -2755,9 +2747,9 @@ class ExplicitlyProvidedDependencies:
     ) -> frozenset[Address]:
         """All addresses that remain after ineligible candidates are discarded.
 
-        Candidates are removed if they appear as ignores (`!` and `!!)` in the `dependencies`
-        field. Note that if the input addresses are generated targets, they will still be marked as
-        covered if their original target generator is in the explicitly provided ignores.
+        Candidates are removed if they appear as ignores (`!` and `!!)` in the `dependencies` field.
+        Note that if the input addresses are generated targets, they will still be marked as covered
+        if their original target generator is in the explicitly provided ignores.
 
         Candidates are also removed if `owners_must_be_ancestors` is True and the targets are not
         ancestors, e.g. `root2:tgt` is not a valid candidate for something defined in `root1`.
@@ -2982,13 +2974,12 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     """Subclass this for fields that act similarly to the `dependencies` field, but are handled
     differently than normal dependencies.
 
-    For example, you might have a field for package/binary dependencies, which you will call
-    the equivalent of `./pants package` on. While you could put these in the normal
-    `dependencies` field, it is often clearer to the user to call out this magic through a
-    dedicated field.
+    For example, you might have a field for package/binary dependencies, which you will call the
+    equivalent of `./pants package` on. While you could put these in the normal `dependencies`
+    field, it is often clearer to the user to call out this magic through a dedicated field.
 
-    This type will ensure that the dependencies show up in project introspection,
-    like `dependencies` and `dependents`, but not show up when you call `Get(TransitiveTargets,
+    This type will ensure that the dependencies show up in project introspection, like
+    `dependencies` and `dependents`, but not show up when you call `Get(TransitiveTargets,
     TransitiveTargetsRequest)` and `Get(Addresses, DependenciesRequest)`.
 
     To hydrate this field's dependencies, use `await Get(Addresses, UnparsedAddressInputs,

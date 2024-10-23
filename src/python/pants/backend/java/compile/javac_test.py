@@ -310,16 +310,16 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
     """Test that javac can handle source-level cycles--even across build target boundaries--via
     graph coarsening.
 
-    This test has to set up a contrived dependency since build-target cycles are forbidden by the graph.  However,
-    file-target cycles are not forbidden, so we configure the graph like so:
+    This test has to set up a contrived dependency since build-target cycles are forbidden by the
+    graph.  However, file-target cycles are not forbidden, so we configure the graph like so:
 
     a:a has a single source file, which has file-target address a/A.java, and which inherits a:a's
-    explicit dependency on b/B.java.
-    b:b depends directly on a:a, and its source b/B.java inherits that dependency.
+    explicit dependency on b/B.java. b:b depends directly on a:a, and its source b/B.java inherits
+    that dependency.
 
     Therefore, after target expansion via Get(Targets, Addresses(...)), we get the cycle of:
 
-        a/A.java -> b/B.java -> a/A.java
+    a/A.java -> b/B.java -> a/A.java
     """
 
     rule_runner.write_files(

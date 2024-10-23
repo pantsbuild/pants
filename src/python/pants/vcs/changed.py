@@ -137,7 +137,8 @@ class ChangedOptions:
     ) -> dict[str, tuple[Hunk, ...]]:
         """Determines the unified diff hunks changed according to SCM/workspace and options.
 
-        More info on unified diff: https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
+        More info on unified diff:
+        https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
         """
         changes_since = self.since or git_worktree.current_rev_identifier
         return git_worktree.changed_files_lines(

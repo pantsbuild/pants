@@ -56,8 +56,8 @@ class _SubsystemMeta(ABCMeta):
 class Subsystem(metaclass=_SubsystemMeta):
     """A separable piece of functionality that may be reused across multiple tasks or other code.
 
-    Subsystems encapsulate the configuration and initialization of things like JVMs,
-    Python interpreters, SCMs and so on.
+    Subsystems encapsulate the configuration and initialization of things like JVMs, Python
+    interpreters, SCMs and so on.
 
     Set the `help` class property with a description, which will be used in `./pants help`. For the
     best rendering, use soft wrapping (e.g. implicit string concatenation) within paragraphs, but
@@ -83,14 +83,14 @@ class Subsystem(metaclass=_SubsystemMeta):
         """A separate container for options that may be redefined by the runtime environment.
 
         To define environment-aware options, create an inner class in the `Subsystem` called
-        `EnvironmentAware`. Option fields share their scope with their enclosing `Subsystem`,
-        and the values of fields will default to the values set through Pants' configuration.
+        `EnvironmentAware`. Option fields share their scope with their enclosing `Subsystem`, and
+        the values of fields will default to the values set through Pants' configuration.
 
-        To consume environment-aware options, inject the `EnvironmentAware` inner class into
-        your rule.
+        To consume environment-aware options, inject the `EnvironmentAware` inner class into your
+        rule.
 
-        Optionally, it is possible to specify environment variables that are required when
-        post-processing raw values provided by users (e.g. `<PATH>` special strings) by specifying
+        Optionally, it is possible to specify environment variables that are required when post-
+        processing raw values provided by users (e.g. `<PATH>` special strings) by specifying
         `env_vars_used_by_options`, and consuming `_options_env` in your post-processing property.
         These environment variables will be requested at construction time.
         """

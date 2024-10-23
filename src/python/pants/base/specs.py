@@ -239,8 +239,8 @@ class RawSpecs:
     Unlike `Specs`, this does not consider include vs. ignore specs. It simply matches all relevant
     targets/files.
 
-    When you want to operate on what the user specified, use `Specs`. Otherwise, you can use
-    either `Specs` or `RawSpecs` in rules, e.g. to find what targets exist in a directory.
+    When you want to operate on what the user specified, use `Specs`. Otherwise, you can use either
+    `Specs` or `RawSpecs` in rules, e.g. to find what targets exist in a directory.
     """
 
     description_of_origin: str

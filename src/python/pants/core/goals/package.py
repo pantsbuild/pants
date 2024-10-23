@@ -220,12 +220,12 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
 class TraverseIfNotPackageTarget(ShouldTraverseDepsPredicate):
     """This predicate stops dep traversal after package targets.
 
-    When traversing deps, such as when collecting a list of transitive deps,
-    this predicate effectively turns any package targets into graph leaf nodes.
-    The package targets are included, but the deps of package targets are not.
+    When traversing deps, such as when collecting a list of transitive deps, this predicate
+    effectively turns any package targets into graph leaf nodes. The package targets are included,
+    but the deps of package targets are not.
 
-    Also, this excludes dependencies from any SpecialCasedDependencies fields,
-    which mirrors the behavior of the default predicate: TraverseIfDependenciesField.
+    Also, this excludes dependencies from any SpecialCasedDependencies fields, which mirrors the
+    behavior of the default predicate: TraverseIfDependenciesField.
     """
 
     package_field_set_types: FrozenOrderedSet[PackageFieldSet]

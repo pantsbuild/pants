@@ -215,8 +215,8 @@ class FrozenYamlIndex(Generic[T]):
 
         The items that map to `None` in the given function are not included in the result.
 
-        This is a combination of the `map` and `filter` higher-order functions into one so
-        both operations are performed in a single pass.
+        This is a combination of the `map` and `filter` higher-order functions into one so both
+        operations are performed in a single pass.
         """
 
         mutable_index: MutableYamlIndex[R] = MutableYamlIndex()

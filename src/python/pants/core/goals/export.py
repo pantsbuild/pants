@@ -89,8 +89,8 @@ class ExportedBinary:
     be used to abstract details from the name of the tool and avoid the other files in the tool's
     digest.
 
-    For example, "my-tool" might have a downloaded file of
-    "my_tool/my_tool_linux_x86-64.bin" and a readme. We would use `ExportedBinary(name="my-tool",
+    For example, "my-tool" might have a downloaded file of "my_tool/my_tool_linux_x86-64.bin" and a
+    readme. We would use `ExportedBinary(name="my-tool",
     path_in_export=my_tool/my_tool_linux_x86-64.bin"`
     """
 

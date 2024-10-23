@@ -209,8 +209,8 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
     ) -> DependencyRuleApplication:
         """Check all rules for any that apply to the relation between the two targets.
 
-        The `__dependencies_rules__` are the rules applicable for the origin target.
-        The `__dependents_rules__` are the rules applicable for the dependency target.
+        The `__dependencies_rules__` are the rules applicable for the origin target. The
+        `__dependents_rules__` are the rules applicable for the dependency target.
 
         Return dependency rule application describing the resulting action to take: ALLOW, DENY or
         WARN. WARN is effectively the same as ALLOW, but with a logged warning.

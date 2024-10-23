@@ -9,8 +9,8 @@ def debugadapter_port_for_testing() -> int:
 
     Use this in Pants's (and plugins') own tests to avoid collisions.
 
-    Assumes that the env var TEST_EXECUTION_SLOT has been set. If not, all tests
-    will use the same port, and collisions may occur.
+    Assumes that the env var TEST_EXECUTION_SLOT has been set. If not, all tests will use the same
+    port, and collisions may occur.
     """
     execution_slot = os.environ.get("TEST_EXECUTION_SLOT", "0")
     return 22000 + int(execution_slot)

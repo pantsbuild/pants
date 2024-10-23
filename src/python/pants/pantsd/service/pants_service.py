@@ -15,15 +15,15 @@ class PantsService(ABC):
     """Pants daemon service base class.
 
     The service lifecycle is made up of states described in the _ServiceState class, and controlled
-    by a calling thread that is holding the Service `lifecycle_lock`. Under that lock, a caller
-    can signal a service to "pause", "run", or "terminate" (see _ServiceState for more details).
+    by a calling thread that is holding the Service `lifecycle_lock`. Under that lock, a caller can
+    signal a service to "pause", "run", or "terminate" (see _ServiceState for more details).
 
-    pantsd pauses all Services before forking a pantsd in order to ensure that no "relevant"
-    locks are held (or awaited: see #6565) by threads that might not survive the fork. While paused,
-    a Service must not have any threads running that might interact with any non-private locks.
+    pantsd pauses all Services before forking a pantsd in order to ensure that no "relevant" locks
+    are held (or awaited: see #6565) by threads that might not survive the fork. While paused, a
+    Service must not have any threads running that might interact with any non-private locks.
 
-    After forking, the pantsd (child) process should call `terminate()` to finish shutting down
-    the service, and the parent process should call `resume()` to cause the service to resume running.
+    After forking, the pantsd (child) process should call `terminate()` to finish shutting down the
+    service, and the parent process should call `resume()` to cause the service to resume running.
     """
 
     class ServiceError(Exception):
@@ -74,12 +74,8 @@ class PantsService(ABC):
 class _ServiceState:
     """A threadsafe state machine for controlling a service running in another thread.
 
-    The state machine represents two stable states:
-      Running
-      Paused
-    And two transitional states:
-      Pausing
-      Terminating
+    The state machine represents two stable states:   Running   Paused And two transitional states:
+    Pausing   Terminating
 
     The methods of this class allow a caller to ask the Service to transition states, and then wait
     for those transitions to occur.
@@ -90,8 +86,8 @@ class _ServiceState:
 
     A complicating assumption is that while a service thread is `Paused`, it must be in a position
     where it could safely disappear and never come back. This is accounted for by having the service
-    thread wait on a Condition variable while Paused: testing indicates that for multiple Pythons
-    on both OSX and Linux, this does not result in poisoning of the associated Lock.
+    thread wait on a Condition variable while Paused: testing indicates that for multiple Pythons on
+    both OSX and Linux, this does not result in poisoning of the associated Lock.
     """
 
     _RUNNING = "Running"
@@ -114,8 +110,8 @@ class _ServiceState:
     def await_paused(self, timeout=None):
         """Blocks until the service is in the Paused state, then returns True.
 
-        If a timeout is specified, the method may return False to indicate a timeout: with no timeout
-        it will always (eventually) return True.
+        If a timeout is specified, the method may return False to indicate a timeout: with no
+        timeout it will always (eventually) return True.
 
         Raises if the service is not currently in the Pausing state.
         """
@@ -138,8 +134,8 @@ class _ServiceState:
     def maybe_pause(self, timeout=None):
         """Called by the service to indicate that it is pausable.
 
-        If the service calls this method while the state is `Pausing`, the state will transition
-        to `Paused`, and the service will block here until it is marked `Running` or `Terminating`.
+        If the service calls this method while the state is `Pausing`, the state will transition to
+        `Paused`, and the service will block here until it is marked `Running` or `Terminating`.
 
         If the state is not currently `Pausing`, and a timeout is not passed, this method returns
         immediately. If a timeout is passed, this method blocks up to that number of seconds to wait

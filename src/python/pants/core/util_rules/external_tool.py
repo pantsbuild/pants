@@ -228,8 +228,8 @@ class ExternalTool(Subsystem, ExportableTool, ExternalToolOptionsMixin, metaclas
 
         If the downloaded artifact is the executable itself, you can leave this unimplemented.
 
-        If the downloaded artifact is an archive, this should be overridden to provide a
-        relative path in the downloaded archive, e.g. `./bin/protoc`.
+        If the downloaded artifact is an archive, this should be overridden to provide a relative
+        path in the downloaded archive, e.g. `./bin/protoc`.
         """
         return f"./{self.generate_url(plat).rsplit('/', 1)[-1]}"
 

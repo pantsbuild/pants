@@ -65,8 +65,8 @@ class Config:
     ) -> Config:
         """Loads config from the given string payloads, with later payloads overriding earlier ones.
 
-        A handful of seed values, plus the values in the DEFAULT section, will be available for use in
-        substitutions.  The caller may override some of these seed values.
+        A handful of seed values, plus the values in the DEFAULT section, will be available for use
+        in substitutions.  The caller may override some of these seed values.
 
         If an `env` is supplied, it is exposed as `env` object available for interpolation via dot
         access of the environment variable names (e.g.: `env.HOME`).

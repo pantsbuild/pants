@@ -207,8 +207,8 @@ class ListValueComponent:
     A component consists of values to append and values to filter while constructing the final list.
 
     Each component may either replace or modify the preceding component.  So that, e.g., a config
-    file can append to and/or filter the default value list, instead of having to repeat most
-    of the contents of the default value list.
+    file can append to and/or filter the default value list, instead of having to repeat most of the
+    contents of the default value list.
     """
 
     REPLACE = "REPLACE"

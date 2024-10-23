@@ -46,11 +46,11 @@ class GenerateLockfile:
     """A union base for generating ecosystem-specific lockfiles.
 
     Each language ecosystem should set up a subclass of `GenerateLockfile`, like
-    `GeneratePythonLockfile` and `GenerateJVMLockfile`, and register a union rule. They should
-    also set up a simple rule that goes from that class -> `WrappedGenerateLockfile`.
+    `GeneratePythonLockfile` and `GenerateJVMLockfile`, and register a union rule. They should also
+    set up a simple rule that goes from that class -> `WrappedGenerateLockfile`.
 
-    Subclasses will usually want to add additional properties, such as what requirements to
-    install and Python interpreter constraints.
+    Subclasses will usually want to add additional properties, such as what requirements to install
+    and Python interpreter constraints.
     """
 
     resolve_name: str

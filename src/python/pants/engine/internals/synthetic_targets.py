@@ -122,8 +122,7 @@ class SyntheticTargetsRequest:
     SINGLE_REQUEST_FOR_ALL_TARGETS: ClassVar[str] = ""
 
     path: str = REQUEST_TARGETS_PER_DIRECTORY
-    """
-    The default field value is used to filter which paths to request targets for, and should be
+    """The default field value is used to filter which paths to request targets for, and should be
     declared as appropriate by union members subclassing `SyntheticTargetsRequest`. The
     SINGLE_REQUEST_FOR_ALL_TARGETS will make a single request for all targets at once, while
     REQUEST_TARGETS_PER_DIRECTORY will request all targets for a particular path at a time. Any

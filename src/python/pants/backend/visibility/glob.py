@@ -178,11 +178,11 @@ class TargetGlob:
     def __str__(self) -> str:
         """Full syntax:
 
-            <target-type>[path:target-name](tag-1, tag-2)
+        <target-type>[path:target-name](tag-1, tag-2)
 
         If no target-type nor tags:
 
-            path:target-name
+        path:target-name
         """
         type_ = f"<{self.type_}>" if self.type_ else ""
         name = f":{self.name}" if self.name else ""

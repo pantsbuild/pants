@@ -34,13 +34,13 @@ class AuxiliaryGoal(ABC, GoalSubsystem):
     Only a single auxiliary goal is executed per run, any remaining goals/arguments are passed
     unaltered to the auxiliary goal. Auxiliary goals have precedence over regular goals.
 
-    When multiple auxiliary goals are presented, the first auxiliary goal will be used unless there is a
-    auxiliary goal that begin with a hyphen (`-`), in which case the last such "option goal" will be
-    prioritized. This is to support things like `./pants some-builtin-goal --help`.
+    When multiple auxiliary goals are presented, the first auxiliary goal will be used unless there
+    is a auxiliary goal that begin with a hyphen (`-`), in which case the last such "option goal"
+    will be prioritized. This is to support things like `./pants some-builtin-goal --help`.
 
-    The intended use for this API is rule code which runs a server (for example, a BSP server)
-    which provides an alternate interface to the Pants rule engine, or other kinds of goals
-    which must run "outside" of the usual engine processing to function.
+    The intended use for this API is rule code which runs a server (for example, a BSP server) which
+    provides an alternate interface to the Pants rule engine, or other kinds of goals which must run
+    "outside" of the usual engine processing to function.
     """
 
     # Used by `pants.option.arg_splitter.ArgSplitter()` to optionally allow aliasing auxiliary goals.

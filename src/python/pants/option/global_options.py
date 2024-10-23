@@ -258,9 +258,9 @@ class AuthPluginResult:
     """The return type for a function specified via `[GLOBAL].remote_auth_plugin`.
 
     The returned `store_headers` and `execution_headers` will replace whatever headers Pants would
-    have used normally, e.g. what is set with `[GLOBAL].remote_store_headers`. This allows you to control
-    the merge strategy if your plugin sets conflicting headers. Usually, you will want to preserve
-    the `initial_store_headers` and `initial_execution_headers` passed to the plugin.
+    have used normally, e.g. what is set with `[GLOBAL].remote_store_headers`. This allows you to
+    control the merge strategy if your plugin sets conflicting headers. Usually, you will want to
+    preserve the `initial_store_headers` and `initial_execution_headers` passed to the plugin.
 
     If set, the returned `instance_name` will override `[GLOBAL].remote_instance_name`,
     `store_address` will override `[GLOBAL].remote_store_address`, and `execution_address` will
@@ -2003,9 +2003,9 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         """Validates an instance of global options for cases that are not prohibited via
         registration.
 
-        For example: mutually exclusive options may be registered by passing a `mutually_exclusive_group`,
-        but when multiple flags must be specified together, it can be necessary to specify post-parse
-        checks.
+        For example: mutually exclusive options may be registered by passing a
+        `mutually_exclusive_group`, but when multiple flags must be specified together, it can be
+        necessary to specify post-parse checks.
 
         Raises pants.option.errors.OptionsError on validation failure.
         """

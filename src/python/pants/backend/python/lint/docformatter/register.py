@@ -1,6 +1,5 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 """Python autoformatter for PEP257 docstring conventions.
 
 See https://www.pantsbuild.org/docs/python-linters-and-formatters and

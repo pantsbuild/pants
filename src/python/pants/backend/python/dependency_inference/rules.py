@@ -210,12 +210,7 @@ def _remove_ignored_imports(
 ) -> frozenset[str]:
     """Remove unowned imports given a list of paths to ignore.
 
-    E.g. having
-    ```
-    import foo.bar
-    from foo.bar import baz
-    import foo.barley
-    ```
+    E.g. having ``` import foo.bar from foo.bar import baz import foo.barley ```
 
     and passing `ignored-paths=["foo.bar"]`, only `foo.bar` and `foo.bar.baz` will be ignored.
     """

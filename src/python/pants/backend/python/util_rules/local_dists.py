@@ -135,7 +135,8 @@ class LocalDistsPex:
     `setup.py` / `pyproject.toml`, the dependencies will be included in the standard resolve process
     that the locally-built dists PEX is adjoined to via PEX_PATH. For hand-made `setup.py` /
     `pyproject.toml` with 3rdparty dependencies not hand-mirrored into BUILD file dependencies, this
-    will lead to issues. See https://github.com/pantsbuild/pants/issues/13587#issuecomment-974863636
+    will lead to issues. See
+    https://github.com/pantsbuild/pants/issues/13587#issuecomment-974863636
     for one way to fix this corner which is intentionally punted on for now.
 
     Lists the files provided by the dists on sys.path, so they can be subtracted from

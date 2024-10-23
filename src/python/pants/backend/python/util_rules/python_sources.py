@@ -25,16 +25,16 @@ from pants.util.logging import LogLevel
 class PythonSourceFiles:
     """Sources that can be introspected by Python, relative to a set of source roots.
 
-    Specifically, this will filter out to only have Python, and, optionally, resource and
-    file targets; and will add any missing `__init__.py` files to ensure that modules are
-    recognized correctly.
+    Specifically, this will filter out to only have Python, and, optionally, resource and file
+    targets; and will add any missing `__init__.py` files to ensure that modules are recognized
+    correctly.
 
-    Use-cases that introspect Python source code (e.g., the `test, `lint`, `fmt` goals) can
-    request this type to get relevant sources that are still relative to their source roots.
-    That way the paths they report are the unstripped ones the user is familiar with.
+    Use-cases that introspect Python source code (e.g., the `test, `lint`, `fmt` goals) can request
+    this type to get relevant sources that are still relative to their source roots. That way the
+    paths they report are the unstripped ones the user is familiar with.
 
-    The sources can also be imported and used by Python (e.g., for the `test` goal), but only
-    if sys.path is modified to include the source roots.
+    The sources can also be imported and used by Python (e.g., for the `test` goal), but only if
+    sys.path is modified to include the source roots.
     """
 
     source_files: SourceFiles

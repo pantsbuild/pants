@@ -26,12 +26,12 @@ class CompleteEnvironmentVars(FrozenDict):
     ) -> FrozenDict[str, str]:
         """Extract a subset of named env vars.
 
-        Given a list of extra environment variable specifiers as strings, filter the contents of
-        the Pants environment to only those variables.
+        Given a list of extra environment variable specifiers as strings, filter the contents of the
+        Pants environment to only those variables.
 
-        Each variable can be specified either as a name or as a name=value pair.
-        In the former case, the value for that name is taken from this env. In the latter
-        case the specified value overrides the value in this env.
+        Each variable can be specified either as a name or as a name=value pair. In the former case,
+        the value for that name is taken from this env. In the latter case the specified value
+        overrides the value in this env.
 
         If `allowed` is specified, the requested variable names must be in that list, or an error
         will be raised.
@@ -86,8 +86,8 @@ class EnvironmentVars(FrozenDict[str, str]):
     environment should use APIs from this module instead.
 
     Wherever possible, the `EnvironmentVars` type should be consumed rather than the
-    `CompleteEnvironmentVars`, as it represents a filtered/relevant subset of the environment, rather
-    than the entire unfiltered environment.
+    `CompleteEnvironmentVars`, as it represents a filtered/relevant subset of the environment,
+    rather than the entire unfiltered environment.
     """
 
 

@@ -150,9 +150,9 @@ class RunInSandboxRequest(RunRequest):
 
     Presently, implementors can opt to use the existing as not guaranteeing hermeticity, which will
     internally mark the rule as uncacheable. In such a case, non-safe APIs can be used, however,
-    this behavior can result in poorer performance, and only exists as a stop-gap while
-    implementors work to make sure their `RunRequest`-generating rules can be used in a hermetic
-    context, or writing new custom rules. (See the Plugin Upgrade Guide for details).
+    this behavior can result in poorer performance, and only exists as a stop-gap while implementors
+    work to make sure their `RunRequest`-generating rules can be used in a hermetic context, or
+    writing new custom rules. (See the Plugin Upgrade Guide for details).
     """
 
 

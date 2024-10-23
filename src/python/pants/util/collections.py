@@ -109,8 +109,8 @@ def partition_sequentially(
     """Stably partitions the given items into batches of around `size_target` items.
 
     The "stability" property refers to avoiding adjusting all batches when a single item is added,
-    which could happen if the items were trivially windowed using `itertools.islice` and an
-    item was added near the front of the list.
+    which could happen if the items were trivially windowed using `itertools.islice` and an item was
+    added near the front of the list.
 
     Batches will optionally be capped to `size_max`, but note that this can weaken the stability
     properties of the bucketing, by forcing bucket boundaries to be created where they otherwise

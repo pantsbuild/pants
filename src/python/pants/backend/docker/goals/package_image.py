@@ -152,12 +152,12 @@ class DockerPackageFieldSet(PackageFieldSet):
         separated with a colon. By introducing the image `ref` we can retain the use of `tag` for
         the version part of the image name.
 
-        This function returns all image refs to apply to the Docker image, grouped by
-        registry. Within each registry, the `tags` attribute contains a metadata about each tag in
-        the context of that registry, and the `full_name` attribute of each `ImageRefTag` provides
-        the image ref, of the following form:
+        This function returns all image refs to apply to the Docker image, grouped by registry.
+        Within each registry, the `tags` attribute contains a metadata about each tag in the context
+        of that registry, and the `full_name` attribute of each `ImageRefTag` provides the image
+        ref, of the following form:
 
-            [<registry>/]<repository-name>[:<tag>]
+        [<registry>/]<repository-name>[:<tag>]
 
         Where the `<repository-name>` may contain any number of separating slashes `/`, depending on
         the `default_repository` from configuration or the `repository` field on the target
