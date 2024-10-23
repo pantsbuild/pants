@@ -15,3 +15,6 @@ dc8227b9841a1057b6ca8629c430f072dd9a190f
 
 # This commit formatted all Rust code
 3632a66bc7918ace25c0aa6f05b4b6a4253d908e
+
+# This commit ran docformatter over the whole codebase.
+ce5abb018207202bf9b80583890a6d85dfc2be47
