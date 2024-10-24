@@ -13,6 +13,7 @@ from pants.backend.python.subsystems.python_native_code import PythonNativeCodeS
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex_environment
 from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexSubsystem
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import adhoc_binaries, external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
@@ -25,10 +26,13 @@ from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
+from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +42,21 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.11.0"
+    default_version = "v2.20.3"
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.3.0,<3.0"
+    version_constraints = ">=2.13.0,<3.0"
+
+    # extra args to be passed to the pex tool; note that they
+    # are going to apply to all invocations of the pex tool.
+    global_args = ArgsListOption(
+        example="--check=error --no-compile",
+        extra_help=softwrap(
+            """
+            Note that these apply to all invocations of the pex tool, including building `pex_binary`
+            targets, preparing `python_test` targets to run, and generating lockfiles.
+            """
+        ),
+    )
 
     @classproperty
     def default_known_versions(cls):
@@ -49,8 +65,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "554a3ad5d1662d93d06a7e65bf5444589d1956752df39e2665a4d54e1e05c949",
-                    "4181790",
+                    "0100c2e0b9e5dd56b063c98176cdd11b6064c2439d0faefdd3d25453393ed9fb",
+                    "4315782",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
@@ -123,6 +139,7 @@ async def setup_pex_cli_process(
     python_native_code: PythonNativeCodeSubsystem.EnvironmentAware,
     global_options: GlobalOptions,
     pex_subsystem: PexSubsystem,
+    pex_cli_subsystem: PexCli,
     python_setup: PythonSetup,
 ) -> Process:
     tmpdir = ".tmp"
@@ -179,6 +196,7 @@ async def setup_pex_cli_process(
         *warnings_args,
         *pip_version_args,
         *resolve_args,
+        *pex_cli_subsystem.global_args,
         # NB: This comes at the end because it may use `--` passthrough args, # which must come at
         # the end.
         *request.extra_args,
@@ -189,7 +207,7 @@ async def setup_pex_cli_process(
     env = {
         **complete_pex_env.environment_dict(python=bootstrap_python),
         **python_native_code.subprocess_env_vars,
-        **(request.extra_env or {}),
+        **(request.extra_env or {}),  # type: ignore[dict-item]
         # If a subcommand is used, we need to use the `pex3` console script.
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
     }
@@ -223,4 +241,5 @@ def rules():
         *external_tool.rules(),
         *pex_environment.rules(),
         *adhoc_binaries.rules(),
+        UnionRule(ExportableTool, PexCli),
     ]

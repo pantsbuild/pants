@@ -27,6 +27,7 @@ Created as part of the release process.
 + Bardur Arantsson
 + Bastian Wegge
 + Ben Limmer
++ Benjamin Dabelow
 + Benjy Weinberger
 + Berkay Öztürk
 + Bill Farner
@@ -69,6 +70,7 @@ Created as part of the release process.
 + Dan Harrison
 + Daniel Anderson
 + Daniel Bentley
++ Daniel Cavazos
 + Daniel Goldman
 + Daniel Moran
 + Daniel Peebles
@@ -76,6 +78,7 @@ Created as part of the release process.
 + Danny McClanahan
 + Dave Brewster
 + David Katz
++ David Singleton
 + David Taylor
 + David Turner
 + Derek Young
@@ -122,6 +125,7 @@ Created as part of the release process.
 + Guy Marom
 + Harley Cooper
 + HeetVekariya
++ Henri Parfait
 + Henry Fuller
 + Herbert Rusznak
 + Huon Wilson
@@ -194,6 +198,7 @@ Created as part of the release process.
 + Kevin Sweeney
 + Koki Nishihara
 + Kris Wilson
++ Krishna Vudata
 + Krishnan Chandra
 + Kushal Dave
 + Kyle Derr
@@ -248,6 +253,7 @@ Created as part of the release process.
 + Mohamed Abdi
 + Morten Hauge
 + Moses Nakamura
++ Muhammad Tsany Qudsi
 + Nadav Samet
 + Nathan Levesque
 + Navneeth Jayendran
@@ -332,6 +338,7 @@ Created as part of the release process.
 + Tom Dimiduk
 + Tom Dyas
 + Tom Howland
++ Tom Most
 + Tom Solberg
 + Tomasz Godzik
 + Tomasz Pasternak

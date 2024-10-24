@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from typing import Iterable
 
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.rules import Rule, collect_rules
 from pants.engine.unions import UnionRule
@@ -147,4 +148,5 @@ def rules() -> Iterable[Rule | UnionRule]:
         *collect_rules(),
         *CCSubsystem.rules(),
         *ExternalCCSubsystem.rules(),
+        UnionRule(ExportableTool, ExternalCCSubsystem),
     )

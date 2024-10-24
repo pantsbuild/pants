@@ -49,7 +49,7 @@ from pants.option.errors import (
     RegistrationError,
     UnknownFlagsError,
 )
-from pants.option.native_options import NativeOptionParser
+from pants.option.native_options import NativeOptionParser, check_dir_exists, check_file_exists
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.ranked_value import Rank, RankedValue
@@ -194,20 +194,44 @@ class Parser:
                 flag_value_map[key].append(flag_val)
             return flag_value_map
 
-    def parse_args_native(self, native_parser: NativeOptionParser) -> OptionValueContainer:
+    def parse_args_native(
+        self,
+        native_parser: NativeOptionParser,
+    ) -> OptionValueContainer:
         namespace = OptionValueContainerBuilder()
+        mutex_map = defaultdict(list)
         for args, kwargs in self._option_registrations:
             self._validate(args, kwargs)
             dest = self.parse_dest(*args, **kwargs)
             val, rank = native_parser.get(
                 scope=self.scope,
+                dest=dest,
                 flags=args,
                 default=kwargs.get("default"),
                 option_type=kwargs.get("type"),
                 member_type=kwargs.get("member_type"),
+                choices=kwargs.get("choices"),
                 passthrough=kwargs.get("passthrough"),
             )
+
+            # If the option is explicitly given, check mutual exclusion.
+            if rank > Rank.HARDCODED:
+                mutex_dest = kwargs.get("mutually_exclusive_group")
+                mutex_map_key = mutex_dest or dest
+                mutex_map[mutex_map_key].append(dest)
+                if len(mutex_map[mutex_map_key]) > 1:
+                    raise MutuallyExclusiveOptionError(
+                        softwrap(
+                            f"""
+                            Can only provide one of these mutually exclusive options in
+                            {self._scope_str(self.scope)}, but multiple given:
+                            {', '.join(mutex_map[mutex_map_key])}
+                            """
+                        )
+                    )
+
             setattr(namespace, dest, RankedValue(rank, val))
+
         return namespace.build()
 
     def parse_args(
@@ -738,29 +762,9 @@ class Parser:
                     )
                 )
             elif type_arg == file_option:
-                check_file_exists(val)
+                check_file_exists(val, dest, self._scope_str())
             elif type_arg == dir_option:
-                check_dir_exists(val)
-
-        def check_file_exists(val) -> None:
-            error_prefix = f"File value `{val}` for option `{dest}` in `{self._scope_str()}`"
-            try:
-                path = Path(val)
-                path_with_buildroot = Path(get_buildroot(), val)
-            except TypeError:
-                raise ParseError(f"{error_prefix} cannot be parsed as a file path.")
-            if not path.is_file() and not path_with_buildroot.is_file():
-                raise ParseError(f"{error_prefix} does not exist.")
-
-        def check_dir_exists(val) -> None:
-            error_prefix = f"Directory value `{val}` for option `{dest}` in `{self._scope_str()}`"
-            try:
-                path = Path(val)
-                path_with_buildroot = Path(get_buildroot(), val)
-            except TypeError:
-                raise ParseError(f"{error_prefix} cannot be parsed as a directory path.")
-            if not path.is_dir() and not path_with_buildroot.is_dir():
-                raise ParseError(f"{error_prefix} does not exist.")
+                check_dir_exists(val, dest, self._scope_str())
 
         # Validate the final value.
         final_val = value_history.final_value

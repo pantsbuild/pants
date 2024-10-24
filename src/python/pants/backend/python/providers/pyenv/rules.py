@@ -7,6 +7,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.pex import PythonProvider
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
+from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.run import RunRequest
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
@@ -320,4 +321,5 @@ def rules():
         *pex_rules(),
         *external_tools_rules(),
         UnionRule(PythonProvider, PyenvPythonProvider),
+        UnionRule(ExportableTool, PyenvPythonProviderSubsystem),
     )

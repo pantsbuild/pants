@@ -109,21 +109,20 @@ class ScalaArtifactsForVersionResult:
         return tuple(coords)
 
 
-@rule
-async def resolve_scala_artifacts_for_version(
-    request: ScalaArtifactsForVersionRequest,
+def _resolve_scala_artifacts_for_version(
+    scala_version: ScalaVersion,
 ) -> ScalaArtifactsForVersionResult:
-    if request.scala_version.major == 3:
+    if scala_version.major == 3:
         return ScalaArtifactsForVersionResult(
             compiler_coordinate=Coordinate(
                 group="org.scala-lang",
                 artifact="scala3-compiler_3",
-                version=str(request.scala_version),
+                version=str(scala_version),
             ),
             library_coordinate=Coordinate(
                 group="org.scala-lang",
                 artifact="scala3-library_3",
-                version=str(request.scala_version),
+                version=str(scala_version),
             ),
             reflect_coordinate=None,
             compiler_main="dotty.tools.dotc.Main",
@@ -134,21 +133,28 @@ async def resolve_scala_artifacts_for_version(
         compiler_coordinate=Coordinate(
             group="org.scala-lang",
             artifact="scala-compiler",
-            version=str(request.scala_version),
+            version=str(scala_version),
         ),
         library_coordinate=Coordinate(
             group="org.scala-lang",
             artifact="scala-library",
-            version=str(request.scala_version),
+            version=str(scala_version),
         ),
         reflect_coordinate=Coordinate(
             group="org.scala-lang",
             artifact="scala-reflect",
-            version=str(request.scala_version),
+            version=str(scala_version),
         ),
         compiler_main="scala.tools.nsc.Main",
         repl_main="scala.tools.nsc.MainGenericRunner",
     )
+
+
+@rule
+async def resolve_scala_artifacts_for_version(
+    request: ScalaArtifactsForVersionRequest,
+) -> ScalaArtifactsForVersionResult:
+    return _resolve_scala_artifacts_for_version(request.scala_version)
 
 
 def rules():

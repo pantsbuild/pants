@@ -104,6 +104,12 @@ def replace_url(monkeypatch):
             "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
             DownloadS3SchemeURL,
         ),
+        (
+            "s3://bucket/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            DownloadS3SchemeURL,
+        ),
         # Path-style
         (
             "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt",

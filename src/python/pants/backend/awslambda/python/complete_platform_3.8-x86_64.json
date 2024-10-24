@@ -513,9 +513,9 @@
     "os_name": "posix",
     "platform_machine": "x86_64",
     "platform_python_implementation": "CPython",
-    "platform_release": "6.6.12-linuxkit",
+    "platform_release": "5.15.0-1052-aws",
     "platform_system": "Linux",
-    "platform_version": "#1 SMP Fri Jan 19 08:53:17 UTC 2024",
+    "platform_version": "#57~20.04.1-Ubuntu SMP Mon Jan 15 17:04:56 UTC 2024",
     "python_full_version": "3.8.19",
     "python_version": "3.8",
     "sys_platform": "linux"

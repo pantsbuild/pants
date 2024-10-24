@@ -7,6 +7,7 @@ import re
 from enum import Enum
 
 from pants.backend.adhoc.target_types import (
+    AdhocToolCacheScopeField,
     AdhocToolDependenciesField,
     AdhocToolExecutionDependenciesField,
     AdhocToolExtraEnvVarsField,
@@ -16,6 +17,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
+    AdhocToolOutputsMatchMode,
     AdhocToolPathEnvModifyModeField,
     AdhocToolRunnableDependenciesField,
     AdhocToolTimeoutField,
@@ -389,6 +391,14 @@ class ShellCommandPathEnvModifyModeField(AdhocToolPathEnvModifyModeField):
     pass
 
 
+class ShellCommandOutputsMatchMode(AdhocToolOutputsMatchMode):
+    pass
+
+
+class ShellCommandCacheScopeField(AdhocToolCacheScopeField):
+    pass
+
+
 class SkipShellCommandTestsField(BoolField):
     alias = "skip_tests"
     default = False
@@ -415,6 +425,8 @@ class ShellCommandTarget(Target):
         ShellCommandOutputRootDirField,
         ShellCommandWorkspaceInvalidationSourcesField,
         ShellCommandPathEnvModifyModeField,
+        ShellCommandOutputsMatchMode,
+        ShellCommandCacheScopeField,
         EnvironmentField,
     )
     help = help_text(

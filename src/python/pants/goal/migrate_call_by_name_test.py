@@ -178,9 +178,9 @@ def test_fix_implicitly_usage_removes_unneeded(source: str, target: str, expecte
             "digest_to_snapshot(**implicitly(DigestSubset(config_files.snapshot.digest, PathGlobs([config_file]))))",
         ),
         (
-            "process_request_to_process_result(VenvPexProcess(arg1, arg2, arg3), **implicitly())",
-            "async def process_request_to_process_result(process: Process, process_execution_environment: ProcessExecutionEnvironment) -> FallibleProcessResult: ...",
-            "process_request_to_process_result(**implicitly(VenvPexProcess(arg1, arg2, arg3)))",
+            "execute_process(VenvPexProcess(arg1, arg2, arg3), **implicitly())",
+            "async def execute_process(process: Process, process_execution_environment: ProcessExecutionEnvironment) -> FallibleProcessResult: ...",
+            "execute_process(**implicitly(VenvPexProcess(arg1, arg2, arg3)))",
         ),
     ],
 )

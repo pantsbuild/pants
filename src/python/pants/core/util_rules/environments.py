@@ -585,6 +585,22 @@ class EnvironmentTarget:
         else:
             return ProcessCacheScope.SUCCESSFUL
 
+    @property
+    def use_working_directory_as_base_for_output_captures(self) -> bool:
+        if self.val and self.val.has_field(LocalWorkspaceCompatiblePlatformsField):
+            return False
+        return True
+
+    @property
+    def can_use_system_path_metadata_requests(self) -> bool:
+        tgt = self.val
+        if not tgt:
+            return True
+
+        return tgt.has_field(LocalCompatiblePlatformsField) or tgt.has_field(
+            LocalWorkspaceCompatiblePlatformsField
+        )
+
 
 def _compute_env_field(field_set: FieldSet) -> EnvironmentField:
     for attr in dir(field_set):

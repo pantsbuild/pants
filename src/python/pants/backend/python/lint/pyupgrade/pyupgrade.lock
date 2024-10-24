@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<4,>=3.7"
+//     "CPython<4,>=3.8"
 //   ],
 //   "generated_with_requirements": [
 //     "pyupgrade<4,>=2.33.0"
@@ -24,6 +24,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "excluded": [],
   "locked_resolves": [
     {
       "locked_requirements": [
@@ -31,39 +32,39 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c05b82c911934b3a638b29f48f48dc6e0ef6c57c55ec36f2b41ae9dbf6711b4b",
-              "url": "https://files.pythonhosted.org/packages/0b/7f/db8aa59a00d63567bc1134c22536bc96a1718d81d06c51dd33adb965066a/pyupgrade-3.3.2-py2.py3-none-any.whl"
+              "hash": "08d0e6129f5e9da7e7a581bdbea689e0d49c3c93eeaf156a07ae2fd794f52660",
+              "url": "https://files.pythonhosted.org/packages/5e/bd/793d8a359e534ed77326858c2c7182037a2a8fd446828688b9c48c9983d4/pyupgrade-3.8.0-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "bcfed63d38811809f179fd269dec246680b0aaa5bbe662b535826e5fa2275219",
-              "url": "https://files.pythonhosted.org/packages/13/15/21fcc8a1d212e22c3aee9a9e2696bc7e898390edffb4617e2cf6d04838f6/pyupgrade-3.3.2.tar.gz"
+              "hash": "1facb0b8407cca468dfcc1d13717e3a85aa37b9e6e7338664ad5bfe5ef50c867",
+              "url": "https://files.pythonhosted.org/packages/fc/de/b89bb5af97a3712407db232b8a43eaf8d19657cdb5740cde22650bb182d9/pyupgrade-3.8.0.tar.gz"
             }
           ],
           "project_name": "pyupgrade",
           "requires_dists": [
             "tokenize-rt>=3.2.0"
           ],
-          "requires_python": ">=3.7",
-          "version": "3.3.2"
+          "requires_python": ">=3.8",
+          "version": "3.8.0"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c67772c662c6b3dc65edf66808577968fb10badfc2042e3027196bed4daf9e5a",
-              "url": "https://files.pythonhosted.org/packages/8d/12/4c7495f25b4c9131706f3aaffb185d4de32c02a6ee49d875e929c5b7c919/tokenize_rt-5.0.0-py2.py3-none-any.whl"
+              "hash": "d4ff7ded2873512938b4f8cbb98c9b07118f01d30ac585a30d7a88353ca36d22",
+              "url": "https://files.pythonhosted.org/packages/5c/c2/44486862562c6902778ccf88001ad5ea3f8da5c030c638cac8be72f65b40/tokenize_rt-6.0.0-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3160bc0c3e8491312d0485171dea861fc160a240f5f5766b72a1165408d10740",
-              "url": "https://files.pythonhosted.org/packages/40/01/fb40ea8c465f680bf7aa3f5bee39c62ba8b7f52c38048c27aa95aff4f779/tokenize_rt-5.0.0.tar.gz"
+              "hash": "b9711bdfc51210211137499b5e355d3de5ec88a85d2025c520cbb921b5194367",
+              "url": "https://files.pythonhosted.org/packages/7d/09/6257dabdeab5097d72c5d874f29b33cd667ec411af6667922d84f85b79b5/tokenize_rt-6.0.0.tar.gz"
             }
           ],
           "project_name": "tokenize-rt",
           "requires_dists": [],
-          "requires_python": ">=3.7",
-          "version": "5.0.0"
+          "requires_python": ">=3.8",
+          "version": "6.0.0"
         }
       ],
       "platform_tag": null
@@ -71,15 +72,16 @@
   ],
   "only_builds": [],
   "only_wheels": [],
+  "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.2.1",
-  "pip_version": "24.0",
+  "pex_version": "2.16.2",
+  "pip_version": "24.2",
   "prefer_older_binary": false,
   "requirements": [
     "pyupgrade<4,>=2.33.0"
   ],
   "requires_python": [
-    "<4,>=3.7"
+    "<4,>=3.8"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

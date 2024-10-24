@@ -226,7 +226,7 @@ class PutativeTarget:
         return dataclasses.replace(
             self,
             owned_sources=owned_sources,
-            kwargs={**self.kwargs, "sources": owned_sources},
+            kwargs=FrozenDict({**self.kwargs, "sources": owned_sources}),
         )
 
     def add_comments(self, comments: Iterable[str]) -> PutativeTarget:
@@ -246,7 +246,7 @@ class PutativeTarget:
         if self.kwargs or has_name:
             _kwargs = {
                 **({"name": self.name} if has_name else {}),
-                **self.kwargs,  # type: ignore[arg-type]
+                **self.kwargs,
             }
             _kwargs_str_parts = [f"\n{indent}{k}={fmt_val(v)}" for k, v in _kwargs.items()]
             kwargs_str = ",".join(_kwargs_str_parts) + ",\n"

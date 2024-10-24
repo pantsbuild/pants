@@ -22,7 +22,7 @@ use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use futures::{try_join, FutureExt, TryFutureExt};
 use log::{debug, info};
 use nails::execution::ExitCode;
-use shell_quote::bash;
+use shell_quote::Bash;
 use store::{
     ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, StoreError,
     WorkdirSymlink,
@@ -758,7 +758,7 @@ pub fn setup_run_sh_script(
 ) -> Result<(), String> {
     let mut env_var_strings: Vec<String> = vec![];
     for (key, value) in env.iter() {
-        let quoted_arg = bash::escape(value);
+        let quoted_arg = Bash::quote_vec(value.as_str());
         let arg_str = str::from_utf8(&quoted_arg)
             .map_err(|e| format!("{e:?}"))?
             .to_string();
@@ -770,7 +770,7 @@ pub fn setup_run_sh_script(
     // Shell-quote every command-line argument, as necessary.
     let mut full_command_line: Vec<String> = vec![];
     for arg in argv.iter() {
-        let quoted_arg = bash::escape(arg);
+        let quoted_arg = Bash::quote_vec(arg.as_str());
         let arg_str = str::from_utf8(&quoted_arg)
             .map_err(|e| format!("{e:?}"))?
             .to_string();
@@ -783,7 +783,7 @@ pub fn setup_run_sh_script(
         } else {
             workdir_path.to_owned()
         };
-        let quoted_cwd = bash::escape(cwd);
+        let quoted_cwd = Bash::quote_vec(cwd.as_os_str());
         str::from_utf8(&quoted_cwd)
             .map_err(|e| format!("{e:?}"))?
             .to_string()

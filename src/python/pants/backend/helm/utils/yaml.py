@@ -159,7 +159,7 @@ class MutableYamlIndex(Generic[T]):
     def frozen(self) -> FrozenYamlIndex[T]:
         """Transforms this collection into a frozen (immutable) one."""
 
-        return FrozenYamlIndex(self)
+        return FrozenYamlIndex.create(self)
 
 
 @dataclass(frozen=True)
@@ -190,7 +190,8 @@ class FrozenYamlIndex(Generic[T]):
 
     _data: FrozenDict[PurePath, Collection[_YamlDocumentIndexNode[T]]]
 
-    def __init__(self, other: MutableYamlIndex[T]) -> None:
+    @classmethod
+    def create(cls, other: MutableYamlIndex[T]) -> FrozenYamlIndex[T]:
         data: dict[PurePath, Collection[_YamlDocumentIndexNode[T]]] = {}
         for file_path, doc_index in other._data.items():
             max_index = max(doc_index.keys())
@@ -202,7 +203,11 @@ class FrozenYamlIndex(Generic[T]):
                 doc_list[idx] = _YamlDocumentIndexNode(paths=FrozenDict(item_map))
 
             data[file_path] = Collection(doc_list)
-        object.__setattr__(self, "_data", FrozenDict(data))
+        return FrozenYamlIndex(_data=FrozenDict(data))
+
+    @classmethod
+    def empty(cls: type[FrozenYamlIndex[T]]) -> FrozenYamlIndex[T]:
+        return FrozenYamlIndex[T](_data=FrozenDict())
 
     def transform_values(self, func: Callable[[T], Optional[R]]) -> FrozenYamlIndex[R]:
         """Transforms the values of the given indexed collection into those that are returned from

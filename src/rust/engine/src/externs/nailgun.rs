@@ -9,14 +9,14 @@ use pyo3::types::PyDict;
 use crate::externs::scheduler::PyExecutor;
 use task_executor::Executor;
 
-pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "PantsdConnectionException",
-        py.get_type::<PantsdConnectionException>(),
+        py.get_type_bound::<PantsdConnectionException>(),
     )?;
     m.add(
         "PantsdClientException",
-        py.get_type::<PantsdClientException>(),
+        py.get_type_bound::<PantsdClientException>(),
     )?;
     m.add_class::<PyNailgunClient>()?;
     Ok(())
@@ -34,10 +34,10 @@ struct PyNailgunClient {
 #[pymethods]
 impl PyNailgunClient {
     #[new]
-    fn __new__(port: u16, py_executor: &PyExecutor) -> Self {
+    fn __new__(port: u16, py_executor: &Bound<'_, PyExecutor>) -> Self {
         Self {
             port,
-            executor: py_executor.0.clone(),
+            executor: py_executor.borrow().0.clone(),
         }
     }
 
@@ -45,7 +45,7 @@ impl PyNailgunClient {
         &self,
         command: String,
         args: Vec<String>,
-        env: &PyDict,
+        env: &Bound<'_, PyDict>,
         py: Python,
     ) -> PyResult<i32> {
         use nailgun::NailgunClientError;

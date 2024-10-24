@@ -14,18 +14,19 @@ from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import (
     GatherConfigFilesByDirectoriesRequest,
-    GatheredConfigFilesByDirectories,
+    gather_config_files_by_workspace_dir,
 )
 from pants.core.util_rules.partitions import Partition
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import digest_to_snapshot, merge_digests
+from pants.engine.process import execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
-from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
@@ -82,16 +83,15 @@ async def partition_scalafmt(
 
     filepaths = tuple(field_set.source.file_path for field_set in request.field_sets)
     lockfile_request = GenerateJvmLockfileFromTool.create(tool)
-    tool_classpath, config_files = await MultiGet(
-        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
-        Get(
-            GatheredConfigFilesByDirectories,
+    tool_classpath, config_files = await concurrently(
+        materialize_classpath_for_tool(ToolClasspathRequest(lockfile=lockfile_request)),
+        gather_config_files_by_workspace_dir(
             GatherConfigFilesByDirectoriesRequest(
                 tool_name=tool.name,
                 config_filename=tool.config_file_name,
                 filepaths=filepaths,
                 orphan_filepath_behavior=tool.orphan_files_behavior,
-            ),
+            )
         ),
     )
 
@@ -107,8 +107,10 @@ async def partition_scalafmt(
             os.path.join(source_dir, name) for name in files_in_source_dir
         )
 
-    config_file_snapshots = await MultiGet(
-        Get(Snapshot, DigestSubset(config_files.snapshot.digest, PathGlobs([config_file])))
+    config_file_snapshots = await concurrently(
+        digest_to_snapshot(
+            **implicitly(DigestSubset(config_files.snapshot.digest, PathGlobs([config_file])))
+        )
         for config_file in source_files_by_config_file
     )
 
@@ -132,33 +134,32 @@ async def scalafmt_fmt(
     request: ScalafmtRequest.Batch, jdk: InternalJdk, tool: ScalafmtSubsystem
 ) -> FmtResult:
     partition_info = cast(PartitionInfo, request.partition_metadata)
-    merged_digest = await Get(
-        Digest,
-        MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest]),
+    merged_digest = await merge_digests(
+        MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest])
     )
 
-    result = await Get(
-        ProcessResult,
-        JvmProcess(
-            jdk=jdk,
-            argv=[
-                "org.scalafmt.cli.Cli",
-                f"--config={partition_info.config_snapshot.files[0]}",
-                "--non-interactive",
-                *request.files,
-            ],
-            classpath_entries=partition_info.classpath_entries,
-            input_digest=merged_digest,
-            output_files=request.files,
-            extra_jvm_options=tool.jvm_options,
-            extra_immutable_input_digests=partition_info.extra_immutable_input_digests,
-            # extra_nailgun_keys=request.extra_immutable_input_digests,
-            use_nailgun=False,
-            description=f"Run `scalafmt` on {pluralize(len(request.files), 'file')}.",
-            level=LogLevel.DEBUG,
-        ),
+    result = await execute_process_or_raise(
+        **implicitly(
+            JvmProcess(
+                jdk=jdk,
+                argv=[
+                    "org.scalafmt.cli.Cli",
+                    f"--config={partition_info.config_snapshot.files[0]}",
+                    "--non-interactive",
+                    *request.files,
+                ],
+                classpath_entries=partition_info.classpath_entries,
+                input_digest=merged_digest,
+                output_files=request.files,
+                extra_jvm_options=tool.jvm_options,
+                extra_immutable_input_digests=partition_info.extra_immutable_input_digests,
+                # extra_nailgun_keys=request.extra_immutable_input_digests,
+                use_nailgun=False,
+                description=f"Run `scalafmt` on {pluralize(len(request.files), 'file')}.",
+                level=LogLevel.DEBUG,
+            ),
+        )
     )
-
     return await FmtResult.create(request, result)
 
 

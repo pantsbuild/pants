@@ -1,7 +1,6 @@
 // Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 
@@ -12,7 +11,9 @@ use options::{
 
 use std::collections::HashMap;
 
-pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+pyo3::import_exception!(pants.option.errors, ParseError);
+
+pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyOptionId>()?;
     m.add_class::<PyConfigSource>()?;
     m.add_class::<PyOptionParser>()?;
@@ -26,14 +27,14 @@ fn val_to_py_object(py: Python, val: &Val) -> PyResult<PyObject> {
         Val::Float(f) => f.into_py(py),
         Val::String(s) => s.into_py(py),
         Val::List(list) => {
-            let pylist = PyList::empty(py);
+            let pylist = PyList::empty_bound(py);
             for m in list {
                 pylist.append(val_to_py_object(py, m)?)?;
             }
             pylist.into_py(py)
         }
         Val::Dict(dict) => {
-            let pydict = PyDict::new(py);
+            let pydict = PyDict::new_bound(py);
             for (k, v) in dict {
                 pydict.set_item(k.into_py(py), val_to_py_object(py, v)?)?;
             }
@@ -43,7 +44,7 @@ fn val_to_py_object(py: Python, val: &Val) -> PyResult<PyObject> {
     Ok(res)
 }
 
-pub(crate) fn py_object_to_val(obj: &PyAny) -> Result<Val, PyErr> {
+pub(crate) fn py_object_to_val(obj: &Bound<'_, PyAny>) -> Result<Val, PyErr> {
     // TODO: If this is_instance_of chain shows up as significant in CPU profiles,
     //  we can use a lookup table of PyTypeObject -> conversion func instead.
     //  Alternatively, we could type-parameterize DictEdit to create a variant that contains
@@ -69,7 +70,7 @@ pub(crate) fn py_object_to_val(obj: &PyAny) -> Result<Val, PyErr> {
             obj.downcast::<PyDict>()?
                 .iter()
                 .map(|(k, v)| {
-                    Ok::<(String, Val), PyErr>((k.extract::<String>()?, py_object_to_val(v)?))
+                    Ok::<(String, Val), PyErr>((k.extract::<String>()?, py_object_to_val(&v)?))
                 })
                 .collect::<Result<HashMap<_, _>, _>>()?,
         ))
@@ -77,18 +78,18 @@ pub(crate) fn py_object_to_val(obj: &PyAny) -> Result<Val, PyErr> {
         Ok(Val::List(
             obj.downcast::<PyList>()?
                 .iter()
-                .map(py_object_to_val)
+                .map(|v| py_object_to_val(&v))
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     } else if obj.is_instance_of::<PyTuple>() {
         Ok(Val::List(
             obj.downcast::<PyTuple>()?
                 .iter()
-                .map(py_object_to_val)
+                .map(|v| py_object_to_val(&v))
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     } else {
-        Err(PyValueError::new_err(format!(
+        Err(ParseError::new_err(format!(
             "Unsupported Python type in option default: {}",
             obj.get_type().name()?
         )))
@@ -102,7 +103,11 @@ struct PyOptionId(OptionId);
 impl PyOptionId {
     #[new]
     #[pyo3(signature = (*components, scope = None, switch = None))]
-    fn __new__(components: &PyTuple, scope: Option<&str>, switch: Option<&str>) -> PyResult<Self> {
+    fn __new__(
+        components: &Bound<'_, PyTuple>,
+        scope: Option<&str>,
+        switch: Option<&str>,
+    ) -> PyResult<Self> {
         let components = components
             .iter()
             .map(|c| c.extract::<String>())
@@ -112,14 +117,14 @@ impl PyOptionId {
             Some(switch) if switch.len() == 1 => switch.chars().next(),
             None => None,
             Some(s) => {
-                return Err(PyValueError::new_err(format!(
+                return Err(ParseError::new_err(format!(
                     "Switch value should contain a single character, but was: {}",
                     s
                 )))
             }
         };
         let option_id =
-            OptionId::new(scope, components.into_iter(), switch).map_err(PyValueError::new_err)?;
+            OptionId::new(scope, components.into_iter(), switch).map_err(ParseError::new_err)?;
         Ok(Self(option_id))
     }
 }
@@ -144,7 +149,7 @@ struct PyOptionParser(OptionParser);
 type RankedVal<T> = (T, isize);
 
 fn to_py<T>(res: Result<OptionalOptionValue<T>, String>) -> PyResult<RankedVal<Option<T>>> {
-    let val = res.map_err(PyException::new_err)?;
+    let val = res.map_err(ParseError::new_err)?;
     Ok((val.value, val.source.rank() as isize))
 }
 
@@ -152,7 +157,7 @@ fn to_py<T>(res: Result<OptionalOptionValue<T>, String>) -> PyResult<RankedVal<O
 impl PyOptionParser {
     fn get_list<T: ToOwned + ?Sized>(
         &self,
-        option_id: &PyOptionId,
+        option_id: &Bound<'_, PyOptionId>,
         default: Vec<T::Owned>,
         getter: fn(
             &OptionParser,
@@ -160,7 +165,8 @@ impl PyOptionParser {
             Vec<T::Owned>,
         ) -> Result<ListOptionValue<T::Owned>, String>,
     ) -> PyResult<(Vec<T::Owned>, isize)> {
-        let opt_val = getter(&self.0, &option_id.0, default).map_err(PyException::new_err)?;
+        let opt_val =
+            getter(&self.0, &option_id.borrow().0, default).map_err(ParseError::new_err)?;
         Ok((opt_val.value, opt_val.source.rank() as isize))
     }
 }
@@ -169,10 +175,10 @@ impl PyOptionParser {
 impl PyOptionParser {
     #[new]
     #[pyo3(signature = (args, env, configs, allow_pantsrc))]
-    fn __new__(
+    fn __new__<'py>(
         args: Vec<String>,
-        env: &PyDict,
-        configs: Option<Vec<PyRef<PyConfigSource>>>,
+        env: &Bound<'py, PyDict>,
+        configs: Option<Vec<Bound<'py, PyConfigSource>>>,
         allow_pantsrc: bool,
     ) -> PyResult<Self> {
         let env = env
@@ -184,50 +190,54 @@ impl PyOptionParser {
         let option_parser = OptionParser::new(
             Args::new(args),
             Env::new(env),
-            configs.map(|cs| cs.iter().map(|c| c.0.clone()).collect()),
+            configs.map(|cs| cs.iter().map(|c| c.borrow().0.clone()).collect()),
             allow_pantsrc,
             false,
             None,
         )
-        .map_err(PyValueError::new_err)?;
+        .map_err(ParseError::new_err)?;
         Ok(Self(option_parser))
     }
 
+    #[pyo3(signature = (option_id, default))]
     fn get_bool(
         &self,
-        option_id: &PyOptionId,
+        option_id: &Bound<'_, PyOptionId>,
         default: Option<bool>,
     ) -> PyResult<RankedVal<Option<bool>>> {
-        to_py(self.0.parse_bool_optional(&option_id.0, default))
+        to_py(self.0.parse_bool_optional(&option_id.borrow().0, default))
     }
 
+    #[pyo3(signature = (option_id, default))]
     fn get_int(
         &self,
-        option_id: &PyOptionId,
+        option_id: &Bound<'_, PyOptionId>,
         default: Option<i64>,
     ) -> PyResult<RankedVal<Option<i64>>> {
-        to_py(self.0.parse_int_optional(&option_id.0, default))
+        to_py(self.0.parse_int_optional(&option_id.borrow().0, default))
     }
 
+    #[pyo3(signature = (option_id, default))]
     fn get_float(
         &self,
-        option_id: &PyOptionId,
+        option_id: &Bound<'_, PyOptionId>,
         default: Option<f64>,
     ) -> PyResult<RankedVal<Option<f64>>> {
-        to_py(self.0.parse_float_optional(&option_id.0, default))
+        to_py(self.0.parse_float_optional(&option_id.borrow().0, default))
     }
 
+    #[pyo3(signature = (option_id, default))]
     fn get_string(
         &self,
-        option_id: &PyOptionId,
+        option_id: &Bound<'_, PyOptionId>,
         default: Option<&str>,
     ) -> PyResult<RankedVal<Option<String>>> {
-        to_py(self.0.parse_string_optional(&option_id.0, default))
+        to_py(self.0.parse_string_optional(&option_id.borrow().0, default))
     }
 
     fn get_bool_list(
         &self,
-        option_id: &PyOptionId,
+        option_id: &Bound<'_, PyOptionId>,
         default: Vec<bool>,
     ) -> PyResult<RankedVal<Vec<bool>>> {
         self.get_list::<bool>(option_id, default, |op, oid, def| {
@@ -237,7 +247,7 @@ impl PyOptionParser {
 
     fn get_int_list(
         &self,
-        option_id: &PyOptionId,
+        option_id: &Bound<'_, PyOptionId>,
         default: Vec<i64>,
     ) -> PyResult<RankedVal<Vec<i64>>> {
         self.get_list::<i64>(option_id, default, |op, oid, def| {
@@ -247,7 +257,7 @@ impl PyOptionParser {
 
     fn get_float_list(
         &self,
-        option_id: &PyOptionId,
+        option_id: &Bound<'_, PyOptionId>,
         default: Vec<f64>,
     ) -> PyResult<RankedVal<Vec<f64>>> {
         self.get_list::<f64>(option_id, default, |op, oid, def| {
@@ -257,7 +267,7 @@ impl PyOptionParser {
 
     fn get_string_list(
         &self,
-        option_id: &PyOptionId,
+        option_id: &Bound<'_, PyOptionId>,
         default: Vec<String>,
     ) -> PyResult<RankedVal<Vec<String>>> {
         self.get_list::<String>(option_id, default, |op, oid, def| {
@@ -268,21 +278,21 @@ impl PyOptionParser {
     fn get_dict(
         &self,
         py: Python,
-        option_id: &PyOptionId,
-        default: &PyDict,
+        option_id: &Bound<'_, PyOptionId>,
+        default: &Bound<'_, PyDict>,
     ) -> PyResult<RankedVal<HashMap<String, PyObject>>> {
         let default = default
             .items()
             .into_iter()
             .map(|kv_pair| {
-                let (k, v) = kv_pair.extract::<(String, &PyAny)>()?;
-                Ok::<(String, Val), PyErr>((k, py_object_to_val(v)?))
+                let (k, v) = kv_pair.extract::<(String, Bound<'_, PyAny>)>()?;
+                Ok::<(String, Val), PyErr>((k, py_object_to_val(&v)?))
             })
             .collect::<Result<HashMap<_, _>, _>>()?;
         let opt_val = self
             .0
-            .parse_dict(&option_id.0, default)
-            .map_err(PyException::new_err)?;
+            .parse_dict(&option_id.borrow().0, default)
+            .map_err(ParseError::new_err)?;
         let opt_val_py = opt_val
             .value
             .into_iter()
@@ -296,5 +306,19 @@ impl PyOptionParser {
 
     fn get_passthrough_args(&self) -> PyResult<Option<Vec<String>>> {
         Ok(self.0.get_passthrough_args().cloned())
+    }
+
+    fn get_unconsumed_flags(&self) -> HashMap<String, Vec<String>> {
+        // The python side expects an empty string to represent the GLOBAL scope.
+        self.0
+            .get_unconsumed_flags()
+            .into_iter()
+            .map(|(k, v)| {
+                (
+                    (if k.name() == "GLOBAL" { "" } else { k.name() }).to_string(),
+                    v,
+                )
+            })
+            .collect()
     }
 }

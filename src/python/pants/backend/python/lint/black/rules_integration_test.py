@@ -13,7 +13,6 @@ from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.lint.black.subsystem import Black, BlackFieldSet
 from pants.backend.python.lint.black.subsystem import rules as black_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.fmt import FmtResult, Partitions
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -76,6 +75,7 @@ def run_black(
         env_inherit={"PATH", "PYENV_ROOT", "HOME", "LANG", "LC_ALL"},
     )
     field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
+
     input_sources = rule_runner.request(
         SourceFiles,
         [
@@ -90,7 +90,6 @@ def run_black(
     )
     assert len(partitions) == 1
     partition = partitions[0]
-    assert partition.metadata == InterpreterConstraints([expected_ics])
     fmt_result = rule_runner.request(
         FmtResult,
         [

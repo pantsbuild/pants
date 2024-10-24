@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import PurePath
 
+from pants.backend.codegen.protobuf import protoc
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.python.additional_fields import PythonSourceRootField
 from pants.backend.codegen.protobuf.python.grpc_python_plugin import GrpcPythonPlugin
@@ -17,6 +18,7 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexResolveInfo, VenvPex, VenvPexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -245,4 +247,6 @@ def rules():
         *collect_rules(),
         *pex.rules(),
         UnionRule(GenerateSourcesRequest, GeneratePythonFromProtobufRequest),
+        *protoc.rules(),
+        UnionRule(ExportableTool, GrpcPythonPlugin),
     ]

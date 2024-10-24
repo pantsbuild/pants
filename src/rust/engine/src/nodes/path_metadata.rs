@@ -1,12 +1,12 @@
 // Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use deepsize::DeepSizeOf;
 use graph::CompoundNode;
 
-use super::{NodeKey, NodeOutput, NodeResult};
+use super::{NodeKey, NodeOutput, NodeResult, SubjectPath};
 use crate::context::Context;
 use crate::python::throw;
 
@@ -15,24 +15,28 @@ use crate::python::throw;
 ///
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct PathMetadata {
-    path: PathBuf,
+    pub(super) subject_path: SubjectPath,
 }
 
 impl PathMetadata {
-    pub fn new(path: PathBuf) -> Self {
-        Self { path }
+    pub fn new(subject_path: SubjectPath) -> Result<Self, String> {
+        Ok(Self { subject_path })
     }
 
     pub fn path(&self) -> &Path {
-        &self.path
+        match &self.subject_path {
+            SubjectPath::Workspace(relpath) => relpath.as_path(),
+            SubjectPath::LocalSystem(path) => path,
+        }
     }
 
     pub(super) async fn run_node(self, context: Context) -> NodeResult<Option<fs::PathMetadata>> {
-        let node = self;
-        context
-            .core
-            .vfs
-            .path_metadata(node.path.clone())
+        let (vfs, path) = match &self.subject_path {
+            SubjectPath::Workspace(relpath) => (&context.core.vfs, relpath.as_path()),
+            SubjectPath::LocalSystem(path) => (&context.core.vfs_system, path.as_path()),
+        };
+
+        vfs.path_metadata(path.to_path_buf())
             .await
             .map_err(|e| throw(format!("{e}")))
     }

@@ -11,6 +11,7 @@ use pyo3::basic::CompareOp;
 use pyo3::create_exception;
 use pyo3::exceptions::{PyAssertionError, PyException};
 use pyo3::prelude::*;
+use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyDict, PyFrozenSet, PyType};
 
 use fnv::FnvHasher;
@@ -23,29 +24,32 @@ create_exception!(native_engine, InvalidTargetNameError, InvalidAddressError);
 create_exception!(native_engine, InvalidParametersError, InvalidAddressError);
 create_exception!(native_engine, UnsupportedWildcardError, InvalidAddressError);
 
-pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(address_spec_parse, m)?)?;
 
     m.add(
         "AddressParseException",
-        py.get_type::<AddressParseException>(),
+        py.get_type_bound::<AddressParseException>(),
     )?;
-    m.add("InvalidAddressError", py.get_type::<InvalidAddressError>())?;
+    m.add(
+        "InvalidAddressError",
+        py.get_type_bound::<InvalidAddressError>(),
+    )?;
     m.add(
         "InvalidSpecPathError",
-        py.get_type::<InvalidSpecPathError>(),
+        py.get_type_bound::<InvalidSpecPathError>(),
     )?;
     m.add(
         "InvalidTargetNameError",
-        py.get_type::<InvalidTargetNameError>(),
+        py.get_type_bound::<InvalidTargetNameError>(),
     )?;
     m.add(
         "InvalidParametersError",
-        py.get_type::<InvalidParametersError>(),
+        py.get_type_bound::<InvalidParametersError>(),
     )?;
     m.add(
         "UnsupportedWildcardError",
-        py.get_type::<UnsupportedWildcardError>(),
+        py.get_type_bound::<UnsupportedWildcardError>(),
     )?;
 
     m.add_class::<AddressInput>()?;
@@ -53,15 +57,15 @@ pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
 
     m.add(
         "BANNED_CHARS_IN_TARGET_NAME",
-        PyFrozenSet::new(py, BANNED_CHARS_IN_TARGET_NAME.iter())?,
+        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_TARGET_NAME.iter())?,
     )?;
     m.add(
         "BANNED_CHARS_IN_GENERATED_NAME",
-        PyFrozenSet::new(py, BANNED_CHARS_IN_GENERATED_NAME.iter())?,
+        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_GENERATED_NAME.iter())?,
     )?;
     m.add(
         "BANNED_CHARS_IN_PARAMETERS",
-        PyFrozenSet::new(py, BANNED_CHARS_IN_PARAMETERS.iter())?,
+        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_PARAMETERS.iter())?,
     )?;
 
     Ok(())
@@ -91,6 +95,14 @@ pub struct AddressInput {
 #[pymethods]
 impl AddressInput {
     #[new]
+    #[pyo3(signature = (
+        original_spec,
+        path_component,
+        description_of_origin,
+        target_component=None,
+        generated_component=None,
+        parameters=None
+    ))]
     fn __new__(
         original_spec: String,
         path_component: PathBuf,
@@ -149,16 +161,31 @@ impl AddressInput {
     }
 
     #[classmethod]
+    #[pyo3(signature = (
+        spec,
+        *,
+        description_of_origin,
+        relative_to=None,
+        subproject_roots=None
+    ))]
     fn parse(
-        _cls: &PyType,
+        _cls: &Bound<'_, PyType>,
         spec: &str,
         description_of_origin: &str,
-        relative_to: Option<&str>,
-        subproject_roots: Option<Vec<&str>>,
+        relative_to: Option<PyBackedStr>,
+        subproject_roots: Option<Vec<PyBackedStr>>,
     ) -> PyResult<Self> {
-        let subproject_info = subproject_roots
-            .zip(relative_to)
-            .and_then(|(roots, relative_to)| split_on_longest_dir_prefix(relative_to, &roots));
+        let subproject_roots: Option<Vec<&str>> = subproject_roots
+            .as_deref()
+            .map(|roots| roots.iter().map(|s| s.as_ref()).collect());
+        let relative_to: Option<&str> = relative_to.as_deref();
+
+        let subproject_info = match (subproject_roots, relative_to) {
+            (Some(roots), Some(relative_to)) => {
+                split_on_longest_dir_prefix(relative_to, &roots[..])
+            }
+            _ => None,
+        };
 
         let parsed_spec =
             address::parse_address_spec(spec).map_err(AddressParseException::new_err)?;
@@ -422,6 +449,14 @@ pub struct Address {
 #[pymethods]
 impl Address {
     #[new]
+    #[pyo3(signature = (
+        spec_path,
+        *,
+        target_name=None,
+        parameters=None,
+        generated_name=None,
+        relative_file_path=None
+    ))]
     fn __new__(
         spec_path: PathBuf,
         target_name: Option<String>,
@@ -750,8 +785,8 @@ impl Address {
         self.spec()
     }
 
-    fn metadata<'p>(&self, py: Python<'p>) -> PyResult<&'p PyDict> {
-        let dict = PyDict::new(py);
+    fn metadata<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let dict = PyDict::new_bound(py);
         dict.set_item(pyo3::intern!(py, "address"), self.spec())?;
         Ok(dict)
     }

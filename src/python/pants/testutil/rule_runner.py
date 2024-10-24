@@ -23,10 +23,12 @@ from typing import (
     Generic,
     Iterable,
     Iterator,
+    Literal,
     Mapping,
     Sequence,
     Type,
     TypeVar,
+    Union,
     cast,
     overload,
 )
@@ -46,13 +48,14 @@ from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import ProcessExecutionEnvironment, PyExecutor
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
-from pants.engine.internals.selectors import Effect, Get, Params
+from pants.engine.internals.selectors import AwaitableConstraints, Call, Effect, Get, Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule as QueryRule
 from pants.engine.target import AllTargets, Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.goal.auxiliary_goal import AuxiliaryGoal
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
 from pants.option.global_options import (
@@ -261,6 +264,7 @@ class RuleRunner:
         max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
         inherent_environment: EnvironmentName | None = EnvironmentName(None),
         is_bootstrap: bool = False,
+        auxiliary_goals: Iterable[type[AuxiliaryGoal]] | None = None,
     ) -> None:
         bootstrap_args = [*bootstrap_args]
 
@@ -308,6 +312,7 @@ class RuleRunner:
 
         build_config_builder.register_rules("_dummy_for_test_", all_rules)
         build_config_builder.register_target_types("_dummy_for_test_", target_types or ())
+        build_config_builder.register_auxiliary_goals("_dummy_for_test_", auxiliary_goals or ())
         self.build_config = build_config_builder.create()
 
         self.environment = CompleteEnvironmentVars({})
@@ -663,6 +668,66 @@ class MockGet(Generic[_O]):
     mock: Callable[..., _O]
 
 
+@dataclass(frozen=True)
+class MockRequestExceptionComparable:
+    category: Union[Literal["Get"], Literal["Effect"], str]
+    output_type: str
+    input_types: tuple[str, ...]
+
+    def __str__(self):
+        inputs = ",".join(str(e) for e in self.input_types)
+        return f"{self.category}({self.output_type}, ({inputs},))"
+
+
+def _compare_expected_mocks(
+    expected: Sequence[Union[Get, Effect, AwaitableConstraints]],
+    actual: Sequence[Union[MockGet, MockEffect]],
+) -> str:
+    """Try to be helpful with identifying the problem with supplied mocks."""
+
+    def as_comparable(
+        o: Union[Get, Effect, MockGet, MockEffect, AwaitableConstraints, type]
+    ) -> MockRequestExceptionComparable:
+        if isinstance(o, MockGet) or isinstance(o, Get):
+            category = "Get"
+        elif isinstance(o, MockEffect) or isinstance(o, Effect):
+            category = "Effect"
+        elif isinstance(o, AwaitableConstraints):
+            category = "Effect" if o.is_effect else "Get"
+        else:
+            # If we don't know of this class, try to give something meaningful
+            # This happened with AwaitableContraints
+            maybe_output_type = getattr(o, "output_type", None)
+            maybe_input_types = getattr(o, "input_types", None)
+            return MockRequestExceptionComparable(
+                category=f"Uncategorised of type {type(o).__qualname__}",
+                output_type=maybe_output_type.__name__ if maybe_output_type is not None else None,
+                input_types=tuple(e.__name__ for e in maybe_input_types)
+                if maybe_input_types is not None
+                else tuple(),
+            )
+
+        output_type = o.output_type.__name__
+        input_types = tuple(e.__name__ for e in o.input_types)
+
+        return MockRequestExceptionComparable(
+            category=category,
+            output_type=output_type,
+            input_types=input_types,
+        )
+
+    expected_as_comparable = {as_comparable(e) for e in expected}
+    actual_as_comparable = {as_comparable(e) for e in actual}
+
+    missing = expected_as_comparable - actual_as_comparable
+    additional = actual_as_comparable - expected_as_comparable
+
+    return (
+        f"HINT: missing : {[str(e) for e in missing]}\n"
+        f"HINT: additional : {[str(e) for e in additional]}\n"
+    )
+
+
 def run_rule_with_mocks(
     rule: Callable[..., Coroutine[Any, Any, _O]],
     *,
@@ -718,14 +783,17 @@ def run_rule_with_mocks(
     if task_rule:
         if len(rule_args) != len(task_rule.parameters):
             raise ValueError(
-                f"Rule expected to receive arguments of the form: {task_rule.parameters}; got: {rule_args}"
+                "Error running rule with mocks:\n"
+                f"Rule {task_rule.func.__qualname__} expected to receive arguments of the form: {task_rule.parameters}; got: {rule_args}"
             )
 
+        hints = _compare_expected_mocks(task_rule.awaitables, mock_gets)
         if len(mock_gets) != len(task_rule.awaitables):
             raise ValueError(
-                f"Rule expected to receive Get providers for:\n"
-                f"{pformat(task_rule.awaitables)}\ngot:\n"
-                f"{pformat(mock_gets)}"
+                "Error running rule with mocks:\n"
+                f"Rule {task_rule.func.__qualname__} expected to receive Get providers for:\n"
+                f"{pformat(list(task_rule.awaitables))}\ngot:\n"
+                f"{pformat(mock_gets)}\n" + hints
             )
         # Access the original function, rather than the trampoline that we would get by calling
         # it directly.
@@ -737,7 +805,7 @@ def run_rule_with_mocks(
     if not isinstance(res, (Coroutine, Generator)):
         return res
 
-    def get(res: Get | Effect):
+    def get(res: Get | Effect | Call):
         provider = next(
             (
                 mock_get.mock
@@ -767,7 +835,7 @@ def run_rule_with_mocks(
     while True:
         try:
             res = rule_coroutine.send(rule_input)
-            if isinstance(res, (Get, Effect)):
+            if isinstance(res, (Get, Effect, Call)):
                 rule_input = get(res)
             elif type(res) in (tuple, list):
                 rule_input = [get(g) for g in res]  # type: ignore[union-attr]

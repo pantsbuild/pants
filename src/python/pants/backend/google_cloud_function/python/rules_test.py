@@ -32,6 +32,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
+    FaaSArchitecture,
     PythonFaaSPex3VenvCreateExtraArgsField,
 )
 from pants.core.goals import package
@@ -179,6 +180,7 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
         Address("src/py/project", target_name="lambda"),
         expected_extra_log_lines=(
             "    Runtime: python37",
+            f"    Architecture: {FaaSArchitecture.X86_64.value}",
             "    Handler: handler",
         ),
     )
@@ -261,7 +263,10 @@ def test_create_hello_world_gcf(
     )
 
     extra_log_lines_base = tuple() if complete_platforms_target_type else ("    Runtime: python37",)
-    expected_extra_log_lines = extra_log_lines_base + ("    Handler: handler",)
+    expected_extra_log_lines = extra_log_lines_base + (
+        f"    Architecture: {FaaSArchitecture.X86_64.value}",
+        "    Handler: handler",
+    )
     zip_file_relpath, content = create_python_google_cloud_function(
         rule_runner,
         Address("src/python/foo/bar", target_name="gcf"),

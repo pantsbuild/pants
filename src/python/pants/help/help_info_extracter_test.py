@@ -284,7 +284,12 @@ def test_get_all_help_info():
         UnionMembership({}),
         fake_consumed_scopes_mapper,
         RegisteredTargetTypes({BazLibrary.alias: BazLibrary}),
-        BuildFileSymbolsInfo.from_info((BuildFileSymbolInfo("dummy", rule_info_test),)),
+        BuildFileSymbolsInfo.from_info(
+            (
+                BuildFileSymbolInfo("dummy", rule_info_test),
+                BuildFileSymbolInfo("private", 1, hide_from_help=True),
+            )
+        ),
         bc_builder.create(),
     )
 
@@ -324,8 +329,8 @@ def test_get_all_help_info():
                         "target_field_name": None,
                     },
                     {
-                        "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
-                        "comma_separated_display_args": "-l=<LogLevel>, --level=<LogLevel>",
+                        "display_args": ("-l<LogLevel>", "--level=<LogLevel>"),
+                        "comma_separated_display_args": "-l<LogLevel>, --level=<LogLevel>",
                         "scoped_cmd_line_args": ("-l", "--level"),
                         "unscoped_cmd_line_args": ("-l", "--level"),
                         "config_key": "level",
@@ -643,8 +648,8 @@ def test_get_all_help_info():
                 "target_field_name": None,
             },
             "PANTS_LEVEL": {
-                "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
-                "comma_separated_display_args": "-l=<LogLevel>, --level=<LogLevel>",
+                "display_args": ("-l<LogLevel>", "--level=<LogLevel>"),
+                "comma_separated_display_args": "-l<LogLevel>, --level=<LogLevel>",
                 "scoped_cmd_line_args": ("-l", "--level"),
                 "unscoped_cmd_line_args": ("-l", "--level"),
                 "config_key": "level",

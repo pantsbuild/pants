@@ -20,8 +20,8 @@ from pants.core.subsystems import python_bootstrap
 from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.native_engine import Digest
+from pants.engine.fs import CreateDigest, FileContent, PathMetadataRequest, PathMetadataResult
+from pants.engine.internals.native_engine import Digest, PathMetadataKind, PathNamespace
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
@@ -414,6 +414,10 @@ class FindBinary(BinaryPath):
     pass
 
 
+class GetentBinary(BinaryPath):
+    pass
+
+
 class GpgBinary(BinaryPath):
     pass
 
@@ -626,11 +630,56 @@ async def get_bash(system_binaries: SystemBinariesSubsystem.EnvironmentAware) ->
     return BashBinary(first_path.path, first_path.fingerprint)
 
 
-@rule
-async def find_binary(
+async def _find_candidate_paths_via_path_metadata_lookups(
     request: BinaryPathRequest,
-    env_target: EnvironmentTarget,
-) -> BinaryPaths:
+) -> tuple[str, ...]:
+    metadata_results = await MultiGet(
+        Get(PathMetadataResult, PathMetadataRequest(path=path, namespace=PathNamespace.SYSTEM))
+        for path in request.search_path
+    )
+
+    found_paths_and_requests: list[str | PathMetadataRequest] = []
+    file_metadata_requests: list[PathMetadataRequest] = []
+
+    for metadata_result in metadata_results:
+        metadata = metadata_result.metadata
+        if not metadata:
+            continue
+
+        if metadata.kind in (PathMetadataKind.DIRECTORY, PathMetadataKind.SYMLINK):
+            file_metadata_request = PathMetadataRequest(
+                path=os.path.join(metadata.path, request.binary_name),
+                namespace=PathNamespace.SYSTEM,
+            )
+            found_paths_and_requests.append(file_metadata_request)
+            file_metadata_requests.append(file_metadata_request)
+
+        elif metadata.kind == PathMetadataKind.FILE and request.check_file_entries:
+            found_paths_and_requests.append(metadata.path)
+
+    file_metadata_results = await MultiGet(
+        Get(PathMetadataResult, PathMetadataRequest, file_metadata_request)
+        for file_metadata_request in file_metadata_requests
+    )
+    file_metadata_results_by_request = dict(zip(file_metadata_requests, file_metadata_results))
+
+    found_paths: list[str] = []
+    for found_path_or_request in found_paths_and_requests:
+        if isinstance(found_path_or_request, str):
+            found_paths.append(found_path_or_request)
+        else:
+            file_metadata_result = file_metadata_results_by_request[found_path_or_request]
+            file_metadata = file_metadata_result.metadata
+            if not file_metadata:
+                continue
+            found_paths.append(file_metadata.path)
+
+    return tuple(found_paths)
+
+
+async def _find_candidate_paths_via_subprocess_helper(
+    request: BinaryPathRequest, env_target: EnvironmentTarget
+) -> tuple[str, ...]:
     # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
     # our shebang. This avoids mixing locations that we would search for bash into the search paths
     # of the request we are servicing.
@@ -701,11 +750,25 @@ async def find_binary(
             cache_scope=env_target.executable_search_path_cache_scope(),
         ),
     )
+    return tuple(result.stdout.decode().splitlines())
 
-    binary_paths = BinaryPaths(binary_name=request.binary_name)
-    found_paths = result.stdout.decode().splitlines()
+
+@rule
+async def find_binary(
+    request: BinaryPathRequest,
+    env_target: EnvironmentTarget,
+) -> BinaryPaths:
+    found_paths: tuple[str, ...]
+    if env_target.can_use_system_path_metadata_requests:
+        found_paths = await _find_candidate_paths_via_path_metadata_lookups(request)
+    else:
+        found_paths = await _find_candidate_paths_via_subprocess_helper(request, env_target)
+
     if not request.test:
-        return dataclasses.replace(binary_paths, paths=[BinaryPath(path) for path in found_paths])
+        return BinaryPaths(
+            binary_name=request.binary_name,
+            paths=(BinaryPath(path) for path in found_paths),
+        )
 
     results = await MultiGet(
         Get(
@@ -721,8 +784,8 @@ async def find_binary(
         )
         for path in found_paths
     )
-    return dataclasses.replace(
-        binary_paths,
+    return BinaryPaths(
+        binary_name=request.binary_name,
         paths=[
             (
                 BinaryPath.fingerprinted(path, result.stdout)
@@ -905,6 +968,16 @@ async def find_git(system_binaries: SystemBinariesSubsystem.EnvironmentAware) ->
         request, rationale="track changes to files in your build environment"
     )
     return GitBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `getent` binary", level=LogLevel.DEBUG)
+async def find_getent(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> GetentBinary:
+    request = BinaryPathRequest(
+        binary_name="getent", search_path=system_binaries.system_binary_paths
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="getent file")
+    return GetentBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `gpg` binary", level=LogLevel.DEBUG)
