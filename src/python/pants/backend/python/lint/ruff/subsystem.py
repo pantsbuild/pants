@@ -43,8 +43,12 @@ class Ruff(TemplatedExternalTool):
     name = "Ruff"
     help = "The Ruff Python formatter (https://github.com/astral-sh/ruff)."
 
-    default_version = "0.4.9"
+    default_version = "0.6.4"
     default_known_versions = [
+        "0.6.4|macos_arm64|2648dd09984c82db9f3163ce8762c89536e4bf0e198f17e06a01c0e32214273e|9167424",
+        "0.6.4|macos_x86_64|4438cbc80c6aa0e839abc3abb2a869a27113631cb40aa26540572fb53752c432|9463378",
+        "0.6.4|linux_arm64|a9157a0f062d62c1b1582284a8d10629503f38bc9b7126b614cb7569073180ff|10120541",
+        "0.6.4|linux_x86_64|3ca04aabf7259c59193e4153a865618cad26f73be930ce5f6109e0e6097d037b|10373921",
         # Custom URLs because 0.5+ doesn't include the version
         "0.4.9|macos_arm64|5f4506d7ec2ae6ac5a48ba309218a4b825a00d4cad9967b7bbcec1724ef04930|8148128|https://github.com/astral-sh/ruff/releases/download/v0.4.9/ruff-0.4.9-aarch64-apple-darwin.tar.gz",
         "0.4.9|macos_x86_64|e4d745adb0f5a0b08f2c9ca71e57f451a9b8485ae35b5555d9f5d20fc93a6cb6|8510706|https://github.com/astral-sh/ruff/releases/download/v0.4.9/ruff-0.4.9-x86_64-apple-darwin.tar.gz",
