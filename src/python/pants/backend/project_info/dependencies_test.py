@@ -246,11 +246,9 @@ def test_python_dependencies(rule_runner: PythonRuleRunner) -> None:
 
 def test_python_dependencies_output_format_json_direct_deps(rule_runner: PythonRuleRunner) -> None:
     create_targets(rule_runner)
-    assert_deps = partial(
-        assert_dependencies,
-        rule_runner,
-        output_format=DependenciesOutputFormat.json,
-    )
+
+    def assert_deps(**kwargs) -> None:
+        assert_dependencies(rule_runner, output_format=DependenciesOutputFormat.json, **kwargs)
 
     # input: single module
     assert_deps(
@@ -372,11 +370,9 @@ def test_python_dependencies_output_format_json_transitive_deps(
     rule_runner: PythonRuleRunner,
 ) -> None:
     create_targets(rule_runner)
-    assert_deps = partial(
-        assert_dependencies,
-        rule_runner,
-        output_format=DependenciesOutputFormat.json,
-    )
+
+    def assert_deps(**kwargs) -> None:
+        assert_dependencies(rule_runner, output_format=DependenciesOutputFormat.json, **kwargs)
 
     # input: single module
     assert_deps(

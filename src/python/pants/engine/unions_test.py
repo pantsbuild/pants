@@ -79,9 +79,9 @@ def test_distinct_union_per_subclass() -> None:
     assert dataclasses.is_dataclass(Pasta.Shape)
     assert dataclasses.is_dataclass(Spaghetti.Shape)
     assert dataclasses.is_dataclass(Rigatoni.Shape)
-    assert Pasta.Shape(True).round  # type: ignore[call-arg, attr-defined]
-    assert Spaghetti.Shape(True).round  # type: ignore[call-arg, attr-defined]
-    assert Rigatoni.Shape(True).round  # type: ignore[call-arg, attr-defined]
+    assert Pasta.Shape(True).round
+    assert Spaghetti.Shape(True).round
+    assert Rigatoni.Shape(True).round
 
     # Also on class instances, just spot-checking
     assert Pasta().Shape is Pasta.Shape
