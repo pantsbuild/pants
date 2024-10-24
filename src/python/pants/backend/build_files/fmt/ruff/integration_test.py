@@ -8,14 +8,12 @@ import pytest
 from pants.backend.build_files.fmt.ruff.register import RuffRequest
 from pants.backend.build_files.fmt.ruff.register import rules as ruff_build_rules
 from pants.backend.python.lint.ruff.check.rules import rules as ruff_fmt_rules
-from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import config_files
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.native_engine import Snapshot
-from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
