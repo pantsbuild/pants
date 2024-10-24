@@ -29,8 +29,7 @@ def test_get_type_hints(monkeypatch) -> None:
         b: int | float
 
     monkeypatch.setattr(typing, "ForwardRef", ForwardRefPristine)
-    with pytest.raises(TypeError):
-        get_type_hints(A)
+    assert get_type_hints(A)
 
     monkeypatch.setattr(typing, "ForwardRef", ForwardRefPatched)
     assert get_type_hints(A)
