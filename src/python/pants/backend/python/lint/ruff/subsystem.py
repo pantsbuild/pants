@@ -45,7 +45,7 @@ class Ruff(TemplatedExternalTool):
 
     default_version = "0.4.9"
     default_known_versions = [
-        # Custom URls because the tagging scheme changed from `v0.4.x` (Note: v) to `0.5.x`:
+        # Custom URLs because 0.5+ doesn't include the version
         "0.4.9|macos_arm64|5f4506d7ec2ae6ac5a48ba309218a4b825a00d4cad9967b7bbcec1724ef04930|8148128|https://github.com/astral-sh/ruff/releases/download/v0.4.9/ruff-0.4.9-aarch64-apple-darwin.tar.gz",
         "0.4.9|macos_x86_64|e4d745adb0f5a0b08f2c9ca71e57f451a9b8485ae35b5555d9f5d20fc93a6cb6|8510706|https://github.com/astral-sh/ruff/releases/download/v0.4.9/ruff-0.4.9-x86_64-apple-darwin.tar.gz",
         "0.4.9|linux_arm64|00c50563f9921a141ddd4ec0371149f3bbfa0369d9d238a143bcc3a932363785|8106747|https://github.com/astral-sh/ruff/releases/download/v0.4.9/ruff-0.4.9-aarch64-unknown-linux-musl.tar.gz",
@@ -53,7 +53,9 @@ class Ruff(TemplatedExternalTool):
     ]
     version_constraints = ">=0.1.2,<1"
 
-    default_url_template = "https://github.com/astral-sh/ruff/releases/download/v{version}/ruff-{version}-{platform}.tar.gz"
+    default_url_template = (
+        "https://github.com/astral-sh/ruff/releases/download/{version}/ruff-{platform}.tar.gz"
+    )
     default_url_platform_mapping = {
         # NB. musl not gnu, for increased compatibility
         "linux_arm64": "aarch64-unknown-linux-musl",
