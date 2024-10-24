@@ -7,6 +7,8 @@ import os.path
 from enum import Enum
 from typing import Iterable
 
+from packaging.version import parse
+
 from pants.backend.python.util_rules import python_sources
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFilesRequest
@@ -69,7 +71,12 @@ class Ruff(TemplatedExternalTool):
     }
 
     def generate_exe(self, plat: Platform) -> str:
-        return "./ruff"
+        # Older versions like 0.4.x just have the binary at the top level of the tar.gz, newer
+        # versions nest it within a directory with the platform.
+        if parse(self.version) < parse("0.5.0"):
+            return "./ruff"
+
+        return f"ruff-{self.default_url_platform_mapping[plat.value]}/ruff"
 
     skip = SkipOption("fmt", "fix", "lint")
     args = ArgsListOption(example="--exclude=foo --ignore=E501")
