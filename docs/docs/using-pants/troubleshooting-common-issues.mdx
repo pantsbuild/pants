@@ -81,7 +81,7 @@ Helpfully, the error message already contains the list of directories that pants
 
 If `system_binary_paths` contains the special string `<PATH>`, note that the PATH variable can also be changed after the invocation of pants in [`.pants.bootstrap`](../..//docs/using-pants/key-concepts/options#pantsbootstrap-file).
 
-Pantsd caches the location of binaries and also negative hits. If you recently installed the binary or changed it's location, make sure to stop pantsd so that it will be restarted on the next invocation of pants. To do so, run `rm -r .pants.d/pids/`in the build root.
+Pantsd caches the location of binaries and also negative hits. If you recently installed the binary or changed its location, make sure to stop pantsd so that it will be restarted on the next invocation of pants. To do so, run `rm -r .pants.d/pids/` in the build root.
 
 ## Import errors and missing dependencies
 
