@@ -190,7 +190,7 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
         Process,
         [
             pex_process_type(
-                pex_data.pex,
+                pex_data.pex,  # type: ignore[arg-type]
                 description="Run the pex and check its reported environment",
             ),
         ],
@@ -248,7 +248,7 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
             Process,
             [
                 pex_process_type(
-                    pex_data.pex,
+                    pex_data.pex,  # type: ignore[arg-type]
                     description="Run the pex and check its cwd",
                     working_directory=working_dir,
                     input_digest=runtime_files,

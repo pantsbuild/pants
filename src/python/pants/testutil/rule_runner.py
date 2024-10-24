@@ -671,7 +671,7 @@ class MockGet(Generic[_O]):
 @dataclass(frozen=True)
 class MockRequestExceptionComparable:
     category: Union[Literal["Get"], Literal["Effect"], str]
-    output_type: str
+    output_type: str | None
     input_types: tuple[str, ...]
 
     def __str__(self):

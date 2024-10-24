@@ -57,7 +57,7 @@ _RegisterIfFuncT = Callable[[_SubsystemType], Any]
 
 
 def _eval_maybe_dynamic(val: _MaybeDynamicT[_DefaultT], subsystem_cls: _SubsystemType) -> _DefaultT:
-    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[no-any-return]
+    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[return-value]
 
 
 class _OptionBase(Generic[_OptT, _DefaultT]):

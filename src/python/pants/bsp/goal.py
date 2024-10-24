@@ -217,14 +217,14 @@ class BSPGoal(AuxiliaryGoal):
         saved_stdout = sys.stdout
         saved_stdin = sys.stdin
         try:
-            sys.stdout = os.fdopen(sys.stdout.fileno(), "wb", buffering=0)  # type: ignore[assignment]
-            sys.stdin = os.fdopen(sys.stdin.fileno(), "rb", buffering=0)  # type: ignore[assignment]
+            sys.stdout = os.fdopen(sys.stdout.fileno(), "wb", buffering=0)
+            sys.stdin = os.fdopen(sys.stdin.fileno(), "rb", buffering=0)
             conn = BSPConnection(
                 scheduler_session,
                 union_membership,
                 context,
-                sys.stdin,  # type: ignore[arg-type]
-                sys.stdout,  # type: ignore[arg-type]
+                sys.stdin,
+                sys.stdout,
             )
             conn.run()
         finally:
