@@ -1075,8 +1075,13 @@ async def find_mv(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> 
 
 
 @rule(desc="Finding the `open` binary", level=LogLevel.DEBUG)
-async def find_open(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> OpenBinary:
-    request = BinaryPathRequest(binary_name="open", search_path=system_binaries.system_binary_paths)
+async def find_open(
+    platform: Platform, system_binaries: SystemBinariesSubsystem.EnvironmentAware
+) -> OpenBinary:
+    request = BinaryPathRequest(
+        binary_name=("open" if platform.is_macos else "xdg-open"),
+        search_path=system_binaries.system_binary_paths,
+    )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="open URLs with default browser")
     return OpenBinary(first_path.path, first_path.fingerprint)
