@@ -127,6 +127,9 @@ def determine_python_files(files: Iterable[str]) -> Tuple[str, ...]:
             pyi_file = f + "i"
             if pyi_file not in result:
                 result.add(f)
+        else:
+            result.add(f)
+
     return tuple(result)
 
 
