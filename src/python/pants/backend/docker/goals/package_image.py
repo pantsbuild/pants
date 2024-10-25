@@ -65,7 +65,7 @@ class DockerBuildTargetStageError(ValueError):
     pass
 
 
-class DockerImageOptionValueError(ValueError):
+class DockerImageOptionValueError(InterpolationError):
     pass
 
 
