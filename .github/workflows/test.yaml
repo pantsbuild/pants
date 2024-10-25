@@ -560,22 +560,6 @@ jobs:
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
-  check_labels:
-    if: github.repository_owner == 'pantsbuild'
-    name: Ensure PR has a category label
-    runs-on:
-    - ubuntu-22.04
-    steps:
-    - env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: github.event_name == 'pull_request'
-      name: Ensure category label
-      uses: mheap/github-action-required-labels@v4.0.0
-      with:
-        count: 1
-        labels: category:new feature, category:user api change, category:plugin api change, category:performance, category:bugfix,
-          category:documentation, category:internal
-        mode: exactly
   check_release_notes:
     if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has release notes
@@ -694,7 +678,6 @@ jobs:
     name: Set Merge OK
     needs:
     - classify_changes
-    - check_labels
     - check_release_notes
     - bootstrap_pants_linux_arm64
     - bootstrap_pants_linux_x86_64
@@ -703,7 +686,6 @@ jobs:
     - build_wheels_linux_x86_64
     - build_wheels_macos11_arm64
     - build_wheels_macos12_x86_64
-    - check_labels
     - check_release_notes
     - classify_changes
     - lint_python

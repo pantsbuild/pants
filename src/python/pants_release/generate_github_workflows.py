@@ -17,8 +17,6 @@ import toml
 import yaml
 from pants_release.common import die
 
-from pants.util.strutil import softwrap
-
 
 def action(name: str, node16_compat: bool = False) -> str:
     # Versions of actions compatible with node16 and the `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` setting.
@@ -186,29 +184,6 @@ def classify_changes() -> Jobs:
             ],
         },
     }
-
-
-def ensure_category_label() -> Sequence[Step]:
-    """Check that exactly one category label is present on a pull request."""
-    return [
-        {
-            "if": "github.event_name == 'pull_request'",
-            "name": "Ensure category label",
-            "uses": action("github-action-required-labels"),
-            "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
-            "with": {
-                "mode": "exactly",
-                "count": 1,
-                "labels": softwrap(
-                    """
-                    category:new feature, category:user api change,
-                    category:plugin api change, category:performance, category:bugfix,
-                    category:documentation, category:internal
-                    """
-                ),
-            },
-        }
-    ]
 
 
 def ensure_release_notes() -> Sequence[Step]:
@@ -1014,12 +989,6 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
 def test_workflow_jobs() -> Jobs:
     linux_x86_64_helper = Helper(Platform.LINUX_X86_64)
     jobs: dict[str, Any] = {
-        "check_labels": {
-            "name": "Ensure PR has a category label",
-            "runs-on": linux_x86_64_helper.runs_on(),
-            "if": IS_PANTS_OWNER,
-            "steps": ensure_category_label(),
-        },
         "check_release_notes": {
             "name": "Ensure PR has release notes",
             "runs-on": linux_x86_64_helper.runs_on(),
@@ -1713,7 +1682,7 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
             # NB: This always() condition is critical, as it ensures that this job is run even if
             #   jobs it depends on are skipped.
             "if": "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
-            "needs": ["classify_changes", "check_labels", "check_release_notes"] + sorted(pr_jobs),
+            "needs": ["classify_changes", "check_release_notes"] + sorted(pr_jobs),
             "outputs": {"merge_ok": f"{gha_expr('steps.set_merge_ok.outputs.merge_ok')}"},
             "steps": [
                 {
@@ -1755,7 +1724,7 @@ def generate() -> dict[Path, str]:
     pr_jobs = test_workflow_jobs()
     pr_jobs.update(**classify_changes())
     for key, val in pr_jobs.items():
-        if key in {"check_labels", "classify_changes", "check_release_notes"}:
+        if key in {"classify_changes", "check_release_notes"}:
             continue
         needs = val.get("needs", [])
         if isinstance(needs, str):
