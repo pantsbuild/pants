@@ -129,9 +129,9 @@ Pants can generate multi-platform lockfiles for Terraform. The setting `[downloa
 platforms = ["windows_amd64", "darwin_amd64", "linux_amd64"]
 ```
 
-### Basic Operations
+## Basic Operations
 
-#### Formatting
+### Formatting
 
 Run `terraform fmt` as part of the `fix`, `fmt`, or `lint` goals.
 
@@ -142,7 +142,7 @@ pants fix ::
 ✓ terraform-fmt made no changes.
 ```
 
-#### Validate
+### Validate
 
 Run `terraform validate` as part of the `check` goal.
 
@@ -161,7 +161,7 @@ Success! The configuration is valid.
 terraform_module(skip_terraform_validate=True)
 ```
 
-#### Deploying
+### Deploying
 
 :::caution Terraform deployment support is in alpha stage
 Many options and features aren't supported yet.
@@ -191,4 +191,16 @@ To run `terraform plan`, use the `--dry-run` flag of the `experimental-deploy` g
 
 ```
 pants experimental-deploy --dry-run ::
+```
+
+#### Publishing before deploying
+
+You can automatically `publish` items before deploying. Add the publishable target to the `publish_dependencies` field. An example usecase is publishing a Docker image before deploying resources that will use it.
+
+```python tab={"label":"BUILD"}
+docker_image(name="my_container")
+
+terraform_module(name="my_terraform")
+
+terraform_deployment(name="my_deployment", root_module=":my_terraform", publish_dependencies=[":my_container"])
 ```
