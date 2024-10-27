@@ -231,4 +231,63 @@ def test_mocked_deploy(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
     assert "https://www.example.com" in result.stderr
     assert "main" in result.stderr
-    assert "production" in result.stderr
+
+
+def test_mocked_deploy_rule_infer_publish_dependency(rule_runner: RuleRunner) -> None:
+    """Test that a rule can add publish dependencies from the infered dependencies."""
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+            mock_package(
+                name="dependency",
+                repositories=["https://www.example.com"],
+            )
+
+            mock_deploy(
+                name="main",
+                dependencies=[":dependency"],
+                destination="production",
+            )
+            """
+            )
+        }
+    )
+
+    with mock_console(rule_runner.options_bootstrapper):
+        result = rule_runner.run_goal_rule(Deploy, args=("src:main",))
+
+    assert result.exit_code == 0
+    assert "https://www.example.com" in result.stderr
+    assert "main" in result.stderr
+
+
+def test_deploy_publishes_dependencies(rule_runner: RuleRunner) -> None:
+    """Test that the generic `publish_dependencies` results in published dependencies."""
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+            mock_package(
+                name="dependency",
+                repositories=["https://www.example.com"],
+            )
+
+            mock_deploy(
+                name="main",
+                publish_dependencies=[":dependency"],
+                destination="production",
+            )
+            """
+            )
+        }
+    )
+
+    with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
+        result = rule_runner.run_goal_rule(Deploy, args=("src:main",))
+
+    assert result.exit_code == 0
+    assert (
+        "dependency" in result.stderr and "https://www.example.com" in result.stderr
+    ), "dependency was not published"
+    assert "main" in result.stderr, "was not deployed"
