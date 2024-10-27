@@ -11,6 +11,7 @@ from typing import Iterable
 
 from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import PublishFieldSet, PublishProcesses, PublishProcessesRequest
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
@@ -22,15 +23,31 @@ from pants.engine.target import (
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
+    SpecialCasedDependencies,
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
+    Targets,
 )
 from pants.engine.unions import union
 from pants.option.option_types import BoolOption
-from pants.util.strutil import pluralize, softwrap
+from pants.util.docutil import bin_name
+from pants.util.strutil import help_text, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class DeploymentPublishDependencies(SpecialCasedDependencies):
+    alias = "publish_dependencies"
+    help = help_text(
+        f"""
+        Addresses to targets that should be packaged with the `{bin_name()} experimental-deploy` goal
+        and whose resulting artifacts should be published.
+        Pants will publish the artifacts as if you had run `{bin_name()} publish`.
+
+        For example, this will allow you to publish Docker images that will be used when deploying a Helm chart.
+        """
+    )
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -41,6 +58,8 @@ class DeployFieldSet(FieldSet, metaclass=ABCMeta):
     Union members may list any fields required to fulfill the instantiation of the `DeployProcess`
     result of the deploy rule.
     """
+
+    publish_dependencies: DeploymentPublishDependencies
 
 
 @dataclass(frozen=True)
@@ -199,11 +218,27 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
         for field_set in target_roots_to_deploy_field_sets.field_sets
     )
 
-    publish_targets = (
+    deploy_publish_dependencies = await MultiGet(
+        Get(
+            Targets,
+            UnparsedAddressInputs,
+            field_set.publish_dependencies.to_unparsed_address_inputs(),
+        )
+        for field_set in target_roots_to_deploy_field_sets.field_sets
+    )
+    specified_publish_targets = (
+        set(chain.from_iterable(deploy_publish_dependencies))
+        if deploy_subsystem.publish_dependencies
+        else set()
+    )
+
+    inferred_publish_targets = (
         set(chain.from_iterable([deploy.publish_dependencies for deploy in deploy_processes]))
         if deploy_subsystem.publish_dependencies
         else set()
     )
+
+    publish_targets = inferred_publish_targets | specified_publish_targets
 
     logger.debug(f"Found {pluralize(len(publish_targets), 'dependency')}")
     publish_processes = await _all_publish_processes(publish_targets)
