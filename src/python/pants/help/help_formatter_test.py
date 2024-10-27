@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import Tuple
 
 from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import HelpInfoExtracter, OptionHelpInfo
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptions
+from pants.option.native_options import NativeOptionParser
 from pants.option.option_value_container import OptionValueContainerBuilder
 from pants.option.parser import OptionValueHistory, Parser
 from pants.option.ranked_value import Rank, RankedValue
@@ -58,43 +60,51 @@ class TestOptionHelpFormatter:
         assert default_line.lstrip() == "default: kiwi"
 
     @classmethod
-    def _get_parser(cls) -> Parser:
+    def _get_parser(cls) -> Tuple[Parser, NativeOptionParser]:
         return Parser(
             env={},
             config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
+        ), NativeOptionParser(
+            args=[], env={}, config_sources=[], allow_pantsrc=False, include_derivation=True
         )
 
     @classmethod
     def _format_for_global_scope(
         cls, show_advanced: bool, show_deprecated: bool, args: list[str], kwargs
     ) -> list[str]:
-        parser = cls._get_parser()
+        parser, native_parser = cls._get_parser()
         parser.register(*args, **kwargs)
         return cls._format_for_global_scope_with_parser(
-            parser, show_advanced=show_advanced, show_deprecated=show_deprecated
+            parser, native_parser, show_advanced=show_advanced, show_deprecated=show_deprecated
         )
 
     @classmethod
     def _format_for_global_scope_with_parser(
-        cls, parser: Parser, show_advanced: bool, show_deprecated: bool
+        cls,
+        parser: Parser,
+        native_parser: NativeOptionParser,
+        show_advanced: bool,
+        show_deprecated: bool,
     ) -> list[str]:
         # Force a parse to generate the derivation history.
         parser.parse_args(Parser.ParseArgsRequest((), OptionValueContainerBuilder(), [], False))
-        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False, "help.test")
+        oshi = HelpInfoExtracter("").get_option_scope_help_info(
+            "", parser, native_parser, False, "help.test"
+        )
         return HelpFormatter(
             show_advanced=show_advanced, show_deprecated=show_deprecated, color=False
         ).format_options(oshi)
 
     def test_suppress_advanced(self) -> None:
-        parser = self._get_parser()
+        parser, native_parser = self._get_parser()
         parser.register("--foo", advanced=True)
         # must have a non advanced option to be able to supress showing advanced options.
         parser.register("--jerry", advanced=False)
-        lines = self._format_for_global_scope_with_parser(parser, False, False)
+        lines = self._format_for_global_scope_with_parser(parser, native_parser, False, False)
         assert len(lines) == 15
         assert not any("--foo" in line for line in lines)
-        lines = self._format_for_global_scope_with_parser(parser, True, False)
+        lines = self._format_for_global_scope_with_parser(parser, native_parser, True, False)
         assert len(lines) == 24
 
     def test_suppress_deprecated(self) -> None:

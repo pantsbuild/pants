@@ -121,6 +121,7 @@ class Options:
         # for user-facing behavior.
         native_options_validation: NativeOptionsValidation = NativeOptionsValidation.error,
         native_options_config_discovery: bool = True,
+        include_derivation: bool = False,
     ) -> Options:
         """Create an Options instance.
 
@@ -134,6 +135,7 @@ class Options:
         :param native_options_validation: How to validate the native options parser against the
                legacy Python parser.
         :param native_options_config_discovery: Whether to discover config files in the native parser or use the ones supplied
+        :param include_derivation: Whether to gather option value derivation information.
         """
         # We need parsers for all the intermediate scopes, so inherited option values
         # can propagate through them.
@@ -167,8 +169,13 @@ class Options:
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
 
         config_to_pass = None if native_options_config_discovery else config.sources()
+
         native_parser = NativeOptionParser(
-            args, env, config_sources=config_to_pass, allow_pantsrc=True
+            args,
+            env,
+            config_sources=config_to_pass,
+            allow_pantsrc=True,
+            include_derivation=include_derivation,
         )
 
         return cls(
@@ -217,6 +224,10 @@ class Options:
         self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
         self._allow_unknown_options = allow_unknown_options
+
+    @property
+    def native_parser(self) -> NativeOptionParser:
+        return self._native_parser
 
     @property
     def specs(self) -> list[str]:

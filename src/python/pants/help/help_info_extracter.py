@@ -41,9 +41,11 @@ from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsI
 from pants.engine.rules import Rule, TaskRule
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule, is_union
+from pants.option.native_options import NativeOptionParser
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
+from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import ScopeInfo
 from pants.util.frozendict import LazyFrozenDict
 from pants.util.strutil import first_paragraph, strval
@@ -505,6 +507,7 @@ class HelpInfoExtracter:
                 return HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
                     scope_info.description,
                     options.get_parser(scope_info.scope),
+                    options.native_parser.with_derivation(),
                     # `filter` should be treated as a subsystem for `help`, even though it still
                     # works as a goal for backwards compatibility.
                     scope_info.is_goal if scope_info.scope != "filter" else False,
@@ -999,6 +1002,7 @@ class HelpInfoExtracter:
         self,
         description: str,
         parser: Parser,
+        native_parser: NativeOptionParser,
         is_goal: bool,
         provider: str = "",
         deprecated_scope: Optional[str] = None,
@@ -1009,7 +1013,37 @@ class HelpInfoExtracter:
         advanced_options = []
         deprecated_options = []
         for args, kwargs in parser.option_registrations_iter():
-            history = parser.history(kwargs["dest"])
+            derivation = native_parser.get_derivation(
+                scope=parser.scope, registration_args=args, registration_kwargs=kwargs
+            )
+            # Massage the derivation structure returned by the NativeParser into an
+            # OptionValueHistory as returned by the legacy parser.
+            # TODO: Once we get rid of the legacy parser we can probably simplify by
+            #  using the native structure directly.
+            ranked_values = []
+
+            # Adding this constant, empty history entry is silly, but it appears in the
+            # legacy parser's results as an implementation artifact, and we want to be
+            # consistent with its tests until we get rid of it.
+            is_list = kwargs.get("type") == list
+            is_dict = kwargs.get("type") == dict
+            empty_val: list | dict | None = [] if is_list else {} if is_dict else None
+            empty_details = "" if (is_list or is_dict) else None
+            ranked_values.append(RankedValue(Rank.NONE, empty_val, empty_details))
+
+            for value, ranks in derivation:
+                if len(ranks) == 0:
+                    rank = Rank.NONE
+                    details = None
+                else:
+                    rank = ranks[-1]
+                    # Again, distinguishing between '' vs None in the details field
+                    # does not matter, but we want to be consistent with the idiosyncratic
+                    # behavior of the legacy parser, until we get rid of it.
+                    details = rank.description() or empty_details
+                ranked_values.append(RankedValue(rank, value, details))
+            history = OptionValueHistory(tuple(ranked_values))
+            # history = parser.history(kwargs["dest"])
             ohi = self.get_option_help_info(args, kwargs)
             ohi = dataclasses.replace(ohi, value_history=history)
             if ohi.deprecation_active:
