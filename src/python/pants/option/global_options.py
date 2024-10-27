@@ -982,6 +982,8 @@ class BootstrapOptions:
     )
     native_options_validation = EnumOption(
         default=NativeOptionsValidation.warning,
+        removal_version="2.26.0.dev0",
+        removal_hint="The legacy parser has been removed so this option has no effect.",
         help=softwrap(
             """
             Pants is switching its option parsing system from a legacy parser written in Python
