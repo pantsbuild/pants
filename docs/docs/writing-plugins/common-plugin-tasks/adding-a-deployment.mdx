@@ -18,7 +18,7 @@ These allow for specifying the target in the BUILD file and referencing its cont
 ```python  tab={"label": "pants-plugins/my_deployment/target_types.py"}
 from dataclasses import dataclass
 
-from pants.core.goals.deploy import DeployFieldSet
+from pants.core.goals.deploy import DeployFieldSet, DeploymentPublishDependencies
 from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, DescriptionField, Target
 
 
@@ -32,7 +32,8 @@ class MyDeploymentTarget(Target):
     alias = "my_deployment"
     core_fields = {
         *COMMON_TARGET_FIELDS,
-        MyDeploymentDependenciesField
+        DeploymentPublishDependencies,  # This enables manually specifying dependencies to publish before deploying
+        MyDeploymentDependenciesField,
     }
 
 
