@@ -520,11 +520,11 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    # if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+    #   != 'true')
     name: Build wheels (macOS12-x86_64)
-    needs:
-    - classify_changes
+    # needs:
+    # - classify_changes
     runs-on:
     - macos-12
     steps:
