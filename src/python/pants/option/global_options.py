@@ -1807,6 +1807,20 @@ class BootstrapOptions:
         ),
     )
 
+    allow_deprecated_macos_versions = StrListOption(
+        default=[],
+        advanced=True,
+        help=softwrap(
+            f"""
+            Silence warnings/errors about running Pants on these versions of macOS. Pants only supports
+            recent versions of macOS, and there may be arbitrary breakage on older versions.
+
+            If you have questions or concerns about this, please reach out to us at
+            {doc_url("community/getting-help")}.
+            """
+        ),
+    )
+
 
 # N.B. By subclassing BootstrapOptions, we inherit all of those options and are also able to extend
 # it with non-bootstrap options too.

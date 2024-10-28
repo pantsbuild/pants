@@ -20,7 +20,7 @@ from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.docutil import doc_url
-from pants.util.osutil import is_macos_before_12
+from pants.util.osutil import get_normalized_arch_name, is_macos_before_12, macos_major_version
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -151,9 +151,66 @@ class PantsRunner:
             return runner.run(start_time)
 
 
-def _validate_macos_version(global_bootstrap_options: OptionValueContainer) -> None:
-    """Check for running on deprecated/unsupported versions of macOS, and similar"""
+# for each architecture, indicate the first Pants version that doesn't support the given version of
+# macOS, if it is (soon to be) unsupported:
+_MACOS_VERSION_BECOMES_UNSUPPORTED_IN = {
+    # macos-14 is currently oldest github hosted runner for arm
+    "arm64": {
+        10: "2.24.0.dev0",
+        11: "2.24.0.dev0",
+        12: "2.25.0.dev0",
+        13: "2.25.0.dev0",
+        # adding new values here should update the phrasing of the message below
+    },
+    # macos-13 will soon be the oldest (and only) github hosted runner for x86-64 (see https://github.com/pantsbuild/pants/issues/21333)
+    "x86_64": {
+        10: "2.24.0.dev0",
+        11: "2.24.0.dev0",
+        12: "2.25.0.dev0",
+        # adding new values here should update the phrasing of the message below
+    },
+}
 
+
+def _validate_macos_version(global_bootstrap_options: OptionValueContainer) -> None:
+    """Check for running on deprecated/unsupported versions of macOS, and similar."""
+
+    macos_version = macos_major_version()
+    if macos_version is None:
+        # Not macOS, no validation/deprecations required!
+        return
+
+    arch_versions = _MACOS_VERSION_BECOMES_UNSUPPORTED_IN[get_normalized_arch_name()]
+    unsupported_version = arch_versions.get(macos_version)
+
+    is_permitted_deprecated_macos_version = (
+        str(macos_version) in global_bootstrap_options.allow_deprecated_macos_versions
+    )
+
+    if unsupported_version is not None and not is_permitted_deprecated_macos_version:
+        warn_or_error(
+            unsupported_version,
+            "using Pants on older macOS",
+            softwrap(
+                f"""
+                Future versions of Pants will only run on macOS 13 and newer (on x86-64) and macOS
+                14 and newer (on arm64), but this machine appears older ({platform.platform()}
+                implies macOS version {macos_version}). This version also isn't permitted by your
+                `[GLOBAL].allow_deprecated_macos_versions` configuration
+                ({global_bootstrap_options.allow_deprecated_macos_versions}).
+
+                Either upgrade your operating system(s), or silence this message (and thus opt-in to
+                potential breakage) by adding "{macos_version}" to the
+                `[GLOBAL].allow_deprecated_macos_versions` list.
+
+                If you have questions or concerns about this, please reach out to us at
+                {doc_url("community/getting-help")}.
+                """
+            ),
+        )
+
+    # NB. this is the "old" style deprecation of 10.15 & 11, and can be torn out in favour of the
+    # above, once we replace [GLOBAL].allow_deprecated_macos_before_12 completely
     if not global_bootstrap_options.allow_deprecated_macos_before_12 and is_macos_before_12():
         warn_or_error(
             "2.24.0.dev0",
