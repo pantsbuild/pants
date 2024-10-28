@@ -124,25 +124,7 @@ class PantsRunner:
                         ),
                     )
 
-            if (
-                not global_bootstrap_options.allow_deprecated_macos_before_12
-                and is_macos_before_12()
-            ):
-                warn_or_error(
-                    "2.24.0.dev0",
-                    "using Pants on macOS 10.15 - 11",
-                    softwrap(
-                        f"""
-                        Future versions of Pants will only run on macOS 12 and newer, but this machine
-                        appears older ({platform.platform()}).
-
-                        You can temporarily silence this warning with the
-                        `[GLOBAL].allow_deprecated_macos_before_12` option. If you have questions or
-                        concerns about this, please reach out to us at
-                        {doc_url("community/getting-help")}.
-                        """
-                    ),
-                )
+            _validate_macos_version(global_bootstrap_options)
 
             # N.B. We inline imports to speed up the python thin client run, and avoids importing
             # engine types until after the runner has had a chance to set __PANTS_BIN_NAME.
@@ -167,3 +149,24 @@ class PantsRunner:
                 options_bootstrapper=options_bootstrapper,
             )
             return runner.run(start_time)
+
+
+def _validate_macos_version(global_bootstrap_options: OptionValueContainer) -> None:
+    """Check for running on deprecated/unsupported versions of macOS, and similar"""
+
+    if not global_bootstrap_options.allow_deprecated_macos_before_12 and is_macos_before_12():
+        warn_or_error(
+            "2.24.0.dev0",
+            "using Pants on macOS 10.15 - 11",
+            softwrap(
+                f"""
+                Future versions of Pants will only run on macOS 12 and newer, but this machine
+                appears older ({platform.platform()}).
+
+                You can temporarily silence this warning with the
+                `[GLOBAL].allow_deprecated_macos_before_12` option. If you have questions or
+                concerns about this, please reach out to us at
+                {doc_url("community/getting-help")}.
+                """
+            ),
+        )
