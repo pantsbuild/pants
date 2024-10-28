@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.goals.deploy import DeployFieldSet
+from pants.core.goals.deploy import DeploymentPublishDependencies
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import TestTimeoutField
 from pants.engine.internals.native_engine import AddressInput
@@ -527,7 +527,7 @@ class HelmDeploymentTarget(Target):
     alias = "helm_deployment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        *DeployFieldSet.fields.values(),
+        DeploymentPublishDependencies,
         HelmDeploymentChartField,
         HelmDeploymentReleaseNameField,
         HelmDeploymentDependenciesField,

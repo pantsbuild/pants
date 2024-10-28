@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.core.goals.deploy import DeployFieldSet
+from pants.core.goals.deploy import DeployFieldSet, DeploymentPublishDependencies
 from pants.engine.internals.native_engine import AddressInput
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -118,7 +118,7 @@ class TerraformDeploymentTarget(Target):
     alias = "terraform_deployment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        *DeployFieldSet.fields.values(),
+        DeploymentPublishDependencies,
         TerraformDependenciesField,
         TerraformRootModuleField,
     )

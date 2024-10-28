@@ -6,7 +6,12 @@ from textwrap import dedent
 
 import pytest
 
-from pants.core.goals.deploy import Deploy, DeployFieldSet, DeployProcess
+from pants.core.goals.deploy import (
+    Deploy,
+    DeployFieldSet,
+    DeploymentPublishDependencies,
+    DeployProcess,
+)
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.goals.publish import (
     PublishFieldSet,
@@ -58,7 +63,7 @@ class MockDeployTarget(Target):
     alias = "mock_deploy"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        *DeployFieldSet.fields.values(),
+        DeploymentPublishDependencies,
         MockDestinationField,
         MockDependenciesField,
     )
