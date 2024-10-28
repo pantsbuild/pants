@@ -2282,6 +2282,7 @@ dependencies = [
  "clap",
  "env_logger",
  "mock",
+ "tokio",
 ]
 
 [[package]]
@@ -2291,6 +2292,7 @@ dependencies = [
  "clap",
  "mock",
  "protos",
+ "tokio",
 ]
 
 [[package]]

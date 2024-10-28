@@ -941,6 +941,7 @@ async fn successful_with_only_call_to_execute() {
             }]),
             None,
         )
+        .await
     };
 
     let result = run_command_remote(mock_server.address(), execute_request)
@@ -989,6 +990,7 @@ async fn successful_after_reconnect_with_wait_execution() {
             ]),
             None,
         )
+        .await
     };
 
     let result = run_command_remote(mock_server.address(), execute_request)
@@ -1046,6 +1048,7 @@ async fn successful_after_reconnect_from_retryable_error() {
             ]),
             None,
         )
+        .await
     };
 
     let result = run_command_remote(mock_server.address(), execute_request)
@@ -1108,6 +1111,7 @@ async fn creates_executing_workunit() {
             }]),
             None,
         )
+        .await
     };
 
     let result =
@@ -1172,12 +1176,14 @@ async fn dropped_request_cancels() {
             }]),
             None,
         )
+        .await
     };
 
     let cas = mock::StubCAS::builder()
         .file(&TestData::roland())
         .directory(&TestDirectory::containing_roland())
-        .build();
+        .build()
+        .await;
     let (command_runner, _store) = create_command_runner(mock_server.address(), &cas).await;
 
     let context = Context {
@@ -1228,7 +1234,8 @@ async fn server_rejecting_execute_request_gives_error() {
             stream_responses: Err(Status::invalid_argument("".to_owned())),
         }]),
         None,
-    );
+    )
+    .await;
 
     let error = run_command_remote(mock_server.address(), execute_request)
         .await
@@ -1260,6 +1267,7 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
             }]),
             None,
         )
+        .await
     };
 
     let result = run_command_remote(mock_server.address(), execute_request)
@@ -1287,7 +1295,7 @@ fn remote_options_for_cas(cas: &mock::StubCAS) -> RemoteStoreOptions {
 async fn sends_headers() {
     let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
-    let cas = mock::StubCAS::empty();
+    let cas = mock::StubCAS::empty().await;
     let runtime = task_executor::Executor::new();
     let store_dir = TempDir::new().unwrap();
     let store = Store::local_only(runtime.clone(), store_dir)
@@ -1321,6 +1329,7 @@ async fn sends_headers() {
             }]),
             None,
         )
+        .await
     };
 
     let command_runner = CommandRunner::new(
@@ -1443,7 +1452,7 @@ async fn ensure_inline_stdio_is_stored() {
     let store_dir = TempDir::new().unwrap();
     let store_dir_path = store_dir.path();
 
-    let cas = mock::StubCAS::empty();
+    let cas = mock::StubCAS::empty().await;
     let store = Store::local_only(runtime.clone(), store_dir_path)
         .unwrap()
         .into_with_remote(remote_options_for_cas(&cas))
@@ -1483,6 +1492,7 @@ async fn ensure_inline_stdio_is_stored() {
             }]),
             None,
         )
+        .await
     };
 
     let cmd_runner = CommandRunner::new(
@@ -1571,6 +1581,7 @@ async fn bad_result_bytes() {
             }]),
             None,
         )
+        .await
     };
 
     run_command_remote(mock_server.address(), execute_request)
@@ -1616,6 +1627,7 @@ async fn initial_response_error() {
             }]),
             None,
         )
+        .await
     };
 
     let result = run_command_remote(mock_server.address(), execute_request)
@@ -1658,6 +1670,7 @@ async fn initial_response_missing_response_and_error() {
             }]),
             None,
         )
+        .await
     };
 
     let result = run_command_remote(mock_server.address(), execute_request)
@@ -1714,6 +1727,7 @@ async fn fails_after_retry_limit_exceeded() {
             ]),
             None,
         )
+        .await
     };
 
     let result = run_command_remote(mock_server.address(), execute_request)
@@ -1772,6 +1786,7 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
             ]),
             None,
         )
+        .await
     };
 
     let result = run_command_remote(mock_server.address(), execute_request)
@@ -1792,7 +1807,8 @@ async fn execute_missing_file_uploads_if_known() {
     let store_dir = TempDir::new().unwrap();
     let cas = mock::StubCAS::builder()
         .directory(&TestDirectory::containing_roland())
-        .build();
+        .build()
+        .await;
     let store = Store::local_only(runtime.clone(), store_dir)
         .unwrap()
         .into_with_remote(remote_options_for_cas(&cas))
@@ -1851,6 +1867,7 @@ async fn execute_missing_file_uploads_if_known() {
             ]),
             None,
         )
+        .await
     };
 
     store
@@ -1901,10 +1918,14 @@ async fn execute_missing_file_errors_if_unknown() {
             mock::execution_server::MockExecution::new(vec![]),
             None,
         )
+        .await
     };
 
     let store_dir = TempDir::new().unwrap();
-    let cas = mock::StubCAS::builder().file(&TestData::roland()).build();
+    let cas = mock::StubCAS::builder()
+        .file(&TestData::roland())
+        .build()
+        .await;
     let runtime = task_executor::Executor::new();
     let store = Store::local_only(runtime.clone(), store_dir)
         .unwrap()
@@ -2127,7 +2148,8 @@ async fn remote_workunits_are_stored() {
     let cas = mock::StubCAS::builder()
         .file(&TestData::roland())
         .directory(&TestDirectory::containing_roland())
-        .build();
+        .build()
+        .await;
     // TODO: This CommandRunner is only used for parsing, add so intentionally passes a CAS/AC
     // address rather than an Execution address.
     let (command_runner, _store) = create_command_runner(cas.address(), &cas).await;
@@ -2658,7 +2680,8 @@ async fn run_command_remote_in_workunit(
         .file(&TestData::roland())
         .directory(&TestDirectory::containing_roland())
         .tree(&TestTree::roland_at_root())
-        .build();
+        .build()
+        .await;
     let (command_runner, store) = create_command_runner(execution_address, &cas).await;
     let original = command_runner
         .run(Context::default(), workunit, request)
@@ -2696,7 +2719,9 @@ async fn extract_execute_response(
     let cas = mock::StubCAS::builder()
         .file(&TestData::roland())
         .directory(&TestDirectory::containing_roland())
-        .build();
+        .build()
+        .await;
+
     // TODO: This CommandRunner is only used for parsing, add so intentionally passes a CAS/AC
     // address rather than an Execution address.
     let (command_runner, store) = create_command_runner(cas.address(), &cas).await;
@@ -2734,7 +2759,8 @@ async fn extract_output_files_from_response(
         .directory(&TestDirectory::containing_roland())
         .tree(&TestTree::roland_at_root())
         .tree(&TestTree::robin_at_root())
-        .build();
+        .build()
+        .await;
     let executor = task_executor::Executor::new();
     let store_dir = TempDir::new().unwrap();
     let store = make_store(store_dir.path(), &cas, executor.clone()).await;

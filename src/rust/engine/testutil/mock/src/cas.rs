@@ -177,7 +177,7 @@ impl StubCASBuilder {
         self
     }
 
-    pub fn build(self) -> StubCAS {
+    pub async fn build(self) -> StubCAS {
         let request_counts = Arc::new(Mutex::new(HashMap::new()));
         let write_message_sizes = Arc::new(Mutex::new(Vec::new()));
         let blobs = Arc::new(Mutex::new(self.content));
@@ -202,10 +202,8 @@ impl StubCASBuilder {
 
         // TODO: Refactor to just use `tokio::net::TcpListener` directly (but requries the method be async and
         // all call sites updated).
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        listener.set_nonblocking(true).unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let local_addr = listener.local_addr().unwrap();
-        let listener = TcpListener::from_std(listener).unwrap();
 
         let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel();
 
@@ -243,12 +241,12 @@ impl StubCAS {
         StubCASBuilder::new()
     }
 
-    pub fn empty() -> StubCAS {
-        StubCAS::builder().build()
+    pub async fn empty() -> StubCAS {
+        StubCAS::builder().build().await
     }
 
-    pub fn cas_always_errors() -> StubCAS {
-        StubCAS::builder().cas_always_errors().build()
+    pub async fn cas_always_errors() -> StubCAS {
+        StubCAS::builder().cas_always_errors().build().await
     }
 
     ///

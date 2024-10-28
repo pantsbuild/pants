@@ -123,7 +123,7 @@ impl TestServer {
     ///                      If a GetOperation request is received whose name is not equal to this
     ///                      MockExecution's name, or more requests are received than stub responses
     ///                      are available for, an error will be returned.
-    pub fn new(mock_execution: MockExecution, port: Option<u16>) -> TestServer {
+    pub async fn new(mock_execution: MockExecution, port: Option<u16>) -> TestServer {
         let mock_responder = MockResponder::new(mock_execution);
         let mock_responder2 = mock_responder.clone();
 
