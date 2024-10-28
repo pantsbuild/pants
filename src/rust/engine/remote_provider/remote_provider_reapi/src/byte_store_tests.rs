@@ -302,7 +302,7 @@ async fn store_file_source_read_error_immediately() {
 #[tokio::test]
 async fn store_bytes_one_chunk() {
     let testdata = TestData::roland();
-    let cas = StubCAS::empty();
+    let cas = StubCAS::empty().await;
     let provider = new_provider(&cas).await;
 
     provider
