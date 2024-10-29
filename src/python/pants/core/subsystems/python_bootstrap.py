@@ -29,7 +29,7 @@ from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
-_PBS_URL_TEMPLATE = "https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.9.16+20230116-{}-install_only.tar.gz"
+_PBS_URL_TEMPLATE = "https://github.com/indygreg/python-build-standalone/releases/download/20241008/cpython-3.11.10+20241008-{}-install_only.tar.gz"
 
 
 class PythonBootstrapSubsystem(Subsystem):
@@ -48,23 +48,23 @@ class PythonBootstrapSubsystem(Subsystem):
         default={
             "linux_arm64": (
                 _PBS_URL_TEMPLATE.format("aarch64-unknown-linux-gnu"),
-                "1ba520c0db431c84305677f56eb9a4254f5097430ed443e92fc8617f8fba973d",
-                23873387,
+                "320635e957e13d2e10d70a3031563d032fae9e40e60e5ec32bc353643fae1335",
+                25925875,
             ),
             "linux_x86_64": (
                 _PBS_URL_TEMPLATE.format("x86_64-unknown-linux-gnu"),
-                "7ba397787932393e65fc2fb9fcfabf54f2bb6751d5da2b45913cb25b2d493758",
-                26129729,
+                "ff121f14ed113c9da83a45f76c3cf41976fb4419fe406d5cc7066765761c6a4e",
+                29716764,
             ),
             "macos_arm64": (
                 _PBS_URL_TEMPLATE.format("aarch64-apple-darwin"),
-                "d732d212d42315ac27c6da3e0b69636737a8d72086c980daf844344c010cab80",
-                17084463,
+                "ecdc9c042b8f97bff211fcf9425bc51c96acd4037df1565964e89816f2c9564d",
+                17795541,
             ),
             "macos_x86_64": (
                 _PBS_URL_TEMPLATE.format("x86_64-apple-darwin"),
-                "3948384af5e8d4ee7e5ccc648322b99c1c5cf4979954ed5e6b3382c69d6db71e",
-                17059474,
+                "a618c086e0514f681523947e2b66a4dc0c6560f91c36faa072fa6787455df9ea",
+                18165701,
             ),
         },
         help=softwrap(
