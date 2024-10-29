@@ -1815,7 +1815,7 @@ class BootstrapOptions:
         help=softwrap(
             f"""
             Silence warnings/errors about running Pants on these versions of macOS. Pants only supports
-            recent versions of macOS, and there may be arbitrary breakage on older versions.
+            recent versions of macOS. You can try running on older versions, but it may or may not work.
 
             If you have questions or concerns about this, please reach out to us at
             {doc_url("community/getting-help")}.

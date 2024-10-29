@@ -198,7 +198,7 @@ def _validate_macos_version(global_bootstrap_options: OptionValueContainer) -> N
             "using Pants on older macOS",
             softwrap(
                 f"""
-                Future versions of Pants will only run on macOS 13 and newer (on x86-64) and macOS
+                Recent versions of Pants only support macOS 13 and newer (on x86-64) and macOS
                 14 and newer (on arm64), but this machine appears older ({platform.platform()}
                 implies macOS version {macos_version}). This version also isn't permitted by your
                 `[GLOBAL].allow_deprecated_macos_versions` configuration
