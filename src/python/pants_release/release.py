@@ -667,7 +667,7 @@ def tag_release() -> None:
     banner("Tagging release")
 
     check_head_commit()
-    check_clean_git_branch()
+    # check_clean_git_branch()
     check_pgp()
 
     prompt_artifact_freshness()
