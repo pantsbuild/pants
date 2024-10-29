@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, ClassVar, Iterable
 
 from pants.base.build_environment import get_buildroot
-from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import Rule, _uncacheable_rule, collect_rules, rule
@@ -51,7 +51,7 @@ async def get_un_cachable_version_manager_paths(
     request: VersionManagerSearchPathsRequest,
 ) -> VersionManagerSearchPaths:
     """Inspects the directory of a version manager tool like pyenv or nvm to find installations."""
-    if not (request.env_tgt.val is None or isinstance(request.env_tgt.val, LocalEnvironmentTarget)):
+    if not request.env_tgt.can_access_local_system_paths:
         return VersionManagerSearchPaths()
 
     manager_root_dir = request.root_dir
@@ -121,8 +121,9 @@ async def validate_search_paths(request: ValidateSearchPathsRequest) -> Validate
     env = request.env_tgt.val
     search_paths = request.search_paths
 
-    if env is None or isinstance(env, LocalEnvironmentTarget):
+    if request.env_tgt.can_access_local_system_paths:
         return ValidatedSearchPaths(search_paths)
+    assert env is not None, "Expected request.env_tgt to be defined"
 
     if request.is_default:
         # Strip out the not-allowed special strings from search_paths.
