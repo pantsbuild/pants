@@ -853,6 +853,7 @@ def build_wheels_job(
     else:
         initial_steps = [
             *checkout(ref=for_deploy_ref),
+            *helper.setup_pythons(),
             # NB: We only cache Rust, but not `native_engine.so` and the Pants
             # virtualenv. This is because we must build both these things with
             # multiple Python versions, whereas that caching assumes only one primary
