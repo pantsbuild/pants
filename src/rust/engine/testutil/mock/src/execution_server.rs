@@ -5,7 +5,6 @@ use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
-use std::net::TcpListener;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -127,13 +126,9 @@ impl TestServer {
         let mock_responder = MockResponder::new(mock_execution);
         let mock_responder2 = mock_responder.clone();
 
-        // TODO: Refactor to just use `tokio::net::TcpListener` directly (but requries the method be async and
-        // all call sites updated).
         let addr_str = format!("127.0.0.1:{}", port.unwrap_or(0));
-        let listener = TcpListener::bind(addr_str).unwrap();
-        listener.set_nonblocking(true).unwrap();
+        let listener = tokio::net::TcpListener::bind(addr_str).await.unwrap();
         let local_addr = listener.local_addr().unwrap();
-        let listener = tokio::net::TcpListener::from_std(listener).unwrap();
 
         let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();
 
