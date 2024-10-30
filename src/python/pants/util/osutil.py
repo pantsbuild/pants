@@ -96,7 +96,7 @@ def get_normalized_arch_name() -> str:
     return normalize_arch_name(get_arch_name())
 
 
-def _macos_major_version() -> None | int:
+def macos_major_version() -> None | int:
     if not hasattr(platform, "mac_ver"):
         return None
 
@@ -108,12 +108,12 @@ def _macos_major_version() -> None | int:
 
 
 def is_macos_big_sur() -> bool:
-    return _macos_major_version() == 11
+    return macos_major_version() == 11
 
 
 def is_macos_before_12() -> bool:
     """MacOS 11 support ended Sep 2023."""
-    version = _macos_major_version()
+    version = macos_major_version()
     return version is not None and version < 12
 
 

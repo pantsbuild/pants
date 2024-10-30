@@ -1805,6 +1805,22 @@ class BootstrapOptions:
             {doc_url("community/getting-help")}.
             """
         ),
+        removal_version="2.26.0.dev0",
+        removal_hint='Upgrade your operating system or write `allow_deprecated_macos_versions = ["10", "11"]` instead.',
+    )
+
+    allow_deprecated_macos_versions = StrListOption(
+        default=[],
+        advanced=True,
+        help=softwrap(
+            f"""
+            Silence warnings/errors about running Pants on these versions of macOS. Pants only supports
+            recent versions of macOS. You can try running on older versions, but it may or may not work.
+
+            If you have questions or concerns about this, please reach out to us at
+            {doc_url("community/getting-help")}.
+            """
+        ),
     )
 
 

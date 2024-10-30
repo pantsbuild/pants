@@ -88,7 +88,7 @@ cache_content_behavior = "fetch"
 
 # Our current macOS 10.15 and 11 infrastructure is working okay, so for now (i.e. 2.24 dev
 # releases), we'll just keep building on them:
-allow_deprecated_macos_before_12 = true
+allow_deprecated_macos_versions = ["10", "11"]
 
 [DEFAULT]
 # Tell `scie-pants` to use our `./pants` bootstrap script.
