@@ -482,7 +482,7 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
     error_cases = [
         (env_name, tgts, env_tgt.val)
         for ((env_name, tgts), env_tgt) in zip(env_names_and_targets, env_tgts)
-        if env_tgt.val is not None and not isinstance(env_tgt.val, LocalEnvironmentTarget)
+        if env_tgt.val is not None and not env_tgt.can_access_local_system_paths
     ]
 
     for env_name, tgts, env_tgt in error_cases:
@@ -592,7 +592,7 @@ class EnvironmentTarget:
         return True
 
     @property
-    def can_use_system_path_metadata_requests(self) -> bool:
+    def can_access_local_system_paths(self) -> bool:
         tgt = self.val
         if not tgt:
             return True

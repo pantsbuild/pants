@@ -17,8 +17,6 @@ import toml
 import yaml
 from pants_release.common import die
 
-from pants.util.strutil import softwrap
-
 
 def action(name: str, node16_compat: bool = False) -> str:
     # Versions of actions compatible with node16 and the `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` setting.
@@ -36,9 +34,8 @@ def action(name: str, node16_compat: bool = False) -> str:
             "cache": "actions/cache@v4",
             "checkout": "actions/checkout@v4",
             "download-artifact": "actions/download-artifact@v4",
-            "expose-pythons": "pantsbuild/actions/expose-pythons@v9",
             "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
-            "rust-cache": "benjyw/rust-cache@61b5b2e17a28350779e9a535e353da2f8b00e832",
+            "rust-cache": "benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a",
             "setup-go": "actions/setup-go@v5",
             "setup-java": "actions/setup-java@v4",
             "setup-node": "actions/setup-node@v4",
@@ -123,7 +120,8 @@ NATIVE_FILES = [
 
 # We don't specify a patch version so that we get the latest, which comes pre-installed:
 #  https://github.com/actions/setup-python#available-versions-of-python
-PYTHON_VERSION = "3.9"
+# NOTE: The last entry becomes the default
+PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.13", "3.11"]
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
 DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true'"
@@ -186,29 +184,6 @@ def classify_changes() -> Jobs:
             ],
         },
     }
-
-
-def ensure_category_label() -> Sequence[Step]:
-    """Check that exactly one category label is present on a pull request."""
-    return [
-        {
-            "if": "github.event_name == 'pull_request'",
-            "name": "Ensure category label",
-            "uses": action("github-action-required-labels"),
-            "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
-            "with": {
-                "mode": "exactly",
-                "count": 1,
-                "labels": softwrap(
-                    """
-                    category:new feature, category:user api change,
-                    category:plugin api change, category:performance, category:bugfix,
-                    category:documentation, category:internal
-                    """
-                ),
-            },
-        }
-    ]
 
 
 def ensure_release_notes() -> Sequence[Step]:
@@ -360,11 +335,14 @@ def install_rustup() -> Step:
     }
 
 
-def install_python(version: str) -> Step:
+def install_pythons(versions: list[str]) -> Step:
+    # See:
+    # https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md#specifying-multiple-pythonpypy-versions
+    # This is a list expressed as a newline delimited string instead of a... list
     return {
-        "name": f"Set up Python {version}",
+        "name": f"Set up Python {', '.join(versions)}",
         "uses": action("setup-python"),
-        "with": {"python-version": version},
+        "with": {"python-version": "\n".join(versions)},
     }
 
 
@@ -565,27 +543,16 @@ class Helper:
             },
         ]
 
-    def setup_primary_python(self) -> Sequence[Step]:
+    def setup_pythons(self) -> Sequence[Step]:
         ret = []
         if self.platform not in HAS_PYTHON:
-            ret.append(install_python(PYTHON_VERSION))
-        return ret
-
-    def expose_all_pythons(self) -> Sequence[Step]:
-        ret = []
-        if self.platform not in HAS_PYTHON:
-            ret.append(
-                {
-                    "name": "Expose Pythons",
-                    "uses": action("expose-pythons"),
-                }
-            )
+            ret.append(install_pythons(PYTHON_VERSIONS))
         return ret
 
     def bootstrap_pants(self) -> Sequence[Step]:
         return [
             *checkout(),
-            *self.setup_primary_python(),
+            *self.setup_pythons(),
             *self.bootstrap_caches(),
             {
                 "name": "Bootstrap Pants",
@@ -780,8 +747,7 @@ def test_jobs(
                 # preinstalled on the self-hosted runners.
                 else []
             ),
-            *helper.setup_primary_python(),
-            *helper.expose_all_pythons(),
+            *helper.setup_pythons(),
             *helper.native_binaries_download(),
             {
                 "name": human_readable_step_name,
@@ -887,7 +853,7 @@ def build_wheels_job(
     else:
         initial_steps = [
             *checkout(ref=for_deploy_ref),
-            *helper.expose_all_pythons(),
+            *helper.setup_pythons(),
             # NB: We only cache Rust, but not `native_engine.so` and the Pants
             # virtualenv. This is because we must build both these things with
             # multiple Python versions, whereas that caching assumes only one primary
@@ -1014,12 +980,6 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
 def test_workflow_jobs() -> Jobs:
     linux_x86_64_helper = Helper(Platform.LINUX_X86_64)
     jobs: dict[str, Any] = {
-        "check_labels": {
-            "name": "Ensure PR has a category label",
-            "runs-on": linux_x86_64_helper.runs_on(),
-            "if": IS_PANTS_OWNER,
-            "steps": ensure_category_label(),
-        },
         "check_release_notes": {
             "name": "Ensure PR has release notes",
             "runs-on": linux_x86_64_helper.runs_on(),
@@ -1043,7 +1003,7 @@ def test_workflow_jobs() -> Jobs:
                 "steps": [
                     *checkout(),
                     *launch_bazel_remote(),
-                    *linux_x86_64_helper.setup_primary_python(),
+                    *linux_x86_64_helper.setup_pythons(),
                     *linux_x86_64_helper.native_binaries_download(),
                     {
                         "name": "Lint",
@@ -1119,8 +1079,7 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             "timeout-minutes": 90,
             "steps": [
                 *checkout(),
-                *helper.setup_primary_python(),
-                *helper.expose_all_pythons(),
+                *helper.setup_pythons(),
                 {
                     "name": "Prepare cache comparison",
                     "run": dedent(
@@ -1253,8 +1212,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         "fetch-tags": True,
                     },
                 },
-                *helper.setup_primary_python(),
-                *helper.expose_all_pythons(),
+                *helper.setup_pythons(),
                 *helper.bootstrap_caches(),
                 {
                     "name": "Generate announcement",
@@ -1591,7 +1549,7 @@ def public_repos() -> PublicReposOutput:
             "permissions": {},
             "steps": [
                 *checkout(repository=repo.name, **repo.checkout_options),
-                install_python(repo.python_version),
+                install_pythons([repo.python_version]),
                 *([install_go()] if repo.install_go else []),
                 *([install_node(repo.node_version)] if repo.node_version else []),
                 *([download_apache_thrift()] if repo.install_thrift else []),
@@ -1713,7 +1671,7 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
             # NB: This always() condition is critical, as it ensures that this job is run even if
             #   jobs it depends on are skipped.
             "if": "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
-            "needs": ["classify_changes", "check_labels", "check_release_notes"] + sorted(pr_jobs),
+            "needs": ["classify_changes", "check_release_notes"] + sorted(pr_jobs),
             "outputs": {"merge_ok": f"{gha_expr('steps.set_merge_ok.outputs.merge_ok')}"},
             "steps": [
                 {
@@ -1755,7 +1713,7 @@ def generate() -> dict[Path, str]:
     pr_jobs = test_workflow_jobs()
     pr_jobs.update(**classify_changes())
     for key, val in pr_jobs.items():
-        if key in {"check_labels", "classify_changes", "check_release_notes"}:
+        if key in {"classify_changes", "check_release_notes"}:
             continue
         needs = val.get("needs", [])
         if isinstance(needs, str):

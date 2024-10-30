@@ -48,16 +48,11 @@ There is even a `__run.sh` script in the directory that will run the process usi
 
 If you are using the latest stable version of Pants and still experience a cache invalidation issue: we are sorry for the trouble. We have not yet added a comprehensive goal to "clear all caches", because we are very interested in coming up with coherent solutions to potential issues (see for more information). If you experience a cache issue, please absolutely [file a bug](https://github.com/pantsbuild/pants/issues/new) before proceeding to the following steps.
 
-To start with, first try using `--no-pantsd`. If that doesn't work, you can also try `--no-local-cache`.
-
-If `--no-pantsd` worked, you can restart `pantsd`, either by:
-
-- Killing the `pantsd` process associated with your workspace. You can use `ps aux | grep pants` to find the PID, the `kill -9 <pid>`.
-- Deleting the `<build root>/.pants.d/pids` directory.
+To start with, first try using `--no-pantsd`. If `--no-pantsd` worked, you can stop pantsd so that it will restarted on the next invocation of pants. To do so, run `rm -r .pants.d/pids/`in the build root.
 
 If this resolves the issue, please report that on the ticket and attach the recent content of the `.pants.d/workdir/pantsd/pantsd.log` file.
 
-If restarting `pantsd` is not sufficient, you can also use `--no-local-cache` to ignore the persistent caches. If this resolves the issue, then it is possible that the contents of the cache (at `~/.cache/pants`) will be useful for debugging the ticket that you filed: please try to preserve the cache contents until it can be resolved.
+If restarting pantsd is not sufficient, you can also use `--no-local-cache` to ignore the persistent caches. If this resolves the issue, then it is possible that the contents of the cache (at `~/.cache/pants`) will be useful for debugging the ticket that you filed: please try to preserve the cache contents until it can be resolved.
 
 ## Pants cannot find a file in your project
 
@@ -73,6 +68,20 @@ pants_ignore.add = ["!folder/"]
 ```
 
 Alternatively, you can stop populating `pants_ignore` from your `.gitignore` by setting `pants_ignore_use_gitignore = false` in the `[GLOBAL]` scope.
+
+## Pants cannot find a required binary
+
+Pants may be unable to locate a required binary to execute a specified goal. This can manifest in an error message such as:
+
+```
+BinaryNotFoundError: Cannot find `required_binary` on `['/usr/bin/', '/bin', '/usr/local/bin', '/opt/homebrew/bin']`. Please ensure that it is installed so that Pants can interact with the required_binary.
+```
+
+Helpfully, the error message already contains the list of directories that pants searches for binaries. This list is controlled by the [`system_binary_paths`](../../reference/subsystems/system-binaries#system_binary_paths) setting in the system-binaries subsystem. Ensure that the directory that contains your binary is on the list.
+
+If `system_binary_paths` contains the special string `<PATH>`, note that the PATH variable can also be changed after the invocation of pants in [`.pants.bootstrap`](../..//docs/using-pants/key-concepts/options#pantsbootstrap-file).
+
+Pantsd caches the location of binaries and also negative hits. If you recently installed the binary or changed its location, make sure to stop pantsd so that it will be restarted on the next invocation of pants. To do so, run `rm -r .pants.d/pids/` in the build root.
 
 ## Import errors and missing dependencies
 

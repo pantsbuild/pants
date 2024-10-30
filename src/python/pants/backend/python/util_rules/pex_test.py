@@ -181,7 +181,7 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
             "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
             "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
         ),
-        interpreter_constraints=InterpreterConstraints(["CPython>=3.6"]),
+        interpreter_constraints=InterpreterConstraints(["CPython>=3.8"]),
         env={"LANG": "es_PY.UTF-8"},
     )
 
@@ -190,7 +190,7 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
         Process,
         [
             pex_process_type(
-                pex_data.pex,
+                pex_data.pex,  # type: ignore[arg-type]
                 description="Run the pex and check its reported environment",
             ),
         ],
@@ -232,7 +232,7 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
         pex_type=pex_type,
         main=EntryPoint("main"),
         sources=sources,
-        interpreter_constraints=InterpreterConstraints(["CPython>=3.6"]),
+        interpreter_constraints=InterpreterConstraints(["CPython>=3.8"]),
     )
 
     pex_process_type = PexProcess if isinstance(pex_data.pex, Pex) else VenvPexProcess
@@ -248,7 +248,7 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
             Process,
             [
                 pex_process_type(
-                    pex_data.pex,
+                    pex_data.pex,  # type: ignore[arg-type]
                     description="Run the pex and check its cwd",
                     working_directory=working_dir,
                     input_digest=runtime_files,
@@ -426,7 +426,7 @@ def test_entry_point(rule_runner: RuleRunner) -> None:
 
 
 def test_interpreter_constraints(rule_runner: RuleRunner) -> None:
-    constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6,<3.12"])
+    constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.8,<3.12"])
     pex_info = create_pex_and_get_pex_info(
         rule_runner, interpreter_constraints=constraints, internal_only=False
     )
@@ -442,7 +442,7 @@ def test_platforms(rule_runner: RuleRunner) -> None:
     # We use Python 2.7, rather than Python 3, to ensure that the specified platform is
     # actually used.
     platforms = PexPlatforms(["linux-x86_64-cp-27-cp27mu"])
-    constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
+    constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.8"])
     pex_data = create_pex_and_get_all_data(
         rule_runner,
         requirements=PexRequirements(["cryptography==2.9"]),
