@@ -12,13 +12,14 @@ from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
+from pants.engine.intrinsics import execute_process
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import NativeDependenciesRequest
 from pants.engine.intrinsics import parse_dockerfile_info
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule, implicitly
 from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
@@ -162,7 +163,11 @@ async def _natively_parse_dockerfile(address: Address, digest: Digest) -> Docker
 async def _legacy_parse_dockerfile(
     address: Address, digest: Digest, dockerfiles: tuple[str, ...]
 ) -> DockerfileInfo:
-    result = await Get(ProcessResult, DockerfileParseRequest(digest, dockerfiles))
+    process = await setup_process_for_parse_dockerfile(
+        DockerfileParseRequest(digest, dockerfiles),
+        **implicitly(),
+    )
+    result = await execute_process(process, **implicitly())
 
     try:
         raw_output = result.stdout.decode("utf-8")
