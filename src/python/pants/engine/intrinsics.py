@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 
+from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     AddPrefix,
@@ -102,7 +103,8 @@ async def add_prefix(add_prefix: AddPrefix) -> Digest:
 
 @rule
 async def execute_process(
-    process: Process, process_execution_environment: ProcessExecutionEnvironment
+    process: Process, process_execution_environment: ProcessExecutionEnvironment,
+    subprocess_env_vars: SubprocessEnvironmentVars,
 ) -> FallibleProcessResult:
     return await native_engine.execute_process(process, process_execution_environment)
 
