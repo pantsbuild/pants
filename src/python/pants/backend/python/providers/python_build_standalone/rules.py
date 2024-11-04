@@ -6,6 +6,8 @@ import collections.abc
 import functools
 import json
 import textwrap
+import uuid
+from pathlib import PurePath
 from typing import Iterable, TypedDict, cast
 
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -19,7 +21,14 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
 )
 from pants.core.util_rules.external_tool import rules as external_tools_rules
-from pants.core.util_rules.system_binaries import CpBinary
+from pants.core.util_rules.system_binaries import (
+    CpBinary,
+    MkdirBinary,
+    MvBinary,
+    RmBinary,
+    ShBinary,
+    TestBinary,
+)
 from pants.engine.fs import DownloadFile
 from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.selectors import Get
@@ -179,7 +188,12 @@ async def get_python(
     pbs_subsystem: PBSPythonProviderSubsystem,
     platform: Platform,
     named_caches_dir: NamedCachesDirOption,
+    sh: ShBinary,
+    mkdir: MkdirBinary,
     cp: CpBinary,
+    mv: MvBinary,
+    rm: RmBinary,
+    test: TestBinary,
 ) -> PythonExecutable:
     versions_info = pbs_subsystem.get_all_pbs_pythons()
 
@@ -204,15 +218,76 @@ async def get_python(
         ),
     )
 
+    sandbox_cache_dir = PurePath(PBS_SANDBOX_NAME)
+
+    # The final desired destination within the named cache:
+    persisted_destination = sandbox_cache_dir / python_version
+
+    # Temporary directory (on the same filesystem as the persisted destination) to copy to,
+    # incorporating uniqueness so that we don't collide with concurrent invocations
+    temp_dir = sandbox_cache_dir / "tmp" / f"pbs-copier-{uuid.uuid4()}"
+    copy_target = temp_dir / python_version
+
     await Get(
         ProcessResult,
         Process(
             [
-                cp.path,
-                "-R",
-                "-n",
-                "python",
-                f"{PBS_SANDBOX_NAME}/{python_version}",
+                sh.path,
+                "-euc",
+                # Atomically-copy the downloaded files into the named cache, in 5 steps:
+                #
+                # 1. Check if the target directory already exists, skipping all the work if it does
+                #    (the atomic creation means this will be fully created by an earlier execution,
+                #    no torn state).
+                #
+                # 2. Copy the files into a temporary directory within the persistent named cache. Copying
+                #    into a temporary directory ensures that we don't end up with partial state if this
+                #    process is interrupted. Placing the temporary directory within the persistent named
+                #    cache ensures it is on the same filesystem as the final destination, allowing for
+                #    atomic mv.
+                #
+                # 3. Actually move the temporary directory to the final destination, failing if it
+                #    already exists (which would indicate a concurrent execution), but squashing that
+                #    error. Note that this is specifically moving to the parent directory of the target,
+                #    i.e. something like:
+                #
+                #        mv .python_build_standalone/tmp/pbs-copier-.../3.10.11 .python_build_standalone
+                #
+                #    which detects `.python_build_standalone` is a directory and thus attempts to create
+                #    `.python_build_standalone/3.10.11`. This fails if that target already exists. The
+                #    alternative of explicitly passing the final target like
+                #    `mv ... .python_build_standalone/3.10.11` will (incorrectly) create nested
+                #    directory `.python_build_standalone/3.10.11/3.10.11` if the target already exists.
+                #
+                # 4. Check it worked. In particular, mv might fail for a different reason than the final
+                #    destination already existing: in those cases, we won't have put things in the right
+                #    place, and downstream code won't have the Python it needs. So, we check that the
+                #    final destination exists and fail if it doesn't, surfacing any errors to the user.
+                #
+                # 5. Clean-up the temporary files
+                f"""
+                # Step 1: check and skip
+                if {test.path} -d {persisted_destination}; then
+                    echo "{persisted_destination} already exists, fully created by earlier execution" >&2
+                    exit 0
+                fi
+
+                # Step 2: copy from the digest into the named cache
+                {mkdir.path} -p "{temp_dir}"
+                {cp.path} -R python "{copy_target}"
+
+                # Step 3: attempt to move, squashing the error
+                {mv.path} "{copy_target}" "{persisted_destination.parent}" || echo "mv failed: ?" >&2
+
+                # Step 4: confirm and clean-up
+                if ! {test.path} -d "{persisted_destination}"; then
+                    echo "Failed to create {persisted_destination}" >&2
+                    exit 1
+                fi
+
+                # Step 5: remove the temporary directory
+                {rm.path} -rf "{temp_dir}"
+                """,
             ],
             level=LogLevel.DEBUG,
             input_digest=downloaded_python.digest,
