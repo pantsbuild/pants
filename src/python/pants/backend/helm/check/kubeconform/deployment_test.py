@@ -126,6 +126,7 @@ def test_valid_deployment(rule_runner: RuleRunner) -> None:
     )
 
 
+@pytest.mark.platform_specific_behavior
 def test_invalid(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
