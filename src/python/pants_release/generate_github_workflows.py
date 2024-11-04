@@ -82,6 +82,7 @@ GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS12_X86_64}
 SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS11_ARM64}
 # We control these runners, so we preinstall and expose python on them.
 HAS_PYTHON = {Platform.LINUX_ARM64, Platform.MACOS11_ARM64}
+HAS_GO = {Platform.MACOS12_X86_64, Platform.MACOS11_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
@@ -740,8 +741,9 @@ def test_jobs(
             *checkout(),
             *(launch_bazel_remote() if with_remote_caching else []),
             install_jdk(),
+            *([install_go()] if helper.platform not in HAS_GO else []),
             *(
-                [install_go(), download_apache_thrift()]
+                [download_apache_thrift()]
                 if helper.platform == Platform.LINUX_X86_64
                 # Other platforms either don't run those tests, or have the binaries
                 # preinstalled on the self-hosted runners.
