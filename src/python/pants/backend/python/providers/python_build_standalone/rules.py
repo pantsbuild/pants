@@ -277,7 +277,7 @@ async def get_python(
                 {cp.path} -R python "{copy_target}"
 
                 # Step 3: attempt to move, squashing the error
-                {mv.path} "{copy_target}" "{persisted_destination.parent}" || echo "mv failed: ?" >&2
+                {mv.path} "{copy_target}" "{persisted_destination.parent}" || echo "mv failed: $?" >&2
 
                 # Step 4: confirm and clean-up
                 if ! {test.path} -d "{persisted_destination}"; then
