@@ -68,6 +68,7 @@ def test_no_changes_needed(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is False
 
 
+@pytest.mark.platform_specific_behavior
 def test_changes_needed(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.toml": BAD_FILE, "sub/g.toml": BAD_FILE})
     fmt_result = run_taplo(rule_runner)
