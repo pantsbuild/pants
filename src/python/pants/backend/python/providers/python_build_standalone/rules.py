@@ -5,10 +5,8 @@ from __future__ import annotations
 import collections.abc
 import functools
 import json
-import os
-import shutil
 import textwrap
-from typing import Iterable, TypedDict, Union, cast
+from typing import Iterable, TypedDict, cast
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -41,8 +39,6 @@ from pants.util.strutil import softwrap
 PBS_SANDBOX_NAME = ".python_build_standalone"
 PBS_NAMED_CACHE_NAME = "python_build_standalone"
 PBS_APPEND_ONLY_CACHES = FrozenDict({PBS_NAMED_CACHE_NAME: PBS_SANDBOX_NAME})
-
-StrPath = Union[str, bytes, os.PathLike]
 
 
 class PBSPythonInfo(TypedDict):
@@ -194,7 +190,7 @@ async def get_python(
     )
     pbs_py_info = versions_info[python_version][platform.value]
 
-    await Get(
+    downloaded_python = await Get(
         DownloadedExternalTool,
         ExternalToolRequest(
             DownloadFile(
@@ -208,12 +204,25 @@ async def get_python(
         ),
     )
 
-    # Copy the python binary into the sandbox
-    shutil.copytree(
-        "python",
-        f"{PBS_SANDBOX_NAME}/{python_version}",
-        dirs_exist_ok=True,
-        copy_function=_copy_no_clobber,
+    await Get(
+        ProcessResult,
+        Process(
+            [
+                cp.path,
+                "--recursive",
+                "--no-clobber",
+                "python",
+                f"{PBS_SANDBOX_NAME}/{python_version}",
+            ],
+            level=LogLevel.DEBUG,
+            input_digest=downloaded_python.digest,
+            description=f"Install Python {python_version}",
+            append_only_caches=PBS_APPEND_ONLY_CACHES,
+            # Don't cache, we want this to always be run so that we can assume for the rest of the
+            # session the named_cache destination for this Python is valid, as the Python ecosystem
+            # mainly assumes absolute paths for Python interpreters.
+            cache_scope=ProcessCacheScope.PER_SESSION,
+        ),
     )
 
     python_path = named_caches_dir.val / PBS_NAMED_CACHE_NAME / python_version / "bin" / "python3"
@@ -233,8 +242,3 @@ def rules():
         *external_tools_rules(),
         UnionRule(PythonProvider, PBSPythonProvider),
     )
-
-
-def _copy_no_clobber(src: StrPath, dst: StrPath) -> None:
-    if not os.path.exists(dst):
-        shutil.copy2(src, dst)
