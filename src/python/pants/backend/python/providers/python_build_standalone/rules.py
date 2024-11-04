@@ -209,8 +209,8 @@ async def get_python(
         Process(
             [
                 cp.path,
-                "--recursive",
-                "--no-clobber",
+                "-R",
+                "-n",
                 "python",
                 f"{PBS_SANDBOX_NAME}/{python_version}",
             ],
