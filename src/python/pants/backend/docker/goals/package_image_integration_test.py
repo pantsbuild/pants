@@ -48,6 +48,7 @@ def run_docker(
     return result
 
 
+@pytest.mark.platform_specific_behavior
 def test_docker_build(rule_runner: RuleRunner) -> None:
     """This test requires a running docker daemon."""
     rule_runner.write_files(
