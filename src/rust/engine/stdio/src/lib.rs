@@ -82,9 +82,9 @@ impl Console {
 impl Drop for Console {
     fn drop(&mut self) {
         // "Forget" about our file handles without closing them.
-        self.stdin_handle.take().unwrap().into_raw_fd();
-        self.stdout_handle.take().unwrap().into_raw_fd();
-        self.stderr_handle.take().unwrap().into_raw_fd();
+        let _ = self.stdin_handle.take().unwrap().into_raw_fd();
+        let _ = self.stdout_handle.take().unwrap().into_raw_fd();
+        let _ = self.stderr_handle.take().unwrap().into_raw_fd();
     }
 }
 

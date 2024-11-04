@@ -10,8 +10,10 @@ Created as part of the release process.
 + Alan Velasco
 + Alex Bancroft
 + Alex Schmitt
++ Alexander Heldt
 + Alexander Johnson
 + Alexander Kuhn-Regnier
++ Alexandre Viau
 + Alexey Tereshenkov
 + Alisha Parveen
 + Andreas Stenius
@@ -253,6 +255,7 @@ Created as part of the release process.
 + Mohamed Abdi
 + Morten Hauge
 + Moses Nakamura
++ Muhammad Tsany Qudsi
 + Nadav Samet
 + Nathan Levesque
 + Navneeth Jayendran

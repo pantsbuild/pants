@@ -759,7 +759,7 @@ async def find_binary(
     env_target: EnvironmentTarget,
 ) -> BinaryPaths:
     found_paths: tuple[str, ...]
-    if env_target.can_use_system_path_metadata_requests:
+    if env_target.can_access_local_system_paths:
         found_paths = await _find_candidate_paths_via_path_metadata_lookups(request)
     else:
         found_paths = await _find_candidate_paths_via_subprocess_helper(request, env_target)

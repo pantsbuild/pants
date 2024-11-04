@@ -38,7 +38,6 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.pydocstyle.subsystem import Pydocstyle
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
-from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
 from pants.backend.python.subsystems.debugpy import DebugPy
@@ -127,9 +126,6 @@ all_python_tools = tuple(
             PythonTool(PythonProtobufGrpclibPlugin, "pants.backend.codegen.protobuf.python"),
             PythonTool(Pytype, "pants.backend.experimental.python.typecheck.pytype"),
             PythonTool(PyOxidizer, "pants.backend.experimental.python.packaging.pyoxidizer"),
-            # Note - Ruff has two backends (<package>.check and <package>.format).
-            # Both of these rely on the same resolve underneath so we just pick one here.
-            PythonTool(Ruff, "pants.backend.experimental.python.lint.ruff.check"),
             PythonTool(SemgrepSubsystem, "pants.backend.experimental.tools.semgrep"),
             PythonTool(Setuptools, "pants.backend.python"),
             PythonTool(SetuptoolsSCM, "pants.backend.python"),

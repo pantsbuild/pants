@@ -659,14 +659,18 @@ def test_coverage(rule_runner: PythonRuleRunner) -> None:
 
 
 def sort_results() -> None:
-    create_test_result = partial(
-        TestResult,
-        stdout="",
-        stdout_digest=EMPTY_FILE_DIGEST,
-        stderr="",
-        stderr_digest=EMPTY_FILE_DIGEST,
-        output_setting=ShowOutput.ALL,
-    )
+    def create_test_result(exit_code: int | None, addresses: Iterable[Address]) -> TestResult:
+        return TestResult(
+            exit_code=exit_code,
+            addresses=tuple(addresses),
+            stdout_bytes=b"",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_bytes=b"",
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_setting=ShowOutput.ALL,
+            result_metadata=None,
+        )
+
     skip1 = create_test_result(
         exit_code=None,
         addresses=(Address("t1"),),

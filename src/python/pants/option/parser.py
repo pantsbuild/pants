@@ -344,22 +344,20 @@ class Parser:
         Useful for generating help and other documentation.
 
         Each yielded item is an (args, kwargs) pair, as passed to register(), except that kwargs
-        will be normalized in the following ways:
-          - It will always have 'dest' explicitly set.
-          - It will always have 'default' explicitly set, and the value will be a RankedValue.
+        will be normalized to always have 'dest' and 'default' explicitly set.
         """
 
         def normalize_kwargs(orig_args, orig_kwargs):
             nkwargs = copy.copy(orig_kwargs)
             dest = self.parse_dest(*orig_args, **nkwargs)
             nkwargs["dest"] = dest
-            if not ("default" in nkwargs and isinstance(nkwargs["default"], RankedValue)):
+            if "default" not in nkwargs:
                 type_arg = nkwargs.get("type", str)
                 member_type = nkwargs.get("member_type", str)
                 default_val = self.to_value_type(nkwargs.get("default"), type_arg, member_type)
                 if isinstance(default_val, (ListValueComponent, DictValueComponent)):
                     default_val = default_val.val
-                nkwargs["default"] = RankedValue(Rank.HARDCODED, default_val)
+                nkwargs["default"] = default_val
             return nkwargs
 
         # Yield our directly-registered options.
