@@ -163,6 +163,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert_success(rule_runner)
 
 
+@pytest.mark.platform_specific_behavior
 def test_failure(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"test.yaml": REPEATED_KEY, "not_yaml": NOT_YAML})
     assert_failure_with('duplication of key "this"', rule_runner)
