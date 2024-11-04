@@ -72,6 +72,7 @@ def run_run_request(
         return mocked_console[1].get_stdout().strip()
 
 
+@pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize("py_version", ["3.8.*", "3.9.*", "3.9.10"])
 def test_using_pbs(rule_runner, py_version):
     rule_runner.write_files(
