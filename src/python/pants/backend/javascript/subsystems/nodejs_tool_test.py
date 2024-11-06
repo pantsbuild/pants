@@ -92,7 +92,7 @@ def test_execute_process_with_package_manager(
     [
         pytest.param("yarn", "1.22.22", id="yarn"),
         pytest.param("npm", "10.9.0", id="npm"),
-        pytest.param("pnpm", "9.12.1", id="pnpm"),
+        pytest.param("pnpm", "9.12.3", id="pnpm"),
     ],
 )
 def test_execute_process_with_package_manager_version_from_configuration(
