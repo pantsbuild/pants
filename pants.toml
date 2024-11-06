@@ -13,6 +13,7 @@ backend_packages.add = [
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
+  "pants.backend.experimental.python.lint.ruff.check",
   "pants.backend.python.typecheck.mypy",
   "pants.backend.python.lint.pyupgrade",
   "pants.backend.python.mixed_interpreter_constraints",
