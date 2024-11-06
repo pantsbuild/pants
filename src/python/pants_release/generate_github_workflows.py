@@ -83,6 +83,7 @@ SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS11_ARM64}
 # We control these runners, so we preinstall and expose python on them.
 HAS_PYTHON = {Platform.LINUX_ARM64, Platform.MACOS11_ARM64}
 HAS_GO = {Platform.MACOS12_X86_64, Platform.MACOS11_ARM64}
+HAS_DOCKER = {Platform.LINUX_ARM64, Platform.LINUX_X86_64, Platform.MACOS11_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
@@ -373,6 +374,11 @@ def install_go(node16_compat: bool = False) -> Step:
         "with": {"go-version": "1.19.5"},
     }
 
+def install_docker_with_brew() -> Step:
+    return {
+        "name": "Install Docker",
+        "run": "brew install docker",
+    }
 
 # NOTE: Any updates to the version of arduino/setup-protoc will require an audit of the updated  source code to verify
 # nothing "bad" has been added to the action. (We pass the user's GitHub secret to the action in order to avoid the
@@ -742,6 +748,7 @@ def test_jobs(
             *(launch_bazel_remote() if with_remote_caching else []),
             install_jdk(),
             *([install_go()] if helper.platform not in HAS_GO else []),
+            *([install_docker_with_brew()] if helper.platform not in HAS_DOCKER else []),
             *(
                 [download_apache_thrift()]
                 if helper.platform == Platform.LINUX_X86_64
