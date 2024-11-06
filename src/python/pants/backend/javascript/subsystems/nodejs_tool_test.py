@@ -13,7 +13,7 @@ from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.subsystems import nodejs_tool
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase, NodeJSToolRequest
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult, Process, ProcessResult
+from pants.engine.process import InteractiveProcess, Process, ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 from pants.util.logging import LogLevel
 
@@ -77,9 +77,7 @@ def test_execute_process_with_package_manager(
     ip = InteractiveProcess.from_process(to_run)
     with mock_console(rule_runner.options_bootstrapper) as mocked_console:
         interactive_result = rule_runner.run_interactive_process(ip)
-        assert interactive_result.exit_code == 0, mocked_console[
-            1
-        ].get_stderr()
+        assert interactive_result.exit_code == 0, mocked_console[1].get_stderr()
 
     # Remove the corepack binary path from argv.
     assert to_run.argv[1:] == expected_argv + ("cowsay@1.6.0", "--version")

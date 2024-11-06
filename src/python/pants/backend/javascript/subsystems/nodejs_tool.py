@@ -14,7 +14,11 @@ from pants.backend.javascript.install_node_package import (
 from pants.backend.javascript.nodejs_project_environment import NodeJsProjectEnvironmentProcess
 from pants.backend.javascript.package_manager import PackageManager
 from pants.backend.javascript.resolve import FirstPartyNodePackageResolves, NodeJSProjectResolves
-from pants.backend.javascript.subsystems.nodejs import NodeJS, NodeJSProcessEnvironment, NodeJSToolProcess
+from pants.backend.javascript.subsystems.nodejs import (
+    NodeJS,
+    NodeJSProcessEnvironment,
+    NodeJSToolProcess,
+)
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process
@@ -121,7 +125,12 @@ async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
         NodeJSToolProcess(
             env.binaries.binary_dir + "/corepack",
             pkg_manager.version,
-            args=(pkg_manager.name, *pkg_manager.download_and_execute_args, request.tool, *request.args),
+            args=(
+                pkg_manager.name,
+                *pkg_manager.download_and_execute_args,
+                request.tool,
+                *request.args,
+            ),
             description=request.description,
             input_digest=request.input_digest,
             output_files=request.output_files,
