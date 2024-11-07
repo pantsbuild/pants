@@ -22,7 +22,7 @@ jobs:
     - self-hosted
     - runs-on
     - runner=4cpu-linux-arm64
-    - image=ubuntu22-full-arm64-python3.7-python3.8-python3.9
+    - image=ubuntu22-full-arm64-python3.7-3.13
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
@@ -40,7 +40,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.81.0-*
+        path: '~/.rustup/toolchains/1.82.0-*
 
           ~/.rustup/update-hashes
 
@@ -48,7 +48,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -112,16 +112,28 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
       with:
         fetch-depth: 10
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -133,7 +145,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.81.0-*
+        path: '~/.rustup/toolchains/1.82.0-*
 
           ~/.rustup/update-hashes
 
@@ -141,7 +153,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -221,10 +233,22 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 10
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -236,7 +260,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS12-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.81.0-*
+        path: '~/.rustup/toolchains/1.82.0-*
 
           ~/.rustup/update-hashes
 
@@ -244,7 +268,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -316,7 +340,7 @@ jobs:
     - self-hosted
     - runs-on
     - runner=4cpu-linux-arm64
-    - image=ubuntu22-full-arm64-python3.7-python3.8-python3.9
+    - image=ubuntu22-full-arm64-python3.7-3.13
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
@@ -373,7 +397,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -421,75 +445,6 @@ jobs:
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
-  build_wheels_macos10_15_x86_64:
-    env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
-      MODE: debug
-      PANTS_REMOTE_CACHE_READ: 'false'
-      PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
-    name: Build wheels (macOS10-15-x86_64)
-    needs:
-    - classify_changes
-    runs-on:
-    - self-hosted
-    - macOS-10.15-X64
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 10
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Set rustup profile
-      run: rustup set profile default
-    - name: Cache Rust toolchain
-      uses: actions/cache@v4
-      with:
-        key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.81.0-*
-
-          ~/.rustup/update-hashes
-
-          ~/.rustup/settings.toml
-
-          '
-    - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
-      with:
-        cache-bin: 'false'
-        shared-key: engine
-        workspaces: src/rust/engine
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Install Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: 1.19.5
-    - env:
-        ARCHFLAGS: -arch x86_64
-      name: Build wheels
-      run: ./pants run src/python/pants_release/release.py -- build-wheels
-    - env:
-        ARCHFLAGS: -arch x86_64
-      name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v4
-      with:
-        name: logs-wheels-and-pex-macOS10-15-x86_64
-        overwrite: 'true'
-        path: .pants.d/workdir/*.log
-    timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
@@ -520,7 +475,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.81.0-*
+        path: '~/.rustup/toolchains/1.82.0-*
 
           ~/.rustup/update-hashes
 
@@ -528,7 +483,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -559,29 +514,97 @@ jobs:
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
-  check_labels:
-    if: github.repository_owner == 'pantsbuild'
-    name: Ensure PR has a category label
+  build_wheels_macos12_x86_64:
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
+      MODE: debug
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
+    name: Build wheels (macOS12-x86_64)
+    needs:
+    - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - macos-12
     steps:
-    - env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: github.event_name == 'pull_request'
-      name: Ensure category label
-      uses: mheap/github-action-required-labels@v4.0.0
+    - name: Check out code
+      uses: actions/checkout@v4
       with:
-        count: 1
-        labels: category:new feature, category:user api change, category:plugin api change, category:performance, category:bugfix,
-          category:documentation, category:internal
-        mode: exactly
+        fetch-depth: 10
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: macOS12-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.82.0-*
+
+          ~/.rustup/update-hashes
+
+          ~/.rustup/settings.toml
+
+          '
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.19.5
+    - env:
+        ARCHFLAGS: -arch x86_64
+      name: Build wheels
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        ARCHFLAGS: -arch x86_64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v4
+      with:
+        name: logs-wheels-and-pex-macOS12-x86_64
+        overwrite: 'true'
+        path: .pants.d/workdir/*.log
+    timeout-minutes: 90
   check_release_notes:
     if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has release notes
     needs:
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -608,7 +631,7 @@ jobs:
       release: ${{ steps.classify.outputs.release }}
       rust: ${{ steps.classify.outputs.rust }}
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -630,7 +653,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -654,10 +677,22 @@ jobs:
         \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -684,7 +719,7 @@ jobs:
     needs:
     - set_merge_ok
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - run: "merge_ok=\"${{ needs.set_merge_ok.outputs.merge_ok }}\"\nif [[ \"${merge_ok}\" == \"true\" ]]; then\n    echo\
         \ \"Merge OK\"\n    exit 0\nelse\n    echo \"Merge NOT OK\"\n    exit 1\nfi\n"
@@ -693,16 +728,14 @@ jobs:
     name: Set Merge OK
     needs:
     - classify_changes
-    - check_labels
     - check_release_notes
     - bootstrap_pants_linux_arm64
     - bootstrap_pants_linux_x86_64
     - bootstrap_pants_macos12_x86_64
     - build_wheels_linux_arm64
     - build_wheels_linux_x86_64
-    - build_wheels_macos10_15_x86_64
     - build_wheels_macos11_arm64
-    - check_labels
+    - build_wheels_macos12_x86_64
     - check_release_notes
     - classify_changes
     - lint_python
@@ -721,7 +754,7 @@ jobs:
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - id: set_merge_ok
       run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
@@ -736,7 +769,7 @@ jobs:
     - self-hosted
     - runs-on
     - runner=4cpu-linux-arm64
-    - image=ubuntu22-full-arm64-python3.7-python3.8-python3.9
+    - image=ubuntu22-full-arm64-python3.7-3.13
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
@@ -790,7 +823,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -834,12 +867,22 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -882,7 +925,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -926,12 +969,22 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -974,7 +1027,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1018,12 +1071,22 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1066,7 +1129,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1110,12 +1173,22 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1158,7 +1231,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1202,12 +1275,22 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1250,7 +1333,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1294,12 +1377,22 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1342,7 +1435,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1386,12 +1479,22 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1434,7 +1537,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1478,12 +1581,22 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1526,7 +1639,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1570,12 +1683,22 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1618,7 +1741,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1662,12 +1785,22 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1721,12 +1854,22 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Set up Python 3.9
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@v9
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:

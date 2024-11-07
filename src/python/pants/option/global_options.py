@@ -800,7 +800,7 @@ class LogLevelOption(EnumOption[LogLevel, LogLevel]):
 
     def __new__(cls) -> LogLevelOption:
         self = super().__new__(
-            cls,  # type: ignore[arg-type]
+            cls,
             default=LogLevel.INFO,
             daemon=True,
             help="Set the logging level.",
@@ -1800,6 +1800,22 @@ class BootstrapOptions:
             f"""
             Silence warnings about running Pants on macOS 10.15 - 11. In future versions, Pants will
             only be supported on macOS 12 and newer.
+
+            If you have questions or concerns about this, please reach out to us at
+            {doc_url("community/getting-help")}.
+            """
+        ),
+        removal_version="2.26.0.dev0",
+        removal_hint='Upgrade your operating system or write `allow_deprecated_macos_versions = ["10", "11"]` instead.',
+    )
+
+    allow_deprecated_macos_versions = StrListOption(
+        default=[],
+        advanced=True,
+        help=softwrap(
+            f"""
+            Silence warnings/errors about running Pants on these versions of macOS. Pants only supports
+            recent versions of macOS. You can try running on older versions, but it may or may not work.
 
             If you have questions or concerns about this, please reach out to us at
             {doc_url("community/getting-help")}.

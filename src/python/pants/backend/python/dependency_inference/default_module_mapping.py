@@ -216,7 +216,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
     "pyjwt": ("jwt",),
     "pykube-ng": ("pykube",),
     "pymongo": ("bson", "gridfs", "pymongo"),
-    "pymupdf": ("fitz",),
+    "pymupdf": ("fitz", "pymupdf"),
     "pynacl": ("nacl",),
     "pyopenssl": ("OpenSSL",),
     "pypdf2": ("PyPDF2",),

@@ -141,14 +141,16 @@ class _AwaitableCollector(ast.NodeVisitor):
         if beginning_indent:
             source = "\n".join(line[beginning_indent:] for line in source.split("\n"))
 
-        self.source_file = inspect.getsourcefile(func)
+        self.source_file = inspect.getsourcefile(func) or "<unknown>"
 
         self.types = _TypeStack(func)
         self.awaitables: List[AwaitableConstraints] = []
         self.visit(ast.parse(source))
 
     def _format(self, node: ast.AST, msg: str) -> str:
-        lineno = node.lineno + self.func.__code__.co_firstlineno - 1
+        lineno: str = "<unknown>"
+        if isinstance(node, (ast.expr, ast.stmt)):
+            lineno = str(node.lineno + self.func.__code__.co_firstlineno - 1)
         return f"{self.source_file}:{lineno}: {msg}"
 
     def _lookup(self, attr: ast.expr) -> Any:

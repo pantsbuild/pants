@@ -5,13 +5,14 @@ use std::time::Duration;
 
 use futures::future::TryFutureExt;
 use futures::try_join;
-use pyo3::prelude::{pyfunction, wrap_pyfunction, IntoPy, PyModule, PyResult, Python};
+use pyo3::types::{PyAnyMethods, PyModule, PyModuleMethods};
+use pyo3::{pyfunction, wrap_pyfunction, Bound, IntoPy, PyResult, Python};
 
 use crate::externs::{self, PyGeneratorResponseNativeCall};
 use crate::nodes::{task_get_context, ExecuteProcess, NodeResult, Snapshot};
 use crate::python::Value;
 
-pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(execute_process, m)?)?;
 
     Ok(())
@@ -23,7 +24,7 @@ fn execute_process(process: Value, process_config: Value) -> PyGeneratorResponse
         let context = task_get_context();
 
         let process_config: externs::process::PyProcessExecutionEnvironment =
-            Python::with_gil(|py| process_config.extract(py)).map_err(|e| format!("{e}"))?;
+            Python::with_gil(|py| process_config.bind(py).extract()).map_err(|e| format!("{e}"))?;
         let process_request = ExecuteProcess::lift(&context.core.store(), process, process_config)
             .map_err(|e| e.enrich("Error lifting Process"))
             .await?;

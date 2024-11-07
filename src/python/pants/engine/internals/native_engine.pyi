@@ -534,6 +534,13 @@ class PathMetadata:
     def symlink_target(self) -> str | None: ...
     def copy(self) -> PathMetadata: ...
 
+class PathNamespace:
+    WORKSPACE: PathNamespace = ...
+    SYSTEM: PathNamespace = ...
+
+    def __eq__(self, other: PathNamespace | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+
 # ------------------------------------------------------------------------------
 # Intrinsics
 # ------------------------------------------------------------------------------
@@ -682,6 +689,7 @@ class PyOptionParser:
     ) -> OptionListValue[str]: ...
     def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionDictValue: ...
     def get_passthrough_args(self) -> Optional[list[str]]: ...
+    def get_unconsumed_flags(self) -> dict[str, list[str]]: ...
 
 # ------------------------------------------------------------------------------
 # Testutil
@@ -751,6 +759,7 @@ class RawFdRunner(Protocol):
         stderr_fileno: int,
     ) -> int: ...
 
+def initialize() -> None: ...
 def capture_snapshots(
     scheduler: PyScheduler,
     session: PySession,
@@ -904,15 +913,19 @@ class PyGeneratorResponseCall:
     @overload
     def __init__(
         self,
+        rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
         input_arg0: dict[Any, type],
     ) -> None: ...
     @overload
-    def __init__(self, output_type: type, args: tuple[Any, ...], input_arg0: _Input) -> None: ...
+    def __init__(
+        self, rule_id: str, output_type: type, args: tuple[Any, ...], input_arg0: _Input
+    ) -> None: ...
     @overload
     def __init__(
         self,
+        rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
         input_arg0: type[_Input],
@@ -921,6 +934,7 @@ class PyGeneratorResponseCall:
     @overload
     def __init__(
         self,
+        rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
         input_arg0: type[_Input] | _Input,

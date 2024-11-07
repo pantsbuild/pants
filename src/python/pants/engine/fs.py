@@ -21,7 +21,7 @@ from pants.engine.internals.native_engine import AddPrefix as AddPrefix
 from pants.engine.internals.native_engine import Digest as Digest
 from pants.engine.internals.native_engine import FileDigest as FileDigest
 from pants.engine.internals.native_engine import MergeDigests as MergeDigests
-from pants.engine.internals.native_engine import PathMetadata
+from pants.engine.internals.native_engine import PathMetadata, PathNamespace
 from pants.engine.internals.native_engine import RemovePrefix as RemovePrefix
 from pants.engine.internals.native_engine import Snapshot as Snapshot
 from pants.engine.rules import QueryRule
@@ -350,6 +350,7 @@ class PathMetadataRequest:
     """
 
     path: str
+    namespace: PathNamespace = PathNamespace.WORKSPACE
 
 
 @dataclass(frozen=True)

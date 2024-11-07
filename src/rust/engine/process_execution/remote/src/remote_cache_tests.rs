@@ -96,7 +96,7 @@ struct StoreSetup {
 
 impl StoreSetup {
     pub async fn new() -> Self {
-        Self::new_with_stub_cas(StubCAS::builder().build()).await
+        Self::new_with_stub_cas(StubCAS::builder().build().await).await
     }
 
     pub async fn new_with_stub_cas(cas: StubCAS) -> Self {
@@ -358,7 +358,8 @@ async fn cache_read_speculation() {
         let store_setup = StoreSetup::new_with_stub_cas(
             StubCAS::builder()
                 .ac_read_delay(Duration::from_millis(remote_delay_ms))
-                .build(),
+                .build()
+                .await,
         )
         .await;
         let (local_runner, local_runner_call_counter) = create_local_runner(1, local_delay_ms);
@@ -560,7 +561,8 @@ async fn cache_write_does_not_block() {
     let store_setup = StoreSetup::new_with_stub_cas(
         StubCAS::builder()
             .ac_write_delay(Duration::from_millis(100))
-            .build(),
+            .build()
+            .await,
     )
     .await;
     let (local_runner, local_runner_call_counter) = create_local_runner(0, 100);
@@ -750,7 +752,7 @@ async fn make_action_result_basic() {
         .expect("Error saving directory");
 
     let mock_command_runner = Arc::new(MockCommandRunner);
-    let cas = StubCAS::builder().build();
+    let cas = StubCAS::builder().build().await;
     let runner = crate::remote_cache::CommandRunner::from_provider_options(
         RemoteCacheRunnerOptions {
             inner: mock_command_runner.clone(),
@@ -845,4 +847,50 @@ async fn make_action_result_basic() {
       TestTree::roland_at_root().digest(),  // tree directory
     };
     assert_eq!(expected_digests_set, actual_digests_set);
+}
+
+#[tokio::test]
+async fn no_remote_cache_on_scope_local() {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
+
+    async fn run_process(
+        cache_hit: bool,
+        cache_scope: ProcessCacheScope,
+        workunit: &mut RunningWorkunit,
+    ) -> (i32, usize) {
+        let store_setup = StoreSetup::new_with_stub_cas(
+            StubCAS::builder()
+                .ac_read_delay(Duration::from_millis(100))
+                .build()
+                .await,
+        )
+        .await;
+        let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
+        let cache_runner =
+            create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer).await;
+
+        let (process, action_digest) = create_process(&store_setup).await;
+        let process = process.cache_scope(cache_scope);
+        if cache_hit {
+            store_setup
+                .cas
+                .action_cache
+                .insert(action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
+        }
+
+        assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
+        let result = cache_runner
+            .run(Context::default(), workunit, process)
+            .await
+            .unwrap();
+
+        let final_local_count = local_runner_call_counter.load(Ordering::SeqCst);
+        (result.exit_code, final_local_count)
+    }
+
+    // remote is not used because of cache scope LocalSuccessful.
+    let (exit_code, local_call_count) =
+        run_process(true, ProcessCacheScope::LocalSuccessful, &mut workunit).await;
+    assert_eq!(exit_code, 1);
+    assert_eq!(local_call_count, 1);
 }

@@ -13,6 +13,7 @@ from pants.backend.python.subsystems.python_native_code import PythonNativeCodeS
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex_environment
 from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexSubsystem
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import adhoc_binaries, external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
@@ -25,6 +26,7 @@ from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
 from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
@@ -40,9 +42,9 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.16.2"
+    default_version = "v2.20.3"
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.3.0,<3.0"
+    version_constraints = ">=2.13.0,<3.0"
 
     # extra args to be passed to the pex tool; note that they
     # are going to apply to all invocations of the pex tool.
@@ -63,8 +65,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "f2ec29dda754c71a8b662e3b4a9071aef269a9991ae920666567669472dcd556",
-                    "4284448",
+                    "0100c2e0b9e5dd56b063c98176cdd11b6064c2439d0faefdd3d25453393ed9fb",
+                    "4315782",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
@@ -205,7 +207,7 @@ async def setup_pex_cli_process(
     env = {
         **complete_pex_env.environment_dict(python=bootstrap_python),
         **python_native_code.subprocess_env_vars,
-        **(request.extra_env or {}),
+        **(request.extra_env or {}),  # type: ignore[dict-item]
         # If a subcommand is used, we need to use the `pex3` console script.
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
     }
@@ -239,4 +241,5 @@ def rules():
         *external_tool.rules(),
         *pex_environment.rules(),
         *adhoc_binaries.rules(),
+        UnionRule(ExportableTool, PexCli),
     ]

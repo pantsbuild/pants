@@ -12,7 +12,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter
 from pants.option.config import Config
-from pants.option.errors import ConfigValidationError
+from pants.option.errors import ConfigValidationError, UnknownFlagsError
 from pants.option.native_options import NativeOptionParser
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
@@ -273,6 +273,29 @@ class Options:
             )
         global_config.verify(section_to_valid_options)
 
+    def verify_args(self):
+        # Consume all known args, and see if any are left.
+        # This will have the side-effect of precomputing (and memoizing) options for all scopes.
+        for scope in self.known_scope_to_info:
+            self.for_scope(scope)
+        # We implement some global help flags, such as `-h`, `--help`, '-v', `--version`,
+        # as scope aliases (so `--help` is an alias for `help` and so on).
+        # There aren't consumed by the native parser, since they aren't registered as options,
+        # so we must account for them.
+        scope_aliases_that_look_like_flags = set()
+        for si in self.known_scope_to_info.values():
+            scope_aliases_that_look_like_flags.update(
+                sa for sa in si.scope_aliases if sa.startswith("-")
+            )
+
+        for scope, flags in self._native_parser.get_unconsumed_flags().items():
+            flags = tuple(flag for flag in flags if flag not in scope_aliases_that_look_like_flags)
+            if flags:
+                # We may have unconsumed flags in multiple positional contexts, but our
+                # error handling expects just one, so pick the first one. After the user
+                # fixes that error we will show the next scope.
+                raise UnknownFlagsError(flags, scope)
+
     def is_known_scope(self, scope: str) -> bool:
         """Whether the given scope is known by this instance.
 
@@ -389,35 +412,38 @@ class Options:
         :raises pants.option.errors.ConfigValidationError: if the scope is unknown.
         """
 
-        values_builder = OptionValueContainerBuilder()
-        flags_in_scope = self._scope_to_flags.get(scope, [])
-        parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
-        legacy_values = self.get_parser(scope).parse_args(
-            parse_args_request, log_warnings=log_parser_warnings
-        )
+        native_values = self.get_parser(scope).parse_args_native(self._native_parser)
         native_mismatch_msgs = []
 
         if self._native_options_validation == NativeOptionsValidation.ignore:
-            native_values = None
+            legacy_values = None
         else:
             try:
-                native_values = self.get_parser(scope).parse_args_native(self._native_parser)
+                values_builder = OptionValueContainerBuilder()
+                flags_in_scope = self._scope_to_flags.get(scope, [])
+                parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
+                legacy_values = self.get_parser(scope).parse_args(
+                    parse_args_request, log_warnings=log_parser_warnings
+                )
+            except UnknownFlagsError:
+                # Let the native parser handle unknown flags.
+                legacy_values = None
             except Exception as e:
                 native_mismatch_msgs.append(
-                    f"Failed to parse options with native parser due to error:\n    {e}"
+                    f"Failed to parse options with legacy parser due to error:\n    {e}"
                 )
-                native_values = None
+                legacy_values = None
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
-            values_builder = legacy_values.to_builder()
-            self._check_and_apply_deprecations(scope, values_builder)
-            legacy_values = values_builder.build()
+            native_values_builder = native_values.to_builder()
+            self._check_and_apply_deprecations(scope, native_values_builder)
+            native_values = native_values_builder.build()
 
-            if native_values:
-                native_values_builder = native_values.to_builder()
-                self._check_and_apply_deprecations(scope, native_values_builder)
-                native_values = native_values_builder.build()
+            if legacy_values:
+                values_builder = legacy_values.to_builder()
+                self._check_and_apply_deprecations(scope, values_builder)
+                legacy_values = values_builder.build()
 
         def listify_tuples(x):
             # Sequence values from the legacy parser can be tuple or list, but those coming from
@@ -429,7 +455,7 @@ class Options:
             else:
                 return x
 
-        if native_values:
+        if legacy_values:
 
             def legacy_val_info(k):
                 if k in legacy_values:
@@ -475,7 +501,7 @@ class Options:
                         If you can't resolve this discrepancy, please reach out to the Pants
                         development team: {doc_url('/community/getting-help')}.
 
-                        The native parser will become the default in 2.23.x, and the legacy parser
+                        The native parser is the default in 2.23.x, and the legacy parser
                         will be removed in 2.24.x. So it is imperative that we find out about any
                         discrepancies during this transition period.
 
@@ -499,8 +525,7 @@ class Options:
                 raise Exception(
                     "Option value mismatches detected, see logs above for details. Aborting."
                 )
-        # TODO: In a future release, switch to the native_values as authoritative.
-        return legacy_values
+        return native_values
 
     def get_fingerprintable_for_scope(
         self,

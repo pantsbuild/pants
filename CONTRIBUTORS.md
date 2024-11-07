@@ -10,8 +10,10 @@ Created as part of the release process.
 + Alan Velasco
 + Alex Bancroft
 + Alex Schmitt
++ Alexander Heldt
 + Alexander Johnson
 + Alexander Kuhn-Regnier
++ Alexandre Viau
 + Alexey Tereshenkov
 + Alisha Parveen
 + Andreas Stenius
@@ -27,6 +29,7 @@ Created as part of the release process.
 + Bardur Arantsson
 + Bastian Wegge
 + Ben Limmer
++ Benjamin Dabelow
 + Benjy Weinberger
 + Berkay Öztürk
 + Bill Farner
@@ -197,6 +200,7 @@ Created as part of the release process.
 + Kevin Sweeney
 + Koki Nishihara
 + Kris Wilson
++ Krishna Vudata
 + Krishnan Chandra
 + Kushal Dave
 + Kyle Derr
@@ -251,6 +255,7 @@ Created as part of the release process.
 + Mohamed Abdi
 + Morten Hauge
 + Moses Nakamura
++ Muhammad Tsany Qudsi
 + Nadav Samet
 + Nathan Levesque
 + Navneeth Jayendran

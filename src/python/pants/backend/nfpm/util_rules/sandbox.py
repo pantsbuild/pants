@@ -208,7 +208,11 @@ async def populate_nfpm_content_sandbox(
     ):
         for entry in digest_entries:
             if isinstance(entry, FileEntry) and entry.path == source.value:
-                moved_entries.append(dataclasses.replace(entry, path=src.value))
+                new_path = src.value
+                if new_path is None:
+                    raise ValueError("unexpected None")
+
+                moved_entries.append(dataclasses.replace(entry, path=new_path))
             else:
                 moved_entries.append(entry)
 

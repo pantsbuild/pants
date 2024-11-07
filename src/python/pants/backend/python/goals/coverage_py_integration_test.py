@@ -152,7 +152,9 @@ def run_coverage(tmpdir: str, *extra_args: str) -> PantsResult:
 def test_coverage(major_minor_interpreter: str) -> None:
     with setup_tmpdir(sources(False)) as tmpdir:
         result = run_coverage(
-            tmpdir, f"--coverage-py-interpreter-constraints=['=={major_minor_interpreter}.*']"
+            tmpdir,
+            f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']",
+            f"--coverage-py-interpreter-constraints=['=={major_minor_interpreter}.*']",
         )
     assert (
         dedent(
@@ -184,7 +186,9 @@ def test_coverage(major_minor_interpreter: str) -> None:
 def test_coverage_batched(major_minor_interpreter: str) -> None:
     with setup_tmpdir(sources(True)) as tmpdir:
         result = run_coverage(
-            tmpdir, f"--coverage-py-interpreter-constraints=['=={major_minor_interpreter}.*']"
+            tmpdir,
+            f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']",
+            f"--coverage-py-interpreter-constraints=['=={major_minor_interpreter}.*']",
         )
     assert (
         dedent(

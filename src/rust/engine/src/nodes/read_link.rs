@@ -7,7 +7,7 @@ use deepsize::DeepSizeOf;
 use fs::Link;
 use graph::CompoundNode;
 
-use super::{NodeKey, NodeOutput, NodeResult};
+use super::{NodeKey, NodeOutput, NodeResult, SubjectPath};
 use crate::context::Context;
 use crate::python::throw;
 
@@ -15,7 +15,10 @@ use crate::python::throw;
 /// A Node that represents reading the destination of a symlink (non-recursively).
 ///
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct ReadLink(pub(super) Link);
+pub struct ReadLink {
+    pub(super) link: Link,
+    pub(super) subject_path: SubjectPath,
+}
 
 impl ReadLink {
     pub(super) async fn run_node(self, context: Context) -> NodeResult<LinkDest> {
@@ -23,7 +26,7 @@ impl ReadLink {
         let link_dest = context
             .core
             .vfs
-            .read_link(&node.0)
+            .read_link(&node.link)
             .await
             .map_err(|e| throw(format!("{e}")))?;
         Ok(LinkDest(link_dest))

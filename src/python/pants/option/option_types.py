@@ -57,7 +57,7 @@ _RegisterIfFuncT = Callable[[_SubsystemType], Any]
 
 
 def _eval_maybe_dynamic(val: _MaybeDynamicT[_DefaultT], subsystem_cls: _SubsystemType) -> _DefaultT:
-    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[no-any-return]
+    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[return-value]
 
 
 class _OptionBase(Generic[_OptT, _DefaultT]):
@@ -247,7 +247,7 @@ class _ListOptionBase(
     ):
         default = default or []
         instance = super().__new__(
-            cls,  # type: ignore[arg-type]
+            cls,
             flag_name,
             default=default,  # type: ignore[arg-type]
             help=help,
@@ -765,9 +765,9 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
         fingerprint: bool | None = None,
     ):
         return super().__new__(
-            cls,  # type: ignore[arg-type]
+            cls,
             flag_name,
-            default=default,  # type: ignore[arg-type]
+            default=default,
             help=help,
             register_if=register_if,
             advanced=advanced,
@@ -798,8 +798,8 @@ class SkipOption(BoolOption[bool]):
         goals = (goal,) + other_goals
         invocation_str = " and ".join([f"`{bin_name()} {goal}`" for goal in goals])
         return super().__new__(
-            cls,  # type: ignore[arg-type]
-            default=False,  # type: ignore[arg-type]
+            cls,
+            default=False,
             help=lambda subsystem_cls: (
                 f"If true, don't use {subsystem_cls.name} when running {invocation_str}."
             ),
@@ -823,7 +823,7 @@ class ArgsListOption(ShellStrListOption):
         if extra_help:
             extra_help = "\n\n" + extra_help
         instance = super().__new__(
-            cls,  # type: ignore[arg-type]
+            cls,
             help=(
                 lambda subsystem_cls: softwrap(
                     f"""

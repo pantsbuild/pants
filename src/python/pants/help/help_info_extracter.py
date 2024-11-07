@@ -621,18 +621,14 @@ class HelpInfoExtracter:
         if default_help_repr is not None:
             return str(default_help_repr)  # Should already be a string, but might as well be safe.
 
-        ranked_default = kwargs.get("default")
-        fallback: Any = None
+        default = kwargs.get("default")
+        if default is not None:
+            return default
         if is_list_option(kwargs):
-            fallback = []
+            return []
         elif is_dict_option(kwargs):
-            fallback = {}
-        default = (
-            ranked_default.value
-            if ranked_default and ranked_default.value is not None
-            else fallback
-        )
-        return default
+            return {}
+        return None
 
     @staticmethod
     def stringify_type(t: type) -> str:
@@ -1059,7 +1055,8 @@ class HelpInfoExtracter:
                     display_args.append(f"--[no-]{sa_2}")
             else:
                 metavar = self.compute_metavar(kwargs)
-                display_args.append(f"{scoped_arg}={metavar}")
+                separator = "" if is_short_arg else "="
+                display_args.append(f"{scoped_arg}{separator}{metavar}")
                 if kwargs.get("passthrough"):
                     type_str = self.stringify_type(kwargs.get("member_type", str))
                     display_args.append(f"... -- [{type_str} [{type_str} [...]]]")

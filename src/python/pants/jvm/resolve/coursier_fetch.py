@@ -12,7 +12,7 @@ import os
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
-from typing import TYPE_CHECKING, Any, FrozenSet, Iterable, Iterator, List, Tuple
+from typing import TYPE_CHECKING, Any, Iterable, Iterator, List, Tuple
 
 import toml
 
@@ -65,6 +65,7 @@ from pants.jvm.target_types import (
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list, pluralize
 
 if TYPE_CHECKING:
@@ -302,8 +303,8 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
 
 @dataclass(frozen=True)
 class CoursierResolveInfo:
-    coord_arg_strings: FrozenSet[str]
-    force_version_coord_arg_strings: FrozenSet[str]
+    coord_arg_strings: FrozenOrderedSet[str]
+    force_version_coord_arg_strings: FrozenOrderedSet[str]
     extra_args: tuple[str, ...]
     digest: Digest
 
@@ -394,17 +395,17 @@ async def prepare_coursier_resolve_info(
         ),
     )
 
-    coord_arg_strings = set()
-    force_version_coord_arg_strings = set()
-    for req in to_resolve:
+    coord_arg_strings: OrderedSet[str] = OrderedSet()
+    force_version_coord_arg_strings: OrderedSet[str] = OrderedSet()
+    for req in sorted(to_resolve, key=lambda ar: ar.coordinate):
         coord_arg_str = req.to_coord_arg_str()
         coord_arg_strings.add(coord_arg_str)
         if req.force_version:
             force_version_coord_arg_strings.add(coord_arg_str)
 
     return CoursierResolveInfo(
-        coord_arg_strings=frozenset(coord_arg_strings),
-        force_version_coord_arg_strings=frozenset(force_version_coord_arg_strings),
+        coord_arg_strings=FrozenOrderedSet(coord_arg_strings),
+        force_version_coord_arg_strings=FrozenOrderedSet(force_version_coord_arg_strings),
         digest=digest,
         extra_args=tuple(extra_args),
     )

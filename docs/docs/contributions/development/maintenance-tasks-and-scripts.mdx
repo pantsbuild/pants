@@ -62,6 +62,16 @@ Some tools use `NodeJSToolBase` to install executable npm packages. To update th
 
 Example: [#21007](https://github.com/pantsbuild/pants/pull/21007).
 
+
+### Python Build Standalone known versions
+
+The Python Build Standalone providers needs to be updated with new upstream releases.  There are *many* artifacts here, so the hashes are stored in a json file that is updated by running:
+
+```
+pants run src/python/pants/backend/python/providers/python_build_standalone/scripts/generate_urls.py
+```
+
+
 ## Update or create FaaS complete platforms files
 
 The function-as-a-service (FaaS) subsystems provide some built-in PEX complete platforms JSON files, for specific runtimes. To update or create these:

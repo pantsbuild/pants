@@ -17,7 +17,7 @@ from pants.option.global_options import GlobalOptions, LogLevelOption
 from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.option.options import Options
 from pants.option.parser import Parser
-from pants.option.ranked_value import Rank, RankedValue
+from pants.option.ranked_value import Rank
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
@@ -127,7 +127,6 @@ def test_default() -> None:
 
 def test_compute_default():
     def do_test(expected_default: Optional[Any], **kwargs):
-        kwargs["default"] = RankedValue(Rank.HARDCODED, kwargs["default"])
         assert expected_default == HelpInfoExtracter.compute_default(**kwargs)
 
     do_test(False, type=bool, default=False)
@@ -329,8 +328,8 @@ def test_get_all_help_info():
                         "target_field_name": None,
                     },
                     {
-                        "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
-                        "comma_separated_display_args": "-l=<LogLevel>, --level=<LogLevel>",
+                        "display_args": ("-l<LogLevel>", "--level=<LogLevel>"),
+                        "comma_separated_display_args": "-l<LogLevel>, --level=<LogLevel>",
                         "scoped_cmd_line_args": ("-l", "--level"),
                         "unscoped_cmd_line_args": ("-l", "--level"),
                         "config_key": "level",
@@ -648,8 +647,8 @@ def test_get_all_help_info():
                 "target_field_name": None,
             },
             "PANTS_LEVEL": {
-                "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
-                "comma_separated_display_args": "-l=<LogLevel>, --level=<LogLevel>",
+                "display_args": ("-l<LogLevel>", "--level=<LogLevel>"),
+                "comma_separated_display_args": "-l<LogLevel>, --level=<LogLevel>",
                 "scoped_cmd_line_args": ("-l", "--level"),
                 "unscoped_cmd_line_args": ("-l", "--level"),
                 "config_key": "level",
