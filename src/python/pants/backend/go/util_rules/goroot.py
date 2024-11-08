@@ -39,6 +39,11 @@ class GoRoot:
         """Can this Go compiler handle the target version?"""
         return compatible_go_version(compiler_version=self.version, target_version=version)
 
+    def major_version(self, version: str) -> str:
+        _version_components = version.split(".")  # e.g. [1, 17] or [1, 17, 1]
+        major_version = ".".join(_version_components[:2])
+        return major_version
+
     @property
     def full_version(self) -> str:
         return self._raw_metadata["GOVERSION"]
