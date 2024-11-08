@@ -49,6 +49,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+@pytest.mark.platform_specific_behavior
 def test_simple_archive(rule_runner: RuleRunner) -> None:
     binary_name = "archive"
 

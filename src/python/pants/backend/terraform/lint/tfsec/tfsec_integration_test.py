@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.terraform import tool
 from pants.backend.terraform.lint.tffmt.tffmt import PartitionMetadata
 from pants.backend.terraform.lint.tfsec.rules import rules as tfsec_rules
@@ -83,6 +85,7 @@ def set_up_rule_runner(tfsec_args: list[str]) -> RuleRunner:
     return rule_runner
 
 
+@pytest.mark.platform_specific_behavior
 def test_run_tfsec():
     rule_runner = set_up_rule_runner([])
 
