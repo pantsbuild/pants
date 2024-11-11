@@ -49,7 +49,12 @@ from pants.option.errors import (
     RegistrationError,
     UnknownFlagsError,
 )
-from pants.option.native_options import NativeOptionParser, check_dir_exists, check_file_exists
+from pants.option.native_options import (
+    NativeOptionParser,
+    check_dir_exists,
+    check_file_exists,
+    parse_dest,
+)
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.ranked_value import Rank, RankedValue
@@ -61,7 +66,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class OptionValueHistory:
-    ranked_values: tuple[RankedValue]
+    ranked_values: tuple[RankedValue, ...]
 
     @property
     def final_value(self) -> RankedValue:
@@ -203,15 +208,8 @@ class Parser:
         for args, kwargs in self._option_registrations:
             self._validate(args, kwargs)
             dest = self.parse_dest(*args, **kwargs)
-            val, rank = native_parser.get(
-                scope=self.scope,
-                dest=dest,
-                flags=args,
-                default=kwargs.get("default"),
-                option_type=kwargs.get("type"),
-                member_type=kwargs.get("member_type"),
-                choices=kwargs.get("choices"),
-                passthrough=kwargs.get("passthrough"),
+            val, rank = native_parser.get_value(
+                scope=self.scope, registration_args=args, registration_kwargs=kwargs
             )
 
             # If the option is explicitly given, check mutual exclusion.
@@ -534,13 +532,7 @@ class Parser:
           - The key in the config file.
           - Computing the name of the env var used to set the option name.
         """
-        dest = kwargs.get("dest")
-        if dest:
-            return dest
-        # No explicit dest, so compute one based on the first long arg, or the short arg
-        # if that's all there is.
-        arg = next((a for a in args if a.startswith("--")), args[0])
-        return arg.lstrip("-").replace("-", "_")
+        return parse_dest(*args, **kwargs)
 
     @staticmethod
     def _convert_member_type(member_type, value):

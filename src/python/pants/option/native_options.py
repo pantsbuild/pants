@@ -23,6 +23,26 @@ from pants.util.strutil import get_strict_env, softwrap
 logger = logging.getLogger()
 
 
+def parse_dest(*args, **kwargs):
+    """Return the dest for an option registration.
+
+    If an explicit `dest` is specified, returns that and otherwise derives a default from the
+    option flags where '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
+
+    The dest is used for:
+      - The name of the field containing the option value.
+      - The key in the config file.
+      - Computing the name of the env var used to set the option name.
+    """
+    dest = kwargs.get("dest")
+    if dest:
+        return dest
+    # No explicit dest, so compute one based on the first long arg, or the short arg
+    # if that's all there is.
+    arg = next((a for a in args if a.startswith("--")), args[0])
+    return arg.lstrip("-").replace("-", "_")
+
+
 class NativeOptionParser:
     """A Python wrapper around the Rust options parser."""
 
@@ -41,7 +61,16 @@ class NativeOptionParser:
         env: Mapping[str, str],
         config_sources: Optional[Sequence[ConfigSource]],
         allow_pantsrc: bool,
+        include_derivation: bool,
     ):
+        # Remember these args so this object can clone itself in with_derivation() below.
+        self._args, self._env, self._config_sources, self._allow_pantsrc = (
+            args,
+            env,
+            config_sources,
+            allow_pantsrc,
+        )
+
         py_config_sources = (
             None
             if config_sources is None
@@ -52,6 +81,7 @@ class NativeOptionParser:
             dict(get_strict_env(env, logger)),
             py_config_sources,
             allow_pantsrc,
+            include_derivation,
         )
 
         # (type, member_type) -> native get for that type.
@@ -67,7 +97,46 @@ class NativeOptionParser:
             (dict, None): self._native_parser.get_dict,
         }
 
-    def get(
+    def with_derivation(self) -> NativeOptionParser:
+        """Return a clone of this object but with value derivation enabled."""
+        # We may be able to get rid of this method once we remove the legacy parser entirely.
+        # For now it is convenient to allow the help mechanism to get derivations via the
+        # existing Options object, which otherwise does not need derivations.
+        return NativeOptionParser(
+            args=None if self._args is None else tuple(self._args),
+            env=dict(self._env),
+            config_sources=None if self._config_sources is None else tuple(self._config_sources),
+            allow_pantsrc=self._allow_pantsrc,
+            include_derivation=True,
+        )
+
+    def get_value(self, *, scope, registration_args, registration_kwargs) -> Tuple[Any, Rank]:
+        val, rank, _ = self._get_value_and_derivation(scope, registration_args, registration_kwargs)
+        return (val, rank)
+
+    def get_derivation(
+        self, *, scope, registration_args, registration_kwargs
+    ) -> list[Tuple[Any, list[Rank]]]:
+        _, _, derivation = self._get_value_and_derivation(
+            scope, registration_args, registration_kwargs
+        )
+        return derivation
+
+    def _get_value_and_derivation(
+        self, scope, registration_args, registration_kwargs
+    ) -> Tuple[Any, Rank, list[Tuple[Any, list[Rank]]]]:
+        return self._get(
+            scope=scope,
+            dest=parse_dest(*registration_args, **registration_kwargs),
+            flags=registration_args,
+            default=registration_kwargs.get("default"),
+            option_type=registration_kwargs.get("type"),
+            member_type=registration_kwargs.get("member_type"),
+            choices=registration_kwargs.get("choices"),
+            passthrough=registration_kwargs.get("passthrough"),
+        )
+
+    def _get(
         self,
         *,
         scope,
@@ -78,7 +147,7 @@ class NativeOptionParser:
         member_type=None,
         choices=None,
         passthrough=False,
-    ) -> Tuple[Any, Rank]:
+    ) -> Tuple[Any, Rank, list[Tuple[Any, list[Rank]]]]:
         def scope_str() -> str:
             return "global scope" if scope == GLOBAL_SCOPE else f"scope '{scope}'"
 
@@ -150,19 +219,28 @@ class NativeOptionParser:
             suffix = f" with member type {rust_member_type}" if rust_option_type is list else ""
             raise OptionsError(f"Unsupported type: {rust_option_type}{suffix}")
 
-        val, rank_int = getter(option_id, default)  # type:ignore
+        val, rank_int, derivation = getter(option_id, default)  # type:ignore
         rank = self.int_to_rank[rank_int]
 
-        if val is not None:
+        def process_value(v):
             if option_type is list:
                 if member_type == shell_str:
-                    val = _flatten_shlexed_list(val)
+                    v = _flatten_shlexed_list(v)
                 elif callable(member_type):
-                    val = [apply_callable(member_type, x) for x in val]
+                    v = [apply_callable(member_type, x) for x in v]
                 if passthrough:
-                    val += self._native_parser.get_passthrough_args() or []
+                    v += self._native_parser.get_passthrough_args() or []
             elif callable(option_type):
-                val = apply_callable(option_type, val)
+                v = apply_callable(option_type, v)
+            return v
+
+        if derivation:
+            derivation = [
+                (process_value(v), [self.int_to_rank[r] for r in rs]) for (v, rs) in derivation
+            ]
+
+        if val is not None:
+            val = process_value(val)
 
             # Validate the value.
 
@@ -194,7 +272,7 @@ class NativeOptionParser:
             else:
                 check_scalar_value(val, choices)
 
-        return (val, rank)
+        return (val, rank, derivation)
 
     def get_unconsumed_flags(self) -> dict[str, tuple[str, ...]]:
         return {k: tuple(v) for k, v in self._native_parser.get_unconsumed_flags().items()}

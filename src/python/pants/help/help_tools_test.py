@@ -11,6 +11,7 @@ from pants.help.help_tools import ToolHelpInfo
 from pants.help.maybe_color import MaybeColor
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptions
+from pants.option.native_options import NativeOptionParser
 from pants.option.parser import Parser
 
 
@@ -24,22 +25,27 @@ def parser() -> Parser:
 
 
 @pytest.fixture
+def native_parser() -> NativeOptionParser:
+    return NativeOptionParser([], {}, [], allow_pantsrc=False, include_derivation=True)
+
+
+@pytest.fixture
 def extracter() -> HelpInfoExtracter:
     return HelpInfoExtracter("test")
 
 
 @pytest.fixture
-def tool_info(extracter, parser) -> ToolHelpInfo:
+def tool_info(extracter, parser, native_parser) -> ToolHelpInfo:
     parser.register("version", typ=str, default="1.0")
     parser.register("url-template", typ=str, default="https://download/{version}")
-    oshi = extracter.get_option_scope_help_info("Test description.", parser, False)
+    oshi = extracter.get_option_scope_help_info("Test description.", parser, native_parser, False)
     tool_info = ToolHelpInfo.from_option_scope_help_info(oshi)
     assert tool_info is not None
     return tool_info
 
 
-def test_no_tool_help_info(extracter, parser) -> None:
-    oshi = extracter.get_option_scope_help_info("", parser, False)
+def test_no_tool_help_info(extracter, parser, native_parser) -> None:
+    oshi = extracter.get_option_scope_help_info("", parser, native_parser, False)
     assert ToolHelpInfo.from_option_scope_help_info(oshi) is None
 
 

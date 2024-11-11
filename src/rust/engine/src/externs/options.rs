@@ -5,8 +5,9 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 
 use options::{
-    Args, ConfigSource, Env, ListOptionValue, OptionId, OptionParser, OptionalOptionValue, Scope,
-    Val,
+    apply_dict_edits, apply_list_edits, Args, ConfigSource, DictEdit, DictEditAction, Env,
+    ListEdit, ListEditAction, ListOptionValue, OptionId, OptionParser, OptionalOptionValue, Scope,
+    Source, Val,
 };
 
 use std::collections::HashMap;
@@ -20,6 +21,8 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
+// The (nested) values of a dict-valued option are represented by Val.
+// This function converts them to equivalent Python types.
 fn val_to_py_object(py: Python, val: &Val) -> PyResult<PyObject> {
     let res = match val {
         Val::Bool(b) => b.into_py(py),
@@ -44,6 +47,18 @@ fn val_to_py_object(py: Python, val: &Val) -> PyResult<PyObject> {
     Ok(res)
 }
 
+// Converts a string->Val dict into a Python type.
+fn dict_into_py(py: Python, vals: HashMap<String, Val>) -> PyResult<PyDictVal> {
+    vals.into_iter()
+        .map(|(k, v)| match val_to_py_object(py, &v) {
+            Ok(pyobj) => Ok((k, pyobj)),
+            Err(err) => Err(err),
+        })
+        .collect::<PyResult<HashMap<String, PyObject>>>()
+}
+
+// Converts a Python object into a Val, which is necessary for receiving
+// the default values of dict-valued options from Python.
 pub(crate) fn py_object_to_val(obj: &Bound<'_, PyAny>) -> Result<Val, PyErr> {
     // TODO: If this is_instance_of chain shows up as significant in CPU profiles,
     //  we can use a lookup table of PyTypeObject -> conversion func instead.
@@ -146,11 +161,121 @@ impl PyConfigSource {
 #[pyclass]
 struct PyOptionParser(OptionParser);
 
-type RankedVal<T> = (T, isize);
+// The pythonic value of a dict-typed option.
+type PyDictVal = HashMap<String, PyObject>;
 
-fn to_py<T>(res: Result<OptionalOptionValue<T>, String>) -> PyResult<RankedVal<Option<T>>> {
+// The derivation of the option value, as a vec of (value, vec of source ranks) tuples.
+// A scalar value will always have a single source. A list/dict value may have elements
+// appended across multiple sources.
+// In ascending rank order, so the last value is the final value of the option.
+type OptionValueDerivation<T> = Vec<(T, Vec<isize>)>;
+
+// A tuple (final value, rank of final value, optional derivation of value).
+//
+// Note: The final value and its rank could be computed from the derivation (see above),
+// but the full derivation is not itself computed in normal usage.
+// We could get rid of this tuple type by representing the final value and its rank as
+// a singleton derivation (in the case where we don't otherwise need the full derivation).
+// But that would allocate two unnecessary Vecs for every option.
+type OptionValue<T> = (Option<T>, isize, Option<OptionValueDerivation<T>>);
+
+// Condense list value derivation across sources, so that it reflects merges vs. replacements
+// in a useful way. E.g., if we merge [a, b] and [c], and then replace it with [d, e],
+// the derivation will show:
+//   - [d, e] (from command-line flag)
+//   - [a, b, c] (from env var, from config)
+fn condense_list_value_derivation<T: PartialEq>(
+    derivation: Vec<(Source, Vec<ListEdit<T>>)>,
+) -> OptionValueDerivation<Vec<T>> {
+    let mut ret: OptionValueDerivation<Vec<T>> = vec![];
+    let mut cur_group = vec![];
+    let mut cur_ranks = vec![];
+
+    // In this case, for simplicity, we always use the "inefficient" O(M*N) remover,
+    // even for hashable values. This is very unlikely to have a noticeable performance impact
+    // in practice. And if it does, it would only be when we generate option value derivation
+    // for help display, and not in regular usage.
+    // See comments on OptionParser::parse_list_hashable() for context.
+    fn remover<T: PartialEq>(list: &mut Vec<T>, to_remove: &[T]) {
+        list.retain(|item| !to_remove.contains(item));
+    }
+
+    for (source, list_edits) in derivation.into_iter() {
+        for list_edit in list_edits {
+            if list_edit.action == ListEditAction::Replace {
+                if !cur_group.is_empty() {
+                    ret.push((
+                        apply_list_edits::<T>(remover, cur_group.into_iter()),
+                        cur_ranks,
+                    ));
+                }
+                cur_group = vec![];
+                cur_ranks = vec![];
+            }
+            cur_group.push(list_edit);
+            cur_ranks.push(source.rank() as isize);
+        }
+    }
+    if !cur_group.is_empty() {
+        ret.push((
+            apply_list_edits::<T>(remover, cur_group.into_iter()),
+            cur_ranks,
+        ));
+    }
+
+    ret
+}
+
+// Condense dict value derivation across sources, so that it reflects merges vs. replacements
+//  in a useful way. E.g., if we merge {a: 1, b: 2] and {c: 3}, and then replace it with {d: 4},
+// the derivation will show:
+//   - {d: 4} (from command-line flag)
+//   - {a: 1, b: 2, c: 3} (from env var, from config)
+fn condense_dict_value_derivation(
+    py: Python,
+    derivation: Vec<(Source, Vec<DictEdit>)>,
+) -> PyResult<OptionValueDerivation<PyDictVal>> {
+    let mut ret: OptionValueDerivation<PyDictVal> = vec![];
+    let mut cur_group = vec![];
+    let mut cur_ranks = vec![];
+
+    for (source, dict_edits) in derivation.into_iter() {
+        for dict_edit in dict_edits {
+            if dict_edit.action == DictEditAction::Replace {
+                if !cur_group.is_empty() {
+                    ret.push((
+                        dict_into_py(py, apply_dict_edits(cur_group.into_iter()))?,
+                        cur_ranks,
+                    ));
+                }
+                cur_group = vec![];
+                cur_ranks = vec![];
+            }
+            cur_group.push(dict_edit);
+            cur_ranks.push(source.rank() as isize);
+        }
+    }
+    if !cur_group.is_empty() {
+        ret.push((
+            dict_into_py(py, apply_dict_edits(cur_group.into_iter()))?,
+            cur_ranks,
+        ));
+    }
+
+    Ok(ret)
+}
+
+fn into_py<T>(res: Result<OptionalOptionValue<T>, String>) -> PyResult<OptionValue<T>> {
     let val = res.map_err(ParseError::new_err)?;
-    Ok((val.value, val.source.rank() as isize))
+    Ok((
+        val.value,
+        val.source.rank() as isize,
+        val.derivation.map(|d| {
+            d.into_iter()
+                .map(|(source, val)| (val, vec![source.rank() as isize]))
+                .collect()
+        }),
+    ))
 }
 
 #[allow(clippy::type_complexity)]
@@ -164,22 +289,30 @@ impl PyOptionParser {
             &OptionId,
             Vec<T::Owned>,
         ) -> Result<ListOptionValue<T::Owned>, String>,
-    ) -> PyResult<(Vec<T::Owned>, isize)> {
+    ) -> PyResult<OptionValue<Vec<T::Owned>>>
+    where
+        <T as ToOwned>::Owned: PartialEq,
+    {
         let opt_val =
             getter(&self.0, &option_id.borrow().0, default).map_err(ParseError::new_err)?;
-        Ok((opt_val.value, opt_val.source.rank() as isize))
+        Ok((
+            Some(opt_val.value),
+            opt_val.source.rank() as isize,
+            opt_val.derivation.map(condense_list_value_derivation),
+        ))
     }
 }
 
 #[pymethods]
 impl PyOptionParser {
     #[new]
-    #[pyo3(signature = (args, env, configs, allow_pantsrc))]
+    #[pyo3(signature = (args, env, configs, allow_pantsrc, include_derivation))]
     fn __new__<'py>(
         args: Vec<String>,
         env: &Bound<'py, PyDict>,
         configs: Option<Vec<Bound<'py, PyConfigSource>>>,
         allow_pantsrc: bool,
+        include_derivation: bool,
     ) -> PyResult<Self> {
         let env = env
             .items()
@@ -192,7 +325,7 @@ impl PyOptionParser {
             Env::new(env),
             configs.map(|cs| cs.iter().map(|c| c.borrow().0.clone()).collect()),
             allow_pantsrc,
-            false,
+            include_derivation,
             None,
         )
         .map_err(ParseError::new_err)?;
@@ -204,8 +337,8 @@ impl PyOptionParser {
         &self,
         option_id: &Bound<'_, PyOptionId>,
         default: Option<bool>,
-    ) -> PyResult<RankedVal<Option<bool>>> {
-        to_py(self.0.parse_bool_optional(&option_id.borrow().0, default))
+    ) -> PyResult<OptionValue<bool>> {
+        into_py(self.0.parse_bool_optional(&option_id.borrow().0, default))
     }
 
     #[pyo3(signature = (option_id, default))]
@@ -213,8 +346,8 @@ impl PyOptionParser {
         &self,
         option_id: &Bound<'_, PyOptionId>,
         default: Option<i64>,
-    ) -> PyResult<RankedVal<Option<i64>>> {
-        to_py(self.0.parse_int_optional(&option_id.borrow().0, default))
+    ) -> PyResult<OptionValue<i64>> {
+        into_py(self.0.parse_int_optional(&option_id.borrow().0, default))
     }
 
     #[pyo3(signature = (option_id, default))]
@@ -222,8 +355,8 @@ impl PyOptionParser {
         &self,
         option_id: &Bound<'_, PyOptionId>,
         default: Option<f64>,
-    ) -> PyResult<RankedVal<Option<f64>>> {
-        to_py(self.0.parse_float_optional(&option_id.borrow().0, default))
+    ) -> PyResult<OptionValue<f64>> {
+        into_py(self.0.parse_float_optional(&option_id.borrow().0, default))
     }
 
     #[pyo3(signature = (option_id, default))]
@@ -231,15 +364,15 @@ impl PyOptionParser {
         &self,
         option_id: &Bound<'_, PyOptionId>,
         default: Option<&str>,
-    ) -> PyResult<RankedVal<Option<String>>> {
-        to_py(self.0.parse_string_optional(&option_id.borrow().0, default))
+    ) -> PyResult<OptionValue<String>> {
+        into_py(self.0.parse_string_optional(&option_id.borrow().0, default))
     }
 
     fn get_bool_list(
         &self,
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<bool>,
-    ) -> PyResult<RankedVal<Vec<bool>>> {
+    ) -> PyResult<OptionValue<Vec<bool>>> {
         self.get_list::<bool>(option_id, default, |op, oid, def| {
             op.parse_bool_list(oid, def)
         })
@@ -249,7 +382,7 @@ impl PyOptionParser {
         &self,
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<i64>,
-    ) -> PyResult<RankedVal<Vec<i64>>> {
+    ) -> PyResult<OptionValue<Vec<i64>>> {
         self.get_list::<i64>(option_id, default, |op, oid, def| {
             op.parse_int_list(oid, def)
         })
@@ -259,7 +392,7 @@ impl PyOptionParser {
         &self,
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<f64>,
-    ) -> PyResult<RankedVal<Vec<f64>>> {
+    ) -> PyResult<OptionValue<Vec<f64>>> {
         self.get_list::<f64>(option_id, default, |op, oid, def| {
             op.parse_float_list(oid, def)
         })
@@ -269,7 +402,7 @@ impl PyOptionParser {
         &self,
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<String>,
-    ) -> PyResult<RankedVal<Vec<String>>> {
+    ) -> PyResult<OptionValue<Vec<String>>> {
         self.get_list::<String>(option_id, default, |op, oid, def| {
             op.parse_string_list(oid, def)
         })
@@ -280,7 +413,7 @@ impl PyOptionParser {
         py: Python,
         option_id: &Bound<'_, PyOptionId>,
         default: &Bound<'_, PyDict>,
-    ) -> PyResult<RankedVal<HashMap<String, PyObject>>> {
+    ) -> PyResult<OptionValue<PyDictVal>> {
         let default = default
             .items()
             .into_iter()
@@ -289,19 +422,21 @@ impl PyOptionParser {
                 Ok::<(String, Val), PyErr>((k, py_object_to_val(&v)?))
             })
             .collect::<Result<HashMap<_, _>, _>>()?;
+
         let opt_val = self
             .0
             .parse_dict(&option_id.borrow().0, default)
             .map_err(ParseError::new_err)?;
-        let opt_val_py = opt_val
-            .value
-            .into_iter()
-            .map(|(k, v)| match val_to_py_object(py, &v) {
-                Ok(pyobj) => Ok((k, pyobj)),
-                Err(err) => Err(err),
-            })
-            .collect::<PyResult<HashMap<String, PyObject>>>()?;
-        Ok((opt_val_py, opt_val.source.rank() as isize))
+        let opt_val_py = dict_into_py(py, opt_val.value)?;
+
+        Ok((
+            Some(opt_val_py),
+            opt_val.source.rank() as isize,
+            match opt_val.derivation {
+                Some(d) => Some(condense_dict_value_derivation(py, d)?),
+                None => None,
+            },
+        ))
     }
 
     fn get_passthrough_args(&self) -> PyResult<Option<Vec<String>>> {

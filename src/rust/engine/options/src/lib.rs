@@ -225,6 +225,44 @@ impl Source {
     }
 }
 
+pub fn apply_list_edits<T>(
+    remover: fn(&mut Vec<T>, &[T]),
+    list_edits: impl Iterator<Item = ListEdit<T>>,
+) -> Vec<T> {
+    let mut list = vec![];
+    // Removals from any source apply after adds from any source (but are themselves
+    // overridden by later replacements), so we collect them here and apply them later.
+    let mut removal_lists: Vec<Vec<T>> = vec![];
+
+    for list_edit in list_edits {
+        match list_edit.action {
+            ListEditAction::Replace => {
+                list = list_edit.items;
+                removal_lists.clear();
+            }
+            ListEditAction::Add => list.extend(list_edit.items),
+            ListEditAction::Remove => removal_lists.push(list_edit.items),
+        }
+    }
+
+    for removals in removal_lists {
+        remover(&mut list, &removals);
+    }
+
+    list
+}
+
+pub fn apply_dict_edits(dict_edits: impl Iterator<Item = DictEdit>) -> HashMap<String, Val> {
+    let mut dict = HashMap::new();
+    for dict_edit in dict_edits {
+        match dict_edit.action {
+            DictEditAction::Replace => dict = dict_edit.items,
+            DictEditAction::Add => dict.extend(dict_edit.items),
+        }
+    }
+    dict
+}
+
 #[derive(Debug)]
 pub struct OptionValue<T> {
     pub derivation: Option<Vec<(Source, T)>>,
@@ -522,16 +560,15 @@ impl OptionParser {
         id: &OptionId,
         default: Vec<T>,
         getter: fn(&Arc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
-        remover: fn(&mut Vec<T>, &Vec<T>),
+        remover: fn(&mut Vec<T>, &[T]),
     ) -> Result<ListOptionValue<T>, String> {
-        let mut list = default;
         let mut derivation = None;
         if self.include_derivation {
             let mut derivations = vec![(
                 Source::Default,
                 vec![ListEdit {
                     action: ListEditAction::Replace,
-                    items: list.clone(),
+                    items: default.clone(),
                 }],
             )];
             for (source_type, source) in self.sources.iter() {
@@ -544,33 +581,22 @@ impl OptionParser {
             derivation = Some(derivations);
         }
 
-        // Removals from any source apply after adds from any source (but are themselves
-        // overridden by later replacements), so we collect them here and apply them later.
-        let mut removal_lists: Vec<Vec<T>> = vec![];
-
         let mut highest_priority_source = Source::Default;
+        let mut edits: Vec<ListEdit<T>> = vec![ListEdit {
+            action: ListEditAction::Replace,
+            items: default,
+        }];
         for (source_type, source) in self.sources.iter() {
             if let Some(list_edits) = getter(source, id)? {
                 highest_priority_source = source_type.clone();
-                for list_edit in list_edits {
-                    match list_edit.action {
-                        ListEditAction::Replace => {
-                            list = list_edit.items;
-                            removal_lists.clear();
-                        }
-                        ListEditAction::Add => list.extend(list_edit.items),
-                        ListEditAction::Remove => removal_lists.push(list_edit.items),
-                    }
-                }
+                edits.extend(list_edits);
             }
         }
-        for removals in removal_lists {
-            remover(&mut list, &removals);
-        }
+
         Ok(ListOptionValue {
             derivation,
             source: highest_priority_source,
-            value: list,
+            value: apply_list_edits(remover, edits.into_iter()),
         })
     }
 
@@ -638,14 +664,13 @@ impl OptionParser {
         id: &OptionId,
         default: HashMap<String, Val>,
     ) -> Result<DictOptionValue, String> {
-        let mut dict = default;
         let mut derivation = None;
         if self.include_derivation {
             let mut derivations = vec![(
                 Source::Default,
                 vec![DictEdit {
                     action: DictEditAction::Replace,
-                    items: dict.clone(),
+                    items: default.clone(),
                 }],
             )];
             for (source_type, source) in self.sources.iter() {
@@ -656,21 +681,20 @@ impl OptionParser {
             derivation = Some(derivations);
         }
         let mut highest_priority_source = Source::Default;
+        let mut edits: Vec<DictEdit> = vec![DictEdit {
+            action: DictEditAction::Replace,
+            items: default,
+        }];
         for (source_type, source) in self.sources.iter() {
             if let Some(dict_edits) = source.get_dict(id)? {
                 highest_priority_source = source_type.clone();
-                for dict_edit in dict_edits {
-                    match dict_edit.action {
-                        DictEditAction::Replace => dict = dict_edit.items,
-                        DictEditAction::Add => dict.extend(dict_edit.items),
-                    }
-                }
+                edits.extend(dict_edits);
             }
         }
         Ok(DictOptionValue {
             derivation,
             source: highest_priority_source,
-            value: dict,
+            value: apply_dict_edits(edits.into_iter()),
         })
     }
 

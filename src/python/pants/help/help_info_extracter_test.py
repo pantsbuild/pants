@@ -14,6 +14,7 @@ from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_hint, to_help_str
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptions, LogLevelOption
+from pants.option.native_options import NativeOptionParser
 from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.option.options import Options
 from pants.option.parser import Parser
@@ -103,9 +104,10 @@ def test_default() -> None:
             config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
         )
+        native_parser = NativeOptionParser([], {}, [], allow_pantsrc=False, include_derivation=True)
         parser.register(*args, **kwargs)
         oshi = HelpInfoExtracter(parser.scope).get_option_scope_help_info(
-            "description", parser, False, "provider"
+            "description", parser, native_parser, False, "provider"
         )
         assert oshi.description == "description"
         assert oshi.provider == "provider"
@@ -202,8 +204,11 @@ def test_grouping():
             config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
         )
+        native_parser = NativeOptionParser([], {}, [], allow_pantsrc=False, include_derivation=True)
         parser.register("--foo", **kwargs)
-        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False, "")
+        oshi = HelpInfoExtracter("").get_option_scope_help_info(
+            "", parser, native_parser, False, ""
+        )
         assert exp_to_len(expected_basic) == len(oshi.basic)
         assert exp_to_len(expected_advanced) == len(oshi.advanced)
 
@@ -260,6 +265,7 @@ def test_get_all_help_info():
         known_scope_infos=[Global.get_scope_info(), Foo.get_scope_info(), Bar.get_scope_info()],
         args=["./pants", "--backend-packages=['internal_plugins.releases']"],
         bootstrap_option_values=None,
+        include_derivation=True,
     )
     Global.register_options_on_scope(options, UnionMembership({}))
     Foo.register_options_on_scope(options, UnionMembership({}))
