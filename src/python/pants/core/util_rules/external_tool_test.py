@@ -146,7 +146,7 @@ def rule_runner():
     )
 
 
-def test_export(rule_runner):
+def test_export(rule_runner) -> None:
     """Tests export_external_tool.
 
     Ensures we locate the class and prepare the Digest correctly
