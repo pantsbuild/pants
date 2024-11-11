@@ -107,7 +107,7 @@ fn test_source_ordering() {
 fn test_parse_single_valued_options() {
     fn check(
         expected: i64,
-        expected_derivation: Vec<(Source, i64)>,
+        expected_derivation: Vec<(&Source, i64)>,
         args: Vec<&'static str>,
         env: Vec<(&'static str, &'static str)>,
         config: &'static str,
@@ -123,10 +123,10 @@ fn test_parse_single_valued_options() {
     check(
         3,
         vec![
-            (Source::Default, 0),
-            (config_source(), 1),
-            (Source::Env, 2),
-            (Source::Flag, 3),
+            (&Source::Default, 0),
+            (&config_source(), 1),
+            (&Source::Env, 2),
+            (&Source::Flag, 3),
         ],
         vec!["--scope-foo=3"],
         vec![("PANTS_SCOPE_FOO", "2")],
@@ -134,7 +134,7 @@ fn test_parse_single_valued_options() {
     );
     check(
         3,
-        vec![(Source::Default, 0), (Source::Env, 2), (Source::Flag, 3)],
+        vec![(&Source::Default, 0), (&Source::Env, 2), (&Source::Flag, 3)],
         vec!["--scope-foo=3"],
         vec![("PANTS_SCOPE_FOO", "2")],
         "",
@@ -142,9 +142,9 @@ fn test_parse_single_valued_options() {
     check(
         3,
         vec![
-            (Source::Default, 0),
-            (config_source(), 1),
-            (Source::Flag, 3),
+            (&Source::Default, 0),
+            (&config_source(), 1),
+            (&Source::Flag, 3),
         ],
         vec!["--scope-foo=3"],
         vec![],
@@ -152,33 +152,37 @@ fn test_parse_single_valued_options() {
     );
     check(
         2,
-        vec![(Source::Default, 0), (config_source(), 1), (Source::Env, 2)],
+        vec![
+            (&Source::Default, 0),
+            (&config_source(), 1),
+            (&Source::Env, 2),
+        ],
         vec![],
         vec![("PANTS_SCOPE_FOO", "2")],
         "[scope]\nfoo = 1",
     );
     check(
         2,
-        vec![(Source::Default, 0), (Source::Env, 2)],
+        vec![(&Source::Default, 0), (&Source::Env, 2)],
         vec![],
         vec![("PANTS_SCOPE_FOO", "2")],
         "",
     );
     check(
         1,
-        vec![(Source::Default, 0), (config_source(), 1)],
+        vec![(&Source::Default, 0), (&config_source(), 1)],
         vec![],
         vec![],
         "[scope]\nfoo = 1",
     );
-    check(0, vec![(Source::Default, 0)], vec![], vec![], "");
+    check(0, vec![(&Source::Default, 0)], vec![], vec![], "");
 }
 
 #[test]
 fn test_parse_list_options() {
     fn check(
         expected: Vec<i64>,
-        expected_derivation: Vec<(Source, Vec<ListEdit<i64>>)>,
+        expected_derivation: Vec<(&Source, Vec<ListEdit<i64>>)>,
         args: Vec<&'static str>,
         env: Vec<(&'static str, &'static str)>,
         config: &'static str,
@@ -216,10 +220,10 @@ fn test_parse_list_options() {
     check(
         vec![0, 1, 2, 3, 4, 5, 6, 7],
         vec![
-            (Source::Default, vec![replace(vec![0])]),
-            (config_source(), vec![add(vec![1, 2])]),
-            (Source::Env, vec![add(vec![3, 4])]),
-            (Source::Flag, vec![add(vec![5, 6, 7])]),
+            (&Source::Default, vec![replace(vec![0])]),
+            (&config_source(), vec![add(vec![1, 2])]),
+            (&Source::Env, vec![add(vec![3, 4])]),
+            (&Source::Flag, vec![add(vec![5, 6, 7])]),
         ],
         vec!["--scope-foo=+[5, 6, 7]"],
         vec![("PANTS_SCOPE_FOO", "+[3, 4]")],
@@ -230,10 +234,10 @@ fn test_parse_list_options() {
     check(
         vec![1, 2, 3, 4, 5, 6, 7],
         vec![
-            (Source::Default, vec![replace(vec![0])]),
-            (config_source(), vec![replace(vec![1, 2])]),
-            (Source::Env, vec![add(vec![3, 4])]),
-            (Source::Flag, vec![add(vec![5, 6, 7])]),
+            (&Source::Default, vec![replace(vec![0])]),
+            (&config_source(), vec![replace(vec![1, 2])]),
+            (&Source::Env, vec![add(vec![3, 4])]),
+            (&Source::Flag, vec![add(vec![5, 6, 7])]),
         ],
         vec!["--scope-foo=+[5, 6, 7]"],
         vec![("PANTS_SCOPE_FOO", "+[3, 4]")],
@@ -244,10 +248,10 @@ fn test_parse_list_options() {
     check(
         vec![3, 4, 5, 6, 7],
         vec![
-            (Source::Default, vec![replace(vec![0])]),
-            (config_source(), vec![add(vec![1, 2])]),
-            (Source::Env, vec![replace(vec![3, 4])]),
-            (Source::Flag, vec![add(vec![5, 6, 7])]),
+            (&Source::Default, vec![replace(vec![0])]),
+            (&config_source(), vec![add(vec![1, 2])]),
+            (&Source::Env, vec![replace(vec![3, 4])]),
+            (&Source::Flag, vec![add(vec![5, 6, 7])]),
         ],
         vec!["--scope-foo=+[5, 6, 7]"],
         vec![("PANTS_SCOPE_FOO", "[3, 4]")],
@@ -258,10 +262,10 @@ fn test_parse_list_options() {
     check(
         vec![5, 6, 7],
         vec![
-            (Source::Default, vec![replace(vec![0])]),
-            (config_source(), vec![add(vec![1, 2])]),
-            (Source::Env, vec![add(vec![3, 4])]),
-            (Source::Flag, vec![replace(vec![5, 6, 7])]),
+            (&Source::Default, vec![replace(vec![0])]),
+            (&config_source(), vec![add(vec![1, 2])]),
+            (&Source::Env, vec![add(vec![3, 4])]),
+            (&Source::Flag, vec![replace(vec![5, 6, 7])]),
         ],
         vec!["--scope-foo=[5, 6, 7]"],
         vec![("PANTS_SCOPE_FOO", "+[3, 4]")],
@@ -272,10 +276,10 @@ fn test_parse_list_options() {
     check(
         vec![0, 1, 2, 11, 22, 3, 4],
         vec![
-            (Source::Default, vec![replace(vec![0])]),
-            (config_source(), vec![add(vec![1, 2])]),
-            (extra_config_source(), vec![add(vec![11, 22])]),
-            (Source::Env, vec![add(vec![3, 4])]),
+            (&Source::Default, vec![replace(vec![0])]),
+            (&config_source(), vec![add(vec![1, 2])]),
+            (&extra_config_source(), vec![add(vec![11, 22])]),
+            (&Source::Env, vec![add(vec![3, 4])]),
         ],
         vec![],
         vec![("PANTS_SCOPE_FOO", "+[3, 4]")],
@@ -286,10 +290,10 @@ fn test_parse_list_options() {
     check(
         vec![1, 3],
         vec![
-            (Source::Default, vec![replace(vec![0])]),
-            (config_source(), vec![replace(vec![1, 2])]),
-            (extra_config_source(), vec![remove(vec![2, 4])]),
-            (Source::Env, vec![add(vec![3, 4])]),
+            (&Source::Default, vec![replace(vec![0])]),
+            (&config_source(), vec![replace(vec![1, 2])]),
+            (&extra_config_source(), vec![remove(vec![2, 4])]),
+            (&Source::Env, vec![add(vec![3, 4])]),
         ],
         vec![],
         vec![("PANTS_SCOPE_FOO", "+[3, 4]")],
@@ -300,8 +304,8 @@ fn test_parse_list_options() {
     check(
         vec![0, 3, 4],
         vec![
-            (Source::Default, vec![replace(vec![0])]),
-            (Source::Env, vec![add(vec![3, 4])]),
+            (&Source::Default, vec![replace(vec![0])]),
+            (&Source::Env, vec![add(vec![3, 4])]),
         ],
         vec![],
         vec![("PANTS_SCOPE_FOO", "+[3, 4]")],
@@ -312,10 +316,10 @@ fn test_parse_list_options() {
     check(
         vec![0, 1, 3, 4, 5, 6, 7],
         vec![
-            (Source::Default, vec![replace(vec![0])]),
-            (config_source(), vec![add(vec![1, 2])]),
-            (Source::Env, vec![remove(vec![2]), add(vec![3, 4])]),
-            (Source::Flag, vec![add(vec![5, 6, 7])]),
+            (&Source::Default, vec![replace(vec![0])]),
+            (&config_source(), vec![add(vec![1, 2])]),
+            (&Source::Env, vec![remove(vec![2]), add(vec![3, 4])]),
+            (&Source::Flag, vec![add(vec![5, 6, 7])]),
         ],
         vec!["--scope-foo=+[5, 6, 7]"],
         vec![("PANTS_SCOPE_FOO", "-[2],+[3, 4]")],
@@ -326,8 +330,8 @@ fn test_parse_list_options() {
     check(
         vec![0, 5, 6, 7],
         vec![
-            (Source::Default, vec![replace(vec![0])]),
-            (Source::Flag, vec![add(vec![5, 6, 7])]),
+            (&Source::Default, vec![replace(vec![0])]),
+            (&Source::Flag, vec![add(vec![5, 6, 7])]),
         ],
         vec!["--scope-foo=+[5, 6, 7]"],
         vec![],
@@ -339,9 +343,9 @@ fn test_parse_list_options() {
     check(
         vec![1, 2, 2, 4],
         vec![
-            (Source::Default, vec![replace(vec![0])]),
-            (config_source(), vec![add(vec![1, 2, 3, 2, 0, 3, 3, 4])]),
-            (Source::Env, vec![remove(vec![0, 3])]),
+            (&Source::Default, vec![replace(vec![0])]),
+            (&config_source(), vec![add(vec![1, 2, 3, 2, 0, 3, 3, 4])]),
+            (&Source::Env, vec![remove(vec![0, 3])]),
         ],
         vec![],
         vec![("PANTS_SCOPE_FOO", "-[0, 3]")],
@@ -353,10 +357,10 @@ fn test_parse_list_options() {
     check(
         vec![0, 2],
         vec![
-            (Source::Default, vec![replace(vec![0])]),
-            (config_source(), vec![add(vec![1, 2])]),
-            (Source::Env, vec![remove(vec![1])]),
-            (Source::Flag, vec![add(vec![1])]),
+            (&Source::Default, vec![replace(vec![0])]),
+            (&config_source(), vec![add(vec![1, 2])]),
+            (&Source::Env, vec![remove(vec![1])]),
+            (&Source::Flag, vec![add(vec![1])]),
         ],
         vec!["--scope-foo=+[1]"],
         vec![("PANTS_SCOPE_FOO", "-[1]")],
@@ -368,9 +372,9 @@ fn test_parse_list_options() {
     check(
         vec![0, 2],
         vec![
-            (Source::Default, vec![replace(vec![0])]),
-            (config_source(), vec![add(vec![1, 2])]),
-            (Source::Env, vec![remove(vec![1]), add(vec![1])]),
+            (&Source::Default, vec![replace(vec![0])]),
+            (&config_source(), vec![add(vec![1, 2])]),
+            (&Source::Env, vec![remove(vec![1]), add(vec![1])]),
         ],
         vec![],
         vec![("PANTS_SCOPE_FOO", "-[1],+[1]")],
@@ -382,9 +386,9 @@ fn test_parse_list_options() {
     check(
         vec![0],
         vec![
-            (Source::Default, vec![replace(vec![0])]),
-            (config_source(), vec![remove(vec![0])]),
-            (Source::Env, vec![replace(vec![0])]),
+            (&Source::Default, vec![replace(vec![0])]),
+            (&config_source(), vec![remove(vec![0])]),
+            (&Source::Env, vec![replace(vec![0])]),
         ],
         vec![],
         vec![("PANTS_SCOPE_FOO", "[0]")],
@@ -401,7 +405,7 @@ fn test_parse_dict_options() {
 
     fn check(
         expected: HashMap<&str, Val>,
-        expected_derivation: Vec<(Source, Vec<DictEdit>)>,
+        expected_derivation: Vec<(&Source, Vec<DictEdit>)>,
         args: Vec<&'static str>,
         env: Vec<(&'static str, &'static str)>,
         config: &'static str,
@@ -448,7 +452,7 @@ fn test_parse_dict_options() {
     }
 
     let default_derivation = (
-        Source::Default,
+        &Source::Default,
         replace(hashmap! {"key1" => Val::Int(1), "key2" => Val::String("val2".to_string())}),
     );
 
@@ -464,11 +468,14 @@ fn test_parse_dict_options() {
         },
         vec![
             default_derivation.clone(),
-            (config_source(), add(hashmap! {"key5" => Val::Bool(true)})),
-            (extra_config_source(), add(hashmap! {"key6" => Val::Int(6)})),
-            (Source::Env, add(hashmap! {"key4" => Val::Float(4.0)})),
+            (&config_source(), add(hashmap! {"key5" => Val::Bool(true)})),
             (
-                Source::Flag,
+                &extra_config_source(),
+                add(hashmap! {"key6" => Val::Int(6)}),
+            ),
+            (&Source::Env, add(hashmap! {"key4" => Val::Float(4.0)})),
+            (
+                &Source::Flag,
                 add2(
                     hashmap! {"key3" => Val::Int(3)},
                     hashmap! {"key3a" => Val::String("3a".to_string())},
@@ -489,13 +496,13 @@ fn test_parse_dict_options() {
         },
         vec![
             default_derivation.clone(),
-            (config_source(), add(hashmap! {"key5" => Val::Bool(true)})),
+            (&config_source(), add(hashmap! {"key5" => Val::Bool(true)})),
             (
-                extra_config_source(),
+                &extra_config_source(),
                 replace(hashmap! {"key6" => Val::Int(6)}),
             ),
-            (Source::Env, add(hashmap! {"key4" => Val::Float(4.0)})),
-            (Source::Flag, add(hashmap! {"key3" => Val::Int(3)})),
+            (&Source::Env, add(hashmap! {"key4" => Val::Float(4.0)})),
+            (&Source::Flag, add(hashmap! {"key3" => Val::Int(3)})),
         ],
         vec!["--scope-foo=+{'key3': 3}"],
         vec![("PANTS_SCOPE_FOO", "+{'key4': 4.0}")],
@@ -510,13 +517,13 @@ fn test_parse_dict_options() {
         },
         vec![
             default_derivation.clone(),
-            (config_source(), add(hashmap! {"key5" => Val::Bool(true)})),
+            (&config_source(), add(hashmap! {"key5" => Val::Bool(true)})),
             (
-                extra_config_source(),
+                &extra_config_source(),
                 replace(hashmap! {"key6" => Val::Int(6)}),
             ),
-            (Source::Env, replace(hashmap! {"key4" => Val::Float(4.0)})),
-            (Source::Flag, add(hashmap! {"key3" => Val::Int(3)})),
+            (&Source::Env, replace(hashmap! {"key4" => Val::Float(4.0)})),
+            (&Source::Flag, add(hashmap! {"key3" => Val::Int(3)})),
         ],
         vec!["--scope-foo=+{'key3': 3}"],
         vec![("PANTS_SCOPE_FOO", "{'key4': 4.0}")],
@@ -530,13 +537,13 @@ fn test_parse_dict_options() {
         },
         vec![
             default_derivation.clone(),
-            (config_source(), add(hashmap! {"key5" => Val::Bool(true)})),
+            (&config_source(), add(hashmap! {"key5" => Val::Bool(true)})),
             (
-                extra_config_source(),
+                &extra_config_source(),
                 replace(hashmap! {"key6" => Val::Int(6)}),
             ),
-            (Source::Env, replace(hashmap! {"key4" => Val::Float(4.0)})),
-            (Source::Flag, replace(hashmap! {"key3" => Val::Int(3)})),
+            (&Source::Env, replace(hashmap! {"key4" => Val::Float(4.0)})),
+            (&Source::Flag, replace(hashmap! {"key3" => Val::Int(3)})),
         ],
         vec!["--scope-foo={'key3': 3}"],
         vec![("PANTS_SCOPE_FOO", "{'key4': 4.0}")],
