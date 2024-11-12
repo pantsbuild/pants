@@ -264,21 +264,21 @@ pub fn apply_dict_edits(dict_edits: impl Iterator<Item = DictEdit>) -> HashMap<S
 }
 
 #[derive(Debug)]
-pub struct OptionValue<T> {
-    pub derivation: Option<Vec<(Source, T)>>,
-    pub source: Source,
+pub struct OptionValue<'a, T> {
+    pub derivation: Option<Vec<(&'a Source, T)>>,
+    pub source: &'a Source,
     pub value: T,
 }
 
 #[derive(Debug)]
-pub struct OptionalOptionValue<T> {
-    pub derivation: Option<Vec<(Source, T)>>,
-    pub source: Source,
+pub struct OptionalOptionValue<'a, T> {
+    pub derivation: Option<Vec<(&'a Source, T)>>,
+    pub source: &'a Source,
     pub value: Option<T>,
 }
 
-impl<T> OptionalOptionValue<T> {
-    fn unwrap(self) -> OptionValue<T> {
+impl<'a, T> OptionalOptionValue<'a, T> {
+    fn unwrap(self) -> OptionValue<'a, T> {
         OptionValue {
             derivation: self.derivation,
             source: self.source,
@@ -288,18 +288,19 @@ impl<T> OptionalOptionValue<T> {
 }
 
 #[derive(Debug)]
-pub struct ListOptionValue<T> {
-    pub derivation: Option<Vec<(Source, Vec<ListEdit<T>>)>>,
+pub struct ListOptionValue<'a, T> {
+    #[allow(clippy::type_complexity)]
+    pub derivation: Option<Vec<(&'a Source, Vec<ListEdit<T>>)>>,
     // The highest-priority source that provided edits for this value.
-    pub source: Source,
+    pub source: &'a Source,
     pub value: Vec<T>,
 }
 
 #[derive(Debug)]
-pub struct DictOptionValue {
-    pub derivation: Option<Vec<(Source, Vec<DictEdit>)>>,
+pub struct DictOptionValue<'a> {
+    pub derivation: Option<Vec<(&'a Source, Vec<DictEdit>)>>,
     // The highest-priority source that provided edits for this value.
-    pub source: Source,
+    pub source: &'a Source,
     pub value: HashMap<String, Val>,
 }
 
@@ -473,11 +474,11 @@ impl OptionParser {
         if self.include_derivation {
             let mut derivations = vec![];
             if let Some(def) = default {
-                derivations.push((Source::Default, def.to_owned()));
+                derivations.push((&Source::Default, def.to_owned()));
             }
             for (source_type, source) in self.sources.iter() {
                 if let Some(val) = getter(source, id)? {
-                    derivations.push((source_type.clone(), val));
+                    derivations.push((source_type, val));
                 }
             }
             derivation = Some(derivations);
@@ -486,14 +487,14 @@ impl OptionParser {
             if let Some(value) = getter(source, id)? {
                 return Ok(OptionalOptionValue {
                     derivation,
-                    source: source_type.clone(),
+                    source: source_type,
                     value: Some(value),
                 });
             }
         }
         Ok(OptionalOptionValue {
             derivation,
-            source: Source::Default,
+            source: &Source::Default,
             value: default.map(|x| x.to_owned()),
         })
     }
@@ -565,7 +566,7 @@ impl OptionParser {
         let mut derivation = None;
         if self.include_derivation {
             let mut derivations = vec![(
-                Source::Default,
+                &Source::Default,
                 vec![ListEdit {
                     action: ListEditAction::Replace,
                     items: default.clone(),
@@ -574,21 +575,21 @@ impl OptionParser {
             for (source_type, source) in self.sources.iter() {
                 if let Some(list_edits) = getter(source, id)? {
                     if !list_edits.is_empty() {
-                        derivations.push((source_type.clone(), list_edits));
+                        derivations.push((source_type, list_edits));
                     }
                 }
             }
             derivation = Some(derivations);
         }
 
-        let mut highest_priority_source = Source::Default;
+        let mut highest_priority_source = &Source::Default;
         let mut edits: Vec<ListEdit<T>> = vec![ListEdit {
             action: ListEditAction::Replace,
             items: default,
         }];
         for (source_type, source) in self.sources.iter() {
             if let Some(list_edits) = getter(source, id)? {
-                highest_priority_source = source_type.clone();
+                highest_priority_source = source_type;
                 edits.extend(list_edits);
             }
         }
@@ -667,7 +668,7 @@ impl OptionParser {
         let mut derivation = None;
         if self.include_derivation {
             let mut derivations = vec![(
-                Source::Default,
+                &Source::Default,
                 vec![DictEdit {
                     action: DictEditAction::Replace,
                     items: default.clone(),
@@ -675,19 +676,19 @@ impl OptionParser {
             )];
             for (source_type, source) in self.sources.iter() {
                 if let Some(dict_edits) = source.get_dict(id)? {
-                    derivations.push((source_type.clone(), dict_edits));
+                    derivations.push((source_type, dict_edits));
                 }
             }
             derivation = Some(derivations);
         }
-        let mut highest_priority_source = Source::Default;
+        let mut highest_priority_source = &Source::Default;
         let mut edits: Vec<DictEdit> = vec![DictEdit {
             action: DictEditAction::Replace,
             items: default,
         }];
         for (source_type, source) in self.sources.iter() {
             if let Some(dict_edits) = source.get_dict(id)? {
-                highest_priority_source = source_type.clone();
+                highest_priority_source = source_type;
                 edits.extend(dict_edits);
             }
         }

@@ -185,7 +185,7 @@ type OptionValue<T> = (Option<T>, isize, Option<OptionValueDerivation<T>>);
 //   - [d, e] (from command-line flag)
 //   - [a, b, c] (from env var, from config)
 fn condense_list_value_derivation<T: PartialEq>(
-    derivation: Vec<(Source, Vec<ListEdit<T>>)>,
+    derivation: Vec<(&Source, Vec<ListEdit<T>>)>,
 ) -> OptionValueDerivation<Vec<T>> {
     let mut ret: OptionValueDerivation<Vec<T>> = vec![];
     let mut cur_group = vec![];
@@ -233,7 +233,7 @@ fn condense_list_value_derivation<T: PartialEq>(
 //   - {a: 1, b: 2, c: 3} (from env var, from config)
 fn condense_dict_value_derivation(
     py: Python,
-    derivation: Vec<(Source, Vec<DictEdit>)>,
+    derivation: Vec<(&Source, Vec<DictEdit>)>,
 ) -> PyResult<OptionValueDerivation<PyDictVal>> {
     let mut ret: OptionValueDerivation<PyDictVal> = vec![];
     let mut cur_group = vec![];
@@ -280,15 +280,15 @@ fn into_py<T>(res: Result<OptionalOptionValue<T>, String>) -> PyResult<OptionVal
 
 #[allow(clippy::type_complexity)]
 impl PyOptionParser {
-    fn get_list<T: ToOwned + ?Sized>(
-        &self,
+    fn get_list<'a, T: ToOwned + ?Sized>(
+        &'a self,
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<T::Owned>,
         getter: fn(
-            &OptionParser,
+            &'a OptionParser,
             &OptionId,
             Vec<T::Owned>,
-        ) -> Result<ListOptionValue<T::Owned>, String>,
+        ) -> Result<ListOptionValue<'a, T::Owned>, String>,
     ) -> PyResult<OptionValue<Vec<T::Owned>>>
     where
         <T as ToOwned>::Owned: PartialEq,
