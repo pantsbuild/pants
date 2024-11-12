@@ -18,10 +18,7 @@ from pants.backend.helm.dependency_inference.subsystem import (
     UnownedHelmDependencyUsage,
 )
 from pants.backend.helm.subsystems import k8s_parser
-from pants.backend.helm.subsystems.k8s_parser import (
-    ParsedKubeManifest,
-    ParseKubeManifestRequest,
-)
+from pants.backend.helm.subsystems.k8s_parser import ParsedKubeManifest, ParseKubeManifestRequest
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.backend.helm.target_types import rules as helm_target_types_rules
 from pants.backend.helm.util_rules import renderer
@@ -76,9 +73,7 @@ class HelmDeploymentReport(EngineAwareReturnType):
 
 
 @rule(desc="Analyse Helm deployment", level=LogLevel.DEBUG)
-async def analyse_deployment(
-    request: AnalyseHelmDeploymentRequest,
-) -> HelmDeploymentReport:
+async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeploymentReport:
     rendered_deployment = await Get(
         RenderedHelmFiles,
         HelmDeploymentRequest(
@@ -88,9 +83,7 @@ async def analyse_deployment(
         ),
     )
 
-    rendered_entries = await Get(
-        DigestEntries, Digest, rendered_deployment.snapshot.digest
-    )
+    rendered_entries = await Get(DigestEntries, Digest, rendered_deployment.snapshot.digest)
     parsed_manifests = await MultiGet(
         Get(
             ParsedKubeManifest,
@@ -190,9 +183,7 @@ async def _first_party_helm_deployment_mapping(
     docker_target_addresses = {tgt.address for tgt in docker_targets}
     maybe_addresses_by_ref = {
         ref: maybe_addr
-        for ((ref, _), maybe_addr) in zip(
-            indexed_address_inputs.values(), maybe_addresses
-        )
+        for ((ref, _), maybe_addr) in zip(indexed_address_inputs.values(), maybe_addresses)
     }
 
     resolver = ImageReferenceResolver(
@@ -297,15 +288,9 @@ class ImageReferenceResolver:
                 f"The behavior for unowned imports can also be set with the `[{HelmInferSubsystem.options_scope}].unowned_dependency_behavior`",
             ]
         )
-        if (
-            self.helm_infer.unowned_dependency_behavior
-            == UnownedHelmDependencyUsage.RaiseError
-        ):
+        if self.helm_infer.unowned_dependency_behavior == UnownedHelmDependencyUsage.RaiseError:
             raise UnownedDependencyError(message)
-        elif (
-            self.helm_infer.unowned_dependency_behavior
-            == UnownedHelmDependencyUsage.LogWarning
-        ):
+        elif self.helm_infer.unowned_dependency_behavior == UnownedHelmDependencyUsage.LogWarning:
             logging.warning(message)
         else:
             return
