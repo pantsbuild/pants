@@ -1040,10 +1040,11 @@ class HelpInfoExtracter:
                     # Again, distinguishing between '' vs None in the details field
                     # does not matter, but we want to be consistent with the idiosyncratic
                     # behavior of the legacy parser, until we get rid of it.
-                    details = rank.description() or empty_details
+                    details = (
+                        ", ".join(filter(None, [r.description() for r in ranks])) or empty_details
+                    )
                 ranked_values.append(RankedValue(rank, value, details))
             history = OptionValueHistory(tuple(ranked_values))
-            # history = parser.history(kwargs["dest"])
             ohi = self.get_option_help_info(args, kwargs)
             ohi = dataclasses.replace(ohi, value_history=history)
             if ohi.deprecation_active:

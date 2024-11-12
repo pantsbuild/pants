@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from enum import Enum
+from types import SimpleNamespace
 from typing import Any, Iterable, List, Optional, Tuple, Union
 
 from pants.base.build_environment import get_buildroot
@@ -15,7 +16,7 @@ from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptions, LogLevelOption
 from pants.option.native_options import NativeOptionParser
-from pants.option.option_types import BoolOption, IntOption, StrListOption
+from pants.option.option_types import BoolOption, IntListOption, StrListOption
 from pants.option.options import Options
 from pants.option.parser import Parser
 from pants.option.ranked_value import Rank
@@ -217,12 +218,12 @@ def test_grouping():
     do_test({"advanced": True}, expected_advanced=True)
 
 
-def test_get_all_help_info():
+def test_get_all_help_info(tmp_path) -> None:
     class Global(Subsystem):
         options_scope = GLOBAL_SCOPE
         help = help_text("Global options.")
 
-        opt1 = IntOption(default=42, help="Option 1")
+        opt1 = IntListOption(default=[42], help="Option 1")
         # This is special in having a short option `-l`. Make sure it works.
         level = LogLevelOption()
 
@@ -256,11 +257,13 @@ def test_get_all_help_info():
         alias = "baz_library"
         help = "A library of baz-es.\n\nUse it however you like."
 
-        core_fields = [QuxField, QuuxField]
+        core_fields = (QuxField, QuuxField)
 
+    config_path = "pants.test.toml"
+    config_source = SimpleNamespace(path=config_path, content=b"[GLOBAL]\nopt1 = '+[99]'")
     options = Options.create(
-        env={},
-        config=Config.load([]),
+        env={"PANTS_OPT1": "88"},
+        config=Config.load([config_source]),
         native_options_config_discovery=False,
         known_scope_infos=[Global.get_scope_info(), Foo.get_scope_info(), Bar.get_scope_info()],
         args=["./pants", "--backend-packages=['internal_plugins.releases']"],
@@ -309,20 +312,24 @@ def test_get_all_help_info():
                 "deprecated_scope": None,
                 "basic": (
                     {
-                        "display_args": ("--opt1=<int>",),
-                        "comma_separated_display_args": "--opt1=<int>",
+                        "display_args": ('--opt1="[<int>, <int>, ...]"',),
+                        "comma_separated_display_args": '--opt1="[<int>, <int>, ...]"',
                         "scoped_cmd_line_args": ("--opt1",),
                         "unscoped_cmd_line_args": ("--opt1",),
                         "config_key": "opt1",
                         "env_var": "PANTS_OPT1",
                         "value_history": {
                             "ranked_values": (
-                                {"rank": Rank.NONE, "value": None, "details": None},
-                                {"rank": Rank.HARDCODED, "value": 42, "details": None},
+                                {"rank": Rank.NONE, "value": [], "details": ""},
+                                {
+                                    "rank": Rank.ENVIRONMENT,
+                                    "value": [42, 99, 88],
+                                    "details": "from config, from an env var",
+                                },
                             ),
                         },
-                        "typ": int,
-                        "default": 42,
+                        "typ": list,
+                        "default": [42],
                         "fromfile": False,
                         "help": "Option 1",
                         "deprecation_active": False,
@@ -628,20 +635,24 @@ def test_get_all_help_info():
         },
         "env_var_to_help_info": {
             "PANTS_OPT1": {
-                "display_args": ("--opt1=<int>",),
-                "comma_separated_display_args": "--opt1=<int>",
+                "display_args": ('--opt1="[<int>, <int>, ...]"',),
+                "comma_separated_display_args": '--opt1="[<int>, <int>, ...]"',
                 "scoped_cmd_line_args": ("--opt1",),
                 "unscoped_cmd_line_args": ("--opt1",),
                 "config_key": "opt1",
                 "env_var": "PANTS_OPT1",
                 "value_history": {
                     "ranked_values": (
-                        {"rank": Rank.NONE, "value": None, "details": None},
-                        {"rank": Rank.HARDCODED, "value": 42, "details": None},
+                        {"rank": Rank.NONE, "value": [], "details": ""},
+                        {
+                            "rank": Rank.ENVIRONMENT,
+                            "value": [42, 99, 88],
+                            "details": "from config, from an env var",
+                        },
                     ),
                 },
-                "typ": int,
-                "default": 42,
+                "typ": list,
+                "default": [42],
                 "fromfile": False,
                 "help": "Option 1",
                 "deprecation_active": False,
