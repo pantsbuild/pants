@@ -18,7 +18,10 @@ from pants.backend.helm.dependency_inference.subsystem import (
     UnownedHelmDependencyUsage,
 )
 from pants.backend.helm.subsystems import k8s_parser
-from pants.backend.helm.subsystems.k8s_parser import ParsedKubeManifest, ParseKubeManifestRequest
+from pants.backend.helm.subsystems.k8s_parser import (
+    ParsedKubeManifest,
+    ParseKubeManifestRequest,
+)
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.backend.helm.target_types import rules as helm_target_types_rules
 from pants.backend.helm.util_rules import renderer
@@ -73,7 +76,9 @@ class HelmDeploymentReport(EngineAwareReturnType):
 
 
 @rule(desc="Analyse Helm deployment", level=LogLevel.DEBUG)
-async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeploymentReport:
+async def analyse_deployment(
+    request: AnalyseHelmDeploymentRequest,
+) -> HelmDeploymentReport:
     rendered_deployment = await Get(
         RenderedHelmFiles,
         HelmDeploymentRequest(
@@ -83,7 +88,9 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
         ),
     )
 
-    rendered_entries = await Get(DigestEntries, Digest, rendered_deployment.snapshot.digest)
+    rendered_entries = await Get(
+        DigestEntries, Digest, rendered_deployment.snapshot.digest
+    )
     parsed_manifests = await MultiGet(
         Get(
             ParsedKubeManifest,
@@ -133,6 +140,29 @@ class FirstPartyHelmDeploymentMapping:
 @rule
 async def first_party_helm_deployment_mapping(
     request: FirstPartyHelmDeploymentMappingRequest,
+    helm_infer: HelmInferSubsystem,
+) -> FirstPartyHelmDeploymentMapping:
+    if not helm_infer.deployment_dependencies:
+        return FirstPartyHelmDeploymentMapping(
+            request.field_set.address,
+            FrozenYamlIndex.empty(),
+        )
+    # Use a small proxy rule to make sure we don't calculate AllDockerImageTargets
+    # if `[helm-infer].deployment_dependencies` is set to true.
+    return await Get(
+        FirstPartyHelmDeploymentMapping,
+        _FirstPartyHelmDeploymentMappingRequest(field_set=request.field_set),
+    )
+
+
+@dataclass(frozen=True)
+class _FirstPartyHelmDeploymentMappingRequest(EngineAwareParameter):
+    field_set: HelmDeploymentFieldSet
+
+
+@rule
+async def _first_party_helm_deployment_mapping(
+    request: _FirstPartyHelmDeploymentMappingRequest,
     docker_targets: AllDockerImageTargets,
     helm_infer: HelmInferSubsystem,
 ) -> FirstPartyHelmDeploymentMapping:
@@ -160,10 +190,14 @@ async def first_party_helm_deployment_mapping(
     docker_target_addresses = {tgt.address for tgt in docker_targets}
     maybe_addresses_by_ref = {
         ref: maybe_addr
-        for ((ref, _), maybe_addr) in zip(indexed_address_inputs.values(), maybe_addresses)
+        for ((ref, _), maybe_addr) in zip(
+            indexed_address_inputs.values(), maybe_addresses
+        )
     }
 
-    resolver = ImageReferenceResolver(helm_infer, maybe_addresses_by_ref, docker_target_addresses)
+    resolver = ImageReferenceResolver(
+        helm_infer, maybe_addresses_by_ref, docker_target_addresses
+    )
 
     indexed_docker_addresses = indexed_address_inputs.transform_values(
         lambda image_ref_ai: resolver.image_ref_to_actual_address(image_ref_ai[0])
@@ -263,9 +297,15 @@ class ImageReferenceResolver:
                 f"The behavior for unowned imports can also be set with the `[{HelmInferSubsystem.options_scope}].unowned_dependency_behavior`",
             ]
         )
-        if self.helm_infer.unowned_dependency_behavior == UnownedHelmDependencyUsage.RaiseError:
+        if (
+            self.helm_infer.unowned_dependency_behavior
+            == UnownedHelmDependencyUsage.RaiseError
+        ):
             raise UnownedDependencyError(message)
-        elif self.helm_infer.unowned_dependency_behavior == UnownedHelmDependencyUsage.LogWarning:
+        elif (
+            self.helm_infer.unowned_dependency_behavior
+            == UnownedHelmDependencyUsage.LogWarning
+        ):
             logging.warning(message)
         else:
             return
@@ -286,29 +326,22 @@ async def inject_deployment_dependencies(
         DependenciesRequest(request.field_set.dependencies),
     )
 
-    if infer_subsystem.deployment_dependencies:
-        chart_address, explicitly_provided_deps, mapping = await MultiGet(
-            get_address,
-            get_explicit_deps,
-            Get(
-                FirstPartyHelmDeploymentMapping,
-                FirstPartyHelmDeploymentMappingRequest(request.field_set),
-            ),
-        )
-    else:
-        (chart_address, explicitly_provided_deps), mapping = (
-            await MultiGet(get_address, get_explicit_deps),
-            FirstPartyHelmDeploymentMapping(
-                request.field_set.address,
-                FrozenYamlIndex.empty(),
-            ),
-        )
+    chart_address, explicitly_provided_deps, mapping = await MultiGet(
+        get_address,
+        get_explicit_deps,
+        Get(
+            FirstPartyHelmDeploymentMapping,
+            FirstPartyHelmDeploymentMappingRequest(request.field_set),
+        ),
+    )
 
     dependencies: OrderedSet[Address] = OrderedSet()
     dependencies.add(chart_address)
 
     for imager_ref, candidate_address in mapping.indexed_docker_addresses.values():
-        matches = frozenset([candidate_address]).difference(explicitly_provided_deps.includes)
+        matches = frozenset([candidate_address]).difference(
+            explicitly_provided_deps.includes
+        )
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
             matches,
             request.field_set.address,
