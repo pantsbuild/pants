@@ -288,6 +288,7 @@ Created as part of the release process.
 + Pierre Chevalier
 + Pierre DAL-PRA
 + Qicheng Ma
++ Rahul Mehta
 + Ramon Buckland
 + Raph Estrada
 + Raúl Cuza
@@ -322,6 +323,7 @@ Created as part of the release process.
 + Stu Hood
 + Subin Kim
 + Suresh Joshi
++ Sven Widén
 + Tal Amuyal
 + Tansy Arron-Walker
 + Ted Dziuba
