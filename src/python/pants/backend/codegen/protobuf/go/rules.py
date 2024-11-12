@@ -599,6 +599,8 @@ async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go"],
                 description="Build Go protobuf plugin for `protoc`.",
+                # Allow `go` to contact the Go module proxy since it will run its own build.
+                allow_downloads=True,
             ),
         ),
         Get(
@@ -611,6 +613,8 @@ async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go-grpc"],
                 description="Build Go gRPC protobuf plugin for `protoc`.",
+                # Allow `go` to contact the Go module proxy since it will run its own build.
+                allow_downloads=True,
             ),
         ),
     )
