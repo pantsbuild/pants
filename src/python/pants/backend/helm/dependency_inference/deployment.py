@@ -130,6 +130,11 @@ class FirstPartyHelmDeploymentMapping:
     indexed_docker_addresses: FrozenYamlIndex[tuple[str, Address]]
 
 
+@dataclass(frozen=True)
+class _FirstPartyHelmDeploymentMappingRequest(EngineAwareParameter):
+    field_set: HelmDeploymentFieldSet
+
+
 @rule
 async def first_party_helm_deployment_mapping(
     request: FirstPartyHelmDeploymentMappingRequest,
@@ -146,11 +151,6 @@ async def first_party_helm_deployment_mapping(
         FirstPartyHelmDeploymentMapping,
         _FirstPartyHelmDeploymentMappingRequest(field_set=request.field_set),
     )
-
-
-@dataclass(frozen=True)
-class _FirstPartyHelmDeploymentMappingRequest(EngineAwareParameter):
-    field_set: HelmDeploymentFieldSet
 
 
 @rule
