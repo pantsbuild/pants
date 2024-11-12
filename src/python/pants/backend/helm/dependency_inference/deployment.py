@@ -186,9 +186,7 @@ async def _first_party_helm_deployment_mapping(
         for ((ref, _), maybe_addr) in zip(indexed_address_inputs.values(), maybe_addresses)
     }
 
-    resolver = ImageReferenceResolver(
-        helm_infer, maybe_addresses_by_ref, docker_target_addresses
-    )
+    resolver = ImageReferenceResolver(helm_infer, maybe_addresses_by_ref, docker_target_addresses)
 
     indexed_docker_addresses = indexed_address_inputs.transform_values(
         lambda image_ref_ai: resolver.image_ref_to_actual_address(image_ref_ai[0])
@@ -324,9 +322,7 @@ async def inject_deployment_dependencies(
     dependencies.add(chart_address)
 
     for imager_ref, candidate_address in mapping.indexed_docker_addresses.values():
-        matches = frozenset([candidate_address]).difference(
-            explicitly_provided_deps.includes
-        )
+        matches = frozenset([candidate_address]).difference(explicitly_provided_deps.includes)
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
             matches,
             request.field_set.address,
