@@ -1031,19 +1031,8 @@ class HelpInfoExtracter:
             empty_details = "" if (is_list or is_dict) else None
             ranked_values.append(RankedValue(Rank.NONE, empty_val, empty_details))
 
-            for value, ranks in derivation:
-                if len(ranks) == 0:
-                    rank = Rank.NONE
-                    details = None
-                else:
-                    rank = ranks[-1]
-                    # Again, distinguishing between '' vs None in the details field
-                    # does not matter, but we want to be consistent with the idiosyncratic
-                    # behavior of the legacy parser, until we get rid of it.
-                    details = (
-                        ", ".join(filter(None, [r.description() for r in ranks])) or empty_details
-                    )
-                ranked_values.append(RankedValue(rank, value, details))
+            for value, rank, details in derivation:
+                ranked_values.append(RankedValue(rank, value, details or empty_details))
             history = OptionValueHistory(tuple(ranked_values))
             ohi = self.get_option_help_info(args, kwargs)
             ohi = dataclasses.replace(ohi, value_history=history)
