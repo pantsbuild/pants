@@ -116,7 +116,7 @@ class NativeOptionParser:
 
     def get_derivation(
         self, *, scope, registration_args, registration_kwargs
-    ) -> list[Tuple[Any, list[Rank]]]:
+    ) -> list[Tuple[Any, Rank, Optional[str]]]:
         _, _, derivation = self._get_value_and_derivation(
             scope, registration_args, registration_kwargs
         )
@@ -124,7 +124,7 @@ class NativeOptionParser:
 
     def _get_value_and_derivation(
         self, scope, registration_args, registration_kwargs
-    ) -> Tuple[Any, Rank, list[Tuple[Any, list[Rank]]]]:
+    ) -> Tuple[Any, Rank, list[Tuple[Any, Rank, Optional[str]]]]:
         return self._get(
             scope=scope,
             dest=parse_dest(*registration_args, **registration_kwargs),
@@ -147,7 +147,7 @@ class NativeOptionParser:
         member_type=None,
         choices=None,
         passthrough=False,
-    ) -> Tuple[Any, Rank, list[Tuple[Any, list[Rank]]]]:
+    ) -> Tuple[Any, Rank, list[Tuple[Any, Rank, Optional[str]]]]:
         def scope_str() -> str:
             return "global scope" if scope == GLOBAL_SCOPE else f"scope '{scope}'"
 
@@ -235,9 +235,7 @@ class NativeOptionParser:
             return v
 
         if derivation:
-            derivation = [
-                (process_value(v), [self.int_to_rank[r] for r in rs]) for (v, rs) in derivation
-            ]
+            derivation = [(process_value(v), self.int_to_rank[r], d) for (v, r, d) in derivation]
 
         if val is not None:
             val = process_value(val)
