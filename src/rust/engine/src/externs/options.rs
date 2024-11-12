@@ -10,6 +10,7 @@ use options::{
     Source, Val,
 };
 
+use itertools::Itertools;
 use std::collections::HashMap;
 
 pyo3::import_exception!(pants.option.errors, ParseError);
@@ -164,11 +165,8 @@ struct PyOptionParser(OptionParser);
 // The pythonic value of a dict-typed option.
 type PyDictVal = HashMap<String, PyObject>;
 
-// The derivation of the option value, as a vec of (value, vec of source ranks) tuples.
-// A scalar value will always have a single source. A list/dict value may have elements
-// appended across multiple sources.
-// In ascending rank order, so the last value is the final value of the option.
-type OptionValueDerivation<T> = Vec<(T, Vec<isize>)>;
+// The derivation of the option value, as a vec of (value, rank, details string) tuples.
+type OptionValueDerivation<'py, T> = Vec<(T, isize, Option<Bound<'py, PyString>>)>;
 
 // A tuple (final value, rank of final value, optional derivation of value).
 //
@@ -177,19 +175,50 @@ type OptionValueDerivation<T> = Vec<(T, Vec<isize>)>;
 // We could get rid of this tuple type by representing the final value and its rank as
 // a singleton derivation (in the case where we don't otherwise need the full derivation).
 // But that would allocate two unnecessary Vecs for every option.
-type OptionValue<T> = (Option<T>, isize, Option<OptionValueDerivation<T>>);
+type OptionValue<'py, T> = (Option<T>, isize, Option<OptionValueDerivation<'py, T>>);
+
+fn source_to_details(source: &Source) -> Option<&str> {
+    match source {
+        Source::Default => None,
+        Source::Config { ordinal: _, path } => Some(path),
+        Source::Env => Some("env var"),
+        Source::Flag => Some("command-line flag"),
+    }
+}
+
+fn to_details<'py>(py: Python<'py>, sources: Vec<&'py Source>) -> Option<Bound<'py, PyString>> {
+    if sources.is_empty() {
+        return None;
+    }
+    if sources.len() == 1 {
+        return source_to_details(sources.first().unwrap()).map(|s| PyString::intern_bound(py, s));
+    }
+    #[allow(unstable_name_collisions)]
+    // intersperse is provided by itertools::Itertools, but is also in the Rust nightly
+    // as an experimental feature of standard Iterator. If/when that becomes standard we
+    // can use it, but for now we must squelch the name collision.
+    Some(PyString::intern_bound(
+        py,
+        &sources
+            .into_iter()
+            .filter_map(source_to_details)
+            .intersperse(", ")
+            .collect::<String>(),
+    ))
+}
 
 // Condense list value derivation across sources, so that it reflects merges vs. replacements
 // in a useful way. E.g., if we merge [a, b] and [c], and then replace it with [d, e],
 // the derivation will show:
 //   - [d, e] (from command-line flag)
 //   - [a, b, c] (from env var, from config)
-fn condense_list_value_derivation<T: PartialEq>(
-    derivation: Vec<(&Source, Vec<ListEdit<T>>)>,
-) -> OptionValueDerivation<Vec<T>> {
-    let mut ret: OptionValueDerivation<Vec<T>> = vec![];
-    let mut cur_group = vec![];
-    let mut cur_ranks = vec![];
+fn condense_list_value_derivation<'py, T: PartialEq>(
+    py: Python<'py>,
+    derivation: Vec<(&'py Source, Vec<ListEdit<T>>)>,
+) -> OptionValueDerivation<'py, Vec<T>> {
+    let mut ret: OptionValueDerivation<'py, Vec<T>> = vec![];
+    let mut cur_group: Vec<ListEdit<T>> = vec![];
+    let mut cur_sources: Vec<&Source> = vec![];
 
     // In this case, for simplicity, we always use the "inefficient" O(M*N) remover,
     // even for hashable values. This is very unlikely to have a noticeable performance impact
@@ -203,23 +232,25 @@ fn condense_list_value_derivation<T: PartialEq>(
     for (source, list_edits) in derivation.into_iter() {
         for list_edit in list_edits {
             if list_edit.action == ListEditAction::Replace {
-                if !cur_group.is_empty() {
+                if !cur_sources.is_empty() {
                     ret.push((
                         apply_list_edits::<T>(remover, cur_group.into_iter()),
-                        cur_ranks,
+                        cur_sources.last().unwrap().rank() as isize,
+                        to_details(py, cur_sources),
                     ));
                 }
                 cur_group = vec![];
-                cur_ranks = vec![];
+                cur_sources = vec![];
             }
             cur_group.push(list_edit);
-            cur_ranks.push(source.rank() as isize);
+            cur_sources.push(source);
         }
     }
-    if !cur_group.is_empty() {
+    if !cur_sources.is_empty() {
         ret.push((
             apply_list_edits::<T>(remover, cur_group.into_iter()),
-            cur_ranks,
+            cur_sources.last().unwrap().rank() as isize,
+            to_details(py, cur_sources),
         ));
     }
 
@@ -231,13 +262,13 @@ fn condense_list_value_derivation<T: PartialEq>(
 // the derivation will show:
 //   - {d: 4} (from command-line flag)
 //   - {a: 1, b: 2, c: 3} (from env var, from config)
-fn condense_dict_value_derivation(
-    py: Python,
-    derivation: Vec<(&Source, Vec<DictEdit>)>,
-) -> PyResult<OptionValueDerivation<PyDictVal>> {
-    let mut ret: OptionValueDerivation<PyDictVal> = vec![];
-    let mut cur_group = vec![];
-    let mut cur_ranks = vec![];
+fn condense_dict_value_derivation<'py>(
+    py: Python<'py>,
+    derivation: Vec<(&'py Source, Vec<DictEdit>)>,
+) -> PyResult<OptionValueDerivation<'py, PyDictVal>> {
+    let mut ret: OptionValueDerivation<'py, PyDictVal> = vec![];
+    let mut cur_group: Vec<DictEdit> = vec![];
+    let mut cur_sources: Vec<&Source> = vec![];
 
     for (source, dict_edits) in derivation.into_iter() {
         for dict_edit in dict_edits {
@@ -245,34 +276,39 @@ fn condense_dict_value_derivation(
                 if !cur_group.is_empty() {
                     ret.push((
                         dict_into_py(py, apply_dict_edits(cur_group.into_iter()))?,
-                        cur_ranks,
+                        cur_sources.last().unwrap().rank() as isize,
+                        to_details(py, cur_sources),
                     ));
                 }
                 cur_group = vec![];
-                cur_ranks = vec![];
+                cur_sources = vec![];
             }
             cur_group.push(dict_edit);
-            cur_ranks.push(source.rank() as isize);
+            cur_sources.push(source);
         }
     }
     if !cur_group.is_empty() {
         ret.push((
             dict_into_py(py, apply_dict_edits(cur_group.into_iter()))?,
-            cur_ranks,
+            cur_sources.last().unwrap().rank() as isize,
+            to_details(py, cur_sources),
         ));
     }
 
     Ok(ret)
 }
 
-fn into_py<T>(res: Result<OptionalOptionValue<T>, String>) -> PyResult<OptionValue<T>> {
+fn into_py<'py, T>(
+    py: Python<'py>,
+    res: Result<OptionalOptionValue<'py, T>, String>,
+) -> PyResult<OptionValue<'py, T>> {
     let val = res.map_err(ParseError::new_err)?;
     Ok((
         val.value,
         val.source.rank() as isize,
         val.derivation.map(|d| {
             d.into_iter()
-                .map(|(source, val)| (val, vec![source.rank() as isize]))
+                .map(|(source, val)| (val, source.rank() as isize, to_details(py, vec![source])))
                 .collect()
         }),
     ))
@@ -280,16 +316,17 @@ fn into_py<T>(res: Result<OptionalOptionValue<T>, String>) -> PyResult<OptionVal
 
 #[allow(clippy::type_complexity)]
 impl PyOptionParser {
-    fn get_list<'a, T: ToOwned + ?Sized>(
-        &'a self,
+    fn get_list<'py, T: ToOwned + ?Sized>(
+        &'py self,
+        py: Python<'py>,
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<T::Owned>,
         getter: fn(
-            &'a OptionParser,
+            &'py OptionParser,
             &OptionId,
             Vec<T::Owned>,
-        ) -> Result<ListOptionValue<'a, T::Owned>, String>,
-    ) -> PyResult<OptionValue<Vec<T::Owned>>>
+        ) -> Result<ListOptionValue<'py, T::Owned>, String>,
+    ) -> PyResult<OptionValue<'py, Vec<T::Owned>>>
     where
         <T as ToOwned>::Owned: PartialEq,
     {
@@ -298,7 +335,9 @@ impl PyOptionParser {
         Ok((
             Some(opt_val.value),
             opt_val.source.rank() as isize,
-            opt_val.derivation.map(condense_list_value_derivation),
+            opt_val
+                .derivation
+                .map(|d| condense_list_value_derivation(py, d)),
         ))
     }
 }
@@ -333,87 +372,107 @@ impl PyOptionParser {
     }
 
     #[pyo3(signature = (option_id, default))]
-    fn get_bool(
-        &self,
+    fn get_bool<'py>(
+        &'py self,
+        py: Python<'py>,
         option_id: &Bound<'_, PyOptionId>,
         default: Option<bool>,
-    ) -> PyResult<OptionValue<bool>> {
-        into_py(self.0.parse_bool_optional(&option_id.borrow().0, default))
+    ) -> PyResult<OptionValue<'py, bool>> {
+        into_py(
+            py,
+            self.0.parse_bool_optional(&option_id.borrow().0, default),
+        )
     }
 
     #[pyo3(signature = (option_id, default))]
-    fn get_int(
-        &self,
+    fn get_int<'py>(
+        &'py self,
+        py: Python<'py>,
         option_id: &Bound<'_, PyOptionId>,
         default: Option<i64>,
-    ) -> PyResult<OptionValue<i64>> {
-        into_py(self.0.parse_int_optional(&option_id.borrow().0, default))
+    ) -> PyResult<OptionValue<'py, i64>> {
+        into_py(
+            py,
+            self.0.parse_int_optional(&option_id.borrow().0, default),
+        )
     }
 
     #[pyo3(signature = (option_id, default))]
-    fn get_float(
-        &self,
+    fn get_float<'py>(
+        &'py self,
+        py: Python<'py>,
         option_id: &Bound<'_, PyOptionId>,
         default: Option<f64>,
-    ) -> PyResult<OptionValue<f64>> {
-        into_py(self.0.parse_float_optional(&option_id.borrow().0, default))
+    ) -> PyResult<OptionValue<'py, f64>> {
+        into_py(
+            py,
+            self.0.parse_float_optional(&option_id.borrow().0, default),
+        )
     }
 
     #[pyo3(signature = (option_id, default))]
-    fn get_string(
-        &self,
+    fn get_string<'py>(
+        &'py self,
+        py: Python<'py>,
         option_id: &Bound<'_, PyOptionId>,
         default: Option<&str>,
-    ) -> PyResult<OptionValue<String>> {
-        into_py(self.0.parse_string_optional(&option_id.borrow().0, default))
+    ) -> PyResult<OptionValue<'py, String>> {
+        into_py(
+            py,
+            self.0.parse_string_optional(&option_id.borrow().0, default),
+        )
     }
 
-    fn get_bool_list(
-        &self,
+    fn get_bool_list<'py>(
+        &'py self,
+        py: Python<'py>,
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<bool>,
-    ) -> PyResult<OptionValue<Vec<bool>>> {
-        self.get_list::<bool>(option_id, default, |op, oid, def| {
+    ) -> PyResult<OptionValue<'py, Vec<bool>>> {
+        self.get_list::<bool>(py, option_id, default, |op, oid, def| {
             op.parse_bool_list(oid, def)
         })
     }
 
-    fn get_int_list(
-        &self,
+    fn get_int_list<'py>(
+        &'py self,
+        py: Python<'py>,
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<i64>,
-    ) -> PyResult<OptionValue<Vec<i64>>> {
-        self.get_list::<i64>(option_id, default, |op, oid, def| {
+    ) -> PyResult<OptionValue<'py, Vec<i64>>> {
+        self.get_list::<i64>(py, option_id, default, |op, oid, def| {
             op.parse_int_list(oid, def)
         })
     }
 
-    fn get_float_list(
-        &self,
+    fn get_float_list<'py>(
+        &'py self,
+        py: Python<'py>,
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<f64>,
-    ) -> PyResult<OptionValue<Vec<f64>>> {
-        self.get_list::<f64>(option_id, default, |op, oid, def| {
+    ) -> PyResult<OptionValue<'py, Vec<f64>>> {
+        self.get_list::<f64>(py, option_id, default, |op, oid, def| {
             op.parse_float_list(oid, def)
         })
     }
 
-    fn get_string_list(
-        &self,
+    fn get_string_list<'py>(
+        &'py self,
+        py: Python<'py>,
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<String>,
-    ) -> PyResult<OptionValue<Vec<String>>> {
-        self.get_list::<String>(option_id, default, |op, oid, def| {
+    ) -> PyResult<OptionValue<'py, Vec<String>>> {
+        self.get_list::<String>(py, option_id, default, |op, oid, def| {
             op.parse_string_list(oid, def)
         })
     }
 
-    fn get_dict(
-        &self,
-        py: Python,
+    fn get_dict<'py>(
+        &'py self,
+        py: Python<'py>,
         option_id: &Bound<'_, PyOptionId>,
         default: &Bound<'_, PyDict>,
-    ) -> PyResult<OptionValue<PyDictVal>> {
+    ) -> PyResult<OptionValue<'py, PyDictVal>> {
         let default = default
             .items()
             .into_iter()

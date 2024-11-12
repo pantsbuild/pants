@@ -662,10 +662,8 @@ class PyConfigSource:
 # See src/rust/engine/src/externs/options.rs for the Rust-side versions of these types.
 T = TypeVar("T")
 
-# List of pairs of (value, ranks of the sources of the value).
-# A scalar value will always have a single source. A list/dict value
-# may come from multiple sources, if its elements were appended.
-OptionValueDerivation = list[Tuple[T, list[int]]]
+# List of tuples of (value, rank, details string).
+OptionValueDerivation = list[Tuple[T, int, str]]
 
 # A tuple (value, rank of value, optional derivation of value).
 OptionValue = Tuple[Optional[T], int, Optional[OptionValueDerivation]]

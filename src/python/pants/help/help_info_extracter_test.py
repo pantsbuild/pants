@@ -324,7 +324,7 @@ def test_get_all_help_info(tmp_path) -> None:
                                 {
                                     "rank": Rank.ENVIRONMENT,
                                     "value": [42, 99, 88],
-                                    "details": "from config, from an env var",
+                                    "details": "pants.test.toml, env var",
                                 },
                             ),
                         },
@@ -388,7 +388,7 @@ def test_get_all_help_info(tmp_path) -> None:
                                 {"details": "", "rank": Rank.NONE, "value": []},
                                 {"details": "", "rank": Rank.HARDCODED, "value": []},
                                 {
-                                    "details": "from command-line flag",
+                                    "details": "command-line flag",
                                     "rank": Rank.FLAG,
                                     "value": ["internal_plugins.releases"],
                                 },
@@ -647,7 +647,7 @@ def test_get_all_help_info(tmp_path) -> None:
                         {
                             "rank": Rank.ENVIRONMENT,
                             "value": [42, 99, 88],
-                            "details": "from config, from an env var",
+                            "details": "pants.test.toml, env var",
                         },
                     ),
                 },
@@ -711,7 +711,7 @@ def test_get_all_help_info(tmp_path) -> None:
                         {"details": "", "rank": Rank.NONE, "value": []},
                         {"details": "", "rank": Rank.HARDCODED, "value": []},
                         {
-                            "details": "from command-line flag",
+                            "details": "command-line flag",
                             "rank": Rank.FLAG,
                             "value": ["internal_plugins.releases"],
                         },
