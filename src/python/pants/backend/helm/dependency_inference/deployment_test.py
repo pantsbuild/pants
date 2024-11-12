@@ -62,7 +62,10 @@ def rule_runner() -> RuleRunner:
             *process.rules(),
             *stripped_source_files.rules(),
             *tool.rules(),
-            QueryRule(FirstPartyHelmDeploymentMapping, (FirstPartyHelmDeploymentMappingRequest,)),
+            QueryRule(
+                FirstPartyHelmDeploymentMapping,
+                (FirstPartyHelmDeploymentMappingRequest,),
+            ),
             QueryRule(HelmDeploymentReport, (AnalyseHelmDeploymentRequest,)),
             QueryRule(InferredDependencies, (InferHelmDeploymentDependenciesRequest,)),
         ],
@@ -102,7 +105,8 @@ def test_deployment_dependencies_report(rule_runner: RuleRunner) -> None:
 
     source_root_patterns = ("/src/*",)
     rule_runner.set_options(
-        [f"--source-root-patterns={repr(source_root_patterns)}"], env_inherit=PYTHON_BOOTSTRAP_ENV
+        [f"--source-root-patterns={repr(source_root_patterns)}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
     target = rule_runner.get_target(Address("src/deployment", target_name="foo"))
@@ -230,13 +234,17 @@ def test_resolve_relative_docker_addresses_to_deployment(
 
     def make_request():
         return rule_runner.request(
-            FirstPartyHelmDeploymentMapping, [FirstPartyHelmDeploymentMappingRequest(field_set)]
+            FirstPartyHelmDeploymentMapping,
+            [FirstPartyHelmDeploymentMappingRequest(field_set)],
         )
 
     if correct_target_name:
         expected = [
             (":myapp0", Address("src/deployment", target_name="myapp0")),
-            ("//src/deployment:myapp1", Address("src/deployment", target_name="myapp1")),
+            (
+                "//src/deployment:myapp1",
+                Address("src/deployment", target_name="myapp1"),
+            ),
             ("./subdir:myapp2", Address("src/deployment/subdir", target_name="myapp2")),
         ]
         assert list(make_request().indexed_docker_addresses.values()) == expected
@@ -377,7 +385,8 @@ def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
     expected_dependency_addr = Address("src/image", target_name="myapp")
 
     mapping = rule_runner.request(
-        FirstPartyHelmDeploymentMapping, [FirstPartyHelmDeploymentMappingRequest(field_set)]
+        FirstPartyHelmDeploymentMapping,
+        [FirstPartyHelmDeploymentMappingRequest(field_set)],
     )
     assert list(mapping.indexed_docker_addresses.values()) == [
         (expected_image_ref, expected_dependency_addr)
@@ -433,6 +442,63 @@ def test_disambiguate_docker_dependency(rule_runner: RuleRunner) -> None:
     source_root_patterns = ("/", "src/*")
     rule_runner.set_options(
         [f"--source-root-patterns={repr(source_root_patterns)}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    deployment_addr = Address("src/deployment", target_name="foo")
+    tgt = rule_runner.get_target(deployment_addr)
+
+    inferred_dependencies = rule_runner.request(
+        InferredDependencies,
+        [InferHelmDeploymentDependenciesRequest(HelmDeploymentFieldSet.create(tgt))],
+    )
+
+    # Assert only the Helm chart dependency has been inferred
+    assert len(inferred_dependencies.include) == 1
+    assert set(inferred_dependencies.include) == {Address("src/mychart")}
+
+
+def test_dont_infer_docker_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/mychart/BUILD": "helm_chart()",
+            "src/mychart/Chart.yaml": HELM_CHART_FILE,
+            "src/mychart/values.yaml": HELM_VALUES_FILE,
+            "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "src/mychart/templates/pod.yaml": dedent(
+                """\
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: {{ template "fullname" . }}
+                  labels:
+                    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+                spec:
+                  containers:
+                    - name: myapp-container
+                      image: registry/image:latest
+                """
+            ),
+            "src/deployment/BUILD": dedent(
+                """\
+                helm_deployment(
+                    name="foo",
+                    chart="//src/mychart",
+                )
+                """
+            ),
+            "src/docker/BUILD": "docker_image(name='latest')",
+            "src/docker/Dockerfile": "FROM busybox:1.28",
+        }
+    )
+
+    source_root_patterns = ("/", "src/*")
+    rule_runner.set_options(
+        [
+            f"--source-root-patterns={repr(source_root_patterns)}",
+            "--no-helm-infer-deployment-dependencies",
+            "--helm-infer-unowned-dependency-behavior=error",
+        ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
