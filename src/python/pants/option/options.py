@@ -18,7 +18,6 @@ from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.parser import Parser
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
-from pants.util.docutil import doc_url
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
@@ -220,7 +219,6 @@ class Options:
         self._passthru = passthru
         self._parser_by_scope = parser_by_scope
         self._native_parser = native_parser
-        self._native_options_validation = native_options_validation
         self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
         self._allow_unknown_options = allow_unknown_options
@@ -279,9 +277,7 @@ class Options:
         section_to_valid_options = {}
         for scope in self.known_scope_to_info:
             section = GLOBAL_SCOPE_CONFIG_SECTION if scope == GLOBAL_SCOPE else scope
-            section_to_valid_options[section] = set(
-                self.for_scope(scope, check_deprecations=False, log_parser_warnings=True)
-            )
+            section_to_valid_options[section] = set(self.for_scope(scope, check_deprecations=False))
         global_config.verify(section_to_valid_options)
 
     def verify_args(self):
@@ -409,7 +405,9 @@ class Options:
     # TODO: Eagerly precompute backing data for this?
     @memoized_method
     def for_scope(
-        self, scope: str, check_deprecations: bool = True, log_parser_warnings: bool = False
+        self,
+        scope: str,
+        check_deprecations: bool = True,
     ) -> OptionValueContainer:
         """Return the option values for the given scope.
 
@@ -424,118 +422,12 @@ class Options:
         """
 
         native_values = self.get_parser(scope).parse_args_native(self._native_parser)
-        native_mismatch_msgs = []
-
-        if self._native_options_validation == NativeOptionsValidation.ignore:
-            legacy_values = None
-        else:
-            try:
-                values_builder = OptionValueContainerBuilder()
-                flags_in_scope = self._scope_to_flags.get(scope, [])
-                parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
-                legacy_values = self.get_parser(scope).parse_args(
-                    parse_args_request, log_warnings=log_parser_warnings
-                )
-            except UnknownFlagsError:
-                # Let the native parser handle unknown flags.
-                legacy_values = None
-            except Exception as e:
-                native_mismatch_msgs.append(
-                    f"Failed to parse options with legacy parser due to error:\n    {e}"
-                )
-                legacy_values = None
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
             native_values_builder = native_values.to_builder()
             self._check_and_apply_deprecations(scope, native_values_builder)
             native_values = native_values_builder.build()
-
-            if legacy_values:
-                values_builder = legacy_values.to_builder()
-                self._check_and_apply_deprecations(scope, values_builder)
-                legacy_values = values_builder.build()
-
-        def listify_tuples(x):
-            # Sequence values from the legacy parser can be tuple or list, but those coming from
-            # the native parser are always list. We convert to list here for comparison purposes.
-            if isinstance(x, (tuple, list)):
-                return [listify_tuples(y) for y in x]
-            elif isinstance(x, dict):
-                return {k: listify_tuples(v) for k, v in x.items()}
-            else:
-                return x
-
-        if legacy_values:
-
-            def legacy_val_info(k):
-                if k in legacy_values:
-                    val = legacy_values[k]
-                    descr = (
-                        f"{val} of type {type(val)}, from source {legacy_values.get_rank(k).name}"
-                    )
-                else:
-                    descr = "not provided"
-                return f"Legacy value: {descr}"
-
-            def native_val_info(k):
-                if k in native_values:
-                    val = native_values[k]
-                    descr = (
-                        f"{val} of type {type(val)}, from source {native_values.get_rank(k).name}"
-                    )
-                else:
-                    descr = "not provided"
-                return f"Native value: {descr}"
-
-            for key in sorted(legacy_values.get_keys() | native_values.get_keys()):
-                if listify_tuples(legacy_values.get(key)) != native_values.get(key):
-                    native_mismatch_msgs.append(
-                        f"Value mismatch for the option `{key}`:\n"
-                        f"    {legacy_val_info(key)}\n"
-                        f"    {native_val_info(key)}"
-                    )
-
-        if native_mismatch_msgs:
-
-            def log(log_func):
-                scope_section = GLOBAL_SCOPE_CONFIG_SECTION if scope == GLOBAL_SCOPE else scope
-                formatted_msgs = "\n\n".join(f"- {m}" for m in native_mismatch_msgs)
-                log_func(
-                    softwrap(
-                        f"""
-                        Found differences between the new native options parser and the legacy
-                        options parser in scope [{scope_section}]:
-
-                        {formatted_msgs}
-
-                        If you can't resolve this discrepancy, please reach out to the Pants
-                        development team: {doc_url('/community/getting-help')}.
-
-                        The native parser is the default in 2.23.x, and the legacy parser
-                        will be removed in 2.24.x. So it is imperative that we find out about any
-                        discrepancies during this transition period.
-
-                        You can use the global native_options_validation option
-                        ({doc_url('reference/global-options#native_options_validation')}) to
-                        configure this check.
-
-                        Note that there is a known issue with differences in the handling of backslash
-                        escapes in config values of type list-of-string. This surfaces as, for instance, legacy value `['"example"']` and native value `['\\"example\\"']`. The solution to this issue will
-                        be to change the escaping in your config values appropriately when switching to
-                        2.23.x. Typically this will mean removing superfluous escapes, and the new behavior
-                        will be more ergonomic.
-                        """
-                    )
-                )
-
-            if self._native_options_validation == NativeOptionsValidation.warning:
-                log(logger.warning)
-            elif self._native_options_validation == NativeOptionsValidation.error:
-                log(logger.error)
-                raise Exception(
-                    "Option value mismatches detected, see logs above for details. Aborting."
-                )
         return native_values
 
     def get_fingerprintable_for_scope(

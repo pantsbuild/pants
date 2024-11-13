@@ -212,8 +212,9 @@ class Parser:
                 scope=self.scope, registration_args=args, registration_kwargs=kwargs
             )
 
-            # If the option is explicitly given, check mutual exclusion.
+            # If the option is explicitly given, check deprecation and mutual exclusion.
             if rank > Rank.HARDCODED:
+                self._check_deprecated(dest, kwargs)
                 mutex_dest = kwargs.get("mutually_exclusive_group")
                 mutex_map_key = mutex_dest or dest
                 mutex_map[mutex_map_key].append(dest)
