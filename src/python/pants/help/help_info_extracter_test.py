@@ -101,8 +101,6 @@ def test_default() -> None:
         # Defaults are computed in the parser and added into the kwargs, so we
         # must jump through this hoop in this test.
         parser = Parser(
-            env={},
-            config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
         )
         native_parser = NativeOptionParser([], {}, [], allow_pantsrc=False, include_derivation=True)
@@ -201,8 +199,6 @@ def test_grouping():
             return int(exp)  # True -> 1, False -> 0.
 
         parser = Parser(
-            env={},
-            config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
         )
         native_parser = NativeOptionParser([], {}, [], allow_pantsrc=False, include_derivation=True)

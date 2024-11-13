@@ -9,7 +9,6 @@ import pytest
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.help_tools import ToolHelpInfo
 from pants.help.maybe_color import MaybeColor
-from pants.option.config import Config
 from pants.option.global_options import GlobalOptions
 from pants.option.native_options import NativeOptionParser
 from pants.option.parser import Parser
@@ -18,8 +17,6 @@ from pants.option.parser import Parser
 @pytest.fixture
 def parser() -> Parser:
     return Parser(
-        env={},
-        config=Config.load([]),
         scope_info=GlobalOptions.get_scope_info(),
     )
 

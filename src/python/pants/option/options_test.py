@@ -39,11 +39,11 @@ from pants.option.errors import (
     UnknownFlagsError,
 )
 from pants.option.global_options import GlobalOptions
+from pants.option.native_options import parse_dest
 from pants.option.option_types import StrOption
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionEncoder
-from pants.option.parser import Parser
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
@@ -1009,8 +1009,8 @@ def test_choices() -> None:
 
 
 def test_parse_dest() -> None:
-    assert "thing" == Parser.parse_dest("--thing")
-    assert "other_thing" == Parser.parse_dest("--thing", dest="other_thing")
+    assert "thing" == parse_dest("--thing")
+    assert "other_thing" == parse_dest("--thing", dest="other_thing")
 
 
 def test_validation() -> None:
