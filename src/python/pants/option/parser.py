@@ -47,7 +47,6 @@ from pants.option.errors import (
     ParseError,
     PassthroughType,
     RegistrationError,
-    UnknownFlagsError,
 )
 from pants.option.native_options import (
     NativeOptionParser,
@@ -231,109 +230,6 @@ class Parser:
 
             setattr(namespace, dest, RankedValue(rank, val))
 
-        return namespace.build()
-
-    def parse_args(
-        self, parse_args_request: ParseArgsRequest, log_warnings: bool = False
-    ) -> OptionValueContainer:
-        """Set values for this parser's options on the namespace object.
-
-        :raises: :class:`ParseError` if any flags weren't recognized.
-        """
-
-        flag_value_map = parse_args_request.flag_value_map
-        namespace = parse_args_request.namespace
-
-        mutex_map: DefaultDict[str, list[str]] = defaultdict(list)
-        for args, kwargs in self._option_registrations:
-            self._validate(args, kwargs)
-            dest = self.parse_dest(*args, **kwargs)
-
-            # Compute the values provided on the command line for this option.  Note that there may be
-            # multiple values, for any combination of the following reasons:
-            #   - The user used the same flag multiple times.
-            #   - The user specified a boolean flag (--foo) and its inverse (--no-foo).
-            #   - The option has multiple names, and the user used more than one of them.
-            #
-            # We also check if the option is deprecated, but we only do so if the option is explicitly
-            # specified as a command-line flag, so we don't spam users with deprecated option values
-            # specified in config, which isn't something they control.
-            flag_vals: list[int | float | bool | str] = []
-
-            for arg in args:
-                if self.is_bool(kwargs):
-                    vals = flag_value_map.get(arg)
-                    if vals:
-                        # Ensure that --foo is as-if --foo-true.
-                        vals[:] = [True if v is None else v for v in vals]
-                    # If the user specified --no-foo on the cmd line, treat it as if the user specified
-                    # --foo, but with the inverse value (ensuring that --no-foo is as-if --no-foo=true,
-                    # which is as-if --foo=false).
-                    inverse_arg = self._inverse_arg(arg)
-                    if inverse_arg in flag_value_map:
-                        flag_value_map[arg] = [
-                            self._invert(v) or False for v in flag_value_map[inverse_arg]
-                        ]
-                        del flag_value_map[inverse_arg]
-
-                if arg in flag_value_map:
-                    for v in flag_value_map[arg]:
-                        if v is None:
-                            raise ParseError(
-                                f"Missing value for command line flag {arg} in {self._scope_str()}"
-                            )
-                        flag_vals.append(v)
-                    del flag_value_map[arg]
-
-            # Get the value for this option, falling back to defaults as needed.
-            try:
-                value_history = self._compute_value(
-                    dest,
-                    kwargs,
-                    flag_vals,
-                    parse_args_request.passthrough_args,
-                    log_warnings,
-                )
-                self._history[dest] = value_history
-                val = value_history.final_value
-            except ParseError as e:
-                # Reraise a new exception with context on the option being processed at the time of error.
-                # Note that other exception types can be raised here that are caught by ParseError (e.g.
-                # BooleanConversionError), hence we reference the original exception type as type(e).
-                args_str = ", ".join(args)
-                raise type(e)(
-                    softwrap(
-                        f"""
-                        Error computing value for {args_str} in {self._scope_str()} (may also be
-                        from PANTS_* environment variables). Caused by:
-
-                        {e}
-                        """
-                    )
-                )
-
-            # If the option is explicitly given, check deprecation and mutual exclusion.
-            if val.rank > Rank.HARDCODED:
-                self._check_deprecated(dest, kwargs)
-                mutex_dest = kwargs.get("mutually_exclusive_group")
-                mutex_map_key = mutex_dest or dest
-                mutex_map[mutex_map_key].append(dest)
-                if len(mutex_map[mutex_map_key]) > 1:
-                    raise MutuallyExclusiveOptionError(
-                        softwrap(
-                            f"""
-                            Can only provide one of these mutually exclusive options in
-                            {self._scope_str()}, but multiple given:
-                            {', '.join(mutex_map[mutex_map_key])}
-                            """
-                        )
-                    )
-
-            setattr(namespace, dest, val)
-
-        if not parse_args_request.allow_unknown_flags and flag_value_map:
-            # There were unconsumed flags.
-            raise UnknownFlagsError(tuple(flag_value_map.keys()), self.scope)
         return namespace.build()
 
     def option_registrations_iter(self):

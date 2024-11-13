@@ -486,7 +486,6 @@ class HelpInfoExtracter:
             scope_info: ScopeInfo,
         ) -> Callable[[], OptionScopeHelpInfo]:
             def load() -> OptionScopeHelpInfo:
-                options.for_scope(scope_info.scope)  # Force parsing.
                 subsystem_cls = scope_info.subsystem_cls
                 if not scope_info.description:
                     cls_name = (
