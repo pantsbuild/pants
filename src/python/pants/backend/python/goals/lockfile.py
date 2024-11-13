@@ -261,10 +261,10 @@ async def setup_user_lockfile_requests(
 
     tools = ExportableTool.filter_for_subclasses(union_membership, PythonToolBase)
 
-    out = []
+    out = set()
     for resolve in requested:
         if resolve in python_setup.resolves:
-            out.append(
+            out.add(
                 GeneratePythonLockfile(
                     requirements=PexRequirements.req_strings_from_requirement_fields(
                         resolve_to_requirements_fields[resolve]
@@ -291,7 +291,7 @@ async def setup_user_lockfile_requests(
             else:
                 ic = InterpreterConstraints(tool.default_interpreter_constraints)
 
-            out.append(
+            out.add(
                 GeneratePythonLockfile(
                     requirements=FrozenOrderedSet(sorted(tool.requirements)),
                     find_links=FrozenOrderedSet(find_links),
