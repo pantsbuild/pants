@@ -3,21 +3,23 @@
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageSourceField
-from pants.backend.tools.trivy.rules import run_trivy, RunTrivyRequest
-from pants.backend.tools.trivy.subsystem import Trivy, SkipTrivyField
-from pants.core.goals.lint import LintTargetsRequest, LintResult
-from pants.core.goals.package import EnvironmentAwarePackageRequest, PackageFieldSet, BuiltPackage
-from pants.core.goals.test import BuiltPackageDependencies, BuildPackageDependenciesRequest
+from pants.backend.tools.trivy.rules import RunTrivyRequest, run_trivy
+from pants.backend.tools.trivy.subsystem import SkipTrivyField, Trivy
+from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.util_rules.partitions import PartitionerType
-from pants.core.util_rules.source_files import determine_source_files, SourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.internals.native_engine import Digest, EMPTY_DIGEST, Address
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import rule, collect_rules
-from pants.engine.target import FieldSet, Target, Targets, FieldSetsPerTarget, FieldSetsPerTargetRequest
+from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.internals.selectors import Get
+from pants.engine.rules import collect_rules, rule
+from pants.engine.target import (
+    FieldSet,
+    FieldSetsPerTarget,
+    FieldSetsPerTargetRequest,
+    Target,
+    Targets,
+)
 from pants.util.logging import LogLevel
 
 
@@ -43,7 +45,6 @@ class TrivyDockerRequest(LintTargetsRequest):
 async def run_trivy_docker(
     request: TrivyDockerRequest.Batch[TrivyDockerRequest, Any],
 ) -> LintResult:
-
     assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
     addrs = tuple(e.address for e in request.elements)
 
@@ -55,19 +56,18 @@ async def run_trivy_docker(
     [field_set] = field_sets_per_tgt.field_sets
 
     package = await Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
-    r = await run_trivy(RunTrivyRequest(
-        command="image",
-        scanners=(),
-        target=package.artifacts[0].image_id,
-        input_digest=EMPTY_DIGEST,
-        description=f"Run Trivy on docker image {','.join(package.artifacts[0].tags)}"
-    ))
+    r = await run_trivy(
+        RunTrivyRequest(
+            command="image",
+            scanners=(),
+            target=package.artifacts[0].image_id,
+            input_digest=EMPTY_DIGEST,
+            description=f"Run Trivy on docker image {','.join(package.artifacts[0].tags)}",
+        )
+    )
 
     return LintResult.create(request, r)
 
 
 def rules():
-    return (
-        *collect_rules(),
-        *TrivyDockerRequest.rules()
-    )
+    return (*collect_rules(), *TrivyDockerRequest.rules())
