@@ -40,6 +40,13 @@ class Trivy(TemplatedExternalTool):
         advanced=True,
     )
 
+    @property
+    def cache_dir(self) -> str:
+        return "__trivy_cache"
+
+    @property
+    def append_only_caches(self) -> dict[str, str]:
+        return {"trivy_cache": self.cache_dir}
 
 class SkipTrivyField(BoolField):
     alias = "skip-trivy"
