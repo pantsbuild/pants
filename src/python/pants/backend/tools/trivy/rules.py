@@ -45,6 +45,7 @@ async def run_trivy(
     """Run Trivy"""
     argv = ["__trivy/trivy", "-d", "--format=table", "--exit-code=1"]
 
+    # workaround for Trivy DB being overloaded on pulls
     argv.extend(["--db-repository", "ghcr.io/aquasecurity/trivy-db,public.ecr.aws/aquasecurity/trivy-db"])
 
     argv.append(request.command)
@@ -54,6 +55,8 @@ async def run_trivy(
         argv.append(",".join(request.scanners))
 
     argv.append(request.target)
+
+    argv.append("--no-progress")  # quiet progress output, which just clutters logs
 
     argv.extend(trivy.args)
 
