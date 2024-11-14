@@ -5,9 +5,8 @@ from typing import Any
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageSourceField
-from pants.backend.terraform.lint.trivy.rules import SkipTrivyField
 from pants.backend.tools.trivy.rules import run_trivy, RunTrivyRequest
-from pants.backend.tools.trivy.subsystem import Trivy
+from pants.backend.tools.trivy.subsystem import Trivy, SkipTrivyField
 from pants.core.goals.lint import LintTargetsRequest, LintResult
 from pants.core.goals.package import EnvironmentAwarePackageRequest, PackageFieldSet, BuiltPackage
 from pants.core.goals.test import BuiltPackageDependencies, BuildPackageDependenciesRequest
