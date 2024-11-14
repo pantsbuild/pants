@@ -60,7 +60,7 @@ class TestOptionHelpFormatter:
     @classmethod
     def _get_parser(cls) -> Tuple[Parser, NativeOptionParser]:
         return Parser(
-            scope_info=GlobalOptions.get_scope_info(),
+            scope=GlobalOptions.options_scope,
         ), NativeOptionParser(
             args=[], env={}, config_sources=[], allow_pantsrc=False, include_derivation=True
         )

@@ -23,7 +23,7 @@ from pants.util.strutil import get_strict_env, softwrap
 logger = logging.getLogger()
 
 
-def parse_dest(*args, **kwargs):
+def parse_dest(*args: str, **kwargs) -> str:
     """Return the dest for an option registration.
 
     If an explicit `dest` is specified, returns that and otherwise derives a default from the
@@ -36,7 +36,7 @@ def parse_dest(*args, **kwargs):
     """
     dest = kwargs.get("dest")
     if dest:
-        return dest
+        return str(dest)
     # No explicit dest, so compute one based on the first long arg, or the short arg
     # if that's all there is.
     arg = next((a for a in args if a.startswith("--")), args[0])

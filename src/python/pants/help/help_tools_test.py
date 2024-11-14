@@ -16,9 +16,7 @@ from pants.option.parser import Parser
 
 @pytest.fixture
 def parser() -> Parser:
-    return Parser(
-        scope_info=GlobalOptions.get_scope_info(),
-    )
+    return Parser(scope=GlobalOptions.options_scope)
 
 
 @pytest.fixture

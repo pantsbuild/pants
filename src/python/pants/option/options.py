@@ -15,7 +15,7 @@ from pants.option.config import Config
 from pants.option.errors import ConfigValidationError, UnknownFlagsError
 from pants.option.native_options import NativeOptionParser
 from pants.option.option_util import is_list_option
-from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser import Parser
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.memo import memoized_method
@@ -164,7 +164,7 @@ class Options:
                             [line for line in [line.strip() for line in f] if line]
                         )
 
-        parser_by_scope = {si.scope: Parser(si) for si in complete_known_scope_infos}
+        parser_by_scope = {si.scope: Parser(si.scope) for si in complete_known_scope_infos}
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
 
         config_to_pass = None if native_options_config_discovery else config.sources()
@@ -391,16 +391,6 @@ class Options:
                     entity=f"scope {deprecated_scope}",
                     hint=f"Use scope {scope} instead (options: {', '.join(explicit_keys)})",
                 )
-
-    def _make_parse_args_request(
-        self, flags_in_scope, namespace: OptionValueContainerBuilder
-    ) -> Parser.ParseArgsRequest:
-        return Parser.ParseArgsRequest(
-            flags_in_scope=flags_in_scope,
-            namespace=namespace,
-            passthrough_args=self._passthru,
-            allow_unknown_flags=self._allow_unknown_options,
-        )
 
     # TODO: Eagerly precompute backing data for this?
     @memoized_method
