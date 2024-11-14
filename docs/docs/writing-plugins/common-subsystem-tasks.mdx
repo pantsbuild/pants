@@ -96,7 +96,7 @@ Only some language backends support `pants export`. These include the Python and
                 f"""
                 If true, Pants will include all relevant config files during runs.
 
-                Use `[{cls.options_scope}].config` and `[{cls.options_scope}].custom_check_dir` instead if your config is in a non-standard location.
+                Use `[{cls.options_scope}].config` instead if your config is in a non-standard location.
                 """
             ),
         )
@@ -161,7 +161,7 @@ Only some language backends support `pants export`. These include the Python and
         )
 
         args = []
-        if subsystem.config_request:
+        if subsystem.config:
             args.append(f"--config-file={subsystem.config}")
 
         # run your process with the digest and args
