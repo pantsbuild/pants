@@ -6,14 +6,15 @@ from dataclasses import dataclass
 
 from pants.backend.tools.trivy.subsystem import Trivy
 from pants.core.goals.resolves import ExportableTool
+from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.intrinsics import execute_process
 from pants.engine.platform import Platform
-from pants.engine.process import Process, FallibleProcessResult
-from pants.engine.rules import rule, collect_rules
+from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -34,17 +35,20 @@ class RunTrivyRequest:
 # TODO: report format
 # TODO: exit code options
 
+
 @rule
 async def run_trivy(
-        request: RunTrivyRequest,
-        trivy: Trivy,
-        platform: Platform,
+    request: RunTrivyRequest,
+    trivy: Trivy,
+    platform: Platform,
 ) -> FallibleProcessResult:
-    """Run Trivy"""
+    """Run Trivy."""
     argv = ["__trivy/trivy", "-d", "--format=table", "--exit-code=1"]
 
     # workaround for Trivy DB being overloaded on pulls
-    argv.extend(["--db-repository", "ghcr.io/aquasecurity/trivy-db,public.ecr.aws/aquasecurity/trivy-db"])
+    argv.extend(
+        ["--db-repository", "ghcr.io/aquasecurity/trivy-db,public.ecr.aws/aquasecurity/trivy-db"]
+    )
 
     argv.extend(["--cache-dir", trivy.cache_dir])
 
@@ -64,10 +68,7 @@ async def run_trivy(
 
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(trivy.extra_env_vars))
 
-
-    immutable_input_digests = {
-        "__trivy": download_trivy.digest
-    }
+    immutable_input_digests = {"__trivy": download_trivy.digest}
 
     result = await execute_process(
         Process(
@@ -84,7 +85,6 @@ async def run_trivy(
 
 
 def rules():
-    from pants.core.util_rules import external_tool
     return (
         *collect_rules(),
         *external_tool.rules(),
