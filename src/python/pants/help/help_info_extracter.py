@@ -1110,9 +1110,11 @@ class HelpInfoExtracter:
         choices = self.compute_choices(kwargs)
 
         dest = parse_dest(*args, **kwargs)
-        # Global options have three env var variants. The last one is the most human-friendly.
         udest = dest.upper()
         if self._scope == GLOBAL_SCOPE:
+            # Global options have 2-3 env var variants, e.g., --pants-workdir can be
+            # set with PANTS_GLOBAL_PANTS_WORKDIR, PANTS_PANTS_WORKDIR, or PANTS_WORKDIR.
+            # The last one is the most human-friendly, so it's what we use in the help info.
             if udest.startswith("PANTS_"):
                 env_var = udest
             else:
