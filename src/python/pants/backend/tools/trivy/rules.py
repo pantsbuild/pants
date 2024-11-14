@@ -5,9 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.tools.trivy.subsystem import Trivy
-from pants.core.goals.lint import LintResult
 from pants.core.goals.resolves import ExportableTool
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest, download_external_tool
+from pants.core.util_rules.external_tool import download_external_tool
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get
@@ -30,7 +29,6 @@ class RunTrivyRequest:
     description: str
 
 
-# TODO: caching https://aquasecurity.github.io/trivy/v0.17.2/examples/cache/
 # TODO: capture output file?
 # TODO: config files
 # TODO: report format
@@ -47,6 +45,8 @@ async def run_trivy(
 
     # workaround for Trivy DB being overloaded on pulls
     argv.extend(["--db-repository", "ghcr.io/aquasecurity/trivy-db,public.ecr.aws/aquasecurity/trivy-db"])
+
+    argv.extend(["--cache-dir", trivy.cache_dir])
 
     argv.append(request.command)
 
@@ -71,13 +71,15 @@ async def run_trivy(
 
     result = await execute_process(
         Process(
-        argv=tuple(argv),
-        input_digest=request.input_digest,
-        immutable_input_digests=immutable_input_digests,
-        env=env,
-        description=request.description,
-        level=LogLevel.DEBUG,
-    ))
+            argv=tuple(argv),
+            input_digest=request.input_digest,
+            immutable_input_digests=immutable_input_digests,
+            append_only_caches=trivy.append_only_caches,
+            env=env,
+            description=request.description,
+            level=LogLevel.DEBUG,
+        )
+    )
     return result
 
 
