@@ -1,6 +1,7 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.core.util_rules.external_tool import ExternalTool, TemplatedExternalTool, ExternalToolVersion
+from pants.engine.target import BoolField
 from pants.option.option_types import SkipOption, ArgsListOption, StrListOption
 from pants.util.strutil import softwrap
 
@@ -38,3 +39,9 @@ class Trivy(TemplatedExternalTool):
         ),
         advanced=True,
     )
+
+
+class SkipTrivyField(BoolField):
+    alias = "skip-trivy"
+    default = False
+    help = "If true, don't run Trivy on this target's Terraform files"
