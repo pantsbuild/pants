@@ -33,7 +33,6 @@ class RunTrivyRequest:
 
 # TODO: capture output file?
 # TODO: report format
-# TODO: exit code options
 
 
 @rule
@@ -61,6 +60,10 @@ async def run_trivy(
     if request.scanners:
         argv.append("--scanners")
         argv.append(",".join(request.scanners))
+
+    if trivy.severity:
+        argv.append("--severity")
+        argv.append(",".join(trivy.severity))
 
     argv.append(request.target)
 
