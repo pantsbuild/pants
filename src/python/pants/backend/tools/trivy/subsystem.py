@@ -59,6 +59,15 @@ class Trivy(TemplatedExternalTool):
     skip = SkipOption("lint")
     args = ArgsListOption(example="--scanners vuln")
 
+    severity = StrListOption(
+        default=None,
+        help=softwrap(
+            """
+            Severities of security issues to be displayed (UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL)
+            """
+        ),
+    )
+
     extra_env_vars = StrListOption(
         help=softwrap(
             """
