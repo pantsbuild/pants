@@ -10,7 +10,7 @@ import typing
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, Mapping
+from typing import Any, Mapping
 
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
 from pants.option.custom_types import (
@@ -42,7 +42,7 @@ from pants.option.errors import (
 from pants.option.native_options import NativeOptionParser, parse_dest
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.ranked_value import Rank, RankedValue
-from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -92,16 +92,12 @@ class Parser:
         b = cls.ensure_bool(s)
         return not b
 
-    def __init__(
-        self,
-        scope_info: ScopeInfo,
-    ) -> None:
+    def __init__(self, scope: str) -> None:
         """Create a Parser instance.
 
         :param scope_info: the scope this parser acts for.
         """
-        self._scope_info = scope_info
-        self._scope = self._scope_info.scope
+        self._scope = scope
 
         # All option args registered with this parser.  Used to prevent conflicts.
         self._known_args: set[str] = set()
@@ -113,10 +109,6 @@ class Parser:
         self._history: dict[str, OptionValueHistory] = {}
 
     @property
-    def scope_info(self) -> ScopeInfo:
-        return self._scope_info
-
-    @property
     def scope(self) -> str:
         return self._scope
 
@@ -125,30 +117,6 @@ class Parser:
         prefix = f"{self.scope}-" if self.scope != GLOBAL_SCOPE else ""
         return frozenset(f"--{prefix}{arg.lstrip('--')}" for arg in self._known_args)
 
-    def history(self, dest: str) -> OptionValueHistory | None:
-        return self._history.get(dest)
-
-    @dataclass(frozen=True)
-    class ParseArgsRequest:
-        namespace: OptionValueContainerBuilder
-        passthrough_args: list[str]
-        allow_unknown_flags: bool
-
-        def __init__(
-            self,
-            flags_in_scope: Iterable[str],
-            namespace: OptionValueContainerBuilder,
-            passthrough_args: list[str],
-            allow_unknown_flags: bool,
-        ) -> None:
-            """
-            :param flags_in_scope: Iterable of arg strings to parse into flag values.
-            :param namespace: The object to register the flag values on
-            """
-            object.__setattr__(self, "namespace", namespace)
-            object.__setattr__(self, "passthrough_args", passthrough_args)
-            object.__setattr__(self, "allow_unknown_flags", allow_unknown_flags)
-
     def parse_args_native(
         self,
         native_parser: NativeOptionParser,
@@ -156,7 +124,6 @@ class Parser:
         namespace = OptionValueContainerBuilder()
         mutex_map = defaultdict(list)
         for args, kwargs in self._option_registrations:
-            self._validate(args, kwargs)
             dest = parse_dest(*args, **kwargs)
             val, rank = native_parser.get_value(
                 scope=self.scope, registration_args=args, registration_kwargs=kwargs
@@ -213,9 +180,9 @@ class Parser:
 
     def register(self, *args, **kwargs) -> None:
         """Register an option."""
-        if args:
-            dest = parse_dest(*args, **kwargs)
-            self._check_deprecated(dest, kwargs, print_warning=False)
+        self._validate(args, kwargs)
+        dest = parse_dest(*args, **kwargs)
+        self._check_deprecated(dest, kwargs, print_warning=False)
 
         if self.is_bool(kwargs):
             default = kwargs.get("default")
@@ -316,7 +283,7 @@ class Parser:
         default_value = kwargs.get("default")
         if default_value is not None:
             if isinstance(default_value, str) and type_arg != str:
-                # attempt to parse default value, for correctness..
+                # attempt to parse default value, for correctness.
                 # custom function types may implement their own validation
                 default_value = self.to_value_type(default_value, type_arg, member_type)
                 if hasattr(default_value, "val"):
@@ -324,7 +291,11 @@ class Parser:
 
                 # fall through to type check, to verify that custom types returned a value of correct type
 
-            if isinstance(type_arg, type) and not isinstance(default_value, type_arg):
+            if (
+                isinstance(type_arg, type)
+                and not isinstance(default_value, type_arg)
+                and not (issubclass(type_arg, bool) and default_value == UnsetBool)
+            ):
                 error(
                     DefaultValueType,
                     option_type=type_arg.__name__,

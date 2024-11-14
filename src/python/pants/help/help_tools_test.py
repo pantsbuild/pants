@@ -16,9 +16,7 @@ from pants.option.parser import Parser
 
 @pytest.fixture
 def parser() -> Parser:
-    return Parser(
-        scope_info=GlobalOptions.get_scope_info(),
-    )
+    return Parser(scope=GlobalOptions.options_scope)
 
 
 @pytest.fixture
@@ -33,8 +31,8 @@ def extracter() -> HelpInfoExtracter:
 
 @pytest.fixture
 def tool_info(extracter, parser, native_parser) -> ToolHelpInfo:
-    parser.register("version", typ=str, default="1.0")
-    parser.register("url-template", typ=str, default="https://download/{version}")
+    parser.register("--version", type=str, default="1.0")
+    parser.register("--url-template", type=str, default="https://download/{version}")
     oshi = extracter.get_option_scope_help_info("Test description.", parser, native_parser, False)
     tool_info = ToolHelpInfo.from_option_scope_help_info(oshi)
     assert tool_info is not None

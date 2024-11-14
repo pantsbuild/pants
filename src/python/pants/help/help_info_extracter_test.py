@@ -101,7 +101,7 @@ def test_default() -> None:
         # Defaults are computed in the parser and added into the kwargs, so we
         # must jump through this hoop in this test.
         parser = Parser(
-            scope_info=GlobalOptions.get_scope_info(),
+            scope=GlobalOptions.options_scope,
         )
         native_parser = NativeOptionParser([], {}, [], allow_pantsrc=False, include_derivation=True)
         parser.register(*args, **kwargs)
@@ -198,9 +198,7 @@ def test_grouping():
         def exp_to_len(exp):
             return int(exp)  # True -> 1, False -> 0.
 
-        parser = Parser(
-            scope_info=GlobalOptions.get_scope_info(),
-        )
+        parser = Parser(scope=GlobalOptions.options_scope)
         native_parser = NativeOptionParser([], {}, [], allow_pantsrc=False, include_derivation=True)
         parser.register("--foo", **kwargs)
         oshi = HelpInfoExtracter("").get_option_scope_help_info(

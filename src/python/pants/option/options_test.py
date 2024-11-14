@@ -1014,7 +1014,7 @@ def test_parse_dest() -> None:
 
 
 def test_validation() -> None:
-    def assertError(expected_error, *args, **kwargs):
+    def assert_error(expected_error, *args, **kwargs):
         with pytest.raises(expected_error):
             options = Options.create(
                 args=["./pants"],
@@ -1025,17 +1025,17 @@ def test_validation() -> None:
             options.register(GLOBAL_SCOPE, *args, **kwargs)
             options.for_global_scope()
 
-    assertError(NoOptionNames)
-    assertError(OptionNameDoubleDash, "badname")
-    assertError(OptionNameDoubleDash, "-badname")
-    assertError(InvalidKwarg, "--foo", badkwarg=42)
-    assertError(BooleanOptionNameWithNo, "--no-foo", type=bool)
-    assertError(MemberTypeNotAllowed, "--foo", member_type=int)
-    assertError(MemberTypeNotAllowed, "--foo", type=dict, member_type=int)
-    assertError(InvalidMemberType, "--foo", type=list, member_type=set)
-    assertError(InvalidMemberType, "--foo", type=list, member_type=list)
-    assertError(HelpType, "--foo", help=())
-    assertError(HelpType, "--foo", help=("Help!",))
+    assert_error(NoOptionNames)
+    assert_error(OptionNameDoubleDash, "badname")
+    assert_error(OptionNameDoubleDash, "-badname")
+    assert_error(InvalidKwarg, "--foo", badkwarg=42)
+    assert_error(BooleanOptionNameWithNo, "--no-foo", type=bool)
+    assert_error(MemberTypeNotAllowed, "--foo", member_type=int)
+    assert_error(MemberTypeNotAllowed, "--foo", type=dict, member_type=int)
+    assert_error(InvalidMemberType, "--foo", type=list, member_type=set)
+    assert_error(InvalidMemberType, "--foo", type=list, member_type=list)
+    assert_error(HelpType, "--foo", help=())
+    assert_error(HelpType, "--foo", help=("Help!",))
 
 
 def test_shadowing() -> None:
@@ -1046,7 +1046,7 @@ def test_shadowing() -> None:
         args=["./pants"],
     )
     options.register("", "--opt1")
-    options.register("foo", "-o", "--opt2")
+    options.register("foo", "--opt2")
 
 
 def test_is_known_scope() -> None:
