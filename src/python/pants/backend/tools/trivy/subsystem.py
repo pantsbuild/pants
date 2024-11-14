@@ -1,8 +1,15 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import ExternalToolVersion, TemplatedExternalTool
 from pants.engine.target import BoolField
-from pants.option.option_types import ArgsListOption, SkipOption, StrListOption
+from pants.option.option_types import (
+    ArgsListOption,
+    BoolOption,
+    FileOption,
+    SkipOption,
+    StrListOption,
+)
 from pants.util.strutil import softwrap
 
 
@@ -60,6 +67,37 @@ class Trivy(TemplatedExternalTool):
         ),
         advanced=True,
     )
+
+    config_discovery = BoolOption(
+        default=True,
+        advanced=True,
+        help=lambda cls: softwrap(
+            f"""
+            If true, Pants will include all relevant config files during runs.
+            
+            Use `[{cls.options_scope}].config` instead if your config is in a non-standard location
+            """
+        ),
+    )
+    config = FileOption(
+        default=None,
+        advanced=True,
+        help=lambda cls: softwrap(
+            """
+            Path to the Trivy config file.
+            
+            Setting this option will disable config discovery for the config file. Use this option if the config is located in a non-standard location.
+            """
+        ),
+    )
+
+    def config_request(self) -> ConfigFilesRequest:
+        return ConfigFilesRequest(
+            specified=self.config,
+            specified_option_name=f"[{self.options_scope}].config",
+            discovery=self.config_discovery,
+            check_existence=["trivy.yaml"],
+        )
 
     @property
     def cache_dir(self) -> str:
