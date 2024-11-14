@@ -5,21 +5,14 @@ from __future__ import annotations
 
 import copy
 import inspect
-import json
 import logging
-import re
 import typing
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
-from typing import Any, DefaultDict, Iterable, Mapping
+from typing import Any, Iterable, Mapping
 
-import yaml
-
-from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
-from pants.option.config import DEFAULT_SECTION, Config
 from pants.option.custom_types import (
     DictValueComponent,
     ListValueComponent,
@@ -31,10 +24,8 @@ from pants.option.custom_types import (
 )
 from pants.option.errors import (
     BooleanConversionError,
-    BooleanOptionNameWithNo,
     DefaultMemberValueType,
     DefaultValueType,
-    FromfileError,
     HelpType,
     InvalidKwarg,
     InvalidKwargNonGlobalScope,
@@ -48,16 +39,10 @@ from pants.option.errors import (
     PassthroughType,
     RegistrationError,
 )
-from pants.option.native_options import (
-    NativeOptionParser,
-    check_dir_exists,
-    check_file_exists,
-    parse_dest,
-)
-from pants.option.option_util import is_dict_option, is_list_option
+from pants.option.native_options import NativeOptionParser, parse_dest
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.ranked_value import Rank, RankedValue
-from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -107,24 +92,14 @@ class Parser:
         b = cls.ensure_bool(s)
         return not b
 
-    @classmethod
-    def scope_str(cls, scope: str) -> str:
-        return "global scope" if scope == GLOBAL_SCOPE else f"scope '{scope}'"
-
     def __init__(
         self,
-        env: Mapping[str, str],
-        config: Config,
         scope_info: ScopeInfo,
     ) -> None:
         """Create a Parser instance.
 
-        :param env: a dict of environment variables.
-        :param config: data from a config file.
         :param scope_info: the scope this parser acts for.
         """
-        self._env = env
-        self._config = config
         self._scope_info = scope_info
         self._scope = self._scope_info.scope
 
@@ -155,7 +130,6 @@ class Parser:
 
     @dataclass(frozen=True)
     class ParseArgsRequest:
-        flag_value_map: dict[str, list[Any]]
         namespace: OptionValueContainerBuilder
         passthrough_args: list[str]
         allow_unknown_flags: bool
@@ -171,32 +145,9 @@ class Parser:
             :param flags_in_scope: Iterable of arg strings to parse into flag values.
             :param namespace: The object to register the flag values on
             """
-            object.__setattr__(self, "flag_value_map", self._create_flag_value_map(flags_in_scope))
             object.__setattr__(self, "namespace", namespace)
             object.__setattr__(self, "passthrough_args", passthrough_args)
             object.__setattr__(self, "allow_unknown_flags", allow_unknown_flags)
-
-        @staticmethod
-        def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, list[str | None]]:
-            """Returns a map of flag -> list of values, based on the given flag strings.
-
-            None signals no value given (e.g., -x, --foo). The value is a list because the user may
-            specify the same flag multiple times, and that's sometimes OK (e.g., when appending to
-            list- valued options).
-            """
-            flag_value_map: DefaultDict[str, list[str | None]] = defaultdict(list)
-            for flag in flags:
-                flag_val: str | None
-                key, has_equals_sign, flag_val = flag.partition("=")
-                if not has_equals_sign:
-                    if not flag.startswith("--"):  # '-xfoo' style.
-                        key = flag[0:2]
-                        flag_val = flag[2:]
-                    if not flag_val:
-                        # Either a short option with no value or a long option with no equals sign.
-                        flag_val = None
-                flag_value_map[key].append(flag_val)
-            return flag_value_map
 
     def parse_args_native(
         self,
@@ -206,7 +157,7 @@ class Parser:
         mutex_map = defaultdict(list)
         for args, kwargs in self._option_registrations:
             self._validate(args, kwargs)
-            dest = self.parse_dest(*args, **kwargs)
+            dest = parse_dest(*args, **kwargs)
             val, rank = native_parser.get_value(
                 scope=self.scope, registration_args=args, registration_kwargs=kwargs
             )
@@ -222,7 +173,7 @@ class Parser:
                         softwrap(
                             f"""
                             Can only provide one of these mutually exclusive options in
-                            {self._scope_str(self.scope)}, but multiple given:
+                            {self._scope_str()}, but multiple given:
                             {', '.join(mutex_map[mutex_map_key])}
                             """
                         )
@@ -244,7 +195,7 @@ class Parser:
 
         def normalize_kwargs(orig_args, orig_kwargs):
             nkwargs = copy.copy(orig_kwargs)
-            dest = self.parse_dest(*orig_args, **nkwargs)
+            dest = parse_dest(*orig_args, **nkwargs)
             nkwargs["dest"] = dest
             if "default" not in nkwargs:
                 type_arg = nkwargs.get("type", str)
@@ -263,7 +214,7 @@ class Parser:
     def register(self, *args, **kwargs) -> None:
         """Register an option."""
         if args:
-            dest = self.parse_dest(*args, **kwargs)
+            dest = parse_dest(*args, **kwargs)
             self._check_deprecated(dest, kwargs, print_warning=False)
 
         if self.is_bool(kwargs):
@@ -415,31 +366,6 @@ class Parser:
         if removal_version is not None:
             validate_deprecation_semver(removal_version, "removal version")
 
-    _ENV_SANITIZER_RE = re.compile(r"[.-]")
-
-    @staticmethod
-    def parse_dest(*args, **kwargs):
-        """Return the dest for an option registration.
-
-        If an explicit `dest` is specified, returns that and otherwise derives a default from the
-        option flags where '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
-
-        The dest is used for:
-          - The name of the field containing the option value.
-          - The key in the config file.
-          - Computing the name of the env var used to set the option name.
-        """
-        return parse_dest(*args, **kwargs)
-
-    @staticmethod
-    def _convert_member_type(member_type, value):
-        if member_type == dict:
-            return DictValueComponent.create(value).val
-        try:
-            return member_type(value)
-        except ValueError as error:
-            raise ParseError(str(error))
-
     @classmethod
     def to_value_type(cls, val_str, type_arg, member_type):
         """Convert a string to a value of the option's type."""
@@ -461,223 +387,8 @@ class Parser:
                 f"Error applying type '{type_arg.__name__}' to option value '{val_str}': {e}"
             )
 
-    @classmethod
-    def get_env_var_names(cls, scope: str, dest: str):
-        # Get value from environment, and capture details about its derivation.
-        udest = dest.upper()
-        if scope == GLOBAL_SCOPE:
-            # For convenience, we allow three forms of env var for global scope options.
-            # The fully-specified env var is PANTS_GLOBAL_FOO, which is uniform with PANTS_<SCOPE>_FOO
-            # for all the other scopes.  However we also allow simply PANTS_FOO. And if the option name
-            # itself starts with 'pants-' then we also allow simply FOO. E.g., PANTS_WORKDIR instead of
-            # PANTS_PANTS_WORKDIR or PANTS_GLOBAL_PANTS_WORKDIR. We take the first specified value we
-            # find, in this order: PANTS_GLOBAL_FOO, PANTS_FOO, FOO.
-            env_vars = [f"PANTS_GLOBAL_{udest}", f"PANTS_{udest}"]
-            if udest.startswith("PANTS_"):
-                env_vars.append(udest)
-        else:
-            sanitized_env_var_scope = cls._ENV_SANITIZER_RE.sub("_", scope.upper())
-            env_vars = [f"PANTS_{sanitized_env_var_scope}_{udest}"]
-        return env_vars
-
-    def _compute_value(self, dest, kwargs, flag_val_strs, passthru_arg_strs, log_warnings):
-        """Compute the value to use for an option.
-
-        The source of the value is chosen according to the ranking in Rank.
-        """
-        type_arg = kwargs.get("type", str)
-        member_type = kwargs.get("member_type", str)
-
-        def to_value_type(val_str):
-            return self.to_value_type(val_str, type_arg, member_type)
-
-        # Helper function to expand a fromfile=True value string, if needed.
-        # May return a string or a dict/list decoded from a json/yaml file.
-        # If the fromfile is optional and the file does not exist then
-        # None will be returned.
-        def expand(val_or_str):
-            if (
-                kwargs.get("fromfile", True)
-                and isinstance(val_or_str, str)
-                and val_or_str.startswith("@")
-            ):
-                if val_or_str.startswith("@@"):  # Support a literal @ for fromfile values via @@.
-                    return val_or_str[1:]
-                else:
-                    if val_or_str.startswith("@?"):  # Support an optional fromfile value via @?.
-                        fromfile, optional = val_or_str[2:], True
-                    else:
-                        fromfile, optional = val_or_str[1:], False
-                    fromfile_path = Path(get_buildroot(), fromfile)
-                    try:
-                        if optional and not fromfile_path.exists():
-                            if log_warnings:
-                                logger.warning(f"Optional file config {fromfile!r} does not exist.")
-                            return None
-                        contents = fromfile_path.read_text()
-                        if fromfile.endswith(".json"):
-                            return json.loads(contents)
-                        elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
-                            return yaml.safe_load(contents)
-                        else:
-                            return contents.strip()
-                    except (OSError, ValueError, yaml.YAMLError) as e:
-                        raise FromfileError(
-                            f"Failed to read {dest} in {self._scope_str()} from file {fromfile}: {e!r}"
-                        )
-            else:
-                return val_or_str
-
-        # Helper function to merge multiple values from a single rank (e.g., multiple flags,
-        # or multiple config files).
-        def merge_in_rank(vals):
-            if not vals:
-                return None
-            expanded_vals = [to_value_type(v) for v in (expand(i) for i in vals) if v is not None]
-            if not expanded_vals:
-                return None
-            if is_list_option(kwargs):
-                return ListValueComponent.merge(expanded_vals)
-            if is_dict_option(kwargs):
-                return DictValueComponent.merge(expanded_vals)
-            return expanded_vals[-1]  # Last value wins.
-
-        # Get value from config files, and capture details about its derivation.
-        config_details = None
-        config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
-        config_default_val = merge_in_rank(self._config.get(DEFAULT_SECTION, dest))
-        config_val = merge_in_rank(self._config.get(config_section, dest))
-        config_source_files = self._config.get_sources_for_option(config_section, dest)
-        if config_source_files:
-            config_details = f"from {', '.join(config_source_files)}"
-
-        # Get value from environment, and capture details about its derivation.
-        env_vars = self.get_env_var_names(self._scope, dest)
-        env_val = None
-        env_details = None
-        if self._env:
-            for env_var in env_vars:
-                if env_var in self._env:
-                    env_val = merge_in_rank([self._env.get(env_var)])
-                    env_details = f"from env var {env_var}"
-                    break
-
-        # Get value from cmd-line flags.
-        flag_vals = list(flag_val_strs)
-        if kwargs.get("passthrough") and passthru_arg_strs:
-            # NB: Passthrough arguments are either of type `str` or `shell_str`
-            # (see self._validate): the former never need interpretation, and the latter do not
-            # need interpretation when they have been provided directly via `sys.argv` as the
-            # passthrough args have been.
-            flag_vals.append(
-                ListValueComponent(ListValueComponent.MODIFY, [*passthru_arg_strs], [])
-            )
-        if len(flag_vals) > 1 and not (is_list_option(kwargs) or is_dict_option(kwargs)):
-            raise ParseError(
-                f"Multiple cmd line flags specified for option {dest} in {self._scope_str()}"
-            )
-        flag_val = merge_in_rank(flag_vals)
-        flag_details = None if flag_val is None else "from command-line flag"
-
-        # Rank all available values.
-        values_to_rank = [
-            (flag_val, flag_details),
-            (env_val, env_details),
-            (config_val, config_details),
-            (config_default_val, config_details),
-            (to_value_type(kwargs.get("default")), None),
-            (None, None),
-        ]
-        # Note that ranked_vals will always have at least one element, and all elements will be
-        # instances of RankedValue (so none will be None, although they may wrap a None value).
-        ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))
-
-        def group(value_component_type, process_val_func) -> list[RankedValue]:
-            # We group any values that are merged together, so that the history can reflect
-            # merges vs. replacements in a useful way. E.g., if we merge [a, b] and [c],
-            # and then replace it with [d, e], the history will contain:
-            #   - [d, e] (from command-line flag)
-            #   - [a, b, c] (from env var, from config)
-            # And similarly for dicts.
-            grouped: list[list[RankedValue]] = [[]]
-            for ranked_val in ranked_vals:
-                if ranked_val.value and ranked_val.value.action == value_component_type.REPLACE:
-                    grouped.append([])
-                grouped[-1].append(ranked_val)
-            return [
-                RankedValue(
-                    grp[-1].rank,
-                    process_val_func(
-                        value_component_type.merge(
-                            rv.value for rv in grp if rv.value is not None
-                        ).val
-                    ),
-                    ", ".join(rv.details for rv in grp if rv.details),
-                )
-                for grp in grouped
-                if grp
-            ]
-
-        if is_list_option(kwargs):
-
-            def process_list(lst):
-                return [self._convert_member_type(member_type, val) for val in lst]
-
-            historic_ranked_vals = group(ListValueComponent, process_list)
-        elif is_dict_option(kwargs):
-            historic_ranked_vals = group(DictValueComponent, lambda x: x)
-        else:
-            historic_ranked_vals = ranked_vals
-
-        value_history = OptionValueHistory(tuple(historic_ranked_vals))
-
-        # Helper function to check various validity constraints on final option values.
-        def check_scalar_value(val):
-            if val is None:
-                return
-            choices = kwargs.get("choices")
-            if choices is None and "type" in kwargs:
-                if inspect.isclass(type_arg) and issubclass(type_arg, Enum):
-                    choices = list(type_arg)
-            if choices is not None and val not in choices:
-                raise ParseError(
-                    softwrap(
-                        f"""
-                        `{val}` is not an allowed value for option {dest} in {self._scope_str()}.
-                        Must be one of: {choices}
-                        """
-                    )
-                )
-            elif type_arg == file_option:
-                check_file_exists(val, dest, self._scope_str())
-            elif type_arg == dir_option:
-                check_dir_exists(val, dest, self._scope_str())
-
-        # Validate the final value.
-        final_val = value_history.final_value
-        if isinstance(final_val.value, list):
-            for component in final_val.value:
-                check_scalar_value(component)
-            if inspect.isclass(member_type) and issubclass(member_type, Enum):
-                if len(final_val.value) != len(set(final_val.value)):
-                    raise ParseError(f"Duplicate enum values specified in list: {final_val.value}")
-        elif isinstance(final_val.value, dict):
-            for component in final_val.value.values():
-                check_scalar_value(component)
-        else:
-            check_scalar_value(final_val.value)
-
-        return value_history
-
-    def _inverse_arg(self, arg: str) -> str | None:
-        if not arg.startswith("--"):
-            return None
-        if arg.startswith("--no-"):
-            raise BooleanOptionNameWithNo(self.scope, arg)
-        return f"--no-{arg[2:]}"
-
-    def _scope_str(self, scope: str | None = None) -> str:
-        return self.scope_str(scope if scope is not None else self.scope)
+    def _scope_str(self) -> str:
+        return "global scope" if self.scope == GLOBAL_SCOPE else f"scope '{self.scope}'"
 
     def __str__(self) -> str:
         return f"Parser({self._scope})"

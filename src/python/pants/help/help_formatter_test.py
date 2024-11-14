@@ -7,7 +7,6 @@ from typing import Tuple
 
 from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import HelpInfoExtracter, OptionHelpInfo
-from pants.option.config import Config
 from pants.option.global_options import GlobalOptions
 from pants.option.native_options import NativeOptionParser
 from pants.option.parser import OptionValueHistory, Parser
@@ -61,8 +60,6 @@ class TestOptionHelpFormatter:
     @classmethod
     def _get_parser(cls) -> Tuple[Parser, NativeOptionParser]:
         return Parser(
-            env={},
-            config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
         ), NativeOptionParser(
             args=[], env={}, config_sources=[], allow_pantsrc=False, include_derivation=True
