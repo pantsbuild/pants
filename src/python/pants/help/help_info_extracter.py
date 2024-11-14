@@ -9,6 +9,7 @@ import difflib
 import inspect
 import itertools
 import json
+import re
 from collections import defaultdict, namedtuple
 from dataclasses import dataclass
 from enum import Enum
@@ -41,16 +42,18 @@ from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsI
 from pants.engine.rules import Rule, TaskRule
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule, is_union
-from pants.option.native_options import NativeOptionParser
+from pants.option.native_options import NativeOptionParser, parse_dest
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
 from pants.option.ranked_value import Rank, RankedValue
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.frozendict import LazyFrozenDict
 from pants.util.strutil import first_paragraph, strval
 
 T = TypeVar("T")
+
+_ENV_SANITIZER_RE = re.compile(r"[.-]")
 
 
 class HelpJSONEncoder(json.JSONEncoder):
@@ -486,7 +489,6 @@ class HelpInfoExtracter:
             scope_info: ScopeInfo,
         ) -> Callable[[], OptionScopeHelpInfo]:
             def load() -> OptionScopeHelpInfo:
-                options.for_scope(scope_info.scope)  # Force parsing.
                 subsystem_cls = scope_info.subsystem_cls
                 if not scope_info.description:
                     cls_name = (
@@ -1107,9 +1109,18 @@ class HelpInfoExtracter:
         removal_hint = kwargs.get("removal_hint")
         choices = self.compute_choices(kwargs)
 
-        dest = Parser.parse_dest(*args, **kwargs)
-        # Global options have three env var variants. The last one is the most human-friendly.
-        env_var = Parser.get_env_var_names(self._scope, dest)[-1]
+        dest = parse_dest(*args, **kwargs)
+        udest = dest.upper()
+        if self._scope == GLOBAL_SCOPE:
+            # Global options have 2-3 env var variants, e.g., --pants-workdir can be
+            # set with PANTS_GLOBAL_PANTS_WORKDIR, PANTS_PANTS_WORKDIR, or PANTS_WORKDIR.
+            # The last one is the most human-friendly, so it's what we use in the help info.
+            if udest.startswith("PANTS_"):
+                env_var = udest
+            else:
+                env_var = f"PANTS_{udest}"
+        else:
+            env_var = f"PANTS_{_ENV_SANITIZER_RE.sub('_', self._scope.upper())}_{udest}"
 
         target_field_name = f"{self._scope_prefix}_{option_field_name_for(args)}".replace("-", "_")
         environment_aware = kwargs.get("environment_aware") is True

@@ -871,8 +871,14 @@ impl SessionCore {
             } else {
                 // There are no live or invalidated sources of this Digest. Directly fail.
                 return result.map_err(|e| {
+                    let suffix = if let Some(workunit_data) = workunit.workunit() {
+                        &format!(", with workunit: {:?}", workunit_data)
+                    } else {
+                        ""
+                    };
+
                     throw(format!(
-                        "Could not identify a process to backtrack to for: {e}"
+                        "Could not identify a process to backtrack to for: {e}{suffix}"
                     ))
                 });
             }
