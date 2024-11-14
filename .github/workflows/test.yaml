@@ -7,6 +7,7 @@ concurrency:
   cancel-in-progress: true
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
 env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
   PANTS_CONFIG_FILES: +['pants.ci.toml']
   RUST_BACKTRACE: all
 jobs:
@@ -327,12 +328,11 @@ jobs:
     container:
       image: quay.io/pypa/manylinux2014_aarch64:latest
     env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config
+      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
     name: Build wheels (Linux-ARM64)
     needs:
     - classify_changes
@@ -387,12 +387,11 @@ jobs:
     container:
       image: quay.io/pypa/manylinux2014_x86_64:latest
     env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config
+      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
     name: Build wheels (Linux-x86_64)
     needs:
     - classify_changes
@@ -447,12 +446,11 @@ jobs:
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config
+      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
     name: Build wheels (macOS10-15-x86_64)
     needs:
     - classify_changes
@@ -516,12 +514,11 @@ jobs:
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config
+      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
     name: Build wheels (macOS11-ARM64)
     needs:
     - classify_changes

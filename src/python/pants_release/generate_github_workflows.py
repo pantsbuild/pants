@@ -126,7 +126,7 @@ NATIVE_FILES = [
 PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.13", "3.11"]
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
-DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true'"
+DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true'"
 IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 
 # NB: This overrides `pants.ci.toml`.
@@ -316,6 +316,7 @@ def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
         "RUST_BACKTRACE": "all",
+        "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION": "true"
     }
 
 
@@ -878,7 +879,9 @@ def build_wheels_job(
             **({"needs": needs} if needs else {}),
             "timeout-minutes": 90,
             "env": {
-                "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION": bool(container),
+                #"ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION": bool(container),
+                #**({"ACTIONS_RUNNER_FORCED_INTERNAL_NODE_VERSION": "node16"} if container else {}),
+                #**({"ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION": "node16"} if container else {}),
                 **DISABLE_REMOTE_CACHE_ENV,
                 # If we're not deploying these wheels, build in debug mode, which allows for
                 # incremental compilation across wheels. If this becomes too slow in CI, most likely
