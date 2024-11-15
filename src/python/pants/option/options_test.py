@@ -353,8 +353,9 @@ def test_deprecated_options_error() -> None:
     def register(opts: Options) -> None:
         opts.register(GLOBAL_SCOPE, "--expired", removal_version="0.0.1.dev0")
 
+    opts = create_options([GLOBAL_SCOPE], register, [])
     with pytest.raises(CodeRemovedError):
-        create_options([GLOBAL_SCOPE], register, [])
+        opts.for_scope(scope=GLOBAL_SCOPE)
 
 
 @unittest.mock.patch("pants.base.deprecated.PANTS_SEMVER", Version(_FAKE_CUR_VERSION))
