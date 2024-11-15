@@ -880,11 +880,7 @@ def build_wheels_job(
             "steps": [
                 *initial_steps,
                 install_protoc(),  # for prost crate
-                *(
-                    []
-                    if platform == Platform.LINUX_ARM64
-                    else [install_go()]
-                ),
+                *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
                 {
                     "name": "Build wheels",
                     "run": "./pants run src/python/pants_release/release.py -- build-wheels",
