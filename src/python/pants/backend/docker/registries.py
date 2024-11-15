@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterator
 
-from pants.option.parser import Parser
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
@@ -52,13 +51,13 @@ class DockerRegistryOptions:
         return cls(
             alias=alias,
             address=d["address"],
-            default=Parser.ensure_bool(d.get("default", alias == "default")),
-            skip_push=Parser.ensure_bool(d.get("skip_push", DockerRegistryOptions.skip_push)),
+            default=d.get("default", alias == "default"),
+            skip_push=d.get("skip_push", DockerRegistryOptions.skip_push),
             extra_image_tags=tuple(
                 d.get("extra_image_tags", DockerRegistryOptions.extra_image_tags)
             ),
-            repository=Parser.to_value_type(d.get("repository"), str, None),
-            use_local_alias=Parser.ensure_bool(d.get("use_local_alias", False)),
+            repository=d.get("repository"),
+            use_local_alias=d.get("use_local_alias", False),
         )
 
     def register(self, registries: dict[str, DockerRegistryOptions]) -> None:
