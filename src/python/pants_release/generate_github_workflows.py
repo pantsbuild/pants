@@ -20,41 +20,28 @@ from pants_release.common import die
 from pants.util.strutil import softwrap
 
 
-def action(name: str, node16_compat: bool = False) -> str:
-    # Versions of actions compatible with node16 and the `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` setting.
-    # glibc 2.17 is required to build manylinux_2014 wheels, but node.js does do not ship glibc 2.17 compatible
-    # binaries for node >= v17.
-    if node16_compat:
-        version_map = {
-            "checkout": "actions/checkout@v3",
-            "upload-artifact": "actions/upload-artifact@v3",
-            "setup-go": "actions/setup-go@v4",
-        }
-    else:
-        version_map = {
-            "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
-            "cache": "actions/cache@v4",
-            "checkout": "actions/checkout@v4",
-            "download-artifact": "actions/download-artifact@v4",
-            "expose-pythons": "pantsbuild/actions/expose-pythons@v9",
-            "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
-            "rust-cache": "benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1",
-            "setup-go": "actions/setup-go@v5",
-            "setup-java": "actions/setup-java@v4",
-            "setup-node": "actions/setup-node@v4",
-            "setup-protoc": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
-            "setup-python": "actions/setup-python@v5",
-            "slack-github-action": "slackapi/slack-github-action@v1.24.0",
-            "upload-artifact": "actions/upload-artifact@v4",
-        }
+def action(name: str) -> str:
+    version_map = {
+        "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
+        "cache": "actions/cache@v4",
+        "checkout": "actions/checkout@v4",
+        "download-artifact": "actions/download-artifact@v4",
+        "expose-pythons": "pantsbuild/actions/expose-pythons@v9",
+        "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
+        "rust-cache": "benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a",
+        "setup-go": "actions/setup-go@v5",
+        "setup-java": "actions/setup-java@v4",
+        "setup-node": "actions/setup-node@v4",
+        "setup-protoc": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
+        "setup-python": "actions/setup-python@v5",
+        "slack-github-action": "slackapi/slack-github-action@v1.24.0",
+        "upload-artifact": "actions/upload-artifact@v4",
+    }
     try:
         return version_map[name]
     except KeyError as e:
-        configured_version = (
-            "Node 16 compatible version configured" if node16_compat else "version configured"
-        )
         raise ValueError(
-            f"Requested github action '{name}' does not have a {configured_version}.\n"
+            f"Requested github action '{name}' does not have a version configured.\n"
             f"Current known versions: {version_map}"
         ) from e
 
@@ -127,7 +114,7 @@ NATIVE_FILES = [
 PYTHON_VERSION = "3.9"
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
-DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true'"
+DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true'"
 IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 
 # NB: This overrides `pants.ci.toml`.
@@ -262,7 +249,7 @@ def checkout(
         # We need to fetch a few commits back, to be able to access HEAD^2 in the PR case.
         {
             "name": "Check out code",
-            "uses": action("checkout", node16_compat=containerized),
+            "uses": action("checkout"),
             "with": {
                 **fetch_depth_opt,
                 **({"ref": ref} if ref else {}),
@@ -388,10 +375,10 @@ def install_jdk() -> Step:
     }
 
 
-def install_go(node16_compat: bool = False) -> Step:
+def install_go() -> Step:
     return {
         "name": "Install Go",
-        "uses": action("setup-go", node16_compat=node16_compat),
+        "uses": action("setup-go"),
         "with": {"go-version": "1.19.5"},
     }
 
@@ -614,10 +601,10 @@ class Helper:
             self.native_binaries_upload(),
         ]
 
-    def upload_log_artifacts(self, name: str, node16_compat: bool = False) -> Step:
+    def upload_log_artifacts(self, name: str) -> Step:
         return {
             "name": "Upload pants.log",
-            "uses": action("upload-artifact", node16_compat=node16_compat),
+            "uses": action("upload-artifact"),
             "if": "always()",
             "continue-on-error": True,
             "with": {
@@ -866,9 +853,9 @@ def build_wheels_job(
     # the code, install rustup and expose Pythons.
     # TODO: Apply rust caching here.
     if platform == Platform.LINUX_X86_64:
-        container = {"image": "quay.io/pypa/manylinux2014_x86_64:latest"}
+        container = {"image": "quay.io/pypa/manylinux_2_28_x86_64:latest"}
     elif platform == Platform.LINUX_ARM64:
-        container = {"image": "quay.io/pypa/manylinux2014_aarch64:latest"}
+        container = {"image": "quay.io/pypa/manylinux_2_28_aarch64:latest"}
     else:
         container = None
 
@@ -883,6 +870,10 @@ def build_wheels_job(
                     echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
                     echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
                     echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
+                    echo "/opt/python/cp310-cp310/bin" >> $GITHUB_PATH
+                    echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
+                    echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
+                    echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
                     """
                 ),
             },
@@ -921,11 +912,7 @@ def build_wheels_job(
             "steps": [
                 *initial_steps,
                 install_protoc(),  # for prost crate
-                *(
-                    []
-                    if platform == Platform.LINUX_ARM64
-                    else [install_go(node16_compat=bool(container))]
-                ),
+                *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
                 {
                     "name": "Build wheels",
                     "run": "./pants run src/python/pants_release/release.py -- build-wheels",
@@ -936,7 +923,7 @@ def build_wheels_job(
                     "run": "./pants package src/python/pants:pants-pex",
                     "env": helper.platform_env(),
                 },
-                helper.upload_log_artifacts(name="wheels-and-pex", node16_compat=bool(container)),
+                helper.upload_log_artifacts(name="wheels-and-pex"),
                 *(
                     [
                         {

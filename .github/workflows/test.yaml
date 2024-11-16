@@ -48,7 +48,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -141,7 +141,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -244,7 +244,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -301,14 +301,14 @@ jobs:
     timeout-minutes: 60
   build_wheels_linux_arm64:
     container:
-      image: quay.io/pypa/manylinux2014_aarch64:latest
+      image: quay.io/pypa/manylinux_2_28_aarch64:latest
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config
+      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
     name: Build wheels (Linux-ARM64)
     needs:
     - classify_changes
@@ -320,7 +320,7 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -337,6 +337,14 @@ jobs:
         echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
 
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp310-cp310/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
 
         '
     - name: Install Protoc
@@ -353,7 +361,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-Linux-ARM64
         overwrite: 'true'
@@ -361,14 +369,14 @@ jobs:
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
-      image: quay.io/pypa/manylinux2014_x86_64:latest
+      image: quay.io/pypa/manylinux_2_28_x86_64:latest
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config
+      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
     name: Build wheels (Linux-x86_64)
     needs:
     - classify_changes
@@ -376,7 +384,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -394,6 +402,14 @@ jobs:
 
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
+        echo "/opt/python/cp310-cp310/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
+
         '
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
@@ -401,7 +417,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - env:
@@ -415,7 +431,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-Linux-x86_64
         overwrite: 'true'
@@ -427,8 +443,8 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config
+      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
     name: Build wheels (macOS10-15-x86_64)
     needs:
     - classify_changes
@@ -459,7 +475,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -496,8 +512,8 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config
+      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
     name: Build wheels (macOS11-ARM64)
     needs:
     - classify_changes
@@ -528,7 +544,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
