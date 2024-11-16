@@ -53,8 +53,8 @@ class OptionValueHistory:
         return self.ranked_values[-1]
 
 
-class Parser:
-    """An argument parser."""
+class OptionRegistrar:
+    """Holds information about registered options."""
 
     @staticmethod
     def is_bool(kwargs: Mapping[str, Any]) -> bool:
@@ -89,13 +89,13 @@ class Parser:
         return not b
 
     def __init__(self, scope: str) -> None:
-        """Create a Parser instance.
+        """Create an OptionRegistrar instance.
 
-        :param scope: the scope this parser acts for.
+        :param scope: the scope this registrar acts for.
         """
         self._scope = scope
 
-        # All option args registered with this parser.  Used to prevent conflicts.
+        # All option args registered with this registrar.  Used to prevent conflicts.
         self._known_args: set[str] = set()
 
         # List of (args, kwargs) registration pairs, exactly as captured at registration time.
@@ -115,7 +115,7 @@ class Parser:
 
     def option_registrations_iter(self):
         """Returns an iterator over the normalized registration arguments of each option in this
-        parser.
+        registrar.
 
         Useful for generating help and other documentation.
 
@@ -308,4 +308,4 @@ class Parser:
             )
 
     def __str__(self) -> str:
-        return f"Parser({self.scope})"
+        return f"OptionRegistrar({self.scope})"

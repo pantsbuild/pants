@@ -21,8 +21,8 @@ from pants.option.errors import (
 from pants.option.native_options import NativeOptionParser
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
-from pants.option.parser import Parser
 from pants.option.ranked_value import Rank, RankedValue
+from pants.option.registrar import OptionRegistrar
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -122,9 +122,6 @@ class Options:
         args: Sequence[str],
         bootstrap_option_values: OptionValueContainer | None = None,
         allow_unknown_options: bool = False,
-        # We default to error to be strict in tests, but set explicitly in OptionsBootstrapper
-        # for user-facing behavior.
-        native_options_validation: NativeOptionsValidation = NativeOptionsValidation.error,
         native_options_config_discovery: bool = True,
         include_derivation: bool = False,
     ) -> Options:
@@ -137,12 +134,11 @@ class Options:
         :param bootstrap_option_values: An optional namespace containing the values of bootstrap
                options. We can use these values when registering other options.
         :param allow_unknown_options: Whether to ignore or error on unknown cmd-line flags.
-        :param native_options_validation: How to validate the native options parser against the
-               legacy Python parser.
-        :param native_options_config_discovery: Whether to discover config files in the native parser or use the ones supplied
+        :param native_options_config_discovery: Whether to discover config files in the native
+            parser or use the ones supplied.
         :param include_derivation: Whether to gather option value derivation information.
         """
-        # We need parsers for all the intermediate scopes, so inherited option values
+        # We need registrars for all the intermediate scopes, so inherited option values
         # can propagate through them.
         complete_known_scope_infos = cls.complete_scopes(known_scope_infos)
         splitter = ArgSplitter(complete_known_scope_infos, get_buildroot())
@@ -170,7 +166,9 @@ class Options:
                             [line for line in [line.strip() for line in f] if line]
                         )
 
-        parser_by_scope = {si.scope: Parser(si.scope) for si in complete_known_scope_infos}
+        registrar_by_scope = {
+            si.scope: OptionRegistrar(si.scope) for si in complete_known_scope_infos
+        }
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
 
         config_to_pass = None if native_options_config_discovery else config.sources()
@@ -190,9 +188,8 @@ class Options:
             scope_to_flags=split_args.scope_to_flags,
             specs=split_args.specs,
             passthru=split_args.passthru,
-            parser_by_scope=parser_by_scope,
+            registrar_by_scope=registrar_by_scope,
             native_parser=native_parser,
-            native_options_validation=native_options_validation,
             bootstrap_option_values=bootstrap_option_values,
             known_scope_to_info=known_scope_to_info,
             allow_unknown_options=allow_unknown_options,
@@ -206,9 +203,8 @@ class Options:
         scope_to_flags: dict[str, list[str]],
         specs: list[str],
         passthru: list[str],
-        parser_by_scope: dict[str, Parser],
+        registrar_by_scope: dict[str, OptionRegistrar],
         native_parser: NativeOptionParser,
-        native_options_validation: NativeOptionsValidation,
         bootstrap_option_values: OptionValueContainer | None,
         known_scope_to_info: dict[str, ScopeInfo],
         allow_unknown_options: bool = False,
@@ -223,7 +219,7 @@ class Options:
         self._scope_to_flags = scope_to_flags
         self._specs = specs
         self._passthru = passthru
-        self._parser_by_scope = parser_by_scope
+        self._registrar_by_scope = registrar_by_scope
         self._native_parser = native_parser
         self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
@@ -271,7 +267,10 @@ class Options:
 
     @property
     def known_scope_to_scoped_args(self) -> dict[str, frozenset[str]]:
-        return {scope: parser.known_scoped_args for scope, parser in self._parser_by_scope.items()}
+        return {
+            scope: registrar.known_scoped_args
+            for scope, registrar in self._registrar_by_scope.items()
+        }
 
     @property
     def scope_to_flags(self) -> dict[str, list[str]]:
@@ -318,10 +317,10 @@ class Options:
 
     def register(self, scope: str, *args, **kwargs) -> None:
         """Register an option in the given scope."""
-        self.get_parser(scope).register(*args, **kwargs)
+        self.get_registrar(scope).register(*args, **kwargs)
         deprecated_scope = self.known_scope_to_info[scope].deprecated_scope
         if deprecated_scope:
-            self.get_parser(deprecated_scope).register(*args, **kwargs)
+            self.get_registrar(deprecated_scope).register(*args, **kwargs)
 
     def registration_function_for_subsystem(self, subsystem_cls):
         """Returns a function for registering options on the given scope."""
@@ -337,15 +336,15 @@ class Options:
         register.scope = subsystem_cls.options_scope
         return register
 
-    def get_parser(self, scope: str) -> Parser:
-        """Returns the parser for the given scope, so code can register on it directly.
+    def get_registrar(self, scope: str) -> OptionRegistrar:
+        """Returns the registrar for the given scope, so code can register on it directly.
 
-        :param scope: The scope to retrieve the parser for.
-        :return: The parser for the given scope.
+        :param scope: The scope to retrieve the registrar for.
+        :return: The registrar for the given scope.
         :raises pants.option.errors.ConfigValidationError: if the scope is not known.
         """
         try:
-            return self._parser_by_scope[scope]
+            return self._registrar_by_scope[scope]
         except KeyError:
             raise ConfigValidationError(f"No such options scope: {scope}")
 
@@ -418,10 +417,10 @@ class Options:
         """
         builder = OptionValueContainerBuilder()
         mutex_map = defaultdict(list)
-        parser = self.get_parser(scope)
+        registrar = self.get_registrar(scope)
         scope_str = "global scope" if scope == GLOBAL_SCOPE else f"scope '{scope}'"
 
-        for args, kwargs in parser.option_registrations_iter():
+        for args, kwargs in registrar.option_registrations_iter():
             dest = kwargs["dest"]
             val, rank = self._native_parser.get_value(
                 scope=scope, registration_args=args, registration_kwargs=kwargs
@@ -483,9 +482,9 @@ class Options:
         """
 
         pairs = []
-        parser = self.get_parser(scope)
+        registrar = self.get_registrar(scope)
         # Sort the arguments, so that the fingerprint is consistent.
-        for _, kwargs in sorted(parser.option_registrations_iter()):
+        for _, kwargs in sorted(registrar.option_registrations_iter()):
             if not kwargs.get("fingerprint", True):
                 continue
             if daemon_only and not kwargs.get("daemon", False):

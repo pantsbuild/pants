@@ -11,12 +11,12 @@ from pants.help.help_tools import ToolHelpInfo
 from pants.help.maybe_color import MaybeColor
 from pants.option.global_options import GlobalOptions
 from pants.option.native_options import NativeOptionParser
-from pants.option.parser import Parser
+from pants.option.registrar import OptionRegistrar
 
 
 @pytest.fixture
-def parser() -> Parser:
-    return Parser(scope=GlobalOptions.options_scope)
+def registrar() -> OptionRegistrar:
+    return OptionRegistrar(scope=GlobalOptions.options_scope)
 
 
 @pytest.fixture
@@ -30,17 +30,19 @@ def extracter() -> HelpInfoExtracter:
 
 
 @pytest.fixture
-def tool_info(extracter, parser, native_parser) -> ToolHelpInfo:
-    parser.register("--version", type=str, default="1.0")
-    parser.register("--url-template", type=str, default="https://download/{version}")
-    oshi = extracter.get_option_scope_help_info("Test description.", parser, native_parser, False)
+def tool_info(extracter, registrar, native_parser) -> ToolHelpInfo:
+    registrar.register("--version", type=str, default="1.0")
+    registrar.register("--url-template", type=str, default="https://download/{version}")
+    oshi = extracter.get_option_scope_help_info(
+        "Test description.", registrar, native_parser, False
+    )
     tool_info = ToolHelpInfo.from_option_scope_help_info(oshi)
     assert tool_info is not None
     return tool_info
 
 
-def test_no_tool_help_info(extracter, parser, native_parser) -> None:
-    oshi = extracter.get_option_scope_help_info("", parser, native_parser, False)
+def test_no_tool_help_info(extracter, registrar, native_parser) -> None:
+    oshi = extracter.get_option_scope_help_info("", registrar, native_parser, False)
     assert ToolHelpInfo.from_option_scope_help_info(oshi) is None
 
 
