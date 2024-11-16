@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from collections import defaultdict
 from enum import Enum
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -12,11 +13,16 @@ from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter
 from pants.option.config import Config
-from pants.option.errors import ConfigValidationError, UnknownFlagsError
+from pants.option.errors import (
+    ConfigValidationError,
+    MutuallyExclusiveOptionError,
+    UnknownFlagsError,
+)
 from pants.option.native_options import NativeOptionParser
 from pants.option.option_util import is_list_option
-from pants.option.option_value_container import OptionValueContainer
+from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.parser import Parser
+from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -410,8 +416,47 @@ class Options:
         :return: An OptionValueContainer representing the option values for the given scope.
         :raises pants.option.errors.ConfigValidationError: if the scope is unknown.
         """
+        builder = OptionValueContainerBuilder()
+        mutex_map = defaultdict(list)
+        parser = self.get_parser(scope)
+        scope_str = "global scope" if scope == GLOBAL_SCOPE else f"scope '{scope}'"
 
-        native_values = self.get_parser(scope).parse_args_native(self._native_parser)
+        for args, kwargs in parser.option_registrations_iter():
+            dest = kwargs["dest"]
+            val, rank = self._native_parser.get_value(
+                scope=scope, registration_args=args, registration_kwargs=kwargs
+            )
+            explicitly_set = rank > Rank.HARDCODED
+
+            # If we explicitly set a deprecated but not-yet-expired option, warn about it.
+            # Otherwise, raise a CodeRemovedError if the deprecation has expired.
+            removal_version = kwargs.get("removal_version", None)
+            if removal_version is not None:
+                warn_or_error(
+                    removal_version=removal_version,
+                    entity=f"option '{dest}' in {scope_str}",
+                    start_version=kwargs.get("deprecation_start_version", None),
+                    hint=kwargs.get("removal_hint", None),
+                    print_warning=explicitly_set,
+                )
+
+            # If we explicitly set the option, check for mutual exclusivity.
+            if explicitly_set:
+                mutex_dest = kwargs.get("mutually_exclusive_group")
+                mutex_map_key = mutex_dest or dest
+                mutex_map[mutex_map_key].append(dest)
+                if len(mutex_map[mutex_map_key]) > 1:
+                    raise MutuallyExclusiveOptionError(
+                        softwrap(
+                            f"""
+                            Can only provide one of these mutually exclusive options in
+                            {scope_str}, but multiple given:
+                            {', '.join(mutex_map[mutex_map_key])}
+                            """
+                        )
+                    )
+            setattr(builder, dest, RankedValue(rank, val))
+        native_values = builder.build()
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
