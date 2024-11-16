@@ -45,8 +45,8 @@ from pants.engine.unions import UnionMembership, UnionRule, is_union
 from pants.option.native_options import NativeOptionParser, parse_dest
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
-from pants.option.parser import OptionValueHistory, Parser
 from pants.option.ranked_value import Rank, RankedValue
+from pants.option.registrar import OptionRegistrar, OptionValueHistory
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.frozendict import LazyFrozenDict
 from pants.util.strutil import first_paragraph, strval
@@ -508,7 +508,7 @@ class HelpInfoExtracter:
                     )
                 return HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
                     scope_info.description,
-                    options.get_parser(scope_info.scope),
+                    options.get_registrar(scope_info.scope),
                     options.native_parser.with_derivation(),
                     # `filter` should be treated as a subsystem for `help`, even though it still
                     # works as a goal for backwards compatibility.
@@ -1003,7 +1003,7 @@ class HelpInfoExtracter:
     def get_option_scope_help_info(
         self,
         description: str,
-        parser: Parser,
+        registrar: OptionRegistrar,
         native_parser: NativeOptionParser,
         is_goal: bool,
         provider: str = "",
@@ -1014,11 +1014,11 @@ class HelpInfoExtracter:
         basic_options = []
         advanced_options = []
         deprecated_options = []
-        for args, kwargs in parser.option_registrations_iter():
+        for args, kwargs in registrar.option_registrations_iter():
             derivation = native_parser.get_derivation(
-                scope=parser.scope, registration_args=args, registration_kwargs=kwargs
+                scope=registrar.scope, registration_args=args, registration_kwargs=kwargs
             )
-            # Massage the derivation structure returned by the NativeParser into an
+            # Massage the derivation structure returned by the NativeOptionParser into an
             # OptionValueHistory as returned by the legacy parser.
             # TODO: Once we get rid of the legacy parser we can probably simplify by
             #  using the native structure directly.
@@ -1071,7 +1071,7 @@ class HelpInfoExtracter:
                 scoped_arg = arg
             scoped_cmd_line_args.append(scoped_arg)
 
-            if Parser.is_bool(kwargs):
+            if OptionRegistrar.is_bool(kwargs):
                 if is_short_arg:
                     display_args.append(scoped_arg)
                 else:
