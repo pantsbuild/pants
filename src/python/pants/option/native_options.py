@@ -275,6 +275,9 @@ class NativeOptionParser:
     def get_unconsumed_flags(self) -> dict[str, tuple[str, ...]]:
         return {k: tuple(v) for k, v in self._native_parser.get_unconsumed_flags().items()}
 
+    def validate_config(self, valid_keys: dict[str, set[str]]) -> list[str]:
+        return self._native_parser.validate_config(valid_keys)
+
 
 def check_file_exists(val: str, dest: str, scope: str) -> None:
     error_prefix = f"File value `{val}` for option `{dest}` in `{scope}`"
