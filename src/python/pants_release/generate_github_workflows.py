@@ -63,14 +63,16 @@ class Platform(Enum):
     MACOS10_15_X86_64 = "macOS10-15-x86_64"
     # the oldest version of macOS supported by GitHub self-hosted runners
     MACOS12_X86_64 = "macOS12-x86_64"
+    MACOS13_X86_64 = "macOS13-x86_64"
     MACOS11_ARM64 = "macOS11-ARM64"
+    MACOS14_ARM64 = "macOS14-ARM64"
 
 
-GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS12_X86_64}
+GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS12_X86_64, Platform.MACOS13_X86_64, Platform.MACOS14_ARM64}
 SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
 # We control these runners, so we preinstall and expose python on them.
 HAS_PYTHON = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
-HAS_GO = {Platform.MACOS12_X86_64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
+HAS_GO = {Platform.MACOS12_X86_64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64, Platform.MACOS13_X86_64, Platform.MACOS14_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
@@ -411,6 +413,10 @@ class Helper:
         ret = ["self-hosted"] if self.platform in SELF_HOSTED else []
         if self.platform == Platform.MACOS12_X86_64:
             ret += ["macos-12"]
+        elif self.platform == Platform.MACOS13_X86_64:
+            ret += ["macos-13"]
+        elif self.platform == Platform.MACOS14_ARM64:
+            ret += ["macos-14"]
         elif self.platform == Platform.MACOS11_ARM64:
             ret += ["macOS-11-ARM64"]
         elif self.platform == Platform.MACOS10_15_X86_64:
@@ -430,11 +436,11 @@ class Helper:
 
     def platform_env(self):
         ret = {}
-        if self.platform in {Platform.MACOS10_15_X86_64, Platform.MACOS12_X86_64}:
+        if self.platform in {Platform.MACOS10_15_X86_64, Platform.MACOS12_X86_64, Platform.MACOS13_X86_64}:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
             # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
             ret["ARCHFLAGS"] = "-arch x86_64"
-        if self.platform == Platform.MACOS11_ARM64:
+        if self.platform in {Platform.MACOS11_ARM64, Platform.MACOS14_ARM64}:
             ret["ARCHFLAGS"] = "-arch arm64"
         if self.platform == Platform.LINUX_X86_64:
             # Currently we run Linux x86_64 CI on GitHub Actions-hosted hardware, and
@@ -793,8 +799,8 @@ def linux_arm64_test_jobs() -> Jobs:
     return jobs
 
 
-def macos12_x86_64_test_jobs() -> Jobs:
-    helper = Helper(Platform.MACOS12_X86_64)
+def macos13_x86_64_test_jobs() -> Jobs:
+    helper = Helper(Platform.MACOS13_X86_64)
     jobs = {
         helper.job_name("bootstrap_pants"): bootstrap_jobs(
             helper,
@@ -964,8 +970,8 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
     return {
         **build_wheels_job(Platform.LINUX_X86_64, for_deploy_ref, needs),
         **build_wheels_job(Platform.LINUX_ARM64, for_deploy_ref, needs),
-        **build_wheels_job(Platform.MACOS10_15_X86_64, for_deploy_ref, needs),
-        **build_wheels_job(Platform.MACOS11_ARM64, for_deploy_ref, needs),
+        **build_wheels_job(Platform.MACOS13_X86_64, for_deploy_ref, needs),
+        **build_wheels_job(Platform.MACOS14_ARM64, for_deploy_ref, needs),
     }
 
 
@@ -982,7 +988,7 @@ def test_workflow_jobs() -> Jobs:
     }
     jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
-    jobs.update(**macos12_x86_64_test_jobs())
+    jobs.update(**macos13_x86_64_test_jobs())
     jobs.update(**build_wheels_jobs())
     jobs.update(
         {
