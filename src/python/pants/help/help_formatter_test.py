@@ -9,8 +9,8 @@ from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import HelpInfoExtracter, OptionHelpInfo
 from pants.option.global_options import GlobalOptions
 from pants.option.native_options import NativeOptionParser
-from pants.option.parser import OptionValueHistory, Parser
 from pants.option.ranked_value import Rank, RankedValue
+from pants.option.registrar import OptionRegistrar, OptionValueHistory
 
 
 class TestOptionHelpFormatter:
@@ -58,9 +58,9 @@ class TestOptionHelpFormatter:
         assert default_line.lstrip() == "default: kiwi"
 
     @classmethod
-    def _get_parser(cls) -> Tuple[Parser, NativeOptionParser]:
-        return Parser(
-            scope_info=GlobalOptions.get_scope_info(),
+    def _get_registrar_and_parser(cls) -> Tuple[OptionRegistrar, NativeOptionParser]:
+        return OptionRegistrar(
+            scope=GlobalOptions.options_scope,
         ), NativeOptionParser(
             args=[], env={}, config_sources=[], allow_pantsrc=False, include_derivation=True
         )
@@ -69,36 +69,36 @@ class TestOptionHelpFormatter:
     def _format_for_global_scope(
         cls, show_advanced: bool, show_deprecated: bool, args: list[str], kwargs
     ) -> list[str]:
-        parser, native_parser = cls._get_parser()
-        parser.register(*args, **kwargs)
+        registrar, native_parser = cls._get_registrar_and_parser()
+        registrar.register(*args, **kwargs)
         return cls._format_for_global_scope_with_parser(
-            parser, native_parser, show_advanced=show_advanced, show_deprecated=show_deprecated
+            registrar, native_parser, show_advanced=show_advanced, show_deprecated=show_deprecated
         )
 
     @classmethod
     def _format_for_global_scope_with_parser(
         cls,
-        parser: Parser,
+        registrar: OptionRegistrar,
         native_parser: NativeOptionParser,
         show_advanced: bool,
         show_deprecated: bool,
     ) -> list[str]:
         oshi = HelpInfoExtracter("").get_option_scope_help_info(
-            "", parser, native_parser, False, "help.test"
+            "", registrar, native_parser, False, "help.test"
         )
         return HelpFormatter(
             show_advanced=show_advanced, show_deprecated=show_deprecated, color=False
         ).format_options(oshi)
 
     def test_suppress_advanced(self) -> None:
-        parser, native_parser = self._get_parser()
-        parser.register("--foo", advanced=True)
+        registrar, native_parser = self._get_registrar_and_parser()
+        registrar.register("--foo", advanced=True)
         # must have a non advanced option to be able to supress showing advanced options.
-        parser.register("--jerry", advanced=False)
-        lines = self._format_for_global_scope_with_parser(parser, native_parser, False, False)
+        registrar.register("--jerry", advanced=False)
+        lines = self._format_for_global_scope_with_parser(registrar, native_parser, False, False)
         assert len(lines) == 15
         assert not any("--foo" in line for line in lines)
-        lines = self._format_for_global_scope_with_parser(parser, native_parser, True, False)
+        lines = self._format_for_global_scope_with_parser(registrar, native_parser, True, False)
         assert len(lines) == 24
 
     def test_suppress_deprecated(self) -> None:

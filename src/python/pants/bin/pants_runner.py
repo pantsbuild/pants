@@ -25,8 +25,9 @@ from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
-# Pants 2.18 is using a new distribution model, that's supported (sans bugs) in 0.10.0.
-MINIMUM_SCIE_PANTS_VERSION = Version("0.10.0")
+# First version with Python 3.11 support:
+# https://github.com/pantsbuild/scie-pants/releases/tag/v0.12.0
+MINIMUM_SCIE_PANTS_VERSION = Version("0.12.0")
 
 
 @dataclass(frozen=True)

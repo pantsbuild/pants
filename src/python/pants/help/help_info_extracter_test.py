@@ -18,8 +18,8 @@ from pants.option.global_options import GlobalOptions, LogLevelOption
 from pants.option.native_options import NativeOptionParser
 from pants.option.option_types import BoolOption, IntListOption, StrListOption
 from pants.option.options import Options
-from pants.option.parser import Parser
 from pants.option.ranked_value import Rank
+from pants.option.registrar import OptionRegistrar
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
@@ -98,15 +98,15 @@ def test_non_global_scope():
 
 def test_default() -> None:
     def do_test(args, kwargs, expected_default_str):
-        # Defaults are computed in the parser and added into the kwargs, so we
+        # Defaults are computed in the registrar and added into the kwargs, so we
         # must jump through this hoop in this test.
-        parser = Parser(
-            scope_info=GlobalOptions.get_scope_info(),
+        registrar = OptionRegistrar(
+            scope=GlobalOptions.options_scope,
         )
         native_parser = NativeOptionParser([], {}, [], allow_pantsrc=False, include_derivation=True)
-        parser.register(*args, **kwargs)
-        oshi = HelpInfoExtracter(parser.scope).get_option_scope_help_info(
-            "description", parser, native_parser, False, "provider"
+        registrar.register(*args, **kwargs)
+        oshi = HelpInfoExtracter(registrar.scope).get_option_scope_help_info(
+            "description", registrar, native_parser, False, "provider"
         )
         assert oshi.description == "description"
         assert oshi.provider == "provider"
@@ -198,13 +198,11 @@ def test_grouping():
         def exp_to_len(exp):
             return int(exp)  # True -> 1, False -> 0.
 
-        parser = Parser(
-            scope_info=GlobalOptions.get_scope_info(),
-        )
+        registrar = OptionRegistrar(scope=GlobalOptions.options_scope)
         native_parser = NativeOptionParser([], {}, [], allow_pantsrc=False, include_derivation=True)
-        parser.register("--foo", **kwargs)
+        registrar.register("--foo", **kwargs)
         oshi = HelpInfoExtracter("").get_option_scope_help_info(
-            "", parser, native_parser, False, ""
+            "", registrar, native_parser, False, ""
         )
         assert exp_to_len(expected_basic) == len(oshi.basic)
         assert exp_to_len(expected_advanced) == len(oshi.advanced)
