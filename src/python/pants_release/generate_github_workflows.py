@@ -8,7 +8,7 @@ import difflib
 import os
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, ReprEnum
 from pathlib import Path
 from textwrap import dedent  # noqa: PNT20
 from typing import Any, Dict, Sequence, cast
@@ -1300,7 +1300,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     return jobs, inputs
 
 
-class DefaultGoals(str, Enum):
+class DefaultGoals(str, ReprEnum):
     tailor_update_build_files = "tailor --check update-build-files --check ::"
     lint_check = "lint check ::"
     test = "test ::"

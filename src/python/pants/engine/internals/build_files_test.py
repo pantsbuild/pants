@@ -1079,7 +1079,7 @@ def test_build_file_parse_error(target_adaptor_rule_runner: RuleRunner) -> None:
             ),
         },
     )
-    with pytest.raises(ExecutionError, match='File "src/bad/BUILD", line 3'):
+    with pytest.raises(ExecutionError, match='File "src/bad/BUILD", line 2'):
         target_adaptor_rule_runner.request(
             TargetAdaptor,
             [
