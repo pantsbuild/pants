@@ -563,14 +563,10 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 10
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.7
-
-          3.8
-
-          3.9
+        python-version: '3.9
 
           3.10
 

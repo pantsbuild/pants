@@ -66,12 +66,24 @@ class Platform(Enum):
 
 GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS13_X86_64, Platform.MACOS14_ARM64}
 SELF_HOSTED = {Platform.LINUX_ARM64}
-# We control these runners, so we preinstall and expose python on them.
-HAS_PYTHON = {Platform.LINUX_ARM64}
 HAS_GO = {Platform.MACOS13_X86_64, Platform.MACOS14_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
+
+# We don't specify a patch version so that we get the latest, which comes pre-installed:
+#  https://github.com/actions/setup-python#available-versions-of-python
+# NOTE: The last entry becomes the default
+_BASE_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.13", "3.11"]
+
+PYTHON_VERSIONS_PER_PLATFORM = {
+    Platform.LINUX_X86_64: _BASE_PYTHON_VERSIONS,
+    Platform.MACOS13_X86_64: _BASE_PYTHON_VERSIONS,
+    # Python 3.7 or 3.8 aren't supported directly on arm64 macOS
+    Platform.MACOS14_ARM64: [v for v in _BASE_PYTHON_VERSIONS if v not in ("3.7", "3.8")],
+    # These runners have Python already installed
+    Platform.LINUX_ARM64: None,
+}
 
 
 def gha_expr(expr: str) -> str:
@@ -104,11 +116,6 @@ NATIVE_FILES = [
     f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so",
     f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so.metadata",
 ]
-
-# We don't specify a patch version so that we get the latest, which comes pre-installed:
-#  https://github.com/actions/setup-python#available-versions-of-python
-# NOTE: The last entry becomes the default
-PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.13", "3.11"]
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
 DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true'"
@@ -528,8 +535,9 @@ class Helper:
 
     def setup_pythons(self) -> Sequence[Step]:
         ret = []
-        if self.platform not in HAS_PYTHON:
-            ret.append(install_pythons(PYTHON_VERSIONS))
+        versions = PYTHON_VERSIONS_PER_PLATFORM[self.platform]
+        if versions is not None:
+            ret.append(install_pythons(versions))
         return ret
 
     def bootstrap_pants(self) -> Sequence[Step]:
