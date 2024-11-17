@@ -102,6 +102,7 @@ class PythonAwsLambdaFunctionRuntimes(Enum):
     PYTHON_310 = "python3.10"
     PYTHON_311 = "python3.11"
     PYTHON_312 = "python3.12"
+    PYTHON_313 = "python3.13"
 
     def to_interpreter_version(self) -> Tuple[int, int]:
         """Returns the Python version implied by the runtime, as (major, minor)."""
@@ -127,6 +128,8 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         (PythonAwsLambdaFunctionRuntimes.PYTHON_311, FaaSArchitecture.ARM64): "3.11-arm64",
         (PythonAwsLambdaFunctionRuntimes.PYTHON_312, FaaSArchitecture.X86_64): "3.12-x86_64",
         (PythonAwsLambdaFunctionRuntimes.PYTHON_312, FaaSArchitecture.ARM64): "3.12-arm64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_313, FaaSArchitecture.X86_64): "3.13-x86_64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_313, FaaSArchitecture.ARM64): "3.13-arm64",
     }
 
     help = help_text(
