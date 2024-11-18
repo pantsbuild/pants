@@ -215,7 +215,7 @@ impl PySnapshot {
     #[getter]
     fn files<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
         let files = self.0.files();
-        PyTuple::new_bound(
+        PyTuple::new(
             py,
             files
                 .into_iter()
@@ -227,7 +227,7 @@ impl PySnapshot {
     #[getter]
     fn dirs<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
         let dirs = self.0.directories();
-        PyTuple::new_bound(
+        PyTuple::new(
             py,
             dirs.into_iter()
                 .map(|path| PyString::new_bound(py, &path.to_string_lossy()))
@@ -241,7 +241,7 @@ impl PySnapshot {
         let result = self.0.tree.diff(&other.borrow().0.tree);
 
         let into_tuple = |x: &Vec<PathBuf>| -> Bound<'py, PyTuple> {
-            PyTuple::new_bound(
+            PyTuple::new(
                 py,
                 x.iter()
                     .map(|path| PyString::new_bound(py, &path.to_string_lossy()))
@@ -249,7 +249,7 @@ impl PySnapshot {
             )
         };
 
-        PyTuple::new_bound(
+        PyTuple::new(
             py,
             vec![
                 into_tuple(&result.our_unique_files),

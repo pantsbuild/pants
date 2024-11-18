@@ -294,8 +294,7 @@ impl Task {
                         }
                         func.call(args, Some(&kwargs))
                     } else {
-                        let args_tuple =
-                            PyTuple::new_bound(py, deps.iter().map(|v| v.to_object(py)));
+                        let args_tuple = PyTuple::new(py, deps.iter().map(|v| v.to_object(py)));
                         func.call1(args_tuple)
                     };
 

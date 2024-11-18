@@ -629,7 +629,7 @@ fn nailgun_server_create(
             Python::with_gil(|py| {
                 let result = runner.bind(py).call1((
                     exe.cmd.command,
-                    PyTuple::new_bound(py, exe.cmd.args),
+                    PyTuple::new(py, exe.cmd.args),
                     exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),
                     exe.cmd.working_dir,
                     PySessionCancellationLatch(exe.cancelled),

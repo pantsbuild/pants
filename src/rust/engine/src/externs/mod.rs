@@ -127,7 +127,7 @@ pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {
         .into_iter()
         .map(|v| v.consume_into_py_object(py))
         .collect();
-    Value::from(PyTuple::new_bound(py, &arg_handles).to_object(py))
+    Value::from(PyTuple::new(py, &arg_handles).to_object(py))
 }
 
 /// Store a slice containing 2-tuples of (key, value) as a Python dictionary.
@@ -391,7 +391,7 @@ pub(crate) fn generator_send(
 /// those configured in types::Types.
 pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
     let py_type = type_id.as_py_type_bound(py);
-    let args_tuple = PyTuple::new_bound(py, args.iter().map(|v| v.bind(py)));
+    let args_tuple = PyTuple::new(py, args.iter().map(|v| v.bind(py)));
     let res = py_type.call1(args_tuple).unwrap_or_else(|e| {
         panic!(
             "Core type constructor `{}` failed: {:?}",
@@ -522,7 +522,7 @@ impl PyGeneratorResponseNativeCall {
 
     fn send(&self, py: Python, value: PyObject) -> PyResult<()> {
         Err(PyStopIteration::new_err(
-            PyTuple::new_bound(py, [value]).to_object(py),
+            PyTuple::new(py, [value]).to_object(py),
         ))
     }
 }
