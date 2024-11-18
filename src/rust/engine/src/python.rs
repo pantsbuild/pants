@@ -512,10 +512,7 @@ impl Failure {
 
 impl Failure {
     fn from_wrapped_failure(py: Python, py_err: &PyErr) -> Option<Failure> {
-        match py_err
-            .value_bound(py)
-            .downcast::<externs::NativeEngineFailure>()
-        {
+        match py_err.value(py).downcast::<externs::NativeEngineFailure>() {
             Ok(n_e_failure) => {
                 let failure = n_e_failure
                     .getattr("failure")

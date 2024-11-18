@@ -304,7 +304,7 @@ pub(crate) fn generator_send(
             let throw_method = generator.bind(py).getattr(intern!(py, "throw"))?;
             if err.is_instance_of::<NativeEngineFailure>(py) {
                 let throw = err
-                    .value_bound(py)
+                    .value(py)
                     .getattr(intern!(py, "failure"))?
                     .extract::<PyRef<PyFailure>>()?
                     .get_error(py);
@@ -332,9 +332,7 @@ pub(crate) fn generator_send(
         }
         Err(e) => {
             match (maybe_thrown, e.cause(py)) {
-                (Some((thrown, err)), Some(cause))
-                    if thrown.value_bound(py).is(cause.value_bound(py)) =>
-                {
+                (Some((thrown, err)), Some(cause)) if thrown.value(py).is(cause.value(py)) => {
                     // Preserve the engine traceback by using the wrapped failure error as cause. The cause
                     // will be swapped back again in `Failure::from_py_err_with_gil()` to preserve the python
                     // traceback.
