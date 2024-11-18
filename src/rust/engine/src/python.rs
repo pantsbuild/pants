@@ -4,6 +4,7 @@
 // Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
 #![allow(deprecated)]
 
+use std::convert::Infallible;
 use std::sync::Arc;
 use std::{fmt, hash};
 
@@ -359,6 +360,17 @@ impl<'py> FromPyObject<'py> for Value {
 impl ToPyObject for &Value {
     fn to_object(&self, py: Python) -> PyObject {
         self.0.clone_ref(py)
+    }
+}
+
+impl<'a, 'py> IntoPyObject<'py> for &'a Value {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>; // Maybe consider `Borrowed` instead of `Bound` to optimize reference counting?
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        let py_any = self.0.clone_ref(py);
+        Ok(py_any.into_bound(py))
     }
 }
 
