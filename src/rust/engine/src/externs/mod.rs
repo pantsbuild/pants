@@ -144,7 +144,7 @@ pub fn store_dict(
 
 /// Store an opaque buffer of bytes to pass to Python. This will end up as a Python `bytes`.
 pub fn store_bytes(py: Python, bytes: &[u8]) -> Value {
-    Value::from(PyBytes::new_bound(py, bytes).to_object(py))
+    Value::from(PyBytes::new(py, bytes).to_object(py))
 }
 
 /// Store a buffer of utf8 bytes to pass to Python. This will end up as a Python `str`.

@@ -1435,8 +1435,7 @@ fn session_get_observation_histograms<'py>(
 
         let encoded_observations = PyDict::new(py);
         for (metric, encoded_histogram) in &observations {
-            encoded_observations
-                .set_item(metric, PyBytes::new_bound(py, &encoded_histogram[..]))?;
+            encoded_observations.set_item(metric, PyBytes::new(py, &encoded_histogram[..]))?;
         }
 
         let result = PyDict::new(py);
