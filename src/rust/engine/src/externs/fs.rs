@@ -216,7 +216,7 @@ impl PySnapshot {
     }
 
     #[getter]
-    fn files<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
+    fn files<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let files = self.0.files();
         PyTuple::new(
             py,
@@ -228,7 +228,7 @@ impl PySnapshot {
     }
 
     #[getter]
-    fn dirs<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
+    fn dirs<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let dirs = self.0.directories();
         PyTuple::new(
             py,
@@ -240,10 +240,14 @@ impl PySnapshot {
 
     // NB: Prefix with underscore. The Python call will be hidden behind a helper which returns a much
     // richer type.
-    fn _diff<'py>(&self, other: &Bound<'py, PySnapshot>, py: Python<'py>) -> Bound<'py, PyTuple> {
+    fn _diff<'py>(
+        &self,
+        other: &Bound<'py, PySnapshot>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyTuple>> {
         let result = self.0.tree.diff(&other.borrow().0.tree);
 
-        let into_tuple = |x: &Vec<PathBuf>| -> Bound<'py, PyTuple> {
+        let into_tuple = |x: &Vec<PathBuf>| -> PyResult<Bound<'py, PyTuple>> {
             PyTuple::new(
                 py,
                 x.iter()
@@ -255,11 +259,11 @@ impl PySnapshot {
         PyTuple::new(
             py,
             vec![
-                into_tuple(&result.our_unique_files),
-                into_tuple(&result.our_unique_dirs),
-                into_tuple(&result.their_unique_files),
-                into_tuple(&result.their_unique_dirs),
-                into_tuple(&result.changed_files),
+                into_tuple(&result.our_unique_files)?,
+                into_tuple(&result.our_unique_dirs)?,
+                into_tuple(&result.their_unique_files)?,
+                into_tuple(&result.their_unique_dirs)?,
+                into_tuple(&result.changed_files)?,
             ],
         )
     }

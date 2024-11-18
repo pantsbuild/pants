@@ -629,9 +629,17 @@ fn nailgun_server_create(
         let executor = py_executor.0.clone();
         nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
             Python::with_gil(|py| {
+                let args_tuple = match PyTuple::new(py, exe.cmd.args) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        error!("PyTuple construction failure: {e:?}");
+                        return nailgun::ExitCode(1);
+                    }
+                };
+
                 let result = runner.bind(py).call1((
                     exe.cmd.command,
-                    PyTuple::new(py, exe.cmd.args),
+                    args_tuple,
                     exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),
                     exe.cmd.working_dir,
                     PySessionCancellationLatch(exe.cancelled),
@@ -1826,7 +1834,7 @@ fn single_file_digests_to_bytes<'py>(
             .map(|values| values.into_iter().map(|val| val.into()).collect())
             .map_err(possible_store_missing_digest)?;
 
-        let output_list = PyList::new(py, &bytes_values);
+        let output_list = PyList::new(py, &bytes_values)?;
         Ok(output_list)
     })
 }

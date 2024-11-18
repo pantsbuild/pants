@@ -391,7 +391,9 @@ pub(crate) fn generator_send(
 /// those configured in types::Types.
 pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
     let py_type = type_id.as_py_type_bound(py);
-    let args_tuple = PyTuple::new(py, args.iter().map(|v| v.bind(py)));
+    let args_tuple = PyTuple::new(py, args.iter().map(|v| v.bind(py))).unwrap_or_else(|e| {
+        panic!("Core type constructor `PyTuple` failed: {e:?}",);
+    });
     let res = py_type.call1(args_tuple).unwrap_or_else(|e| {
         panic!(
             "Core type constructor `{}` failed: {:?}",
@@ -522,7 +524,7 @@ impl PyGeneratorResponseNativeCall {
 
     fn send(&self, py: Python, value: PyObject) -> PyResult<()> {
         Err(PyStopIteration::new_err(
-            PyTuple::new(py, [value]).to_object(py),
+            PyTuple::new(py, [value])?.to_object(py),
         ))
     }
 }
