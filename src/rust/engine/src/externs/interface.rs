@@ -3,6 +3,8 @@
 
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
+// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
+#![allow(deprecated)]
 
 /// This crate is a wrapper around the engine crate which exposes a Python module via PyO3.
 use std::any::Any;

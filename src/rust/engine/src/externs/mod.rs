@@ -3,6 +3,8 @@
 
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
+// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
+#![allow(deprecated)]
 
 use futures::future::{BoxFuture, Future};
 use futures::FutureExt;

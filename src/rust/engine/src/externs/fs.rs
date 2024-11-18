@@ -1,6 +1,9 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
+#![allow(deprecated)]
+
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
 use std::hash::{Hash, Hasher};
