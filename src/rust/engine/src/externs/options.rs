@@ -38,7 +38,7 @@ fn val_to_py_object(py: Python, val: &Val) -> PyResult<PyObject> {
             pylist.into_py(py)
         }
         Val::Dict(dict) => {
-            let pydict = PyDict::new_bound(py);
+            let pydict = PyDict::new(py);
             for (k, v) in dict {
                 pydict.set_item(k.into_py(py), val_to_py_object(py, v)?)?;
             }

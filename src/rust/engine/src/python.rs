@@ -481,7 +481,7 @@ impl Failure {
             .map(|traceback| traceback.to_object(py));
         let val = Value::from(py_err.into_py(py));
         let python_traceback = if let Some(tb) = maybe_ptraceback {
-            let locals = PyDict::new_bound(py);
+            let locals = PyDict::new(py);
             locals
                 .set_item("traceback", py.import_bound("traceback").unwrap())
                 .unwrap();

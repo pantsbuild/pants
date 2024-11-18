@@ -1433,13 +1433,13 @@ fn session_get_observation_histograms<'py>(
                 .map_err(PyException::new_err)
         })?;
 
-        let encoded_observations = PyDict::new_bound(py);
+        let encoded_observations = PyDict::new(py);
         for (metric, encoded_histogram) in &observations {
             encoded_observations
                 .set_item(metric, PyBytes::new_bound(py, &encoded_histogram[..]))?;
         }
 
-        let result = PyDict::new_bound(py);
+        let result = PyDict::new(py);
         result.set_item("version", OBSERVATIONS_VERSION)?;
         result.set_item("histograms", encoded_observations)?;
         Ok(result)
@@ -1535,7 +1535,7 @@ fn rule_graph_rule_gets<'py>(
 ) -> PyO3Result<Bound<'py, PyDict>> {
     let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
-        let result = PyDict::new_bound(py);
+        let result = PyDict::new(py);
         for (rule, rule_dependencies) in core.rule_graph.rule_dependencies() {
             let task = rule.0;
             let function = &task.func;

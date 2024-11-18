@@ -783,7 +783,7 @@ impl Address {
     }
 
     fn metadata<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let dict = PyDict::new_bound(py);
+        let dict = PyDict::new(py);
         dict.set_item(pyo3::intern!(py, "address"), self.spec())?;
         Ok(dict)
     }

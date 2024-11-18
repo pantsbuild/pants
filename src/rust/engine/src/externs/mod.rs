@@ -135,7 +135,7 @@ pub fn store_dict(
     py: Python,
     keys_and_values: impl IntoIterator<Item = (Value, Value)>,
 ) -> PyResult<Value> {
-    let dict = PyDict::new_bound(py);
+    let dict = PyDict::new(py);
     for (k, v) in keys_and_values {
         dict.set_item(k.consume_into_py_object(py), v.consume_into_py_object(py))?;
     }
