@@ -219,7 +219,7 @@ impl PySnapshot {
             py,
             files
                 .into_iter()
-                .map(|path| PyString::new_bound(py, &path.to_string_lossy()))
+                .map(|path| PyString::new(py, &path.to_string_lossy()))
                 .collect::<Vec<_>>(),
         )
     }
@@ -230,7 +230,7 @@ impl PySnapshot {
         PyTuple::new(
             py,
             dirs.into_iter()
-                .map(|path| PyString::new_bound(py, &path.to_string_lossy()))
+                .map(|path| PyString::new(py, &path.to_string_lossy()))
                 .collect::<Vec<_>>(),
         )
     }
@@ -244,7 +244,7 @@ impl PySnapshot {
             PyTuple::new(
                 py,
                 x.iter()
-                    .map(|path| PyString::new_bound(py, &path.to_string_lossy()))
+                    .map(|path| PyString::new(py, &path.to_string_lossy()))
                     .collect::<Vec<_>>(),
             )
         };

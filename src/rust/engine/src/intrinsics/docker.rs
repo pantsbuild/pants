@@ -65,7 +65,7 @@ fn docker_resolve_image(docker_request: Value) -> PyGeneratorResponseNativeCall 
             externs::unsafe_call(
                 py,
                 docker_resolve_image_result,
-                &[Value::from(&PyString::new_bound(py, &image_id))],
+                &[Value::from(&PyString::new(py, &image_id))],
             )
         }))
     })
