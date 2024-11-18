@@ -48,11 +48,11 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGeneratorResponseCall>()?;
     m.add_class::<PyGeneratorResponseGet>()?;
 
-    m.add("EngineError", py.get_type_bound::<EngineError>())?;
-    m.add("IntrinsicError", py.get_type_bound::<IntrinsicError>())?;
+    m.add("EngineError", py.get_type::<EngineError>())?;
+    m.add("IntrinsicError", py.get_type::<IntrinsicError>())?;
     m.add(
         "IncorrectProductError",
-        py.get_type_bound::<IncorrectProductError>(),
+        py.get_type::<IncorrectProductError>(),
     )?;
 
     Ok(())

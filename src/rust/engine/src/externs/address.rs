@@ -29,27 +29,24 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add(
         "AddressParseException",
-        py.get_type_bound::<AddressParseException>(),
+        py.get_type::<AddressParseException>(),
     )?;
-    m.add(
-        "InvalidAddressError",
-        py.get_type_bound::<InvalidAddressError>(),
-    )?;
+    m.add("InvalidAddressError", py.get_type::<InvalidAddressError>())?;
     m.add(
         "InvalidSpecPathError",
-        py.get_type_bound::<InvalidSpecPathError>(),
+        py.get_type::<InvalidSpecPathError>(),
     )?;
     m.add(
         "InvalidTargetNameError",
-        py.get_type_bound::<InvalidTargetNameError>(),
+        py.get_type::<InvalidTargetNameError>(),
     )?;
     m.add(
         "InvalidParametersError",
-        py.get_type_bound::<InvalidParametersError>(),
+        py.get_type::<InvalidParametersError>(),
     )?;
     m.add(
         "UnsupportedWildcardError",
-        py.get_type_bound::<UnsupportedWildcardError>(),
+        py.get_type::<UnsupportedWildcardError>(),
     )?;
 
     m.add_class::<AddressInput>()?;

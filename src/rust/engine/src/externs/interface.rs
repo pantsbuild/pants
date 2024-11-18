@@ -76,7 +76,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     externs::workunits::register(m)?;
     externs::dep_inference::register(m)?;
 
-    m.add("PollTimeout", py.get_type_bound::<PollTimeout>())?;
+    m.add("PollTimeout", py.get_type::<PollTimeout>())?;
 
     m.add_class::<PyExecutionRequest>()?;
     m.add_class::<PyExecutionStrategyOptions>()?;
@@ -223,9 +223,9 @@ impl PyTypes {
         py: Python,
     ) -> Self {
         Self(GILProtected::new(RefCell::new(Some(Types {
-            directory_digest: TypeId::new(&py.get_type_bound::<externs::fs::PyDigest>()),
-            file_digest: TypeId::new(&py.get_type_bound::<externs::fs::PyFileDigest>()),
-            snapshot: TypeId::new(&py.get_type_bound::<externs::fs::PySnapshot>()),
+            directory_digest: TypeId::new(&py.get_type::<externs::fs::PyDigest>()),
+            file_digest: TypeId::new(&py.get_type::<externs::fs::PyFileDigest>()),
+            snapshot: TypeId::new(&py.get_type::<externs::fs::PySnapshot>()),
             paths: TypeId::new(paths),
             path_metadata_request: TypeId::new(path_metadata_request),
             path_metadata_result: TypeId::new(path_metadata_result),
@@ -236,9 +236,9 @@ impl PyTypes {
             digest_contents: TypeId::new(digest_contents),
             digest_entries: TypeId::new(digest_entries),
             path_globs: TypeId::new(path_globs),
-            merge_digests: TypeId::new(&py.get_type_bound::<externs::fs::PyMergeDigests>()),
-            add_prefix: TypeId::new(&py.get_type_bound::<externs::fs::PyAddPrefix>()),
-            remove_prefix: TypeId::new(&py.get_type_bound::<externs::fs::PyRemovePrefix>()),
+            merge_digests: TypeId::new(&py.get_type::<externs::fs::PyMergeDigests>()),
+            add_prefix: TypeId::new(&py.get_type::<externs::fs::PyAddPrefix>()),
+            remove_prefix: TypeId::new(&py.get_type::<externs::fs::PyRemovePrefix>()),
             create_digest: TypeId::new(create_digest),
             digest_subset: TypeId::new(digest_subset),
             native_download_file: TypeId::new(native_download_file),
@@ -246,7 +246,7 @@ impl PyTypes {
             process: TypeId::new(process),
             process_result: TypeId::new(process_result),
             process_config_from_environment: TypeId::new(
-                &py.get_type_bound::<externs::process::PyProcessExecutionEnvironment>(),
+                &py.get_type::<externs::process::PyProcessExecutionEnvironment>(),
             ),
             process_result_metadata: TypeId::new(process_result_metadata),
             coroutine: TypeId::new(coroutine),
@@ -264,7 +264,7 @@ impl PyTypes {
                 parsed_javascript_deps_candidate_result,
             ),
             deps_request: TypeId::new(
-                &py.get_type_bound::<externs::dep_inference::PyNativeDependenciesRequest>(),
+                &py.get_type::<externs::dep_inference::PyNativeDependenciesRequest>(),
             ),
         }))))
     }
