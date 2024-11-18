@@ -70,7 +70,7 @@ pub struct PyFailure(pub Failure);
 impl PyFailure {
     fn get_error(&self, py: Python) -> PyErr {
         match &self.0 {
-            Failure::Throw { val, .. } => PyErr::from_value_bound(val.bind(py).to_owned()),
+            Failure::Throw { val, .. } => PyErr::from_value(val.bind(py).to_owned()),
             f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
                 EngineError::new_err(format!("{f}"))
             }

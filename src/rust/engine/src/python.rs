@@ -462,7 +462,7 @@ impl Failure {
                 }) => {
                     // Preserve tracebacks (both engine and python) from upstream error by using any existing
                     // engine traceback and restoring the original python exception cause.
-                    py_err.set_cause(py, Some(PyErr::from_value_bound(val.0.bind(py).to_owned())));
+                    py_err.set_cause(py, Some(PyErr::from_value(val.0.bind(py).to_owned())));
                     (
             format!(
               "{python_traceback}\nDuring handling of the above exception, another exception occurred:\n\n"
