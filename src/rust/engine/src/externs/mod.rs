@@ -286,8 +286,8 @@ pub(crate) enum GeneratorInput {
 /// - we will `send` back a single value or tupled values to the coroutine, or `throw` an exception.
 /// - a coroutine will eventually return a single return value.
 ///
-pub(crate) fn generator_send<'py>(
-    py: Python<'py>,
+pub(crate) fn generator_send(
+    py: Python<'_>,
     generator_type: &TypeId,
     generator: &Value,
     input: GeneratorInput,
@@ -497,7 +497,7 @@ impl PyGeneratorResponseNativeCall {
         }))))
     }
 
-    fn take<'py>(&self, py: Python<'py>) -> Result<NativeCall, String> {
+    fn take(&self, py: Python<'_>) -> Result<NativeCall, String> {
         self.0
             .get(py)
             .borrow_mut()
@@ -593,7 +593,7 @@ impl PyGeneratorResponseCall {
     }
 
     #[getter]
-    fn inputs<'py>(&self, py: Python<'py>) -> PyResult<Vec<PyObject>> {
+    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
         let inner = self.borrow_inner(py)?;
         let args: Vec<PyObject> = inner.args.as_ref().map_or_else(
             || Ok(Vec::default()),
@@ -607,7 +607,7 @@ impl PyGeneratorResponseCall {
 }
 
 impl PyGeneratorResponseCall {
-    fn take<'py>(&self, py: Python<'py>) -> Result<Call, String> {
+    fn take(&self, py: Python<'_>) -> Result<Call, String> {
         self.0
             .get(py)
             .borrow_mut()
@@ -621,7 +621,7 @@ impl PyGeneratorResponseCall {
 pub struct PyGeneratorResponseGet(GILProtected<RefCell<Option<Get>>>);
 
 impl PyGeneratorResponseGet {
-    fn take<'py>(&self, py: Python<'py>) -> Result<Get, String> {
+    fn take(&self, py: Python<'_>) -> Result<Get, String> {
         self.0
             .get(py)
             .borrow_mut()
@@ -693,7 +693,7 @@ impl PyGeneratorResponseGet {
     }
 
     #[getter]
-    fn inputs<'py>(&self, py: Python<'py>) -> PyResult<Vec<PyObject>> {
+    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
         Ok(self
             .0
             .get(py)
@@ -710,7 +710,7 @@ impl PyGeneratorResponseGet {
             .collect())
     }
 
-    fn __repr__<'py>(&self, py: Python<'py>) -> PyResult<String> {
+    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
         Ok(format!(
             "{}",
             self.0.get(py).borrow().as_ref().ok_or_else(|| {
