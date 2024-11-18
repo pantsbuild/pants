@@ -66,7 +66,6 @@ class Platform(Enum):
 
 GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS13_X86_64, Platform.MACOS14_ARM64}
 SELF_HOSTED = {Platform.LINUX_ARM64}
-HAS_GO = {Platform.MACOS13_X86_64, Platform.MACOS14_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
@@ -731,7 +730,7 @@ def test_jobs(
             *checkout(),
             *(launch_bazel_remote() if with_remote_caching else []),
             install_jdk(),
-            *([install_go()] if helper.platform not in HAS_GO else []),
+            install_go(),
             *(
                 [download_apache_thrift()]
                 if helper.platform == Platform.LINUX_X86_64
