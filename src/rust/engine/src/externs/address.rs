@@ -54,15 +54,15 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add(
         "BANNED_CHARS_IN_TARGET_NAME",
-        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_TARGET_NAME.iter())?,
+        PyFrozenSet::new(py, BANNED_CHARS_IN_TARGET_NAME.iter())?,
     )?;
     m.add(
         "BANNED_CHARS_IN_GENERATED_NAME",
-        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_GENERATED_NAME.iter())?,
+        PyFrozenSet::new(py, BANNED_CHARS_IN_GENERATED_NAME.iter())?,
     )?;
     m.add(
         "BANNED_CHARS_IN_PARAMETERS",
-        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_PARAMETERS.iter())?,
+        PyFrozenSet::new(py, BANNED_CHARS_IN_PARAMETERS.iter())?,
     )?;
 
     Ok(())
