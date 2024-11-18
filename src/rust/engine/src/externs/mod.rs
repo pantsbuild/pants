@@ -262,7 +262,7 @@ pub fn val_to_log_level_bound(obj: &Bound<'_, PyAny>) -> Result<log::Level, Stri
 
 /// Link to the Pants docs using the current version of Pants.
 pub fn doc_url(py: Python, slug: &str) -> String {
-    let docutil_module = py.import_bound("pants.util.docutil").unwrap();
+    let docutil_module = py.import("pants.util.docutil").unwrap();
     let doc_url_func = docutil_module.getattr("doc_url").unwrap();
     doc_url_func.call1((slug,)).unwrap().extract().unwrap()
 }

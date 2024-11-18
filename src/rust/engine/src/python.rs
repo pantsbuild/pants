@@ -483,7 +483,7 @@ impl Failure {
         let python_traceback = if let Some(tb) = maybe_ptraceback {
             let locals = PyDict::new(py);
             locals
-                .set_item("traceback", py.import_bound("traceback").unwrap())
+                .set_item("traceback", py.import("traceback").unwrap())
                 .unwrap();
             locals.set_item("tb", tb).unwrap();
             locals.set_item("val", &val).unwrap();

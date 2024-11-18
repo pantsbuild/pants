@@ -241,7 +241,7 @@ impl Field {
         };
 
         let alias = Self::cls_alias(cls)?;
-        let deprecated = PyModule::import_bound(py, "pants.base.deprecated")?;
+        let deprecated = PyModule::import(py, "pants.base.deprecated")?;
         deprecated.getattr("warn_or_error")?.call(
             (
                 removal_version,
