@@ -1824,7 +1824,7 @@ fn single_file_digests_to_bytes<'py>(
             .map(|values| values.into_iter().map(|val| val.into()).collect())
             .map_err(possible_store_missing_digest)?;
 
-        let output_list = PyList::new_bound(py, &bytes_values);
+        let output_list = PyList::new(py, &bytes_values);
         Ok(output_list)
     })
 }
