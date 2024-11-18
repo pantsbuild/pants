@@ -834,7 +834,7 @@ async fn workunit_to_py_value(
         ))
     })?;
     let has_parent_ids = !workunit.parent_ids.is_empty();
-    let mut dict_entries = Python::with_gil(|py| {
+    let mut dict_entries = Python::with_gil(|py| -> PyO3Result<Vec<(Value, Value)>> {
         let mut dict_entries = vec![
             (
                 externs::store_utf8(py, "name"),
@@ -862,7 +862,7 @@ async fn workunit_to_py_value(
         }
         dict_entries.push((
             externs::store_utf8(py, "parent_ids"),
-            externs::store_tuple(py, parent_ids),
+            externs::store_tuple(py, parent_ids)?,
         ));
 
         match workunit.state {
@@ -909,8 +909,8 @@ async fn workunit_to_py_value(
                 externs::store_utf8(py, desc),
             ));
         }
-        dict_entries
-    });
+        Ok(dict_entries)
+    })?;
 
     let mut artifact_entries = Vec::new();
 
@@ -1031,7 +1031,7 @@ async fn workunits_to_py_tuple_value(
         workunit_values.push(py_value);
     }
 
-    Ok(externs::store_tuple(py, workunit_values))
+    externs::store_tuple(py, workunit_values)
 }
 
 #[pyfunction]
@@ -1080,7 +1080,7 @@ fn session_poll_workunits(
                     completed,
                     &core,
                 ))?;
-                Ok(externs::store_tuple(py, vec![started_val, completed_val]).into())
+                Ok(externs::store_tuple(py, vec![started_val, completed_val])?.into())
             })
         })
     })

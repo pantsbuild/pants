@@ -221,9 +221,12 @@ impl Task {
                         .collect::<Vec<_>>();
                     match future::try_join_all(get_futures).await {
                         Ok(values) => {
-                            input = GeneratorInput::Arg(Python::with_gil(|py| {
-                                externs::store_tuple(py, values)
-                            }));
+                            let values_tuple_result =
+                                Python::with_gil(|py| externs::store_tuple(py, values));
+                            input = match values_tuple_result {
+                                Ok(t) => GeneratorInput::Arg(t),
+                                Err(err) => GeneratorInput::Err(err),
+                            }
                         }
                         Err(throw @ Failure::Throw { .. }) => {
                             input = GeneratorInput::Err(PyErr::from(throw));
@@ -297,7 +300,7 @@ impl Task {
                         }
                         func.call(args, Some(&kwargs))
                     } else {
-                        let args_tuple = PyTuple::new(py, deps.iter().map(|v| v.to_object(py)));
+                        let args_tuple = PyTuple::new(py, deps.iter().map(|v| v.to_object(py)))?;
                         func.call1(args_tuple)
                     };
 

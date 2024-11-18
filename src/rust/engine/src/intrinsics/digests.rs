@@ -235,8 +235,8 @@ fn path_globs_to_paths(path_globs: Value) -> PyGeneratorResponseNativeCall {
                 py,
                 core.types.paths,
                 &[
-                    externs::store_tuple(py, files),
-                    externs::store_tuple(py, dirs),
+                    externs::store_tuple(py, files)?,
+                    externs::store_tuple(py, dirs)?,
                 ],
             ))
         })

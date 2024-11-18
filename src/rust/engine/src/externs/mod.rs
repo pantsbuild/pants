@@ -124,12 +124,12 @@ pub fn union_in_scope_types<'py>(
     Ok(Some(union_in_scope_types))
 }
 
-pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {
+pub fn store_tuple(py: Python, values: Vec<Value>) -> PyResult<Value> {
     let arg_handles: Vec<_> = values
         .into_iter()
         .map(|v| v.consume_into_py_object(py))
         .collect();
-    Value::from(PyTuple::new(py, &arg_handles).to_object(py))
+    Ok(Value::from(PyTuple::new(py, &arg_handles)?.to_object(py)))
 }
 
 /// Store a slice containing 2-tuples of (key, value) as a Python dictionary.
