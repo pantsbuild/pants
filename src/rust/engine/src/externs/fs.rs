@@ -270,7 +270,7 @@ pub struct PyMergeDigests(pub Vec<DirectoryDigest>);
 impl PyMergeDigests {
     #[new]
     fn __new__(digests: &Bound<'_, PyAny>, _py: Python) -> PyResult<Self> {
-        let digests: PyResult<Vec<DirectoryDigest>> = PyIterator::from_bound_object(digests)?
+        let digests: PyResult<Vec<DirectoryDigest>> = PyIterator::from_object(digests)?
             .map(|v| {
                 let py_digest = v?.extract::<PyDigest>()?;
                 Ok(py_digest.0)
