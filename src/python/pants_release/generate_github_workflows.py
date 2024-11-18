@@ -60,20 +60,29 @@ Env = Dict[str, str]
 class Platform(Enum):
     LINUX_X86_64 = "Linux-x86_64"
     LINUX_ARM64 = "Linux-ARM64"
-    MACOS10_15_X86_64 = "macOS10-15-x86_64"
-    # the oldest version of macOS supported by GitHub self-hosted runners
-    MACOS12_X86_64 = "macOS12-x86_64"
-    MACOS11_ARM64 = "macOS11-ARM64"
+    MACOS13_X86_64 = "macOS13-x86_64"
+    MACOS14_ARM64 = "macOS14-ARM64"
 
 
-GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS12_X86_64}
-SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
-# We control these runners, so we preinstall and expose python on them.
-HAS_PYTHON = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
-HAS_GO = {Platform.MACOS12_X86_64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
+GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS13_X86_64, Platform.MACOS14_ARM64}
+SELF_HOSTED = {Platform.LINUX_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
+
+# We don't specify a patch version so that we get the latest, which comes pre-installed:
+#  https://github.com/actions/setup-python#available-versions-of-python
+# NOTE: The last entry becomes the default
+_BASE_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.13", "3.11"]
+
+PYTHON_VERSIONS_PER_PLATFORM = {
+    Platform.LINUX_X86_64: _BASE_PYTHON_VERSIONS,
+    Platform.MACOS13_X86_64: _BASE_PYTHON_VERSIONS,
+    # Python 3.7 or 3.8 aren't supported directly on arm64 macOS
+    Platform.MACOS14_ARM64: [v for v in _BASE_PYTHON_VERSIONS if v not in ("3.7", "3.8")],
+    # These runners have Python already installed
+    Platform.LINUX_ARM64: None,
+}
 
 
 def gha_expr(expr: str) -> str:
@@ -106,11 +115,6 @@ NATIVE_FILES = [
     f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so",
     f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so.metadata",
 ]
-
-# We don't specify a patch version so that we get the latest, which comes pre-installed:
-#  https://github.com/actions/setup-python#available-versions-of-python
-# NOTE: The last entry becomes the default
-PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.13", "3.11"]
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
 DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true'"
@@ -409,12 +413,10 @@ class Helper:
         # any platform-specific labels, so we don't run on future GH-hosted
         # platforms without realizing it.
         ret = ["self-hosted"] if self.platform in SELF_HOSTED else []
-        if self.platform == Platform.MACOS12_X86_64:
-            ret += ["macos-12"]
-        elif self.platform == Platform.MACOS11_ARM64:
-            ret += ["macOS-11-ARM64"]
-        elif self.platform == Platform.MACOS10_15_X86_64:
-            ret += ["macOS-10.15-X64"]
+        if self.platform == Platform.MACOS13_X86_64:
+            ret += ["macos-13"]
+        elif self.platform == Platform.MACOS14_ARM64:
+            ret += ["macos-14"]
         elif self.platform == Platform.LINUX_X86_64:
             ret += ["ubuntu-22.04"]
         elif self.platform == Platform.LINUX_ARM64:
@@ -430,11 +432,11 @@ class Helper:
 
     def platform_env(self):
         ret = {}
-        if self.platform in {Platform.MACOS10_15_X86_64, Platform.MACOS12_X86_64}:
+        if self.platform in {Platform.MACOS13_X86_64}:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
             # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
             ret["ARCHFLAGS"] = "-arch x86_64"
-        if self.platform == Platform.MACOS11_ARM64:
+        if self.platform in {Platform.MACOS14_ARM64}:
             ret["ARCHFLAGS"] = "-arch arm64"
         if self.platform == Platform.LINUX_X86_64:
             # Currently we run Linux x86_64 CI on GitHub Actions-hosted hardware, and
@@ -447,10 +449,6 @@ class Helper:
         return ret
 
     def wrap_cmd(self, cmd: str) -> str:
-        if self.platform == Platform.MACOS11_ARM64:
-            # The self-hosted M1 runner is an X86_64 binary that runs under Rosetta,
-            # so we have to explicitly change the arch for the subprocesses it spawns.
-            return f"arch -arm64 {cmd}"
         return cmd
 
     def native_binaries_upload(self) -> Step:
@@ -536,8 +534,9 @@ class Helper:
 
     def setup_pythons(self) -> Sequence[Step]:
         ret = []
-        if self.platform not in HAS_PYTHON:
-            ret.append(install_pythons(PYTHON_VERSIONS))
+        versions = PYTHON_VERSIONS_PER_PLATFORM[self.platform]
+        if versions is not None:
+            ret.append(install_pythons(versions))
         return ret
 
     def bootstrap_pants(self) -> Sequence[Step]:
@@ -731,7 +730,7 @@ def test_jobs(
             *checkout(),
             *(launch_bazel_remote() if with_remote_caching else []),
             install_jdk(),
-            *([install_go()] if helper.platform not in HAS_GO else []),
+            install_go(),
             *(
                 [download_apache_thrift()]
                 if helper.platform == Platform.LINUX_X86_64
@@ -793,8 +792,8 @@ def linux_arm64_test_jobs() -> Jobs:
     return jobs
 
 
-def macos12_x86_64_test_jobs() -> Jobs:
-    helper = Helper(Platform.MACOS12_X86_64)
+def macos13_x86_64_test_jobs() -> Jobs:
+    helper = Helper(Platform.MACOS13_X86_64)
     jobs = {
         helper.job_name("bootstrap_pants"): bootstrap_jobs(
             helper,
@@ -964,8 +963,8 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
     return {
         **build_wheels_job(Platform.LINUX_X86_64, for_deploy_ref, needs),
         **build_wheels_job(Platform.LINUX_ARM64, for_deploy_ref, needs),
-        **build_wheels_job(Platform.MACOS10_15_X86_64, for_deploy_ref, needs),
-        **build_wheels_job(Platform.MACOS11_ARM64, for_deploy_ref, needs),
+        **build_wheels_job(Platform.MACOS13_X86_64, for_deploy_ref, needs),
+        **build_wheels_job(Platform.MACOS14_ARM64, for_deploy_ref, needs),
     }
 
 
@@ -982,7 +981,7 @@ def test_workflow_jobs() -> Jobs:
     }
     jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
-    jobs.update(**macos12_x86_64_test_jobs())
+    jobs.update(**macos13_x86_64_test_jobs())
     jobs.update(**build_wheels_jobs())
     jobs.update(
         {
