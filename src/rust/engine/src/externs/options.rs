@@ -191,13 +191,13 @@ fn to_details<'py>(py: Python<'py>, sources: Vec<&'py Source>) -> Option<Bound<'
         return None;
     }
     if sources.len() == 1 {
-        return source_to_details(sources.first().unwrap()).map(|s| PyString::intern_bound(py, s));
+        return source_to_details(sources.first().unwrap()).map(|s| PyString::intern(py, s));
     }
     #[allow(unstable_name_collisions)]
     // intersperse is provided by itertools::Itertools, but is also in the Rust nightly
     // as an experimental feature of standard Iterator. If/when that becomes standard we
     // can use it, but for now we must squelch the name collision.
-    Some(PyString::intern_bound(
+    Some(PyString::intern(
         py,
         &sources
             .into_iter()
