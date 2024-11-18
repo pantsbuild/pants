@@ -410,6 +410,7 @@ async def python_codegen_export_setup() -> _ExportPythonCodegenSetup:
                     is_executable=True,
                     content=textwrap.dedent(
                         f"""\
+                        import logging
                         import os
                         import site
                         import sys
@@ -424,7 +425,15 @@ async def python_codegen_export_setup() -> _ExportPythonCodegenSetup:
                         for item in os.listdir(codegen_dir):
                             if item == "{_ExportPythonCodegenSetup.SCRIPT_NAME}":
                                 continue
-                            os.rename(os.path.join(codegen_dir, item), os.path.join(site_packages_dir, item))
+                            src = os.path.join(codegen_dir, item)
+                            dest = os.path.join(site_packages_dir, item)
+                            if os.path.exists(dest):
+                                logging.warning(f"Cannot export generated py code for {{item}} because site-packages/{{item}} already exists in the venv.")
+                                logging.warning(f"This usually means that a 3rd party Python dependency has the same package name as the one used in the generated code.")
+                                logging.warning(f"Please rename the generated code package to avoid conflicts, or manually move the generated code from `pants export-codegen ::` to {{site_packages_dir}}.")
+                                logging.warning(f"Skipping py codegen export for {{item}}...")
+                                continue
+                            os.rename(src, dst)
                         """
                     ).encode(),
                 )
