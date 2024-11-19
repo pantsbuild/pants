@@ -18,7 +18,7 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild')
+    if: ((github.repository_owner == 'pantsbuild'))
     name: Build wheels (Linux-x86_64)
     runs-on:
     - ubuntu-20.04
