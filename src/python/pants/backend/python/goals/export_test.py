@@ -256,8 +256,8 @@ def test_export_codegen_outputs():
             "src/python/foo/BUILD": dedent(
                 """
                 codegen_target(
-                  name="codegen", 
-                  source="an-input", 
+                  name="codegen",
+                  source="an-input",
                   resolve="test-resolve"
                 )
                 """
@@ -270,8 +270,8 @@ def test_export_codegen_outputs():
             "src/python/ansicolors/BUILD": dedent(
                 """
                 codegen_target(
-                  name="codegen", 
-                  source="ansicolors-input", 
+                  name="codegen",
+                  source="ansicolors-input",
                   resolve="test-resolve"
                 )
                 """
