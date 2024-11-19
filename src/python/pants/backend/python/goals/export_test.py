@@ -287,4 +287,7 @@ def test_export_codegen_outputs():
     export_snapshot = rule_runner.request(Snapshot, [export_result.digest])
     assert any(p.endswith("__pants_codegen__/codegen_setup.py") for p in export_snapshot.files)
     assert any(p.endswith("__pants_codegen__/foo/an-input.py") for p in export_snapshot.files)
-    assert any(p.endswith("__pants_codegen__/ansicolors/ansicolors-input.py") for p in export_snapshot.files)
+    assert any(
+        p.endswith("__pants_codegen__/ansicolors/ansicolors-input.py")
+        for p in export_snapshot.files
+    )
