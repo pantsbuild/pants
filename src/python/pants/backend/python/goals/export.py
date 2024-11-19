@@ -428,6 +428,7 @@ async def python_codegen_export_setup() -> _ExportPythonCodegenSetup:
                             src = os.path.join(codegen_dir, item)
                             dest = os.path.join(site_packages_dir, item)
                             shutil.copytree(src, dest, dirs_exist_ok=True)
+                            shutil.rmtree(src)
                         """
                     ).encode(),
                 )
