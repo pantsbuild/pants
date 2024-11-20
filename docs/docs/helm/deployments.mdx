@@ -87,7 +87,9 @@ There are quite a few things to notice in the previous example:
 
 The `helm_deployment` target has many additional fields including the target kubernetes namespace, adding inline override values (similar to using helm's `--set` arg) and many others. Please run `pants help helm_deployment` to see all the possibilities.
 
-## Dependencies with `docker_image` targets
+## Dependencies
+
+### With `docker_image` targets
 
 A Helm deployment will in most cases deploy one or more Docker images into Kubernetes. Furthermore, it's quite likely there is going to be at least a few first party Docker images among those. Pants is capable of analysing the Helm chart being used in a deployment to detect those required first-party Docker images using Pants' target addresses to those Docker images.
 
@@ -155,6 +157,18 @@ This should work with any kind of Kubernetes resource that leads to Docker image
 Pants' will rely on the behaviour of the `docker_image` target when it comes down to generate the final image reference. Since a given image may have more than one valid image reference, **Pants will try to use the first one that is not tagged as `latest`**, falling back to `latest` if none could be found.
 It's good practice to publish your Docker images using tags other than `latest` and Pants preferred behaviour is to choose those as this guarantees that the _version_ of the Docker image being deployed is the expected one.
 :::
+
+### Other publish dependencies
+
+You can automatically `publish` items before deploying. Add the publishable target to the `publish_dependencies` field. This is useful if Pants cannot infer the dependency on a `docker_image` target.
+
+```python tab={"label":"BUILD"}
+docker_image(name="my_container")
+
+helm_chart(name="my_chart")
+
+helm_deployment(name="my_deployment", chart=":my_chart", publish_dependencies=[":my_container"])
+```
 
 ## Value files
 

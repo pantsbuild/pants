@@ -1,0 +1,120 @@
+---
+    title: Adding a Deployment
+    sidebar_position: 11
+---
+
+How to create a custom deployment that is deployed with the `experimental-deploy` goal
+
+---
+
+The `experimental-deploy` goal is experimental. Changes may be sudden, frequent, and breaking.
+
+This guide will walk you through implementing a target that supports being deployed. The advantage of this over implementing a `run` goal are sandboxed execution and the pre-publishing dependent targets.
+
+## 1. Create target and fieldsets for the target
+
+These allow for specifying the target in the BUILD file and referencing its contents
+
+```python  tab={"label": "pants-plugins/my_deployment/target_types.py"}
+from dataclasses import dataclass
+
+from pants.core.goals.deploy import DeployFieldSet, DeploymentPublishDependencies
+from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, DescriptionField, Target
+
+
+# Example for fields your deployment might have
+class MyDeploymentDependenciesField(Dependencies):
+    pass
+
+
+@dataclass(frozen=True)
+class MyDeploymentTarget(Target):
+    alias = "my_deployment"
+    core_fields = {
+        *COMMON_TARGET_FIELDS,
+        DeploymentPublishDependencies,  # This enables manually specifying dependencies to publish before deploying
+        MyDeploymentDependenciesField,
+    }
+
+
+@dataclass(frozen=True)
+class MyDeploymentFieldSet(DeployFieldSet):
+    required_fields = (
+        MyDeploymentDependenciesField,
+    )
+    description: DescriptionField
+    dependencies: MyDeploymentDependenciesField
+```
+
+## 2. Create a DeployFieldSet subclass
+
+A subclass of DeployFieldSet will ensure that it has the general fields of a deployment.
+
+```python tab={"label": "pants-plugins/my_deployment/deploy.py"}
+@dataclass(frozen=True)
+class DeployMyDeploymentFieldSet(MyDeploymentFieldSet, DeployFieldSet):
+    pass
+```
+
+
+## 3. Rules to deploy
+
+Create a rule from the `DeployFieldSet` subclass to `DeployProcess` to actually deploy
+
+```python tab={"label": "pants-plugins/my_deployment/deploy.py"}
+from pants.core.goals.deploy import DeployProcess, DeploySubsystem
+from pants.engine.process import InteractiveProcess, Process
+from pants.option.global_options import KeepSandboxes
+
+@rule(desc="Deploy my deployment")
+async def run_my_deploy(
+    field_set: DeployMyDeploymentFieldSet,
+    deploy_subsystem: DeploySubsystem,
+    keep_sandboxes: KeepSandboxes,
+) -> DeployProcess:
+    # If your deployment supports dry-run, you can hook into the flag here
+    if deploy_subsystem.dry_run:
+        ...
+    else:
+        ...
+
+    deploy_process = InteractiveProcess.from_process(
+        Process(...),  # Implementation of the command invocation
+        keep_sandboxes=keep_sandboxes
+    )
+
+    publish_dependencies = ...  # you can infer dependencies that need to be published before the deployment
+
+    return DeployProcess(
+        name=field_set.address.spec,
+        process=deploy_process,
+        publish_dependencies=publish_dependencies,  # these will be published before the deployment
+    )
+```
+
+## 4. Register rules
+
+At the bottom of the file, let Pants know what your rules and types do. Update your plugin's `register.py` to tell Pants about them.
+
+```python tab={"label": "pants-plugins/my_deployment/deploy.py"}
+from pants.core.goals.deploy import DeployFieldSet
+from pants.engine.rules import collect_rules
+from pants.engine.unions import UnionRule
+
+
+def rules():
+    return (
+        *collect_rules(),
+        UnionRule(DeployFieldSet, DeployMyDeploymentFieldSet)
+    )
+```
+
+```python tab={"label": "pants-plugins/my_deployment/register.py"}
+from my_deployment import deploy
+
+def rules():
+    return [
+        ...,
+        *deploy.rules()
+    ]
+```

@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class DeployTerraformFieldSet(TerraformDeploymentFieldSet, DeployFieldSet):
+class DeployTerraformFieldSet(TerraformDeploymentFieldSet):
     pass
 
 

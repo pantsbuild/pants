@@ -6,7 +6,12 @@ from textwrap import dedent
 
 import pytest
 
-from pants.core.goals.deploy import Deploy, DeployFieldSet, DeployProcess
+from pants.core.goals.deploy import (
+    Deploy,
+    DeployFieldSet,
+    DeploymentPublishDependencies,
+    DeployProcess,
+)
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.goals.publish import (
     PublishFieldSet,
@@ -15,6 +20,7 @@ from pants.core.goals.publish import (
     PublishRequest,
 )
 from pants.core.register import rules as core_rules
+from pants.core.util_rules.system_binaries import BinaryShims, BinaryShimsRequest, EchoBinary
 from pants.engine import process
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
@@ -30,7 +36,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, mock_console
 
 
 class MockDestinationField(StringField):
@@ -57,6 +63,7 @@ class MockDeployTarget(Target):
     alias = "mock_deploy"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        DeploymentPublishDependencies,
         MockDestinationField,
         MockDependenciesField,
     )
@@ -104,9 +111,15 @@ async def mock_package(request: MockPackageFieldSet) -> BuiltPackage:
 
 
 @rule
-async def mock_publish(request: MockPublishRequest) -> PublishProcesses:
+async def mock_publish(request: MockPublishRequest, echo_binary: EchoBinary) -> PublishProcesses:
     if not request.field_set.repositories.value:
         return PublishProcesses()
+
+    echo = await Get(
+        BinaryShims,
+        BinaryShimsRequest,
+        BinaryShimsRequest.for_paths(echo_binary, rationale="echo the repo during testing"),
+    )
 
     return PublishProcesses(
         PublishPackages(
@@ -116,7 +129,9 @@ async def mock_publish(request: MockPublishRequest) -> PublishProcesses:
                 for artifact in pkg.artifacts
                 if artifact.relpath
             ),
-            process=None if repo == "skip" else InteractiveProcess(["echo", repo]),
+            process=None
+            if repo == "skip"
+            else InteractiveProcess(["echo", repo], input_digest=echo.digest),
             description="(requested)" if repo == "skip" else repo,
         )
         for repo in request.field_set.repositories.value
@@ -124,19 +139,25 @@ async def mock_publish(request: MockPublishRequest) -> PublishProcesses:
 
 
 @rule
-async def mock_deploy(field_set: MockDeployFieldSet) -> DeployProcess:
+async def mock_deploy(field_set: MockDeployFieldSet, echo_binary: EchoBinary) -> DeployProcess:
     if not field_set.destination.value:
         return DeployProcess(name="test-deploy", publish_dependencies=(), process=None)
+
+    echo = await Get(
+        BinaryShims,
+        BinaryShimsRequest,
+        BinaryShimsRequest.for_paths(echo_binary, rationale="echo the repo during testing"),
+    )
 
     dependencies = await Get(Targets, DependenciesRequest(field_set.dependencies))
     dest = field_set.destination.value
     return DeployProcess(
-        name="test-deploy",
+        name=field_set.address.spec,
         publish_dependencies=tuple(dependencies),
         description="(requested)" if dest == "skip" else None,
         process=None
         if dest == "skip"
-        else InteractiveProcess(["echo", dest], run_in_workspace=True),
+        else InteractiveProcess(["echo", dest], run_in_workspace=True, input_digest=echo.digest),
     )
 
 
@@ -186,11 +207,9 @@ def test_skip_deploy(rule_runner: RuleRunner) -> None:
     result = rule_runner.run_goal_rule(Deploy, args=("src:inst",))
 
     assert result.exit_code == 0
-    assert "test-deploy skipped (requested)." in result.stderr
+    assert "inst skipped (requested)." in result.stderr
 
 
-@pytest.mark.skip("Can not run interactive process from test..?")
-@pytest.mark.no_error_if_skipped
 def test_mocked_deploy(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -211,8 +230,69 @@ def test_mocked_deploy(rule_runner: RuleRunner) -> None:
         }
     )
 
-    result = rule_runner.run_goal_rule(Deploy, args=("src:main",))
+    with mock_console(rule_runner.options_bootstrapper):
+        result = rule_runner.run_goal_rule(Deploy, args=("src:main",))
 
     assert result.exit_code == 0
     assert "https://www.example.com" in result.stderr
-    assert "production" in result.stderr
+    assert "main" in result.stderr
+
+
+def test_mocked_deploy_rule_infer_publish_dependency(rule_runner: RuleRunner) -> None:
+    """Test that a rule can add publish dependencies from the infered dependencies."""
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+            mock_package(
+                name="dependency",
+                repositories=["https://www.example.com"],
+            )
+
+            mock_deploy(
+                name="main",
+                dependencies=[":dependency"],
+                destination="production",
+            )
+            """
+            )
+        }
+    )
+
+    with mock_console(rule_runner.options_bootstrapper):
+        result = rule_runner.run_goal_rule(Deploy, args=("src:main",))
+
+    assert result.exit_code == 0
+    assert "https://www.example.com" in result.stderr
+    assert "main" in result.stderr
+
+
+def test_deploy_publishes_dependencies(rule_runner: RuleRunner) -> None:
+    """Test that the generic `publish_dependencies` results in published dependencies."""
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+            mock_package(
+                name="dependency",
+                repositories=["https://www.example.com"],
+            )
+
+            mock_deploy(
+                name="main",
+                publish_dependencies=[":dependency"],
+                destination="production",
+            )
+            """
+            )
+        }
+    )
+
+    with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
+        result = rule_runner.run_goal_rule(Deploy, args=("src:main",))
+
+    assert result.exit_code == 0
+    assert (
+        "dependency" in result.stderr and "https://www.example.com" in result.stderr
+    ), "dependency was not published"
+    assert "main" in result.stderr, "was not deployed"

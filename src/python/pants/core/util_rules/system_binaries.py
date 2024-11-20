@@ -406,6 +406,10 @@ class DuBinary(BinaryPath):
     pass
 
 
+class EchoBinary(BinaryPath):
+    pass
+
+
 class ExprBinary(BinaryPath):
     pass
 
@@ -942,6 +946,15 @@ async def find_du(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> 
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="du file")
     return DuBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `echo` binary", level=LogLevel.DEBUG)
+async def find_echo(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> EchoBinary:
+    """Useful for tests."""
+    request = BinaryPathRequest(binary_name="echo", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="echo file")
+    return EchoBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `expr` binary", level=LogLevel.DEBUG)
