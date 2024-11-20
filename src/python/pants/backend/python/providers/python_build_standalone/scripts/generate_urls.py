@@ -8,6 +8,7 @@ import itertools
 import json
 import os
 import re
+import sys
 from pathlib import Path
 
 import github
@@ -23,7 +24,10 @@ def _github():
     # generate with `gh auth token`
     token = os.environ.get("GH_TOKEN")
     if token is None:
-        print("WARNING: No GitHub token configured in GH_TOKEN. Lower rate limits will apply!")
+        print(
+            "WARNING: No GitHub token configured in GH_TOKEN. Lower rate limits will apply!",
+            file=sys.stderr,
+        )
     return github.Github(auth=github.Auth.Token(token) if token else None)
 
 
