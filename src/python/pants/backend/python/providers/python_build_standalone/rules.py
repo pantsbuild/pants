@@ -2,13 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import collections.abc
 import functools
 import json
+import operator
 import textwrap
 import uuid
 from pathlib import PurePath
-from typing import Iterable, TypedDict, cast
+from typing import Callable, Iterable, Mapping, TypedDict, cast
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -36,14 +36,16 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.errors import ConfigError
 from pants.option.global_options import NamedCachesDirOption
-from pants.option.option_types import StrListOption
+from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.resources import read_sibling_resource
 from pants.util.strutil import softwrap
+from pants.version import Version
 
 PBS_SANDBOX_NAME = ".python_build_standalone"
 PBS_NAMED_CACHE_NAME = "python_build_standalone"
@@ -54,6 +56,7 @@ class PBSPythonInfo(TypedDict):
     url: str
     sha256: str
     size: int
+    tag: str
 
 
 @functools.cache
@@ -118,6 +121,15 @@ class PBSPythonProviderSubsystem(Subsystem):
         ),
     )
 
+    _release_constraint = StrOption(
+        default=None,
+        help=textwrap.dedent(
+            """
+            A constraint on the PBS "release" version to ensure only matching PBS releases are considered.
+            """
+        ),
+    )
+
     def get_all_pbs_pythons(self) -> dict[str, dict[str, PBSPythonInfo]]:
         all_pythons = load_pbs_pythons().copy()
 
@@ -135,10 +147,44 @@ class PBSPythonProviderSubsystem(Subsystem):
                 all_pythons[pyversion] = {}
 
             all_pythons[pyversion][platform] = PBSPythonInfo(
-                url=url, sha256=sha256, size=int(filesize)
+                url=url, sha256=sha256, size=int(filesize), tag="99999999"
             )
 
         return all_pythons
+
+    def make_release_constraint_evaluator(self) -> Callable[[Version], bool]:
+        rc = self._release_constraint
+        if rc is None:
+            return lambda _version: True
+
+        operators = (
+            (">=", operator.ge),
+            ("<=", operator.le),
+            ("==", operator.eq),
+            ("!=", operator.ne),
+            # `>` and `<` must come last!
+            (">", operator.gt),
+            ("<", operator.lt),
+        )
+        cmp_op_and_callback: tuple[str, Callable[[Version, Version], bool]] | None = None
+        for op, callback in operators:
+            if rc.startswith(op):
+                cmp_op_and_callback = (op, cast("Callable[[Version, Version], bool]", callback))
+                break
+
+        if cmp_op_and_callback is None:
+            raise ConfigError(
+                "release_constraint must start with a comparison operator, i.e. >=, <=, ==, !=, <, >"
+            )
+
+        cmp_op, cmp_callback = cmp_op_and_callback
+        cmp_version = Version(rc[len(cmp_op) :])
+
+        def callback_func(version: Version) -> bool:
+            nonlocal cmp_callback, cmp_version
+            return cmp_callback(version, cmp_version)
+
+        return callback_func
 
 
 class PBSPythonProvider(PythonProvider):
@@ -148,21 +194,34 @@ class PBSPythonProvider(PythonProvider):
 def _choose_python(
     interpreter_constraints: InterpreterConstraints,
     universe: Iterable[str],
-    pbs_versions: collections.abc.Collection[str],
-) -> str:
-    """Choose the highest supported patch of the lowest supported Major/Minor version."""
+    # pbs_versions: collections.abc.Collection[str],
+    pbs_versions: Mapping[str, Mapping[str, PBSPythonInfo]],
+    platform: Platform,
+    release_constraint_func: Callable[[Version], bool],
+) -> tuple[str, PBSPythonInfo]:
+    """Choose the highest supported patchlevel of the lowest supported major/minor version
+    consistent with any PBS release constraint."""
+
+    # Construct a list of candidate PBS releases.
+    candidate_pbs_releases: list[tuple[tuple[int, int, int], PBSPythonInfo]] = []
     supported_python_triplets = interpreter_constraints.enumerate_python_versions(universe)
-    version_triplet: tuple[int, int, int] | None = None
     for triplet in supported_python_triplets:
-        pbs_supported_version = ".".join(map(str, triplet)) in pbs_versions
-        if pbs_supported_version:
-            if version_triplet and version_triplet[:2] < triplet[:2]:
-                # This version is a major/minor above the previous supported one, we're done.
-                break
+        triplet_str = ".".join(map(str, triplet))
+        pbs_version_metadata = pbs_versions.get(triplet_str)
+        if not pbs_version_metadata:
+            continue
 
-            version_triplet = triplet
+        pbs_version_platform_metadata = pbs_version_metadata.get(platform.value)
+        if not pbs_version_platform_metadata:
+            continue
 
-    if version_triplet is None:
+        tag_as_version = Version(pbs_version_platform_metadata["tag"])
+        if not release_constraint_func(tag_as_version):
+            continue
+
+        candidate_pbs_releases.append((triplet, pbs_version_platform_metadata))
+
+    if not candidate_pbs_releases:
         raise Exception(
             softwrap(
                 f"""\
@@ -178,7 +237,23 @@ def _choose_python(
             )
         )
 
-    return ".".join(map(str, version_triplet))
+    # Choose the highest supported patchlevel of the lowest supported major/minor version
+    # by searching until the major/minor version increases or the search ends (in which case the
+    # last candidate is the one).
+    candidate_pbs_releases.sort(key=lambda x: x[0])
+    major_minor = candidate_pbs_releases[0][0][0:2]
+    i = 0
+    while i < len(candidate_pbs_releases):
+        if (
+            i + 1 < len(candidate_pbs_releases)
+            and candidate_pbs_releases[i + 1][0][0:2] != major_minor
+        ):
+            r = candidate_pbs_releases[i]
+            return (".".join(map(str, r[0])), r[1])
+        i += 1
+
+    r = candidate_pbs_releases[-1]
+    return (".".join(map(str, r[0])), r[1])
 
 
 @rule
@@ -197,12 +272,13 @@ async def get_python(
 ) -> PythonExecutable:
     versions_info = pbs_subsystem.get_all_pbs_pythons()
 
-    python_version = _choose_python(
+    python_version, pbs_py_info = _choose_python(
         request.interpreter_constraints,
         python_setup.interpreter_versions_universe,
         versions_info,
+        platform,
+        pbs_subsystem.make_release_constraint_evaluator(),
     )
-    pbs_py_info = versions_info[python_version][platform.value]
 
     downloaded_python = await Get(
         DownloadedExternalTool,
