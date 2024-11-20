@@ -7,7 +7,7 @@ use crate::{
     OptionParser, Source, Val,
 };
 use itertools::Itertools;
-use maplit::hashmap;
+use maplit::{hashmap, hashset};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -583,4 +583,56 @@ fn test_do_not_load_pantsrc_if_configs_passed() {
         vec![Source::Env, Source::Flag],
         found_sources.keys().cloned().collect_vec()
     )
+}
+
+#[test]
+fn test_validate_config() {
+    with_setup(
+        vec![],
+        vec![],
+        "[foo]\nbar = 0",
+        "[baz]\nqux = 0",
+        |option_parser| {
+            assert_eq!(
+                vec![
+                    "Invalid table name [foo] in pants.toml".to_string(),
+                    "Invalid table name [baz] in pants_extra.toml".to_string()
+                ],
+                option_parser.validate_config(&hashmap! {})
+            )
+        },
+    );
+
+    with_setup(
+        vec![],
+        vec![],
+        "[foo]\nbar = 0",
+        "[baz]\nqux = 0",
+        |option_parser| {
+            assert_eq!(
+                vec!["Invalid option 'bar' under [foo] in pants.toml".to_string(),],
+                option_parser.validate_config(&hashmap! {
+                    "foo".to_string() => hashset! {"other".to_string()},
+                    "baz".to_string() => hashset! {"qux".to_string()},
+                })
+            )
+        },
+    );
+
+    let empty: Vec<String> = vec![];
+    with_setup(
+        vec![],
+        vec![],
+        "[foo]\nbar = 0",
+        "[baz]\nqux = 0",
+        |option_parser| {
+            assert_eq!(
+                empty,
+                option_parser.validate_config(&hashmap! {
+                    "foo".to_string() => hashset! {"bar".to_string()},
+                    "baz".to_string() => hashset! {"qux".to_string()},
+                })
+            )
+        },
+    );
 }

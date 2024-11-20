@@ -11,6 +11,7 @@ use crate::ListEdit;
 use core::iter::once;
 use itertools::{chain, Itertools};
 use parking_lot::Mutex;
+use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -269,6 +270,10 @@ impl OptionsSource for ArgsReader {
             },
             id.name("-", NameTransform::ToLower)
         )
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
