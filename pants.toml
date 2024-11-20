@@ -160,6 +160,7 @@ python-default = "3rdparty/python/user_reqs.lock"
 flake8 = "3rdparty/python/flake8.lock"
 mypy = "3rdparty/python/mypy.lock"
 pytest = "3rdparty/python/pytest.lock"
+pbs-script = "3rdparty/python/pbs-script-requirements.lock"
 
 [python-infer]
 assets = true
