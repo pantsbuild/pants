@@ -118,7 +118,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 10
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -130,8 +130,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Install Protoc
@@ -233,7 +231,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 10
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -245,8 +243,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Install Protoc
@@ -678,7 +674,7 @@ jobs:
         \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -690,8 +686,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Download native binaries
@@ -870,7 +864,7 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -882,8 +876,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Download native binaries
@@ -972,7 +964,7 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -984,8 +976,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Download native binaries
@@ -1074,7 +1064,7 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -1086,8 +1076,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Download native binaries
@@ -1176,7 +1164,7 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -1188,8 +1176,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Download native binaries
@@ -1278,7 +1264,7 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -1290,8 +1276,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Download native binaries
@@ -1380,7 +1364,7 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -1392,8 +1376,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Download native binaries
@@ -1482,7 +1464,7 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -1494,8 +1476,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Download native binaries
@@ -1584,7 +1564,7 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -1596,8 +1576,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Download native binaries
@@ -1686,7 +1664,7 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -1698,8 +1676,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Download native binaries
@@ -1788,7 +1764,7 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -1800,8 +1776,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Download native binaries
@@ -1857,7 +1831,7 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.7
@@ -1869,8 +1843,6 @@ jobs:
           3.10
 
           3.12
-
-          3.13
 
           3.11'
     - name: Download native binaries

@@ -124,7 +124,7 @@ NATIVE_FILES = [
 # We don't specify a patch version so that we get the latest, which comes pre-installed:
 #  https://github.com/actions/setup-python#available-versions-of-python
 # NOTE: The last entry becomes the default
-PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.13", "3.11"]
+PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.11"]
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
 DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true'"
