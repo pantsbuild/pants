@@ -1,9 +1,6 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
-#![allow(deprecated)]
-
 use std::fmt;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -14,7 +11,7 @@ use graph::CompoundNode;
 use internment::Intern;
 use pyo3::prelude::{PyAnyMethods, PyErr, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use pyo3::{Bound, IntoPy, ToPyObject};
+use pyo3::{Bound, IntoPyObject};
 use rule_graph::DependencyKey;
 use workunit_store::{in_workunit, Level, RunningWorkunit};
 
@@ -300,13 +297,18 @@ impl Task {
                         }
                         func.call(args, Some(&kwargs))
                     } else {
-                        let args_tuple = PyTuple::new(py, deps.iter().map(|v| v.to_object(py)))?;
+                        let deps = deps
+                            .iter()
+                            .map(|v| v.into_pyobject(py))
+                            .collect::<Result<Vec<_>, _>>()
+                            .map_err(|e| format!("Conversion error: {e:?}"))?;
+                        let args_tuple = PyTuple::new(py, deps)?;
                         func.call1(args_tuple)
                     };
 
                     res.map(|res| {
                         let type_id = TypeId::new(&res.get_type().as_borrowed());
-                        let val = Value::new(res.into_py(py));
+                        let val = Value::from(&res);
                         (val, type_id)
                     })
                     .map_err(Failure::from)
