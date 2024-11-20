@@ -283,6 +283,21 @@ class Options:
         for scope in self.known_scope_to_info:
             section = GLOBAL_SCOPE_CONFIG_SECTION if scope == GLOBAL_SCOPE else scope
             section_to_valid_options[section] = set(self.for_scope(scope, check_deprecations=False))
+
+        error_log = self.native_parser.validate_config(section_to_valid_options)
+        if error_log:
+            for error in error_log:
+                logger.error(error)
+            raise ConfigValidationError(
+                softwrap(
+                    """
+                    Invalid config entries detected. See log for details on which entries to update
+                    or remove.
+
+                    (Specify --no-verify-config to disable this check.)
+                    """
+                )
+            )
         global_config.verify(section_to_valid_options)
 
     def verify_args(self):

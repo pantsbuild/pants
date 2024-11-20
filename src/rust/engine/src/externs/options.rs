@@ -11,7 +11,7 @@ use options::{
 };
 
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pyo3::import_exception!(pants.option.errors, ParseError);
 
@@ -514,5 +514,20 @@ impl PyOptionParser {
                 )
             })
             .collect()
+    }
+
+    fn validate_config(
+        &self,
+        py: Python<'_>,
+        py_valid_keys: HashMap<String, PyObject>,
+    ) -> PyResult<Vec<String>> {
+        let mut valid_keys = HashMap::new();
+
+        for (section_name, keys) in py_valid_keys.into_iter() {
+            let keys_set = keys.extract::<HashSet<String>>(py)?;
+            valid_keys.insert(section_name, keys_set);
+        }
+
+        Ok(self.0.validate_config(&valid_keys))
     }
 }
