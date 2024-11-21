@@ -395,6 +395,12 @@ impl<'py, T> From<&Bound<'py, T>> for Value {
     }
 }
 
+impl<'py, T> From<Bound<'py, T>> for Value {
+    fn from(py_value: Bound<'py, T>) -> Self {
+        Value::from(&py_value)
+    }
+}
+
 impl IntoPy<PyObject> for &Value {
     fn into_py(self, py: Python) -> PyObject {
         (*self.0).bind(py).into_py(py)
