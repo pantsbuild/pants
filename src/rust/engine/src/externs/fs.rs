@@ -1,6 +1,9 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
+#![allow(deprecated)]
+
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -213,50 +216,54 @@ impl PySnapshot {
     }
 
     #[getter]
-    fn files<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
+    fn files<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let files = self.0.files();
-        PyTuple::new_bound(
+        PyTuple::new(
             py,
             files
                 .into_iter()
-                .map(|path| PyString::new_bound(py, &path.to_string_lossy()))
+                .map(|path| PyString::new(py, &path.to_string_lossy()))
                 .collect::<Vec<_>>(),
         )
     }
 
     #[getter]
-    fn dirs<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
+    fn dirs<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let dirs = self.0.directories();
-        PyTuple::new_bound(
+        PyTuple::new(
             py,
             dirs.into_iter()
-                .map(|path| PyString::new_bound(py, &path.to_string_lossy()))
+                .map(|path| PyString::new(py, &path.to_string_lossy()))
                 .collect::<Vec<_>>(),
         )
     }
 
     // NB: Prefix with underscore. The Python call will be hidden behind a helper which returns a much
     // richer type.
-    fn _diff<'py>(&self, other: &Bound<'py, PySnapshot>, py: Python<'py>) -> Bound<'py, PyTuple> {
+    fn _diff<'py>(
+        &self,
+        other: &Bound<'py, PySnapshot>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyTuple>> {
         let result = self.0.tree.diff(&other.borrow().0.tree);
 
-        let into_tuple = |x: &Vec<PathBuf>| -> Bound<'py, PyTuple> {
-            PyTuple::new_bound(
+        let into_tuple = |x: &Vec<PathBuf>| -> PyResult<Bound<'py, PyTuple>> {
+            PyTuple::new(
                 py,
                 x.iter()
-                    .map(|path| PyString::new_bound(py, &path.to_string_lossy()))
+                    .map(|path| PyString::new(py, &path.to_string_lossy()))
                     .collect::<Vec<_>>(),
             )
         };
 
-        PyTuple::new_bound(
+        PyTuple::new(
             py,
             vec![
-                into_tuple(&result.our_unique_files),
-                into_tuple(&result.our_unique_dirs),
-                into_tuple(&result.their_unique_files),
-                into_tuple(&result.their_unique_dirs),
-                into_tuple(&result.changed_files),
+                into_tuple(&result.our_unique_files)?,
+                into_tuple(&result.our_unique_dirs)?,
+                into_tuple(&result.their_unique_files)?,
+                into_tuple(&result.their_unique_dirs)?,
+                into_tuple(&result.changed_files)?,
             ],
         )
     }
@@ -270,7 +277,7 @@ pub struct PyMergeDigests(pub Vec<DirectoryDigest>);
 impl PyMergeDigests {
     #[new]
     fn __new__(digests: &Bound<'_, PyAny>, _py: Python) -> PyResult<Self> {
-        let digests: PyResult<Vec<DirectoryDigest>> = PyIterator::from_bound_object(digests)?
+        let digests: PyResult<Vec<DirectoryDigest>> = PyIterator::from_object(digests)?
             .map(|v| {
                 let py_digest = v?.extract::<PyDigest>()?;
                 Ok(py_digest.0)

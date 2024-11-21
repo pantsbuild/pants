@@ -3,6 +3,8 @@
 
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
+// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
+#![allow(deprecated)]
 
 /// This crate is a wrapper around the engine crate which exposes a Python module via PyO3.
 use std::any::Any;
@@ -76,7 +78,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     externs::workunits::register(m)?;
     externs::dep_inference::register(m)?;
 
-    m.add("PollTimeout", py.get_type_bound::<PollTimeout>())?;
+    m.add("PollTimeout", py.get_type::<PollTimeout>())?;
 
     m.add_class::<PyExecutionRequest>()?;
     m.add_class::<PyExecutionStrategyOptions>()?;
@@ -223,9 +225,9 @@ impl PyTypes {
         py: Python,
     ) -> Self {
         Self(GILProtected::new(RefCell::new(Some(Types {
-            directory_digest: TypeId::new(&py.get_type_bound::<externs::fs::PyDigest>()),
-            file_digest: TypeId::new(&py.get_type_bound::<externs::fs::PyFileDigest>()),
-            snapshot: TypeId::new(&py.get_type_bound::<externs::fs::PySnapshot>()),
+            directory_digest: TypeId::new(&py.get_type::<externs::fs::PyDigest>()),
+            file_digest: TypeId::new(&py.get_type::<externs::fs::PyFileDigest>()),
+            snapshot: TypeId::new(&py.get_type::<externs::fs::PySnapshot>()),
             paths: TypeId::new(paths),
             path_metadata_request: TypeId::new(path_metadata_request),
             path_metadata_result: TypeId::new(path_metadata_result),
@@ -236,9 +238,9 @@ impl PyTypes {
             digest_contents: TypeId::new(digest_contents),
             digest_entries: TypeId::new(digest_entries),
             path_globs: TypeId::new(path_globs),
-            merge_digests: TypeId::new(&py.get_type_bound::<externs::fs::PyMergeDigests>()),
-            add_prefix: TypeId::new(&py.get_type_bound::<externs::fs::PyAddPrefix>()),
-            remove_prefix: TypeId::new(&py.get_type_bound::<externs::fs::PyRemovePrefix>()),
+            merge_digests: TypeId::new(&py.get_type::<externs::fs::PyMergeDigests>()),
+            add_prefix: TypeId::new(&py.get_type::<externs::fs::PyAddPrefix>()),
+            remove_prefix: TypeId::new(&py.get_type::<externs::fs::PyRemovePrefix>()),
             create_digest: TypeId::new(create_digest),
             digest_subset: TypeId::new(digest_subset),
             native_download_file: TypeId::new(native_download_file),
@@ -246,7 +248,7 @@ impl PyTypes {
             process: TypeId::new(process),
             process_result: TypeId::new(process_result),
             process_config_from_environment: TypeId::new(
-                &py.get_type_bound::<externs::process::PyProcessExecutionEnvironment>(),
+                &py.get_type::<externs::process::PyProcessExecutionEnvironment>(),
             ),
             process_result_metadata: TypeId::new(process_result_metadata),
             coroutine: TypeId::new(coroutine),
@@ -264,7 +266,7 @@ impl PyTypes {
                 parsed_javascript_deps_candidate_result,
             ),
             deps_request: TypeId::new(
-                &py.get_type_bound::<externs::dep_inference::PyNativeDependenciesRequest>(),
+                &py.get_type::<externs::dep_inference::PyNativeDependenciesRequest>(),
             ),
         }))))
     }
@@ -627,9 +629,17 @@ fn nailgun_server_create(
         let executor = py_executor.0.clone();
         nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
             Python::with_gil(|py| {
+                let args_tuple = match PyTuple::new(py, exe.cmd.args) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        error!("PyTuple construction failure: {e:?}");
+                        return nailgun::ExitCode(1);
+                    }
+                };
+
                 let result = runner.bind(py).call1((
                     exe.cmd.command,
-                    PyTuple::new_bound(py, exe.cmd.args),
+                    args_tuple,
                     exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),
                     exe.cmd.working_dir,
                     PySessionCancellationLatch(exe.cancelled),
@@ -824,7 +834,7 @@ async fn workunit_to_py_value(
         ))
     })?;
     let has_parent_ids = !workunit.parent_ids.is_empty();
-    let mut dict_entries = Python::with_gil(|py| {
+    let mut dict_entries = Python::with_gil(|py| -> PyO3Result<Vec<(Value, Value)>> {
         let mut dict_entries = vec![
             (
                 externs::store_utf8(py, "name"),
@@ -852,7 +862,7 @@ async fn workunit_to_py_value(
         }
         dict_entries.push((
             externs::store_utf8(py, "parent_ids"),
-            externs::store_tuple(py, parent_ids),
+            externs::store_tuple(py, parent_ids)?,
         ));
 
         match workunit.state {
@@ -899,8 +909,8 @@ async fn workunit_to_py_value(
                 externs::store_utf8(py, desc),
             ));
         }
-        dict_entries
-    });
+        Ok(dict_entries)
+    })?;
 
     let mut artifact_entries = Vec::new();
 
@@ -1021,7 +1031,7 @@ async fn workunits_to_py_tuple_value(
         workunit_values.push(py_value);
     }
 
-    Ok(externs::store_tuple(py, workunit_values))
+    externs::store_tuple(py, workunit_values)
 }
 
 #[pyfunction]
@@ -1070,7 +1080,7 @@ fn session_poll_workunits(
                     completed,
                     &core,
                 ))?;
-                Ok(externs::store_tuple(py, vec![started_val, completed_val]).into())
+                Ok(externs::store_tuple(py, vec![started_val, completed_val])?.into())
             })
         })
     })
@@ -1433,13 +1443,12 @@ fn session_get_observation_histograms<'py>(
                 .map_err(PyException::new_err)
         })?;
 
-        let encoded_observations = PyDict::new_bound(py);
+        let encoded_observations = PyDict::new(py);
         for (metric, encoded_histogram) in &observations {
-            encoded_observations
-                .set_item(metric, PyBytes::new_bound(py, &encoded_histogram[..]))?;
+            encoded_observations.set_item(metric, PyBytes::new(py, &encoded_histogram[..]))?;
         }
 
-        let result = PyDict::new_bound(py);
+        let result = PyDict::new(py);
         result.set_item("version", OBSERVATIONS_VERSION)?;
         result.set_item("histograms", encoded_observations)?;
         Ok(result)
@@ -1535,7 +1544,7 @@ fn rule_graph_rule_gets<'py>(
 ) -> PyO3Result<Bound<'py, PyDict>> {
     let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
-        let result = PyDict::new_bound(py);
+        let result = PyDict::new(py);
         for (rule, rule_dependencies) in core.rule_graph.rule_dependencies() {
             let task = rule.0;
             let function = &task.func;
@@ -1825,7 +1834,7 @@ fn single_file_digests_to_bytes<'py>(
             .map(|values| values.into_iter().map(|val| val.into()).collect())
             .map_err(possible_store_missing_digest)?;
 
-        let output_list = PyList::new_bound(py, &bytes_values);
+        let output_list = PyList::new(py, &bytes_values)?;
         Ok(output_list)
     })
 }

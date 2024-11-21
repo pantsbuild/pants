@@ -3,6 +3,8 @@
 
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
+// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
+#![allow(deprecated)]
 
 use futures::future::{BoxFuture, Future};
 use futures::FutureExt;
@@ -48,11 +50,11 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGeneratorResponseCall>()?;
     m.add_class::<PyGeneratorResponseGet>()?;
 
-    m.add("EngineError", py.get_type_bound::<EngineError>())?;
-    m.add("IntrinsicError", py.get_type_bound::<IntrinsicError>())?;
+    m.add("EngineError", py.get_type::<EngineError>())?;
+    m.add("IntrinsicError", py.get_type::<IntrinsicError>())?;
     m.add(
         "IncorrectProductError",
-        py.get_type_bound::<IncorrectProductError>(),
+        py.get_type::<IncorrectProductError>(),
     )?;
 
     Ok(())
@@ -70,7 +72,7 @@ pub struct PyFailure(pub Failure);
 impl PyFailure {
     fn get_error(&self, py: Python) -> PyErr {
         match &self.0 {
-            Failure::Throw { val, .. } => PyErr::from_value_bound(val.bind(py).to_owned()),
+            Failure::Throw { val, .. } => PyErr::from_value(val.bind(py).to_owned()),
             f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
                 EngineError::new_err(format!("{f}"))
             }
@@ -122,12 +124,12 @@ pub fn union_in_scope_types<'py>(
     Ok(Some(union_in_scope_types))
 }
 
-pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {
+pub fn store_tuple(py: Python, values: Vec<Value>) -> PyResult<Value> {
     let arg_handles: Vec<_> = values
         .into_iter()
         .map(|v| v.consume_into_py_object(py))
         .collect();
-    Value::from(PyTuple::new_bound(py, &arg_handles).to_object(py))
+    Ok(Value::from(PyTuple::new(py, &arg_handles)?.to_object(py)))
 }
 
 /// Store a slice containing 2-tuples of (key, value) as a Python dictionary.
@@ -135,7 +137,7 @@ pub fn store_dict(
     py: Python,
     keys_and_values: impl IntoIterator<Item = (Value, Value)>,
 ) -> PyResult<Value> {
-    let dict = PyDict::new_bound(py);
+    let dict = PyDict::new(py);
     for (k, v) in keys_and_values {
         dict.set_item(k.consume_into_py_object(py), v.consume_into_py_object(py))?;
     }
@@ -144,7 +146,7 @@ pub fn store_dict(
 
 /// Store an opaque buffer of bytes to pass to Python. This will end up as a Python `bytes`.
 pub fn store_bytes(py: Python, bytes: &[u8]) -> Value {
-    Value::from(PyBytes::new_bound(py, bytes).to_object(py))
+    Value::from(PyBytes::new(py, bytes).to_object(py))
 }
 
 /// Store a buffer of utf8 bytes to pass to Python. This will end up as a Python `str`.
@@ -262,7 +264,7 @@ pub fn val_to_log_level_bound(obj: &Bound<'_, PyAny>) -> Result<log::Level, Stri
 
 /// Link to the Pants docs using the current version of Pants.
 pub fn doc_url(py: Python, slug: &str) -> String {
-    let docutil_module = py.import_bound("pants.util.docutil").unwrap();
+    let docutil_module = py.import("pants.util.docutil").unwrap();
     let doc_url_func = docutil_module.getattr("doc_url").unwrap();
     doc_url_func.call1((slug,)).unwrap().extract().unwrap()
 }
@@ -304,7 +306,7 @@ pub(crate) fn generator_send(
             let throw_method = generator.bind(py).getattr(intern!(py, "throw"))?;
             if err.is_instance_of::<NativeEngineFailure>(py) {
                 let throw = err
-                    .value_bound(py)
+                    .value(py)
                     .getattr(intern!(py, "failure"))?
                     .extract::<PyRef<PyFailure>>()?
                     .get_error(py);
@@ -332,9 +334,7 @@ pub(crate) fn generator_send(
         }
         Err(e) => {
             match (maybe_thrown, e.cause(py)) {
-                (Some((thrown, err)), Some(cause))
-                    if thrown.value_bound(py).is(cause.value_bound(py)) =>
-                {
+                (Some((thrown, err)), Some(cause)) if thrown.value(py).is(cause.value(py)) => {
                     // Preserve the engine traceback by using the wrapped failure error as cause. The cause
                     // will be swapped back again in `Failure::from_py_err_with_gil()` to preserve the python
                     // traceback.
@@ -391,7 +391,9 @@ pub(crate) fn generator_send(
 /// those configured in types::Types.
 pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
     let py_type = type_id.as_py_type_bound(py);
-    let args_tuple = PyTuple::new_bound(py, args.iter().map(|v| v.bind(py)));
+    let args_tuple = PyTuple::new(py, args.iter().map(|v| v.bind(py))).unwrap_or_else(|e| {
+        panic!("Core type constructor `PyTuple` failed: {e:?}",);
+    });
     let res = py_type.call1(args_tuple).unwrap_or_else(|e| {
         panic!(
             "Core type constructor `{}` failed: {:?}",
@@ -522,7 +524,7 @@ impl PyGeneratorResponseNativeCall {
 
     fn send(&self, py: Python, value: PyObject) -> PyResult<()> {
         Err(PyStopIteration::new_err(
-            PyTuple::new_bound(py, [value]).to_object(py),
+            PyTuple::new(py, [value])?.to_object(py),
         ))
     }
 }

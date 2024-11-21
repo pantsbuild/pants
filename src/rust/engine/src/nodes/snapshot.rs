@@ -1,6 +1,9 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
+#![allow(deprecated)]
+
 use std::path::Path;
 
 use deepsize::DeepSizeOf;
@@ -163,7 +166,8 @@ impl Snapshot {
         Ok(externs::unsafe_call(
             py,
             context.core.types.digest_contents,
-            &[externs::store_tuple(py, entries)],
+            &[externs::store_tuple(py, entries)
+                .map_err(|e| format!("PyTuple construction failure: {e:?}"))?],
         ))
     }
 
@@ -189,7 +193,8 @@ impl Snapshot {
         Ok(externs::unsafe_call(
             py,
             context.core.types.digest_entries,
-            &[externs::store_tuple(py, entries)],
+            &[externs::store_tuple(py, entries)
+                .map_err(|e| format!("PyTuple construction faiure: {e:?}"))?],
         ))
     }
 
