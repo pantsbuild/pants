@@ -26,7 +26,6 @@ def action(name: str) -> str:
         "cache": "actions/cache@v4",
         "checkout": "actions/checkout@v4",
         "download-artifact": "actions/download-artifact@v4",
-        "expose-pythons": "pantsbuild/actions/expose-pythons@v9",
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
         "rust-cache": "benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a",
         "setup-go": "actions/setup-go@v5",
@@ -111,7 +110,8 @@ NATIVE_FILES = [
 
 # We don't specify a patch version so that we get the latest, which comes pre-installed:
 #  https://github.com/actions/setup-python#available-versions-of-python
-PYTHON_VERSION = "3.9"
+# NOTE: The last entry becomes the default
+PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.11"]
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
 DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true'"
@@ -348,11 +348,14 @@ def install_rustup() -> Step:
     }
 
 
-def install_python(version: str) -> Step:
+def install_pythons(versions: list[str]) -> Step:
+    # See:
+    # https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md#specifying-multiple-pythonpypy-versions
+    # This is a list expressed as a newline delimited string instead of a... list
     return {
-        "name": f"Set up Python {version}",
+        "name": f"Set up Python {', '.join(versions)}",
         "uses": action("setup-python"),
-        "with": {"python-version": version},
+        "with": {"python-version": "\n".join(versions)},
     }
 
 
@@ -555,27 +558,16 @@ class Helper:
             },
         ]
 
-    def setup_primary_python(self) -> Sequence[Step]:
+    def setup_pythons(self) -> Sequence[Step]:
         ret = []
         if self.platform not in HAS_PYTHON:
-            ret.append(install_python(PYTHON_VERSION))
-        return ret
-
-    def expose_all_pythons(self) -> Sequence[Step]:
-        ret = []
-        if self.platform not in HAS_PYTHON:
-            ret.append(
-                {
-                    "name": "Expose Pythons",
-                    "uses": action("expose-pythons"),
-                }
-            )
+            ret.append(install_pythons(PYTHON_VERSIONS))
         return ret
 
     def bootstrap_pants(self) -> Sequence[Step]:
         return [
             *checkout(),
-            *self.setup_primary_python(),
+            *self.setup_pythons(),
             *self.bootstrap_caches(),
             {
                 "name": "Bootstrap Pants",
@@ -770,8 +762,7 @@ def test_jobs(
                 # preinstalled on the self-hosted runners.
                 else []
             ),
-            *helper.setup_primary_python(),
-            *helper.expose_all_pythons(),
+            *helper.setup_pythons(),
             *helper.native_binaries_download(),
             {
                 "name": human_readable_step_name,
@@ -881,7 +872,7 @@ def build_wheels_job(
     else:
         initial_steps = [
             *checkout(ref=for_deploy_ref),
-            *helper.expose_all_pythons(),
+            *helper.setup_pythons(),
             # NB: We only cache Rust, but not `native_engine.so` and the Pants
             # virtualenv. This is because we must build both these things with
             # multiple Python versions, whereas that caching assumes only one primary
@@ -1033,7 +1024,7 @@ def test_workflow_jobs() -> Jobs:
                 "steps": [
                     *checkout(),
                     *launch_bazel_remote(),
-                    *linux_x86_64_helper.setup_primary_python(),
+                    *linux_x86_64_helper.setup_pythons(),
                     *linux_x86_64_helper.native_binaries_download(),
                     {
                         "name": "Lint",
@@ -1109,8 +1100,7 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             "timeout-minutes": 90,
             "steps": [
                 *checkout(),
-                *helper.setup_primary_python(),
-                *helper.expose_all_pythons(),
+                *helper.setup_pythons(),
                 {
                     "name": "Prepare cache comparison",
                     "run": dedent(
@@ -1243,8 +1233,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         "fetch-tags": True,
                     },
                 },
-                *helper.setup_primary_python(),
-                *helper.expose_all_pythons(),
+                *helper.setup_pythons(),
                 *helper.bootstrap_caches(),
                 {
                     "name": "Generate announcement",
@@ -1581,7 +1570,7 @@ def public_repos() -> PublicReposOutput:
             "permissions": {},
             "steps": [
                 *checkout(repository=repo.name, **repo.checkout_options),
-                install_python(repo.python_version),
+                install_pythons([repo.python_version]),
                 *([install_go()] if repo.install_go else []),
                 *([install_node(repo.node_version)] if repo.node_version else []),
                 *([download_apache_thrift()] if repo.install_thrift else []),
