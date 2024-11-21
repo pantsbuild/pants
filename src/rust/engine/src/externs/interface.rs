@@ -3,8 +3,6 @@
 
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
-// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
-#![allow(deprecated)]
 
 /// This crate is a wrapper around the engine crate which exposes a Python module via PyO3.
 use std::any::Any;
@@ -35,14 +33,14 @@ use process_execution::CacheContentBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
     pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
-    PyResult as PyO3Result, Python, ToPyObject,
+    PyResult as PyO3Result, Python,
 };
 use pyo3::sync::GILProtected;
 use pyo3::types::{
     PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyModuleMethods, PyTuple,
     PyType,
 };
-use pyo3::{create_exception, Bound, IntoPy, PyAny, PyRef};
+use pyo3::{create_exception, Bound, IntoPyObject, PyAny, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, RuleGraph};
@@ -949,8 +947,8 @@ async fn workunit_to_py_value(
         let mut user_metadata_entries = Vec::with_capacity(metadata.user_metadata.len());
         for (user_metadata_key, user_metadata_item) in metadata.user_metadata.iter() {
             let value = match user_metadata_item {
-                UserMetadataItem::String(v) => v.into_py(py),
-                UserMetadataItem::Int(n) => n.into_py(py),
+                UserMetadataItem::String(v) => v.into_pyobject(py)?.to_owned().into_any().unbind(),
+                UserMetadataItem::Int(n) => n.into_pyobject(py)?.to_owned().into_any().unbind(),
                 UserMetadataItem::PyValue(py_val_handle) => (**py_val_handle)
                     .as_any()
                     .downcast_ref::<Value>()
@@ -959,7 +957,9 @@ async fn workunit_to_py_value(
                             "Failed to convert {py_val_handle:?} to a Value."
                         ))
                     })?
-                    .to_object(py),
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind(),
             };
             user_metadata_entries.push((
                 externs::store_utf8(py, user_metadata_key.as_str()),
@@ -1095,14 +1095,14 @@ fn session_run_interactive_process(
     py: Python,
     py_session: &Bound<'_, PySession>,
     interactive_process: PyObject,
-    process_config_from_environment: PyProcessExecutionEnvironment,
+    process_config_from_environment: &Bound<'_, PyProcessExecutionEnvironment>,
 ) -> PyO3Result<PyObject> {
     let core = py_session.borrow().0.core().clone();
     let session = &py_session.borrow().0;
     let context = core.graph.context(SessionCore::new(session.clone()));
 
     let interactive_process: Value = interactive_process.into();
-    let process_config = Value::new(process_config_from_environment.into_py(py));
+    let process_config = Value::from(process_config_from_environment.as_any());
 
     py.allow_threads(|| {
         core.executor.clone().block_on(nodes::task_context(
@@ -1149,7 +1149,7 @@ fn scheduler_live_items<'py>(
         .enter(|| py.allow_threads(|| scheduler.live_items(session)));
     let py_items = items
         .into_iter()
-        .map(|value| value.bind(py).to_object(py))
+        .map(|value| value.bind(py).clone().unbind())
         .collect();
     (py_items, sizes)
 }
@@ -1548,7 +1548,12 @@ fn rule_graph_rule_gets<'py>(
         for (rule, rule_dependencies) in core.rule_graph.rule_dependencies() {
             let task = rule.0;
             let function = &task.func;
-            let mut dependencies = Vec::new();
+            #[allow(clippy::type_complexity)]
+            let mut dependencies: Vec<(
+                Bound<'_, PyType>,
+                Vec<Bound<'_, PyType>>,
+                pyo3::Py<PyAny>,
+            )> = Vec::new();
             for (dependency_key, rule) in rule_dependencies {
                 // NB: We are only migrating non-union Gets, which are those in the `gets` list
                 // which do not have `in_scope_params` marking them as being for unions, or a call
@@ -1569,13 +1574,16 @@ fn rule_graph_rule_gets<'py>(
                 dependencies.push((
                     dependency_key.product.as_py_type_bound(py),
                     provided_params,
-                    function.0.value.into_py(py),
+                    function.0.value.into_pyobject(py)?.into_any().unbind(),
                 ));
             }
             if dependencies.is_empty() {
                 continue;
             }
-            result.set_item(function.0.value.into_py(py), dependencies.into_py(py))?;
+            result.set_item(
+                function.0.value.into_pyobject(py)?,
+                dependencies.into_pyobject(py)?,
+            )?;
         }
         Ok(result)
     })
