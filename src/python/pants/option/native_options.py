@@ -272,6 +272,9 @@ class NativeOptionParser:
 
         return (val, rank, derivation)
 
+    def get_args(self) -> tuple[str, ...]:
+        return tuple(self._native_parser.get_args())
+
     def get_unconsumed_flags(self) -> dict[str, tuple[str, ...]]:
         return {k: tuple(v) for k, v in self._native_parser.get_unconsumed_flags().items()}
 

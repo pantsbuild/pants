@@ -13,6 +13,10 @@ mod config;
 #[cfg(test)]
 mod config_tests;
 
+mod cli_alias;
+#[cfg(test)]
+mod cli_alias_tests;
+
 mod env;
 #[cfg(test)]
 mod env_tests;
@@ -450,6 +454,42 @@ impl OptionParser {
             }
         }
 
+        // Remove the args source, as we don't support providing cli aliases on the cli...
+        let unexpanded_args_source = sources.remove(&Source::Flag).unwrap();
+
+        parser = OptionParser {
+            sources: sources.clone(),
+            include_derivation: false,
+        };
+        let alias_strings = parser
+            .parse_dict(&option_id!(["cli"], "alias"), HashMap::new())?
+            .value
+            .into_iter()
+            .map(|(k, v)| {
+                if let Val::String(s) = v {
+                    Ok((k, s))
+                } else {
+                    Err(format!(
+                        "Values in [cli.alias] must be strings. Got: {:?}",
+                        v
+                    ))
+                }
+            })
+            .collect::<Result<HashMap<_, _>, String>>()?;
+
+        let alias_map =
+            cli_alias::create_alias_map(&HashSet::new(), &HashMap::new(), &alias_strings)?;
+
+        // Add the args reader back in, after expanding aliases.
+        let unexpanded_args_reader = unexpanded_args_source
+            .as_any()
+            .downcast_ref::<ArgsReader>()
+            .unwrap();
+        sources.insert(
+            Source::Flag,
+            Arc::new(unexpanded_args_reader.expand_aliases(&alias_map)),
+        );
+
         Ok(OptionParser {
             sources,
             include_derivation,
@@ -690,6 +730,10 @@ impl OptionParser {
             source: highest_priority_source,
             value: apply_dict_edits(edits.into_iter()),
         })
+    }
+
+    pub fn get_args(&self) -> Result<Vec<String>, String> {
+        Ok(self.get_args_reader()?.get_args())
     }
 
     pub fn get_passthrough_args(&self) -> Result<Option<Vec<String>>, String> {

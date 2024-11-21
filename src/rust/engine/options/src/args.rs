@@ -5,6 +5,7 @@ use std::env;
 
 use super::id::{is_valid_scope_name, NameTransform, OptionId, Scope};
 use super::{DictEdit, OptionsSource};
+use crate::cli_alias::{expand_aliases, AliasMap};
 use crate::fromfile::FromfileExpander;
 use crate::parse::{ParseError, Parseable};
 use crate::ListEdit;
@@ -90,7 +91,6 @@ impl Arg {
 #[derive(Debug)]
 pub struct Args {
     // The arg strings this struct was instantiated with.
-    #[allow(dead_code)]
     arg_strs: Vec<String>,
 
     // The structured args parsed from the arg strings.
@@ -156,6 +156,10 @@ impl Args {
         args.next(); // Consume the process name (argv[0]).
         Self::new(env::args().collect::<Vec<_>>())
     }
+
+    pub fn expand_aliases(&self, alias_map: &AliasMap) -> Self {
+        Self::new(expand_aliases(self.arg_strs.clone(), alias_map))
+    }
 }
 
 pub(crate) struct ArgsTracker {
@@ -206,6 +210,17 @@ impl ArgsReader {
             fromfile_expander,
             tracker,
         }
+    }
+
+    pub fn expand_aliases(&self, alias_map: &AliasMap) -> Self {
+        Self::new(
+            self.args.expand_aliases(alias_map),
+            self.fromfile_expander.clone(),
+        )
+    }
+
+    pub fn get_args(&self) -> Vec<String> {
+        self.args.arg_strs.clone()
     }
 
     pub fn get_passthrough_args(&self) -> Option<Vec<String>> {

@@ -499,6 +499,10 @@ impl PyOptionParser {
         ))
     }
 
+    fn get_args(&self) -> PyResult<Vec<String>> {
+        self.0.get_args().map_err(PyException::new_err)
+    }
+
     fn get_passthrough_args(&self) -> PyResult<Option<Vec<String>>> {
         self.0.get_passthrough_args().map_err(PyException::new_err)
     }

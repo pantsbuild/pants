@@ -1142,6 +1142,64 @@ def test_passthru_args_not_interpreted():
     ).string
 
 
+def test_alias() -> None:
+    config0_content = dedent(
+        """\
+                [cli.alias]
+                pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
+                green = "lint test"
+                """
+    )
+
+    config1_content = dedent(
+        """\
+                [cli]
+                alias.add = {green = "lint test --force check"}
+                """
+    )
+
+    config2_content = dedent(
+        """\
+                [cli]
+                alias = "+{'shell': 'repl'}"
+                """
+    )
+
+    config = Config.load(
+        [
+            FileContent("config0", config0_content.encode()),
+            FileContent("config1", config1_content.encode()),
+            FileContent("config2", config2_content.encode()),
+        ]
+    )
+
+    options = Options.create(
+        env={},
+        config=config,
+        native_options_config_discovery=False,
+        known_scope_infos=[],
+        args=["pyupgrade", "green"],
+    )
+
+    assert (
+        "--backend-packages=pants.backend.python.lint.pyupgrade",
+        "fmt",
+        "lint",
+        "test",
+        "--force",
+        "check",
+    ) == options.get_args()
+
+    options = Options.create(
+        env={},
+        config=config,
+        native_options_config_discovery=False,
+        known_scope_infos=[],
+        args=["shell"],
+    )
+    assert ("repl",) == options.get_args()
+
+
 def test_global_scope_env_vars():
     def check_pants_foo(expected_val, env):
         val = _parse(env=env).for_global_scope().pants_foo
