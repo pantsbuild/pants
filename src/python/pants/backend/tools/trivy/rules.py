@@ -31,8 +31,7 @@ class RunTrivyRequest:
     description: str
 
 
-# TODO: capture output file?
-# TODO: report format
+# TODO: set debug flag if debugging
 
 
 @rule
