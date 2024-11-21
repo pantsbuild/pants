@@ -118,6 +118,6 @@ class Trivy(TemplatedExternalTool):
 
 
 class SkipTrivyField(BoolField):
-    alias = "skip-trivy"
+    alias = "skip_trivy"
     default = False
     help = "If true, don't run Trivy on this target's Terraform files"

@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.docker.target_types import DockerImageSourceField
+from pants.backend.docker.target_types import DockerImageSourceField, DockerImageTarget
 from pants.backend.tools.trivy.rules import RunTrivyRequest, run_trivy
 from pants.backend.tools.trivy.subsystem import SkipTrivyField, Trivy
 from pants.core.goals.lint import LintResult, LintTargetsRequest
@@ -31,7 +31,6 @@ class TrivyDockerFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return False
         return tgt.get(SkipTrivyField).value
 
 
@@ -70,4 +69,8 @@ async def run_trivy_docker(
 
 
 def rules():
-    return (*collect_rules(), *TrivyDockerRequest.rules())
+    return (
+        *collect_rules(),
+        *TrivyDockerRequest.rules(),
+        DockerImageTarget.register_plugin_field(SkipTrivyField),
+    )
