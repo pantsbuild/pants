@@ -102,7 +102,7 @@ impl DownloadedFile {
                 let url_str: String = externs::getattr(py_download_file, "url")
                     .map_err(|e| format!("Failed to get `url` for field: {e}"))?;
                 let auth_headers =
-                    externs::getattr_from_str_frozendict_bound(py_download_file, "auth_headers");
+                    externs::getattr_from_str_frozendict(py_download_file, "auth_headers");
                 let py_file_digest: PyFileDigest =
                     externs::getattr(py_download_file, "expected_digest")?;
                 let retry_delay_duration: Duration =

@@ -216,7 +216,7 @@ pub fn collect_iterable_bound<'py>(
 }
 
 /// Read a `FrozenDict[str, T]`.
-pub fn getattr_from_str_frozendict_bound<'py, T: FromPyObject<'py>>(
+pub fn getattr_from_str_frozendict<'py, T: FromPyObject<'py>>(
     value: &Bound<'py, PyAny>,
     field: &str,
 ) -> BTreeMap<String, T> {

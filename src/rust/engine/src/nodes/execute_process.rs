@@ -45,7 +45,7 @@ impl ExecuteProcess {
                 lift_directory_digest_bound(&input_files_py_value)
                     .map_err(|err| format!("Error parsing input_digest {err}"))?
             };
-            let immutable_inputs = externs::getattr_from_str_frozendict_bound::<Bound<PyAny>>(
+            let immutable_inputs = externs::getattr_from_str_frozendict::<Bound<PyAny>>(
                 value,
                 "immutable_input_digests",
             )
@@ -80,7 +80,7 @@ impl ExecuteProcess {
         input_digests: InputDigests,
         process_config: externs::process::PyProcessExecutionEnvironment,
     ) -> Result<Process, StoreError> {
-        let env = externs::getattr_from_str_frozendict_bound(value, "env");
+        let env = externs::getattr_from_str_frozendict(value, "env");
 
         let working_directory = externs::getattr_as_optional_string(value, "working_directory")
             .map_err(|e| format!("Failed to get `working_directory` from field: {e}"))?
@@ -112,7 +112,7 @@ impl ExecuteProcess {
         let level = externs::val_to_log_level(&py_level)?;
 
         let append_only_caches =
-            externs::getattr_from_str_frozendict_bound::<PyBackedStr>(value, "append_only_caches")
+            externs::getattr_from_str_frozendict::<PyBackedStr>(value, "append_only_caches")
                 .into_iter()
                 .map(|(name, dest)| {
                     let path: &str = dest.as_ref();
