@@ -82,11 +82,10 @@ impl ExecuteProcess {
     ) -> Result<Process, StoreError> {
         let env = externs::getattr_from_str_frozendict_bound(value, "env");
 
-        let working_directory =
-            externs::getattr_as_optional_string_bound(value, "working_directory")
-                .map_err(|e| format!("Failed to get `working_directory` from field: {e}"))?
-                .map(RelativePath::new)
-                .transpose()?;
+        let working_directory = externs::getattr_as_optional_string(value, "working_directory")
+            .map_err(|e| format!("Failed to get `working_directory` from field: {e}"))?
+            .map(RelativePath::new)
+            .transpose()?;
 
         let output_files = externs::getattr::<Vec<String>>(value, "output_files")?
             .into_iter()
@@ -121,12 +120,12 @@ impl ExecuteProcess {
                 })
                 .collect::<Result<_, String>>()?;
 
-        let jdk_home = externs::getattr_as_optional_string_bound(value, "jdk_home")
+        let jdk_home = externs::getattr_as_optional_string(value, "jdk_home")
             .map_err(|e| format!("Failed to get `jdk_home` from field: {e}"))?
             .map(PathBuf::from);
 
         let execution_slot_variable =
-            externs::getattr_as_optional_string_bound(value, "execution_slot_variable")
+            externs::getattr_as_optional_string(value, "execution_slot_variable")
                 .map_err(|e| format!("Failed to get `execution_slot_variable` for field: {e}"))?;
 
         let concurrency_available: usize = externs::getattr(value, "concurrency_available")?;

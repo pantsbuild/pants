@@ -367,7 +367,7 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let subject_path = Python::with_gil(|py| -> Result<_, String> {
             let arg = single_path.bind(py);
-            let path = externs::getattr_as_optional_string_bound(arg, "path")
+            let path = externs::getattr_as_optional_string(arg, "path")
                 .map_err(|e| format!("Failed to get `path` for field: {e}"))?;
             let path = path.ok_or_else(|| "Path must not be `None`.".to_string())?;
 

@@ -39,7 +39,7 @@ impl Snapshot {
             .map_err(|e| format!("Failed to get `globs` for field: {e}"))?;
 
         let description_of_origin =
-            externs::getattr_as_optional_string_bound(item, "description_of_origin")
+            externs::getattr_as_optional_string(item, "description_of_origin")
                 .map_err(|e| format!("Failed to get `description_of_origin` for field: {e}"))?;
 
         let glob_match_error_behavior: Bound<'_, PyAny> =

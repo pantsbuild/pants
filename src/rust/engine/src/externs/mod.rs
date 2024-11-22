@@ -229,7 +229,7 @@ pub fn getattr_from_str_frozendict_bound<'py, T: FromPyObject<'py>>(
         .collect()
 }
 
-pub fn getattr_as_optional_string_bound(
+pub fn getattr_as_optional_string(
     value: &Bound<'_, PyAny>,
     field: &str,
 ) -> PyResult<Option<String>> {
