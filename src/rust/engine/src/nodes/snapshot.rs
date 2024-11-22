@@ -62,9 +62,7 @@ impl Snapshot {
         Ok(PathGlobs::new(globs, strict_glob_matching, conjunction))
     }
 
-    pub fn lift_prepared_path_globs_bound(
-        item: &Bound<'_, PyAny>,
-    ) -> Result<PreparedPathGlobs, String> {
+    pub fn lift_prepared_path_globs(item: &Bound<'_, PyAny>) -> Result<PreparedPathGlobs, String> {
         let path_globs = Snapshot::lift_path_globs_bound(item)?;
         path_globs
             .parse()

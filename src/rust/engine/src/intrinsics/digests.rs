@@ -349,7 +349,7 @@ fn digest_subset_to_digest(digest_subset: Value) -> PyGeneratorResponseNativeCal
                 externs::getattr(py_digest_subset, "globs").unwrap();
             let py_digest: Bound<'_, PyAny> = externs::getattr(py_digest_subset, "digest").unwrap();
             let res: NodeResult<_> = Ok((
-                Snapshot::lift_prepared_path_globs_bound(&py_path_globs)?,
+                Snapshot::lift_prepared_path_globs(&py_path_globs)?,
                 lift_directory_digest_bound(&py_digest)?,
             ));
             res

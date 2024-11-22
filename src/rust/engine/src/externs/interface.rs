@@ -1721,7 +1721,7 @@ fn capture_snapshots(
                 let path_globs = {
                     let path_globs_py_value =
                         externs::getattr::<Bound<'_, PyAny>>(&value, "path_globs")?;
-                    nodes::Snapshot::lift_prepared_path_globs_bound(&path_globs_py_value)
+                    nodes::Snapshot::lift_prepared_path_globs(&path_globs_py_value)
                 };
                 let digest_hint = {
                     let maybe_digest: Bound<'_, PyAny> = externs::getattr(&value, "digest_hint")?;
