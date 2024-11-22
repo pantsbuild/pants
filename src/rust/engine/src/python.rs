@@ -338,7 +338,7 @@ impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let repr = Python::with_gil(|py| {
             let obj = self.0.bind(py);
-            externs::val_to_str_bound(obj)
+            externs::val_to_str(obj)
         });
         write!(f, "{repr}")
     }
@@ -511,7 +511,7 @@ impl Failure {
             .extract::<String>()
             .unwrap()
         } else {
-            Self::native_traceback(&externs::val_to_str_bound(val.bind(py)))
+            Self::native_traceback(&externs::val_to_str(val.bind(py)))
         };
         Failure::Throw {
             val,
@@ -551,7 +551,7 @@ impl fmt::Display for Failure {
             Failure::Throw { val, .. } => {
                 let repr = Python::with_gil(|py| {
                     let obj = val.0.bind(py);
-                    externs::val_to_str_bound(obj)
+                    externs::val_to_str(obj)
                 });
                 write!(f, "{repr}")
             }

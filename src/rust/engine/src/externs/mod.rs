@@ -200,7 +200,7 @@ pub fn collect_iterable<'py>(
                 py_res.map_err(|py_err| {
                     format!(
                         "Could not iterate {}, failed to extract {}th item: {:?}",
-                        val_to_str_bound(value),
+                        val_to_str(value),
                         i,
                         py_err
                     )
@@ -209,7 +209,7 @@ pub fn collect_iterable<'py>(
             .collect(),
         Err(py_err) => Err(format!(
             "Could not iterate {}: {:?}",
-            val_to_str_bound(value),
+            val_to_str(value),
             py_err
         )),
     }
@@ -241,7 +241,7 @@ pub fn getattr_as_optional_string(
 /// Call the equivalent of `str()` on an arbitrary Python object.
 ///
 /// Converts `None` to the empty string.
-pub fn val_to_str_bound(obj: &Bound<'_, PyAny>) -> String {
+pub fn val_to_str(obj: &Bound<'_, PyAny>) -> String {
     if obj.is_none() {
         return "".to_string();
     }
@@ -254,7 +254,7 @@ pub fn val_to_log_level(obj: &Bound<'_, PyAny>) -> Result<log::Level, String> {
             .map_err(|e: num_enum::TryFromPrimitiveError<_>| {
                 format!(
                     "Could not parse {:?} as a LogLevel: {}",
-                    val_to_str_bound(obj),
+                    val_to_str(obj),
                     e
                 )
             })
