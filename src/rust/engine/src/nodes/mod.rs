@@ -220,7 +220,7 @@ fn select_reentry(
     .boxed()
 }
 
-pub fn lift_directory_digest_bound(digest: &Bound<'_, PyAny>) -> Result<DirectoryDigest, String> {
+pub fn lift_directory_digest(digest: &Bound<'_, PyAny>) -> Result<DirectoryDigest, String> {
     let py_digest: externs::fs::PyDigest = digest.extract().map_err(|e| format!("{e}"))?;
     Ok(py_digest.0)
 }

@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::externs;
 use crate::externs::fs::PyFileDigest;
-use crate::nodes::{lift_directory_digest_bound, lift_file_digest_bound};
+use crate::nodes::{lift_directory_digest, lift_file_digest_bound};
 use crate::Value;
 
 use pyo3::prelude::*;
@@ -76,7 +76,7 @@ impl EngineAwareReturnType {
                 lift_file_digest_bound(&value).map(ArtifactOutput::FileDigest)
             } else {
                 let digest_value = value.getattr("digest").ok()?;
-                lift_directory_digest_bound(&digest_value)
+                lift_directory_digest(&digest_value)
                     .map(|dd| ArtifactOutput::Snapshot(Arc::new(dd)))
             }
             .ok()?;

@@ -23,8 +23,8 @@ use crate::externs::fs::{
 };
 use crate::externs::PyGeneratorResponseNativeCall;
 use crate::nodes::{
-    lift_directory_digest_bound, task_get_context, unmatched_globs_additional_context,
-    DownloadedFile, NodeResult, PathMetadataNode, Snapshot, SubjectPath,
+    lift_directory_digest, task_get_context, unmatched_globs_additional_context, DownloadedFile,
+    NodeResult, PathMetadataNode, Snapshot, SubjectPath,
 };
 use crate::python::{throw, Key, Value};
 use crate::Failure;
@@ -53,7 +53,7 @@ fn get_digest_contents(digest: Value) -> PyGeneratorResponseNativeCall {
 
         let digest = Python::with_gil(|py| {
             let py_digest = digest.bind(py);
-            lift_directory_digest_bound(py_digest)
+            lift_directory_digest(py_digest)
         })?;
 
         let digest_contents = context.core.store().contents_for_directory(digest).await?;
@@ -71,7 +71,7 @@ fn get_digest_entries(digest: Value) -> PyGeneratorResponseNativeCall {
 
         let digest = Python::with_gil(|py| {
             let py_digest = digest.bind(py);
-            lift_directory_digest_bound(py_digest)
+            lift_directory_digest(py_digest)
         })?;
         let digest_entries = context.core.store().entries_for_directory(digest).await?;
         Ok::<_, Failure>(Python::with_gil(|py| {
@@ -133,7 +133,7 @@ fn digest_to_snapshot(digest: Value) -> PyGeneratorResponseNativeCall {
 
         let digest = Python::with_gil(|py| {
             let py_digest = digest.bind(py);
-            lift_directory_digest_bound(py_digest)
+            lift_directory_digest(py_digest)
         })?;
         let snapshot = store::Snapshot::from_digest(store, digest).await?;
         Ok::<_, Failure>(Python::with_gil(|py| {
@@ -350,7 +350,7 @@ fn digest_subset_to_digest(digest_subset: Value) -> PyGeneratorResponseNativeCal
             let py_digest: Bound<'_, PyAny> = externs::getattr(py_digest_subset, "digest").unwrap();
             let res: NodeResult<_> = Ok((
                 Snapshot::lift_prepared_path_globs(&py_path_globs)?,
-                lift_directory_digest_bound(&py_digest)?,
+                lift_directory_digest(&py_digest)?,
             ));
             res
         })?;

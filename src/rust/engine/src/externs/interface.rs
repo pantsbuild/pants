@@ -1728,7 +1728,7 @@ fn capture_snapshots(
                     if maybe_digest.is_none() {
                         None
                     } else {
-                        Some(nodes::lift_directory_digest_bound(&maybe_digest)?)
+                        Some(nodes::lift_directory_digest(&maybe_digest)?)
                     }
                 };
                 path_globs.map(|path_globs| (path_globs, root, digest_hint))
@@ -1773,7 +1773,7 @@ fn ensure_remote_has_recursive(
         let digests: Vec<Digest> = py_digests
             .iter()
             .map(|value| {
-                crate::nodes::lift_directory_digest_bound(&value)
+                crate::nodes::lift_directory_digest(&value)
                     .map(|dd| dd.as_digest())
                     .or_else(|_| crate::nodes::lift_file_digest_bound(&value))
             })
@@ -1798,7 +1798,7 @@ fn ensure_directory_digest_persisted(
     let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         let digest =
-            crate::nodes::lift_directory_digest_bound(py_digest).map_err(PyException::new_err)?;
+            crate::nodes::lift_directory_digest(py_digest).map_err(PyException::new_err)?;
 
         py.allow_threads(|| {
             core.executor
@@ -1868,8 +1868,7 @@ fn write_digest(
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
 
-        let lifted_digest =
-            nodes::lift_directory_digest_bound(digest).map_err(PyValueError::new_err)?;
+        let lifted_digest = nodes::lift_directory_digest(digest).map_err(PyValueError::new_err)?;
 
         // Python will have already validated that path_prefix is a relative path.
         let path_prefix = Path::new(&path_prefix);

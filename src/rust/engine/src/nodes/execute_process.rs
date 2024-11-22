@@ -20,7 +20,7 @@ use workunit_store::{
     Metric, ObservationMetric, RunningWorkunit, UserMetadataItem, WorkunitMetadata,
 };
 
-use super::{lift_directory_digest_bound, NodeKey, NodeOutput, NodeResult};
+use super::{lift_directory_digest, NodeKey, NodeOutput, NodeResult};
 use crate::context::Context;
 use crate::externs;
 use crate::python::{throw, Value};
@@ -42,7 +42,7 @@ impl ExecuteProcess {
             let input_files = {
                 let input_files_py_value: Bound<'_, PyAny> =
                     externs::getattr(value, "input_digest")?;
-                lift_directory_digest_bound(&input_files_py_value)
+                lift_directory_digest(&input_files_py_value)
                     .map_err(|err| format!("Error parsing input_digest {err}"))?
             };
             let immutable_inputs = externs::getattr_from_str_frozendict::<Bound<PyAny>>(
@@ -50,12 +50,7 @@ impl ExecuteProcess {
                 "immutable_input_digests",
             )
             .into_iter()
-            .map(|(path, digest)| {
-                Ok((
-                    RelativePath::new(path)?,
-                    lift_directory_digest_bound(&digest)?,
-                ))
-            })
+            .map(|(path, digest)| Ok((RelativePath::new(path)?, lift_directory_digest(&digest)?)))
             .collect::<Result<BTreeMap<_, _>, String>>()?;
             let use_nailgun = externs::getattr::<Vec<String>>(value, "use_nailgun")?
                 .into_iter()
