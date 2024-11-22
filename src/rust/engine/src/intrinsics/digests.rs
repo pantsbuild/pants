@@ -258,7 +258,7 @@ fn create_digest(py: Python, create_digest: Value) -> PyGeneratorResponseNativeC
         let items: Vec<CreateDigestItem> = {
             Python::with_gil(|py| {
                 let py_create_digest = create_digest.bind(py);
-                externs::collect_iterable_bound(py_create_digest)
+                externs::collect_iterable(py_create_digest)
                     .unwrap()
                     .into_iter()
                     .map(|obj| {

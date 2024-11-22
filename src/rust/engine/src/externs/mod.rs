@@ -190,7 +190,7 @@ where
 ///
 /// Collect the Values contained within an outer Python Iterable PyObject.
 ///
-pub fn collect_iterable_bound<'py>(
+pub fn collect_iterable<'py>(
     value: &Bound<'py, PyAny>,
 ) -> Result<Vec<Bound<'py, PyAny>>, String> {
     match value.iter() {

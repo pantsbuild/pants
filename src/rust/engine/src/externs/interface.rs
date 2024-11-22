@@ -1713,7 +1713,7 @@ fn capture_snapshots(
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
 
-        let values = externs::collect_iterable_bound(path_globs_and_root_tuple_wrapper).unwrap();
+        let values = externs::collect_iterable(path_globs_and_root_tuple_wrapper).unwrap();
         let path_globs_and_roots = values
             .into_iter()
             .map(|value| {
