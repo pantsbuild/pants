@@ -190,9 +190,7 @@ where
 ///
 /// Collect the Values contained within an outer Python Iterable PyObject.
 ///
-pub fn collect_iterable<'py>(
-    value: &Bound<'py, PyAny>,
-) -> Result<Vec<Bound<'py, PyAny>>, String> {
+pub fn collect_iterable<'py>(value: &Bound<'py, PyAny>) -> Result<Vec<Bound<'py, PyAny>>, String> {
     match value.iter() {
         Ok(py_iter) => py_iter
             .enumerate()
@@ -252,11 +250,7 @@ pub fn val_to_log_level(obj: &Bound<'_, PyAny>) -> Result<log::Level, String> {
     let res: Result<PythonLogLevel, String> = getattr(obj, "_level").and_then(|n: u64| {
         n.try_into()
             .map_err(|e: num_enum::TryFromPrimitiveError<_>| {
-                format!(
-                    "Could not parse {:?} as a LogLevel: {}",
-                    val_to_str(obj),
-                    e
-                )
+                format!("Could not parse {:?} as a LogLevel: {}", val_to_str(obj), e)
             })
     });
     res.map(|py_level| py_level.into())

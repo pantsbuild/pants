@@ -470,11 +470,7 @@ impl NodeKey {
         py: Python<'a>,
         params: &'a Params,
     ) -> impl Iterator<Item = &'a Key> + 'a {
-        let engine_aware_param_ty = context
-            .core
-            .types
-            .engine_aware_parameter
-            .as_py_type(py);
+        let engine_aware_param_ty = context.core.types.engine_aware_parameter.as_py_type(py);
         params.keys().filter(move |key| {
             key.type_id()
                 .as_py_type(py)
