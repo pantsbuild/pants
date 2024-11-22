@@ -1775,7 +1775,7 @@ fn ensure_remote_has_recursive(
             .map(|value| {
                 crate::nodes::lift_directory_digest(&value)
                     .map(|dd| dd.as_digest())
-                    .or_else(|_| crate::nodes::lift_file_digest_bound(&value))
+                    .or_else(|_| crate::nodes::lift_file_digest(&value))
             })
             .collect::<Result<Vec<Digest>, _>>()
             .map_err(PyException::new_err)?;

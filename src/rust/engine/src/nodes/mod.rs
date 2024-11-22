@@ -225,7 +225,7 @@ pub fn lift_directory_digest(digest: &Bound<'_, PyAny>) -> Result<DirectoryDiges
     Ok(py_digest.0)
 }
 
-pub fn lift_file_digest_bound(digest: &Bound<'_, PyAny>) -> Result<hashing::Digest, String> {
+pub fn lift_file_digest(digest: &Bound<'_, PyAny>) -> Result<hashing::Digest, String> {
     let py_file_digest: externs::fs::PyFileDigest = digest.extract().map_err(|e| format!("{e}"))?;
     Ok(py_file_digest.0)
 }
