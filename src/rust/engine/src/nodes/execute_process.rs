@@ -41,7 +41,7 @@ impl ExecuteProcess {
             let value = value.bind(py);
             let input_files = {
                 let input_files_py_value: Bound<'_, PyAny> =
-                    externs::getattr_bound(value, "input_digest")?;
+                    externs::getattr(value, "input_digest")?;
                 lift_directory_digest_bound(&input_files_py_value)
                     .map_err(|err| format!("Error parsing input_digest {err}"))?
             };
@@ -57,7 +57,7 @@ impl ExecuteProcess {
                 ))
             })
             .collect::<Result<BTreeMap<_, _>, String>>()?;
-            let use_nailgun = externs::getattr_bound::<Vec<String>>(value, "use_nailgun")?
+            let use_nailgun = externs::getattr::<Vec<String>>(value, "use_nailgun")?
                 .into_iter()
                 .map(RelativePath::new)
                 .collect::<Result<BTreeSet<_>, _>>()?;
@@ -88,18 +88,17 @@ impl ExecuteProcess {
                 .map(RelativePath::new)
                 .transpose()?;
 
-        let output_files = externs::getattr_bound::<Vec<String>>(value, "output_files")?
+        let output_files = externs::getattr::<Vec<String>>(value, "output_files")?
             .into_iter()
             .map(RelativePath::new)
             .collect::<Result<_, _>>()?;
 
-        let output_directories =
-            externs::getattr_bound::<Vec<String>>(value, "output_directories")?
-                .into_iter()
-                .map(RelativePath::new)
-                .collect::<Result<_, _>>()?;
+        let output_directories = externs::getattr::<Vec<String>>(value, "output_directories")?
+            .into_iter()
+            .map(RelativePath::new)
+            .collect::<Result<_, _>>()?;
 
-        let timeout_in_seconds: f64 = externs::getattr_bound(value, "timeout_seconds")?;
+        let timeout_in_seconds: f64 = externs::getattr(value, "timeout_seconds")?;
 
         let timeout = if timeout_in_seconds < 0.0 {
             None
@@ -107,9 +106,9 @@ impl ExecuteProcess {
             Some(Duration::from_millis((timeout_in_seconds * 1000.0) as u64))
         };
 
-        let description: String = externs::getattr_bound(value, "description")?;
+        let description: String = externs::getattr(value, "description")?;
 
-        let py_level = externs::getattr_bound(value, "level")?;
+        let py_level = externs::getattr(value, "level")?;
 
         let level = externs::val_to_log_level_bound(&py_level)?;
 
@@ -130,22 +129,22 @@ impl ExecuteProcess {
             externs::getattr_as_optional_string_bound(value, "execution_slot_variable")
                 .map_err(|e| format!("Failed to get `execution_slot_variable` for field: {e}"))?;
 
-        let concurrency_available: usize = externs::getattr_bound(value, "concurrency_available")?;
+        let concurrency_available: usize = externs::getattr(value, "concurrency_available")?;
 
         let cache_scope: ProcessCacheScope = {
-            let cache_scope_enum: Bound<'_, PyAny> = externs::getattr_bound(value, "cache_scope")?;
-            externs::getattr_bound::<String>(&cache_scope_enum, "name")?.try_into()?
+            let cache_scope_enum: Bound<'_, PyAny> = externs::getattr(value, "cache_scope")?;
+            externs::getattr::<String>(&cache_scope_enum, "name")?.try_into()?
         };
 
         let remote_cache_speculation_delay = std::time::Duration::from_millis(
-            externs::getattr_bound::<i32>(value, "remote_cache_speculation_delay_millis")
+            externs::getattr::<i32>(value, "remote_cache_speculation_delay_millis")
                 .map_err(|e| format!("Failed to get `name` for field: {e}"))? as u64,
         );
 
-        let attempt = externs::getattr_bound(value, "attempt").unwrap_or(0);
+        let attempt = externs::getattr(value, "attempt").unwrap_or(0);
 
         Ok(Process {
-            argv: externs::getattr_bound(value, "argv").unwrap(),
+            argv: externs::getattr(value, "argv").unwrap(),
             env,
             working_directory,
             input_digests,

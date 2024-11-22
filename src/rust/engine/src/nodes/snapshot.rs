@@ -35,7 +35,7 @@ impl Snapshot {
     }
 
     pub fn lift_path_globs_bound(item: &Bound<'_, PyAny>) -> Result<PathGlobs, String> {
-        let globs: Vec<String> = externs::getattr_bound(item, "globs")
+        let globs: Vec<String> = externs::getattr(item, "globs")
             .map_err(|e| format!("Failed to get `globs` for field: {e}"))?;
 
         let description_of_origin =
@@ -43,19 +43,19 @@ impl Snapshot {
                 .map_err(|e| format!("Failed to get `description_of_origin` for field: {e}"))?;
 
         let glob_match_error_behavior: Bound<'_, PyAny> =
-            externs::getattr_bound(item, "glob_match_error_behavior")
+            externs::getattr(item, "glob_match_error_behavior")
                 .map_err(|e| format!("Failed to get `glob_match_error_behavior` for field: {e}"))?;
 
-        let failure_behavior: String = externs::getattr_bound(&glob_match_error_behavior, "value")
+        let failure_behavior: String = externs::getattr(&glob_match_error_behavior, "value")
             .map_err(|e| format!("Failed to get `value` for field: {e}"))?;
 
         let strict_glob_matching =
             StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
 
-        let conjunction_obj: Bound<'_, PyAny> = externs::getattr_bound(item, "conjunction")
+        let conjunction_obj: Bound<'_, PyAny> = externs::getattr(item, "conjunction")
             .map_err(|e| format!("Failed to get `conjunction` for field: {e}"))?;
 
-        let conjunction_string: String = externs::getattr_bound(&conjunction_obj, "value")
+        let conjunction_string: String = externs::getattr(&conjunction_obj, "value")
             .map_err(|e| format!("Failed to get `value` for field: {e}"))?;
 
         let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;

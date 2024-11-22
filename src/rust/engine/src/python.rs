@@ -201,11 +201,11 @@ impl Function {
     pub fn full_name(&self) -> String {
         let (module, name, line_no) = Python::with_gil(|py| {
             let obj = self.0.value.bind(py);
-            let module: String = externs::getattr_bound(obj, "__module__").unwrap();
-            let name: String = externs::getattr_bound(obj, "__name__").unwrap();
+            let module: String = externs::getattr(obj, "__module__").unwrap();
+            let name: String = externs::getattr(obj, "__name__").unwrap();
             // NB: this is a custom dunder method that Python code should populate before sending the
             // function (e.g. an `@rule`) through FFI.
-            let line_no: u64 = externs::getattr_bound(obj, "__line_number__").unwrap();
+            let line_no: u64 = externs::getattr(obj, "__line_number__").unwrap();
             (module, name, line_no)
         });
         format!("{module}:{line_no}:{name}")

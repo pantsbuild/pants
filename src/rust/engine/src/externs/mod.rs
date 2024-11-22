@@ -169,7 +169,7 @@ pub fn store_bool(py: Python, val: bool) -> Value {
 ///
 /// Gets an attribute of the given value as the given type.
 ///
-pub fn getattr_bound<'py, T>(value: &Bound<'py, PyAny>, field: &str) -> Result<T, String>
+pub fn getattr<'py, T>(value: &Bound<'py, PyAny>, field: &str) -> Result<T, String>
 where
     T: FromPyObject<'py>,
 {
@@ -220,8 +220,8 @@ pub fn getattr_from_str_frozendict_bound<'py, T: FromPyObject<'py>>(
     value: &Bound<'py, PyAny>,
     field: &str,
 ) -> BTreeMap<String, T> {
-    let frozendict: Bound<PyAny> = getattr_bound(value, field).unwrap();
-    let pydict: Bound<PyDict> = getattr_bound(&frozendict, "_data").unwrap();
+    let frozendict: Bound<PyAny> = getattr(value, field).unwrap();
+    let pydict: Bound<PyDict> = getattr(&frozendict, "_data").unwrap();
     pydict
         .items()
         .into_iter()
@@ -249,7 +249,7 @@ pub fn val_to_str_bound(obj: &Bound<'_, PyAny>) -> String {
 }
 
 pub fn val_to_log_level_bound(obj: &Bound<'_, PyAny>) -> Result<log::Level, String> {
-    let res: Result<PythonLogLevel, String> = getattr_bound(obj, "_level").and_then(|n: u64| {
+    let res: Result<PythonLogLevel, String> = getattr(obj, "_level").and_then(|n: u64| {
         n.try_into()
             .map_err(|e: num_enum::TryFromPrimitiveError<_>| {
                 format!(

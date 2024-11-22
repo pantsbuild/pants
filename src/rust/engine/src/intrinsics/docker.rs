@@ -27,9 +27,8 @@ fn docker_resolve_image(docker_request: Value) -> PyGeneratorResponseNativeCall 
 
         let (image_name, platform) = Python::with_gil(|py| {
             let py_docker_request = docker_request.bind(py);
-            let image_name: String =
-                externs::getattr_bound(py_docker_request, "image_name").unwrap();
-            let platform: String = externs::getattr_bound(py_docker_request, "platform").unwrap();
+            let image_name: String = externs::getattr(py_docker_request, "image_name").unwrap();
+            let platform: String = externs::getattr(py_docker_request, "platform").unwrap();
             (image_name, platform)
         });
 

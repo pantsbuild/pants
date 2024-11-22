@@ -262,24 +262,24 @@ fn create_digest(py: Python, create_digest: Value) -> PyGeneratorResponseNativeC
                     .unwrap()
                     .into_iter()
                     .map(|obj| {
-                        let raw_path: String = externs::getattr_bound(&obj, "path").unwrap();
+                        let raw_path: String = externs::getattr(&obj, "path").unwrap();
                         let path = RelativePath::new(PathBuf::from(raw_path)).unwrap();
                         if obj.hasattr("content").unwrap() {
                             let bytes = bytes::Bytes::from(
-                                externs::getattr_bound::<Vec<u8>>(&obj, "content").unwrap(),
+                                externs::getattr::<Vec<u8>>(&obj, "content").unwrap(),
                             );
                             let is_executable: bool =
-                                externs::getattr_bound(&obj, "is_executable").unwrap();
+                                externs::getattr(&obj, "is_executable").unwrap();
                             new_file_count += 1;
                             CreateDigestItem::FileContent(path, bytes, is_executable)
                         } else if obj.hasattr("file_digest").unwrap() {
                             let py_file_digest: PyFileDigest =
-                                externs::getattr_bound(&obj, "file_digest").unwrap();
+                                externs::getattr(&obj, "file_digest").unwrap();
                             let is_executable: bool =
-                                externs::getattr_bound(&obj, "is_executable").unwrap();
+                                externs::getattr(&obj, "is_executable").unwrap();
                             CreateDigestItem::FileEntry(path, py_file_digest.0, is_executable)
                         } else if obj.hasattr("target").unwrap() {
-                            let target: String = externs::getattr_bound(&obj, "target").unwrap();
+                            let target: String = externs::getattr(&obj, "target").unwrap();
                             CreateDigestItem::SymlinkEntry(path, PathBuf::from(target))
                         } else {
                             CreateDigestItem::Dir(path)
@@ -346,9 +346,8 @@ fn digest_subset_to_digest(digest_subset: Value) -> PyGeneratorResponseNativeCal
         let (path_globs, original_digest) = Python::with_gil(|py| {
             let py_digest_subset = digest_subset.bind(py);
             let py_path_globs: Bound<'_, PyAny> =
-                externs::getattr_bound(py_digest_subset, "globs").unwrap();
-            let py_digest: Bound<'_, PyAny> =
-                externs::getattr_bound(py_digest_subset, "digest").unwrap();
+                externs::getattr(py_digest_subset, "globs").unwrap();
+            let py_digest: Bound<'_, PyAny> = externs::getattr(py_digest_subset, "digest").unwrap();
             let res: NodeResult<_> = Ok((
                 Snapshot::lift_prepared_path_globs_bound(&py_path_globs)?,
                 lift_directory_digest_bound(&py_digest)?,
@@ -372,7 +371,7 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
                 .map_err(|e| format!("Failed to get `path` for field: {e}"))?;
             let path = path.ok_or_else(|| "Path must not be `None`.".to_string())?;
 
-            let namespace: PyPathNamespace = externs::getattr_bound(arg, "namespace")
+            let namespace: PyPathNamespace = externs::getattr(arg, "namespace")
                 .map_err(|e| format!("Failed to get `namespace` for field: {e}"))?;
             match namespace {
                 PyPathNamespace::Workspace => SubjectPath::new_workspace(&path).map_err(|_| {
