@@ -184,7 +184,7 @@ fn path_globs_to_digest(path_globs: Value) -> PyGeneratorResponseNativeCall {
 
         let path_globs = Python::with_gil(|py| {
             let py_path_globs = path_globs.bind(py);
-            Snapshot::lift_path_globs_bound(py_path_globs)
+            Snapshot::lift_path_globs(py_path_globs)
         })
         .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
         let snapshot = context.get(Snapshot::from_path_globs(path_globs)).await?;
@@ -202,7 +202,7 @@ fn path_globs_to_paths(path_globs: Value) -> PyGeneratorResponseNativeCall {
 
         let path_globs = Python::with_gil(|py| {
             let py_path_globs = path_globs.bind(py);
-            Snapshot::lift_path_globs_bound(py_path_globs)
+            Snapshot::lift_path_globs(py_path_globs)
         })
         .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
 

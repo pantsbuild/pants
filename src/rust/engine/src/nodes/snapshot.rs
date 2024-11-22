@@ -34,7 +34,7 @@ impl Snapshot {
         Snapshot { path_globs }
     }
 
-    pub fn lift_path_globs_bound(item: &Bound<'_, PyAny>) -> Result<PathGlobs, String> {
+    pub fn lift_path_globs(item: &Bound<'_, PyAny>) -> Result<PathGlobs, String> {
         let globs: Vec<String> = externs::getattr(item, "globs")
             .map_err(|e| format!("Failed to get `globs` for field: {e}"))?;
 
@@ -63,7 +63,7 @@ impl Snapshot {
     }
 
     pub fn lift_prepared_path_globs(item: &Bound<'_, PyAny>) -> Result<PreparedPathGlobs, String> {
-        let path_globs = Snapshot::lift_path_globs_bound(item)?;
+        let path_globs = Snapshot::lift_path_globs(item)?;
         path_globs
             .parse()
             .map_err(|e| format!("Failed to parse PathGlobs for globs({item:?}): {e}"))
