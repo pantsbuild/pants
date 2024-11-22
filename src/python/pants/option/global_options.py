@@ -696,7 +696,7 @@ class ExecutionOptions:
             remote_execution_rpc_concurrency=dynamic_remote_options.execution_rpc_concurrency,
             remote_execution_append_only_caches_base_path=bootstrap_options.remote_execution_append_only_caches_base_path,
         )
-    
+
     @classmethod
     def with_user_agent(cls, headers: dict[str, str]) -> dict[str,str]:
         return {"user-agent": f"pants/{VERSION}"} | headers
