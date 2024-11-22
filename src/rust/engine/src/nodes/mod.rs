@@ -474,10 +474,10 @@ impl NodeKey {
             .core
             .types
             .engine_aware_parameter
-            .as_py_type_bound(py);
+            .as_py_type(py);
         params.keys().filter(move |key| {
             key.type_id()
-                .as_py_type_bound(py)
+                .as_py_type(py)
                 .is_subclass(&engine_aware_param_ty)
                 .unwrap_or(false)
         })

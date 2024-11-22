@@ -1532,7 +1532,7 @@ fn rule_graph_consumed_types<'py>(
         Ok(subgraph
             .consumed_types()
             .into_iter()
-            .map(|type_id| type_id.as_py_type_bound(py))
+            .map(|type_id| type_id.as_py_type(py))
             .collect())
     })
 }
@@ -1564,10 +1564,10 @@ fn rule_graph_rule_gets<'py>(
                 let provided_params = dependency_key
                     .provided_params
                     .iter()
-                    .map(|p| p.as_py_type_bound(py))
+                    .map(|p| p.as_py_type(py))
                     .collect::<Vec<_>>();
                 dependencies.push((
-                    dependency_key.product.as_py_type_bound(py),
+                    dependency_key.product.as_py_type(py),
                     provided_params,
                     function.0.value.into_py(py),
                 ));

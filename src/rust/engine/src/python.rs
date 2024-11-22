@@ -137,7 +137,7 @@ impl TypeId {
         Self(py_type.as_type_ptr())
     }
 
-    pub fn as_py_type_bound<'py>(&self, py: Python<'py>) -> Bound<'py, PyType> {
+    pub fn as_py_type<'py>(&self, py: Python<'py>) -> Bound<'py, PyType> {
         // SAFETY: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
         // type is not unloaded. That is true today, but would not be if we implemented support for hot
         // reloading of plugins.
@@ -149,12 +149,12 @@ impl TypeId {
     }
 
     pub fn is_union(&self) -> bool {
-        Python::with_gil(|py| externs::is_union(py, &self.as_py_type_bound(py)).unwrap())
+        Python::with_gil(|py| externs::is_union(py, &self.as_py_type(py)).unwrap())
     }
 
     pub fn union_in_scope_types(&self) -> Option<Vec<TypeId>> {
         Python::with_gil(|py| {
-            externs::union_in_scope_types(py, &self.as_py_type_bound(py))
+            externs::union_in_scope_types(py, &self.as_py_type(py))
                 .unwrap()
                 .map(|types| {
                     types
@@ -169,7 +169,7 @@ impl TypeId {
 impl fmt::Debug for TypeId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         Python::with_gil(|py| {
-            let type_bound = self.as_py_type_bound(py);
+            let type_bound = self.as_py_type(py);
             let name = type_bound.name().unwrap();
             write!(f, "{name}")
         })

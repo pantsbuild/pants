@@ -397,7 +397,7 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
                 None => py.None(),
             };
 
-            let py_type = context.core.types.path_metadata_result.as_py_type_bound(py);
+            let py_type = context.core.types.path_metadata_result.as_py_type(py);
             let args_tuple = PyTuple::new(py, &[path_metadata_opt]).unwrap_or_else(|e| {
                 panic!("Core type constructor `PyTuple` failed: {e:?}");
             });

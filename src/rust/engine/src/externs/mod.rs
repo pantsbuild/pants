@@ -363,7 +363,7 @@ pub(crate) fn generator_send(
                 let gog = gog?;
                 // TODO: Find a better way to check whether something is a coroutine... this seems
                 // unnecessarily awkward.
-                if gog.is_instance(&generator_type.as_py_type_bound(py))? {
+                if gog.is_instance(&generator_type.as_py_type(py))? {
                     Ok(GetOrGenerator::Generator(Value::new(gog.unbind())))
                 } else if let Ok(get) = gog.extract::<PyRef<PyGeneratorResponseGet>>() {
                     Ok(GetOrGenerator::Get(
@@ -390,7 +390,7 @@ pub(crate) fn generator_send(
 /// NB: Panics on failure. Only recommended for use with built-in types, such as
 /// those configured in types::Types.
 pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
-    let py_type = type_id.as_py_type_bound(py);
+    let py_type = type_id.as_py_type(py);
     let args_tuple = PyTuple::new(py, args.iter().map(|v| v.bind(py))).unwrap_or_else(|e| {
         panic!("Core type constructor `PyTuple` failed: {e:?}",);
     });
@@ -581,7 +581,7 @@ impl PyGeneratorResponseCall {
 
     #[getter]
     fn output_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyType>> {
-        Ok(self.borrow_inner(py)?.output_type.as_py_type_bound(py))
+        Ok(self.borrow_inner(py)?.output_type.as_py_type(py))
     }
 
     #[getter]
@@ -590,7 +590,7 @@ impl PyGeneratorResponseCall {
             .borrow_inner(py)?
             .input_types
             .iter()
-            .map(|t| t.as_py_type_bound(py))
+            .map(|t| t.as_py_type(py))
             .collect())
     }
 
@@ -673,7 +673,7 @@ impl PyGeneratorResponseGet {
                 )
             })?
             .output
-            .as_py_type_bound(py))
+            .as_py_type(py))
     }
 
     #[getter]
@@ -690,7 +690,7 @@ impl PyGeneratorResponseGet {
             })?
             .input_types
             .iter()
-            .map(|t| t.as_py_type_bound(py))
+            .map(|t| t.as_py_type(py))
             .collect())
     }
 
