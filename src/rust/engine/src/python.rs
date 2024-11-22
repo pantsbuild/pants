@@ -381,14 +381,7 @@ impl From<PyObject> for Value {
 
 impl<'py, T> From<&Bound<'py, T>> for Value {
     fn from(value: &Bound<'py, T>) -> Self {
-        Value::new(
-            value
-                .clone()
-                .into_pyobject(value.py())
-                .unwrap()
-                .into_any()
-                .unbind(),
-        )
+        Value::new(value.to_owned().into_any().unbind())
     }
 }
 
