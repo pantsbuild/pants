@@ -698,7 +698,10 @@ class ExecutionOptions:
         )
 
     @classmethod
-    def with_user_agent(cls, headers: dict[str, str]) -> dict[str,str]:
+    def with_user_agent(cls, headers: dict[str, str]) -> dict[str, str]:
+        has_user_agent = any(k.lower() == "user-agent" for k in headers.keys())
+        if has_user_agent:
+            return headers
         return {"user-agent": f"pants/{VERSION}"} | headers
 
 
