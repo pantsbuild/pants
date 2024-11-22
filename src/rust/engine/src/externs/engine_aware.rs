@@ -50,7 +50,7 @@ impl EngineAwareReturnType {
         if level_val.is_none() {
             return None;
         }
-        externs::val_to_log_level_bound(&level_val).ok()
+        externs::val_to_log_level(&level_val).ok()
     }
 
     fn message(obj: &Bound<'_, PyAny>) -> Option<String> {

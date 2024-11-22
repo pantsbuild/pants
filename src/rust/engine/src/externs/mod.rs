@@ -248,7 +248,7 @@ pub fn val_to_str_bound(obj: &Bound<'_, PyAny>) -> String {
     obj.str().unwrap().extract().unwrap()
 }
 
-pub fn val_to_log_level_bound(obj: &Bound<'_, PyAny>) -> Result<log::Level, String> {
+pub fn val_to_log_level(obj: &Bound<'_, PyAny>) -> Result<log::Level, String> {
     let res: Result<PythonLogLevel, String> = getattr(obj, "_level").and_then(|n: u64| {
         n.try_into()
             .map_err(|e: num_enum::TryFromPrimitiveError<_>| {

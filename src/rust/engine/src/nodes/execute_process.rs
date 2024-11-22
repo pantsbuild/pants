@@ -109,7 +109,7 @@ impl ExecuteProcess {
 
         let py_level = externs::getattr(value, "level")?;
 
-        let level = externs::val_to_log_level_bound(&py_level)?;
+        let level = externs::val_to_log_level(&py_level)?;
 
         let append_only_caches =
             externs::getattr_from_str_frozendict_bound::<PyBackedStr>(value, "append_only_caches")
