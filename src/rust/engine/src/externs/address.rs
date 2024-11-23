@@ -17,6 +17,8 @@ use pyo3::types::{PyDict, PyFrozenSet, PyType};
 use fnv::FnvHasher;
 use lazy_static::lazy_static;
 
+use crate::python::PyComparedBool;
+
 create_exception!(native_engine, AddressParseException, PyException);
 create_exception!(native_engine, InvalidAddressError, AddressParseException);
 create_exception!(native_engine, InvalidSpecPathError, InvalidAddressError);
@@ -406,20 +408,13 @@ impl AddressInput {
         format!("{self:?}")
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp, py: Python) -> PyResult<PyObject> {
-        Ok(match op {
-            CompareOp::Eq => (self == other)
-                .into_pyobject(py)?
-                .to_owned()
-                .into_any()
-                .unbind(),
-            CompareOp::Ne => (self != other)
-                .into_pyobject(py)?
-                .to_owned()
-                .into_any()
-                .unbind(),
-            _ => py.NotImplemented(),
-        })
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyComparedBool {
+        match op {
+            CompareOp::Eq => Some(self == other),
+            CompareOp::Ne => Some(self != other),
+            _ => None,
+        }
+        .into()
     }
 }
 
