@@ -1532,7 +1532,7 @@ fn rule_graph_consumed_types<'py>(
         Ok(subgraph
             .consumed_types()
             .into_iter()
-            .map(|type_id| type_id.as_py_type_bound(py))
+            .map(|type_id| type_id.as_py_type(py))
             .collect())
     })
 }
@@ -1569,10 +1569,10 @@ fn rule_graph_rule_gets<'py>(
                 let provided_params = dependency_key
                     .provided_params
                     .iter()
-                    .map(|p| p.as_py_type_bound(py))
+                    .map(|p| p.as_py_type(py))
                     .collect::<Vec<_>>();
                 dependencies.push((
-                    dependency_key.product.as_py_type_bound(py),
+                    dependency_key.product.as_py_type(py),
                     provided_params,
                     function.0.value.into_pyobject(py)?.into_any().unbind(),
                 ));
@@ -1721,23 +1721,22 @@ fn capture_snapshots(
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
 
-        let values = externs::collect_iterable_bound(path_globs_and_root_tuple_wrapper).unwrap();
+        let values = externs::collect_iterable(path_globs_and_root_tuple_wrapper).unwrap();
         let path_globs_and_roots = values
             .into_iter()
             .map(|value| {
-                let root: PathBuf = externs::getattr_bound(&value, "root")?;
+                let root: PathBuf = externs::getattr(&value, "root")?;
                 let path_globs = {
                     let path_globs_py_value =
-                        externs::getattr_bound::<Bound<'_, PyAny>>(&value, "path_globs")?;
-                    nodes::Snapshot::lift_prepared_path_globs_bound(&path_globs_py_value)
+                        externs::getattr::<Bound<'_, PyAny>>(&value, "path_globs")?;
+                    nodes::Snapshot::lift_prepared_path_globs(&path_globs_py_value)
                 };
                 let digest_hint = {
-                    let maybe_digest: Bound<'_, PyAny> =
-                        externs::getattr_bound(&value, "digest_hint")?;
+                    let maybe_digest: Bound<'_, PyAny> = externs::getattr(&value, "digest_hint")?;
                     if maybe_digest.is_none() {
                         None
                     } else {
-                        Some(nodes::lift_directory_digest_bound(&maybe_digest)?)
+                        Some(nodes::lift_directory_digest(&maybe_digest)?)
                     }
                 };
                 path_globs.map(|path_globs| (path_globs, root, digest_hint))
@@ -1782,9 +1781,9 @@ fn ensure_remote_has_recursive(
         let digests: Vec<Digest> = py_digests
             .iter()
             .map(|value| {
-                crate::nodes::lift_directory_digest_bound(&value)
+                crate::nodes::lift_directory_digest(&value)
                     .map(|dd| dd.as_digest())
-                    .or_else(|_| crate::nodes::lift_file_digest_bound(&value))
+                    .or_else(|_| crate::nodes::lift_file_digest(&value))
             })
             .collect::<Result<Vec<Digest>, _>>()
             .map_err(PyException::new_err)?;
@@ -1807,7 +1806,7 @@ fn ensure_directory_digest_persisted(
     let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         let digest =
-            crate::nodes::lift_directory_digest_bound(py_digest).map_err(PyException::new_err)?;
+            crate::nodes::lift_directory_digest(py_digest).map_err(PyException::new_err)?;
 
         py.allow_threads(|| {
             core.executor
@@ -1877,8 +1876,7 @@ fn write_digest(
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
 
-        let lifted_digest =
-            nodes::lift_directory_digest_bound(digest).map_err(PyValueError::new_err)?;
+        let lifted_digest = nodes::lift_directory_digest(digest).map_err(PyValueError::new_err)?;
 
         // Python will have already validated that path_prefix is a relative path.
         let path_prefix = Path::new(&path_prefix);

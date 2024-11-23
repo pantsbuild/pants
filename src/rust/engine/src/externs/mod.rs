@@ -167,7 +167,7 @@ pub fn store_bool(py: Python, val: bool) -> Value {
 ///
 /// Gets an attribute of the given value as the given type.
 ///
-pub fn getattr_bound<'py, T>(value: &Bound<'py, PyAny>, field: &str) -> Result<T, String>
+pub fn getattr<'py, T>(value: &Bound<'py, PyAny>, field: &str) -> Result<T, String>
 where
     T: FromPyObject<'py>,
 {
@@ -188,9 +188,7 @@ where
 ///
 /// Collect the Values contained within an outer Python Iterable PyObject.
 ///
-pub fn collect_iterable_bound<'py>(
-    value: &Bound<'py, PyAny>,
-) -> Result<Vec<Bound<'py, PyAny>>, String> {
+pub fn collect_iterable<'py>(value: &Bound<'py, PyAny>) -> Result<Vec<Bound<'py, PyAny>>, String> {
     match value.try_iter() {
         Ok(py_iter) => py_iter
             .enumerate()
@@ -198,7 +196,7 @@ pub fn collect_iterable_bound<'py>(
                 py_res.map_err(|py_err| {
                     format!(
                         "Could not iterate {}, failed to extract {}th item: {:?}",
-                        val_to_str_bound(value),
+                        val_to_str(value),
                         i,
                         py_err
                     )
@@ -207,19 +205,19 @@ pub fn collect_iterable_bound<'py>(
             .collect(),
         Err(py_err) => Err(format!(
             "Could not iterate {}: {:?}",
-            val_to_str_bound(value),
+            val_to_str(value),
             py_err
         )),
     }
 }
 
 /// Read a `FrozenDict[str, T]`.
-pub fn getattr_from_str_frozendict_bound<'py, T: FromPyObject<'py>>(
+pub fn getattr_from_str_frozendict<'py, T: FromPyObject<'py>>(
     value: &Bound<'py, PyAny>,
     field: &str,
 ) -> BTreeMap<String, T> {
-    let frozendict: Bound<PyAny> = getattr_bound(value, field).unwrap();
-    let pydict: Bound<PyDict> = getattr_bound(&frozendict, "_data").unwrap();
+    let frozendict: Bound<PyAny> = getattr(value, field).unwrap();
+    let pydict: Bound<PyDict> = getattr(&frozendict, "_data").unwrap();
     pydict
         .items()
         .into_iter()
@@ -227,7 +225,7 @@ pub fn getattr_from_str_frozendict_bound<'py, T: FromPyObject<'py>>(
         .collect()
 }
 
-pub fn getattr_as_optional_string_bound(
+pub fn getattr_as_optional_string(
     value: &Bound<'_, PyAny>,
     field: &str,
 ) -> PyResult<Option<String>> {
@@ -239,22 +237,18 @@ pub fn getattr_as_optional_string_bound(
 /// Call the equivalent of `str()` on an arbitrary Python object.
 ///
 /// Converts `None` to the empty string.
-pub fn val_to_str_bound(obj: &Bound<'_, PyAny>) -> String {
+pub fn val_to_str(obj: &Bound<'_, PyAny>) -> String {
     if obj.is_none() {
         return "".to_string();
     }
     obj.str().unwrap().extract().unwrap()
 }
 
-pub fn val_to_log_level_bound(obj: &Bound<'_, PyAny>) -> Result<log::Level, String> {
-    let res: Result<PythonLogLevel, String> = getattr_bound(obj, "_level").and_then(|n: u64| {
+pub fn val_to_log_level(obj: &Bound<'_, PyAny>) -> Result<log::Level, String> {
+    let res: Result<PythonLogLevel, String> = getattr(obj, "_level").and_then(|n: u64| {
         n.try_into()
             .map_err(|e: num_enum::TryFromPrimitiveError<_>| {
-                format!(
-                    "Could not parse {:?} as a LogLevel: {}",
-                    val_to_str_bound(obj),
-                    e
-                )
+                format!("Could not parse {:?} as a LogLevel: {}", val_to_str(obj), e)
             })
     });
     res.map(|py_level| py_level.into())
@@ -365,7 +359,7 @@ pub(crate) fn generator_send(
                 let gog = gog?;
                 // TODO: Find a better way to check whether something is a coroutine... this seems
                 // unnecessarily awkward.
-                if gog.is_instance(&generator_type.as_py_type_bound(py))? {
+                if gog.is_instance(&generator_type.as_py_type(py))? {
                     Ok(GetOrGenerator::Generator(Value::new(gog.unbind())))
                 } else if let Ok(get) = gog.extract::<PyRef<PyGeneratorResponseGet>>() {
                     Ok(GetOrGenerator::Get(
@@ -392,7 +386,7 @@ pub(crate) fn generator_send(
 /// NB: Panics on failure. Only recommended for use with built-in types, such as
 /// those configured in types::Types.
 pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
-    let py_type = type_id.as_py_type_bound(py);
+    let py_type = type_id.as_py_type(py);
     let args_tuple = PyTuple::new(py, args.iter().map(|v| v.bind(py))).unwrap_or_else(|e| {
         panic!("Core type constructor `PyTuple` failed: {e:?}",);
     });
@@ -582,7 +576,7 @@ impl PyGeneratorResponseCall {
 
     #[getter]
     fn output_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyType>> {
-        Ok(self.borrow_inner(py)?.output_type.as_py_type_bound(py))
+        Ok(self.borrow_inner(py)?.output_type.as_py_type(py))
     }
 
     #[getter]
@@ -591,7 +585,7 @@ impl PyGeneratorResponseCall {
             .borrow_inner(py)?
             .input_types
             .iter()
-            .map(|t| t.as_py_type_bound(py))
+            .map(|t| t.as_py_type(py))
             .collect())
     }
 
@@ -674,7 +668,7 @@ impl PyGeneratorResponseGet {
                 )
             })?
             .output
-            .as_py_type_bound(py))
+            .as_py_type(py))
     }
 
     #[getter]
@@ -691,7 +685,7 @@ impl PyGeneratorResponseGet {
             })?
             .input_types
             .iter()
-            .map(|t| t.as_py_type_bound(py))
+            .map(|t| t.as_py_type(py))
             .collect())
     }
 

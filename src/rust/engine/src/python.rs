@@ -134,7 +134,7 @@ impl TypeId {
         Self(py_type.as_type_ptr())
     }
 
-    pub fn as_py_type_bound<'py>(&self, py: Python<'py>) -> Bound<'py, PyType> {
+    pub fn as_py_type<'py>(&self, py: Python<'py>) -> Bound<'py, PyType> {
         // SAFETY: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
         // type is not unloaded. That is true today, but would not be if we implemented support for hot
         // reloading of plugins.
@@ -146,12 +146,12 @@ impl TypeId {
     }
 
     pub fn is_union(&self) -> bool {
-        Python::with_gil(|py| externs::is_union(py, &self.as_py_type_bound(py)).unwrap())
+        Python::with_gil(|py| externs::is_union(py, &self.as_py_type(py)).unwrap())
     }
 
     pub fn union_in_scope_types(&self) -> Option<Vec<TypeId>> {
         Python::with_gil(|py| {
-            externs::union_in_scope_types(py, &self.as_py_type_bound(py))
+            externs::union_in_scope_types(py, &self.as_py_type(py))
                 .unwrap()
                 .map(|types| {
                     types
@@ -166,7 +166,7 @@ impl TypeId {
 impl fmt::Debug for TypeId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         Python::with_gil(|py| {
-            let type_bound = self.as_py_type_bound(py);
+            let type_bound = self.as_py_type(py);
             let name = type_bound.name().unwrap();
             write!(f, "{name}")
         })
@@ -198,11 +198,11 @@ impl Function {
     pub fn full_name(&self) -> String {
         let (module, name, line_no) = Python::with_gil(|py| {
             let obj = self.0.value.bind(py);
-            let module: String = externs::getattr_bound(obj, "__module__").unwrap();
-            let name: String = externs::getattr_bound(obj, "__name__").unwrap();
+            let module: String = externs::getattr(obj, "__module__").unwrap();
+            let name: String = externs::getattr(obj, "__name__").unwrap();
             // NB: this is a custom dunder method that Python code should populate before sending the
             // function (e.g. an `@rule`) through FFI.
-            let line_no: u64 = externs::getattr_bound(obj, "__line_number__").unwrap();
+            let line_no: u64 = externs::getattr(obj, "__line_number__").unwrap();
             (module, name, line_no)
         });
         format!("{module}:{line_no}:{name}")
@@ -335,7 +335,7 @@ impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let repr = Python::with_gil(|py| {
             let obj = self.0.bind(py);
-            externs::val_to_str_bound(obj)
+            externs::val_to_str(obj)
         });
         write!(f, "{repr}")
     }
@@ -507,7 +507,7 @@ impl Failure {
             .extract::<String>()
             .unwrap()
         } else {
-            Self::native_traceback(&externs::val_to_str_bound(val.bind(py)))
+            Self::native_traceback(&externs::val_to_str(val.bind(py)))
         };
         Failure::Throw {
             val,
@@ -547,7 +547,7 @@ impl fmt::Display for Failure {
             Failure::Throw { val, .. } => {
                 let repr = Python::with_gil(|py| {
                     let obj = val.0.bind(py);
-                    externs::val_to_str_bound(obj)
+                    externs::val_to_str(obj)
                 });
                 write!(f, "{repr}")
             }
