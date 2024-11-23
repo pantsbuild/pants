@@ -1,9 +1,6 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
-#![allow(deprecated)]
-
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -14,7 +11,7 @@ use fs::{
 use hashing::{Digest, EMPTY_DIGEST};
 use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyRef, PyResult, Python};
 use pyo3::types::{PyAnyMethods, PyModuleMethods, PyTuple, PyTypeMethods};
-use pyo3::{Bound, IntoPy, PyAny};
+use pyo3::{Bound, IntoPyObject, PyAny};
 use store::{SnapshotOps, SubsetParams};
 
 use crate::externs;
@@ -394,8 +391,13 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
 
         Ok(Python::with_gil(|py| {
             let path_metadata_opt = match metadata_opt {
-                Some(m) => m.into_py(py),
-                None => py.None(),
+                Some(m) => m
+                    .into_pyobject(py)
+                    .unwrap_or_else(|e| {
+                        panic!("Failed to convert type: {e:?}",);
+                    })
+                    .into_any(),
+                None => py.None().into_bound(py),
             };
 
             let py_type = context.core.types.path_metadata_result.as_py_type_bound(py);

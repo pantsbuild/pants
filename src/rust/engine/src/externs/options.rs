@@ -1,8 +1,8 @@
 // Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
+use pyo3::{prelude::*, BoundObject};
 
 use options::{
     apply_dict_edits, apply_list_edits, Args, ConfigSource, DictEdit, DictEditAction, Env,
@@ -26,23 +26,23 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 // This function converts them to equivalent Python types.
 fn val_to_py_object(py: Python, val: &Val) -> PyResult<PyObject> {
     let res = match val {
-        Val::Bool(b) => b.into_py(py),
-        Val::Int(i) => i.into_py(py),
-        Val::Float(f) => f.into_py(py),
-        Val::String(s) => s.into_py(py),
+        Val::Bool(b) => b.into_pyobject(py)?.into_any().unbind(),
+        Val::Int(i) => i.into_pyobject(py)?.into_any().unbind(),
+        Val::Float(f) => f.into_pyobject(py)?.into_any().unbind(),
+        Val::String(s) => s.into_pyobject(py)?.into_any().unbind(),
         Val::List(list) => {
             let pylist = PyList::empty(py);
             for m in list {
                 pylist.append(val_to_py_object(py, m)?)?;
             }
-            pylist.into_py(py)
+            pylist.into_pyobject(py)?.into_any().unbind()
         }
         Val::Dict(dict) => {
             let pydict = PyDict::new(py);
             for (k, v) in dict {
-                pydict.set_item(k.into_py(py), val_to_py_object(py, v)?)?;
+                pydict.set_item(k.into_pyobject(py)?, val_to_py_object(py, v)?)?;
             }
-            pydict.into_py(py)
+            pydict.into_pyobject(py)?.into_any().unbind()
         }
     };
     Ok(res)

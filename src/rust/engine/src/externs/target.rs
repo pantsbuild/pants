@@ -170,9 +170,9 @@ impl Field {
         ))
     }
 
-    fn __richcmp__(
-        self_: &Bound<'_, Self>,
-        other: &Bound<'_, PyAny>,
+    fn __richcmp__<'py>(
+        self_: &Bound<'py, Self>,
+        other: &Bound<'py, PyAny>,
         op: CompareOp,
         py: Python,
     ) -> PyResult<PyObject> {
@@ -182,11 +182,11 @@ impl Field {
                 .value
                 .bind(py)
                 .eq(&other.extract::<PyRef<Field>>()?.value)?;
-        match op {
-            CompareOp::Eq => Ok(is_eq.into_py(py)),
-            CompareOp::Ne => Ok((!is_eq).into_py(py)),
-            _ => Ok(py.NotImplemented()),
-        }
+        Ok(match op {
+            CompareOp::Eq => is_eq.into_pyobject(py)?.to_owned().into_any().unbind(),
+            CompareOp::Ne => (!is_eq).into_pyobject(py)?.to_owned().into_any().unbind(),
+            _ => py.NotImplemented(),
+        })
     }
 }
 

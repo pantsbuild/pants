@@ -1,9 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
-#![allow(deprecated)]
-
 use std::convert::Infallible;
 use std::sync::Arc;
 use std::{fmt, hash};
@@ -11,7 +8,7 @@ use std::{fmt, hash};
 use deepsize::{known_deep_size, DeepSizeOf};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
-use pyo3::{FromPyObject, IntoPy, ToPyObject};
+use pyo3::FromPyObject;
 use smallvec::SmallVec;
 
 use hashing::Digest;
@@ -261,7 +258,7 @@ impl fmt::Display for Key {
 impl<'py> FromPyObject<'py> for Key {
     fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = obj.py();
-        externs::INTERNS.key_insert(py, obj.into_py(py))
+        externs::INTERNS.key_insert(py, obj.to_owned().unbind())
     }
 }
 
@@ -352,14 +349,7 @@ impl fmt::Display for Value {
 
 impl<'py> FromPyObject<'py> for Value {
     fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
-        let py = obj.py();
-        Ok(obj.into_py(py).into())
-    }
-}
-
-impl ToPyObject for &Value {
-    fn to_object(&self, py: Python) -> PyObject {
-        self.0.clone_ref(py)
+        Ok(Value::new(obj.to_owned().unbind()))
     }
 }
 
@@ -391,13 +381,19 @@ impl From<PyObject> for Value {
 
 impl<'py, T> From<&Bound<'py, T>> for Value {
     fn from(value: &Bound<'py, T>) -> Self {
-        Value::new(value.clone().into_py(value.py()))
+        Value::new(value.to_owned().into_any().unbind())
     }
 }
 
-impl IntoPy<PyObject> for &Value {
-    fn into_py(self, py: Python) -> PyObject {
-        (*self.0).bind(py).into_py(py)
+impl<'py, T> From<Bound<'py, T>> for Value {
+    fn from(py_value: Bound<'py, T>) -> Self {
+        Value::from(&py_value)
+    }
+}
+
+impl<'a, 'py, T> From<Borrowed<'a, 'py, T>> for Value {
+    fn from(value: Borrowed<'a, 'py, T>) -> Self {
+        Value::from(value.as_any())
     }
 }
 
@@ -493,8 +489,8 @@ impl Failure {
 
         let maybe_ptraceback = py_err
             .traceback(py)
-            .map(|traceback| traceback.to_object(py));
-        let val = Value::from(py_err.into_py(py));
+            .map(|traceback| traceback.into_pyobject(py).unwrap());
+        let val = Value::from(py_err.into_pyobject(py).unwrap());
         let python_traceback = if let Some(tb) = maybe_ptraceback {
             let locals = PyDict::new(py);
             locals
