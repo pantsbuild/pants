@@ -1,9 +1,6 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
-#![allow(deprecated)]
-
 use std::path::Path;
 
 use deepsize::DeepSizeOf;
@@ -14,7 +11,7 @@ use fs::{
 use futures::TryFutureExt;
 use graph::CompoundNode;
 use pyo3::prelude::{Py, PyAny, Python};
-use pyo3::{Bound, IntoPy};
+use pyo3::Bound;
 
 use super::{unmatched_globs_additional_context, NodeKey, NodeOutput, NodeResult};
 use crate::context::Context;
@@ -71,18 +68,18 @@ impl Snapshot {
 
     pub fn store_directory_digest(py: Python, item: DirectoryDigest) -> Result<Value, String> {
         let py_digest = Py::new(py, externs::fs::PyDigest(item)).map_err(|e| format!("{e}"))?;
-        Ok(Value::new(py_digest.into_py(py)))
+        Ok(Value::new(py_digest.into_any()))
     }
 
     pub fn store_file_digest(py: Python, item: hashing::Digest) -> Result<Value, String> {
         let py_file_digest =
             Py::new(py, externs::fs::PyFileDigest(item)).map_err(|e| format!("{e}"))?;
-        Ok(Value::new(py_file_digest.into_py(py)))
+        Ok(Value::new(py_file_digest.into_any()))
     }
 
     pub fn store_snapshot(py: Python, item: store::Snapshot) -> Result<Value, String> {
         let py_snapshot = Py::new(py, externs::fs::PySnapshot(item)).map_err(|e| format!("{e}"))?;
-        Ok(Value::new(py_snapshot.into_py(py)))
+        Ok(Value::new(py_snapshot.into_any()))
     }
 
     pub fn store_path(py: Python, item: &Path) -> Result<Value, String> {
