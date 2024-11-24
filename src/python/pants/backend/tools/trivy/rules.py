@@ -17,6 +17,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.global_options import KeepSandboxes
 from pants.util.logging import LogLevel
 
 
@@ -24,6 +25,7 @@ from pants.util.logging import LogLevel
 class RunTrivyRequest:
     # trivy fields
     command: str
+    command_args: tuple[str, ...]  # arguments that are command specific
     scanners: tuple[str, ...]
     target: str
     # pants fields
@@ -39,14 +41,10 @@ async def run_trivy(
     request: RunTrivyRequest,
     trivy: Trivy,
     platform: Platform,
+    keep_sandboxes: KeepSandboxes,
 ) -> FallibleProcessResult:
     """Run Trivy."""
-    argv = ["__trivy/trivy", "-d", "--exit-code=1"]
-
-    # workaround for Trivy DB being overloaded on pulls
-    argv.extend(
-        ["--db-repository", "ghcr.io/aquasecurity/trivy-db,public.ecr.aws/aquasecurity/trivy-db"]
-    )
+    argv = ["__trivy/trivy", "--exit-code=1"]
 
     argv.extend(["--cache-dir", trivy.cache_dir])
 
@@ -66,7 +64,7 @@ async def run_trivy(
 
     argv.append(request.target)
 
-    argv.append("--no-progress")  # quiet progress output, which just clutters logs
+    argv.extend(request.command_args)
 
     argv.extend(trivy.args)
 
