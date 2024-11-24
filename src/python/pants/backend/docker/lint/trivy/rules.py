@@ -40,6 +40,16 @@ class TrivyDockerRequest(LintTargetsRequest):
     partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 
+def command_args():
+    return (
+        # workaround for Trivy DB being overloaded on pulls
+        "--db-repository",
+        "ghcr.io/aquasecurity/trivy-db,public.ecr.aws/aquasecurity/trivy-db",
+        # quiet progress output, which just clutters logs
+        "--no-progress",
+    )
+
+
 @rule(desc="Lint Docker image with Trivy", level=LogLevel.DEBUG)
 async def run_trivy_docker(
     request: TrivyDockerRequest.Batch[TrivyDockerRequest, Any],
@@ -58,6 +68,7 @@ async def run_trivy_docker(
     r = await run_trivy(
         RunTrivyRequest(
             command="image",
+            command_args=command_args(),
             scanners=(),
             target=package.artifacts[0].image_id,
             input_digest=EMPTY_DIGEST,
