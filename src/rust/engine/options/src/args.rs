@@ -89,6 +89,11 @@ impl Arg {
 
 #[derive(Debug)]
 pub struct Args {
+    // The arg strings this struct was instantiated with.
+    #[allow(dead_code)]
+    arg_strs: Vec<String>,
+
+    // The structured args parsed from the arg strings.
     args: Vec<Arg>,
     passthrough_args: Option<Vec<String>>,
 }
@@ -97,14 +102,16 @@ impl Args {
     // Create an Args instance with the provided args, which must *not* include the
     // argv[0] process name.
     pub fn new<I: IntoIterator<Item = String>>(arg_strs: I) -> Self {
+        let arg_strs = arg_strs.into_iter().collect::<Vec<_>>();
         let mut args: Vec<Arg> = vec![];
         let mut passthrough_args: Option<Vec<String>> = None;
         let mut scope = Scope::Global;
-        let mut args_iter = arg_strs.into_iter();
+
+        let mut args_iter = arg_strs.iter();
         while let Some(arg_str) = args_iter.next() {
             if arg_str == "--" {
                 // We've hit the passthrough args delimiter (`--`).
-                passthrough_args = Some(args_iter.collect::<Vec<String>>());
+                passthrough_args = Some(args_iter.map(String::to_string).collect::<Vec<String>>());
                 break;
             } else if arg_str.starts_with("--") {
                 let mut components = arg_str.splitn(2, '=');
@@ -129,8 +136,8 @@ impl Args {
                         Some(value.to_string())
                     },
                 });
-            } else if is_valid_scope_name(&arg_str) {
-                scope = Scope::Scope(arg_str)
+            } else if is_valid_scope_name(arg_str) {
+                scope = Scope::Scope(arg_str.to_string())
             } else {
                 // The arg is a spec, so revert to global context for any trailing flags.
                 scope = Scope::Global;
@@ -138,6 +145,7 @@ impl Args {
         }
 
         Self {
+            arg_strs,
             args,
             passthrough_args,
         }
@@ -200,8 +208,8 @@ impl ArgsReader {
         }
     }
 
-    pub fn get_passthrough_args(&self) -> Option<&Vec<String>> {
-        self.args.passthrough_args.as_ref()
+    pub fn get_passthrough_args(&self) -> Option<Vec<String>> {
+        self.args.passthrough_args.clone()
     }
 
     pub fn get_tracker(&self) -> Arc<ArgsTracker> {

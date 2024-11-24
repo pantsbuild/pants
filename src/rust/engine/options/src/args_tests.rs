@@ -391,7 +391,7 @@ fn test_passthrough_args() {
     assert_string("debug", option_id!(-'l', "level"));
 
     assert_eq!(
-        Some(&vec![
+        Some(vec![
             "--passthrough0".to_string(),
             "passthrough1".to_string(),
             "-p".to_string(),
@@ -404,7 +404,7 @@ fn test_passthrough_args() {
 fn test_empty_passthrough_args() {
     let args = mk_args(["-ldebug", "--foo=bar", "--"]);
 
-    assert_eq!(Some(&vec![]), args.get_passthrough_args());
+    assert_eq!(Some(vec![]), args.get_passthrough_args());
 }
 
 #[test]

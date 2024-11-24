@@ -1,6 +1,7 @@
 // Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 
@@ -499,13 +500,15 @@ impl PyOptionParser {
     }
 
     fn get_passthrough_args(&self) -> PyResult<Option<Vec<String>>> {
-        Ok(self.0.get_passthrough_args().cloned())
+        self.0.get_passthrough_args().map_err(PyException::new_err)
     }
 
-    fn get_unconsumed_flags(&self) -> HashMap<String, Vec<String>> {
+    fn get_unconsumed_flags(&self) -> PyResult<HashMap<String, Vec<String>>> {
         // The python side expects an empty string to represent the GLOBAL scope.
-        self.0
+        Ok(self
+            .0
             .get_unconsumed_flags()
+            .map_err(PyException::new_err)?
             .into_iter()
             .map(|(k, v)| {
                 (
@@ -513,7 +516,7 @@ impl PyOptionParser {
                     v,
                 )
             })
-            .collect()
+            .collect())
     }
 
     fn validate_config(
