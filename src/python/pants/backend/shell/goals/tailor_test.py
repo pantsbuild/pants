@@ -35,16 +35,13 @@ def rule_runner() -> RuleRunner:
 
 
 @pytest.mark.parametrize(
-    "opt_tailor,opt_tailor_sources,opt_tailor_tests,expects_sources,expects_tests",
+    "opt_tailor_sources,opt_tailor_tests,expects_sources,expects_tests",
     [
-        pytest.param(True, True, True, True, True, id="legacy tailor enabled"),
-        pytest.param(False, True, True, False, False, id="legacy tailor disabled"),
-        pytest.param(True, False, True, False, True, id="sources disabled"),
-        pytest.param(True, True, False, True, False, id="tests disabled"),
+        pytest.param(False, True, False, True, id="sources disabled"),
+        pytest.param(True, False, True, False, id="tests disabled"),
     ],
 )
 def test_find_putative_targets(
-    opt_tailor,
     opt_tailor_sources,
     opt_tailor_tests,
     expects_sources,
@@ -66,7 +63,6 @@ def test_find_putative_targets(
     )
     rule_runner.set_options(
         [
-            f"--shell-setup-tailor={opt_tailor}",
             f"--shell-setup-tailor-sources={opt_tailor_sources}",
             f"--shell-setup-tailor-shunit2-tests={opt_tailor_tests}",
         ]

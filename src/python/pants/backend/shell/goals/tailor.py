@@ -47,9 +47,6 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
 async def find_putative_targets(
     req: PutativeShellTargetsRequest, all_owned_sources: AllOwnedSources, shell_setup: ShellSetup
 ) -> PutativeTargets:
-    if not shell_setup.tailor:
-        return PutativeTargets()
-
     if not (shell_setup.tailor_sources or shell_setup.tailor_shunit2_tests):
         return PutativeTargets()
 

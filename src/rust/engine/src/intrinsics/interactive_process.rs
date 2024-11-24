@@ -58,7 +58,7 @@ pub async fn interactive_process_inner(
         externs::process::PyProcessExecutionEnvironment,
     ) = Python::with_gil(|py| {
         let py_interactive_process = interactive_process.bind(py);
-        let py_process: Value = externs::getattr_bound(py_interactive_process, "process").unwrap();
+        let py_process: Value = externs::getattr(py_interactive_process, "process").unwrap();
         let process_config = process_config.bind(py).extract().unwrap();
         (
             py_interactive_process.extract().unwrap(),
@@ -84,11 +84,11 @@ pub async fn interactive_process_inner(
     let (run_in_workspace, keep_sandboxes) = Python::with_gil(|py| {
         let py_interactive_process = py_interactive_process.bind(py);
         let run_in_workspace: bool =
-            externs::getattr_bound(py_interactive_process, "run_in_workspace").unwrap();
+            externs::getattr(py_interactive_process, "run_in_workspace").unwrap();
         let keep_sandboxes_value: Bound<'_, PyAny> =
-            externs::getattr_bound(py_interactive_process, "keep_sandboxes").unwrap();
+            externs::getattr(py_interactive_process, "keep_sandboxes").unwrap();
         let keep_sandboxes = KeepSandboxes::from_str(
-            externs::getattr_bound::<PyBackedStr>(&keep_sandboxes_value, "value")
+            externs::getattr::<PyBackedStr>(&keep_sandboxes_value, "value")
                 .unwrap()
                 .as_ref(),
         )
