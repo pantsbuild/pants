@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::externs;
 use crate::externs::fs::PyFileDigest;
-use crate::nodes::{lift_directory_digest_bound, lift_file_digest_bound};
+use crate::nodes::{lift_directory_digest, lift_file_digest};
 use crate::Value;
 
 use pyo3::prelude::*;
@@ -50,7 +50,7 @@ impl EngineAwareReturnType {
         if level_val.is_none() {
             return None;
         }
-        externs::val_to_log_level_bound(&level_val).ok()
+        externs::val_to_log_level(&level_val).ok()
     }
 
     fn message(obj: &Bound<'_, PyAny>) -> Option<String> {
@@ -73,10 +73,10 @@ impl EngineAwareReturnType {
         for kv_pair in artifacts_dict.items().into_iter() {
             let (key, value): (String, Bound<'_, PyAny>) = kv_pair.extract().ok()?;
             let artifact_output = if value.is_instance_of::<PyFileDigest>() {
-                lift_file_digest_bound(&value).map(ArtifactOutput::FileDigest)
+                lift_file_digest(&value).map(ArtifactOutput::FileDigest)
             } else {
                 let digest_value = value.getattr("digest").ok()?;
-                lift_directory_digest_bound(&digest_value)
+                lift_directory_digest(&digest_value)
                     .map(|dd| ArtifactOutput::Snapshot(Arc::new(dd)))
             }
             .ok()?;

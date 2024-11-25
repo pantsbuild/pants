@@ -220,12 +220,12 @@ fn select_reentry(
     .boxed()
 }
 
-pub fn lift_directory_digest_bound(digest: &Bound<'_, PyAny>) -> Result<DirectoryDigest, String> {
+pub fn lift_directory_digest(digest: &Bound<'_, PyAny>) -> Result<DirectoryDigest, String> {
     let py_digest: externs::fs::PyDigest = digest.extract().map_err(|e| format!("{e}"))?;
     Ok(py_digest.0)
 }
 
-pub fn lift_file_digest_bound(digest: &Bound<'_, PyAny>) -> Result<hashing::Digest, String> {
+pub fn lift_file_digest(digest: &Bound<'_, PyAny>) -> Result<hashing::Digest, String> {
     let py_file_digest: externs::fs::PyFileDigest = digest.extract().map_err(|e| format!("{e}"))?;
     Ok(py_file_digest.0)
 }
@@ -470,14 +470,10 @@ impl NodeKey {
         py: Python<'a>,
         params: &'a Params,
     ) -> impl Iterator<Item = &'a Key> + 'a {
-        let engine_aware_param_ty = context
-            .core
-            .types
-            .engine_aware_parameter
-            .as_py_type_bound(py);
+        let engine_aware_param_ty = context.core.types.engine_aware_parameter.as_py_type(py);
         params.keys().filter(move |key| {
             key.type_id()
-                .as_py_type_bound(py)
+                .as_py_type(py)
                 .is_subclass(&engine_aware_param_ty)
                 .unwrap_or(false)
         })
