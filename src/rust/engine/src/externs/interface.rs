@@ -33,14 +33,14 @@ use process_execution::CacheContentBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
     pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
-    PyResult as PyO3Result, Python, ToPyObject,
+    PyResult as PyO3Result, Python,
 };
 use pyo3::sync::GILProtected;
 use pyo3::types::{
     PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyModuleMethods, PyTuple,
     PyType,
 };
-use pyo3::{create_exception, Bound, IntoPy, PyAny, PyRef};
+use pyo3::{create_exception, Bound, IntoPyObject, PyAny, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, RuleGraph};
@@ -76,7 +76,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     externs::workunits::register(m)?;
     externs::dep_inference::register(m)?;
 
-    m.add("PollTimeout", py.get_type_bound::<PollTimeout>())?;
+    m.add("PollTimeout", py.get_type::<PollTimeout>())?;
 
     m.add_class::<PyExecutionRequest>()?;
     m.add_class::<PyExecutionStrategyOptions>()?;
@@ -223,9 +223,9 @@ impl PyTypes {
         py: Python,
     ) -> Self {
         Self(GILProtected::new(RefCell::new(Some(Types {
-            directory_digest: TypeId::new(&py.get_type_bound::<externs::fs::PyDigest>()),
-            file_digest: TypeId::new(&py.get_type_bound::<externs::fs::PyFileDigest>()),
-            snapshot: TypeId::new(&py.get_type_bound::<externs::fs::PySnapshot>()),
+            directory_digest: TypeId::new(&py.get_type::<externs::fs::PyDigest>()),
+            file_digest: TypeId::new(&py.get_type::<externs::fs::PyFileDigest>()),
+            snapshot: TypeId::new(&py.get_type::<externs::fs::PySnapshot>()),
             paths: TypeId::new(paths),
             path_metadata_request: TypeId::new(path_metadata_request),
             path_metadata_result: TypeId::new(path_metadata_result),
@@ -236,9 +236,9 @@ impl PyTypes {
             digest_contents: TypeId::new(digest_contents),
             digest_entries: TypeId::new(digest_entries),
             path_globs: TypeId::new(path_globs),
-            merge_digests: TypeId::new(&py.get_type_bound::<externs::fs::PyMergeDigests>()),
-            add_prefix: TypeId::new(&py.get_type_bound::<externs::fs::PyAddPrefix>()),
-            remove_prefix: TypeId::new(&py.get_type_bound::<externs::fs::PyRemovePrefix>()),
+            merge_digests: TypeId::new(&py.get_type::<externs::fs::PyMergeDigests>()),
+            add_prefix: TypeId::new(&py.get_type::<externs::fs::PyAddPrefix>()),
+            remove_prefix: TypeId::new(&py.get_type::<externs::fs::PyRemovePrefix>()),
             create_digest: TypeId::new(create_digest),
             digest_subset: TypeId::new(digest_subset),
             native_download_file: TypeId::new(native_download_file),
@@ -246,7 +246,7 @@ impl PyTypes {
             process: TypeId::new(process),
             process_result: TypeId::new(process_result),
             process_config_from_environment: TypeId::new(
-                &py.get_type_bound::<externs::process::PyProcessExecutionEnvironment>(),
+                &py.get_type::<externs::process::PyProcessExecutionEnvironment>(),
             ),
             process_result_metadata: TypeId::new(process_result_metadata),
             coroutine: TypeId::new(coroutine),
@@ -264,7 +264,7 @@ impl PyTypes {
                 parsed_javascript_deps_candidate_result,
             ),
             deps_request: TypeId::new(
-                &py.get_type_bound::<externs::dep_inference::PyNativeDependenciesRequest>(),
+                &py.get_type::<externs::dep_inference::PyNativeDependenciesRequest>(),
             ),
         }))))
     }
@@ -627,9 +627,17 @@ fn nailgun_server_create(
         let executor = py_executor.0.clone();
         nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
             Python::with_gil(|py| {
+                let args_tuple = match PyTuple::new(py, exe.cmd.args) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        error!("PyTuple construction failure: {e:?}");
+                        return nailgun::ExitCode(1);
+                    }
+                };
+
                 let result = runner.bind(py).call1((
                     exe.cmd.command,
-                    PyTuple::new_bound(py, exe.cmd.args),
+                    args_tuple,
                     exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),
                     exe.cmd.working_dir,
                     PySessionCancellationLatch(exe.cancelled),
@@ -824,7 +832,7 @@ async fn workunit_to_py_value(
         ))
     })?;
     let has_parent_ids = !workunit.parent_ids.is_empty();
-    let mut dict_entries = Python::with_gil(|py| {
+    let mut dict_entries = Python::with_gil(|py| -> PyO3Result<Vec<(Value, Value)>> {
         let mut dict_entries = vec![
             (
                 externs::store_utf8(py, "name"),
@@ -852,7 +860,7 @@ async fn workunit_to_py_value(
         }
         dict_entries.push((
             externs::store_utf8(py, "parent_ids"),
-            externs::store_tuple(py, parent_ids),
+            externs::store_tuple(py, parent_ids)?,
         ));
 
         match workunit.state {
@@ -899,8 +907,8 @@ async fn workunit_to_py_value(
                 externs::store_utf8(py, desc),
             ));
         }
-        dict_entries
-    });
+        Ok(dict_entries)
+    })?;
 
     let mut artifact_entries = Vec::new();
 
@@ -939,8 +947,8 @@ async fn workunit_to_py_value(
         let mut user_metadata_entries = Vec::with_capacity(metadata.user_metadata.len());
         for (user_metadata_key, user_metadata_item) in metadata.user_metadata.iter() {
             let value = match user_metadata_item {
-                UserMetadataItem::String(v) => v.into_py(py),
-                UserMetadataItem::Int(n) => n.into_py(py),
+                UserMetadataItem::String(v) => v.into_pyobject(py)?.to_owned().into_any().unbind(),
+                UserMetadataItem::Int(n) => n.into_pyobject(py)?.to_owned().into_any().unbind(),
                 UserMetadataItem::PyValue(py_val_handle) => (**py_val_handle)
                     .as_any()
                     .downcast_ref::<Value>()
@@ -949,7 +957,9 @@ async fn workunit_to_py_value(
                             "Failed to convert {py_val_handle:?} to a Value."
                         ))
                     })?
-                    .to_object(py),
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind(),
             };
             user_metadata_entries.push((
                 externs::store_utf8(py, user_metadata_key.as_str()),
@@ -1021,7 +1031,7 @@ async fn workunits_to_py_tuple_value(
         workunit_values.push(py_value);
     }
 
-    Ok(externs::store_tuple(py, workunit_values))
+    externs::store_tuple(py, workunit_values)
 }
 
 #[pyfunction]
@@ -1070,7 +1080,7 @@ fn session_poll_workunits(
                     completed,
                     &core,
                 ))?;
-                Ok(externs::store_tuple(py, vec![started_val, completed_val]).into())
+                Ok(externs::store_tuple(py, vec![started_val, completed_val])?.into())
             })
         })
     })
@@ -1085,14 +1095,14 @@ fn session_run_interactive_process(
     py: Python,
     py_session: &Bound<'_, PySession>,
     interactive_process: PyObject,
-    process_config_from_environment: PyProcessExecutionEnvironment,
+    process_config_from_environment: &Bound<'_, PyProcessExecutionEnvironment>,
 ) -> PyO3Result<PyObject> {
     let core = py_session.borrow().0.core().clone();
     let session = &py_session.borrow().0;
     let context = core.graph.context(SessionCore::new(session.clone()));
 
     let interactive_process: Value = interactive_process.into();
-    let process_config = Value::new(process_config_from_environment.into_py(py));
+    let process_config = Value::from(process_config_from_environment.as_any());
 
     py.allow_threads(|| {
         core.executor.clone().block_on(nodes::task_context(
@@ -1139,7 +1149,7 @@ fn scheduler_live_items<'py>(
         .enter(|| py.allow_threads(|| scheduler.live_items(session)));
     let py_items = items
         .into_iter()
-        .map(|value| value.bind(py).to_object(py))
+        .map(|value| value.bind(py).clone().unbind())
         .collect();
     (py_items, sizes)
 }
@@ -1433,13 +1443,12 @@ fn session_get_observation_histograms<'py>(
                 .map_err(PyException::new_err)
         })?;
 
-        let encoded_observations = PyDict::new_bound(py);
+        let encoded_observations = PyDict::new(py);
         for (metric, encoded_histogram) in &observations {
-            encoded_observations
-                .set_item(metric, PyBytes::new_bound(py, &encoded_histogram[..]))?;
+            encoded_observations.set_item(metric, PyBytes::new(py, &encoded_histogram[..]))?;
         }
 
-        let result = PyDict::new_bound(py);
+        let result = PyDict::new(py);
         result.set_item("version", OBSERVATIONS_VERSION)?;
         result.set_item("histograms", encoded_observations)?;
         Ok(result)
@@ -1523,7 +1532,7 @@ fn rule_graph_consumed_types<'py>(
         Ok(subgraph
             .consumed_types()
             .into_iter()
-            .map(|type_id| type_id.as_py_type_bound(py))
+            .map(|type_id| type_id.as_py_type(py))
             .collect())
     })
 }
@@ -1535,11 +1544,16 @@ fn rule_graph_rule_gets<'py>(
 ) -> PyO3Result<Bound<'py, PyDict>> {
     let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
-        let result = PyDict::new_bound(py);
+        let result = PyDict::new(py);
         for (rule, rule_dependencies) in core.rule_graph.rule_dependencies() {
             let task = rule.0;
             let function = &task.func;
-            let mut dependencies = Vec::new();
+            #[allow(clippy::type_complexity)]
+            let mut dependencies: Vec<(
+                Bound<'_, PyType>,
+                Vec<Bound<'_, PyType>>,
+                pyo3::Py<PyAny>,
+            )> = Vec::new();
             for (dependency_key, rule) in rule_dependencies {
                 // NB: We are only migrating non-union Gets, which are those in the `gets` list
                 // which do not have `in_scope_params` marking them as being for unions, or a call
@@ -1555,18 +1569,21 @@ fn rule_graph_rule_gets<'py>(
                 let provided_params = dependency_key
                     .provided_params
                     .iter()
-                    .map(|p| p.as_py_type_bound(py))
+                    .map(|p| p.as_py_type(py))
                     .collect::<Vec<_>>();
                 dependencies.push((
-                    dependency_key.product.as_py_type_bound(py),
+                    dependency_key.product.as_py_type(py),
                     provided_params,
-                    function.0.value.into_py(py),
+                    function.0.value.into_pyobject(py)?.into_any().unbind(),
                 ));
             }
             if dependencies.is_empty() {
                 continue;
             }
-            result.set_item(function.0.value.into_py(py), dependencies.into_py(py))?;
+            result.set_item(
+                function.0.value.into_pyobject(py)?,
+                dependencies.into_pyobject(py)?,
+            )?;
         }
         Ok(result)
     })
@@ -1704,23 +1721,22 @@ fn capture_snapshots(
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
 
-        let values = externs::collect_iterable_bound(path_globs_and_root_tuple_wrapper).unwrap();
+        let values = externs::collect_iterable(path_globs_and_root_tuple_wrapper).unwrap();
         let path_globs_and_roots = values
             .into_iter()
             .map(|value| {
-                let root: PathBuf = externs::getattr_bound(&value, "root")?;
+                let root: PathBuf = externs::getattr(&value, "root")?;
                 let path_globs = {
                     let path_globs_py_value =
-                        externs::getattr_bound::<Bound<'_, PyAny>>(&value, "path_globs")?;
-                    nodes::Snapshot::lift_prepared_path_globs_bound(&path_globs_py_value)
+                        externs::getattr::<Bound<'_, PyAny>>(&value, "path_globs")?;
+                    nodes::Snapshot::lift_prepared_path_globs(&path_globs_py_value)
                 };
                 let digest_hint = {
-                    let maybe_digest: Bound<'_, PyAny> =
-                        externs::getattr_bound(&value, "digest_hint")?;
+                    let maybe_digest: Bound<'_, PyAny> = externs::getattr(&value, "digest_hint")?;
                     if maybe_digest.is_none() {
                         None
                     } else {
-                        Some(nodes::lift_directory_digest_bound(&maybe_digest)?)
+                        Some(nodes::lift_directory_digest(&maybe_digest)?)
                     }
                 };
                 path_globs.map(|path_globs| (path_globs, root, digest_hint))
@@ -1765,9 +1781,9 @@ fn ensure_remote_has_recursive(
         let digests: Vec<Digest> = py_digests
             .iter()
             .map(|value| {
-                crate::nodes::lift_directory_digest_bound(&value)
+                crate::nodes::lift_directory_digest(&value)
                     .map(|dd| dd.as_digest())
-                    .or_else(|_| crate::nodes::lift_file_digest_bound(&value))
+                    .or_else(|_| crate::nodes::lift_file_digest(&value))
             })
             .collect::<Result<Vec<Digest>, _>>()
             .map_err(PyException::new_err)?;
@@ -1790,7 +1806,7 @@ fn ensure_directory_digest_persisted(
     let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         let digest =
-            crate::nodes::lift_directory_digest_bound(py_digest).map_err(PyException::new_err)?;
+            crate::nodes::lift_directory_digest(py_digest).map_err(PyException::new_err)?;
 
         py.allow_threads(|| {
             core.executor
@@ -1825,7 +1841,7 @@ fn single_file_digests_to_bytes<'py>(
             .map(|values| values.into_iter().map(|val| val.into()).collect())
             .map_err(possible_store_missing_digest)?;
 
-        let output_list = PyList::new_bound(py, &bytes_values);
+        let output_list = PyList::new(py, &bytes_values)?;
         Ok(output_list)
     })
 }
@@ -1860,8 +1876,7 @@ fn write_digest(
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
 
-        let lifted_digest =
-            nodes::lift_directory_digest_bound(digest).map_err(PyValueError::new_err)?;
+        let lifted_digest = nodes::lift_directory_digest(digest).map_err(PyValueError::new_err)?;
 
         // Python will have already validated that path_prefix is a relative path.
         let path_prefix = Path::new(&path_prefix);
