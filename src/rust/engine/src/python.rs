@@ -601,11 +601,9 @@ pub fn throw(msg: String) -> Failure {
 }
 
 /// A tri-state boolean value for use with `__richcmp__` dunder method implementations. The type
-/// represents not only `true` and `false`, but also the `NotImplemented` type which `__richcmp__`
-/// methods may return when a particular comparison operator is not supported.
-///
-/// Even better is the type supports a conversion from `Option<bool>` so implementing `__richcmp__`
-/// implementations should avoid a lot of boilerplate.
+/// represents not only `true` and `false` (via `Some(value`), but also the `NotImplemented` value
+/// (via `None``) which `__richcmp__` methods may return when a particular comparison operator is
+/// not supported.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct PyComparedBool(pub Option<bool>);
 
