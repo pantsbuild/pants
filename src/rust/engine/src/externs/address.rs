@@ -409,12 +409,11 @@ impl AddressInput {
     }
 
     fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyComparedBool {
-        match op {
+        PyComparedBool(match op {
             CompareOp::Eq => Some(self == other),
             CompareOp::Ne => Some(self != other),
             _ => None,
-        }
-        .into()
+        })
     }
 }
 

@@ -607,19 +607,11 @@ pub fn throw(msg: String) -> Failure {
 /// Even better is the type supports a conversion from `Option<bool>` so implementing `__richcmp__`
 /// implementations should avoid a lot of boilerplate.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-pub enum PyComparedBool {
-    True,
-    False,
-    NotImplemented,
-}
+pub struct PyComparedBool(pub Option<bool>);
 
 impl From<Option<bool>> for PyComparedBool {
     fn from(value: Option<bool>) -> Self {
-        match value {
-            Some(true) => PyComparedBool::True,
-            Some(false) => PyComparedBool::False,
-            None => PyComparedBool::NotImplemented,
-        }
+        Self(value)
     }
 }
 
@@ -629,10 +621,9 @@ impl<'py> IntoPyObject<'py> for PyComparedBool {
     type Error = Infallible;
 
     fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-        Ok(match self {
-            PyComparedBool::True => PyBool::new(py, true).to_owned().into_any(),
-            PyComparedBool::False => PyBool::new(py, false).to_owned().into_any(),
-            PyComparedBool::NotImplemented => py.NotImplemented().into_bound(py),
+        Ok(match &self.0 {
+            Some(value) => PyBool::new(py, *value).to_owned().into_any(),
+            None => py.NotImplemented().into_bound(py),
         })
     }
 }
@@ -646,13 +637,9 @@ mod pycomparedbool_tests {
     fn pycomparedbool_conversion_tests() {
         pyo3::prepare_freethreaded_python();
 
-        assert_eq!(PyComparedBool::True, PyComparedBool::from(Some(true)));
-        assert_eq!(PyComparedBool::False, PyComparedBool::from(Some(false)));
-        assert_eq!(PyComparedBool::NotImplemented, PyComparedBool::from(None));
-
         Python::with_gil(|py| {
             assert_eq!(
-                PyComparedBool::True
+                PyComparedBool(Some(true))
                     .into_pyobject(py)
                     .unwrap()
                     .extract::<bool>()
@@ -660,14 +647,14 @@ mod pycomparedbool_tests {
                 true
             );
             assert_eq!(
-                PyComparedBool::False
+                PyComparedBool(Some(false))
                     .into_pyobject(py)
                     .unwrap()
                     .extract::<bool>()
                     .unwrap(),
                 false
             );
-            assert!(PyComparedBool::NotImplemented
+            assert!(PyComparedBool(None)
                 .into_pyobject(py)
                 .unwrap()
                 .is(&py.NotImplemented()),);

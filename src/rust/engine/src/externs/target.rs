@@ -183,12 +183,11 @@ impl Field {
                 .value
                 .bind(py)
                 .eq(&other.extract::<PyRef<Field>>()?.value)?;
-        Ok(match op {
+        Ok(PyComparedBool(match op {
             CompareOp::Eq => Some(is_eq),
             CompareOp::Ne => Some(!is_eq),
             _ => None,
-        }
-        .into())
+        }))
     }
 }
 

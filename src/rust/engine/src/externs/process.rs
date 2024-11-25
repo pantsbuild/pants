@@ -86,12 +86,11 @@ impl PyProcessExecutionEnvironment {
         op: CompareOp,
     ) -> PyComparedBool {
         let other = other.borrow();
-        match op {
+        PyComparedBool(match op {
             CompareOp::Eq => Some(*self == *other),
             CompareOp::Ne => Some(*self != *other),
             _ => None,
-        }
-        .into()
+        })
     }
 
     #[getter]

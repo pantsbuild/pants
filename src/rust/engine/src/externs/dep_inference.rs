@@ -60,12 +60,11 @@ impl PyInferenceMetadata {
     }
 
     fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyComparedBool {
-        match op {
+        PyComparedBool(match op {
             CompareOp::Eq => Some(self == other),
             CompareOp::Ne => Some(self != other),
             _ => None,
-        }
-        .into()
+        })
     }
 
     fn __repr__(&self) -> String {
@@ -113,11 +112,10 @@ impl PyNativeDependenciesRequest {
     }
 
     fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyComparedBool {
-        match op {
+        PyComparedBool(match op {
             CompareOp::Eq => Some(self == other),
             CompareOp::Ne => Some(self != other),
             _ => None,
-        }
-        .into()
+        })
     }
 }
