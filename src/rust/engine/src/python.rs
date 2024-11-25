@@ -605,6 +605,7 @@ pub fn throw(msg: String) -> Failure {
 /// (via `None``) which `__richcmp__` methods may return when a particular comparison operator is
 /// not supported.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[repr(transparent)]
 pub struct PyComparedBool(pub Option<bool>);
 
 impl From<Option<bool>> for PyComparedBool {
