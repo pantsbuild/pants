@@ -111,7 +111,7 @@ impl Args {
         while let Some(arg_str) = args_iter.next() {
             if arg_str == "--" {
                 // We've hit the passthrough args delimiter (`--`).
-                passthrough_args = Some(args_iter.map(String::to_string).collect::<Vec<String>>());
+                passthrough_args = Some(args_iter.cloned().collect::<Vec<String>>());
                 break;
             } else if arg_str.starts_with("--") {
                 let mut components = arg_str.splitn(2, '=');
