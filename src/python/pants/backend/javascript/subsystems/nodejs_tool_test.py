@@ -52,8 +52,8 @@ def test_version_option_overrides_default(rule_runner: RuleRunner):
     "package_manager, expected_argv",
     [
         pytest.param("yarn", ("yarn", "dlx", "--quiet"), id="yarn"),
-        pytest.param("npm", ("npm", "exec", "--yes", "--"), id="npm"),
-        pytest.param("pnpm", ("pnpm", "dlx"), id="pnpm"),
+        pytest.param("npm", ("npm@10.8.2", "exec", "--yes", "--"), id="npm"),
+        pytest.param("pnpm", ("pnpm@9.5.0", "dlx"), id="pnpm"),
     ],
 )
 def test_execute_process_with_package_manager(
@@ -91,8 +91,8 @@ def test_execute_process_with_package_manager(
     "package_manager, version",
     [
         pytest.param("yarn", "1.22.22", id="yarn"),
-        pytest.param("npm", "10.9.0", id="npm"),
-        pytest.param("pnpm", "9.12.3", id="pnpm"),
+        pytest.param("npm", "10.8.2", id="npm"),
+        pytest.param("pnpm", "9.5.0", id="pnpm"),
     ],
 )
 def test_execute_process_with_package_manager_version_from_configuration(
@@ -199,8 +199,12 @@ def request_package_manager_version_for_tool(
 ) -> str:
     request = tool.request((), EMPTY_DIGEST, "Inspect package manager version", LogLevel.DEBUG)
     process = rule_runner.request(Process, [request])
+    if process.argv[0].find("corepack") != -1:
+        args = process.argv[:2] + ("--version",)
+    else:
+        args = (package_manager, "--version")
     result = rule_runner.request(
         ProcessResult,
-        [dataclasses.replace(process, argv=(package_manager, "--version"))],
+        [dataclasses.replace(process, argv=args)],
     )
     return result.stdout.decode().strip()

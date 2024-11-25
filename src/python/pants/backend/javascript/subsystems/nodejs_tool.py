@@ -119,6 +119,10 @@ async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
             )
         )
     pkg_manager = PackageManager.from_string(pkg_manager_and_version)
+    if pkg_manager.name == PackageManager.yarn.__name__:
+        cmd = pkg_manager.name
+    else:
+        cmd = pkg_manager.spec()
 
     return await Get(
         Process,
@@ -126,7 +130,7 @@ async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
             env.binaries.binary_dir + "/corepack",
             pkg_manager.version,
             args=(
-                pkg_manager.name,
+                cmd,
                 *pkg_manager.download_and_execute_args,
                 request.tool,
                 *request.args,
