@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from textwrap import dedent
 from typing import Callable, Optional
 
 import pytest
 
 from pants.backend.python.target_types import PexExecutionMode, PexLayout
-from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
+from pants.base.build_environment import get_buildroot
+from pants.testutil.pants_integration_test import (
+    PantsResult,
+    run_pants,
+    setup_tmpdir,
+)
 
 
 def run_generic_test(
@@ -309,3 +315,58 @@ def test_pass_extra_pex_cli_subsystem_global_args() -> None:
         stderr = result.stderr.strip()
         assert "unrecognized arguments" in stderr
         assert "non-existing-flag-name" in stderr
+
+
+def test_relocated_resources() -> None:
+    sources = {
+        "assets/query.sql": "SELECT 1",
+        "assets/BUILD": dedent(
+            """\
+            files(name='files', sources=['query.sql'])
+            """
+        ),
+        "src/py/project/__init__.py": "",
+        "src/py/project/app.py": dedent(
+            """\
+            from importlib.resources import files
+            import project
+
+            def main():
+                assert files(project).joinpath("query.sql").read_text() == "SELECT 1"
+            """
+        ),
+        "src/py/project/BUILD": dedent(
+            """\
+            python_sources()
+            relocated_files(
+                name='relocated',
+                files_targets=['assets:files'],
+                src='assets',
+                dest='src/py/project',
+            )
+            experimental_wrap_as_resources(name='resources', inputs=[':relocated'])
+            pex_binary(
+                name="binary",
+                dependencies=[':resources'],
+                entry_point="project.app:main",
+            )
+            """
+        ),
+        "pants.toml": "",
+    }
+
+    for relpath, content in sources.items():
+        path = Path(get_buildroot()).joinpath(relpath)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+
+    args = [
+        "--backend-packages=pants.backend.python",
+        "--source-root-patterns=['src/py']",
+        "--python-interpreter-constraints=['CPython>=3.9']",
+        "run",
+        "src/py/project:binary",
+    ]
+    result = run_pants(args, use_pantsd=False)
+
+    assert "No such file or directory" not in result.stderr, result.stderr
