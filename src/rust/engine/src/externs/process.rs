@@ -4,12 +4,12 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+use process_execution::{Platform, ProcessExecutionEnvironment, ProcessExecutionStrategy};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyAssertionError, PyValueError};
-use pyo3::{prelude::*, BoundObject};
+use pyo3::prelude::*;
 
-use process_execution::{Platform, ProcessExecutionEnvironment, ProcessExecutionStrategy};
-use pyo3::types::PyBool;
+use crate::python::PyComparedBool;
 
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyProcessExecutionEnvironment>()?;
@@ -84,22 +84,13 @@ impl PyProcessExecutionEnvironment {
         &self,
         other: &Bound<'_, PyProcessExecutionEnvironment>,
         op: CompareOp,
-        py: Python,
-    ) -> PyObject {
+    ) -> PyComparedBool {
         let other = other.borrow();
-        match op {
-            CompareOp::Eq => PyBool::new(py, *self == *other)
-                .into_bound()
-                .as_any()
-                .clone()
-                .unbind(),
-            CompareOp::Ne => PyBool::new(py, *self != *other)
-                .into_bound()
-                .as_any()
-                .clone()
-                .unbind(),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other),
+            CompareOp::Ne => Some(*self != *other),
+            _ => None,
+        })
     }
 
     #[getter]

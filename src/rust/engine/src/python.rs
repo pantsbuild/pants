@@ -7,7 +7,7 @@ use std::{fmt, hash};
 
 use deepsize::{known_deep_size, DeepSizeOf};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyType};
+use pyo3::types::{PyBool, PyDict, PyType};
 use pyo3::FromPyObject;
 use smallvec::SmallVec;
 
@@ -598,4 +598,65 @@ pub fn throw(msg: String) -> Failure {
         python_traceback,
         engine_traceback: Vec::new(),
     })
+}
+
+/// A tri-state boolean value for use with `__richcmp__` dunder method implementations. The type
+/// represents not only `true` and `false` (via `Some(value`), but also the `NotImplemented` value
+/// (via `None``) which `__richcmp__` methods may return when a particular comparison operator is
+/// not supported.
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[repr(transparent)]
+pub struct PyComparedBool(pub Option<bool>);
+
+impl From<Option<bool>> for PyComparedBool {
+    fn from(value: Option<bool>) -> Self {
+        Self(value)
+    }
+}
+
+impl<'py> IntoPyObject<'py> for PyComparedBool {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        Ok(match self.0 {
+            Some(value) => PyBool::new(py, value).to_owned().into_any(),
+            None => py.NotImplemented().into_bound(py),
+        })
+    }
+}
+
+#[cfg(test)]
+mod pycomparedbool_tests {
+    use super::PyComparedBool;
+    use pyo3::{types::PyAnyMethods, IntoPyObject, Python};
+
+    #[test]
+    fn pycomparedbool_conversion_tests() {
+        pyo3::prepare_freethreaded_python();
+
+        Python::with_gil(|py| {
+            assert_eq!(
+                PyComparedBool(Some(true))
+                    .into_pyobject(py)
+                    .unwrap()
+                    .extract::<bool>()
+                    .unwrap(),
+                true
+            );
+            assert_eq!(
+                PyComparedBool(Some(false))
+                    .into_pyobject(py)
+                    .unwrap()
+                    .extract::<bool>()
+                    .unwrap(),
+                false
+            );
+            assert!(PyComparedBool(None)
+                .into_pyobject(py)
+                .unwrap()
+                .is(&py.NotImplemented()),);
+        })
+    }
 }

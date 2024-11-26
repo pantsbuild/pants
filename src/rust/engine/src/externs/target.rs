@@ -10,6 +10,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 
 use crate::externs::address::Address;
+use crate::python::PyComparedBool;
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Field>()?;
@@ -175,18 +176,18 @@ impl Field {
         other: &Bound<'py, PyAny>,
         op: CompareOp,
         py: Python,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<PyComparedBool> {
         let is_eq = self_.get_type().eq(other.get_type())?
             && self_
                 .borrow()
                 .value
                 .bind(py)
                 .eq(&other.extract::<PyRef<Field>>()?.value)?;
-        Ok(match op {
-            CompareOp::Eq => is_eq.into_pyobject(py)?.to_owned().into_any().unbind(),
-            CompareOp::Ne => (!is_eq).into_pyobject(py)?.to_owned().into_any().unbind(),
-            _ => py.NotImplemented(),
-        })
+        Ok(PyComparedBool(match op {
+            CompareOp::Eq => Some(is_eq),
+            CompareOp::Ne => Some(!is_eq),
+            _ => None,
+        }))
     }
 }
 

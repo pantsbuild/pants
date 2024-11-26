@@ -6,7 +6,6 @@ use std::hash::{Hash, Hasher};
 use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use pyo3::{PyObject, Python};
 
 use fs::DirectoryDigest;
 use protos::gen::pants::cache::{
@@ -14,6 +13,7 @@ use protos::gen::pants::cache::{
 };
 
 use crate::externs::fs::PyDigest;
+use crate::python::PyComparedBool;
 
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyNativeDependenciesRequest>()?;
@@ -59,19 +59,11 @@ impl PyInferenceMetadata {
         )))
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp, py: Python) -> PyResult<PyObject> {
-        Ok(match op {
-            CompareOp::Eq => (self == other)
-                .into_pyobject(py)?
-                .to_owned()
-                .into_any()
-                .unbind(),
-            CompareOp::Ne => (self != other)
-                .into_pyobject(py)?
-                .to_owned()
-                .into_any()
-                .unbind(),
-            _ => py.NotImplemented(),
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyComparedBool {
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(self == other),
+            CompareOp::Ne => Some(self != other),
+            _ => None,
         })
     }
 
@@ -119,19 +111,11 @@ impl PyNativeDependenciesRequest {
         )
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp, py: Python) -> PyResult<PyObject> {
-        Ok(match op {
-            CompareOp::Eq => (self == other)
-                .into_pyobject(py)?
-                .to_owned()
-                .into_any()
-                .unbind(),
-            CompareOp::Ne => (self != other)
-                .into_pyobject(py)?
-                .to_owned()
-                .into_any()
-                .unbind(),
-            _ => py.NotImplemented(),
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyComparedBool {
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(self == other),
+            CompareOp::Ne => Some(self != other),
+            _ => None,
         })
     }
 }
