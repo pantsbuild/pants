@@ -23,7 +23,7 @@ def test_invalid_options() -> None:
     }
     config_errors = [
         "ERROR] Invalid option 'invalid_global' under [GLOBAL]",
-        "ERROR] Invalid section [invalid_scope]",
+        "ERROR] Invalid table name [invalid_scope]",
         "ERROR] Invalid option 'bad_option' under [pytest]",
     ]
 

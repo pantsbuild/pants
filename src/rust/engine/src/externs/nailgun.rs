@@ -12,11 +12,11 @@ use task_executor::Executor;
 pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "PantsdConnectionException",
-        py.get_type_bound::<PantsdConnectionException>(),
+        py.get_type::<PantsdConnectionException>(),
     )?;
     m.add(
         "PantsdClientException",
-        py.get_type_bound::<PantsdClientException>(),
+        py.get_type::<PantsdClientException>(),
     )?;
     m.add_class::<PyNailgunClient>()?;
     Ok(())

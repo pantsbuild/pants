@@ -3,12 +3,15 @@
 
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
+// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
+#![allow(deprecated)]
 
 use futures::future::{BoxFuture, Future};
 use futures::FutureExt;
 use lazy_static::lazy_static;
 use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::sync::GILProtected;
 use pyo3::types::{PyBytes, PyDict, PySequence, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
 use pyo3::{FromPyObject, ToPyObject};
@@ -17,7 +20,6 @@ use std::cell::{Ref, RefCell};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
-use std::ops::Deref;
 
 use logging::PythonLogLevel;
 use rule_graph::RuleId;
@@ -48,11 +50,11 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGeneratorResponseCall>()?;
     m.add_class::<PyGeneratorResponseGet>()?;
 
-    m.add("EngineError", py.get_type_bound::<EngineError>())?;
-    m.add("IntrinsicError", py.get_type_bound::<IntrinsicError>())?;
+    m.add("EngineError", py.get_type::<EngineError>())?;
+    m.add("IntrinsicError", py.get_type::<IntrinsicError>())?;
     m.add(
         "IncorrectProductError",
-        py.get_type_bound::<IncorrectProductError>(),
+        py.get_type::<IncorrectProductError>(),
     )?;
 
     Ok(())
@@ -70,7 +72,7 @@ pub struct PyFailure(pub Failure);
 impl PyFailure {
     fn get_error(&self, py: Python) -> PyErr {
         match &self.0 {
-            Failure::Throw { val, .. } => PyErr::from_value_bound(val.bind(py).to_owned()),
+            Failure::Throw { val, .. } => PyErr::from_value(val.bind(py).to_owned()),
             f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
                 EngineError::new_err(format!("{f}"))
             }
@@ -122,12 +124,12 @@ pub fn union_in_scope_types<'py>(
     Ok(Some(union_in_scope_types))
 }
 
-pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {
+pub fn store_tuple(py: Python, values: Vec<Value>) -> PyResult<Value> {
     let arg_handles: Vec<_> = values
         .into_iter()
         .map(|v| v.consume_into_py_object(py))
         .collect();
-    Value::from(PyTuple::new_bound(py, &arg_handles).to_object(py))
+    Ok(Value::from(PyTuple::new(py, &arg_handles)?.to_object(py)))
 }
 
 /// Store a slice containing 2-tuples of (key, value) as a Python dictionary.
@@ -135,7 +137,7 @@ pub fn store_dict(
     py: Python,
     keys_and_values: impl IntoIterator<Item = (Value, Value)>,
 ) -> PyResult<Value> {
-    let dict = PyDict::new_bound(py);
+    let dict = PyDict::new(py);
     for (k, v) in keys_and_values {
         dict.set_item(k.consume_into_py_object(py), v.consume_into_py_object(py))?;
     }
@@ -144,7 +146,7 @@ pub fn store_dict(
 
 /// Store an opaque buffer of bytes to pass to Python. This will end up as a Python `bytes`.
 pub fn store_bytes(py: Python, bytes: &[u8]) -> Value {
-    Value::from(PyBytes::new_bound(py, bytes).to_object(py))
+    Value::from(PyBytes::new(py, bytes).to_object(py))
 }
 
 /// Store a buffer of utf8 bytes to pass to Python. This will end up as a Python `str`.
@@ -262,7 +264,7 @@ pub fn val_to_log_level_bound(obj: &Bound<'_, PyAny>) -> Result<log::Level, Stri
 
 /// Link to the Pants docs using the current version of Pants.
 pub fn doc_url(py: Python, slug: &str) -> String {
-    let docutil_module = py.import_bound("pants.util.docutil").unwrap();
+    let docutil_module = py.import("pants.util.docutil").unwrap();
     let doc_url_func = docutil_module.getattr("doc_url").unwrap();
     doc_url_func.call1((slug,)).unwrap().extract().unwrap()
 }
@@ -287,7 +289,7 @@ pub(crate) enum GeneratorInput {
 /// - a coroutine will eventually return a single return value.
 ///
 pub(crate) fn generator_send(
-    py: Python,
+    py: Python<'_>,
     generator_type: &TypeId,
     generator: &Value,
     input: GeneratorInput,
@@ -304,7 +306,7 @@ pub(crate) fn generator_send(
             let throw_method = generator.bind(py).getattr(intern!(py, "throw"))?;
             if err.is_instance_of::<NativeEngineFailure>(py) {
                 let throw = err
-                    .value_bound(py)
+                    .value(py)
                     .getattr(intern!(py, "failure"))?
                     .extract::<PyRef<PyFailure>>()?
                     .get_error(py);
@@ -332,9 +334,7 @@ pub(crate) fn generator_send(
         }
         Err(e) => {
             match (maybe_thrown, e.cause(py)) {
-                (Some((thrown, err)), Some(cause))
-                    if thrown.value_bound(py).is(cause.value_bound(py)) =>
-                {
+                (Some((thrown, err)), Some(cause)) if thrown.value(py).is(cause.value(py)) => {
                     // Preserve the engine traceback by using the wrapped failure error as cause. The cause
                     // will be swapped back again in `Failure::from_py_err_with_gil()` to preserve the python
                     // traceback.
@@ -348,13 +348,13 @@ pub(crate) fn generator_send(
     };
 
     let result = if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseCall>>() {
-        Ok(GeneratorResponse::Call(call.take()?))
+        Ok(GeneratorResponse::Call(call.take(py)?))
     } else if let Ok(get) = response.extract::<PyRef<PyGeneratorResponseGet>>() {
         // It isn't necessary to differentiate between `Get` and `Effect` here, as the static
         // analysis of `@rule`s has already validated usage.
-        Ok(GeneratorResponse::Get(get.take()?))
+        Ok(GeneratorResponse::Get(get.take(py)?))
     } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseNativeCall>>() {
-        Ok(GeneratorResponse::NativeCall(call.take()?))
+        Ok(GeneratorResponse::NativeCall(call.take(py)?))
     } else if let Ok(get_multi) = response.downcast::<PySequence>() {
         // Was an `All` or `MultiGet`.
         let gogs = get_multi
@@ -367,7 +367,7 @@ pub(crate) fn generator_send(
                     Ok(GetOrGenerator::Generator(Value::new(gog.unbind())))
                 } else if let Ok(get) = gog.extract::<PyRef<PyGeneratorResponseGet>>() {
                     Ok(GetOrGenerator::Get(
-                        get.take().map_err(PyException::new_err)?,
+                        get.take(py).map_err(PyException::new_err)?,
                     ))
                 } else {
                     Err(PyValueError::new_err(format!(
@@ -391,7 +391,9 @@ pub(crate) fn generator_send(
 /// those configured in types::Types.
 pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
     let py_type = type_id.as_py_type_bound(py);
-    let args_tuple = PyTuple::new_bound(py, args.iter().map(|v| v.bind(py)));
+    let args_tuple = PyTuple::new(py, args.iter().map(|v| v.bind(py))).unwrap_or_else(|e| {
+        panic!("Core type constructor `PyTuple` failed: {e:?}",);
+    });
     let res = py_type.call1(args_tuple).unwrap_or_else(|e| {
         panic!(
             "Core type constructor `{}` failed: {:?}",
@@ -488,15 +490,18 @@ fn interpret_get_inputs(
 }
 
 #[pyclass]
-pub struct PyGeneratorResponseNativeCall(RefCell<Option<NativeCall>>);
+pub struct PyGeneratorResponseNativeCall(GILProtected<RefCell<Option<NativeCall>>>);
 
 impl PyGeneratorResponseNativeCall {
     pub fn new(call: impl Future<Output = Result<Value, Failure>> + 'static + Send) -> Self {
-        Self(RefCell::new(Some(NativeCall { call: call.boxed() })))
+        Self(GILProtected::new(RefCell::new(Some(NativeCall {
+            call: call.boxed(),
+        }))))
     }
 
-    fn take(&self) -> Result<NativeCall, String> {
+    fn take(&self, py: Python<'_>) -> Result<NativeCall, String> {
         self.0
+            .get(py)
             .borrow_mut()
             .take()
             .ok_or_else(|| "A `NativeCall` may only be consumed once.".to_owned())
@@ -519,17 +524,19 @@ impl PyGeneratorResponseNativeCall {
 
     fn send(&self, py: Python, value: PyObject) -> PyResult<()> {
         Err(PyStopIteration::new_err(
-            PyTuple::new_bound(py, [value]).to_object(py),
+            PyTuple::new(py, [value])?.to_object(py),
         ))
     }
 }
 
 #[pyclass(subclass)]
-pub struct PyGeneratorResponseCall(RefCell<Option<Call>>);
+pub struct PyGeneratorResponseCall(GILProtected<RefCell<Option<Call>>>);
 
 impl PyGeneratorResponseCall {
-    fn borrow_inner(&self) -> PyResult<impl Deref<Target = Call> + '_> {
-        Ref::filter_map(self.0.borrow(), |inner| inner.as_ref()).map_err(|_| {
+    fn borrow_inner<'py>(&'py self, py: Python<'py>) -> PyResult<Ref<'py, Call>> {
+        let inner: Ref<'py, _> = self.0.get(py).borrow();
+
+        Ref::filter_map(inner, |o: &Option<Call>| o.as_ref()).map_err(|_| {
             PyException::new_err(
                 "A `Call` may not be consumed after being provided to the @rule engine.",
             )
@@ -562,25 +569,25 @@ impl PyGeneratorResponseCall {
         };
         let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
-        Ok(Self(RefCell::new(Some(Call {
+        Ok(Self(GILProtected::new(RefCell::new(Some(Call {
             rule_id: RuleId::from_string(rule_id),
             output_type,
             args,
             args_arity,
             input_types,
             inputs,
-        }))))
+        })))))
     }
 
     #[getter]
     fn output_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyType>> {
-        Ok(self.borrow_inner()?.output_type.as_py_type_bound(py))
+        Ok(self.borrow_inner(py)?.output_type.as_py_type_bound(py))
     }
 
     #[getter]
     fn input_types<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyType>>> {
         Ok(self
-            .borrow_inner()?
+            .borrow_inner(py)?
             .input_types
             .iter()
             .map(|t| t.as_py_type_bound(py))
@@ -588,8 +595,8 @@ impl PyGeneratorResponseCall {
     }
 
     #[getter]
-    fn inputs<'p>(&'p self, py: Python<'p>) -> PyResult<Vec<PyObject>> {
-        let inner = self.borrow_inner()?;
+    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
+        let inner = self.borrow_inner(py)?;
         let args: Vec<PyObject> = inner.args.as_ref().map_or_else(
             || Ok(Vec::default()),
             |args| args.to_py_object().extract(py),
@@ -602,8 +609,9 @@ impl PyGeneratorResponseCall {
 }
 
 impl PyGeneratorResponseCall {
-    fn take(&self) -> Result<Call, String> {
+    fn take(&self, py: Python<'_>) -> Result<Call, String> {
         self.0
+            .get(py)
             .borrow_mut()
             .take()
             .ok_or_else(|| "A `Call` may only be consumed once.".to_owned())
@@ -612,11 +620,12 @@ impl PyGeneratorResponseCall {
 
 // Contains a `RefCell<Option<Get>>` in order to allow us to `take` the content without cloning.
 #[pyclass(subclass)]
-pub struct PyGeneratorResponseGet(RefCell<Option<Get>>);
+pub struct PyGeneratorResponseGet(GILProtected<RefCell<Option<Get>>>);
 
 impl PyGeneratorResponseGet {
-    fn take(&self) -> Result<Get, String> {
+    fn take(&self, py: Python<'_>) -> Result<Get, String> {
         self.0
+            .get(py)
             .borrow_mut()
             .take()
             .ok_or_else(|| "A `Get` may only be consumed once.".to_owned())
@@ -644,17 +653,18 @@ impl PyGeneratorResponseGet {
 
         let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
-        Ok(Self(RefCell::new(Some(Get {
+        Ok(Self(GILProtected::new(RefCell::new(Some(Get {
             output,
             input_types,
             inputs,
-        }))))
+        })))))
     }
 
     #[getter]
     fn output_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyType>> {
         Ok(self
             .0
+            .get(py)
             .borrow()
             .as_ref()
             .ok_or_else(|| {
@@ -670,6 +680,7 @@ impl PyGeneratorResponseGet {
     fn input_types<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyType>>> {
         Ok(self
             .0
+            .get(py)
             .borrow()
             .as_ref()
             .ok_or_else(|| {
@@ -684,9 +695,10 @@ impl PyGeneratorResponseGet {
     }
 
     #[getter]
-    fn inputs(&self) -> PyResult<Vec<PyObject>> {
+    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
         Ok(self
             .0
+            .get(py)
             .borrow()
             .as_ref()
             .ok_or_else(|| {
@@ -700,10 +712,10 @@ impl PyGeneratorResponseGet {
             .collect())
     }
 
-    fn __repr__(&self) -> PyResult<String> {
+    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
         Ok(format!(
             "{}",
-            self.0.borrow().as_ref().ok_or_else(|| {
+            self.0.get(py).borrow().as_ref().ok_or_else(|| {
                 PyException::new_err(
                     "A `Get` may not be consumed after being provided to the @rule engine.",
                 )

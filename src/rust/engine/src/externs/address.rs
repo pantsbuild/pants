@@ -29,27 +29,24 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add(
         "AddressParseException",
-        py.get_type_bound::<AddressParseException>(),
+        py.get_type::<AddressParseException>(),
     )?;
-    m.add(
-        "InvalidAddressError",
-        py.get_type_bound::<InvalidAddressError>(),
-    )?;
+    m.add("InvalidAddressError", py.get_type::<InvalidAddressError>())?;
     m.add(
         "InvalidSpecPathError",
-        py.get_type_bound::<InvalidSpecPathError>(),
+        py.get_type::<InvalidSpecPathError>(),
     )?;
     m.add(
         "InvalidTargetNameError",
-        py.get_type_bound::<InvalidTargetNameError>(),
+        py.get_type::<InvalidTargetNameError>(),
     )?;
     m.add(
         "InvalidParametersError",
-        py.get_type_bound::<InvalidParametersError>(),
+        py.get_type::<InvalidParametersError>(),
     )?;
     m.add(
         "UnsupportedWildcardError",
-        py.get_type_bound::<UnsupportedWildcardError>(),
+        py.get_type::<UnsupportedWildcardError>(),
     )?;
 
     m.add_class::<AddressInput>()?;
@@ -57,15 +54,15 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add(
         "BANNED_CHARS_IN_TARGET_NAME",
-        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_TARGET_NAME.iter())?,
+        PyFrozenSet::new(py, BANNED_CHARS_IN_TARGET_NAME.iter())?,
     )?;
     m.add(
         "BANNED_CHARS_IN_GENERATED_NAME",
-        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_GENERATED_NAME.iter())?,
+        PyFrozenSet::new(py, BANNED_CHARS_IN_GENERATED_NAME.iter())?,
     )?;
     m.add(
         "BANNED_CHARS_IN_PARAMETERS",
-        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_PARAMETERS.iter())?,
+        PyFrozenSet::new(py, BANNED_CHARS_IN_PARAMETERS.iter())?,
     )?;
 
     Ok(())
@@ -786,7 +783,7 @@ impl Address {
     }
 
     fn metadata<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let dict = PyDict::new_bound(py);
+        let dict = PyDict::new(py);
         dict.set_item(pyo3::intern!(py, "address"), self.spec())?;
         Ok(dict)
     }

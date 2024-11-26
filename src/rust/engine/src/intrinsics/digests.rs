@@ -1,6 +1,9 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
+#![allow(deprecated)]
+
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -232,8 +235,8 @@ fn path_globs_to_paths(path_globs: Value) -> PyGeneratorResponseNativeCall {
                 py,
                 core.types.paths,
                 &[
-                    externs::store_tuple(py, files),
-                    externs::store_tuple(py, dirs),
+                    externs::store_tuple(py, files)?,
+                    externs::store_tuple(py, dirs)?,
                 ],
             ))
         })
@@ -396,7 +399,9 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
             };
 
             let py_type = context.core.types.path_metadata_result.as_py_type_bound(py);
-            let args_tuple = PyTuple::new_bound(py, &[path_metadata_opt]);
+            let args_tuple = PyTuple::new(py, &[path_metadata_opt]).unwrap_or_else(|e| {
+                panic!("Core type constructor `PyTuple` failed: {e:?}");
+            });
             let res = py_type.call1(args_tuple).unwrap_or_else(|e| {
                 panic!(
                     "Core type constructor `{}` failed: {:?}",

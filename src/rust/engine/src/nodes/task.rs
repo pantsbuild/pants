@@ -1,6 +1,9 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
+#![allow(deprecated)]
+
 use std::fmt;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -218,9 +221,12 @@ impl Task {
                         .collect::<Vec<_>>();
                     match future::try_join_all(get_futures).await {
                         Ok(values) => {
-                            input = GeneratorInput::Arg(Python::with_gil(|py| {
-                                externs::store_tuple(py, values)
-                            }));
+                            let values_tuple_result =
+                                Python::with_gil(|py| externs::store_tuple(py, values));
+                            input = match values_tuple_result {
+                                Ok(t) => GeneratorInput::Arg(t),
+                                Err(err) => GeneratorInput::Err(err),
+                            }
                         }
                         Err(throw @ Failure::Throw { .. }) => {
                             input = GeneratorInput::Err(PyErr::from(throw));
@@ -282,7 +288,7 @@ impl Task {
                     // keywords. Otherwise, apply computed arguments as positional.
                     let res = if let Some(args) = args {
                         let args = args.value.bind(py).extract::<Bound<'_, PyTuple>>()?;
-                        let kwargs = PyDict::new_bound(py);
+                        let kwargs = PyDict::new(py);
                         for ((name, _), value) in self
                             .task
                             .args
@@ -294,8 +300,7 @@ impl Task {
                         }
                         func.call(args, Some(&kwargs))
                     } else {
-                        let args_tuple =
-                            PyTuple::new_bound(py, deps.iter().map(|v| v.to_object(py)));
+                        let args_tuple = PyTuple::new(py, deps.iter().map(|v| v.to_object(py)))?;
                         func.call1(args_tuple)
                     };
 

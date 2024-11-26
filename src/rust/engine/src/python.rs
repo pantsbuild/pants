@@ -1,6 +1,10 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
+#![allow(deprecated)]
+
+use std::convert::Infallible;
 use std::sync::Arc;
 use std::{fmt, hash};
 
@@ -359,6 +363,17 @@ impl ToPyObject for &Value {
     }
 }
 
+impl<'a, 'py> IntoPyObject<'py> for &'a Value {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>; // Maybe consider `Borrowed` instead of `Bound` to optimize reference counting?
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        let py_any = self.0.clone_ref(py);
+        Ok(py_any.into_bound(py))
+    }
+}
+
 impl From<Value> for PyObject {
     fn from(value: Value) -> Self {
         match Arc::try_unwrap(value.0) {
@@ -462,7 +477,7 @@ impl Failure {
                 }) => {
                     // Preserve tracebacks (both engine and python) from upstream error by using any existing
                     // engine traceback and restoring the original python exception cause.
-                    py_err.set_cause(py, Some(PyErr::from_value_bound(val.0.bind(py).to_owned())));
+                    py_err.set_cause(py, Some(PyErr::from_value(val.0.bind(py).to_owned())));
                     (
             format!(
               "{python_traceback}\nDuring handling of the above exception, another exception occurred:\n\n"
@@ -477,18 +492,18 @@ impl Failure {
         };
 
         let maybe_ptraceback = py_err
-            .traceback_bound(py)
+            .traceback(py)
             .map(|traceback| traceback.to_object(py));
         let val = Value::from(py_err.into_py(py));
         let python_traceback = if let Some(tb) = maybe_ptraceback {
-            let locals = PyDict::new_bound(py);
+            let locals = PyDict::new(py);
             locals
-                .set_item("traceback", py.import_bound("traceback").unwrap())
+                .set_item("traceback", py.import("traceback").unwrap())
                 .unwrap();
             locals.set_item("tb", tb).unwrap();
             locals.set_item("val", &val).unwrap();
-            py.eval_bound(
-                "''.join(traceback.format_exception(None, value=val, tb=tb))",
+            py.eval(
+                c"''.join(traceback.format_exception(None, value=val, tb=tb))",
                 None,
                 Some(&locals),
             )
@@ -512,10 +527,7 @@ impl Failure {
 
 impl Failure {
     fn from_wrapped_failure(py: Python, py_err: &PyErr) -> Option<Failure> {
-        match py_err
-            .value_bound(py)
-            .downcast::<externs::NativeEngineFailure>()
-        {
+        match py_err.value(py).downcast::<externs::NativeEngineFailure>() {
             Ok(n_e_failure) => {
                 let failure = n_e_failure
                     .getattr("failure")

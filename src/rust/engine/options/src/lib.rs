@@ -34,6 +34,7 @@ mod tests;
 
 mod types;
 
+use std::any::Any;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -107,6 +108,8 @@ pub(crate) trait OptionsSource: Send + Sync {
     /// flag based options and "BOB" in environment variable based options.
     ///
     fn display(&self, id: &OptionId) -> String;
+
+    fn as_any(&self) -> &dyn Any;
 
     ///
     /// Get the string option identified by `id` from this source.
@@ -196,7 +199,7 @@ pub(crate) trait OptionsSource: Send + Sync {
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Source {
     Default,
-    Config { ordinal: usize, path: String },
+    Config { ordinal: usize, path: String }, // TODO: Should be a PathBuf
     Env,
     Flag,
 }
@@ -705,6 +708,28 @@ impl OptionParser {
 
     pub fn get_unconsumed_flags(&self) -> HashMap<Scope, Vec<String>> {
         self.args_tracker.get_unconsumed_flags()
+    }
+
+    // Given a map from section name to valid keys for that section,
+    // returns a vec of validation error messages.
+    pub fn validate_config(
+        &self,
+        section_to_valid_keys: &HashMap<String, HashSet<String>>,
+    ) -> Vec<String> {
+        let mut errors = vec![];
+        for (source_type, source) in self.sources.iter() {
+            if let Source::Config { ordinal: _, path } = source_type {
+                if let Some(config_reader) = source.as_any().downcast_ref::<ConfigReader>() {
+                    errors.extend(
+                        config_reader
+                            .validate(section_to_valid_keys)
+                            .iter()
+                            .map(|err| format!("{} in {}", err, path)),
+                    );
+                }
+            }
+        }
+        errors
     }
 }
 

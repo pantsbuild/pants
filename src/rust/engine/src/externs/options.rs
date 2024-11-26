@@ -11,7 +11,7 @@ use options::{
 };
 
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pyo3::import_exception!(pants.option.errors, ParseError);
 
@@ -31,14 +31,14 @@ fn val_to_py_object(py: Python, val: &Val) -> PyResult<PyObject> {
         Val::Float(f) => f.into_py(py),
         Val::String(s) => s.into_py(py),
         Val::List(list) => {
-            let pylist = PyList::empty_bound(py);
+            let pylist = PyList::empty(py);
             for m in list {
                 pylist.append(val_to_py_object(py, m)?)?;
             }
             pylist.into_py(py)
         }
         Val::Dict(dict) => {
-            let pydict = PyDict::new_bound(py);
+            let pydict = PyDict::new(py);
             for (k, v) in dict {
                 pydict.set_item(k.into_py(py), val_to_py_object(py, v)?)?;
             }
@@ -191,13 +191,13 @@ fn to_details<'py>(py: Python<'py>, sources: Vec<&'py Source>) -> Option<Bound<'
         return None;
     }
     if sources.len() == 1 {
-        return source_to_details(sources.first().unwrap()).map(|s| PyString::intern_bound(py, s));
+        return source_to_details(sources.first().unwrap()).map(|s| PyString::intern(py, s));
     }
     #[allow(unstable_name_collisions)]
     // intersperse is provided by itertools::Itertools, but is also in the Rust nightly
     // as an experimental feature of standard Iterator. If/when that becomes standard we
     // can use it, but for now we must squelch the name collision.
-    Some(PyString::intern_bound(
+    Some(PyString::intern(
         py,
         &sources
             .into_iter()
@@ -514,5 +514,20 @@ impl PyOptionParser {
                 )
             })
             .collect()
+    }
+
+    fn validate_config(
+        &self,
+        py: Python<'_>,
+        py_valid_keys: HashMap<String, PyObject>,
+    ) -> PyResult<Vec<String>> {
+        let mut valid_keys = HashMap::new();
+
+        for (section_name, keys) in py_valid_keys.into_iter() {
+            let keys_set = keys.extract::<HashSet<String>>(py)?;
+            valid_keys.insert(section_name, keys_set);
+        }
+
+        Ok(self.0.validate_config(&valid_keys))
     }
 }
