@@ -620,8 +620,8 @@ impl<'py> IntoPyObject<'py> for PyComparedBool {
     type Error = Infallible;
 
     fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-        Ok(match &self.0 {
-            Some(value) => PyBool::new(py, *value).to_owned().into_any(),
+        Ok(match self.0 {
+            Some(value) => PyBool::new(py, value).to_owned().into_any(),
             None => py.NotImplemented().into_bound(py),
         })
     }
