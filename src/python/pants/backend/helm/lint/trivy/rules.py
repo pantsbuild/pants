@@ -5,12 +5,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer
-from pants.backend.helm.target_types import HelmDeploymentFieldSet
+from pants.backend.helm.target_types import HelmChartFieldSet, HelmDeploymentFieldSet
 from pants.backend.helm.util_rules.post_renderer import HelmDeploymentPostRendererRequest
 from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentCmd,
     HelmDeploymentRequest,
     RenderedHelmFiles,
+    RenderHelmChartRequest,
 )
 from pants.backend.tools.trivy.rules import RunTrivyRequest, run_trivy
 from pants.backend.tools.trivy.subsystem import SkipTrivyField, Trivy
@@ -40,45 +41,6 @@ class RunTrivyOnHelmRequest:
     rendered_files: RenderedHelmFiles
 
 
-@dataclass(frozen=True)
-class TrivyLintHelmDeploymentFieldSet(HelmDeploymentFieldSet, TrivyHelmFieldSet):
-    pass
-
-
-class TrivyLintHelmDeploymentRequest(TrivyLintHelmRequest):
-    field_set_type = TrivyLintHelmDeploymentFieldSet
-    tool_subsystem = Trivy
-    partitioner_type = (
-        PartitionerType.DEFAULT_SINGLE_PARTITION
-    )  # TODO: is this partitioner correct?
-
-
-# TODO: helm charts
-
-
-@rule(desc="Lint Helm deployment with Trivy", level=LogLevel.DEBUG)
-async def run_trivy_on_helm_deployment(
-    request: TrivyLintHelmDeploymentRequest.Batch[TrivyLintHelmDeploymentFieldSet, Any],
-) -> LintResult:
-    assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
-    [field_set] = request.elements
-
-    post_renderer = await Get(HelmPostRenderer, HelmDeploymentPostRendererRequest(field_set))
-    rendered_files = await Get(
-        RenderedHelmFiles,
-        HelmDeploymentRequest(
-            field_set,
-            cmd=HelmDeploymentCmd.RENDER,
-            post_renderer=post_renderer,
-            description=f"Evaluating Helm deployment files for {field_set.address}",
-        ),
-    )
-
-    r = await Get(FallibleProcessResult, RunTrivyOnHelmRequest(field_set, rendered_files))
-
-    return LintResult.create(request, r)
-
-
 @rule
 async def run_trivy_on_helm(
     request: RunTrivyOnHelmRequest,
@@ -100,8 +62,71 @@ async def run_trivy_on_helm(
     return r
 
 
+@dataclass(frozen=True)
+class TrivyLintHelmDeploymentFieldSet(HelmDeploymentFieldSet, TrivyHelmFieldSet):
+    pass
+
+
+class TrivyLintHelmDeploymentRequest(TrivyLintHelmRequest):
+    field_set_type = TrivyLintHelmDeploymentFieldSet
+    tool_subsystem = Trivy
+    partitioner_type = (
+        PartitionerType.DEFAULT_SINGLE_PARTITION
+    )  # TODO: is this partitioner correct?
+
+
+@rule(desc="Lint Helm deployment with Trivy", level=LogLevel.DEBUG)
+async def run_trivy_on_helm_deployment(
+    request: TrivyLintHelmDeploymentRequest.Batch[TrivyLintHelmDeploymentFieldSet, Any],
+) -> LintResult:
+    assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
+    [field_set] = request.elements
+
+    post_renderer = await Get(HelmPostRenderer, HelmDeploymentPostRendererRequest(field_set))
+    rendered_files = await Get(
+        RenderedHelmFiles,
+        HelmDeploymentRequest(
+            field_set,
+            cmd=HelmDeploymentCmd.RENDER,
+            post_renderer=post_renderer,
+            description=f"Evaluating Helm deployment files for {field_set.address}",
+        ),
+    )
+
+    r = await run_trivy_on_helm(RunTrivyOnHelmRequest(field_set, rendered_files))
+
+    return LintResult.create(request, r)
+
+
+@dataclass(frozen=True)
+class TrivyLintHelmChartFieldSet(HelmChartFieldSet, TrivyHelmFieldSet):
+    pass
+
+
+class TrivyLintHelmChartRequest(TrivyLintHelmRequest):
+    field_set_type = TrivyLintHelmChartFieldSet
+    tool_subsystem = Trivy
+    partitioner_type = (
+        PartitionerType.DEFAULT_SINGLE_PARTITION
+    )  # TODO: is this partitioner correct?
+
+
+@rule(desc="Lint Helm chart with Trivy", level=LogLevel.DEBUG)
+async def run_trivy_on_helm_chart(
+    request: TrivyLintHelmChartRequest.Batch[TrivyLintHelmChartRequest, Any],
+) -> LintResult:
+    assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
+    [field_set] = request.elements
+
+    rendered_files = await Get(RenderedHelmFiles, RenderHelmChartRequest(field_set))
+    r = await run_trivy_on_helm(RunTrivyOnHelmRequest(field_set, rendered_files))
+
+    return LintResult.create(request, r)
+
+
 def rules():
     return (
         *collect_rules(),
         *TrivyLintHelmDeploymentRequest.rules(),
+        *TrivyLintHelmChartRequest.rules(),
     )

@@ -45,7 +45,9 @@ class TrivyLintFieldSet(FieldSet):
 class TrivyTerraformRequest(LintTargetsRequest):
     field_set_type = TrivyLintFieldSet
     tool_subsystem = Trivy
-    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
+    partitioner_type = (
+        PartitionerType.DEFAULT_SINGLE_PARTITION
+    )  # TODO: is this partitioner correct?
 
 
 # TODO: terraform modules
