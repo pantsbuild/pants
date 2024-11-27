@@ -8,7 +8,10 @@ use bytes::Bytes;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use remote_provider::{ByteStoreProvider, LoadDestination, RemoteProvider, RemoteStoreOptions};
+use remote_provider::{
+    ByteStoreProvider, ListMissingDigestsAssurance, LoadDestination, RemoteProvider,
+    RemoteStoreOptions,
+};
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::file::mk_tempfile;
@@ -55,7 +58,10 @@ async fn smoke_test_from_options_reapi_provider() {
     assert_eq!(store.load_bytes(empty.digest()).await, Ok(None));
     assert_eq!(
         store
-            .list_missing_digests(vec![roland.digest(), empty.digest()])
+            .list_missing_digests(
+                vec![roland.digest(), empty.digest()],
+                ListMissingDigestsAssurance::ConfirmExistence
+            )
             .await,
         Ok(missing_set)
     );
@@ -106,7 +112,10 @@ async fn smoke_test_from_options_file_provider() {
     assert_eq!(store.load_bytes(catnip.digest()).await, Ok(None));
     assert_eq!(
         store
-            .list_missing_digests(vec![roland.digest(), catnip.digest()])
+            .list_missing_digests(
+                vec![roland.digest(), catnip.digest()],
+                ListMissingDigestsAssurance::ConfirmExistence
+            )
             .await,
         Ok(missing_set)
     );
@@ -251,8 +260,26 @@ async fn list_missing_digests_none_missing() {
     let store = new_byte_store(&testdata);
 
     assert_eq!(
-        store.list_missing_digests(vec![testdata.digest()]).await,
+        store
+            .list_missing_digests(
+                vec![testdata.digest()],
+                ListMissingDigestsAssurance::ConfirmExistence
+            )
+            .await,
         Ok(HashSet::new())
+    );
+
+    // Confirm the assurance arg is passed through as expected
+    let mut digest_set = HashSet::new();
+    digest_set.insert(testdata.digest());
+    assert_eq!(
+        store
+            .list_missing_digests(
+                vec![testdata.digest()],
+                ListMissingDigestsAssurance::AllowFalsePositives
+            )
+            .await,
+        Ok(digest_set)
     );
 }
 
@@ -267,7 +294,9 @@ async fn list_missing_digests_some_missing() {
     digest_set.insert(digest);
 
     assert_eq!(
-        store.list_missing_digests(vec![digest]).await,
+        store
+            .list_missing_digests(vec![digest], ListMissingDigestsAssurance::ConfirmExistence)
+            .await,
         Ok(digest_set)
     );
 }
@@ -279,7 +308,10 @@ async fn list_missing_digests_provider_error() {
 
     assert_error(
         store
-            .list_missing_digests(vec![TestData::roland().digest()])
+            .list_missing_digests(
+                vec![TestData::roland().digest()],
+                ListMissingDigestsAssurance::ConfirmExistence,
+            )
             .await,
     )
 }
@@ -385,9 +417,15 @@ impl ByteStoreProvider for TestProvider {
     async fn list_missing_digests(
         &self,
         digests: &mut (dyn Iterator<Item = Digest> + Send),
+        assurance: ListMissingDigestsAssurance,
     ) -> Result<HashSet<Digest>, String> {
-        let blobs = self.blobs.lock();
-        Ok(digests.filter(|d| !blobs.contains_key(&d.hash)).collect())
+        match assurance {
+            ListMissingDigestsAssurance::ConfirmExistence => {
+                let blobs = self.blobs.lock();
+                Ok(digests.filter(|d| !blobs.contains_key(&d.hash)).collect())
+            }
+            ListMissingDigestsAssurance::AllowFalsePositives => Ok(digests.collect()),
+        }
     }
 }
 
@@ -414,6 +452,7 @@ impl ByteStoreProvider for AlwaysErrorProvider {
     async fn list_missing_digests(
         &self,
         _: &mut (dyn Iterator<Item = Digest> + Send),
+        _: ListMissingDigestsAssurance,
     ) -> Result<HashSet<Digest>, String> {
         Err("AlwaysErrorProvider always fails".to_owned())
     }
