@@ -12,6 +12,8 @@ from pants.backend.terraform.dependency_inference import (
 )
 from pants.backend.terraform.target_types import (
     TerraformDependenciesField,
+    TerraformDeploymentFieldSet,
+    TerraformFieldSet,
     TerraformRootModuleField,
 )
 from pants.backend.terraform.tool import TerraformProcess
@@ -116,6 +118,21 @@ class TerraformUpgradeResponse:
     sources_and_deps: Digest
     lockfile: Digest
     chdir: str
+
+
+def terraform_fieldset_to_init_request(
+    terraform_fieldset: TerraformDeploymentFieldSet | TerraformFieldSet
+) -> TerraformInitRequest:
+    """Create a TerraformInitRequest from both Terraform Modules and Deployments."""
+    if isinstance(terraform_fieldset, TerraformDeploymentFieldSet):
+        deployment = terraform_fieldset
+        return TerraformInitRequest(deployment.root_module, deployment.dependencies)
+    if isinstance(terraform_fieldset, TerraformFieldSet):
+        module = terraform_fieldset
+        return TerraformInitRequest(
+            TerraformRootModuleField(module.address.spec, module.address),
+            module.dependencies,
+        )
 
 
 async def run_terraform_init(request: TerraformInitRequest, upgrade: bool):
