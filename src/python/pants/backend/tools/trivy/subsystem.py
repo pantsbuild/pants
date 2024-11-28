@@ -83,7 +83,7 @@ class Trivy(TemplatedExternalTool):
         help=lambda cls: softwrap(
             f"""
             If true, Pants will include all relevant config files during runs.
-            
+
             Use `[{cls.options_scope}].config` instead if your config is in a non-standard location
             """
         ),
@@ -94,7 +94,7 @@ class Trivy(TemplatedExternalTool):
         help=lambda cls: softwrap(
             """
             Path to the Trivy config file.
-            
+
             Setting this option will disable config discovery for the config file. Use this option if the config is located in a non-standard location.
             """
         ),
