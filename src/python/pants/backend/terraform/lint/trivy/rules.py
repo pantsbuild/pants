@@ -12,6 +12,7 @@ from pants.backend.terraform.dependency_inference import (
 from pants.backend.terraform.target_types import (
     TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
+    TerraformFieldSet,
 )
 from pants.backend.tools.trivy.rules import RunTrivyRequest, run_trivy
 from pants.backend.tools.trivy.subsystem import SkipTrivyField, Trivy
@@ -97,9 +98,33 @@ async def run_trivy_on_terraform_deployment(
     return LintResult.create(request, await run_trivy_on_terraform(RunTrivyOnTerraformRequest(fs)))
 
 
+@dataclass(frozen=True)
+class TrivyLintTerraformModuleFieldSet(TerraformFieldSet, TrivyTerraformFieldSet):
+    pass
+
+
+class TrivyLintTerraformModuleRequest(TrivyLintTerraformRequest):
+    field_set_type = TrivyLintTerraformModuleFieldSet
+    tool_subsystem = Trivy
+    partitioner_type = (
+        PartitionerType.DEFAULT_SINGLE_PARTITION
+    )  # TODO: is this partitioner correct?
+
+
+@rule(desc="Lint Terraform module with Trivy", level=LogLevel.DEBUG)
+async def run_trivy_on_terraform_module(
+    request: TrivyLintTerraformModuleRequest.Batch[TrivyLintTerraformModuleRequest, Any]
+) -> LintResult:
+    assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
+    [fs] = request.elements
+
+    return LintResult.create(request, await run_trivy_on_terraform(RunTrivyOnTerraformRequest(fs)))
+
+
 def rules():
     return (
         *collect_rules(),
         *TrivyLintTerraformDeploymentRequest.rules(),
+        *TrivyLintTerraformModuleRequest.rules(),
         TerraformDeploymentTarget.register_plugin_field(SkipTrivyField),
     )
