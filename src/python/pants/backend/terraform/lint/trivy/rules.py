@@ -1,5 +1,6 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Any
 
@@ -9,9 +10,8 @@ from pants.backend.terraform.dependency_inference import (
     get_terraform_backend_and_vars,
 )
 from pants.backend.terraform.target_types import (
-    TerraformDependenciesField,
+    TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
-    TerraformRootModuleField,
 )
 from pants.backend.tools.trivy.rules import RunTrivyRequest, run_trivy
 from pants.backend.tools.trivy.subsystem import SkipTrivyField, Trivy
@@ -20,46 +20,31 @@ from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.intrinsics import merge_digests
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import DescriptionField, FieldSet, SourcesField, Target
+from pants.engine.target import FieldSet, SourcesField, Target
 from pants.util.logging import LogLevel
 
 
+class TrivyLintTerraformRequest(LintTargetsRequest, metaclass=ABCMeta):
+    tool_subsystem = Trivy
+
+
 @dataclass(frozen=True)
-class TrivyLintFieldSet(FieldSet):
-    required_fields = (
-        DescriptionField,
-        TerraformRootModuleField,
-        TerraformDependenciesField,
-    )
-
-    description: DescriptionField
-    root_module: TerraformRootModuleField
-    dependencies: TerraformDependenciesField
-
+class TrivyTerraformFieldSet(FieldSet, metaclass=ABCMeta):
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
         return tgt.get(SkipTrivyField).value
 
 
-class TrivyTerraformRequest(LintTargetsRequest):
-    field_set_type = TrivyLintFieldSet
-    tool_subsystem = Trivy
-    partitioner_type = (
-        PartitionerType.DEFAULT_SINGLE_PARTITION
-    )  # TODO: is this partitioner correct?
+@dataclass(frozen=True)
+class RunTrivyOnTerraformRequest:
+    field_set: TrivyTerraformFieldSet
 
 
-# TODO: terraform modules
-
-
-@rule(desc="Lint Terraform deployment with Trivy", level=LogLevel.DEBUG)
-async def run_trivy_on_terraform_deployment(
-    request: TrivyTerraformRequest.Batch[TrivyTerraformRequest, Any],
-) -> LintResult:
-    assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
-    [fs] = request.elements
-
+@rule
+async def run_trivy_on_terraform(req: RunTrivyOnTerraformRequest) -> FallibleProcessResult:
+    fs = req.field_set
     tf = await terraform_init(terraform_fieldset_to_init_request(fs))
 
     invocation_files = await get_terraform_backend_and_vars(
@@ -77,7 +62,7 @@ async def run_trivy_on_terraform_deployment(
         MergeDigests([var_files.snapshot.digest, tf.sources_and_deps])
     )
 
-    r = await run_trivy(
+    return await run_trivy(
         RunTrivyRequest(
             command="config",
             scanners=(),
@@ -88,12 +73,33 @@ async def run_trivy_on_terraform_deployment(
         )
     )
 
-    return LintResult.create(request, r)
+
+@dataclass(frozen=True)
+class TrivyLintTerraformDeploymentFieldSet(TerraformDeploymentFieldSet, TrivyTerraformFieldSet):
+    pass
+
+
+class TrivyLintTerraformDeploymentRequest(TrivyLintTerraformRequest):
+    field_set_type = TrivyLintTerraformDeploymentFieldSet
+    tool_subsystem = Trivy
+    partitioner_type = (
+        PartitionerType.DEFAULT_SINGLE_PARTITION
+    )  # TODO: is this partitioner correct?
+
+
+@rule(desc="Lint Terraform deployment with Trivy", level=LogLevel.DEBUG)
+async def run_trivy_on_terraform_deployment(
+    request: TrivyLintTerraformDeploymentRequest.Batch[TrivyLintTerraformDeploymentRequest, Any]
+) -> LintResult:
+    assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
+    [fs] = request.elements
+
+    return LintResult.create(request, await run_trivy_on_terraform(RunTrivyOnTerraformRequest(fs)))
 
 
 def rules():
     return (
         *collect_rules(),
-        *TrivyTerraformRequest.rules(),
+        *TrivyLintTerraformDeploymentRequest.rules(),
         TerraformDeploymentTarget.register_plugin_field(SkipTrivyField),
     )

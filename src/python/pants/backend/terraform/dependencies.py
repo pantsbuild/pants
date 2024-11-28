@@ -129,11 +129,15 @@ def terraform_fieldset_to_init_request(
     if isinstance(terraform_fieldset, TerraformDeploymentFieldSet):
         deployment = terraform_fieldset
         return TerraformInitRequest(deployment.root_module, deployment.dependencies)
-    if isinstance(terraform_fieldset, TerraformFieldSet):
+    elif isinstance(terraform_fieldset, TerraformFieldSet):
         module = terraform_fieldset
         return TerraformInitRequest(
             TerraformRootModuleField(module.address.spec, module.address),
             module.dependencies,
+        )
+    else:
+        raise TypeError(
+            f"Invalid type passed to initialise terraform tpye={type(terraform_fieldset)}"
         )
 
 
