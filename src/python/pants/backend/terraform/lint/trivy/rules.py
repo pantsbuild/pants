@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.terraform.dependencies import TerraformInitRequest, terraform_init
+from pants.backend.terraform.dependencies import terraform_fieldset_to_init_request
 from pants.backend.terraform.dependency_inference import (
     TerraformDeploymentInvocationFilesRequest,
     get_terraform_backend_and_vars,
@@ -55,18 +55,12 @@ class TrivyTerraformRequest(LintTargetsRequest):
 
 @rule(desc="Lint Terraform deployment with Trivy", level=LogLevel.DEBUG)
 async def run_trivy_on_terraform_deployment(
-    request: TrivyTerraformRequest.Batch[TrivyTerraformRequest, Any]
+    request: TrivyTerraformRequest.Batch[TrivyTerraformRequest, Any],
 ) -> LintResult:
     assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
     [fs] = request.elements
 
-    tf = await terraform_init(
-        TerraformInitRequest(
-            fs.root_module,
-            fs.dependencies,
-            initialise_backend=False,  # TODO: do we need to initialise the backend?
-        )
-    )
+    tf = await terraform_init(terraform_fieldset_to_init_request(fs))
 
     invocation_files = await get_terraform_backend_and_vars(
         TerraformDeploymentInvocationFilesRequest(fs.dependencies.address, fs.dependencies)

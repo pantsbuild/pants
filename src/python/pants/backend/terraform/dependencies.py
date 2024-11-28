@@ -12,6 +12,8 @@ from pants.backend.terraform.target_types import (
     LockfileSourceField,
     TerraformBackendConfigField,
     TerraformDependenciesField,
+    TerraformDeploymentFieldSet,
+    TerraformFieldSet,
     TerraformModuleSourcesField,
     TerraformRootModuleField,
     TerraformVarFileSourceField,
@@ -120,6 +122,21 @@ class TerraformInvocationRequirements:
 
 
 @rule
+def terraform_fieldset_to_init_request(
+    terraform_fieldset: TerraformDeploymentFieldSet | TerraformFieldSet,
+) -> TerraformInitRequest:
+    """Create a TerraformInitRequest from both Terraform Modules and Deployments."""
+    if isinstance(terraform_fieldset, TerraformDeploymentFieldSet):
+        deployment = terraform_fieldset
+        return TerraformInitRequest(deployment.root_module, deployment.dependencies)
+    if isinstance(terraform_fieldset, TerraformFieldSet):
+        module = terraform_fieldset
+        return TerraformInitRequest(
+            TerraformRootModuleField(module.address.spec, module.address),
+            module.dependencies,
+        )
+
+
 async def prepare_terraform_invocation(
     request: TerraformInitRequest,
 ) -> TerraformInvocationRequirements:
