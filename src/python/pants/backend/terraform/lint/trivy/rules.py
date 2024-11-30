@@ -12,7 +12,7 @@ from pants.backend.terraform.dependency_inference import (
 from pants.backend.terraform.target_types import (
     TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
-    TerraformFieldSet,
+    TerraformFieldSet, TerraformModuleTarget,
 )
 from pants.backend.tools.trivy.rules import RunTrivyRequest, run_trivy
 from pants.backend.tools.trivy.subsystem import SkipTrivyField, Trivy
@@ -127,4 +127,5 @@ def rules():
         *TrivyLintTerraformDeploymentRequest.rules(),
         *TrivyLintTerraformModuleRequest.rules(),
         TerraformDeploymentTarget.register_plugin_field(SkipTrivyField),
+        TerraformModuleTarget.register_plugin_field(SkipTrivyField),
     )
