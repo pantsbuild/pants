@@ -71,9 +71,7 @@ class TrivyLintHelmDeploymentFieldSet(HelmDeploymentFieldSet, TrivyHelmFieldSet)
 class TrivyLintHelmDeploymentRequest(TrivyLintHelmRequest):
     field_set_type = TrivyLintHelmDeploymentFieldSet
     tool_subsystem = Trivy
-    partitioner_type = (
-        PartitionerType.DEFAULT_SINGLE_PARTITION
-    )  # TODO: is this partitioner correct?
+    partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 
 @rule(desc="Lint Helm deployment with Trivy", level=LogLevel.DEBUG)
@@ -107,9 +105,7 @@ class TrivyLintHelmChartFieldSet(HelmChartFieldSet, TrivyHelmFieldSet):
 class TrivyLintHelmChartRequest(TrivyLintHelmRequest):
     field_set_type = TrivyLintHelmChartFieldSet
     tool_subsystem = Trivy
-    partitioner_type = (
-        PartitionerType.DEFAULT_SINGLE_PARTITION
-    )  # TODO: is this partitioner correct?
+    partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 
 @rule(desc="Lint Helm chart with Trivy", level=LogLevel.DEBUG)
