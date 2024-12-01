@@ -83,9 +83,7 @@ class TrivyLintTerraformDeploymentFieldSet(TerraformDeploymentFieldSet, TrivyTer
 class TrivyLintTerraformDeploymentRequest(TrivyLintTerraformRequest):
     field_set_type = TrivyLintTerraformDeploymentFieldSet
     tool_subsystem = Trivy
-    partitioner_type = (
-        PartitionerType.DEFAULT_SINGLE_PARTITION
-    )  # TODO: is this partitioner correct?
+    partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 
 @rule(desc="Lint Terraform deployment with Trivy", level=LogLevel.DEBUG)
@@ -106,9 +104,7 @@ class TrivyLintTerraformModuleFieldSet(TerraformFieldSet, TrivyTerraformFieldSet
 class TrivyLintTerraformModuleRequest(TrivyLintTerraformRequest):
     field_set_type = TrivyLintTerraformModuleFieldSet
     tool_subsystem = Trivy
-    partitioner_type = (
-        PartitionerType.DEFAULT_SINGLE_PARTITION
-    )  # TODO: is this partitioner correct?
+    partitioner_type =         PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 
 @rule(desc="Lint Terraform module with Trivy", level=LogLevel.DEBUG)
