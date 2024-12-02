@@ -17,7 +17,12 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.errors import OptionsError
-from pants.option.global_options import DynamicRemoteOptions, GlobalOptions, RemoteProvider, ExecutionOptions
+from pants.option.global_options import (
+    DynamicRemoteOptions,
+    ExecutionOptions,
+    GlobalOptions,
+    RemoteProvider,
+)
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil import rule_runner
 from pants.testutil.option_util import create_options_bootstrapper
@@ -146,18 +151,24 @@ def test_execution_options_remote_addresses() -> None:
     with pytest.raises(ExecutionError):
         create_dynamic_remote_options(address=f"https:://{host}")
 
+
 _DEFAULT_USER_AGENT = f"pants/{VERSION}"
+
+
 @pytest.mark.parametrize(
     ("input", "expected"),
     [
         ({}, {"user-agent": _DEFAULT_USER_AGENT}),
         ({"user-agent": "same case"}, {"user-agent": "same case"}),
         ({"User-Agent": "title case"}, {"User-Agent": "title case"}),
-        ({"not-user-agent": "foo"}, {"user-agent": _DEFAULT_USER_AGENT, "not-user-agent": "foo"})
-    ]
+        ({"not-user-agent": "foo"}, {"user-agent": _DEFAULT_USER_AGENT, "not-user-agent": "foo"}),
+    ],
 )
-def test_execution_options_with_user_agent_should_match_table(input: dict[str, str], expected: dict[str, str]) -> None:
+def test_execution_options_with_user_agent_should_match_table(
+    input: dict[str, str], expected: dict[str, str]
+) -> None:
     assert ExecutionOptions.with_user_agent(input) == expected
+
 
 def test_invalidation_globs() -> None:
     # Confirm that an un-normalized relative path in the pythonpath is filtered out, and that an
