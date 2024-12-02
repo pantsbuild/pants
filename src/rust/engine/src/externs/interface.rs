@@ -1902,30 +1902,33 @@ fn write_digest(
         }
 
         block_in_place_and_wait(py, || async move {
-            // Although Workspace.write_digest() is typically used in @goal_rules, and so is not
-            // invoked concurrently, there are a handful of cases where we might need to write
-            // deeper inside the rule graph, and therefore may run into concurrency issues.
-            // One example is the bsp server, which may attempt to write build byproducts into
-            // the workspace for the IDE to consume, and in some cases may try and write the
-            // same files concurrently. Therefore we force all workspace writes to run in
-            // a critical section.
-            //
-            // Side note: When using Workspace.write_digest() outside a @goal_rule, you must take
-            // care to ensure that it always runs, and is not short-circuited by rule memoization,
-            // so that you can rely on the side effect always taking effect. This is typically done
-            // via an @_uncacheable_rule. This lock makes Workspace safe to use outside a @goal_rule,
-            // but does nothing to guarantee that it will run when you expect it to.
-            let _locked = GLOBAL_WORKSPACE_WRITE_LOCK.lock().await;
-            store
-                .materialize_directory(
-                    destination.clone(),
-                    &scheduler.core.build_root,
-                    lifted_digest.clone(),
-                    true, // Force everything we write to be mutable
-                    &BTreeSet::new(),
-                    fs::Permissions::Writable,
-                )
-                .await?;
+            {
+                // Although Workspace.write_digest() is typically used in @goal_rules, and so is not
+                // invoked concurrently, there are a handful of cases where we might need to write
+                // deeper inside the rule graph, and therefore may run into concurrency issues.
+                // One example is the bsp server, which may attempt to write build byproducts into
+                // the workspace for the IDE to consume, and in some cases may try and write the
+                // same files concurrently. Therefore we force all workspace writes to run in
+                // a critical section.
+                //
+                // Side note: When using Workspace.write_digest() outside a @goal_rule, you must
+                // take care to ensure that it always runs, and is not short-circuited by rule
+                // memoization, so that you can rely on the side effect always taking effect.
+                // This is typically done via an @_uncacheable_rule.
+                // This lock makes Workspace safe to use outside a @goal_rule, but does nothing to
+                // guarantee that it will run when you expect it to.
+                let _locked = GLOBAL_WORKSPACE_WRITE_LOCK.lock().await;
+                store
+                    .materialize_directory(
+                        destination.clone(),
+                        &scheduler.core.build_root,
+                        lifted_digest.clone(),
+                        true, // Force everything we write to be mutable
+                        &BTreeSet::new(),
+                        fs::Permissions::Writable,
+                    )
+                    .await?;
+            } // _locked released here.
 
             // Invalidate all the paths we've changed within `path_prefix`: both the paths we cleared and
             // the files we've just written to.
