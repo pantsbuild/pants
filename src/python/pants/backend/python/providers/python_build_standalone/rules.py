@@ -194,7 +194,6 @@ class PBSPythonProvider(PythonProvider):
 def _choose_python(
     interpreter_constraints: InterpreterConstraints,
     universe: Iterable[str],
-    # pbs_versions: collections.abc.Collection[str],
     pbs_versions: Mapping[str, Mapping[str, PBSPythonInfo]],
     platform: Platform,
     release_constraint_func: Callable[[Version], bool],
