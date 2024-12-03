@@ -3,8 +3,6 @@
 
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
-// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
-#![allow(deprecated)]
 
 use futures::future::{BoxFuture, Future};
 use futures::FutureExt;
@@ -12,9 +10,9 @@ use lazy_static::lazy_static;
 use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::sync::GILProtected;
-use pyo3::types::{PyBytes, PyDict, PySequence, PyTuple, PyType};
+use pyo3::types::{PyBool, PyBytes, PyDict, PySequence, PyString, PyTuple, PyType};
+use pyo3::FromPyObject;
 use pyo3::{create_exception, import_exception, intern};
-use pyo3::{FromPyObject, ToPyObject};
 use smallvec::{smallvec, SmallVec};
 use std::cell::{Ref, RefCell};
 use std::collections::BTreeMap;
@@ -129,7 +127,7 @@ pub fn store_tuple(py: Python, values: Vec<Value>) -> PyResult<Value> {
         .into_iter()
         .map(|v| v.consume_into_py_object(py))
         .collect();
-    Ok(Value::from(PyTuple::new(py, &arg_handles)?.to_object(py)))
+    Ok(Value::from(PyTuple::new(py, &arg_handles)?.into_any()))
 }
 
 /// Store a slice containing 2-tuples of (key, value) as a Python dictionary.
@@ -141,35 +139,35 @@ pub fn store_dict(
     for (k, v) in keys_and_values {
         dict.set_item(k.consume_into_py_object(py), v.consume_into_py_object(py))?;
     }
-    Ok(Value::from(dict.to_object(py)))
+    Ok(Value::from(dict.into_any()))
 }
 
 /// Store an opaque buffer of bytes to pass to Python. This will end up as a Python `bytes`.
 pub fn store_bytes(py: Python, bytes: &[u8]) -> Value {
-    Value::from(PyBytes::new(py, bytes).to_object(py))
+    Value::from(PyBytes::new(py, bytes).into_any())
 }
 
 /// Store a buffer of utf8 bytes to pass to Python. This will end up as a Python `str`.
 pub fn store_utf8(py: Python, utf8: &str) -> Value {
-    Value::from(utf8.to_object(py))
+    Value::from(PyString::new(py, utf8).into_any())
 }
 
 pub fn store_u64(py: Python, val: u64) -> Value {
-    Value::from(val.to_object(py))
+    Value::from(val.into_pyobject(py).unwrap())
 }
 
 pub fn store_i64(py: Python, val: i64) -> Value {
-    Value::from(val.to_object(py))
+    Value::from(val.into_pyobject(py).unwrap())
 }
 
 pub fn store_bool(py: Python, val: bool) -> Value {
-    Value::from(val.to_object(py))
+    Value::from(PyBool::new(py, val))
 }
 
 ///
 /// Gets an attribute of the given value as the given type.
 ///
-pub fn getattr_bound<'py, T>(value: &Bound<'py, PyAny>, field: &str) -> Result<T, String>
+pub fn getattr<'py, T>(value: &Bound<'py, PyAny>, field: &str) -> Result<T, String>
 where
     T: FromPyObject<'py>,
 {
@@ -190,17 +188,15 @@ where
 ///
 /// Collect the Values contained within an outer Python Iterable PyObject.
 ///
-pub fn collect_iterable_bound<'py>(
-    value: &Bound<'py, PyAny>,
-) -> Result<Vec<Bound<'py, PyAny>>, String> {
-    match value.iter() {
+pub fn collect_iterable<'py>(value: &Bound<'py, PyAny>) -> Result<Vec<Bound<'py, PyAny>>, String> {
+    match value.try_iter() {
         Ok(py_iter) => py_iter
             .enumerate()
             .map(|(i, py_res)| {
                 py_res.map_err(|py_err| {
                     format!(
                         "Could not iterate {}, failed to extract {}th item: {:?}",
-                        val_to_str_bound(value),
+                        val_to_str(value),
                         i,
                         py_err
                     )
@@ -209,19 +205,19 @@ pub fn collect_iterable_bound<'py>(
             .collect(),
         Err(py_err) => Err(format!(
             "Could not iterate {}: {:?}",
-            val_to_str_bound(value),
+            val_to_str(value),
             py_err
         )),
     }
 }
 
 /// Read a `FrozenDict[str, T]`.
-pub fn getattr_from_str_frozendict_bound<'py, T: FromPyObject<'py>>(
+pub fn getattr_from_str_frozendict<'py, T: FromPyObject<'py>>(
     value: &Bound<'py, PyAny>,
     field: &str,
 ) -> BTreeMap<String, T> {
-    let frozendict: Bound<PyAny> = getattr_bound(value, field).unwrap();
-    let pydict: Bound<PyDict> = getattr_bound(&frozendict, "_data").unwrap();
+    let frozendict: Bound<PyAny> = getattr(value, field).unwrap();
+    let pydict: Bound<PyDict> = getattr(&frozendict, "_data").unwrap();
     pydict
         .items()
         .into_iter()
@@ -229,7 +225,7 @@ pub fn getattr_from_str_frozendict_bound<'py, T: FromPyObject<'py>>(
         .collect()
 }
 
-pub fn getattr_as_optional_string_bound(
+pub fn getattr_as_optional_string(
     value: &Bound<'_, PyAny>,
     field: &str,
 ) -> PyResult<Option<String>> {
@@ -241,22 +237,18 @@ pub fn getattr_as_optional_string_bound(
 /// Call the equivalent of `str()` on an arbitrary Python object.
 ///
 /// Converts `None` to the empty string.
-pub fn val_to_str_bound(obj: &Bound<'_, PyAny>) -> String {
+pub fn val_to_str(obj: &Bound<'_, PyAny>) -> String {
     if obj.is_none() {
         return "".to_string();
     }
     obj.str().unwrap().extract().unwrap()
 }
 
-pub fn val_to_log_level_bound(obj: &Bound<'_, PyAny>) -> Result<log::Level, String> {
-    let res: Result<PythonLogLevel, String> = getattr_bound(obj, "_level").and_then(|n: u64| {
+pub fn val_to_log_level(obj: &Bound<'_, PyAny>) -> Result<log::Level, String> {
+    let res: Result<PythonLogLevel, String> = getattr(obj, "_level").and_then(|n: u64| {
         n.try_into()
             .map_err(|e: num_enum::TryFromPrimitiveError<_>| {
-                format!(
-                    "Could not parse {:?} as a LogLevel: {}",
-                    val_to_str_bound(obj),
-                    e
-                )
+                format!("Could not parse {:?} as a LogLevel: {}", val_to_str(obj), e)
             })
     });
     res.map(|py_level| py_level.into())
@@ -270,7 +262,11 @@ pub fn doc_url(py: Python, slug: &str) -> String {
 }
 
 pub fn create_exception(py: Python, msg: String) -> Value {
-    Value::new(IntrinsicError::new_err(msg).into_py(py))
+    Value::from(
+        IntrinsicError::new_err(msg)
+            .into_pyobject(py)
+            .expect("Construct PyErr"),
+    )
 }
 
 pub(crate) enum GeneratorInput {
@@ -358,12 +354,12 @@ pub(crate) fn generator_send(
     } else if let Ok(get_multi) = response.downcast::<PySequence>() {
         // Was an `All` or `MultiGet`.
         let gogs = get_multi
-            .iter()?
+            .try_iter()?
             .map(|gog| {
                 let gog = gog?;
                 // TODO: Find a better way to check whether something is a coroutine... this seems
                 // unnecessarily awkward.
-                if gog.is_instance(&generator_type.as_py_type_bound(py))? {
+                if gog.is_instance(&generator_type.as_py_type(py))? {
                     Ok(GetOrGenerator::Generator(Value::new(gog.unbind())))
                 } else if let Ok(get) = gog.extract::<PyRef<PyGeneratorResponseGet>>() {
                     Ok(GetOrGenerator::Get(
@@ -390,7 +386,7 @@ pub(crate) fn generator_send(
 /// NB: Panics on failure. Only recommended for use with built-in types, such as
 /// those configured in types::Types.
 pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
-    let py_type = type_id.as_py_type_bound(py);
+    let py_type = type_id.as_py_type(py);
     let args_tuple = PyTuple::new(py, args.iter().map(|v| v.bind(py))).unwrap_or_else(|e| {
         panic!("Core type constructor `PyTuple` failed: {e:?}",);
     });
@@ -401,7 +397,7 @@ pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
             e
         );
     });
-    Value::new(res.into_py(py))
+    Value::from(&res)
 }
 
 lazy_static! {
@@ -522,10 +518,9 @@ impl PyGeneratorResponseNativeCall {
         Some(self_)
     }
 
-    fn send(&self, py: Python, value: PyObject) -> PyResult<()> {
-        Err(PyStopIteration::new_err(
-            PyTuple::new(py, [value])?.to_object(py),
-        ))
+    fn send(&self, py: Python<'_>, value: PyObject) -> PyResult<()> {
+        let args = PyTuple::new(py, [value])?.into_pyobject(py)?.unbind();
+        Err(PyStopIteration::new_err(args))
     }
 }
 
@@ -581,7 +576,7 @@ impl PyGeneratorResponseCall {
 
     #[getter]
     fn output_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyType>> {
-        Ok(self.borrow_inner(py)?.output_type.as_py_type_bound(py))
+        Ok(self.borrow_inner(py)?.output_type.as_py_type(py))
     }
 
     #[getter]
@@ -590,7 +585,7 @@ impl PyGeneratorResponseCall {
             .borrow_inner(py)?
             .input_types
             .iter()
-            .map(|t| t.as_py_type_bound(py))
+            .map(|t| t.as_py_type(py))
             .collect())
     }
 
@@ -673,7 +668,7 @@ impl PyGeneratorResponseGet {
                 )
             })?
             .output
-            .as_py_type_bound(py))
+            .as_py_type(py))
     }
 
     #[getter]
@@ -690,7 +685,7 @@ impl PyGeneratorResponseGet {
             })?
             .input_types
             .iter()
-            .map(|t| t.as_py_type_bound(py))
+            .map(|t| t.as_py_type(py))
             .collect())
     }
 

@@ -1,9 +1,6 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
-#![allow(deprecated)]
-
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -24,6 +21,7 @@ use fs::{
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use store::Snapshot;
 
+use crate::python::PyComparedBool;
 use crate::Failure;
 
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -96,13 +94,13 @@ impl PyDigest {
         format!("{self}")
     }
 
-    fn __richcmp__(&self, other: &Bound<'_, PyDigest>, op: CompareOp, py: Python) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PyDigest>, op: CompareOp) -> PyComparedBool {
         let other_digest = other.borrow();
-        match op {
-            CompareOp::Eq => (*self == *other_digest).into_py(py),
-            CompareOp::Ne => (*self != *other_digest).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other_digest),
+            CompareOp::Ne => Some(*self != *other_digest),
+            _ => None,
+        })
     }
 
     #[getter]
@@ -141,13 +139,13 @@ impl PyFileDigest {
         )
     }
 
-    fn __richcmp__(&self, other: &Bound<'_, PyFileDigest>, op: CompareOp, py: Python) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PyFileDigest>, op: CompareOp) -> PyComparedBool {
         let other_file_digest = other.borrow();
-        match op {
-            CompareOp::Eq => (*self == *other_file_digest).into_py(py),
-            CompareOp::Ne => (*self != *other_file_digest).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other_file_digest),
+            CompareOp::Ne => Some(*self != *other_file_digest),
+            _ => None,
+        })
     }
 
     #[getter]
@@ -201,13 +199,13 @@ impl PySnapshot {
         ))
     }
 
-    fn __richcmp__(&self, other: &Bound<'_, PySnapshot>, op: CompareOp, py: Python) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PySnapshot>, op: CompareOp) -> PyComparedBool {
         let other_digest = other.borrow().0.digest;
-        match op {
-            CompareOp::Eq => (self.0.digest == other_digest).into_py(py),
-            CompareOp::Ne => (self.0.digest != other_digest).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(self.0.digest == other_digest),
+            CompareOp::Ne => Some(self.0.digest != other_digest),
+            _ => None,
+        })
     }
 
     #[getter]
@@ -301,18 +299,13 @@ impl PyMergeDigests {
         format!("MergeDigests([{digests}])")
     }
 
-    fn __richcmp__(
-        &self,
-        other: &Bound<'_, PyMergeDigests>,
-        op: CompareOp,
-        py: Python,
-    ) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PyMergeDigests>, op: CompareOp) -> PyComparedBool {
         let other = other.borrow();
-        match op {
-            CompareOp::Eq => (*self == *other).into_py(py),
-            CompareOp::Ne => (*self != *other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other),
+            CompareOp::Ne => Some(*self != *other),
+            _ => None,
+        })
     }
 }
 
@@ -348,13 +341,13 @@ impl PyAddPrefix {
         )
     }
 
-    fn __richcmp__(&self, other: &Bound<'_, PyAddPrefix>, op: CompareOp, py: Python) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PyAddPrefix>, op: CompareOp) -> PyComparedBool {
         let other = other.borrow();
-        match op {
-            CompareOp::Eq => (*self == *other).into_py(py),
-            CompareOp::Ne => (*self != *other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other),
+            CompareOp::Ne => Some(*self != *other),
+            _ => None,
+        })
     }
 }
 
@@ -390,18 +383,13 @@ impl PyRemovePrefix {
         )
     }
 
-    fn __richcmp__(
-        &self,
-        other: &Bound<'_, PyRemovePrefix>,
-        op: CompareOp,
-        py: Python,
-    ) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PyRemovePrefix>, op: CompareOp) -> PyComparedBool {
         let other = other.borrow();
-        match op {
-            CompareOp::Eq => (*self == *other).into_py(py),
-            CompareOp::Ne => (*self != *other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other),
+            CompareOp::Ne => Some(*self != *other),
+            _ => None,
+        })
     }
 }
 
@@ -481,22 +469,19 @@ impl PyFilespecMatcher {
         format!("FilespecMatcher(includes=['{includes}'], excludes=[{excludes}])",)
     }
 
-    fn __richcmp__(
-        &self,
-        other: &Bound<'_, PyFilespecMatcher>,
-        op: CompareOp,
-        py: Python,
-    ) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PyFilespecMatcher>, op: CompareOp) -> PyComparedBool {
         let other = other.borrow();
-        match op {
-            CompareOp::Eq => (self.0.include_globs() == other.0.include_globs()
-                && self.0.exclude_globs() == other.0.exclude_globs())
-            .into_py(py),
-            CompareOp::Ne => (self.0.include_globs() != other.0.include_globs()
-                || self.0.exclude_globs() != other.0.exclude_globs())
-            .into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(
+                self.0.include_globs() == other.0.include_globs()
+                    && self.0.exclude_globs() == other.0.exclude_globs(),
+            ),
+            CompareOp::Ne => Some(
+                self.0.include_globs() != other.0.include_globs()
+                    || self.0.exclude_globs() != other.0.exclude_globs(),
+            ),
+            _ => None,
+        })
     }
 
     fn matches(&self, paths: Vec<String>, py: Python) -> PyResult<Vec<String>> {

@@ -1,9 +1,6 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
-#![allow(deprecated)]
-
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -14,7 +11,7 @@ use fs::{
 use hashing::{Digest, EMPTY_DIGEST};
 use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyRef, PyResult, Python};
 use pyo3::types::{PyAnyMethods, PyModuleMethods, PyTuple, PyTypeMethods};
-use pyo3::{Bound, IntoPy, PyAny};
+use pyo3::{Bound, IntoPyObject, PyAny};
 use store::{SnapshotOps, SubsetParams};
 
 use crate::externs;
@@ -23,8 +20,8 @@ use crate::externs::fs::{
 };
 use crate::externs::PyGeneratorResponseNativeCall;
 use crate::nodes::{
-    lift_directory_digest_bound, task_get_context, unmatched_globs_additional_context,
-    DownloadedFile, NodeResult, PathMetadataNode, Snapshot, SubjectPath,
+    lift_directory_digest, task_get_context, unmatched_globs_additional_context, DownloadedFile,
+    NodeResult, PathMetadataNode, Snapshot, SubjectPath,
 };
 use crate::python::{throw, Key, Value};
 use crate::Failure;
@@ -53,7 +50,7 @@ fn get_digest_contents(digest: Value) -> PyGeneratorResponseNativeCall {
 
         let digest = Python::with_gil(|py| {
             let py_digest = digest.bind(py);
-            lift_directory_digest_bound(py_digest)
+            lift_directory_digest(py_digest)
         })?;
 
         let digest_contents = context.core.store().contents_for_directory(digest).await?;
@@ -71,7 +68,7 @@ fn get_digest_entries(digest: Value) -> PyGeneratorResponseNativeCall {
 
         let digest = Python::with_gil(|py| {
             let py_digest = digest.bind(py);
-            lift_directory_digest_bound(py_digest)
+            lift_directory_digest(py_digest)
         })?;
         let digest_entries = context.core.store().entries_for_directory(digest).await?;
         Ok::<_, Failure>(Python::with_gil(|py| {
@@ -133,7 +130,7 @@ fn digest_to_snapshot(digest: Value) -> PyGeneratorResponseNativeCall {
 
         let digest = Python::with_gil(|py| {
             let py_digest = digest.bind(py);
-            lift_directory_digest_bound(py_digest)
+            lift_directory_digest(py_digest)
         })?;
         let snapshot = store::Snapshot::from_digest(store, digest).await?;
         Ok::<_, Failure>(Python::with_gil(|py| {
@@ -184,7 +181,7 @@ fn path_globs_to_digest(path_globs: Value) -> PyGeneratorResponseNativeCall {
 
         let path_globs = Python::with_gil(|py| {
             let py_path_globs = path_globs.bind(py);
-            Snapshot::lift_path_globs_bound(py_path_globs)
+            Snapshot::lift_path_globs(py_path_globs)
         })
         .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
         let snapshot = context.get(Snapshot::from_path_globs(path_globs)).await?;
@@ -202,7 +199,7 @@ fn path_globs_to_paths(path_globs: Value) -> PyGeneratorResponseNativeCall {
 
         let path_globs = Python::with_gil(|py| {
             let py_path_globs = path_globs.bind(py);
-            Snapshot::lift_path_globs_bound(py_path_globs)
+            Snapshot::lift_path_globs(py_path_globs)
         })
         .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
 
@@ -258,28 +255,28 @@ fn create_digest(py: Python, create_digest: Value) -> PyGeneratorResponseNativeC
         let items: Vec<CreateDigestItem> = {
             Python::with_gil(|py| {
                 let py_create_digest = create_digest.bind(py);
-                externs::collect_iterable_bound(py_create_digest)
+                externs::collect_iterable(py_create_digest)
                     .unwrap()
                     .into_iter()
                     .map(|obj| {
-                        let raw_path: String = externs::getattr_bound(&obj, "path").unwrap();
+                        let raw_path: String = externs::getattr(&obj, "path").unwrap();
                         let path = RelativePath::new(PathBuf::from(raw_path)).unwrap();
                         if obj.hasattr("content").unwrap() {
                             let bytes = bytes::Bytes::from(
-                                externs::getattr_bound::<Vec<u8>>(&obj, "content").unwrap(),
+                                externs::getattr::<Vec<u8>>(&obj, "content").unwrap(),
                             );
                             let is_executable: bool =
-                                externs::getattr_bound(&obj, "is_executable").unwrap();
+                                externs::getattr(&obj, "is_executable").unwrap();
                             new_file_count += 1;
                             CreateDigestItem::FileContent(path, bytes, is_executable)
                         } else if obj.hasattr("file_digest").unwrap() {
                             let py_file_digest: PyFileDigest =
-                                externs::getattr_bound(&obj, "file_digest").unwrap();
+                                externs::getattr(&obj, "file_digest").unwrap();
                             let is_executable: bool =
-                                externs::getattr_bound(&obj, "is_executable").unwrap();
+                                externs::getattr(&obj, "is_executable").unwrap();
                             CreateDigestItem::FileEntry(path, py_file_digest.0, is_executable)
                         } else if obj.hasattr("target").unwrap() {
-                            let target: String = externs::getattr_bound(&obj, "target").unwrap();
+                            let target: String = externs::getattr(&obj, "target").unwrap();
                             CreateDigestItem::SymlinkEntry(path, PathBuf::from(target))
                         } else {
                             CreateDigestItem::Dir(path)
@@ -346,12 +343,11 @@ fn digest_subset_to_digest(digest_subset: Value) -> PyGeneratorResponseNativeCal
         let (path_globs, original_digest) = Python::with_gil(|py| {
             let py_digest_subset = digest_subset.bind(py);
             let py_path_globs: Bound<'_, PyAny> =
-                externs::getattr_bound(py_digest_subset, "globs").unwrap();
-            let py_digest: Bound<'_, PyAny> =
-                externs::getattr_bound(py_digest_subset, "digest").unwrap();
+                externs::getattr(py_digest_subset, "globs").unwrap();
+            let py_digest: Bound<'_, PyAny> = externs::getattr(py_digest_subset, "digest").unwrap();
             let res: NodeResult<_> = Ok((
-                Snapshot::lift_prepared_path_globs_bound(&py_path_globs)?,
-                lift_directory_digest_bound(&py_digest)?,
+                Snapshot::lift_prepared_path_globs(&py_path_globs)?,
+                lift_directory_digest(&py_digest)?,
             ));
             res
         })?;
@@ -368,11 +364,11 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let subject_path = Python::with_gil(|py| -> Result<_, String> {
             let arg = single_path.bind(py);
-            let path = externs::getattr_as_optional_string_bound(arg, "path")
+            let path = externs::getattr_as_optional_string(arg, "path")
                 .map_err(|e| format!("Failed to get `path` for field: {e}"))?;
             let path = path.ok_or_else(|| "Path must not be `None`.".to_string())?;
 
-            let namespace: PyPathNamespace = externs::getattr_bound(arg, "namespace")
+            let namespace: PyPathNamespace = externs::getattr(arg, "namespace")
                 .map_err(|e| format!("Failed to get `namespace` for field: {e}"))?;
             match namespace {
                 PyPathNamespace::Workspace => SubjectPath::new_workspace(&path).map_err(|_| {
@@ -394,11 +390,16 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
 
         Ok(Python::with_gil(|py| {
             let path_metadata_opt = match metadata_opt {
-                Some(m) => m.into_py(py),
-                None => py.None(),
+                Some(m) => m
+                    .into_pyobject(py)
+                    .unwrap_or_else(|e| {
+                        panic!("Failed to convert type: {e:?}",);
+                    })
+                    .into_any(),
+                None => py.None().into_bound(py),
             };
 
-            let py_type = context.core.types.path_metadata_result.as_py_type_bound(py);
+            let py_type = context.core.types.path_metadata_result.as_py_type(py);
             let args_tuple = PyTuple::new(py, &[path_metadata_opt]).unwrap_or_else(|e| {
                 panic!("Core type constructor `PyTuple` failed: {e:?}");
             });

@@ -3,8 +3,6 @@
 
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
-// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
-#![allow(deprecated)]
 
 /// This crate is a wrapper around the engine crate which exposes a Python module via PyO3.
 use std::any::Any;
@@ -20,6 +18,9 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Mutex;
+
+use lazy_static::lazy_static;
 
 use async_latch::AsyncLatch;
 use fnv::FnvHasher;
@@ -35,14 +36,14 @@ use process_execution::CacheContentBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
     pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
-    PyResult as PyO3Result, Python, ToPyObject,
+    PyResult as PyO3Result, Python,
 };
 use pyo3::sync::GILProtected;
 use pyo3::types::{
     PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyModuleMethods, PyTuple,
     PyType,
 };
-use pyo3::{create_exception, Bound, IntoPy, PyAny, PyRef};
+use pyo3::{create_exception, Bound, IntoPyObject, PyAny, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, RuleGraph};
@@ -949,8 +950,8 @@ async fn workunit_to_py_value(
         let mut user_metadata_entries = Vec::with_capacity(metadata.user_metadata.len());
         for (user_metadata_key, user_metadata_item) in metadata.user_metadata.iter() {
             let value = match user_metadata_item {
-                UserMetadataItem::String(v) => v.into_py(py),
-                UserMetadataItem::Int(n) => n.into_py(py),
+                UserMetadataItem::String(v) => v.into_pyobject(py)?.to_owned().into_any().unbind(),
+                UserMetadataItem::Int(n) => n.into_pyobject(py)?.to_owned().into_any().unbind(),
                 UserMetadataItem::PyValue(py_val_handle) => (**py_val_handle)
                     .as_any()
                     .downcast_ref::<Value>()
@@ -959,7 +960,9 @@ async fn workunit_to_py_value(
                             "Failed to convert {py_val_handle:?} to a Value."
                         ))
                     })?
-                    .to_object(py),
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind(),
             };
             user_metadata_entries.push((
                 externs::store_utf8(py, user_metadata_key.as_str()),
@@ -1095,14 +1098,14 @@ fn session_run_interactive_process(
     py: Python,
     py_session: &Bound<'_, PySession>,
     interactive_process: PyObject,
-    process_config_from_environment: PyProcessExecutionEnvironment,
+    process_config_from_environment: &Bound<'_, PyProcessExecutionEnvironment>,
 ) -> PyO3Result<PyObject> {
     let core = py_session.borrow().0.core().clone();
     let session = &py_session.borrow().0;
     let context = core.graph.context(SessionCore::new(session.clone()));
 
     let interactive_process: Value = interactive_process.into();
-    let process_config = Value::new(process_config_from_environment.into_py(py));
+    let process_config = Value::from(process_config_from_environment.as_any());
 
     py.allow_threads(|| {
         core.executor.clone().block_on(nodes::task_context(
@@ -1149,7 +1152,7 @@ fn scheduler_live_items<'py>(
         .enter(|| py.allow_threads(|| scheduler.live_items(session)));
     let py_items = items
         .into_iter()
-        .map(|value| value.bind(py).to_object(py))
+        .map(|value| value.bind(py).clone().unbind())
         .collect();
     (py_items, sizes)
 }
@@ -1532,7 +1535,7 @@ fn rule_graph_consumed_types<'py>(
         Ok(subgraph
             .consumed_types()
             .into_iter()
-            .map(|type_id| type_id.as_py_type_bound(py))
+            .map(|type_id| type_id.as_py_type(py))
             .collect())
     })
 }
@@ -1548,7 +1551,12 @@ fn rule_graph_rule_gets<'py>(
         for (rule, rule_dependencies) in core.rule_graph.rule_dependencies() {
             let task = rule.0;
             let function = &task.func;
-            let mut dependencies = Vec::new();
+            #[allow(clippy::type_complexity)]
+            let mut dependencies: Vec<(
+                Bound<'_, PyType>,
+                Vec<Bound<'_, PyType>>,
+                pyo3::Py<PyAny>,
+            )> = Vec::new();
             for (dependency_key, rule) in rule_dependencies {
                 // NB: We are only migrating non-union Gets, which are those in the `gets` list
                 // which do not have `in_scope_params` marking them as being for unions, or a call
@@ -1564,18 +1572,21 @@ fn rule_graph_rule_gets<'py>(
                 let provided_params = dependency_key
                     .provided_params
                     .iter()
-                    .map(|p| p.as_py_type_bound(py))
+                    .map(|p| p.as_py_type(py))
                     .collect::<Vec<_>>();
                 dependencies.push((
-                    dependency_key.product.as_py_type_bound(py),
+                    dependency_key.product.as_py_type(py),
                     provided_params,
-                    function.0.value.into_py(py),
+                    function.0.value.into_pyobject(py)?.into_any().unbind(),
                 ));
             }
             if dependencies.is_empty() {
                 continue;
             }
-            result.set_item(function.0.value.into_py(py), dependencies.into_py(py))?;
+            result.set_item(
+                function.0.value.into_pyobject(py)?,
+                dependencies.into_pyobject(py)?,
+            )?;
         }
         Ok(result)
     })
@@ -1713,23 +1724,22 @@ fn capture_snapshots(
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
 
-        let values = externs::collect_iterable_bound(path_globs_and_root_tuple_wrapper).unwrap();
+        let values = externs::collect_iterable(path_globs_and_root_tuple_wrapper).unwrap();
         let path_globs_and_roots = values
             .into_iter()
             .map(|value| {
-                let root: PathBuf = externs::getattr_bound(&value, "root")?;
+                let root: PathBuf = externs::getattr(&value, "root")?;
                 let path_globs = {
                     let path_globs_py_value =
-                        externs::getattr_bound::<Bound<'_, PyAny>>(&value, "path_globs")?;
-                    nodes::Snapshot::lift_prepared_path_globs_bound(&path_globs_py_value)
+                        externs::getattr::<Bound<'_, PyAny>>(&value, "path_globs")?;
+                    nodes::Snapshot::lift_prepared_path_globs(&path_globs_py_value)
                 };
                 let digest_hint = {
-                    let maybe_digest: Bound<'_, PyAny> =
-                        externs::getattr_bound(&value, "digest_hint")?;
+                    let maybe_digest: Bound<'_, PyAny> = externs::getattr(&value, "digest_hint")?;
                     if maybe_digest.is_none() {
                         None
                     } else {
-                        Some(nodes::lift_directory_digest_bound(&maybe_digest)?)
+                        Some(nodes::lift_directory_digest(&maybe_digest)?)
                     }
                 };
                 path_globs.map(|path_globs| (path_globs, root, digest_hint))
@@ -1774,9 +1784,9 @@ fn ensure_remote_has_recursive(
         let digests: Vec<Digest> = py_digests
             .iter()
             .map(|value| {
-                crate::nodes::lift_directory_digest_bound(&value)
+                crate::nodes::lift_directory_digest(&value)
                     .map(|dd| dd.as_digest())
-                    .or_else(|_| crate::nodes::lift_file_digest_bound(&value))
+                    .or_else(|_| crate::nodes::lift_file_digest(&value))
             })
             .collect::<Result<Vec<Digest>, _>>()
             .map_err(PyException::new_err)?;
@@ -1799,7 +1809,7 @@ fn ensure_directory_digest_persisted(
     let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         let digest =
-            crate::nodes::lift_directory_digest_bound(py_digest).map_err(PyException::new_err)?;
+            crate::nodes::lift_directory_digest(py_digest).map_err(PyException::new_err)?;
 
         py.allow_threads(|| {
             core.executor
@@ -1852,6 +1862,10 @@ fn ensure_path_doesnt_exist(path: &Path) -> io::Result<()> {
     }
 }
 
+lazy_static! {
+    static ref GLOBAL_WORKSPACE_WRITE_LOCK: Mutex<()> = Mutex::new(());
+}
+
 #[pyfunction]
 fn write_digest(
     py: Python<'_>,
@@ -1869,8 +1883,7 @@ fn write_digest(
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
 
-        let lifted_digest =
-            nodes::lift_directory_digest_bound(digest).map_err(PyValueError::new_err)?;
+        let lifted_digest = nodes::lift_directory_digest(digest).map_err(PyValueError::new_err)?;
 
         // Python will have already validated that path_prefix is a relative path.
         let path_prefix = Path::new(&path_prefix);
@@ -1889,16 +1902,33 @@ fn write_digest(
         }
 
         block_in_place_and_wait(py, || async move {
-            store
-                .materialize_directory(
-                    destination.clone(),
-                    &scheduler.core.build_root,
-                    lifted_digest.clone(),
-                    true, // Force everything we write to be mutable
-                    &BTreeSet::new(),
-                    fs::Permissions::Writable,
-                )
-                .await?;
+            {
+                // Although Workspace.write_digest() is typically used in @goal_rules, and so is not
+                // invoked concurrently, there are a handful of cases where we might need to write
+                // deeper inside the rule graph, and therefore may run into concurrency issues.
+                // One example is the bsp server, which may attempt to write build byproducts into
+                // the workspace for the IDE to consume, and in some cases may try and write the
+                // same files concurrently. Therefore we force all workspace writes to run in
+                // a critical section.
+                //
+                // Side note: When using Workspace.write_digest() outside a @goal_rule, you must
+                // take care to ensure that it always runs, and is not short-circuited by rule
+                // memoization, so that you can rely on the side effect always taking effect.
+                // This is typically done via an @_uncacheable_rule.
+                // This lock makes Workspace safe to use outside a @goal_rule, but does nothing to
+                // guarantee that it will run when you expect it to.
+                let _locked = GLOBAL_WORKSPACE_WRITE_LOCK.lock().await;
+                store
+                    .materialize_directory(
+                        destination.clone(),
+                        &scheduler.core.build_root,
+                        lifted_digest.clone(),
+                        true, // Force everything we write to be mutable
+                        &BTreeSet::new(),
+                        fs::Permissions::Writable,
+                    )
+                    .await?;
+            } // _locked released here.
 
             // Invalidate all the paths we've changed within `path_prefix`: both the paths we cleared and
             // the files we've just written to.

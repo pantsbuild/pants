@@ -10,6 +10,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 
 use crate::externs::address::Address;
+use crate::python::PyComparedBool;
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Field>()?;
@@ -170,23 +171,23 @@ impl Field {
         ))
     }
 
-    fn __richcmp__(
-        self_: &Bound<'_, Self>,
-        other: &Bound<'_, PyAny>,
+    fn __richcmp__<'py>(
+        self_: &Bound<'py, Self>,
+        other: &Bound<'py, PyAny>,
         op: CompareOp,
         py: Python,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<PyComparedBool> {
         let is_eq = self_.get_type().eq(other.get_type())?
             && self_
                 .borrow()
                 .value
                 .bind(py)
                 .eq(&other.extract::<PyRef<Field>>()?.value)?;
-        match op {
-            CompareOp::Eq => Ok(is_eq.into_py(py)),
-            CompareOp::Ne => Ok((!is_eq).into_py(py)),
-            _ => Ok(py.NotImplemented()),
-        }
+        Ok(PyComparedBool(match op {
+            CompareOp::Eq => Some(is_eq),
+            CompareOp::Ne => Some(!is_eq),
+            _ => None,
+        }))
     }
 }
 

@@ -1,17 +1,15 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-// Temporary: Allow deprecated items while we migrate to PyO3 v0.23.x.
-#![allow(deprecated)]
-
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+use process_execution::{Platform, ProcessExecutionEnvironment, ProcessExecutionStrategy};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyAssertionError, PyValueError};
 use pyo3::prelude::*;
 
-use process_execution::{Platform, ProcessExecutionEnvironment, ProcessExecutionStrategy};
+use crate::python::PyComparedBool;
 
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyProcessExecutionEnvironment>()?;
@@ -86,14 +84,13 @@ impl PyProcessExecutionEnvironment {
         &self,
         other: &Bound<'_, PyProcessExecutionEnvironment>,
         op: CompareOp,
-        py: Python,
-    ) -> PyObject {
+    ) -> PyComparedBool {
         let other = other.borrow();
-        match op {
-            CompareOp::Eq => (*self == *other).into_py(py),
-            CompareOp::Ne => (*self != *other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other),
+            CompareOp::Ne => Some(*self != *other),
+            _ => None,
+        })
     }
 
     #[getter]

@@ -17,6 +17,8 @@ use pyo3::types::{PyDict, PyFrozenSet, PyType};
 use fnv::FnvHasher;
 use lazy_static::lazy_static;
 
+use crate::python::PyComparedBool;
+
 create_exception!(native_engine, AddressParseException, PyException);
 create_exception!(native_engine, InvalidAddressError, AddressParseException);
 create_exception!(native_engine, InvalidSpecPathError, InvalidAddressError);
@@ -406,12 +408,12 @@ impl AddressInput {
         format!("{self:?}")
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp, py: Python) -> PyObject {
-        match op {
-            CompareOp::Eq => (self == other).into_py(py),
-            CompareOp::Ne => (self != other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyComparedBool {
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(self == other),
+            CompareOp::Ne => Some(self != other),
+            _ => None,
+        })
     }
 }
 
@@ -731,19 +733,21 @@ impl Address {
         }
     }
 
-    fn maybe_convert_to_target_generator(self_: PyRef<Self>, py: Python) -> PyObject {
+    fn maybe_convert_to_target_generator(self_: PyRef<Self>, py: Python) -> PyResult<PyObject> {
         if !self_.is_generated_target() && !self_.is_parametrized() {
-            return self_.into_py(py);
+            return Ok(self_.into_pyobject(py)?.into_any().unbind());
         }
 
-        Self {
+        Ok(Self {
             spec_path: self_.spec_path.clone(),
             target_name: self_.target_name.clone(),
             parameters: BTreeMap::default(),
             generated_name: None,
             relative_file_path: None,
         }
-        .into_py(py)
+        .into_pyobject(py)?
+        .into_any()
+        .unbind())
     }
 
     fn create_generated(&self, generated_name: String) -> PyResult<Self> {
