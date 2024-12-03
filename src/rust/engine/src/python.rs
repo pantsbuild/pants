@@ -353,7 +353,7 @@ impl<'py> FromPyObject<'py> for Value {
     }
 }
 
-impl<'a, 'py> IntoPyObject<'py> for &'a Value {
+impl<'py> IntoPyObject<'py> for &Value {
     type Target = PyAny;
     type Output = Bound<'py, Self::Target>; // Maybe consider `Borrowed` instead of `Bound` to optimize reference counting?
     type Error = Infallible;
