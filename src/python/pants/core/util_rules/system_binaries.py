@@ -293,10 +293,7 @@ class ArchiveFormat(Enum):
 
 
 class ZipBinary(BinaryPath):
-    def create_archive_argv(
-        self, output_filename: str, input_files: Sequence[str]
-    ) -> tuple[str, ...]:
-        return (self.path, output_filename, *input_files)
+    pass
 
 
 class UnzipBinary(BinaryPath):
