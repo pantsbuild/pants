@@ -14,9 +14,12 @@ from pants.backend.python.dependency_inference import rules as dependency_infere
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.goals.run_python_source import rules as run_rules
 from pants.backend.python.providers.python_build_standalone import rules as pbs
+from pants.backend.python.providers.python_build_standalone.constraints import ConstraintsList
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.build_graph.address import Address
 from pants.core.goals.run import RunRequest
+from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
@@ -32,6 +35,7 @@ def rule_runner() -> RuleRunner:
             *dependency_inference_rules.rules(),
             *target_types_rules.rules(),
             QueryRule(RunRequest, (PythonSourceFieldSet,)),
+            QueryRule(Platform, ()),
         ],
         target_types=[
             PythonSourcesGeneratorTarget,
@@ -175,3 +179,48 @@ def test_venv_pex_reconstruction(rule_runner):
     shutil.rmtree(venv_location)
     stdout2 = run_run_request(rule_runner, target)
     assert stdout1 == stdout2
+
+
+def test_release_constraint_evaluation(rule_runner: RuleRunner) -> None:
+    ics = InterpreterConstraints(["cpython==3.9.*"])
+    universe = ["3.9"]
+
+    def make_version(tag: str):
+        return {
+            "linux_arm64": {
+                "tag": tag,
+                "sha256": "abc123",
+                "size": 1,
+                "url": "foobar",
+            },
+            "linux_x86_64": {
+                "tag": tag,
+                "sha256": "abc123",
+                "size": 1,
+                "url": "https://example.com/foo.zip",
+            },
+            "macos_arm64": {
+                "tag": tag,
+                "sha256": "abc123",
+                "size": 1,
+                "url": "https://example.com/foo.zip",
+            },
+            "macos_x86_64": {
+                "tag": tag,
+                "sha256": "abc123",
+                "size": 1,
+                "url": "https://example.com/foo.zip",
+            },
+        }
+
+    pbs_versions = {
+        "3.9.18": make_version("20241001"),
+        "3.9.19": make_version("20241101"),
+        "3.9.20": make_version("20241201"),
+    }
+
+    platform = rule_runner.request(Platform, [])
+
+    rc = ConstraintsList.parse(">=20241001,<20241201")
+    version, _info = pbs._choose_python(ics, universe, pbs_versions, platform, rc)
+    assert version == "3.9.19"

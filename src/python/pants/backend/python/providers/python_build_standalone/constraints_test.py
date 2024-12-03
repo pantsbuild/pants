@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from packaging.version import Version as V
 
-from pants.backend.python.providers.python_build_standalone.constraints import Constraint, ConstraintList
+from pants.backend.python.providers.python_build_standalone.constraints import (
+    Constraint,
+    ConstraintsList,
+)
 
 
 def test_single_constraints() -> None:
@@ -40,7 +43,7 @@ def test_single_constraints() -> None:
 
 
 def test_constraints_list() -> None:
-    cs = ConstraintList.parse(">=1.2.0,<2")
+    cs = ConstraintsList.parse(">=1.2.0,<2")
     assert cs.evaluate(V("1.2.1"))
     assert cs.evaluate(V("1.3.0"))
     assert not cs.evaluate(V("0.9.1"))

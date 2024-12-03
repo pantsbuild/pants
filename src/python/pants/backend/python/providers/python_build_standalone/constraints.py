@@ -46,7 +46,7 @@ class Constraint:
 
         if cmp_op_and_callback is None:
             raise ConstraintParseError(
-                f"release_constraint must start with a comparison operator, i.e. {', '.join(_OPERATORS.keys())}"
+                f"A constraiint must start with a comparison operator, i.e. {', '.join(x[0] for x in _OPERATORS)}."
             )
 
         cmp_op, cmp_callback = cmp_op_and_callback
@@ -54,7 +54,7 @@ class Constraint:
         return cls(cmp_callback, cmp_version)
 
 
-class ConstraintList:
+class ConstraintsList:
     """A list of constraints which must all match (i.e., they are AND'ed together)."""
 
     def __init__(self, constraints: Iterable[Constraint]) -> None:
@@ -67,7 +67,7 @@ class ConstraintList:
         return True
 
     @classmethod
-    def parse(cls, constraints_str: str) -> ConstraintList:
+    def parse(cls, constraints_str: str) -> ConstraintsList:
         parts = constraints_str.split(",")
         constraints = [Constraint.parse(part) for part in parts]
         return cls(constraints)

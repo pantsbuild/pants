@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import functools
 import json
-import operator
 import textwrap
 import uuid
 from pathlib import PurePath
-from typing import Callable, Iterable, Mapping, TypedDict, cast
+from typing import Iterable, Mapping, TypedDict, cast
 
+from pants.backend.python.providers.python_build_standalone.constraints import ConstraintsList
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PythonProvider
@@ -36,13 +36,13 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.errors import ConfigError
 from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized_property
 from pants.util.resources import read_sibling_resource
 from pants.util.strutil import softwrap
 from pants.version import Version
@@ -121,14 +121,23 @@ class PBSPythonProviderSubsystem(Subsystem):
         ),
     )
 
-    _release_constraint = StrOption(
+    _release_constraints = StrOption(
         default=None,
         help=textwrap.dedent(
             """
-            A constraint on the PBS "release" version to ensure only matching PBS releases are considered.
+            Version constraints on the PBS "release" version to ensure only matching PBS releases are considered.
+            Constraints should be specfied in a similar manner to interpreter constraints: e.g., `>=1.2.3,<2`.
             """
         ),
     )
+
+    @memoized_property
+    def release_constraints(self) -> ConstraintsList:
+        rcs = self._release_constraints
+        if rcs is None or not rcs.strip():
+            return ConstraintsList([])
+
+        return ConstraintsList.parse(self._release_constraints or "")
 
     def get_all_pbs_pythons(self) -> dict[str, dict[str, PBSPythonInfo]]:
         all_pythons = load_pbs_pythons().copy()
@@ -152,40 +161,6 @@ class PBSPythonProviderSubsystem(Subsystem):
 
         return all_pythons
 
-    def make_release_constraint_evaluator(self) -> Callable[[Version], bool]:
-        rc = self._release_constraint
-        if rc is None:
-            return lambda _version: True
-
-        operators = (
-            (">=", operator.ge),
-            ("<=", operator.le),
-            ("==", operator.eq),
-            ("!=", operator.ne),
-            # `>` and `<` must come last!
-            (">", operator.gt),
-            ("<", operator.lt),
-        )
-        cmp_op_and_callback: tuple[str, Callable[[Version, Version], bool]] | None = None
-        for op, callback in operators:
-            if rc.startswith(op):
-                cmp_op_and_callback = (op, cast("Callable[[Version, Version], bool]", callback))
-                break
-
-        if cmp_op_and_callback is None:
-            raise ConfigError(
-                "release_constraint must start with a comparison operator, i.e. >=, <=, ==, !=, <, >"
-            )
-
-        cmp_op, cmp_callback = cmp_op_and_callback
-        cmp_version = Version(rc[len(cmp_op) :])
-
-        def callback_func(version: Version) -> bool:
-            nonlocal cmp_callback, cmp_version
-            return cmp_callback(version, cmp_version)
-
-        return callback_func
-
 
 class PBSPythonProvider(PythonProvider):
     pass
@@ -196,7 +171,7 @@ def _choose_python(
     universe: Iterable[str],
     pbs_versions: Mapping[str, Mapping[str, PBSPythonInfo]],
     platform: Platform,
-    release_constraint_func: Callable[[Version], bool],
+    release_constraints: ConstraintsList,
 ) -> tuple[str, PBSPythonInfo]:
     """Choose the highest supported patchlevel of the lowest supported major/minor version
     consistent with any PBS release constraint."""
@@ -215,7 +190,7 @@ def _choose_python(
             continue
 
         tag_as_version = Version(pbs_version_platform_metadata["tag"])
-        if not release_constraint_func(tag_as_version):
+        if not release_constraints.evaluate(tag_as_version):
             continue
 
         candidate_pbs_releases.append((triplet, pbs_version_platform_metadata))
@@ -276,7 +251,7 @@ async def get_python(
         python_setup.interpreter_versions_universe,
         versions_info,
         platform,
-        pbs_subsystem.make_release_constraint_evaluator(),
+        pbs_subsystem.release_constraints,
     )
 
     downloaded_python = await Get(
