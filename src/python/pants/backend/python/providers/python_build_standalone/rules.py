@@ -189,8 +189,8 @@ def _choose_python(
         if not pbs_version_platform_metadata:
             continue
 
-        tag_as_version = Version(pbs_version_platform_metadata["tag"])
-        if not release_constraints.evaluate(tag_as_version):
+        tag = pbs_version_platform_metadata.get("tag")
+        if tag and not release_constraints.evaluate(Version(tag)):
             continue
 
         candidate_pbs_releases.append((triplet, pbs_version_platform_metadata))
