@@ -142,7 +142,7 @@ def all_major_minor_python_versions(
     """
     versions = InterpreterConstraints(constraints).partition_into_major_minor_versions(
         # Please update this when new stable Python versions are released to CI.
-        interpreter_universe=["2.7", "3.6", "3.7", "3.8", "3.9"]
+        interpreter_universe=["2.7", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
     )
     return tuple(
         pytest.param(
