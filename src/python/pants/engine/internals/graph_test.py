@@ -1772,7 +1772,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
         pass
 
     addr = Address("", target_name="lib")
-    sources_rule_runner.write_files({f: "" for f in ["f1.f95"]})
+    sources_rule_runner.write_files({"f1.f95": ""})
 
     valid_sources = SourcesSubclass(["*"], addr)
     hydrated_valid_sources = sources_rule_runner.request(
@@ -1809,7 +1809,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
 
 def test_sources_unmatched_globs(sources_rule_runner: RuleRunner) -> None:
     sources_rule_runner.set_options(["--unmatched-build-file-globs=error"])
-    sources_rule_runner.write_files({f: "" for f in ["f1.f95"]})
+    sources_rule_runner.write_files({"f1.f95": ""})
     sources = MultipleSourcesField(["non_existent.f95"], Address("", target_name="lib"))
     with engine_error(contains="non_existent.f95"):
         sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(sources)])
@@ -1878,7 +1878,7 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         # We allow for 1 or 3 files
         expected_num_files = range(1, 4, 2)
 
-    sources_rule_runner.write_files({f: "" for f in ["f1.txt", "f2.txt", "f3.txt", "f4.txt"]})
+    sources_rule_runner.write_files(dict.fromkeys(["f1.txt", "f2.txt", "f3.txt", "f4.txt"], ""))
 
     def hydrate(sources_cls: Type[MultipleSourcesField], sources: Iterable[str]) -> HydratedSources:
         return sources_rule_runner.request(

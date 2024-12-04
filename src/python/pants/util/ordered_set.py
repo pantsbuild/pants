@@ -30,7 +30,7 @@ class _AbstractOrderedSet(AbstractSet[T]):
         # in a ~20% performance increase for the constructor.
         #
         # NB: Dictionaries are ordered in Python 3.7+.
-        self._items: dict[T, None] = {v: None for v in iterable or ()}
+        self._items: dict[T, None] = dict.fromkeys(iterable) if iterable else {}
 
     def __len__(self) -> int:
         """Returns the number of unique elements in the set."""
