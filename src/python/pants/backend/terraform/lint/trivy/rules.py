@@ -47,21 +47,26 @@ class RunTrivyOnTerraformRequest:
 async def run_trivy_on_terraform(req: RunTrivyOnTerraformRequest) -> FallibleProcessResult:
     fs = req.field_set
     tf = await terraform_init(terraform_fieldset_to_init_request(fs))
-
-    invocation_files = await get_terraform_backend_and_vars(
-        TerraformDeploymentInvocationFilesRequest(fs.dependencies.address, fs.dependencies)
-    )
-    var_files = await determine_source_files(
-        SourceFilesRequest(e.get(SourcesField) for e in invocation_files.vars_files)
-    )
-
     command_args = []
-    # Unlike Terraform, which needs the path to the vars file from the root module, Trivy needs the path from the cwd
-    command_args.extend(["--tf-vars", ",".join(var_file for var_file in var_files.files)])
 
-    input_digest = await merge_digests(
-        MergeDigests([var_files.snapshot.digest, tf.sources_and_deps])
-    )
+    if isinstance(fs, TerraformDeploymentFieldSet):
+        # Only add vars files for deployments
+        invocation_files = await get_terraform_backend_and_vars(
+            TerraformDeploymentInvocationFilesRequest(fs.dependencies.address, fs.dependencies)
+        )
+        var_files = await determine_source_files(
+            SourceFilesRequest(e.get(SourcesField) for e in invocation_files.vars_files)
+        )
+
+        # Unlike Terraform, which needs the path to the vars file from the root module, Trivy needs the path from the cwd
+        command_args.extend(["--tf-vars", ",".join(var_file for var_file in var_files.files)])
+
+        input_digest = await merge_digests(
+            MergeDigests([var_files.snapshot.digest, tf.sources_and_deps])
+        )
+    else:
+        input_digest = tf.sources_and_deps
+
 
     return await run_trivy(
         RunTrivyRequest(
