@@ -13,6 +13,10 @@ mod config;
 #[cfg(test)]
 mod config_tests;
 
+mod cli_alias;
+#[cfg(test)]
+mod cli_alias_tests;
+
 mod env;
 #[cfg(test)]
 mod env_tests;
@@ -321,6 +325,10 @@ impl OptionParser {
         allow_pantsrc: bool,
         include_derivation: bool,
         buildroot: Option<BuildRoot>,
+        // TODO: pass the raw option registration data in instead, so we can also use it
+        //  for validating config files and other uses.
+        //  For now this is just what we need to validate CLI aliases.
+        known_scopes_to_flags: Option<&HashMap<String, HashSet<String>>>,
     ) -> Result<OptionParser, String> {
         let has_provided_configs = config_sources.is_some();
 
@@ -328,15 +336,20 @@ impl OptionParser {
         let buildroot_string = buildroot.convert_to_string()?;
         let fromfile_expander = FromfileExpander::relative_to(buildroot);
 
+        let args_reader = ArgsReader::new(args, fromfile_expander.clone());
+        let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
+
         let mut seed_values = HashMap::from_iter(
             env.env
                 .iter()
                 .map(|(k, v)| (format!("env.{k}", k = k), v.clone())),
         );
 
-        let args_reader = ArgsReader::new(args, fromfile_expander.clone());
+        // We bootstrap options in several steps.
 
-        let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
+        // Step #1: Read env and (non cli alias-expanded) args to find config files and
+        // the workdir/distdir.
+
         sources.insert(
             Source::Env,
             Arc::new(EnvReader::new(env, fromfile_expander.clone())),
@@ -399,6 +412,8 @@ impl OptionParser {
             ("pants_distdir".to_string(), subdir("distdir", "dist")?),
         ]);
 
+        // Step #2: Read (unexpanded) args, env, and config to find rcfiles.
+
         let mut ordinal: usize = 0;
         for config_source in config_sources {
             let config = Config::parse(&config_source, &seed_values)?;
@@ -414,6 +429,7 @@ impl OptionParser {
             );
             ordinal += 1;
         }
+
         parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
@@ -449,6 +465,46 @@ impl OptionParser {
                 }
             }
         }
+
+        // Step #3: Read env and config (but not args) to find cli aliases.
+
+        // Remove the args source, as we don't support providing cli aliases on the cli...
+        let unexpanded_args_source = sources.remove(&Source::Flag).unwrap();
+
+        parser = OptionParser {
+            sources: sources.clone(),
+            include_derivation: false,
+        };
+        let alias_strings = parser
+            .parse_dict(&option_id!(["cli"], "alias"), HashMap::new())?
+            .value
+            .into_iter()
+            .map(|(k, v)| {
+                if let Val::String(s) = v {
+                    Ok((k, s))
+                } else {
+                    Err(format!(
+                        "Values in [cli.alias] must be strings. Got: {:?}",
+                        v
+                    ))
+                }
+            })
+            .collect::<Result<HashMap<_, _>, String>>()?;
+
+        let alias_map = cli_alias::create_alias_map(known_scopes_to_flags, &alias_strings)?;
+
+        // Step #4: Return the final OptionParser, which reads from
+        // alias-expanded args, env, config and rcfiles.
+
+        // Add the args reader back in, after expanding aliases.
+        let unexpanded_args_reader = unexpanded_args_source
+            .as_any()
+            .downcast_ref::<ArgsReader>()
+            .unwrap();
+        sources.insert(
+            Source::Flag,
+            Arc::new(unexpanded_args_reader.expand_aliases(&alias_map)),
+        );
 
         Ok(OptionParser {
             sources,
@@ -690,6 +746,10 @@ impl OptionParser {
             source: highest_priority_source,
             value: apply_dict_edits(edits.into_iter()),
         })
+    }
+
+    pub fn get_args(&self) -> Result<Vec<String>, String> {
+        Ok(self.get_args_reader()?.get_args())
     }
 
     pub fn get_passthrough_args(&self) -> Result<Option<Vec<String>>, String> {

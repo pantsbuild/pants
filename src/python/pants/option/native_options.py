@@ -62,13 +62,21 @@ class NativeOptionParser:
         config_sources: Optional[Sequence[ConfigSource]],
         allow_pantsrc: bool,
         include_derivation: bool,
+        known_scopes_to_flags: dict[str, frozenset[str]],
     ):
         # Remember these args so this object can clone itself in with_derivation() below.
-        self._args, self._env, self._config_sources, self._allow_pantsrc = (
+        (
+            self._args,
+            self._env,
+            self._config_sources,
+            self._allow_pantsrc,
+            self._known_scopes_to_flags,
+        ) = (
             args,
             env,
             config_sources,
             allow_pantsrc,
+            known_scopes_to_flags,
         )
 
         py_config_sources = (
@@ -82,6 +90,7 @@ class NativeOptionParser:
             py_config_sources,
             allow_pantsrc,
             include_derivation,
+            known_scopes_to_flags,
         )
 
         # (type, member_type) -> native get for that type.
@@ -108,6 +117,7 @@ class NativeOptionParser:
             config_sources=None if self._config_sources is None else tuple(self._config_sources),
             allow_pantsrc=self._allow_pantsrc,
             include_derivation=True,
+            known_scopes_to_flags=self._known_scopes_to_flags,
         )
 
     def get_value(self, *, scope, registration_args, registration_kwargs) -> Tuple[Any, Rank]:
@@ -271,6 +281,9 @@ class NativeOptionParser:
                 check_scalar_value(val, choices)
 
         return (val, rank, derivation)
+
+    def get_args(self) -> tuple[str, ...]:
+        return tuple(self._native_parser.get_args())
 
     def get_unconsumed_flags(self) -> dict[str, tuple[str, ...]]:
         return {k: tuple(v) for k, v in self._native_parser.get_unconsumed_flags().items()}
