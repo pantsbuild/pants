@@ -12,7 +12,8 @@ from pants.backend.terraform.dependency_inference import (
 from pants.backend.terraform.target_types import (
     TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
-    TerraformFieldSet, TerraformModuleTarget,
+    TerraformFieldSet,
+    TerraformModuleTarget,
 )
 from pants.backend.tools.trivy.rules import RunTrivyRequest, run_trivy
 from pants.backend.tools.trivy.subsystem import SkipTrivyField, Trivy
@@ -67,7 +68,6 @@ async def run_trivy_on_terraform(req: RunTrivyOnTerraformRequest) -> FalliblePro
     else:
         input_digest = tf.sources_and_deps
 
-
     return await run_trivy(
         RunTrivyRequest(
             command="config",
@@ -109,7 +109,7 @@ class TrivyLintTerraformModuleFieldSet(TerraformFieldSet, TrivyTerraformFieldSet
 class TrivyLintTerraformModuleRequest(TrivyLintTerraformRequest):
     field_set_type = TrivyLintTerraformModuleFieldSet
     tool_subsystem = Trivy
-    partitioner_type =         PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
+    partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 
 @rule(desc="Lint Terraform module with Trivy", level=LogLevel.DEBUG)

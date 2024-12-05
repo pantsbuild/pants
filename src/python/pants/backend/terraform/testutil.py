@@ -43,6 +43,7 @@ all_terraform_target_types = [
     TerraformLockfileTarget,
 ]
 
+
 @pytest.fixture
 def rule_runner_with_auto_approve() -> RuleRunner:
     rule_runner = RuleRunner(
