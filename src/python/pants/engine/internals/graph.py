@@ -588,7 +588,9 @@ async def resolve_target_for_bootstrapping(
         ),
     )
     target_adaptor = adaptor_and_type.adaptor
+    assert isinstance(target_adaptor, TargetAdaptor)
     target_type = adaptor_and_type.target_type
+    assert issubclass(target_type, Target)
     target = target_type(
         target_adaptor.kwargs,
         request.address,

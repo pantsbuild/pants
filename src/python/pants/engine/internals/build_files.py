@@ -33,7 +33,7 @@ from pants.engine.internals.dep_rules import (
     DependencyRuleApplication,
     MaybeBuildFileDependencyRulesImplementation,
 )
-from pants.engine.internals.mapper import AddressFamily, AddressMap
+from pants.engine.internals.mapper import AddressFamily, MutableAddressMap
 from pants.engine.internals.parser import (
     BuildFilePreludeSymbols,
     BuildFileSymbolsInfo,
@@ -42,6 +42,7 @@ from pants.engine.internals.parser import (
 )
 from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
+    SyntheticAddressMap,
     SyntheticAddressMaps,
     SyntheticAddressMapsRequest,
 )
@@ -299,8 +300,11 @@ async def parse_address_family(
         Get(SyntheticAddressMaps, SyntheticAddressMapsRequest(directory.path)),
     )
     synthetic_address_maps = tuple(itertools.chain(all_synthetic_address_maps))
+    assert all(isinstance(am, SyntheticAddressMap) for am in all_synthetic_address_maps)
     if not digest_contents and not synthetic_address_maps:
         return OptionalAddressFamily(directory.path)
+
+    mutable_synthetic_address_maps = [m.unfreeze() for m in synthetic_address_maps]
 
     defaults = BuildFileDefaults({})
     dependents_rules: BuildFileDependencyRules | None = None
@@ -359,7 +363,7 @@ async def parse_address_family(
     )
 
     address_maps = [
-        AddressMap.parse(
+        MutableAddressMap.parse(
             fc.path,
             fc.content.decode(),
             parser,
@@ -388,7 +392,7 @@ async def parse_address_family(
 
     # Process synthetic targets.
     for address_map in address_maps:
-        for synthetic in synthetic_address_maps:
+        for synthetic in mutable_synthetic_address_maps:
             synthetic.process_declared_targets(address_map)
             synthetic.apply_defaults(frozen_defaults)
 
@@ -396,7 +400,10 @@ async def parse_address_family(
         directory.path,
         AddressFamily.create(
             spec_path=directory.path,
-            address_maps=(*address_maps, *synthetic_address_maps),
+            address_maps=(
+                *(m.freeze() for m in address_maps),
+                *(m.freeze() for m in mutable_synthetic_address_maps),
+            ),
             defaults=frozen_defaults,
             dependents_rules=frozen_dependents_rules,
             dependencies_rules=frozen_dependencies_rules,

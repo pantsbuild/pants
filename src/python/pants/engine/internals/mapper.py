@@ -19,9 +19,10 @@ from pants.engine.internals.dep_rules import (
     BuildFileDependencyRulesParserState,
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
-from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.internals.target_adaptor import MutableTargetAdaptor, TargetAdaptor
 from pants.engine.target import RegisteredTargetTypes, Tags, Target
 from pants.util.filtering import TargetFilter, and_filters, create_filters
+from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
 
 
@@ -29,7 +30,7 @@ class DuplicateNameError(MappingError):
     """Indicates more than one top-level object was found with the same name."""
 
 
-AddressMapT = TypeVar("AddressMapT", bound="AddressMap")
+MutableAddressMapT = TypeVar("MutableAddressMapT", bound="MutableAddressMap")
 
 
 @dataclass(frozen=True)
@@ -37,7 +38,19 @@ class AddressMap:
     """Maps target adaptors from a byte source."""
 
     path: str
-    name_to_target_adaptor: dict[str, TargetAdaptor]
+    name_to_target_adaptor: FrozenDict[str, TargetAdaptor]
+
+    def __init__(self, path: str, name_to_target_adaptor: Mapping[str, TargetAdaptor]) -> None:
+        object.__setattr__(self, "path", path)
+        object.__setattr__(self, "name_to_target_adaptor", FrozenDict(name_to_target_adaptor))
+
+
+@dataclass
+class MutableAddressMap:
+    """Maps target adaptors from a byte source."""
+
+    path: str
+    name_to_target_adaptor: dict[str, MutableTargetAdaptor]
 
     @classmethod
     def parse(
@@ -51,7 +64,7 @@ class AddressMap:
         defaults: BuildFileDefaultsParserState,
         dependents_rules: BuildFileDependencyRulesParserState | None,
         dependencies_rules: BuildFileDependencyRulesParserState | None,
-    ) -> AddressMap:
+    ) -> MutableAddressMap:
         """Parses a source for targets.
 
         The target adaptors are all 'thin': any targets they point to in other namespaces or even in
@@ -70,14 +83,17 @@ class AddressMap:
             )
         except Exception as e:
             raise MappingError(f"Failed to parse ./{filepath}:\n{type(e).__name__}: {e}")
-        return cls.create(filepath, target_adaptors)
+        return cls.create(filepath, [ta.unfreeze() for ta in target_adaptors])
 
     @classmethod
     def create(
-        cls: type[AddressMapT], filepath: str, target_adaptors: Iterable[TargetAdaptor]
-    ) -> AddressMapT:
-        name_to_target_adaptors: dict[str, TargetAdaptor] = {}
+        cls: type[MutableAddressMapT],
+        filepath: str,
+        target_adaptors: Iterable[MutableTargetAdaptor],
+    ) -> MutableAddressMapT:
+        name_to_target_adaptors: dict[str, MutableTargetAdaptor] = {}
         for target_adaptor in target_adaptors:
+            assert isinstance(target_adaptor, MutableTargetAdaptor)
             name = target_adaptor.name or os.path.basename(os.path.dirname(filepath))
             if name in name_to_target_adaptors:
                 duplicate = name_to_target_adaptors[name]
@@ -88,6 +104,11 @@ class AddressMap:
                 )
             name_to_target_adaptors[name] = target_adaptor
         return cls(filepath, dict(sorted(name_to_target_adaptors.items())))
+
+    def freeze(self) -> AddressMap:
+        return AddressMap(
+            self.path, {name: ta.freeze() for name, ta in self.name_to_target_adaptor.items()}
+        )
 
 
 class DifferingFamiliesError(MappingError):
@@ -113,7 +134,7 @@ class AddressFamily:
 
     # The directory from which the adaptors were parsed.
     namespace: str
-    name_to_target_adaptors: dict[str, tuple[str, TargetAdaptor]]
+    name_to_target_adaptors: FrozenDict[str, tuple[str, TargetAdaptor]]
     defaults: BuildFileDefaults
     dependents_rules: BuildFileDependencyRules | None
     dependencies_rules: BuildFileDependencyRules | None
@@ -155,7 +176,7 @@ class AddressFamily:
                 name_to_target_adaptors[name] = (address_map.path, target_adaptor)
         return AddressFamily(
             namespace=spec_path,
-            name_to_target_adaptors=dict(sorted(name_to_target_adaptors.items())),
+            name_to_target_adaptors=FrozenDict(dict(sorted(name_to_target_adaptors.items()))),
             defaults=defaults,
             dependents_rules=dependents_rules,
             dependencies_rules=dependencies_rules,
