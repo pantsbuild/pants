@@ -71,7 +71,8 @@ def run_docformatter(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(Docformatter.default_interpreter_constraints),
+    # Excluded due to https://github.com/pantsbuild/pants/issues/21718
+    all_major_minor_python_versions(["CPython>=3.8,<3.13"]),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
