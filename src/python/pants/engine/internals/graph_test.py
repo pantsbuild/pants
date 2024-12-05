@@ -1586,8 +1586,8 @@ def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
 @pytest.mark.parametrize(
     "field_content",
     [
-        "tagz=['tag']",
-        "tagz=parametrize(['tag1'], ['tag2'])",
+        "tagz=('tag',)",
+        "tagz=parametrize('tag1', 'tag2')",
     ],
 )
 def test_parametrize_16910(generated_targets_rule_runner: RuleRunner, field_content: str) -> None:

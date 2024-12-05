@@ -42,7 +42,9 @@ class AddressMap:
 
     def __init__(self, path: str, name_to_target_adaptor: Mapping[str, TargetAdaptor]) -> None:
         object.__setattr__(self, "path", path)
-        object.__setattr__(self, "name_to_target_adaptor", FrozenDict(name_to_target_adaptor))
+        object.__setattr__(
+            self, "name_to_target_adaptor", FrozenDict.deep_freeze(name_to_target_adaptor)
+        )
 
 
 @dataclass
