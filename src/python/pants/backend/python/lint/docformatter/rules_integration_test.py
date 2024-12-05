@@ -8,7 +8,6 @@ import pytest
 from pants.backend.python import target_types_rules
 from pants.backend.python.lint.docformatter.rules import DocformatterFieldSet, DocformatterRequest
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
-from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.docformatter.subsystem import rules as docformatter_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
