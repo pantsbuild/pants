@@ -325,6 +325,10 @@ impl OptionParser {
         allow_pantsrc: bool,
         include_derivation: bool,
         buildroot: Option<BuildRoot>,
+        // TODO: pass the raw option registration data in instead, so we can also use it
+        //  for validating config files and other uses.
+        //  For now this is just what we need to validate CLI aliases.
+        known_scopes_to_flags: Option<&HashMap<String, HashSet<String>>>,
     ) -> Result<OptionParser, String> {
         let has_provided_configs = config_sources.is_some();
 
@@ -332,15 +336,20 @@ impl OptionParser {
         let buildroot_string = buildroot.convert_to_string()?;
         let fromfile_expander = FromfileExpander::relative_to(buildroot);
 
+        let args_reader = ArgsReader::new(args, fromfile_expander.clone());
+        let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
+
         let mut seed_values = HashMap::from_iter(
             env.env
                 .iter()
                 .map(|(k, v)| (format!("env.{k}", k = k), v.clone())),
         );
 
-        let args_reader = ArgsReader::new(args, fromfile_expander.clone());
+        // We bootstrap options in several steps.
 
-        let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
+        // Step #1: Read env and (non cli alias-expanded) args to find config files and
+        // the workdir/distdir.
+
         sources.insert(
             Source::Env,
             Arc::new(EnvReader::new(env, fromfile_expander.clone())),
@@ -403,6 +412,8 @@ impl OptionParser {
             ("pants_distdir".to_string(), subdir("distdir", "dist")?),
         ]);
 
+        // Step #2: Read (unexpanded) args, env, and config to find rcfiles.
+
         let mut ordinal: usize = 0;
         for config_source in config_sources {
             let config = Config::parse(&config_source, &seed_values)?;
@@ -418,6 +429,7 @@ impl OptionParser {
             );
             ordinal += 1;
         }
+
         parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
@@ -454,6 +466,8 @@ impl OptionParser {
             }
         }
 
+        // Step #3: Read env and config (but not args) to find cli aliases.
+
         // Remove the args source, as we don't support providing cli aliases on the cli...
         let unexpanded_args_source = sources.remove(&Source::Flag).unwrap();
 
@@ -477,8 +491,10 @@ impl OptionParser {
             })
             .collect::<Result<HashMap<_, _>, String>>()?;
 
-        let alias_map =
-            cli_alias::create_alias_map(&HashSet::new(), &HashMap::new(), &alias_strings)?;
+        let alias_map = cli_alias::create_alias_map(known_scopes_to_flags, &alias_strings)?;
+
+        // Step #4: Return the final OptionParser, which reads from
+        // alias-expanded args, env, config and rcfiles.
 
         // Add the args reader back in, after expanding aliases.
         let unexpanded_args_reader = unexpanded_args_source

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shlex
 import unittest.mock
 from contextlib import contextmanager
@@ -82,7 +83,7 @@ def create_options(
         config=Config.load([FileContent("pants.toml", toml.dumps(config or {}).encode())]),
         known_scope_infos=[*(ScopeInfo(scope) for scope in scopes), *(extra_scope_infos or ())],
         native_options_config_discovery=False,
-        args=["./pants", *(args or ())],
+        args=["pants", *(args or ())],
     )
     register_fn(options)
     return options
@@ -470,7 +471,7 @@ def _parse(
     bootstrap_option_values=None,
     allow_unknown_options=False,
 ) -> Options:
-    args = ["./pants", *shlex.split(flags)]
+    args = ["pants", *shlex.split(flags)]
     options = Options.create(
         env=env or {},
         config=_create_config(config, config2),
@@ -631,7 +632,7 @@ def test_env_var_of_type_int() -> None:
         Options.create,
         config=_create_config(),
         known_scope_infos=_known_scope_infos,
-        args=shlex.split("./pants"),
+        args=shlex.split("pants"),
     )
     options = create_options_object(env={"PANTS_FOO_BAR": "123"})
     options.register(GLOBAL_SCOPE, "--foo-bar", type=int)
@@ -1018,7 +1019,7 @@ def test_validation() -> None:
     def assert_error(expected_error, *args, **kwargs):
         with pytest.raises(expected_error):
             options = Options.create(
-                args=["./pants"],
+                args=["pants"],
                 env={},
                 config=_create_config(),
                 known_scope_infos=[global_scope()],
@@ -1044,7 +1045,7 @@ def test_shadowing() -> None:
         env={},
         config=_create_config(),
         known_scope_infos=[global_scope(), task("bar"), intermediate("foo"), task("foo.bar")],
-        args=["./pants"],
+        args=["pants"],
     )
     options.register("", "--opt1")
     options.register("foo", "--opt2")
@@ -1071,7 +1072,7 @@ def test_file_spec_args() -> None:
         # Note that we prevent loading a real pants.toml during get_bootstrap_options().
         flags = f'--spec-files={tmp.name} --pants-config-files="[]" compile morx:tgt fleem:tgt'
         bootstrapper = OptionsBootstrapper.create(
-            env={}, args=shlex.split(f"./pants {flags}"), allow_pantsrc=False
+            env={}, args=shlex.split(f"pants {flags}"), allow_pantsrc=False
         )
         bootstrap_options = bootstrapper.bootstrap_options.for_global_scope()
         options = _parse(flags=flags, bootstrap_option_values=bootstrap_options)
@@ -1085,7 +1086,7 @@ def test_passthru_args_subsystems_and_goals():
         env={},
         config=_create_config(),
         known_scope_infos=[global_scope(), task("test"), subsystem("passconsumer")],
-        args=["./pants", "test", "target", "--", "bar", "--baz", "@dont_fromfile_expand_me"],
+        args=["pants", "test", "target", "--", "bar", "--baz", "@dont_fromfile_expand_me"],
     )
     options.register("passconsumer", "--passthing", passthrough=True, type=list, member_type=str)
 
@@ -1100,7 +1101,7 @@ def test_at_most_one_goal_with_passthru_args():
             env={},
             config=_create_config(),
             known_scope_infos=[global_scope(), task("test"), task("fmt")],
-            args=["./pants", "test", "fmt", "target", "--", "bar", "--baz"],
+            args=["pants", "test", "fmt", "target", "--", "bar", "--baz"],
         )
     assert (
         "Specifying multiple goals (in this case: ['test', 'fmt']) along with passthrough args"
@@ -1118,7 +1119,7 @@ def test_passthru_args_not_interpreted():
         native_options_config_discovery=False,
         known_scope_infos=[global_scope(), task("test"), subsystem("consumer")],
         args=[
-            "./pants",
+            "pants",
             "--consumer-shlexed=a",
             "--consumer-string=b",
             "test",
@@ -1178,7 +1179,7 @@ def test_alias() -> None:
         config=config,
         native_options_config_discovery=False,
         known_scope_infos=[],
-        args=["pyupgrade", "green"],
+        args=["pants", "pyupgrade", "green"],
     )
 
     assert (
@@ -1195,9 +1196,38 @@ def test_alias() -> None:
         config=config,
         native_options_config_discovery=False,
         known_scope_infos=[],
-        args=["shell"],
+        args=["pants", "shell"],
     )
     assert ("repl",) == options.get_args()
+
+
+def test_alias_validation() -> None:
+    config_content = dedent(
+        """\
+                [cli.alias]
+                foo = "fail_on_known_scope"
+                """
+    )
+    config = Config.load(
+        [
+            FileContent("config", config_content.encode()),
+        ]
+    )
+
+    with pytest.raises(
+        ParseError,
+        match=re.escape(
+            "Invalid alias in `[cli].alias` option: foo. This is already a "
+            "registered goal or subsytem."
+        ),
+    ):
+        Options.create(
+            env={},
+            config=config,
+            native_options_config_discovery=False,
+            known_scope_infos=[ScopeInfo("foo")],
+            args=["pants"],
+        )
 
 
 def test_global_scope_env_vars():
@@ -1579,7 +1609,7 @@ def test_double_registration() -> None:
         env={},
         config=_create_config(),
         known_scope_infos=_known_scope_infos,
-        args=shlex.split("./pants"),
+        args=shlex.split("pants"),
     )
     options.register(GLOBAL_SCOPE, "--foo-bar")
     with pytest.raises(OptionAlreadyRegistered):

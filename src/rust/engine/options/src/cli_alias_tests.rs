@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::cli_alias;
+use crate::cli_alias::AliasMap;
 use maplit::{hashmap, hashset};
 use std::collections::HashMap;
 
@@ -26,7 +27,10 @@ fn owned_map_vec(x: HashMap<&str, Vec<&str>>) -> HashMap<String, Vec<String>> {
 #[test]
 fn test_expand_no_aliases() {
     let args = owned_vec(vec!["foo", "--bar=baz", "qux"]);
-    assert_eq!(args, cli_alias::expand_aliases(args.clone(), &hashmap! {}));
+    assert_eq!(
+        args,
+        cli_alias::expand_aliases(args.clone(), &AliasMap(hashmap! {}))
+    );
 }
 
 #[test]
@@ -37,8 +41,7 @@ fn test_expand_alias() {
         let expanded_word = cli_alias::expand_aliases(
             owned_vec(vec!["alias"]),
             &cli_alias::create_alias_map(
-                &hashset! {},
-                &hashmap! {},
+                None,
                 &hashmap! {"alias".to_string() => replacement.to_string()},
             )
             .unwrap(),
@@ -48,8 +51,7 @@ fn test_expand_alias() {
         let expanded_flag = cli_alias::expand_aliases(
             owned_vec(vec!["--alias"]),
             &cli_alias::create_alias_map(
-                &hashset! {},
-                &hashmap! {},
+                None,
                 &hashmap! {"--alias".to_string() => replacement.to_string()},
             )
             .unwrap(),
@@ -71,8 +73,7 @@ fn test_expand_alias() {
 fn test_expand_args() {
     fn do_test(args: Vec<&str>, expected: Vec<&str>) {
         let aliases = cli_alias::create_alias_map(
-            &hashset! {},
-            &hashmap! {},
+            None,
             &hashmap! {"alias".to_string() => "--flag goal".to_string()},
         )
         .unwrap();
@@ -97,8 +98,7 @@ fn test_expand_args() {
 fn test_expand_args_flag() {
     fn do_test(args: Vec<&str>, expected: Vec<&str>) {
         let aliases = cli_alias::create_alias_map(
-            &hashset! {},
-            &hashmap! {},
+            None,
             &hashmap! {"--alias".to_string() => "--flag goal".to_string()},
         )
         .unwrap();
@@ -122,13 +122,12 @@ fn test_expand_args_flag() {
 #[test]
 fn test_nested_alias() {
     assert_eq!(
-        owned_map_vec(hashmap! {
+        AliasMap(owned_map_vec(hashmap! {
             "basic" => vec!["goal"],
             "nested" => vec!["--option=advanced", "goal"],
-        }),
+        })),
         cli_alias::create_alias_map(
-            &hashset! {},
-            &hashmap! {},
+            None,
             &owned_map(hashmap! {
                 "basic" => "goal",
                 "nested" => "--option=advanced basic",
@@ -138,14 +137,13 @@ fn test_nested_alias() {
     );
 
     assert_eq!(
-        owned_map_vec(hashmap! {
+        AliasMap(owned_map_vec(hashmap! {
             "multi-nested" => vec!["deep", "--option=advanced", "goal"],
             "basic" => vec!["goal"],
             "nested" => vec!["--option=advanced", "goal"],
-        }),
+        })),
         cli_alias::create_alias_map(
-            &hashset! {},
-            &hashmap! {},
+            None,
             &owned_map(hashmap! {
                 "multi-nested" => "deep nested",
                 "basic" => "goal",
@@ -159,12 +157,8 @@ fn test_nested_alias() {
 #[test]
 fn test_alias_cycle() {
     fn do_test_cycle(x: &str, y: &str) {
-        let err_msg = cli_alias::create_alias_map(
-            &hashset! {},
-            &hashmap! {},
-            &owned_map(hashmap! { x => y, y => x,}),
-        )
-        .unwrap_err();
+        let err_msg =
+            cli_alias::create_alias_map(None, &owned_map(hashmap! { x => y, y => x,})).unwrap_err();
         assert!(err_msg.contains("CLI alias cycle detected in `[cli].alias` option:"));
         // The order in which we encounter the cycle depends on unstable HashMap iteration order,
         // so we don't know the exact error message we'll get, just that these two strings must
@@ -181,8 +175,7 @@ fn test_alias_cycle() {
 #[test]
 fn test_deep_alias_cycle() {
     let err_msg = cli_alias::create_alias_map(
-        &hashset! {},
-        &hashmap! {},
+        None,
         &owned_map(hashmap! {
             "xxx" => "yyy",
             "yyy" => "zzz",
@@ -210,12 +203,7 @@ fn test_invalid_alias_name() {
         A single dash is not allowed.",
                 alias
             ),
-            cli_alias::create_alias_map(
-                &hashset! {},
-                &hashmap! {},
-                &owned_map(hashmap! {alias => ""})
-            )
-            .unwrap_err()
+            cli_alias::create_alias_map(None, &owned_map(hashmap! {alias => ""})).unwrap_err()
         )
     }
 
@@ -231,8 +219,7 @@ fn test_banned_alias_names() {
     assert_eq!(
         "Invalid alias in `[cli].alias` option: fmt. This is already a registered goal or subsytem.",
         cli_alias::create_alias_map(
-            &hashset!{"fmt".to_string()},
-            &hashmap!{},
+            Some(&hashmap!{"fmt".to_string() => hashset!{}}),
             &owned_map(hashmap!{"fmt" => ""}),
         ).unwrap_err()
     );
@@ -240,8 +227,7 @@ fn test_banned_alias_names() {
     assert_eq!(
         "Invalid alias in `[cli].alias` option: --keep-sandboxes. This is already a registered flag in the GLOBAL scope.",
         cli_alias::create_alias_map(
-            &hashset!{"".to_string()},
-            &hashmap!{"".to_string() => hashset!{"--keep-sandboxes".to_string()}},
+            Some(&hashmap!{"".to_string() => hashset!{"--keep-sandboxes".to_string()}}),
             &owned_map(hashmap!{"--keep-sandboxes" => ""},
         )
     ).unwrap_err()
@@ -250,8 +236,7 @@ fn test_banned_alias_names() {
     assert_eq!(
         "Invalid alias in `[cli].alias` option: --changed-since. This is already a registered flag in the changed scope.",
         cli_alias::create_alias_map(
-            &hashset!{"changed".to_string()},
-            &hashmap!{"changed".to_string() => hashset!{"--changed-since".to_string()}},
+            Some(&hashmap!{"changed".to_string() => hashset!{"--changed-since".to_string()}}),
             &owned_map(hashmap!{"--changed-since" => ""})
         ).unwrap_err()
     );

@@ -11,8 +11,7 @@ lazy_static! {
 }
 
 fn validate_alias(
-    known_scopes: &HashSet<String>,
-    known_flags: &HashMap<String, HashSet<String>>,
+    known_scopes_to_flags: Option<&HashMap<String, HashSet<String>>>,
     alias: &str,
 ) -> Result<(), String> {
     if !VALID_ALIAS_RE.is_match(alias) {
@@ -24,19 +23,20 @@ fn validate_alias(
         ));
     }
 
-    if known_scopes.contains(alias) {
-        return Err(format!(
-            "Invalid alias in `[cli].alias` option: {}. This is already a registered goal or subsytem.",
-            alias
-        ));
-    };
-
-    for (scope, args) in known_flags.iter() {
-        if args.contains(alias) {
-            return Err(format!(
-                "Invalid alias in `[cli].alias` option: {}. This is already a registered flag in the {} scope.",
-                alias, Scope::named(scope).name()
-            ));
+    if let Some(known_scopes_to_flags) = known_scopes_to_flags {
+        for (scope, args) in known_scopes_to_flags.iter() {
+            if scope == alias {
+                return Err(format!(
+                    "Invalid alias in `[cli].alias` option: {}. This is already a registered goal or subsytem.",
+                    alias
+                ));
+            }
+            if args.contains(alias) {
+                return Err(format!(
+                    "Invalid alias in `[cli].alias` option: {}. This is already a registered flag in the {} scope.",
+                    alias, Scope::named(scope).name()
+                ));
+            }
         }
     }
     Ok(())
@@ -66,34 +66,36 @@ fn recursive_expand(
     Ok(ret)
 }
 
-pub type AliasMap = HashMap<String, Vec<String>>;
+#[derive(Debug, Eq, PartialEq)]
+pub struct AliasMap(pub HashMap<String, Vec<String>>);
 
 #[allow(dead_code)]
 pub fn create_alias_map(
-    known_scopes: &HashSet<String>,
-    known_flags: &HashMap<String, HashSet<String>>,
+    known_scopes_to_flags: Option<&HashMap<String, HashSet<String>>>,
     aliases: &HashMap<String, String>,
 ) -> Result<AliasMap, String> {
-    let definitions: AliasMap = aliases
+    let definitions = AliasMap(aliases
         .iter()
         .map(|(k, v)| {
-            validate_alias(known_scopes, known_flags, k)?;
+            validate_alias(known_scopes_to_flags, k)?;
             if let Some(vs) = shlex::split(v) {
                 Ok((k.to_owned(), vs))
             } else {
-                Err(format!("Couldn't shlex string: {}", v))
+                Err(format!("Invalid value in `[cli].alias` option: {}. Failed to split according to shell rules: {}", k, v))
             }
         })
-        .collect::<Result<_, _>>()?;
+        .collect::<Result<_, _>>()?);
     definitions
+        .0
         .iter()
         .map(|(alias, definition)| {
             Ok((
                 alias.to_owned(),
-                recursive_expand(&definitions, definition, &mut vec![])?,
+                recursive_expand(&definitions.0, definition, &mut vec![])?,
             ))
         })
-        .collect()
+        .collect::<Result<_, _>>()
+        .map(AliasMap)
 }
 
 pub fn expand_aliases<I: IntoIterator<Item = String>>(
@@ -109,7 +111,7 @@ pub fn expand_aliases<I: IntoIterator<Item = String>>(
         }
         expanded_args.push(arg_str);
         if expand {
-            if let Some(replacement) = alias_map.get(expanded_args.last().unwrap()) {
+            if let Some(replacement) = alias_map.0.get(expanded_args.last().unwrap()) {
                 expanded_args.pop();
                 expanded_args.extend(replacement.clone())
             }

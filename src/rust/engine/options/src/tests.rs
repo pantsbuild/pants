@@ -71,6 +71,7 @@ fn with_setup(
         false,
         true,
         Some(BuildRoot::find_from(buildroot.path()).unwrap()),
+        None,
     )
     .unwrap();
     do_check(option_parser);
@@ -575,7 +576,7 @@ fn test_do_not_load_pantsrc_if_configs_passed() {
         }
     }
 
-    let load_0 = OptionParser::new(mk_args(), mk_env(), Some(vec![]), true, true, None);
+    let load_0 = OptionParser::new(mk_args(), mk_env(), Some(vec![]), true, true, None, None);
 
     let found_sources = load_0.unwrap().sources;
     println!("{:?}", found_sources.keys());

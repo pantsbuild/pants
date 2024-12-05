@@ -125,7 +125,7 @@ class TestOptionsBootstrapper:
                 )
             )
             fp.close()
-            args = ["--pants-workdir=/qux"] + self._config_path(fp.name)
+            args = ["pants", "--pants-workdir=/qux"] + self._config_path(fp.name)
             bootstrapper = OptionsBootstrapper.create(
                 env={"PANTS_DISTDIR": "/pear"}, args=args, allow_pantsrc=False
             )

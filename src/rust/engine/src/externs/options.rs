@@ -346,13 +346,14 @@ impl PyOptionParser {
 #[pymethods]
 impl PyOptionParser {
     #[new]
-    #[pyo3(signature = (args, env, configs, allow_pantsrc, include_derivation))]
+    #[pyo3(signature = (args, env, configs, allow_pantsrc, include_derivation, known_scopes_to_flags))]
     fn __new__<'py>(
         args: Vec<String>,
         env: &Bound<'py, PyDict>,
         configs: Option<Vec<Bound<'py, PyConfigSource>>>,
         allow_pantsrc: bool,
         include_derivation: bool,
+        known_scopes_to_flags: Option<HashMap<String, HashSet<String>>>,
     ) -> PyResult<Self> {
         let env = env
             .items()
@@ -367,6 +368,7 @@ impl PyOptionParser {
             allow_pantsrc,
             include_derivation,
             None,
+            known_scopes_to_flags.as_ref(),
         )
         .map_err(ParseError::new_err)?;
         Ok(Self(option_parser))
