@@ -154,7 +154,7 @@ class SyntheticTargetsRequest:
 class SyntheticAddressMap(AddressMap):
     def process_declared_targets(self, address_map: AddressMap) -> None:
         for name, target_adaptor in address_map.name_to_target_adaptor.items():
-            extend_synthetic = target_adaptor.kwargs.pop("_extend_synthetic", False)
+            extend_synthetic = isinstance(target_adaptor, SyntheticTargetAdaptor)
             if name not in self.name_to_target_adaptor:
                 if extend_synthetic:
                     raise InvalidTargetException(
@@ -169,7 +169,7 @@ class SyntheticAddressMap(AddressMap):
 
             # Pop synthetic target to let the explicit target declared in BUILD file take
             # precedence.
-            synthetic_target_adaptor = self.name_to_target_adaptor.pop(name)
+            synthetic_target_adaptor = self.name_to_target_adaptor.pop(name)  # TODO: this here is another mutating operation!
 
             if not extend_synthetic:
                 # The explicitly declared target should replace the synthetic one.
