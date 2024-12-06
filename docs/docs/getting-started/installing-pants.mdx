@@ -35,16 +35,14 @@ bin i github.com/pantsbuild/scie-pants ~/.local/bin/pants
 
 If you have difficulty installing Pants, see our [getting help](/community/getting-help) for community resources to help you resolve your issue.
 
-:::tip Upgrading Pants
+## Upgrading Pants
+
 The `pants` launcher binary will automatically install and use the Pants version specified in `pants.toml`, so upgrading Pants in a repo is as simple as editing `pants_version` in that file.
 
-To upgrade the `pants` launcher binary itself, run
+To upgrade the `pants` launcher binary itself, either:
 
-```
-SCIE_BOOT=update pants
-```
-
-:::
+- Use the package manager you used to install Pants. For example, with Homebrew: `brew update && brew upgrade pantsbuild/tap/pants`.
+- Use its built-in self-update functionality: `SCIE_BOOT=update pants`.
 
 ## Running Pants from sources
 
