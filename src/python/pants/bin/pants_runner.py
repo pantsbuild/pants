@@ -25,8 +25,9 @@ from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
-# Pants 2.18 is using a new distribution model, that's supported (sans bugs) in 0.10.0.
-MINIMUM_SCIE_PANTS_VERSION = Version("0.10.0")
+# First version with working Python 3.11 support:
+# https://github.com/pantsbuild/scie-pants/releases/tag/v0.12.2
+MINIMUM_SCIE_PANTS_VERSION = Version("0.12.2")
 
 
 @dataclass(frozen=True)
@@ -115,11 +116,11 @@ class PantsRunner:
                         else "Run `PANTS_BOOTSTRAP_VERSION=report pants` to see the current version of the `pants` launcher binary"
                     )
                     warn_or_error(
-                        "2.18.0.dev6",
+                        "2.25.0.dev0",
                         f"using a `pants` launcher binary older than {MINIMUM_SCIE_PANTS_VERSION}",
                         softwrap(
                             f"""
-                            {current_version_text}, and see {doc_url("docs/getting-started/installing-pants")} for how to upgrade.
+                            {current_version_text}, and see {doc_url("docs/getting-started/installing-pants#upgrading-pants")} for how to upgrade.
                             """
                         ),
                     )
