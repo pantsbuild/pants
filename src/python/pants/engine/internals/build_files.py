@@ -387,20 +387,19 @@ async def parse_address_family(
     )
 
     # Process synthetic targets.
-    processed_synthetic_address_maps = []
     processed_address_maps = []
     for address_map in address_maps:
         for synthetic in synthetic_address_maps:
             (psap, pap) = synthetic.process_declared_targets(address_map)
             psap = psap.apply_defaults(frozen_defaults)
-            processed_synthetic_address_maps.append(psap)
+            processed_address_maps.append(psap)
             processed_address_maps.append(pap)
 
     return OptionalAddressFamily(
         directory.path,
         AddressFamily.create(
             spec_path=directory.path,
-            address_maps=(*address_maps, *synthetic_address_maps),
+            address_maps=processed_address_maps,
             defaults=frozen_defaults,
             dependents_rules=frozen_dependents_rules,
             dependencies_rules=frozen_dependencies_rules,
