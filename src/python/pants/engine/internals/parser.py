@@ -26,7 +26,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.env_vars import EnvironmentVars
 from pants.engine.internals.defaults import BuildFileDefaultsParserState, SetDefaultsT
 from pants.engine.internals.dep_rules import BuildFileDependencyRulesParserState
-from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor, SyntheticTargetAdaptor
 from pants.engine.target import Field, ImmutableValue, RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
@@ -334,7 +334,10 @@ class Registrar:
         kwargs["__description_of_origin__"] = f"{self._parse_state.filepath()}:{source_line}"
         raw_values = dict(self._parse_state.defaults.get(self._type_alias))
         raw_values.update(kwargs)
-        target_adaptor = TargetAdaptor(self._type_alias, **raw_values)
+        if not raw_values.pop("_extend_synthetic", False):
+            target_adaptor = TargetAdaptor(self._type_alias, **raw_values)
+        else:
+            target_adaptor = SyntheticTargetAdaptor(self._type_alias, **raw_values)
         self._parse_state.add(target_adaptor)
         return target_adaptor
 

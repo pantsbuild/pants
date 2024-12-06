@@ -87,7 +87,7 @@ class TargetAdaptorRequest(EngineAwareParameter):
         return self.address.spec
 
 
-@final
+# @final -- we mark this class final further down.
 class TargetAdaptor:
     """A light-weight object to store target information before being converted into the Target
     API."""
@@ -124,3 +124,12 @@ class TargetAdaptor:
     @property
     def name_explicitly_set(self) -> bool:
         return self.name is not None
+
+
+@final
+class SyntheticTargetAdaptor(TargetAdaptor):
+    """Subclass to indicate this target is used to extend a synthetic target only."""
+
+
+TargetAdaptor = final(TargetAdaptor)
+
