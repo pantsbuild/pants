@@ -596,7 +596,7 @@ class RuleRunner:
 
         :API: public
         """
-        return self.make_snapshot({fp: "" for fp in files})
+        return self.make_snapshot(dict.fromkeys(files, ""))
 
     def get_target(self, address: Address) -> Target:
         """Find the target for a given address.
