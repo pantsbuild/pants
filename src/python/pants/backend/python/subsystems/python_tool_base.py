@@ -225,7 +225,9 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
                 lock_bytes = fp.read()
         elif parts.scheme == "resource":
             # The "netloc" in our made-up "resource://" scheme is the package.
-            lock_bytes = importlib.resources.read_binary(parts.netloc, lockfile_path)
+            lock_bytes = (
+                importlib.resources.files(parts.netloc).joinpath(lockfile_path).read_bytes()
+            )
         else:
             raise ValueError(
                 f"Unsupported scheme {parts.scheme} for lockfile URL: {lockfile.url} "

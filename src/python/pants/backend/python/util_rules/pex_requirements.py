@@ -210,7 +210,7 @@ async def load_lockfile(
         _fc = FileContent(
             lockfile_path,
             # The "netloc" in our made-up "resource://" scheme is the package.
-            importlib.resources.read_binary(parts.netloc, lockfile_path),
+            importlib.resources.files(parts.netloc).joinpath(lockfile_path).read_bytes(),
         )
         lockfile_path, lock_bytes = (_fc.path, _fc.content)
         lockfile_digest = await Get(Digest, CreateDigest([_fc]))
