@@ -20,6 +20,7 @@ from pants.engine.internals.mapper import (
     AddressMap,
     DifferingFamiliesError,
     DuplicateNameError,
+    MutableAddressMap,
     SpecsFilter,
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, _UnrecognizedSymbol
@@ -41,7 +42,7 @@ def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = Fa
         object_aliases=BuildFileAliases(),
         ignore_unrecognized_symbols=ignore_unrecognized_symbols,
     )
-    address_map = AddressMap.parse(
+    address_map = MutableAddressMap.parse(
         path,
         build_file,
         parser,
@@ -53,7 +54,7 @@ def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = Fa
         ),
         dependents_rules=None,
         dependencies_rules=None,
-    )
+    ).freeze()
     assert path == address_map.path
     return address_map
 

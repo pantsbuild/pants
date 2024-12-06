@@ -56,7 +56,15 @@ class Parametrize:
     merge_behaviour: _MergeBehaviour = dataclasses.field(compare=False)
 
     def __init__(self, *args: str, **kwargs: Any) -> None:
-        object.__setattr__(self, "args", args)
+        for arg in args:
+            if not isinstance(arg, str):
+                raise TypeError(
+                    f"In {self}:\n  Positional arguments must be strings, but "
+                    f"`{arg!r}` was a `{type(arg).__name__}`.\n\n"
+                    + _named_args_explanation(f"{arg!r}")
+                )
+
+        object.__setattr__(self, "args", tuple(args))
         object.__setattr__(self, "kwargs", FrozenDict.deep_freeze(kwargs))
         object.__setattr__(self, "is_group", False)
         object.__setattr__(self, "merge_behaviour", Parametrize._MergeBehaviour.never)
@@ -71,10 +79,12 @@ class Parametrize:
             raise KeyError(key)
 
     def to_group(self) -> Self:
+        # TODO: This should use `dataclasses.replace` so class remains immutable!
         object.__setattr__(self, "is_group", True)
         return self
 
     def to_weak(self) -> Self:
+        # TODO: This should use `dataclasses.replace` so class remains immutable!
         object.__setattr__(self, "merge_behaviour", Parametrize._MergeBehaviour.replace)
         return self
 

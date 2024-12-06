@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
 from typing_extensions import final
 
@@ -104,7 +104,7 @@ class TargetAdaptor:
     ) -> None:
         self.type_alias = type_alias
         self.name = name
-        self.kwargs = kwargs
+        self.kwargs = FrozenDict.deep_freeze(kwargs)
         self.description_of_origin = __description_of_origin__
         self.origin_sources_blocks = __origin_sources_blocks__
 
@@ -121,6 +121,71 @@ class TargetAdaptor:
             and self.kwargs == other.kwargs
         )
 
+    def __hash__(self) -> int:
+        return hash((self.type_alias, self.name, self.kwargs))
+
     @property
     def name_explicitly_set(self) -> bool:
         return self.name is not None
+
+    def unfreeze(self) -> MutableTargetAdaptor:
+        return MutableTargetAdaptor(
+            type_alias=self.type_alias,
+            name=self.name,
+            __description_of_origin__=self.description_of_origin,
+            __origin_sources_blocks__=self.origin_sources_blocks,
+            **(dict(self.kwargs)),
+        )
+
+
+@final
+class MutableTargetAdaptor:
+    """A light-weight object to store target information before being converted into the Target API.
+
+    This is mutable for certain use cases. It can be frozen into a `TargetAdaptor`.
+    """
+
+    __slots__ = ("type_alias", "name", "kwargs", "description_of_origin", "origin_sources_blocks")
+
+    def __init__(
+        self,
+        type_alias: str,
+        name: str | None,
+        __description_of_origin__: str,
+        __origin_sources_blocks__: FrozenDict[str, SourceBlocks] = FrozenDict(),
+        **kwargs: Mapping[Any, Any],
+    ) -> None:
+        self.type_alias: str = type_alias
+        self.name: str | None = name
+        self.kwargs: dict[Any, Any] = dict(kwargs)
+        self.description_of_origin = __description_of_origin__
+        self.origin_sources_blocks = __origin_sources_blocks__
+
+    def __repr__(self) -> str:
+        maybe_blocks = f", {self.origin_sources_blocks}" if self.origin_sources_blocks else ""
+        return f"MutableTargetAdaptor(type_alias={self.type_alias}, name={self.name}, origin={self.description_of_origin}{maybe_blocks})"
+
+    def __eq__(self, other: Any | MutableTargetAdaptor) -> bool:
+        if not isinstance(other, MutableTargetAdaptor):
+            return NotImplemented
+        return (
+            self.type_alias == other.type_alias
+            and self.name == other.name
+            and self.kwargs == other.kwargs
+        )
+
+    def __hash__(self) -> int:
+        raise AssertionError("`MutableTargetAdaptor` is mutable and must not be hashed!")
+
+    @property
+    def name_explicitly_set(self) -> bool:
+        return self.name is not None
+
+    def freeze(self) -> TargetAdaptor:
+        return TargetAdaptor(
+            type_alias=self.type_alias,
+            name=self.name,
+            __description_of_origin__=self.description_of_origin,
+            __origin_sources_blocks__=self.origin_sources_blocks,
+            **(self.kwargs),
+        )

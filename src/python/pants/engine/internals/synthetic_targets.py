@@ -81,8 +81,8 @@ from typing import ClassVar, Iterable, Iterator, Sequence
 from pants.base.specs import GlobSpecsProtocol
 from pants.engine.collection import Collection
 from pants.engine.internals.defaults import BuildFileDefaults
-from pants.engine.internals.mapper import AddressMap
-from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.internals.mapper import AddressMap, MutableAddressMap
+from pants.engine.internals.target_adaptor import MutableTargetAdaptor, TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import InvalidTargetException
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -152,8 +152,27 @@ class SyntheticTargetsRequest:
 
 
 class SyntheticAddressMap(AddressMap):
-    def process_declared_targets(self, address_map: AddressMap) -> None:
+    def unfreeze(self) -> MutableSyntheticAddressMap:
+        return MutableSyntheticAddressMap(
+            path=self.path,
+            name_to_target_adaptor={
+                name: ta.unfreeze() for name, ta in self.name_to_target_adaptor.items()
+            },
+        )
+
+
+class MutableSyntheticAddressMap(MutableAddressMap):
+    def freeze(self) -> SyntheticAddressMap:
+        return SyntheticAddressMap(
+            path=self.path,
+            name_to_target_adaptor={
+                name: ta.freeze() for name, ta in self.name_to_target_adaptor.items()
+            },
+        )
+
+    def process_declared_targets(self, address_map: MutableAddressMap) -> None:
         for name, target_adaptor in address_map.name_to_target_adaptor.items():
+            assert isinstance(target_adaptor, MutableTargetAdaptor)
             extend_synthetic = target_adaptor.kwargs.pop("_extend_synthetic", False)
             if name not in self.name_to_target_adaptor:
                 if extend_synthetic:
@@ -197,6 +216,7 @@ class SyntheticAddressMap(AddressMap):
 
     def apply_defaults(self, defaults: BuildFileDefaults) -> None:
         for target_adaptor in self.name_to_target_adaptor.values():
+            assert isinstance(target_adaptor, MutableTargetAdaptor)
             default_values = defaults.get(target_adaptor.type_alias)
             if default_values is not None:
                 target_adaptor.kwargs = {**default_values, **target_adaptor.kwargs}
@@ -218,12 +238,16 @@ class SyntheticAddressMaps(Collection[SyntheticAddressMap]):
         request: SyntheticTargetsRequest,
         synthetic_target_adaptors: Iterable[tuple[str, Iterable[TargetAdaptor]]],
     ) -> SyntheticAddressMaps:
-        return cls(
-            [
-                SyntheticAddressMap.create(os.path.join(request.path, filename), target_adaptors)
-                for filename, target_adaptors in synthetic_target_adaptors
-            ]
+        mutable_synthetic_address_maps = [
+            MutableSyntheticAddressMap.create(
+                os.path.join(request.path, filename), [ta.unfreeze() for ta in target_adaptors]
+            )
+            for filename, target_adaptors in synthetic_target_adaptors
+        ]
+        assert all(
+            isinstance(am, MutableSyntheticAddressMap) for am in mutable_synthetic_address_maps
         )
+        return cls([am.freeze() for am in mutable_synthetic_address_maps])
 
 
 @dataclass(frozen=True)
