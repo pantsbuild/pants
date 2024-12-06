@@ -76,7 +76,7 @@ from __future__ import annotations
 import itertools
 import os.path
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Iterator, Sequence
+from typing import ClassVar, Iterable, Iterator, Sequence, Tuple
 
 from pants.base.specs import GlobSpecsProtocol
 from pants.engine.collection import Collection
@@ -152,10 +152,15 @@ class SyntheticTargetsRequest:
 
 
 class SyntheticAddressMap(AddressMap):
-    def process_declared_targets(self, address_map: AddressMap) -> None:
+    def process_declared_targets(
+        self, address_map: AddressMap
+    ) -> Tuple[SyntheticAddressMap, AddressMap]:
+        name_to_target_adaptor = dict(self.name_to_target_adaptor)
+
+        declared_target_adaptors = []
         for name, target_adaptor in address_map.name_to_target_adaptor.items():
-            extend_synthetic = target_adaptor.kwargs.pop("_extend_synthetic", False)
-            if name not in self.name_to_target_adaptor:
+            extend_synthetic = target_adaptor.kwargs.get("_extend_synthetic", False)
+            if name not in name_to_target_adaptor:
                 if extend_synthetic:
                     raise InvalidTargetException(
                         softwrap(
@@ -169,7 +174,7 @@ class SyntheticAddressMap(AddressMap):
 
             # Pop synthetic target to let the explicit target declared in BUILD file take
             # precedence.
-            synthetic_target_adaptor = self.name_to_target_adaptor.pop(name)
+            synthetic_target_adaptor = name_to_target_adaptor.pop(name)
 
             if not extend_synthetic:
                 # The explicitly declared target should replace the synthetic one.
@@ -192,14 +197,25 @@ class SyntheticAddressMap(AddressMap):
                 )
 
             # Preserve synthetic field values not overriden by the declared target from the BUILD.
-            synthetic_target_adaptor.kwargs.update(target_adaptor.kwargs)
-            target_adaptor.kwargs = synthetic_target_adaptor.kwargs
+            kwargs = dict(synthetic_target_adaptor.kwargs)
+            kwargs.update(target_adaptor.kwargs)
+            kwargs.pop("_extend_synthetic", None)
+            declared_target_adaptors.append(target_adaptor.with_new_kwargs(**kwargs))
 
-    def apply_defaults(self, defaults: BuildFileDefaults) -> None:
+        return (
+            SyntheticAddressMap.create(self.path, name_to_target_adaptor.values()),
+            AddressMap.create(address_map.path, declared_target_adaptors),
+        )
+
+    def apply_defaults(self, defaults: BuildFileDefaults) -> SyntheticAddressMap:
+        processed_target_adaptors = []
         for target_adaptor in self.name_to_target_adaptor.values():
             default_values = defaults.get(target_adaptor.type_alias)
             if default_values is not None:
-                target_adaptor.kwargs = {**default_values, **target_adaptor.kwargs}
+                processed_target_adaptors.append(
+                    target_adaptor.with_new_kwargs(**default_values, **target_adaptor.kwargs)
+                )
+        return SyntheticAddressMap.create(self.path, processed_target_adaptors)
 
 
 @dataclass(frozen=True)
@@ -219,10 +235,8 @@ class SyntheticAddressMaps(Collection[SyntheticAddressMap]):
         synthetic_target_adaptors: Iterable[tuple[str, Iterable[TargetAdaptor]]],
     ) -> SyntheticAddressMaps:
         return cls(
-            [
-                SyntheticAddressMap.create(os.path.join(request.path, filename), target_adaptors)
-                for filename, target_adaptors in synthetic_target_adaptors
-            ]
+            SyntheticAddressMap.create(os.path.join(request.path, filename), target_adaptors)
+            for filename, target_adaptors in synthetic_target_adaptors
         )
 
 
