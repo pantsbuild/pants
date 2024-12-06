@@ -10,6 +10,7 @@ import logging
 import os.path
 import sys
 import typing
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, Sequence, cast
@@ -50,6 +51,7 @@ from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
+    InvalidTargetException,
     RegisteredTargetTypes,
 )
 from pants.engine.unions import UnionMembership
@@ -358,7 +360,7 @@ async def parse_address_family(
         for fc in digest_contents
     )
 
-    address_maps = [
+    declared_address_maps = [
         AddressMap.parse(
             fc.path,
             fc.content.decode(),
@@ -387,16 +389,88 @@ async def parse_address_family(
     )
 
     # Process synthetic targets.
-    for address_map in address_maps:
-        for synthetic in synthetic_address_maps:
-            synthetic.process_declared_targets(address_map)
-            synthetic.apply_defaults(frozen_defaults)
+
+    def apply_defaults(tgt: TargetAdaptor) -> TargetAdaptor:
+        default_values = frozen_defaults.get(tgt.type_alias)
+        if default_values is None:
+            return tgt
+        return tgt.with_new_kwargs(**default_values, **tgt.kwargs)
+
+    name_to_path_and_synthetic_target: dict[str, tuple[str, TargetAdaptor]] = {}
+    for synthetic_address_map in synthetic_address_maps:
+        for name, target in synthetic_address_map.name_to_target_adaptor.items():
+            name_to_path_and_synthetic_target[name] = (
+                synthetic_address_map.path,
+                apply_defaults(target),
+            )
+
+    name_to_path_and_declared_target: dict[str, tuple[str, TargetAdaptor]] = {}
+    for declared_address_map in declared_address_maps:
+        for name, target in declared_address_map.name_to_target_adaptor.items():
+            name_to_path_and_declared_target[name] = (declared_address_map.path, target)
+
+    # We listify the items() so we can modify name_to_path_and_declared_target in the loop.
+    for name, (declared_target_path, declared_target) in list(
+        name_to_path_and_declared_target.items()
+    ):
+        extend_synthetic = declared_target.kwargs.get("_extend_synthetic", False)
+        if extend_synthetic:
+            # Pop synthetic target to let the declared target take precedence.
+            synthetic_target_path, synthetic_target = name_to_path_and_synthetic_target.pop(
+                name, (None, None)
+            )
+            if synthetic_target is None:
+                raise InvalidTargetException(
+                    softwrap(
+                        f"""
+                            The `{declared_target.type_alias}` target {name!r} in {declared_target_path} has
+                            `_extend_synthetic=True` but there is no synthetic target to extend.
+                            """
+                    )
+                )
+
+            if synthetic_target.type_alias != declared_target.type_alias:
+                raise InvalidTargetException(
+                    softwrap(
+                        f"""
+                        The `{declared_target.type_alias}` target {name!r} in {declared_target_path} is
+                        of a different type than the synthetic target
+                        `{synthetic_target.type_alias}` from {synthetic_target_path}.
+
+                        When `_extend_synthetic` is true the target types must match, set this to
+                        false if you want to replace the synthetic target with the target from your
+                        BUILD file.
+                        """
+                    )
+                )
+
+            # Preserve synthetic field values not overriden by the declared target from the BUILD.
+            kwargs = dict(synthetic_target.kwargs)
+            kwargs.update(declared_target.kwargs)
+            name_to_path_and_declared_target[name] = (
+                declared_target_path,
+                declared_target.with_new_kwargs(**kwargs),
+            )
+
+    # Now reconstitute into AddressMaps, to pass into AddressFamily.create().
+    # We no longer need to distinguish between synthetic and declared AddressMaps.
+    # TODO: We might want to move the validation done by AddressFamily.create() to here, since
+    #  we're already iterating over the AddressMap data, and simplify AddressFamily.
+    path_to_targets = defaultdict(list)
+    for name_to_path_and_target in [
+        name_to_path_and_declared_target,
+        name_to_path_and_synthetic_target,
+    ]:
+        for path_and_target in name_to_path_and_target.values():
+            path_to_targets[path_and_target[0]].append(path_and_target[1])
+    address_maps = [AddressMap.create(path, targets) for path, targets in path_to_targets.items()]
 
     return OptionalAddressFamily(
         directory.path,
         AddressFamily.create(
             spec_path=directory.path,
-            address_maps=(*address_maps, *synthetic_address_maps),
+            # TODO: Does the order matter here? If not we could have a single tuple.
+            address_maps=address_maps,
             defaults=frozen_defaults,
             dependents_rules=frozen_dependents_rules,
             dependencies_rules=frozen_dependencies_rules,
