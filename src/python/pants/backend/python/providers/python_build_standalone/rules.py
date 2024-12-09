@@ -139,7 +139,8 @@ class PBSPythonProviderSubsystem(Subsystem):
         help=textwrap.dedent(
             """
             Version constraints on the PBS "release" version to ensure only matching PBS releases are considered.
-            Constraints should be specfied in a similar manner to interpreter constraints: e.g., `>=1.2.3,<2`.
+            Constraints should be specfied using operators like `>=`, `<=`, `>`, `<`, `==`, or `!=` in a similar
+            manner to Python interpreter constraints: e.g., `>=20241201` or `>=20241201,<20250101`.
             """
         ),
     )
