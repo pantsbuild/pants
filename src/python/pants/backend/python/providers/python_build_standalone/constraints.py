@@ -46,7 +46,7 @@ class Constraint:
 
         if cmp_op_and_callback is None:
             raise ConstraintParseError(
-                f"A constraiint must start with a comparison operator, i.e. {', '.join(x[0] for x in _OPERATORS)}."
+                f"A constraint must start with a comparison operator, i.e. {', '.join(x[0] for x in _OPERATORS)}, found {constraint!r}."
             )
 
         cmp_op, cmp_callback = cmp_op_and_callback
