@@ -10,3 +10,7 @@ python_sources(
         "rules.py",
     ],
 )
+
+python_tests(
+    name="tests",
+)

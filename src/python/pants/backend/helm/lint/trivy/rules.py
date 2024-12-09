@@ -5,8 +5,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer
-from pants.backend.helm.target_types import HelmChartFieldSet, HelmDeploymentFieldSet, HelmDeploymentTarget, \
-    HelmChartTarget
+from pants.backend.helm.target_types import (
+    HelmChartFieldSet,
+    HelmChartTarget,
+    HelmDeploymentFieldSet,
+    HelmDeploymentTarget,
+)
 from pants.backend.helm.util_rules.post_renderer import HelmDeploymentPostRendererRequest
 from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentCmd,
