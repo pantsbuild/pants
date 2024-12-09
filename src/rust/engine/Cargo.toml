@@ -258,7 +258,7 @@ humansize = "1.1"
 hyper = "1"
 hyper-rustls = "0.27"
 hyper-util = "0.1"
-ignore = { git = "https://github.com/pantsbuild/ripgrep.git", rev = "0f7e0fdd00ae528745a7fea24a320cae98235341" }
+ignore = "0.4.23"
 indexmap = { version = "1.9", features = ["std", "serde"] }
 indicatif = "0.17.8"
 internment = "0.6"
