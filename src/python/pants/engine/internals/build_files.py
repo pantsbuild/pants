@@ -469,7 +469,6 @@ async def parse_address_family(
         directory.path,
         AddressFamily.create(
             spec_path=directory.path,
-            # TODO: Does the order matter here? If not we could have a single tuple.
             address_maps=address_maps,
             defaults=frozen_defaults,
             dependents_rules=frozen_dependents_rules,
