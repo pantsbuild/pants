@@ -8,7 +8,7 @@ format: json
 
 
 def assert_trivy_output(
-    result, expected_exit_code: int, target: str, error_type: str, expected_error_count: int
+    result, expected_exit_code: int, target: str, scanner_type: str, expected_error_count: int
 ):
     assert result.exit_code == expected_exit_code
     report = json.loads(result.stdout)
@@ -16,11 +16,12 @@ def assert_trivy_output(
     assert (
         target in findings_by_target
     ), f"Did not find expected file in results, target={target} files={list(findings_by_target.keys())}"
-    if error_type == "terraform":
+    if scanner_type == "config":
+        found_count = findings_by_target[target]["MisconfSummary"]["Failures"]
         assert (
-            findings_by_target[target]["MisconfSummary"]["Failures"] == expected_error_count
-        ), "Did not find expected failure count"
-    elif error_type == "docker":
+            found_count == expected_error_count
+        ), f"Did not find expected failure count actual={found_count} expected={expected_error_count}"
+    elif scanner_type == "image":
         found_count = len(findings_by_target[target]["Vulnerabilities"])
         assert (
             found_count == expected_error_count
