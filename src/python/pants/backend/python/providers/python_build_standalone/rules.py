@@ -219,7 +219,9 @@ class PBSPythonProviderSubsystem(Subsystem):
             if py_version not in user_supplied_pythons:
                 user_supplied_pythons[py_version] = {}
 
-            pbs_python_info = PBSPythonInfo(url=url, sha256=sha256, size=int(filesize), tag=tag)
+            pbs_python_info = PBSPythonInfo(
+                url=url, sha256=sha256, size=int(filesize), tag=tag or ""
+            )
             user_supplied_pythons[py_version][platform] = pbs_python_info
 
         return user_supplied_pythons
