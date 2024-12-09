@@ -42,7 +42,6 @@ def rule_runner(standard_deployment: StandardDeployment) -> RuleRunner:
             QueryRule(LintResult, (TrivyLintTerraformDeploymentRequest.Batch,)),
             QueryRule(LintResult, (TrivyLintTerraformModuleRequest.Batch,)),
         ],
-        bootstrap_args=["--keep-sandboxes=always"],
     )
 
     trivy_deployment = standard_deployment.with_added_files(
@@ -93,7 +92,7 @@ def test_lint_deployment(rule_runner) -> None:
         ],
     )
 
-    assert_trivy_output(result, 1, "bad.tf", "terraform", 1)
+    assert_trivy_output(result, 1, "bad.tf", "config", 1)
 
 
 def test_lint_module(rule_runner) -> None:
@@ -110,4 +109,4 @@ def test_lint_module(rule_runner) -> None:
         ],
     )
 
-    assert_trivy_output(result, 1, "bad.tf", "terraform", 2)
+    assert_trivy_output(result, 1, "bad.tf", "config", 2)
