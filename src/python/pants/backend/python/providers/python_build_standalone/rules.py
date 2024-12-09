@@ -61,10 +61,23 @@ class PBSPythonInfo(TypedDict):
 
 @functools.cache
 def load_pbs_pythons() -> dict[str, dict[str, PBSPythonInfo]]:
-    return cast(
-        "dict[str, dict[str, PBSPythonInfo]]",
-        json.loads(read_sibling_resource(__name__, "versions_info.json"))["pythons"],
-    )
+    versions_info = json.loads(read_sibling_resource(__name__, "versions_info.json"))
+    pbs_release_metadata = versions_info["pythons"]
+
+    # Filter out any PBS releases for which we do not have `tag` metadata.
+    py_versions_to_delete: set[str] = set()
+    for py_version, platforms_for_ver in pbs_release_metadata.items():
+        all_have_tag = all(
+            platform_data.get("tag") is not None
+            for platform_name, platform_data in platforms_for_ver.items()
+        )
+        if not all_have_tag:
+            py_versions_to_delete.add(py_version)
+
+    for py_version_to_delete in py_versions_to_delete:
+        del pbs_release_metadata[py_version_to_delete]
+
+    return cast("dict[str, dict[str, PBSPythonInfo]]", pbs_release_metadata)
 
 
 class PBSPythonProviderSubsystem(Subsystem):

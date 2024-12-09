@@ -224,3 +224,20 @@ def test_release_constraint_evaluation(rule_runner: RuleRunner) -> None:
     rc = ConstraintsList.parse(">=20241001,<20241201")
     version, _info = pbs._choose_python(ics, universe, pbs_versions, platform, rc)
     assert version == "3.9.19"
+
+    # Ensure that exception occurs if no version matches.
+    rc = ConstraintsList.parse("==20250101")
+    with pytest.raises(
+        Exception,
+        match="Failed to find a supported Python Build Standalone for Interpreter Constraint",
+    ):
+        _version, _info = pbs._choose_python(ics, universe, pbs_versions, platform, rc)
+
+    # Ensure that PBS versions with no tag metadata are filtered out so there is no "match".
+    actual_pbs_versions = pbs.load_pbs_pythons()
+    rc = ConstraintsList.parse("==19700101")
+    with pytest.raises(
+        Exception,
+        match="Failed to find a supported Python Build Standalone for Interpreter Constraint",
+    ):
+        _version, _info = pbs._choose_python(ics, universe, actual_pbs_versions, platform, rc)
