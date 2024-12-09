@@ -135,17 +135,13 @@ def _create_inference_metadata(
     )
 
 
-async def _prepare_inference_metadata(address: Address, file_path: str) -> InferenceMetadata:
-    owning_pkg, maybe_config = await concurrently(
-        find_owning_package(OwningNodePackageRequest(address)),
-        find_parent_ts_config(ParentTSConfigRequest(file_path, "jsconfig.json"), **implicitly()),
-    )
+async def _prepare_inference_metadata(owning_pkg, maybe_config, spec_path) -> InferenceMetadata:
     if not owning_pkg.target:
         return InferenceMetadata.javascript(
             (
                 os.path.dirname(maybe_config.ts_config.path)
                 if maybe_config.ts_config
-                else address.spec_path
+                else spec_path
             ),
             {},
             maybe_config.ts_config.resolution_root_dir if maybe_config.ts_config else None,
@@ -173,29 +169,57 @@ def _add_extensions(file_imports: frozenset[str], file_extensions: tuple[str, ..
 async def _determine_import_from_candidates(
     candidates: ParsedJavascriptDependencyCandidate,
     package_candidate_map: NodePackageCandidateMap,
+    tsconfig: TSConfig | None,
     file_extensions: tuple[str, ...],
 ) -> Addresses:
-    paths = await path_globs_to_paths(
-        _add_extensions(
-            candidates.file_imports,
-            file_extensions,
+    addresses = Addresses(())
+    # 1. handle relative imports
+    if candidates.file_imports:
+        paths = await path_globs_to_paths(
+            _add_extensions(
+                candidates.file_imports,
+                file_extensions,
+            )
         )
-    )
-    local_owners = await Get(Owners, OwnersRequest(paths.files))
+        local_owners = await Get(Owners, OwnersRequest(paths.files))
+        owning_targets = await Get(Targets, Addresses(local_owners))
+        addresses = Addresses(tgt.address for tgt in owning_targets)
 
-    owning_targets = await Get(Targets, Addresses(local_owners))
+    # 2. handle package imports
+    elif candidates.package_imports:
 
-    addresses = Addresses(tgt.address for tgt in owning_targets)
-    if not local_owners:
-        non_path_string_bases = FrozenOrderedSet(
-            non_path_string.partition(os.path.sep)[0]
-            for non_path_string in candidates.package_imports
+        # Try prepending the tsconfig root dir to the package import.
+        first_party_packge_imports = frozenset(
+            os.path.join(tsconfig.resolution_root_dir, pkg_import)
+            for pkg_import in candidates.package_imports
+        ) if tsconfig and tsconfig.resolution_root_dir else frozenset()
+        paths = await path_globs_to_paths(
+            _add_extensions(
+                first_party_packge_imports,
+                file_extensions,
+            )
         )
-        addresses = Addresses(
-            package_candidate_map[pkg_name]
-            for pkg_name in non_path_string_bases
-            if pkg_name in package_candidate_map
-        )
+        local_owners = await Get(Owners, OwnersRequest(paths.files))
+
+        # 2.a. check for first-party package imports
+        if local_owners:
+            owning_targets = await Get(Targets, Addresses(local_owners))
+            addresses = Addresses(tgt.address for tgt in owning_targets)
+        
+        # 2.b. check for third-party package imports
+        else:
+            # If package name begins with @, then keep the subpackage name
+            non_path_string_bases = FrozenOrderedSet(
+                f"{non_path_string.split('/')[0]}/{non_path_string.split('/')[1]}"
+                if non_path_string.startswith("@")
+                else non_path_string.partition(os.path.sep)[0]
+                for non_path_string in candidates.package_imports
+            )
+            addresses = Addresses(
+                package_candidate_map[pkg_name]
+                for pkg_name in non_path_string_bases
+                if pkg_name in package_candidate_map
+            )
     return addresses
 
 
@@ -243,7 +267,11 @@ async def infer_js_source_dependencies(
     sources = await Get(
         HydratedSources, HydrateSourcesRequest(source, for_sources_types=[JSRuntimeSourceField])
     )
-    metadata = await _prepare_inference_metadata(request.field_set.address, source.file_path)
+    owning_pkg, maybe_config = await concurrently(
+        find_owning_package(OwningNodePackageRequest(request.field_set.address)),
+        find_parent_ts_config(ParentTSConfigRequest(source.file_path, "jsconfig.json"), **implicitly()),
+    )
+    metadata = await _prepare_inference_metadata(owning_pkg, maybe_config, request.field_set.address.spec_path)
 
     import_strings, candidate_pkgs = await concurrently(
         parse_javascript_deps(NativeDependenciesRequest(sources.snapshot.digest, metadata)),
@@ -258,6 +286,7 @@ async def infer_js_source_dependencies(
                 _determine_import_from_candidates(
                     candidates,
                     candidate_pkgs,
+                    tsconfig=maybe_config.ts_config,
                     file_extensions=JS_FILE_EXTENSIONS + JSX_FILE_EXTENSIONS,
                 )
                 for string, candidates in import_strings.imports.items()
