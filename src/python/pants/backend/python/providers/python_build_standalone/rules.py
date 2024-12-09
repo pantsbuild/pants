@@ -232,6 +232,8 @@ class PBSPythonProviderSubsystem(Subsystem):
         )
         for py_version, platform_metadatas_for_py_version in user_supplied_pythons.items():
             for platform_name, platform_metadata in platform_metadatas_for_py_version.items():
+                if py_version not in all_pythons:
+                    all_pythons[py_version] = {}
                 all_pythons[py_version][platform_name] = platform_metadata
 
         return all_pythons
