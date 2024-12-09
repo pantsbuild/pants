@@ -10,7 +10,7 @@ This project provides a *Development Container* (or [Dev Container](https://cont
 
 ## Features
 
-- [Rust](https://www.rust-lang.org/) engine and common [Rust] utilities
+- [Rust] engine and common [Rust] utilities
 - [Python](https://www.python.org/) 3.11
 - [Docker-in-Docker](https://github.com/devcontainers/features/tree/main/src/docker-in-docker) (DinD)
 - [Shell History](https://github.com/stuartleeks/dev-container-features/tree/main/src/shell-history)
@@ -41,4 +41,5 @@ More on getting started can be found [here](https://code.visualstudio.com/docs/d
 More on starting a dev container can be found [here](https://code.visualstudio.com/docs/devcontainers/containers#_picking-your-quick-start).
 
 [pants]: https://github.com/pantsbuild/pants
+[rust]: https://www.rust-lang.org/
 [vs code]: https://code.visualstudio.com/
