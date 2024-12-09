@@ -12,7 +12,7 @@ import pytest
 
 from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, ResolveError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.target_types import GenericTarget
+from pants.core.target_types import GenericTarget, ResourceTarget
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
@@ -33,6 +33,7 @@ from pants.engine.internals.parser import BuildFilePreludeSymbols, BuildFileSymb
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
+    SyntheticAddressMap,
     SyntheticAddressMaps,
     SyntheticAddressMapsRequest,
 )
@@ -111,6 +112,96 @@ def test_parse_address_family_empty() -> None:
     af = optional_af.address_family
     assert af.namespace == "/dev/null"
     assert len(af.name_to_target_adaptors) == 0
+
+
+def test_extend_synthetic_target() -> None:
+    optional_af = run_rule_with_mocks(
+        parse_address_family,
+        rule_args=[
+            Parser(
+                build_root="",
+                registered_target_types=RegisteredTargetTypes({"resource": ResourceTarget}),
+                union_membership=UnionMembership({}),
+                object_aliases=BuildFileAliases(),
+                ignore_unrecognized_symbols=False,
+            ),
+            BootstrapStatus(in_progress=False),
+            BuildFileOptions(("BUILD",)),
+            BuildFilePreludeSymbols(FrozenDict(), ()),
+            AddressFamilyDir("/foo"),
+            RegisteredTargetTypes({}),
+            UnionMembership({}),
+            MaybeBuildFileDependencyRulesImplementation(None),
+            SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
+        ],
+        mock_gets=[
+            MockGet(
+                output_type=DigestContents,
+                input_types=(PathGlobs,),
+                mock=lambda _: DigestContents(
+                    [
+                        FileContent(path="/foo/BUILD.1",
+                                    content=b"resource(name='aaa', some_arg='a')"),
+                        FileContent(
+                            path="/foo/BUILD.2",
+                            content=b"resource(name='bar', some_arg='b', _extend_synthetic=True)",
+                        ),
+                    ]
+                ),
+            ),
+            MockGet(
+                output_type=OptionalAddressFamily,
+                input_types=(AddressFamilyDir,),
+                mock=lambda _: OptionalAddressFamily("/foo"),
+            ),
+            MockGet(
+                output_type=SyntheticAddressMaps,
+                input_types=(SyntheticAddressMapsRequest,),
+                mock=lambda _: SyntheticAddressMaps(
+                    [
+                        SyntheticAddressMap.create(
+                            "/foo/synthetic1",
+                            [
+                                TargetAdaptor("resource", "xxx", "", some_arg="x"),
+                            ],
+                        ),
+                        SyntheticAddressMap.create(
+                            "/foo/synthetic2",
+                            [
+                                TargetAdaptor("resource", "yyy", ""),
+                                TargetAdaptor("resource", "bar", "", extend=42),
+                            ],
+                        ),
+                    ]
+                ),
+            ),
+            MockGet(
+                output_type=EnvironmentVars,
+                input_types=(EnvironmentVarsRequest, CompleteEnvironmentVars),
+                mock=lambda _1, _2: EnvironmentVars({}),
+            ),
+        ],
+    )
+    assert optional_af.path == "/foo"
+    assert optional_af.address_family is not None
+    af = optional_af.address_family
+    assert af.namespace == "/foo"
+
+    path, tgt = af.name_to_target_adaptors["aaa"]
+    assert path == "/foo/BUILD.1"
+    assert tgt.kwargs == FrozenDict({"some_arg": "a"})
+
+    path, tgt = af.name_to_target_adaptors["xxx"]
+    assert path == "/foo/synthetic1"
+    assert tgt.kwargs == FrozenDict({"some_arg": "x"})
+
+    path, tgt = af.name_to_target_adaptors["yyy"]
+    assert path == "/foo/synthetic2"
+    assert tgt.kwargs == FrozenDict({})
+
+    path, tgt = af.name_to_target_adaptors["bar"]
+    assert path == "/foo/BUILD.2"
+    assert tgt.kwargs == FrozenDict({"some_arg": "b", "extend": 42})
 
 
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
