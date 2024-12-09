@@ -149,7 +149,7 @@ class SyntheticTargetsRequest:
 
 
 class SyntheticAddressMap(AddressMap):
-    ...
+    pass
 
 
 @dataclass(frozen=True)
