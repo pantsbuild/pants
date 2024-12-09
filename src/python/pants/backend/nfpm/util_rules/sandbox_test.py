@@ -497,16 +497,16 @@ def test_populate_nfpm_content_sandbox(
                 )
                 """
             ),
-            **{
-                path: ""
-                for path in [
+            **dict.fromkeys(
+                [
                     "scripts/postinstall.sh",
                     "scripts/apk-postupgrade.sh",
                     "scripts/arch-postupgrade.sh",
                     "scripts/deb-config.sh",
                     "scripts/rpm-verify.sh",
-                ]
-            },
+                ],
+                "",
+            ),
         }
     )
 
