@@ -95,4 +95,4 @@ def test_trivy_bad(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    assert_trivy_output(result, 1, BAD_IMAGE_TARGET, "docker", 4)
+    assert_trivy_output(result, 1, BAD_IMAGE_TARGET, "image", 4)
