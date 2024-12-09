@@ -409,10 +409,11 @@ async def parse_address_family(
         for name, target in declared_address_map.name_to_target_adaptor.items():
             name_to_path_and_declared_target[name] = (declared_address_map.path, target)
 
-    # We listify the items() so we can modify name_to_path_and_declared_target in the loop.
-    for name, (declared_target_path, declared_target) in list(
-        name_to_path_and_declared_target.items()
-    ):
+    # We copy the dict so we can modify the original in the loop.
+    for name, (
+        declared_target_path,
+        declared_target,
+    ) in name_to_path_and_declared_target.copy().items():
         extend_synthetic = declared_target.kwargs.get("_extend_synthetic", False)
         if extend_synthetic:
             # Pop synthetic target to let the declared target take precedence.
