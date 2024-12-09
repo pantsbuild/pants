@@ -121,6 +121,7 @@ def main() -> None:
             "url": asset.browser_download_url,
             "sha256": sha256sum,
             "size": asset.size,
+            "tag": pbs_release_tag,
         }
 
     VERSIONS_PATH.write_text(json.dumps(versions_info, sort_keys=True, indent=2))
