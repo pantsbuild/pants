@@ -140,8 +140,9 @@ def test_extend_synthetic_target() -> None:
                 input_types=(PathGlobs,),
                 mock=lambda _: DigestContents(
                     [
-                        FileContent(path="/foo/BUILD.1",
-                                    content=b"resource(name='aaa', some_arg='a')"),
+                        FileContent(
+                            path="/foo/BUILD.1", content=b"resource(name='aaa', some_arg='a')"
+                        ),
                         FileContent(
                             path="/foo/BUILD.2",
                             content=b"resource(name='bar', some_arg='b', _extend_synthetic=True)",
