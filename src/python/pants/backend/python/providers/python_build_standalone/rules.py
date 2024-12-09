@@ -169,10 +169,10 @@ class PBSPythonProviderSubsystem(Subsystem):
             if pyversion not in all_pythons:
                 all_pythons[pyversion] = {}
 
-            # Note: Tag is set `None` which means this version will always match the release constraint.
+            # Note: Tag is set "" which means this version will always match the release constraint.
             # TODO: Infer the release tag from the URL.
             all_pythons[pyversion][platform] = PBSPythonInfo(
-                url=url, sha256=sha256, size=int(filesize), tag=None
+                url=url, sha256=sha256, size=int(filesize), tag=""
             )
 
         return all_pythons
