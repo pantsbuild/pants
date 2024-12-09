@@ -40,7 +40,7 @@ from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.global_options import NamedCachesDirOption
-from pants.option.option_types import StrListOption, StrOption
+from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
@@ -148,6 +148,18 @@ class PBSPythonProviderSubsystem(Subsystem):
         ),
     )
 
+    require_inferrable_release_tag = BoolOption(
+        default=False,
+        help=textwrap.dedent(
+            """
+            Normally, Pants will try to infer the PBS release "tag" from URLs supplied to the
+            `--python-build-standalone-known-python-versions` option. If this option is True,
+            then it is an error if Pants cannot infer the tag from the URL.
+            """
+        ),
+        advanced=True,
+    )
+
     @memoized_property
     def release_constraints(self) -> ConstraintsList:
         rcs = self._release_constraints
@@ -156,7 +168,9 @@ class PBSPythonProviderSubsystem(Subsystem):
 
         return ConstraintsList.parse(self._release_constraints or "")
 
-    def get_user_supplied_pbs_pythons(self) -> dict[str, dict[str, PBSPythonInfo]]:
+    def get_user_supplied_pbs_pythons(
+        self, require_tag: bool
+    ) -> dict[str, dict[str, PBSPythonInfo]]:
         extract_re = re.compile(r"^cpython-([0-9.]+)\+([0-9]+)-.*\.tar\.\w+$")
 
         def extract_version_and_tag(url: str) -> tuple[str, str] | None:
@@ -194,6 +208,14 @@ class PBSPythonProviderSubsystem(Subsystem):
                     )
                 tag = inferred_tag
 
+            if require_tag and tag is None:
+                raise ExternalToolError(
+                    f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                    f'the PBS release "tag" could not be inferred from the supplied URL: {url}'
+                    "\n\nThis is an error because the option"
+                    f"`[{PBSPythonProviderSubsystem.options_scope}].require_inferrable_release_tag` is set to True."
+                )
+
             if py_version not in user_supplied_pythons:
                 user_supplied_pythons[py_version] = {}
 
@@ -205,7 +227,9 @@ class PBSPythonProviderSubsystem(Subsystem):
     def get_all_pbs_pythons(self) -> dict[str, dict[str, PBSPythonInfo]]:
         all_pythons = load_pbs_pythons().copy()
 
-        user_supplied_pythons = self.get_user_supplied_pbs_pythons()
+        user_supplied_pythons = self.get_user_supplied_pbs_pythons(
+            require_tag=self.require_inferrable_release_tag
+        )
         for py_version, platform_metadatas_for_py_version in user_supplied_pythons.items():
             for platform_name, platform_metadata in platform_metadatas_for_py_version.items():
                 all_pythons[py_version][platform_name] = platform_metadata
