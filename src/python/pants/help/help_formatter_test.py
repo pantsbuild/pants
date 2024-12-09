@@ -62,7 +62,12 @@ class TestOptionHelpFormatter:
         return OptionRegistrar(
             scope=GlobalOptions.options_scope,
         ), NativeOptionParser(
-            args=[], env={}, config_sources=[], allow_pantsrc=False, include_derivation=True
+            args=[],
+            env={},
+            config_sources=[],
+            allow_pantsrc=False,
+            include_derivation=True,
+            known_scopes_to_flags={},
         )
 
     @classmethod
