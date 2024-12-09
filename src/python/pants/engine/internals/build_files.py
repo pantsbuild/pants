@@ -414,7 +414,8 @@ async def parse_address_family(
         declared_target_path,
         declared_target,
     ) in name_to_path_and_declared_target.copy().items():
-        extend_synthetic = declared_target.kwargs.get("_extend_synthetic", False)
+        declared_target_kwargs = dict(declared_target.kwargs)
+        extend_synthetic = declared_target_kwargs.pop("_extend_synthetic", False)
         if extend_synthetic:
             # Pop synthetic target to let the declared target take precedence.
             synthetic_target_path, synthetic_target = name_to_path_and_synthetic_target.pop(
@@ -447,11 +448,13 @@ async def parse_address_family(
 
             # Preserve synthetic field values not overriden by the declared target from the BUILD.
             kwargs = dict(synthetic_target.kwargs)
-            kwargs.update(declared_target.kwargs)
-            name_to_path_and_declared_target[name] = (
-                declared_target_path,
-                declared_target.with_new_kwargs(**kwargs),
-            )
+        else:
+            kwargs = {}
+        kwargs.update(declared_target_kwargs)
+        name_to_path_and_declared_target[name] = (
+            declared_target_path,
+            declared_target.with_new_kwargs(**kwargs),
+        )
 
     # Now reconstitute into AddressMaps, to pass into AddressFamily.create().
     # We no longer need to distinguish between synthetic and declared AddressMaps.

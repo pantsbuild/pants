@@ -112,9 +112,9 @@ class TargetAdaptor:
         return TargetAdaptor(
             type_alias=self.type_alias,
             name=self.name,
-            kwargs=kwargs,
             __description_of_origin__=self.description_of_origin,
             __origin_sources_blocks__=self.origin_sources_blocks,
+            **kwargs,
         )
 
     def __repr__(self) -> str:
