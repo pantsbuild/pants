@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import functools
 import json
+import posixpath
+import re
 import textwrap
+import urllib
 import uuid
 from pathlib import PurePath
 from typing import Iterable, Mapping, TypedDict, cast
@@ -153,25 +156,59 @@ class PBSPythonProviderSubsystem(Subsystem):
 
         return ConstraintsList.parse(self._release_constraints or "")
 
+    def get_user_supplied_pbs_pythons(self) -> dict[str, dict[str, PBSPythonInfo]]:
+        extract_re = re.compile(r"^cpython-([0-9.]+)\+([0-9]+)-.*\.tar\.\w+$")
+
+        def extract_version_and_tag(url: str) -> tuple[str, str] | None:
+            parsed_url = urllib.parse.urlparse(urllib.parse.unquote(url))
+            base_path = posixpath.basename(parsed_url.path)
+
+            nonlocal extract_re
+            if m := extract_re.fullmatch(base_path):
+                return (m.group(1), m.group(2))
+
+            return None
+
+        user_supplied_pythons: dict[str, dict[str, PBSPythonInfo]] = {}
+
+        for version_info in self.known_python_versions or []:
+            version_parts = version_info.split("|")
+            if len(version_parts) != 5:
+                raise ExternalToolError(
+                    f"Each value for the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option "
+                    "must be five values separated by a `|` character as follows: PYTHON_VERSION|PLATFORM|SHA256|FILE_SIZE|URL "
+                    f"\n\nInstead, the following value was provided: {version_info}"
+                )
+
+            py_version, platform, sha256, filesize, url = (x.strip() for x in version_parts)
+
+            tag: str | None = None
+            maybe_inferred_py_version_and_tag = extract_version_and_tag(url)
+            if maybe_inferred_py_version_and_tag:
+                inferred_py_version, inferred_tag = maybe_inferred_py_version_and_tag
+                if inferred_py_version != py_version:
+                    raise ExternalToolError(
+                        f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                        f"the value `{version_info}` declares Python version `{py_version}` in the first field, but the URL"
+                        f"provided references Python version `{inferred_py_version}`. These must be the same."
+                    )
+                tag = inferred_tag
+
+            if py_version not in user_supplied_pythons:
+                user_supplied_pythons[py_version] = {}
+
+            pbs_python_info = PBSPythonInfo(url=url, sha256=sha256, size=int(filesize), tag=tag)
+            user_supplied_pythons[py_version][platform] = pbs_python_info
+
+        return user_supplied_pythons
+
     def get_all_pbs_pythons(self) -> dict[str, dict[str, PBSPythonInfo]]:
         all_pythons = load_pbs_pythons().copy()
 
-        for version_info in self.known_python_versions or []:
-            try:
-                pyversion, platform, sha256, filesize, url = (
-                    x.strip() for x in version_info.split("|")
-                )
-            except ValueError:
-                raise ExternalToolError(
-                    f"Bad value for [{PBSPythonProviderSubsystem.options_scope}].known_python_versions: {version_info}"
-                )
-
-            if pyversion not in all_pythons:
-                all_pythons[pyversion] = {}
-
-            all_pythons[pyversion][platform] = PBSPythonInfo(
-                url=url, sha256=sha256, size=int(filesize), tag="99999999"
-            )
+        user_supplied_pythons = self.get_user_supplied_pbs_pythons()
+        for py_version, platform_metadatas_for_py_version in user_supplied_pythons.items():
+            for platform_name, platform_metadata in platform_metadatas_for_py_version.items():
+                all_pythons[py_version][platform_name] = platform_metadata
 
         return all_pythons
 
