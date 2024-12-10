@@ -12,7 +12,11 @@ import uuid
 from pathlib import PurePath
 from typing import Iterable, Mapping, TypedDict, cast
 
-from pants.backend.python.providers.python_build_standalone.constraints import ConstraintsList
+from pants.backend.python.providers.python_build_standalone.constraints import (
+    ConstraintParseError,
+    ConstraintSatisfied,
+    ConstraintsList,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PythonProvider
@@ -39,6 +43,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.errors import OptionsError
 from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -166,7 +171,12 @@ class PBSPythonProviderSubsystem(Subsystem):
         if rcs is None or not rcs.strip():
             return ConstraintsList([])
 
-        return ConstraintsList.parse(self._release_constraints or "")
+        try:
+            return ConstraintsList.parse(self._release_constraints or "")
+        except ConstraintParseError as e:
+            raise OptionsError(
+                f"The `[{PBSPythonProviderSubsystem.options_scope}].release_constraints option` is not valid: {e}"
+            ) from None
 
     def get_user_supplied_pbs_pythons(
         self, require_tag: bool
@@ -250,7 +260,7 @@ def _choose_python(
     universe: Iterable[str],
     pbs_versions: Mapping[str, Mapping[str, PBSPythonInfo]],
     platform: Platform,
-    release_constraints: ConstraintsList,
+    release_constraints: ConstraintSatisfied,
 ) -> tuple[str, PBSPythonInfo]:
     """Choose the highest supported patchlevel of the lowest supported major/minor version
     consistent with any PBS release constraint."""
@@ -269,7 +279,7 @@ def _choose_python(
             continue
 
         tag = pbs_version_platform_metadata.get("tag")
-        if tag and not release_constraints.evaluate(Version(tag)):
+        if tag and not release_constraints.is_satisified(Version(tag)):
             continue
 
         candidate_pbs_releases.append((triplet, pbs_version_platform_metadata))
@@ -294,19 +304,16 @@ def _choose_python(
     # by searching until the major/minor version increases or the search ends (in which case the
     # last candidate is the one).
     candidate_pbs_releases.sort(key=lambda x: x[0])
-    major_minor = candidate_pbs_releases[0][0][0:2]
-    i = 0
-    while i < len(candidate_pbs_releases):
+    for i, (version_triplet, metadata) in enumerate(candidate_pbs_releases):
         if (
-            i + 1 < len(candidate_pbs_releases)
-            and candidate_pbs_releases[i + 1][0][0:2] != major_minor
+            # Last candidate, we're good!
+            i == len(candidate_pbs_releases) - 1
+            # Next candidate is the next major/minor version, so this is the highest patchlevel.
+            or candidate_pbs_releases[i + 1][0][0:2] != version_triplet[0:2]
         ):
-            r = candidate_pbs_releases[i]
-            return (".".join(map(str, r[0])), r[1])
-        i += 1
+            return (".".join(map(str, version_triplet)), metadata)
 
-    r = candidate_pbs_releases[-1]
-    return (".".join(map(str, r[0])), r[1])
+    raise AssertionError("The loop should have returned the final item.")
 
 
 @rule
