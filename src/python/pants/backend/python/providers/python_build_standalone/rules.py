@@ -11,6 +11,7 @@ from typing import Iterable, Mapping, TypedDict, cast
 
 from pants.backend.python.providers.python_build_standalone.constraints import (
     ConstraintParseError,
+    ConstraintSatisfied,
     ConstraintsList,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -196,7 +197,7 @@ def _choose_python(
     universe: Iterable[str],
     pbs_versions: Mapping[str, Mapping[str, PBSPythonInfo]],
     platform: Platform,
-    release_constraints: ConstraintsList,
+    release_constraints: ConstraintSatisfied,
 ) -> tuple[str, PBSPythonInfo]:
     """Choose the highest supported patchlevel of the lowest supported major/minor version
     consistent with any PBS release constraint."""
@@ -215,7 +216,7 @@ def _choose_python(
             continue
 
         tag = pbs_version_platform_metadata.get("tag")
-        if tag and not release_constraints.evaluate(Version(tag)):
+        if tag and not release_constraints.is_satisified(Version(tag)):
             continue
 
         candidate_pbs_releases.append((triplet, pbs_version_platform_metadata))

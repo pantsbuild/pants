@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import operator
-from typing import Callable, Iterable, cast
+from typing import Callable, Iterable, Protocol, cast
 
 from packaging.version import Version
 
@@ -22,7 +22,12 @@ class ConstraintParseError(Exception):
     pass
 
 
-class Constraint:
+class ConstraintSatisfied(Protocol):
+    def is_satisified(self, version: Version) -> bool:
+        ...
+
+
+class Constraint(ConstraintSatisfied):
     """A single version constraint with operator."""
 
     def __init__(
@@ -31,7 +36,7 @@ class Constraint:
         self.cmp_callback: Callable[[Version, Version], bool] = cmp_callback
         self.cmp_version: Version = cmp_version
 
-    def evaluate(self, version: Version) -> bool:
+    def is_satisified(self, version: Version) -> bool:
         return self.cmp_callback(version, self.cmp_version)
 
     @classmethod
@@ -54,15 +59,15 @@ class Constraint:
         return cls(cmp_callback, cmp_version)
 
 
-class ConstraintsList:
+class ConstraintsList(ConstraintSatisfied):
     """A list of constraints which must all match (i.e., they are AND'ed together)."""
 
-    def __init__(self, constraints: Iterable[Constraint]) -> None:
-        self.constraints: tuple[Constraint, ...] = tuple(constraints)
+    def __init__(self, constraints: Iterable[ConstraintSatisfied]) -> None:
+        self.constraints: tuple[ConstraintSatisfied, ...] = tuple(constraints)
 
-    def evaluate(self, version: Version) -> bool:
+    def is_satisified(self, version: Version) -> bool:
         for constraint in self.constraints:
-            if not constraint.evaluate(version):
+            if not constraint.is_satisified(version):
                 return False
         return True
 
