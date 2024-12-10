@@ -9,7 +9,10 @@ import uuid
 from pathlib import PurePath
 from typing import Iterable, Mapping, TypedDict, cast
 
-from pants.backend.python.providers.python_build_standalone.constraints import ConstraintsList
+from pants.backend.python.providers.python_build_standalone.constraints import (
+    ConstraintParseError,
+    ConstraintsList,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PythonProvider
@@ -36,6 +39,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.errors import OptionsError
 from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -151,7 +155,12 @@ class PBSPythonProviderSubsystem(Subsystem):
         if rcs is None or not rcs.strip():
             return ConstraintsList([])
 
-        return ConstraintsList.parse(self._release_constraints or "")
+        try:
+            return ConstraintsList.parse(self._release_constraints or "")
+        except ConstraintParseError as e:
+            raise OptionsError(
+                f"The `[{PBSPythonProviderSubsystem.options_scope}].release_constraints option` is not valid: {e}"
+            ) from None
 
     def get_all_pbs_pythons(self) -> dict[str, dict[str, PBSPythonInfo]]:
         all_pythons = load_pbs_pythons().copy()
