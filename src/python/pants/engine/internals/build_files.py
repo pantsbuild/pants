@@ -418,14 +418,13 @@ async def parse_address_family(
         synthetic_target_path, synthetic_target = name_to_path_and_synthetic_target.pop(
             name, (None, None)
         )
-        extend_synthetic = declared_target.kwargs.get("_extend_synthetic")
-        if extend_synthetic is None:
+        if "_extend_synthetic" not in declared_target.kwargs:
             # The explicitly declared target should replace the synthetic one.
             continue
 
         # The _extend_synthetic kwarg was explicitly provided, so we must strip it.
         declared_target_kwargs = dict(declared_target.kwargs)
-        declared_target_kwargs.pop("_extend_synthetic")
+        extend_synthetic = declared_target_kwargs.pop("_extend_synthetic")
         if extend_synthetic:
             if synthetic_target is None:
                 raise InvalidTargetException(
@@ -453,10 +452,9 @@ async def parse_address_family(
                 )
 
             # Preserve synthetic field values not overriden by the declared target from the BUILD.
-            kwargs = dict(synthetic_target.kwargs)
+            kwargs = {**synthetic_target.kwargs, **declared_target_kwargs}
         else:
-            kwargs = {}
-        kwargs.update(declared_target_kwargs)
+            kwargs = declared_target_kwargs
         name_to_path_and_declared_target[name] = (
             declared_target_path,
             declared_target.with_new_kwargs(**kwargs),

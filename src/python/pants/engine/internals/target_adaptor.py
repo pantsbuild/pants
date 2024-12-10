@@ -104,7 +104,12 @@ class TargetAdaptor:
     ) -> None:
         self.type_alias = type_alias
         self.name = name
-        self.kwargs = FrozenDict.deep_freeze(kwargs)
+        try:
+            self.kwargs = FrozenDict.deep_freeze(kwargs)
+        except TypeError as e:
+            # FrozenDict's ctor eagerly computes its hash. If some kwarg is unhashable it will
+            # raise a TypeError, which we enhance with the description of origin.
+            raise TypeError(f"In {__description_of_origin__}: {e}")
         self.description_of_origin = __description_of_origin__
         self.origin_sources_blocks = __origin_sources_blocks__
 
