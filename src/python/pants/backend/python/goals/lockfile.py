@@ -343,7 +343,7 @@ async def python_lockfile_synthetic_targets(
                     TargetAdaptor(
                         "_lockfiles",
                         name=synthetic_lockfile_target_name(name),
-                        sources=[lockfile],
+                        sources=(lockfile,),
                         __description_of_origin__=f"the [python].resolves option {name!r}",
                     )
                     for _, lockfile, name in lockfiles
