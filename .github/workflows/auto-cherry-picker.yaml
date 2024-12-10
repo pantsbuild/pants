@@ -23,11 +23,11 @@ jobs:
       merge_commit: ${{ steps.get-prereqs.outputs.merge_commit }}
       matrix: ${{ steps.get-prereqs.outputs.matrix }}
     steps:
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 16
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - run: npm install ./build-support/cherry_pick
       - id: get-prereqs
         name: Get Cherry-Pick prerequisites
@@ -60,7 +60,7 @@ jobs:
         include: ${{ fromJSON(needs.prerequisites.outputs.matrix) }}
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
       - name: Prepare cherry-pick branch
@@ -113,7 +113,7 @@ jobs:
     if: needs.prerequisites.result == 'success' && (success() || failure())
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - run: npm install ./build-support/cherry_pick
       - name: Run Script
         uses: actions/github-script@v6
