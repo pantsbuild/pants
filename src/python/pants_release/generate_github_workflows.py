@@ -22,7 +22,7 @@ from pants.util.strutil import softwrap
 
 def action(name: str) -> str:
     version_map = {
-        "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
+        "action-send-mail": "dawidd6/action-send-mail@v4",
         "cache": "actions/cache@v4",
         "checkout": "actions/checkout@v4",
         "download-artifact": "actions/download-artifact@v4",

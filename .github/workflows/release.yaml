@@ -438,7 +438,7 @@ jobs:
         channel-id: C18RRR4JK
         payload-file-path: ${{ runner.temp }}/slack_announcement.json
     - name: Announce to pants-devel
-      uses: dawidd6/action-send-mail@v3.8.0
+      uses: dawidd6/action-send-mail@v4
       with:
         body: file://${{ runner.temp }}/email_announcement_body.md
         connection_url: ${{ secrets.EMAIL_CONNECTION_URL }}
