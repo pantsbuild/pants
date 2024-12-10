@@ -241,19 +241,16 @@ def _choose_python(
     # by searching until the major/minor version increases or the search ends (in which case the
     # last candidate is the one).
     candidate_pbs_releases.sort(key=lambda x: x[0])
-    major_minor = candidate_pbs_releases[0][0][0:2]
-    i = 0
-    while i < len(candidate_pbs_releases):
+    for i, (version_triplet, metadata) in enumerate(candidate_pbs_releases):
         if (
-            i + 1 < len(candidate_pbs_releases)
-            and candidate_pbs_releases[i + 1][0][0:2] != major_minor
+            # Last candidate, we're good!
+            i == len(candidate_pbs_releases) - 1
+            # Next candidate is the next major/minor version, so this is the highest patchlevel.
+            or candidate_pbs_releases[i + 1][0][0:2] != version_triplet[0:2]
         ):
-            r = candidate_pbs_releases[i]
-            return (".".join(map(str, r[0])), r[1])
-        i += 1
+            return (".".join(map(str, version_triplet)), metadata)
 
-    r = candidate_pbs_releases[-1]
-    return (".".join(map(str, r[0])), r[1])
+    raise AssertionError("The loop should have returned the final item.")
 
 
 @rule
