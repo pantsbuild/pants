@@ -394,7 +394,7 @@ async def parse_address_family(
         default_values = frozen_defaults.get(tgt.type_alias)
         if default_values is None:
             return tgt
-        return tgt.with_new_kwargs(**default_values, **tgt.kwargs)
+        return tgt.with_new_kwargs(**{**default_values, **tgt.kwargs})
 
     name_to_path_and_synthetic_target: dict[str, tuple[str, TargetAdaptor]] = {}
     for synthetic_address_map in synthetic_address_maps:
@@ -414,13 +414,19 @@ async def parse_address_family(
         declared_target_path,
         declared_target,
     ) in name_to_path_and_declared_target.copy().items():
+        # Pop the synthetic target to let the declared target take precedence.
+        synthetic_target_path, synthetic_target = name_to_path_and_synthetic_target.pop(
+            name, (None, None)
+        )
+        extend_synthetic = declared_target.kwargs.get("_extend_synthetic")
+        if extend_synthetic is None:
+            # The explicitly declared target should replace the synthetic one.
+            continue
+
+        # The _extend_synthetic kwarg was explicitly provided, so we must strip it.
         declared_target_kwargs = dict(declared_target.kwargs)
-        extend_synthetic = declared_target_kwargs.pop("_extend_synthetic", False)
+        declared_target_kwargs.pop("_extend_synthetic")
         if extend_synthetic:
-            # Pop synthetic target to let the declared target take precedence.
-            synthetic_target_path, synthetic_target = name_to_path_and_synthetic_target.pop(
-                name, (None, None)
-            )
             if synthetic_target is None:
                 raise InvalidTargetException(
                     softwrap(

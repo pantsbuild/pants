@@ -25,7 +25,7 @@ from pants.engine.internals.build_files import (
     evaluate_preludes,
     parse_address_family,
 )
-from pants.engine.internals.defaults import ParametrizeDefault
+from pants.engine.internals.defaults import BuildFileDefaults, ParametrizeDefault
 from pants.engine.internals.dep_rules import MaybeBuildFileDependencyRulesImplementation
 from pants.engine.internals.mapper import AddressFamily
 from pants.engine.internals.parametrize import Parametrize
@@ -129,7 +129,7 @@ def test_extend_synthetic_target() -> None:
             BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict(), ()),
             AddressFamilyDir("/foo"),
-            RegisteredTargetTypes({}),
+            RegisteredTargetTypes({"resource": ResourceTarget}),
             UnionMembership({}),
             MaybeBuildFileDependencyRulesImplementation(None),
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
@@ -141,11 +141,11 @@ def test_extend_synthetic_target() -> None:
                 mock=lambda _: DigestContents(
                     [
                         FileContent(
-                            path="/foo/BUILD.1", content=b"resource(name='aaa', some_arg='a')"
+                            path="/foo/BUILD.1", content=b"resource(name='aaa', description='a')"
                         ),
                         FileContent(
                             path="/foo/BUILD.2",
-                            content=b"resource(name='bar', some_arg='b', _extend_synthetic=True)",
+                            content=b"resource(name='bar', description='b', _extend_synthetic=True)",
                         ),
                     ]
                 ),
@@ -153,7 +153,16 @@ def test_extend_synthetic_target() -> None:
             MockGet(
                 output_type=OptionalAddressFamily,
                 input_types=(AddressFamilyDir,),
-                mock=lambda _: OptionalAddressFamily("/foo"),
+                mock=lambda _: OptionalAddressFamily(
+                    "/",
+                    address_family=AddressFamily.create(
+                        "/",
+                        [],
+                        defaults=BuildFileDefaults(
+                            FrozenDict({"resource": FrozenDict({"description": "q"})})
+                        ),
+                    ),
+                ),
             ),
             MockGet(
                 output_type=SyntheticAddressMaps,
@@ -163,7 +172,7 @@ def test_extend_synthetic_target() -> None:
                         SyntheticAddressMap.create(
                             "/foo/synthetic1",
                             [
-                                TargetAdaptor("resource", "xxx", "", some_arg="x"),
+                                TargetAdaptor("resource", "xxx", "", description="x"),
                             ],
                         ),
                         SyntheticAddressMap.create(
@@ -190,19 +199,19 @@ def test_extend_synthetic_target() -> None:
 
     path, tgt = af.name_to_target_adaptors["aaa"]
     assert path == "/foo/BUILD.1"
-    assert tgt.kwargs == FrozenDict({"some_arg": "a"})
+    assert tgt.kwargs == FrozenDict({"description": "a"})
 
     path, tgt = af.name_to_target_adaptors["xxx"]
     assert path == "/foo/synthetic1"
-    assert tgt.kwargs == FrozenDict({"some_arg": "x"})
+    assert tgt.kwargs == FrozenDict({"description": "x"})
 
     path, tgt = af.name_to_target_adaptors["yyy"]
     assert path == "/foo/synthetic2"
-    assert tgt.kwargs == FrozenDict({})
+    assert tgt.kwargs == FrozenDict({"description": "q"})
 
     path, tgt = af.name_to_target_adaptors["bar"]
     assert path == "/foo/BUILD.2"
-    assert tgt.kwargs == FrozenDict({"some_arg": "b", "extend": 42})
+    assert tgt.kwargs == FrozenDict({"description": "b", "extend": 42})
 
 
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
@@ -600,12 +609,12 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
     )
     assert target_adaptor.name is None
     assert target_adaptor.type_alias == "mock_tgt"
-    assert target_adaptor.kwargs["dependencies"] == [
+    assert target_adaptor.kwargs["dependencies"] == (
         ":dir",
         ":sibling",
         "helloworld/util",
         "helloworld/util:tests",
-    ]
+    )
     # NB: TargetAdaptors do not validate what fields are valid. The Target API should error
     # when encountering this, but it's fine at this stage.
     assert target_adaptor.kwargs["fake_field"] == 42
@@ -641,7 +650,7 @@ def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner)
     )
     assert target_adaptor.name is None
     assert target_adaptor.kwargs["resolve"] == "mock"
-    assert target_adaptor.kwargs["tags"] == ["42"]
+    assert target_adaptor.kwargs["tags"] == ("42",)
 
     target_adaptor = target_adaptor_rule_runner.request(
         TargetAdaptor,
@@ -656,7 +665,7 @@ def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner)
 
     # The defaults are not frozen until after the BUILD file have been fully parsed, so this is a
     # list rather than a tuple at this time.
-    assert target_adaptor.kwargs["tags"] == ["24"]
+    assert target_adaptor.kwargs["tags"] == ("24",)
 
 
 def test_generated_target_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -792,7 +801,7 @@ def test_default_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> 
     )
     targets = tuple(Parametrize.expand(address, target_adaptor.kwargs))
     assert targets == (
-        (address.parametrize(dict(parametrize="a")), dict(tags=["from target"])),
+        (address.parametrize(dict(parametrize="a")), dict(tags=("from target",))),
         (address.parametrize(dict(parametrize="b")), dict(tags=("from b",))),
     )
 
@@ -879,8 +888,8 @@ def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -
         TargetAdaptor,
         [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
     )
-    assert target_adaptor.kwargs["sources"] == ["*.added", "*.mock"]
-    assert target_adaptor.kwargs["tags"] == ["custom-tag", "default-tag"]
+    assert target_adaptor.kwargs["sources"] == ("*.added", "*.mock")
+    assert target_adaptor.kwargs["tags"] == ("custom-tag", "default-tag")
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -1087,7 +1096,7 @@ def test_build_file_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
         [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
     )
     assert target_adaptor.kwargs["description"] == "from env"
-    assert target_adaptor.kwargs["tags"] == ["default", "tag"]
+    assert target_adaptor.kwargs["tags"] == ("default", "tag")
 
 
 def test_prelude_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -1140,7 +1149,7 @@ def test_invalid_build_file_env_vars(caplog, target_adaptor_rule_runner: RuleRun
         [TargetAdaptorRequest(Address("src/bad"), description_of_origin="tests")],
     )
     assert target_adaptor.kwargs["description"] is None
-    assert target_adaptor.kwargs["tags"] == ["tag-from-env"]
+    assert target_adaptor.kwargs["tags"] == ("tag-from-env",)
     assert_logged(
         caplog,
         [
