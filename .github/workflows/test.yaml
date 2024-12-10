@@ -340,7 +340,7 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -373,7 +373,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-Linux-ARM64
         overwrite: 'true'
@@ -396,7 +396,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -435,7 +435,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-Linux-x86_64
         overwrite: 'true'

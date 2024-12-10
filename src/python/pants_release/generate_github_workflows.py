@@ -26,13 +26,13 @@ def action(name: str, node16_compat: bool = False) -> str:
     # binaries for node >= v17.
     if node16_compat:
         version_map = {
-            "checkout": "actions/checkout@v3",
-            "upload-artifact": "actions/upload-artifact@v3",
+            "checkout": "actions/checkout@v4",
+            "upload-artifact": "actions/upload-artifact@v4",
             "setup-go": "actions/setup-go@v4",
         }
     else:
         version_map = {
-            "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
+            "action-send-mail": "dawidd6/action-send-mail@v4",
             "cache": "actions/cache@v4",
             "checkout": "actions/checkout@v4",
             "download-artifact": "actions/download-artifact@v4",
