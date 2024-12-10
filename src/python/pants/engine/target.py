@@ -2062,8 +2062,8 @@ class ListOfDictStringToStringField(Field):
         )
 
         # Also support passing in a single dictionary by wrapping it
-        if not isinstance(value_or_default, list):
-            value_or_default = [value_or_default]
+        if not isinstance(value_or_default, tuple):
+            value_or_default = tuple(value_or_default)
 
         result_lst: list[FrozenDict[str, str]] = []
         for item in value_or_default:
