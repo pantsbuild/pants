@@ -67,8 +67,9 @@ class HelmInferSubsystem(Subsystem):
             )
             ```
 
-            Use the value '*' to disable this check.
-            This will limit Pants's ability to warn on unknown docker images.
+            Use Python fnmatch glob syntax (ex: 'docker.io/*') to disable this
+            check for certain images or patterns.  This will limit Pants's
+            ability to warn on unknown docker images.
             """
         ),
     )

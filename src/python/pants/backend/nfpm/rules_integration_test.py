@@ -269,7 +269,7 @@ def test_generate_package_with_contents(
                     )
                 """
             ),
-            **{path: "" for path in scripts.values()},
+            **dict.fromkeys(scripts.values(), ""),
             "contents/BUILD": dedent(
                 f"""
                 file(
