@@ -43,20 +43,16 @@ class Constraint(ConstraintSatisfied):
     def parse(cls, constraint: str) -> Constraint:
         constraint = constraint.strip()
 
-        cmp_op_and_callback: tuple[str, Callable[[Version, Version], bool]] | None = None
         for op, callback in _OPERATORS:
-            if constraint.startswith(op):
-                cmp_op_and_callback = (op, cast("Callable[[Version, Version], bool]", callback))
-                break
+            constraint_without_op = constraint.removeprefix(op)
+            if constraint_without_op != constraint:
+                cmp_callback = cast("Callable[[Version, Version], bool]", callback)
+                cmp_version = Version(constraint_without_op.strip())
+                return cls(cmp_callback, cmp_version)
 
-        if cmp_op_and_callback is None:
-            raise ConstraintParseError(
-                f"A constraint must start with a comparison operator, i.e. {', '.join(x[0] for x in _OPERATORS)}, found {constraint!r}."
-            )
-
-        cmp_op, cmp_callback = cmp_op_and_callback
-        cmp_version = Version(constraint[len(cmp_op) :])
-        return cls(cmp_callback, cmp_version)
+        raise ConstraintParseError(
+            f"A constraint must start with a comparison operator, i.e. {', '.join(x[0] for x in _OPERATORS)}, found {constraint!r}."
+        )
 
 
 class ConstraintsList(ConstraintSatisfied):
@@ -74,5 +70,5 @@ class ConstraintsList(ConstraintSatisfied):
     @classmethod
     def parse(cls, constraints_str: str) -> ConstraintsList:
         parts = constraints_str.split(",")
-        constraints = [Constraint.parse(part) for part in parts]
+        constraints = [Constraint.parse(part.strip()) for part in parts]
         return cls(constraints)
