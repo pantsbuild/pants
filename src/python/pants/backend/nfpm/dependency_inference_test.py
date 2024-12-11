@@ -94,7 +94,7 @@ def test_infer_nfpm_package_scripts_dependencies(
                 )
                 """
             ),
-            **{path: "" for path in scripts_paths},
+            **dict.fromkeys(scripts_paths, ""),
         }
     )
 

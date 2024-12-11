@@ -16,7 +16,6 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.rules import Get, collect_rules, goal_rule, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.option.alias import CliAlias
 from pants.option.config import Config
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.strutil import softwrap
@@ -132,7 +131,10 @@ async def check_default_tools(
                     SessionValues(
                         {
                             OptionsBootstrapper: OptionsBootstrapper(
-                                tuple(), ("./pants",), args, Config(tuple()), CliAlias()
+                                tuple(),
+                                ("./pants",),
+                                args,
+                                Config(tuple()),
                             )
                         }
                     ),
