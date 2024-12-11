@@ -248,6 +248,8 @@ class PBSPythonProviderSubsystem(Subsystem):
                     all_pythons[py_version] = {}
                 all_pythons[py_version][platform_name] = platform_metadata
 
+        return all_pythons
+
 
 class PBSPythonProvider(PythonProvider):
     pass
