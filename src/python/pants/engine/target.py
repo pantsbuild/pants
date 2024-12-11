@@ -936,7 +936,8 @@ class CoarsenedTargets(Collection[CoarsenedTarget]):
             l._eq_helper(r, equal_items) for l, r in zip(self, other)
         )
 
-    __hash__ = Tuple.__hash__
+    def __hash__(self):
+        return super().__hash__()
 
 
 @dataclass(frozen=True)
@@ -2061,7 +2062,7 @@ class ListOfDictStringToStringField(Field):
         )
 
         # Also support passing in a single dictionary by wrapping it
-        if not isinstance(value_or_default, list):
+        if not isinstance(value_or_default, (list, tuple)):
             value_or_default = [value_or_default]
 
         result_lst: list[FrozenDict[str, str]] = []
