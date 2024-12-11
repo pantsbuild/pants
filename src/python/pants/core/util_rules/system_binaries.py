@@ -243,6 +243,10 @@ class BinaryShimsRequest:
         *paths: BinaryPath,
         rationale: str,
     ) -> BinaryShimsRequest:
+        # Remove any duplicates (which may result if the caller merges `BinaryPath` instances from multiple sources)
+        # and also sort to ensure a stable order for better caching.
+        paths = tuple(sorted(set(paths), key=lambda bp: bp.path))
+
         return cls(
             paths=paths,
             rationale=rationale,
