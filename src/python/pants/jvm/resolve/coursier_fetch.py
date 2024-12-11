@@ -780,8 +780,10 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
         assert lockfile_req is not None
         regen_command = f"`{GenerateLockfilesSubsystem.name} --resolve={lockfile_req.resolve_name}`"
         if lockfile_req.lockfile == DEFAULT_TOOL_LOCKFILE:
-            lockfile_bytes = importlib.resources.read_binary(
-                *lockfile_req.default_lockfile_resource
+            lockfile_bytes = (
+                importlib.resources.files(lockfile_req.default_lockfile_resource[0])
+                .joinpath(lockfile_req.default_lockfile_resource[1])
+                .read_bytes()
             )
             resolution = CoursierResolvedLockfile.from_serialized(lockfile_bytes)
         else:

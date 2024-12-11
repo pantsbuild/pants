@@ -396,7 +396,7 @@ def test_generate_nfpm_yaml(
     extra_metadata: dict[str, Any],
     expect_raise: ContextManager | None,
 ):
-    content_sandbox_digest = get_digest(rule_runner, {path: "" for path in content_sandbox_files})
+    content_sandbox_digest = get_digest(rule_runner, dict.fromkeys(content_sandbox_files, ""))
 
     description = f"A {packager} package"
     rule_runner.write_files(
@@ -494,16 +494,16 @@ def test_generate_nfpm_yaml(
                 )
                 """
             ),
-            **{
-                path: ""
-                for path in [
+            **dict.fromkeys(
+                [
                     "scripts/postinstall.sh",
                     "scripts/apk-postupgrade.sh",
                     "scripts/arch-postupgrade.sh",
                     "scripts/deb-config.sh",
                     "scripts/rpm-verify.sh",
-                ]
-            },
+                ],
+                "",
+            ),
         }
     )
     target = rule_runner.get_target(Address("", target_name=_PKG_NAME))
