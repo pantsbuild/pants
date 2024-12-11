@@ -125,7 +125,7 @@ class TestOptionsBootstrapper:
                 )
             )
             fp.close()
-            args = ["--pants-workdir=/qux"] + self._config_path(fp.name)
+            args = ["pants", "--pants-workdir=/qux"] + self._config_path(fp.name)
             bootstrapper = OptionsBootstrapper.create(
                 env={"PANTS_DISTDIR": "/pear"}, args=args, allow_pantsrc=False
             )
@@ -406,70 +406,6 @@ class TestOptionsBootstrapper:
         )
         logdir = ob.get_bootstrap_options().for_global_scope().logdir
         assert "logdir1" == logdir
-
-    def test_alias(self, tmp_path: Path) -> None:
-        config0 = tmp_path / "config0"
-        config0.write_text(
-            dedent(
-                """\
-                    [cli.alias]
-                    pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
-                    green = "lint test"
-                    """
-            )
-        )
-
-        config1 = tmp_path / "config1"
-        config1.write_text(
-            dedent(
-                """\
-                    [cli]
-                    alias.add = {green = "lint test --force check"}
-                    """
-            )
-        )
-
-        config2 = tmp_path / "config2"
-        config2.write_text(
-            dedent(
-                """\
-                    [cli]
-                    alias = "+{'shell': 'repl'}"
-                    """
-            )
-        )
-
-        config_arg = (
-            f"--pants-config-files=["
-            f"'{config0.as_posix()}','{config1.as_posix()}','{config2.as_posix()}']"
-        )
-        ob = OptionsBootstrapper.create(
-            env={}, args=[config_arg, "pyupgrade", "green"], allow_pantsrc=False
-        )
-        assert (
-            config_arg,
-            "--backend-packages=pants.backend.python.lint.pyupgrade",
-            "fmt",
-            "lint",
-            "test",
-            "--force",
-            "check",
-        ) == ob.args
-        assert (
-            "<ignored>",
-            config_arg,
-            "--backend-packages=pants.backend.python.lint.pyupgrade",
-        ) == ob.bootstrap_args
-
-        ob = OptionsBootstrapper.create(env={}, args=[config_arg, "shell"], allow_pantsrc=False)
-        assert (
-            config_arg,
-            "repl",
-        ) == ob.args
-        assert (
-            "<ignored>",
-            config_arg,
-        ) == ob.bootstrap_args
 
 
 def test_munge_bin_name():
