@@ -1586,8 +1586,12 @@ def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
 @pytest.mark.parametrize(
     "field_content",
     [
-        "tagz=['tag']",
-        "tagz=parametrize(['tag1'], ['tag2'])",
+        "tagz=('tag',)",
+        # TODO: The documentation of `parametrize()`, and the type annotations in its
+        #  implementation in parametrize.py, imply that a positional arg must be
+        #  a string, and other arg types should be applied as kwargs, so it's unclear
+        #  why we expect this to work, and should revisit.
+        "tagz=parametrize(('tag1',), ('tag2',))",
     ],
 )
 def test_parametrize_16910(generated_targets_rule_runner: RuleRunner, field_content: str) -> None:

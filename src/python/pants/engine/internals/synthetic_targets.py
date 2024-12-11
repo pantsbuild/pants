@@ -80,14 +80,11 @@ from typing import ClassVar, Iterable, Iterator, Sequence
 
 from pants.base.specs import GlobSpecsProtocol
 from pants.engine.collection import Collection
-from pants.engine.internals.defaults import BuildFileDefaults
 from pants.engine.internals.mapper import AddressMap
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import InvalidTargetException
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
-from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -152,54 +149,7 @@ class SyntheticTargetsRequest:
 
 
 class SyntheticAddressMap(AddressMap):
-    def process_declared_targets(self, address_map: AddressMap) -> None:
-        for name, target_adaptor in address_map.name_to_target_adaptor.items():
-            extend_synthetic = target_adaptor.kwargs.pop("_extend_synthetic", False)
-            if name not in self.name_to_target_adaptor:
-                if extend_synthetic:
-                    raise InvalidTargetException(
-                        softwrap(
-                            f"""
-                            The `{target_adaptor.type_alias}` target {name!r} in {address_map.path}
-                            has `_extend_synthetic=True` but there is no synthetic target to extend.
-                            """
-                        )
-                    )
-                continue
-
-            # Pop synthetic target to let the explicit target declared in BUILD file take
-            # precedence.
-            synthetic_target_adaptor = self.name_to_target_adaptor.pop(name)
-
-            if not extend_synthetic:
-                # The explicitly declared target should replace the synthetic one.
-                continue
-
-            # Check target type matches, when marked as extending the synthetic target.
-            if synthetic_target_adaptor.type_alias != target_adaptor.type_alias:
-                raise InvalidTargetException(
-                    softwrap(
-                        f"""
-                        The `{target_adaptor.type_alias}` target {name!r} in {address_map.path} is
-                        of a different type than the synthetic target
-                        `{synthetic_target_adaptor.type_alias}` from {self.path}.
-
-                        When `_extend_synthetic` is true the target types must match, set this to
-                        false if you want to replace the synthetic target with the target from your
-                        BUILD file.
-                        """
-                    )
-                )
-
-            # Preserve synthetic field values not overriden by the declared target from the BUILD.
-            synthetic_target_adaptor.kwargs.update(target_adaptor.kwargs)
-            target_adaptor.kwargs = synthetic_target_adaptor.kwargs
-
-    def apply_defaults(self, defaults: BuildFileDefaults) -> None:
-        for target_adaptor in self.name_to_target_adaptor.values():
-            default_values = defaults.get(target_adaptor.type_alias)
-            if default_values is not None:
-                target_adaptor.kwargs = {**default_values, **target_adaptor.kwargs}
+    pass
 
 
 @dataclass(frozen=True)
@@ -219,10 +169,8 @@ class SyntheticAddressMaps(Collection[SyntheticAddressMap]):
         synthetic_target_adaptors: Iterable[tuple[str, Iterable[TargetAdaptor]]],
     ) -> SyntheticAddressMaps:
         return cls(
-            [
-                SyntheticAddressMap.create(os.path.join(request.path, filename), target_adaptors)
-                for filename, target_adaptors in synthetic_target_adaptors
-            ]
+            SyntheticAddressMap.create(os.path.join(request.path, filename), target_adaptors)
+            for filename, target_adaptors in synthetic_target_adaptors
         )
 
 

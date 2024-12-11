@@ -1733,6 +1733,26 @@ def test_get_context_root(
             ),
             "",
         ),
+        # Buildkit with containerd-snapshotter 0.17.1 and disabled attestations
+        (
+            DockerBinary("/bin/docker", "1234", is_podman=False),
+            "sha256:6c3aff6414781126578b3e7b4a217682e89c616c0eac864d5b3ea7c87f1094d0",
+            dedent(
+                """\
+                    #24 exporting to image
+                    #24 exporting layers done
+                    #24 preparing layers for inline cache
+                    #24 preparing layers for inline cache 0.4s done
+                    #24 exporting manifest sha256:6c3aff6414781126578b3e7b4a217682e89c616c0eac864d5b3ea7c87f1094d0 0.0s done
+                    #24 exporting config sha256:af716170542d95134cb41b56e2dfea2c000b05b6fc4f440158ed9834ff96d1b4 0.0s done
+                    #24 naming to REDACTED:latest done
+                    #24 unpacking to REDACTED:latest 0.0s done
+                    #24 DONE 0.5s
+
+                    """
+            ),
+            "",
+        ),
         # Podman
         (
             DockerBinary("/bin/podman", "abcd", is_podman=True),

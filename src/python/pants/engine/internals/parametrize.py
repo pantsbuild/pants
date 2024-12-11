@@ -56,7 +56,7 @@ class Parametrize:
     merge_behaviour: _MergeBehaviour = dataclasses.field(compare=False)
 
     def __init__(self, *args: str, **kwargs: Any) -> None:
-        object.__setattr__(self, "args", args)
+        object.__setattr__(self, "args", tuple(args))
         object.__setattr__(self, "kwargs", FrozenDict.deep_freeze(kwargs))
         object.__setattr__(self, "is_group", False)
         object.__setattr__(self, "merge_behaviour", Parametrize._MergeBehaviour.never)
