@@ -11,6 +11,7 @@ import shlex
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
+from itertools import groupby
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, Sequence
 
@@ -246,6 +247,17 @@ class BinaryShimsRequest:
         # Remove any duplicates (which may result if the caller merges `BinaryPath` instances from multiple sources)
         # and also sort to ensure a stable order for better caching.
         paths = tuple(sorted(set(paths), key=lambda bp: bp.path))
+
+        # Then ensure that there are no duplicate paths with mismatched content.
+        duplicate_paths = set()
+        for path, group in groupby(paths, key=lambda x: x.path):
+            if len(list(group)) > 1:
+                duplicate_paths.add(path)
+        if duplicate_paths:
+            raise ValueError(
+                "Detected duplicate paths with mismatched content at paths: "
+                f"{', '.join(sorted(duplicate_paths))}"
+            )
 
         return cls(
             paths=paths,
