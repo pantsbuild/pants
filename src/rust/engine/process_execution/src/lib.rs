@@ -1023,13 +1023,21 @@ fn make_wrapper_for_append_only_caches(
 
     // Setup the append-only caches.
     for (cache_name, path) in caches {
-        writeln!(
-            &mut script,
-            "/bin/mkdir -p '{}/{}'",
-            base_path,
-            cache_name.name()
-        )
-        .map_err(|err| format!("write! failed: {err:?}"))?;
+        let cache_path = {
+            let mut p = PathBuf::new();
+            p.push(base_path);
+            p.push(cache_name.name());
+
+            shlex::try_quote(
+                p.to_str()
+                    .ok_or_else(|| "Failed to convert path".to_string())?,
+            )
+            .map_err(|e| format!("Failed to convert path: {e}"))?
+            .to_string()
+        };
+        writeln!(&mut script, "/bin/mkdir -p {cache_path}",)
+            .map_err(|err| format!("write! failed: {err:?}"))?;
+
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
                 writeln!(&mut script, "/bin/mkdir -p '{}'", parent.to_string_lossy())
