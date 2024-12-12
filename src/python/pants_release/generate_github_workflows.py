@@ -366,6 +366,13 @@ def install_go() -> Step:
     }
 
 
+def install_python_headers_in_manylinux_container() -> Step:
+    return {
+        "name": "Install Python headers",
+        "run": "yum install -y python3.11-devel",
+    }
+
+
 # NOTE: Any updates to the version of arduino/setup-protoc will require an audit of the updated  source code to verify
 # nothing "bad" has been added to the action. (We pass the user's GitHub secret to the action in order to avoid the
 # default GitHub rate limits when downloading protoc._
@@ -879,7 +886,11 @@ def build_wheels_job(
             "steps": [
                 *initial_steps,
                 install_protoc(),  # for prost crate
-                *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
+                *(
+                    [install_python_headers_in_manylinux_container()]
+                    if platform == Platform.LINUX_ARM64
+                    else [install_go()]
+                ),
                 {
                     "name": "Build wheels",
                     "run": "./pants run src/python/pants_release/release.py -- build-wheels",
