@@ -31,7 +31,6 @@ from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_con
 from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -42,9 +41,24 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.20.3"
-    default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.13.0,<3.0"
+    default_version = "2.25.2"
+    default_known_versions = [
+        "2.25.2|linux_arm64|84de123dcd7af527d615c8b3034f5d5c33949a92264c71f6d612cbfa50cfa673|23825049",
+        "2.25.2|linux_x86_64|182643a2e45959d55ba07d427da019c755733282c99897a655815755a751590b|25507528",
+        "2.25.2|macos_arm64|ce9b92f0bdb7d3916b8ea06a555856b9301959194abc4941a3b0efbbb9d3caa7|21600151",
+        "2.25.2|macos_x86_64|5479e2608d7966a54e83f90cd9c82b94b247f5b5fe8b4a67e3d6edf1d23dce0e|22189893",
+    ]
+
+    default_url_template = (
+        "https://github.com/pex-tool/pex/releases/download/v{version}/pex-{platform}"
+    )
+    default_url_platform_mapping = {
+        "linux_arm64": "linux-aarch64",
+        "linux_x86_64": "linux-x86_64",
+        "macos_arm64": "macos-aarch64",
+        "macos_x86_64": "macos-x86_64",
+    }
+    version_constraints = ">=2.25.0,<3.0"
 
     # extra args to be passed to the pex tool; note that they
     # are going to apply to all invocations of the pex tool.
@@ -57,20 +71,6 @@ class PexCli(TemplatedExternalTool):
             """
         ),
     )
-
-    @classproperty
-    def default_known_versions(cls):
-        return [
-            "|".join(
-                (
-                    cls.default_version,
-                    plat,
-                    "0100c2e0b9e5dd56b063c98176cdd11b6064c2439d0faefdd3d25453393ed9fb",
-                    "4315782",
-                )
-            )
-            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
-        ]
 
 
 @dataclass(frozen=True)
@@ -120,20 +120,20 @@ class PexCliProcess:
             raise ValueError("`--pex-root` flag not allowed. We set its value for you.")
 
 
-class PexPEX(DownloadedExternalTool):
-    """The Pex PEX binary."""
+class PexSCIE(DownloadedExternalTool):
+    """The Pex SCIE binary."""
 
 
 @rule
-async def download_pex_pex(pex_cli: PexCli, platform: Platform) -> PexPEX:
+async def download_pex_pex(pex_cli: PexCli, platform: Platform) -> PexSCIE:
     pex_pex = await Get(DownloadedExternalTool, ExternalToolRequest, pex_cli.get_request(platform))
-    return PexPEX(digest=pex_pex.digest, exe=pex_pex.exe)
+    return PexSCIE(digest=pex_pex.digest, exe=pex_pex.exe)
 
 
 @rule
 async def setup_pex_cli_process(
     request: PexCliProcess,
-    pex_pex: PexPEX,
+    pex_scie: PexSCIE,
     pex_env: PexEnvironment,
     bootstrap_python: PythonBuildStandaloneBinary,
     python_native_code: PythonNativeCodeSubsystem.EnvironmentAware,
@@ -151,7 +151,7 @@ async def setup_pex_cli_process(
         gets.append(Get(Digest, CreateDigest((ca_certs_fc,))))
         cert_args = ["--cert", ca_certs_fc.path]
 
-    digests_to_merge = [pex_pex.digest]
+    digests_to_merge = [pex_scie.digest]
     digests_to_merge.extend(await MultiGet(gets))
     if request.additional_input_digest:
         digests_to_merge.append(request.additional_input_digest)
@@ -203,7 +203,7 @@ async def setup_pex_cli_process(
     ]
 
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
-    normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args)
+    normalized_argv = complete_pex_env.create_argv(pex_scie.exe, *args)
     env = {
         **complete_pex_env.environment_dict(python=bootstrap_python),
         **python_native_code.subprocess_env_vars,

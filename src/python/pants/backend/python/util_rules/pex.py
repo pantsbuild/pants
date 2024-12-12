@@ -28,7 +28,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import pex_cli, pex_requirements
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX, maybe_log_pex_stderr
+from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexSCIE, maybe_log_pex_stderr
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
     PexEnvironment,
@@ -1373,11 +1373,11 @@ async def determine_venv_pex_resolve_info(venv_pex: VenvPex) -> PexResolveInfo:
 
 
 @rule
-async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInfo:
+async def determine_pex_resolve_info(pex_scie: PexSCIE, pex: Pex) -> PexResolveInfo:
     process_result = await Get(
         ProcessResult,
-        PexProcess(
-            pex=Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
+        Process(
+            pex=Pex(digest=pex_scie.digest, name=pex_scie.exe, python=pex.python),
             argv=[pex.name, "repository", "info", "-v"],
             input_digest=pex.digest,
             extra_env={"PEX_MODULE": "pex.tools"},
