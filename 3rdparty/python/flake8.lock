@@ -27,6 +27,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "elide_unused_requires_dist": false,
   "excluded": [],
   "locked_resolves": [
     {
@@ -77,33 +78,33 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b7e027bbb52be2ceb779ee12484cdeef52b0ad3c1fcb8846292bdb86d3034681",
-              "url": "https://files.pythonhosted.org/packages/3a/aa/93667d6f398749d1a9dd37d646e092f9f1baade7cbac948331b50a1d513c/flake8_comprehensions-3.15.0-py3-none-any.whl"
+              "hash": "7c1eadc9d22e765f39857798febe7766b4d9c519793c6c149e3e13bf99693f70",
+              "url": "https://files.pythonhosted.org/packages/5f/bf/0cf8d3c9a233620840f209490c4907d7d416d066557396ebda678c58de09/flake8_comprehensions-3.16.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "923c22603e0310376a6b55b03efebdc09753c69f2d977755cba8bb73458a5d4d",
-              "url": "https://files.pythonhosted.org/packages/60/fa/68481f25fc8ecdbe8a763062ba4f5b17fa4ef7fc0646c081267cef4f67e5/flake8_comprehensions-3.15.0.tar.gz"
+              "hash": "9cbf789905a8f03f9d350fb82b17b264d9a16c7ce3542b2a7b871ef568cafabe",
+              "url": "https://files.pythonhosted.org/packages/6d/7d/7ffaa876ca5b330fc244287208dce1d12515b88a69488ea90ab58c94501d/flake8_comprehensions-3.16.0.tar.gz"
             }
           ],
           "project_name": "flake8-comprehensions",
           "requires_dists": [
             "flake8!=3.2,>=3"
           ],
-          "requires_python": ">=3.8",
-          "version": "3.15.0"
+          "requires_python": ">=3.9",
+          "version": "3.16.0"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "454b0c6df39c03bd8b1891abc9317981901a72ef426a4d56eb5fc689eef8fc65",
-              "url": "https://files.pythonhosted.org/packages/27/0d/9f3e09dd88b3bf321465d5d78e37aeb4f9022ee6764ea003d9ec455b2d61/flake8_no_implicit_concat-0.3.5-py3-none-any.whl"
+              "hash": "a173b4720fed1611b9b127e194aa7e46aa86fed3425df8d37267b78cbbae2e07",
+              "url": "https://files.pythonhosted.org/packages/11/43/4eb677c2e8d165dc89d05421b36850b1f06d69e6996622d6599ab85b309b/flake8_no_implicit_concat-0.3.7-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8e675477c40b21d9481915a4a257260b17e29137b0b76406657c3605f79b2b42",
-              "url": "https://files.pythonhosted.org/packages/1f/3c/c86797634204844c29eb60e00bdf2079cdda97d40905e861e57af60b9567/flake8-no-implicit-concat-0.3.5.tar.gz"
+              "hash": "8472f2a6ddb11980e9bc35aa289d051e36d1e69c66ecd0fe5f5406ff8ab91e3a",
+              "url": "https://files.pythonhosted.org/packages/25/27/5057b10b1729f686af41edd45fc434d96faf25d925aec43bb9b3f27a559a/flake8_no_implicit_concat-0.3.7.tar.gz"
             }
           ],
           "project_name": "flake8-no-implicit-concat",
@@ -125,11 +126,10 @@
             "isort; extra == \"dev\"",
             "more-itertools; python_version < \"3.10\"",
             "mypy; extra == \"dev\"",
-            "pep8-naming; extra == \"dev\"",
-            "typing; python_version < \"3.5\""
+            "pep8-naming; extra == \"dev\""
           ],
-          "requires_python": ">=3.5",
-          "version": "0.3.5"
+          "requires_python": ">=3.6",
+          "version": "0.3.7"
         },
         {
           "artifacts": [
@@ -193,8 +193,8 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.19.1",
-  "pip_version": "24.2",
+  "pex_version": "2.25.2",
+  "pip_version": "24.3.1",
   "prefer_older_binary": false,
   "requirements": [
     "flake8-2020<2,>=1.7.0",
@@ -212,5 +212,6 @@
     "mac"
   ],
   "transitive": true,
-  "use_pep517": null
+  "use_pep517": null,
+  "use_system_time": false
 }
