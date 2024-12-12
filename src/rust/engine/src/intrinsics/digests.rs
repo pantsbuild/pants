@@ -248,15 +248,19 @@ enum CreateDigestItem {
 }
 
 #[pyfunction]
-fn create_digest(py: Python, create_digest: Value) -> PyGeneratorResponseNativeCall {
-    let (items_to_store, trie) = py.allow_threads(|| {
+fn create_digest(py: Python, create_digest: Value) -> PyResult<PyGeneratorResponseNativeCall> {
+    let (items_to_store, trie) = py.allow_threads(|| -> Result<_, Failure> {
         let mut new_file_count = 0;
 
         let items: Vec<CreateDigestItem> = {
-            Python::with_gil(|py| {
+            Python::with_gil(|py| -> Result<_, Failure> {
                 let py_create_digest = create_digest.bind(py);
-                externs::collect_iterable(py_create_digest)
-                    .unwrap()
+                Ok(externs::collect_iterable(py_create_digest)
+                    .map_err(|e| {
+                        throw(format!(
+                            "Error while collecting CreateDigestItem instances: {e}"
+                        ))
+                    })?
                     .into_iter()
                     .map(|obj| {
                         let raw_path: String = externs::getattr(&obj, "path").unwrap();
@@ -282,8 +286,8 @@ fn create_digest(py: Python, create_digest: Value) -> PyGeneratorResponseNativeC
                             CreateDigestItem::Dir(path)
                         }
                     })
-                    .collect()
-            })
+                    .collect())
+            })?
         };
 
         let mut typed_paths: Vec<TypedPath> = Vec::with_capacity(items.len());
@@ -319,19 +323,20 @@ fn create_digest(py: Python, create_digest: Value) -> PyGeneratorResponseNativeC
             }
         }
 
-        let trie = DigestTrie::from_unique_paths(typed_paths, &file_digests).unwrap();
+        let trie = DigestTrie::from_unique_paths(typed_paths, &file_digests)
+            .map_err(|e| throw(format!("DigestTrie::from_unique_paths failure: {e}")))?;
 
-        (items_to_store, trie)
-    });
+        Ok((items_to_store, trie))
+    })?;
 
-    PyGeneratorResponseNativeCall::new(async move {
+    Ok(PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
         let store = context.core.store();
         store.store_file_bytes_batch(items_to_store, true).await?;
         Ok::<_, Failure>(Python::with_gil(|py| {
             Snapshot::store_directory_digest(py, trie.into())
         })?)
-    })
+    }))
 }
 
 #[pyfunction]

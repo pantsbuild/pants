@@ -103,7 +103,9 @@ def test_default() -> None:
         registrar = OptionRegistrar(
             scope=GlobalOptions.options_scope,
         )
-        native_parser = NativeOptionParser([], {}, [], allow_pantsrc=False, include_derivation=True)
+        native_parser = NativeOptionParser(
+            [], {}, [], allow_pantsrc=False, include_derivation=True, known_scopes_to_flags={}
+        )
         registrar.register(*args, **kwargs)
         oshi = HelpInfoExtracter(registrar.scope).get_option_scope_help_info(
             "description", registrar, native_parser, False, "provider"
@@ -199,7 +201,9 @@ def test_grouping():
             return int(exp)  # True -> 1, False -> 0.
 
         registrar = OptionRegistrar(scope=GlobalOptions.options_scope)
-        native_parser = NativeOptionParser([], {}, [], allow_pantsrc=False, include_derivation=True)
+        native_parser = NativeOptionParser(
+            [], {}, [], allow_pantsrc=False, include_derivation=True, known_scopes_to_flags={}
+        )
         registrar.register("--foo", **kwargs)
         oshi = HelpInfoExtracter("").get_option_scope_help_info(
             "", registrar, native_parser, False, ""
