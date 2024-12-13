@@ -12,6 +12,7 @@ python_tests(
             "timeout": 240,
         },
         "export_test.py": {
+            "timeout": 240,
             "tags": ["platform_specific_behavior"],
         },
     },
