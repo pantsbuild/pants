@@ -345,20 +345,6 @@ class Options:
         if deprecated_scope:
             self.get_registrar(deprecated_scope).register(*args, **kwargs)
 
-    def registration_function_for_subsystem(self, subsystem_cls):
-        """Returns a function for registering options on the given scope."""
-
-        # TODO(benjy): Make this an instance of a class that implements __call__, so we can
-        # docstring it, and so it's less weird than attaching properties to a function.
-        def register(*args, **kwargs):
-            self.register(subsystem_cls.options_scope, *args, **kwargs)
-
-        # Clients can access the bootstrap option values as register.bootstrap.
-        register.bootstrap = self.bootstrap_option_values()
-        # Clients can access the scope as register.scope.
-        register.scope = subsystem_cls.options_scope
-        return register
-
     def get_registrar(self, scope: str) -> OptionRegistrar:
         """Returns the registrar for the given scope, so code can register on it directly.
 
