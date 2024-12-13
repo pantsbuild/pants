@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 import shutil
 from textwrap import dedent
 from typing import Mapping, MutableMapping
@@ -113,8 +114,12 @@ def test_export(py_resolve_format: PythonResolveExportFormat, py_hermetic_script
             activate_path = os.path.join(export_dir, "bin", "activate")
             assert os.path.isfile(activate_path), "virtualenv's bin/activate is missing"
             with open(activate_path) as activate_file:
-                prompt = f'PS1="({resolve}/{platform.python_version()}) '
-                assert prompt in activate_file.read()
+                activate_content = activate_file.read()
+
+            prompt_re = re.compile(rf"""PS1=('|")\({resolve}/{platform.python_version()}\) """)
+            assert (
+                prompt_re.search(activate_content) is not None
+            ), "Expected PS1 prompt not defined in bin/activate."
 
             script_path = os.path.join(export_dir, "bin", "wheel")
             assert os.path.isfile(
