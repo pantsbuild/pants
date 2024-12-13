@@ -2,17 +2,24 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::hash_map::DefaultHasher;
+use std::collections::BTreeMap;
+use std::fs::Permissions;
 use std::hash::{Hash, Hasher};
+use std::os::unix::fs::PermissionsExt;
+use std::process::Stdio;
 use std::time::Duration;
 
-use crate::{
-    Platform, Process, ProcessExecutionEnvironment, ProcessExecutionStrategy,
-    ProcessResultMetadata, ProcessResultSource,
-};
+use fs::RelativePath;
 use prost_types::Timestamp;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
+use tempfile::TempDir;
 use workunit_store::RunId;
+
+use crate::{
+    make_wrapper_for_append_only_caches, CacheName, Platform, Process, ProcessExecutionEnvironment,
+    ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource,
+};
 
 #[test]
 fn process_equality() {
@@ -150,4 +157,77 @@ fn process_result_metadata_time_saved_from_cache() {
     let mut metadata = ProcessResultMetadata::new(None, ProcessResultSource::Ran, env, RunId(0));
     metadata.update_cache_hit_elapsed(Duration::new(1, 100));
     assert_eq!(metadata.saved_by_cache, None);
+}
+
+#[tokio::test]
+async fn test_make_wrapper_for_append_only_caches_success() {
+    let mut caches = BTreeMap::new();
+    caches.insert(
+        CacheName::new("test_cache".into()).unwrap(),
+        RelativePath::new("foo").unwrap(),
+    );
+
+    let dummy_caches_base_path = TempDir::new().unwrap();
+    let dummy_sandbox_path = TempDir::new().unwrap();
+    tokio::fs::create_dir_all(dummy_sandbox_path.path().join("a-subdir"))
+        .await
+        .unwrap();
+
+    let mut script_content = make_wrapper_for_append_only_caches(
+        &caches,
+        dummy_caches_base_path.path().to_str().unwrap(),
+        Some("a-subdir"),
+    )
+    .unwrap();
+    script_content.push_str("\necho xyzzy > file.txt\n");
+
+    let script_path = dummy_sandbox_path.path().join("wrapper");
+    tokio::fs::write(&script_path, script_content.as_bytes())
+        .await
+        .unwrap();
+    tokio::fs::set_permissions(&script_path, Permissions::from_mode(0o755))
+        .await
+        .unwrap();
+
+    let mut cmd = tokio::process::Command::new("./wrapper");
+    cmd.current_dir(dummy_sandbox_path.path());
+    cmd.stdin(Stdio::null());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    let child = cmd.spawn().unwrap();
+    let output = child.wait_with_output().await.unwrap();
+    if output.status.code() != Some(0) {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        println!("stdout:{}\n\nstderr: {}", &stdout, &stderr);
+        panic!("Wrapper script failed to run: {}", output.status);
+    }
+
+    let cache_dir_path = dummy_caches_base_path.path().join("test_cache");
+    let cache_dir_metadata = tokio::fs::metadata(&cache_dir_path).await.unwrap();
+    assert!(
+        cache_dir_metadata.is_dir(),
+        "test_cache directory exists in caches base path"
+    );
+
+    let cache_symlink_path = dummy_sandbox_path.path().join("foo");
+    let cache_symlink_metadata = tokio::fs::symlink_metadata(&cache_symlink_path)
+        .await
+        .unwrap();
+    assert!(
+        cache_symlink_metadata.is_symlink(),
+        "symlink to cache created in sandbox path"
+    );
+    let link_target = tokio::fs::read_link(&cache_symlink_path).await.unwrap();
+    assert_eq!(&link_target, &cache_dir_path);
+
+    let test_file_metadata =
+        tokio::fs::metadata(dummy_sandbox_path.path().join("a-subdir/file.txt"))
+            .await
+            .unwrap();
+    assert!(
+        test_file_metadata.is_file(),
+        "script wrote a file into a sudirectory (since script changed the working directory)"
+    );
 }
