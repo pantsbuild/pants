@@ -173,13 +173,12 @@ async fn test_make_wrapper_for_append_only_caches_success() {
         .await
         .unwrap();
 
-    let mut script_content = make_wrapper_for_append_only_caches(
+    let script_content = make_wrapper_for_append_only_caches(
         &caches,
         dummy_caches_base_path.path().to_str().unwrap(),
         Some("a-subdir"),
     )
     .unwrap();
-    script_content.push_str("\necho xyzzy > file.txt\n");
 
     let script_path = dummy_sandbox_path.path().join("wrapper");
     tokio::fs::write(&script_path, script_content.as_bytes())
@@ -190,6 +189,7 @@ async fn test_make_wrapper_for_append_only_caches_success() {
         .unwrap();
 
     let mut cmd = tokio::process::Command::new("./wrapper");
+    cmd.args(&["/bin/sh", "-c", "echo xyzzy > file.txt"]);
     cmd.current_dir(dummy_sandbox_path.path());
     cmd.stdin(Stdio::null());
     cmd.stdout(Stdio::piped());
