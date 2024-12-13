@@ -41,8 +41,12 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "2.25.2"
+    default_version = "2.24.3"
     default_known_versions = [
+        "2.24.3|linux_arm64|3ebccdcfe538891f65b2caff6ba2481242652cf548d06b51738e453b2c37c1e5|23823983",
+        "2.24.3|linux_x86_64|8322a0a9d43542f4e47eaf1684af96a0b3f0bc18904e6c2995821f5ef300be70|25506456",
+        "2.24.3|macos_arm64|2f268523fdd61394361039d569901321d6ebfb2094ab85e9d8a44236ff199219|21599082",
+        "2.24.3|macos_x86_64|49fe233e4110bc281d48d974dce3f89873e459b11184c0a44ce346b511fb57ff|22188826",
         "2.25.2|linux_arm64|84de123dcd7af527d615c8b3034f5d5c33949a92264c71f6d612cbfa50cfa673|23825049",
         "2.25.2|linux_x86_64|182643a2e45959d55ba07d427da019c755733282c99897a655815755a751590b|25507528",
         "2.25.2|macos_arm64|ce9b92f0bdb7d3916b8ea06a555856b9301959194abc4941a3b0efbbb9d3caa7|21600151",
@@ -58,7 +62,7 @@ class PexCli(TemplatedExternalTool):
         "macos_arm64": "macos-aarch64",
         "macos_x86_64": "macos-x86_64",
     }
-    version_constraints = ">=2.25.0,<3.0"
+    version_constraints = ">=2.24.0,<3.0"
 
     # extra args to be passed to the pex tool; note that they
     # are going to apply to all invocations of the pex tool.
