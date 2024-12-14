@@ -215,3 +215,37 @@ def test_no_negative_caching_of_binary_paths_lookups(
     binary_paths = find_binary_paths()
     assert len(binary_paths.paths) == 1
     assert binary_paths.paths[0].path == str(tmp_path / "bar" / MyBin.binary_name)
+
+
+def test_merge_and_detection_of_duplicate_binary_paths() -> None:
+    # Test merge of duplicate paths where content hash is the same.
+    shims_request_1 = BinaryShimsRequest.for_paths(
+        BinaryPath("/foo/bar", "abc123"),
+        BinaryPath("/abc/def/123", "def456"),
+        BinaryPath("/foo/bar", "abc123"),
+        rationale="awesomeness",
+    )
+    assert shims_request_1.paths == (
+        BinaryPath("/abc/def/123", "def456"),
+        BinaryPath("/foo/bar", "abc123"),
+    )
+
+    # Test detection of duplicate pahs with differing content hashes. Exception should be thrown.
+    with pytest.raises(ValueError, match="Detected duplicate paths with mismatched content"):
+        _ = BinaryShimsRequest.for_paths(
+            BinaryPath("/foo/bar", "abc123"),
+            BinaryPath("/abc/def/123", "def456"),
+            BinaryPath("/foo/bar", "xyz789"),
+            rationale="awesomeness",
+        )
+
+    # Test paths with no duplication.
+    shims_request_2 = BinaryShimsRequest.for_paths(
+        BinaryPath("/foo/bar", "abc123"),
+        BinaryPath("/abc/def/123", "def456"),
+        rationale="awesomeness",
+    )
+    assert shims_request_2.paths == (
+        BinaryPath("/abc/def/123", "def456"),
+        BinaryPath("/foo/bar", "abc123"),
+    )
