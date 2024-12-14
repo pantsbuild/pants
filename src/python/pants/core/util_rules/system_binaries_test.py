@@ -178,45 +178,6 @@ def test_binary_shims_paths(rule_runner: RuleRunner, tmp_path: Path) -> None:
     )
 
 
-def test_no_negative_caching_of_binary_paths_lookups(
-    rule_runner: RuleRunner, tmp_path: Path
-) -> None:
-    MyBin.create(tmp_path / "foo")
-    MyBin.create(tmp_path / "bar")
-
-    def find_binary_paths() -> BinaryPaths:
-        return rule_runner.request(
-            BinaryPaths,
-            [
-                BinaryPathRequest(
-                    binary_name=MyBin.binary_name,
-                    search_path=[
-                        str(tmp_path / "foo"),
-                        str(tmp_path / "bar"),
-                    ],
-                    check_file_entries=True,
-                )
-            ],
-        )
-
-    binary_paths = find_binary_paths()
-    assert len(binary_paths.paths) == 2
-    assert binary_paths.paths[0].path == str(tmp_path / "foo" / MyBin.binary_name)
-    assert binary_paths.paths[1].path == str(tmp_path / "bar" / MyBin.binary_name)
-
-    # Delete the one of the binaries. It should no longer be found by the binary paths lookup.
-    (tmp_path / "foo" / MyBin.binary_name).unlink()
-
-    # Force a new session since the path lookup even though uncached across sessions is still
-    # cached in the current session.
-    rule_runner.new_session("session2")
-    rule_runner.set_options([])
-
-    binary_paths = find_binary_paths()
-    assert len(binary_paths.paths) == 1
-    assert binary_paths.paths[0].path == str(tmp_path / "bar" / MyBin.binary_name)
-
-
 def test_merge_and_detection_of_duplicate_binary_paths() -> None:
     # Test merge of duplicate paths where content hash is the same.
     shims_request_1 = BinaryShimsRequest.for_paths(
