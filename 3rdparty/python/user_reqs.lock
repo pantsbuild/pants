@@ -471,16 +471,6 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "9abcc2e083cbe8dde89124a47e5e53ec38751f0d7dfd36801008f316a127d7ba",
-              "url": "https://files.pythonhosted.org/packages/31/d9/90409720277f88eb3ab72f9a32bfa54acdd97e94225df699e7713e850bd4/cryptography-44.0.0-cp39-abi3-manylinux_2_34_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "60eb32934076fa07e4316b7b2742fa52cbb190b42c2df2863dbc4230a0a9b385",
-              "url": "https://files.pythonhosted.org/packages/4e/d5/9cc182bf24c86f542129565976c21301d4ac397e74bf5a16e48241aab8a6/cryptography-44.0.0-cp37-abi3-manylinux_2_34_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "84111ad4ff3f6253820e6d3e58be2cc2a00adb29335d4cacb5ab4d4d34f2a123",
               "url": "https://files.pythonhosted.org/packages/55/09/8cc67f9b84730ad330b3b72cf867150744bf07ff113cda21a15a1c6d2c7c/cryptography-44.0.0-cp37-abi3-macosx_10_9_universal2.whl"
             },
