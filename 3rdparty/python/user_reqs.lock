@@ -23,7 +23,7 @@
 //     "mypy-typing-asserts==0.1.1",
 //     "node-semver==0.9.0",
 //     "packaging==21.3",
-//     "pex==2.24.3",
+//     "pex==2.27.1",
 //     "psutil==5.9.8",
 //     "pydevd-pycharm==203.5419.8",
 //     "pytest<7.1.0,>=6.2.4",
@@ -57,6 +57,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "elide_unused_requires_dist": false,
   "excluded": [],
   "locked_resolves": [
     {
@@ -246,19 +247,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "922820b53db7a7257ffbda3f597266d435245903d80737e34f8a45ff3e3230d8",
-              "url": "https://files.pythonhosted.org/packages/12/90/3c9ff0512038035f59d279fddeb79f5f1eccd8859f06d6163c58798b9487/certifi-2024.8.30-py3-none-any.whl"
+              "hash": "1275f7a45be9464efc1173084eaa30f866fe2e47d389406136d332ed4967ec56",
+              "url": "https://files.pythonhosted.org/packages/a5/32/8f6669fc4798494966bf446c8c4a162e0b5d893dff088afddf76414f70e1/certifi-2024.12.14-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "bec941d2aa8195e248a60b31ff9f0558284cf01a52591ceda73ea9afffd69fd9",
-              "url": "https://files.pythonhosted.org/packages/b0/ee/9b19140fe824b367c04c5e1b369942dd754c4c5462d5674002f75c4dedc1/certifi-2024.8.30.tar.gz"
+              "hash": "b650d30f370c2b724812bee08008be0c4163b163ddaec3f2546c1caf65f191db",
+              "url": "https://files.pythonhosted.org/packages/0f/bd/1d41ee578ce09523c81a15426705dd20969f5abf006d1afe8aeff0dd776a/certifi-2024.12.14.tar.gz"
             }
           ],
           "project_name": "certifi",
           "requires_dists": [],
           "requires_python": ">=3.6",
-          "version": "2024.8.30"
+          "version": "2024.12.14"
         },
         {
           "artifacts": [
@@ -468,16 +469,6 @@
               "algorithm": "sha256",
               "hash": "404fdc66ee5f83a1388be54300ae978b2efd538018de18556dde92575e05defc",
               "url": "https://files.pythonhosted.org/packages/28/34/6b3ac1d80fc174812486561cf25194338151780f27e438526f9c64e16869/cryptography-44.0.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "9abcc2e083cbe8dde89124a47e5e53ec38751f0d7dfd36801008f316a127d7ba",
-              "url": "https://files.pythonhosted.org/packages/31/d9/90409720277f88eb3ab72f9a32bfa54acdd97e94225df699e7713e850bd4/cryptography-44.0.0-cp39-abi3-manylinux_2_34_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "60eb32934076fa07e4316b7b2742fa52cbb190b42c2df2863dbc4230a0a9b385",
-              "url": "https://files.pythonhosted.org/packages/4e/d5/9cc182bf24c86f542129565976c21301d4ac397e74bf5a16e48241aab8a6/cryptography-44.0.0-cp37-abi3-manylinux_2_34_x86_64.whl"
             },
             {
               "algorithm": "sha256",
@@ -1027,13 +1018,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "4dd37ef95cb59f89a8bab22abd4dd04a3266448f6de956af9b3b6a6765cf111b",
-              "url": "https://files.pythonhosted.org/packages/e7/0e/34263464df3aa08e85bda7e3bcb74bb1c1192f8bdcd96c40daa2d832e99c/pex-2.24.3-py2.py3-none-any.whl"
+              "hash": "a826d4bcde255ebe4596e22d24c872c654967adca970d7a7bdbc9c3196bc80a7",
+              "url": "https://files.pythonhosted.org/packages/54/9d/a319e533df0d6a936e9361aaf78a6be3db0667bc87059fcd145a1c5337c7/pex-2.27.1-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5212087afe86f29ff69406b17055f50746791d4a776b5b7de303993e3b50cc60",
-              "url": "https://files.pythonhosted.org/packages/b3/3f/9dc500950f786066aabc156cf9490975738609677c470e346e77084ab5cf/pex-2.24.3.tar.gz"
+              "hash": "b54aade2ef6d9180325418c7c34001b966c14a5a36f051c418658fa15cbb564e",
+              "url": "https://files.pythonhosted.org/packages/6b/55/914d3b17874f9960f66d3f914cbce2a1ef3dab487df3e36d419c124934c1/pex-2.27.1.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -1042,7 +1033,7 @@
             "subprocess32>=3.2.7; python_version < \"3\" and extra == \"subprocess\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.14,>=2.7",
-          "version": "2.24.3"
+          "version": "2.27.1"
         },
         {
           "artifacts": [
@@ -2329,7 +2320,7 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.24.3",
+  "pex_version": "2.27.1",
   "pip_version": "24.3.1",
   "prefer_older_binary": false,
   "requirements": [
@@ -2347,7 +2338,7 @@
     "mypy-typing-asserts==0.1.1",
     "node-semver==0.9.0",
     "packaging==21.3",
-    "pex==2.24.3",
+    "pex==2.27.1",
     "psutil==5.9.8",
     "pydevd-pycharm==203.5419.8",
     "pytest<7.1.0,>=6.2.4",
