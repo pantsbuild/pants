@@ -367,6 +367,7 @@ Created as part of the release process.
 + Yoav Alon
 + Yuhan GUO
 + Yujie Chen
++ achrafmam2
 + andreaimprovised
 + azban
 + bianca rosa
@@ -377,6 +378,7 @@ Created as part of the release process.
 + gyudoza
 + hephex
 + jgartdele/del
++ lukevmorris
 + offsetcyan
 + okcleary
 + olivercoleman-switchdin

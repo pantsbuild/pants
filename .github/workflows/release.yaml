@@ -57,6 +57,8 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Install Python headers
+      run: yum install -y python3.11-devel
     - env: {}
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels

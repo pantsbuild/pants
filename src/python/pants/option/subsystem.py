@@ -288,7 +288,10 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         Subclasses should not generally need to override this method.
         """
-        register = options.registration_function_for_subsystem(cls)
+
+        def register(*args, **kwargs):
+            options.register(cls.options_scope, *args, **kwargs)
+
         plugin_option_containers = union_membership.get(cls.PluginOption)
         for options_info in collect_options_info(cls):
             register(*options_info.flag_names, **options_info.flag_options)
@@ -300,10 +303,6 @@ class Subsystem(metaclass=_SubsystemMeta):
             for option in collect_options_info(container)
         ):
             register(*options_info.flag_names, **options_info.flag_options)
-
-        # NB: If the class defined `register_options` we should call it
-        if "register_options" in cls.__dict__:
-            cls.register_options(register)  # type: ignore[attr-defined]
 
     def __init__(self, options: OptionValueContainer) -> None:
         self.validate_scope()
