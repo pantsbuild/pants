@@ -125,7 +125,7 @@ class DaemonPantsRunner:
             start_time = float(env_start_time) if env_start_time else time.time()
 
             options_bootstrapper = OptionsBootstrapper.create(
-                env=env, args=args, allow_pantsrc=True
+                args=args, env=env, allow_pantsrc=True
             )
 
             # Run using the pre-warmed Session.
