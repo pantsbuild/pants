@@ -28,7 +28,7 @@ from pants.option.option_types import (
     IntOption,
     MemorySizeListOption,
     MemorySizeOption,
-    OptionsInfo,
+    OptionInfo,
     ShellStrListOption,
     ShellStrOption,
     SkipOption,
@@ -50,9 +50,9 @@ class MyEnum(Enum):
 
 
 def opt_info(*names, **options):
-    return OptionsInfo(
-        flag_names=names,
-        flag_options=options,
+    return OptionInfo(
+        args=names,
+        kwargs=options,
     )
 
 
@@ -272,7 +272,7 @@ def test_advanced_params():
             removal_version="99.9.9",
         )
 
-    flag_options = MySubsystem.prop.flag_options
+    flag_options = MySubsystem.prop.kwargs
     assert flag_options["advanced"]
     assert flag_options["metavar"] == "META"
     assert flag_options["fromfile"]
@@ -351,7 +351,7 @@ def test_register_if(cls) -> None:
 
     options_info = list(collect_options_info(MySubsystem))
     assert len(options_info) == 1
-    assert options_info[0].flag_names == ("--registered",)
+    assert options_info[0].args == ("--registered",)
 
 
 def test_property_types() -> None:
