@@ -195,7 +195,6 @@ class Options:
             passthru=split_args.passthru,
             registrar_by_scope=registrar_by_scope,
             native_parser=native_parser,
-            bootstrap_option_values=bootstrap_option_values,
             known_scope_to_info=known_scope_to_info,
             allow_unknown_options=allow_unknown_options,
         )
@@ -210,7 +209,6 @@ class Options:
         passthru: list[str],
         registrar_by_scope: dict[str, OptionRegistrar],
         native_parser: NativeOptionParser,
-        bootstrap_option_values: OptionValueContainer | None,
         known_scope_to_info: dict[str, ScopeInfo],
         allow_unknown_options: bool = False,
     ) -> None:
@@ -226,7 +224,6 @@ class Options:
         self._passthru = passthru
         self._registrar_by_scope = registrar_by_scope
         self._native_parser = native_parser
-        self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
         self._allow_unknown_options = allow_unknown_options
 
@@ -510,14 +507,6 @@ class Options:
         # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,
         # Consider killing if tests consolidate on using TestOptions instead of the raw dicts.
         return self.for_scope(scope)
-
-    def bootstrap_option_values(self) -> OptionValueContainer | None:
-        """Return the option values for bootstrap options.
-
-        General code can also access these values in the global scope.  But option registration code
-        cannot, hence this special-casing of this small set of options.
-        """
-        return self._bootstrap_option_values
 
     def for_global_scope(self) -> OptionValueContainer:
         """Return the option values for the global scope.
