@@ -206,7 +206,7 @@ class MockTestRequest(TestRequest):
 
     @classmethod
     def test_result(cls, field_sets: Iterable[MockTestFieldSet]) -> TestResult:
-        addresses = [field_set.address for field_set in field_sets]
+        addresses = tuple(field_set.address for field_set in field_sets)
         return make_test_result(
             addresses,
             exit_code=cls.exit_code(addresses),

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import logging
 import re
 from dataclasses import dataclass, field
@@ -256,17 +257,10 @@ class ImageReferenceResolver:
         else:
             image_name = parsed.group("repository")
 
-        # Putting this wildcard check after parsing
-        # will mean that we don't approve things that don't look like docker images.
-        if "*" in self.helm_infer.external_docker_images:
-            return True
-        if (
-            image_name in self.helm_infer.external_docker_images
-            or image_ref in self.helm_infer.external_docker_images
-        ):
-            return True
-
-        return False
+        return any(
+            (fnmatch.fnmatch(image_name, pattern) or fnmatch.fnmatch(image_ref, pattern))
+            for pattern in self.helm_infer.external_docker_images
+        )
 
     def _handle_missing_docker_image(self, message):
         self.errors.append(message)

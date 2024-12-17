@@ -57,6 +57,8 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Install Python headers
+      run: yum install -y python3.11-devel
     - env: {}
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
@@ -228,7 +230,7 @@ jobs:
       with:
         key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.82.0-*
+        path: '~/.rustup/toolchains/1.83.0-*
 
           ~/.rustup/update-hashes
 
@@ -325,7 +327,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.82.0-*
+        path: '~/.rustup/toolchains/1.83.0-*
 
           ~/.rustup/update-hashes
 
@@ -427,7 +429,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.82.0-*
+        path: '~/.rustup/toolchains/1.83.0-*
 
           ~/.rustup/update-hashes
 

@@ -16,7 +16,7 @@ from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptions, LogLevelOption
 from pants.option.native_options import NativeOptionParser
-from pants.option.option_types import BoolOption, IntListOption, StrListOption
+from pants.option.option_types import BoolOption, IntListOption, OptionInfo, StrListOption
 from pants.option.options import Options
 from pants.option.ranked_value import Rank
 from pants.option.registrar import OptionRegistrar
@@ -35,7 +35,7 @@ def test_global_scope():
     def do_test(args, kwargs, expected_display_args, expected_scoped_cmd_line_args):
         # The scoped and unscoped args are the same in global scope.
         expected_unscoped_cmd_line_args = expected_scoped_cmd_line_args
-        ohi = HelpInfoExtracter("").get_option_help_info(args, kwargs)
+        ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(args, kwargs))
         assert tuple(expected_display_args) == ohi.display_args
         assert tuple(expected_scoped_cmd_line_args) == ohi.scoped_cmd_line_args
         assert tuple(expected_unscoped_cmd_line_args) == ohi.unscoped_cmd_line_args
@@ -81,7 +81,7 @@ def test_non_global_scope():
         expected_scoped_cmd_line_args,
         expected_unscoped_cmd_line_args,
     ):
-        ohi = HelpInfoExtracter("bar.baz").get_option_help_info(args, kwargs)
+        ohi = HelpInfoExtracter("bar.baz").get_option_help_info(OptionInfo(args, kwargs))
         assert tuple(expected_display_args) == ohi.display_args
         assert tuple(expected_scoped_cmd_line_args) == ohi.scoped_cmd_line_args
         assert tuple(expected_unscoped_cmd_line_args) == ohi.unscoped_cmd_line_args
@@ -103,7 +103,9 @@ def test_default() -> None:
         registrar = OptionRegistrar(
             scope=GlobalOptions.options_scope,
         )
-        native_parser = NativeOptionParser([], {}, [], allow_pantsrc=False, include_derivation=True)
+        native_parser = NativeOptionParser(
+            [], {}, [], allow_pantsrc=False, include_derivation=True, known_scopes_to_flags={}
+        )
         registrar.register(*args, **kwargs)
         oshi = HelpInfoExtracter(registrar.scope).get_option_scope_help_info(
             "description", registrar, native_parser, False, "provider"
@@ -140,7 +142,7 @@ def test_compute_default():
 
 def test_deprecated():
     kwargs = {"removal_version": "999.99.9", "removal_hint": "do not use this"}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), kwargs))
     assert "999.99.9" == ohi.removal_version
     assert "do not use this" == ohi.removal_hint
     assert ohi.deprecated_message is not None
@@ -148,28 +150,28 @@ def test_deprecated():
 
 
 def test_not_deprecated():
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], {})
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), {}))
     assert ohi.removal_version is None
     assert not ohi.deprecation_active
 
 
 def test_deprecation_start_version_past():
     kwargs = {"deprecation_start_version": "1.0.0", "removal_version": "999.99.9"}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), kwargs))
     assert "999.99.9" == ohi.removal_version
     assert ohi.deprecation_active
 
 
 def test_deprecation_start_version_future():
     kwargs = {"deprecation_start_version": "999.99.8", "removal_version": "999.99.9"}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), kwargs))
     assert "999.99.9" == ohi.removal_version
     assert not ohi.deprecation_active
 
 
 def test_passthrough():
     kwargs = {"passthrough": True, "type": list, "member_type": str}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--thing"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--thing",), kwargs))
     assert 2 == len(ohi.display_args)
     assert any(args.startswith("--thing") for args in ohi.display_args)
     assert any(args.startswith("... -- ") for args in ohi.display_args)
@@ -177,19 +179,19 @@ def test_passthrough():
 
 def test_choices() -> None:
     kwargs = {"choices": ["info", "debug"]}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), kwargs))
     assert ohi.choices == ("info", "debug")
 
 
 def test_choices_enum() -> None:
     kwargs = {"type": LogLevelSimple}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), kwargs))
     assert ohi.choices == ("info", "debug")
 
 
 def test_list_of_enum() -> None:
     kwargs = {"type": list, "member_type": LogLevelSimple}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), kwargs))
     assert ohi.choices == ("info", "debug")
 
 
@@ -199,7 +201,9 @@ def test_grouping():
             return int(exp)  # True -> 1, False -> 0.
 
         registrar = OptionRegistrar(scope=GlobalOptions.options_scope)
-        native_parser = NativeOptionParser([], {}, [], allow_pantsrc=False, include_derivation=True)
+        native_parser = NativeOptionParser(
+            [], {}, [], allow_pantsrc=False, include_derivation=True, known_scopes_to_flags={}
+        )
         registrar.register("--foo", **kwargs)
         oshi = HelpInfoExtracter("").get_option_scope_help_info(
             "", registrar, native_parser, False, ""

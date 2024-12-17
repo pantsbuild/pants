@@ -679,7 +679,7 @@ class ExecutionOptions:
             process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
             # Remote store setup.
             remote_store_address=dynamic_remote_options.store_address,
-            remote_store_headers=dynamic_remote_options.store_headers,
+            remote_store_headers=cls.with_user_agent(dynamic_remote_options.store_headers),
             remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
             remote_store_rpc_concurrency=dynamic_remote_options.store_rpc_concurrency,
@@ -691,11 +691,18 @@ class ExecutionOptions:
             remote_cache_rpc_timeout_millis=bootstrap_options.remote_cache_rpc_timeout_millis,
             # Remote execution setup.
             remote_execution_address=dynamic_remote_options.execution_address,
-            remote_execution_headers=dynamic_remote_options.execution_headers,
+            remote_execution_headers=cls.with_user_agent(dynamic_remote_options.execution_headers),
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             remote_execution_rpc_concurrency=dynamic_remote_options.execution_rpc_concurrency,
             remote_execution_append_only_caches_base_path=bootstrap_options.remote_execution_append_only_caches_base_path,
         )
+
+    @classmethod
+    def with_user_agent(cls, headers: dict[str, str]) -> dict[str, str]:
+        has_user_agent = any(k.lower() == "user-agent" for k in headers.keys())
+        if has_user_agent:
+            return headers
+        return {"user-agent": f"pants/{VERSION}"} | headers
 
 
 @dataclass(frozen=True)
@@ -766,9 +773,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_graceful_shutdown_timeout=3,
     # Remote store setup.
     remote_store_address=None,
-    remote_store_headers={
-        "user-agent": f"pants/{VERSION}",
-    },
+    remote_store_headers={},
     remote_store_chunk_bytes=1024 * 1024,
     remote_store_rpc_retries=2,
     remote_store_rpc_concurrency=128,
@@ -780,9 +785,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_cache_rpc_timeout_millis=1500,
     # Remote execution setup.
     remote_execution_address=None,
-    remote_execution_headers={
-        "user-agent": f"pants/{VERSION}",
-    },
+    remote_execution_headers={},
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
     remote_execution_rpc_concurrency=128,
     remote_execution_append_only_caches_base_path=None,
@@ -2256,11 +2259,11 @@ class GlobalOptionsFlags:
         short_flags = set()
 
         for options_info in collect_options_info(BootstrapOptions):
-            for flag in options_info.flag_names:
+            for flag in options_info.args:
                 flags.add(flag)
                 if len(flag) == 2:
                     short_flags.add(flag)
-                elif options_info.flag_options.get("type") == bool:
+                elif options_info.kwargs.get("type") == bool:
                     flags.add(f"--no-{flag[2:]}")
 
         return cls(FrozenOrderedSet(flags), FrozenOrderedSet(short_flags))

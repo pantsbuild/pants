@@ -141,8 +141,28 @@ class Options:
         # We need registrars for all the intermediate scopes, so inherited option values
         # can propagate through them.
         complete_known_scope_infos = cls.complete_scopes(known_scope_infos)
+
+        registrar_by_scope = {
+            si.scope: OptionRegistrar(si.scope) for si in complete_known_scope_infos
+        }
+        known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
+        known_scope_to_flags = {
+            scope: registrar.known_scoped_args for scope, registrar in registrar_by_scope.items()
+        }
+
+        config_to_pass = None if native_options_config_discovery else config.sources()
+        native_parser = NativeOptionParser(
+            args[1:],  # The native parser expects args without the sys.argv[0] binary name.
+            env,
+            config_sources=config_to_pass,
+            allow_pantsrc=True,
+            include_derivation=include_derivation,
+            known_scopes_to_flags=known_scope_to_flags,
+        )
+
         splitter = ArgSplitter(complete_known_scope_infos, get_buildroot())
-        split_args = splitter.split_args(args)
+        # We take the cli alias-expanded args[1:] from the native parser.
+        split_args = splitter.split_args([args[0], *native_parser.get_args()])
 
         if split_args.passthru and len(split_args.goals) > 1:
             raise cls.AmbiguousPassthroughError(
@@ -165,21 +185,6 @@ class Options:
                         split_args.specs.extend(
                             [line for line in [line.strip() for line in f] if line]
                         )
-
-        registrar_by_scope = {
-            si.scope: OptionRegistrar(si.scope) for si in complete_known_scope_infos
-        }
-        known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
-
-        config_to_pass = None if native_options_config_discovery else config.sources()
-
-        native_parser = NativeOptionParser(
-            args,
-            env,
-            config_sources=config_to_pass,
-            allow_pantsrc=True,
-            include_derivation=include_derivation,
-        )
 
         return cls(
             builtin_or_auxiliary_goal=split_args.builtin_or_auxiliary_goal,
@@ -300,6 +305,9 @@ class Options:
             )
         global_config.verify(section_to_valid_options)
 
+    def get_args(self) -> tuple[str, ...]:
+        return self._native_parser.get_args()
+
     def verify_args(self):
         # Consume all known args, and see if any are left.
         # This will have the side-effect of precomputing (and memoizing) options for all scopes.
@@ -336,20 +344,6 @@ class Options:
         deprecated_scope = self.known_scope_to_info[scope].deprecated_scope
         if deprecated_scope:
             self.get_registrar(deprecated_scope).register(*args, **kwargs)
-
-    def registration_function_for_subsystem(self, subsystem_cls):
-        """Returns a function for registering options on the given scope."""
-
-        # TODO(benjy): Make this an instance of a class that implements __call__, so we can
-        # docstring it, and so it's less weird than attaching properties to a function.
-        def register(*args, **kwargs):
-            self.register(subsystem_cls.options_scope, *args, **kwargs)
-
-        # Clients can access the bootstrap option values as register.bootstrap.
-        register.bootstrap = self.bootstrap_option_values()
-        # Clients can access the scope as register.scope.
-        register.scope = subsystem_cls.options_scope
-        return register
 
     def get_registrar(self, scope: str) -> OptionRegistrar:
         """Returns the registrar for the given scope, so code can register on it directly.
@@ -435,28 +429,26 @@ class Options:
         registrar = self.get_registrar(scope)
         scope_str = "global scope" if scope == GLOBAL_SCOPE else f"scope '{scope}'"
 
-        for args, kwargs in registrar.option_registrations_iter():
-            dest = kwargs["dest"]
-            val, rank = self._native_parser.get_value(
-                scope=scope, registration_args=args, registration_kwargs=kwargs
-            )
+        for option_info in registrar.option_registrations_iter():
+            dest = option_info.kwargs["dest"]
+            val, rank = self._native_parser.get_value(scope=scope, option_info=option_info)
             explicitly_set = rank > Rank.HARDCODED
 
             # If we explicitly set a deprecated but not-yet-expired option, warn about it.
             # Otherwise, raise a CodeRemovedError if the deprecation has expired.
-            removal_version = kwargs.get("removal_version", None)
+            removal_version = option_info.kwargs.get("removal_version", None)
             if removal_version is not None:
                 warn_or_error(
                     removal_version=removal_version,
                     entity=f"option '{dest}' in {scope_str}",
-                    start_version=kwargs.get("deprecation_start_version", None),
-                    hint=kwargs.get("removal_hint", None),
+                    start_version=option_info.kwargs.get("deprecation_start_version", None),
+                    hint=option_info.kwargs.get("removal_hint", None),
                     print_warning=explicitly_set,
                 )
 
             # If we explicitly set the option, check for mutual exclusivity.
             if explicitly_set:
-                mutex_dest = kwargs.get("mutually_exclusive_group")
+                mutex_dest = option_info.kwargs.get("mutually_exclusive_group")
                 mutex_map_key = mutex_dest or dest
                 mutex_map[mutex_map_key].append(dest)
                 if len(mutex_map[mutex_map_key]) > 1:
@@ -499,18 +491,18 @@ class Options:
         pairs = []
         registrar = self.get_registrar(scope)
         # Sort the arguments, so that the fingerprint is consistent.
-        for _, kwargs in sorted(registrar.option_registrations_iter()):
-            if not kwargs.get("fingerprint", True):
+        for option_info in sorted(registrar.option_registrations_iter()):
+            if not option_info.kwargs.get("fingerprint", True):
                 continue
-            if daemon_only and not kwargs.get("daemon", False):
+            if daemon_only and not option_info.kwargs.get("daemon", False):
                 continue
-            dest = kwargs["dest"]
+            dest = option_info.kwargs["dest"]
             val = self.for_scope(scope)[dest]
             # If we have a list then we delegate to the fingerprinting implementation of the members.
-            if is_list_option(kwargs):
-                val_type = kwargs.get("member_type", str)
+            if is_list_option(option_info.kwargs):
+                val_type = option_info.kwargs.get("member_type", str)
             else:
-                val_type = kwargs.get("type", str)
+                val_type = option_info.kwargs.get("type", str)
             pairs.append((dest, val_type, val))
         return pairs
 
