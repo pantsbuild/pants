@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import functools
 import json
+import posixpath
+import re
 import textwrap
+import urllib
 import uuid
 from pathlib import PurePath
 from typing import Iterable, Mapping, TypedDict, cast
@@ -42,7 +45,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.errors import OptionsError
 from pants.option.global_options import NamedCachesDirOption
-from pants.option.option_types import StrListOption, StrOption
+from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
@@ -150,6 +153,18 @@ class PBSPythonProviderSubsystem(Subsystem):
         ),
     )
 
+    require_inferrable_release_tag = BoolOption(
+        default=False,
+        help=textwrap.dedent(
+            """
+            Normally, Pants will try to infer the PBS release "tag" from URLs supplied to the
+            `--python-build-standalone-known-python-versions` option. If this option is True,
+            then it is an error if Pants cannot infer the tag from the URL.
+            """
+        ),
+        advanced=True,
+    )
+
     @memoized_property
     def release_constraints(self) -> ConstraintsList:
         rcs = self._release_constraints
@@ -163,27 +178,75 @@ class PBSPythonProviderSubsystem(Subsystem):
                 f"The `[{PBSPythonProviderSubsystem.options_scope}].release_constraints option` is not valid: {e}"
             ) from None
 
+    def get_user_supplied_pbs_pythons(
+        self, require_tag: bool
+    ) -> dict[str, dict[str, PBSPythonInfo]]:
+        extract_re = re.compile(r"^cpython-([0-9.]+)\+([0-9]+)-.*\.tar\.\w+$")
+
+        def extract_version_and_tag(url: str) -> tuple[str, str] | None:
+            parsed_url = urllib.parse.urlparse(urllib.parse.unquote(url))
+            base_path = posixpath.basename(parsed_url.path)
+
+            nonlocal extract_re
+            if m := extract_re.fullmatch(base_path):
+                return (m.group(1), m.group(2))
+
+            return None
+
+        user_supplied_pythons: dict[str, dict[str, PBSPythonInfo]] = {}
+
+        for version_info in self.known_python_versions or []:
+            version_parts = version_info.split("|")
+            if len(version_parts) != 5:
+                raise ExternalToolError(
+                    f"Each value for the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option "
+                    "must be five values separated by a `|` character as follows: PYTHON_VERSION|PLATFORM|SHA256|FILE_SIZE|URL "
+                    f"\n\nInstead, the following value was provided: {version_info}"
+                )
+
+            py_version, platform, sha256, filesize, url = (x.strip() for x in version_parts)
+
+            tag: str | None = None
+            maybe_inferred_py_version_and_tag = extract_version_and_tag(url)
+            if maybe_inferred_py_version_and_tag:
+                inferred_py_version, inferred_tag = maybe_inferred_py_version_and_tag
+                if inferred_py_version != py_version:
+                    raise ExternalToolError(
+                        f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                        f"the value `{version_info}` declares Python version `{py_version}` in the first field, but the URL"
+                        f"provided references Python version `{inferred_py_version}`. These must be the same."
+                    )
+                tag = inferred_tag
+
+            if require_tag and tag is None:
+                raise ExternalToolError(
+                    f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                    f'the PBS release "tag" could not be inferred from the supplied URL: {url}'
+                    "\n\nThis is an error because the option"
+                    f"`[{PBSPythonProviderSubsystem.options_scope}].require_inferrable_release_tag` is set to True."
+                )
+
+            if py_version not in user_supplied_pythons:
+                user_supplied_pythons[py_version] = {}
+
+            pbs_python_info = PBSPythonInfo(
+                url=url, sha256=sha256, size=int(filesize), tag=tag or ""
+            )
+            user_supplied_pythons[py_version][platform] = pbs_python_info
+
+        return user_supplied_pythons
+
     def get_all_pbs_pythons(self) -> dict[str, dict[str, PBSPythonInfo]]:
         all_pythons = load_pbs_pythons().copy()
 
-        for version_info in self.known_python_versions or []:
-            try:
-                pyversion, platform, sha256, filesize, url = (
-                    x.strip() for x in version_info.split("|")
-                )
-            except ValueError:
-                raise ExternalToolError(
-                    f"Bad value for [{PBSPythonProviderSubsystem.options_scope}].known_python_versions: {version_info}"
-                )
-
-            if pyversion not in all_pythons:
-                all_pythons[pyversion] = {}
-
-            # Note: Tag is set "" which means this version will always match the release constraint.
-            # TODO: Infer the release tag from the URL.
-            all_pythons[pyversion][platform] = PBSPythonInfo(
-                url=url, sha256=sha256, size=int(filesize), tag=""
-            )
+        user_supplied_pythons = self.get_user_supplied_pbs_pythons(
+            require_tag=self.require_inferrable_release_tag
+        )
+        for py_version, platform_metadatas_for_py_version in user_supplied_pythons.items():
+            for platform_name, platform_metadata in platform_metadatas_for_py_version.items():
+                if py_version not in all_pythons:
+                    all_pythons[py_version] = {}
+                all_pythons[py_version][platform_name] = platform_metadata
 
         return all_pythons
 

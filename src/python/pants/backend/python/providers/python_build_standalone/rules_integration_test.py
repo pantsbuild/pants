@@ -19,10 +19,12 @@ from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.build_graph.address import Address
 from pants.core.goals.run import RunRequest
+from pants.core.util_rules.external_tool import ExternalToolError
 from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import RuleRunner, mock_console
 
 
@@ -36,6 +38,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             QueryRule(RunRequest, (PythonSourceFieldSet,)),
             QueryRule(Platform, ()),
+            QueryRule(pbs.PBSPythonProviderSubsystem, ()),
         ],
         target_types=[
             PythonSourcesGeneratorTarget,
@@ -146,6 +149,36 @@ def test_additional_versions(rule_runner, mock_empty_versions_resource):
     )
     version = stdout.splitlines()[0]
     assert version.startswith("3.9.16")
+
+
+# Confirm whether the PBS tag data can be inferred from a URL.
+def test_tag_inference_from_url() -> None:
+    subsystem = create_subsystem(
+        pbs.PBSPythonProviderSubsystem,
+        known_python_versions=[
+            "3.10.13|linux_arm|abc123|123|https://github.com/indygreg/python-build-standalone/releases/download/20240224/cpython-3.10.13%2B20240224-aarch64-unknown-linux-gnu-install_only.tar.gz",
+        ],
+    )
+
+    user_supplied_pbs_versions = subsystem.get_user_supplied_pbs_pythons(require_tag=False)
+    assert user_supplied_pbs_versions["3.10.13"]["linux_arm"] == pbs.PBSPythonInfo(
+        url="https://github.com/indygreg/python-build-standalone/releases/download/20240224/cpython-3.10.13%2B20240224-aarch64-unknown-linux-gnu-install_only.tar.gz",
+        sha256="abc123",
+        size=123,
+        tag="20240224",
+    )
+
+    # Confirm whether requiring tag inference results in an error.
+    subsystem = create_subsystem(
+        pbs.PBSPythonProviderSubsystem,
+        known_python_versions=[
+            "3.10.13|linux_arm|abc123|123|file:///releases/20240224/cpython.tar.gz",
+        ],
+    )
+    with pytest.raises(
+        ExternalToolError, match='the PBS release "tag" could not be inferred from the supplied URL'
+    ):
+        _ = subsystem.get_user_supplied_pbs_pythons(require_tag=True)
 
 
 def test_venv_pex_reconstruction(rule_runner):
