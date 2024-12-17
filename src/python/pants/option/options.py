@@ -429,28 +429,26 @@ class Options:
         registrar = self.get_registrar(scope)
         scope_str = "global scope" if scope == GLOBAL_SCOPE else f"scope '{scope}'"
 
-        for args, kwargs in registrar.option_registrations_iter():
-            dest = kwargs["dest"]
-            val, rank = self._native_parser.get_value(
-                scope=scope, registration_args=args, registration_kwargs=kwargs
-            )
+        for option_info in registrar.option_registrations_iter():
+            dest = option_info.kwargs["dest"]
+            val, rank = self._native_parser.get_value(scope=scope, option_info=option_info)
             explicitly_set = rank > Rank.HARDCODED
 
             # If we explicitly set a deprecated but not-yet-expired option, warn about it.
             # Otherwise, raise a CodeRemovedError if the deprecation has expired.
-            removal_version = kwargs.get("removal_version", None)
+            removal_version = option_info.kwargs.get("removal_version", None)
             if removal_version is not None:
                 warn_or_error(
                     removal_version=removal_version,
                     entity=f"option '{dest}' in {scope_str}",
-                    start_version=kwargs.get("deprecation_start_version", None),
-                    hint=kwargs.get("removal_hint", None),
+                    start_version=option_info.kwargs.get("deprecation_start_version", None),
+                    hint=option_info.kwargs.get("removal_hint", None),
                     print_warning=explicitly_set,
                 )
 
             # If we explicitly set the option, check for mutual exclusivity.
             if explicitly_set:
-                mutex_dest = kwargs.get("mutually_exclusive_group")
+                mutex_dest = option_info.kwargs.get("mutually_exclusive_group")
                 mutex_map_key = mutex_dest or dest
                 mutex_map[mutex_map_key].append(dest)
                 if len(mutex_map[mutex_map_key]) > 1:
@@ -493,18 +491,18 @@ class Options:
         pairs = []
         registrar = self.get_registrar(scope)
         # Sort the arguments, so that the fingerprint is consistent.
-        for _, kwargs in sorted(registrar.option_registrations_iter()):
-            if not kwargs.get("fingerprint", True):
+        for option_info in sorted(registrar.option_registrations_iter()):
+            if not option_info.kwargs.get("fingerprint", True):
                 continue
-            if daemon_only and not kwargs.get("daemon", False):
+            if daemon_only and not option_info.kwargs.get("daemon", False):
                 continue
-            dest = kwargs["dest"]
+            dest = option_info.kwargs["dest"]
             val = self.for_scope(scope)[dest]
             # If we have a list then we delegate to the fingerprinting implementation of the members.
-            if is_list_option(kwargs):
-                val_type = kwargs.get("member_type", str)
+            if is_list_option(option_info.kwargs):
+                val_type = option_info.kwargs.get("member_type", str)
             else:
-                val_type = kwargs.get("type", str)
+                val_type = option_info.kwargs.get("type", str)
             pairs.append((dest, val_type, val))
         return pairs
 

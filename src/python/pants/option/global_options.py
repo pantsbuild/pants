@@ -2259,11 +2259,11 @@ class GlobalOptionsFlags:
         short_flags = set()
 
         for options_info in collect_options_info(BootstrapOptions):
-            for flag in options_info.flag_names:
+            for flag in options_info.args:
                 flags.add(flag)
                 if len(flag) == 2:
                     short_flags.add(flag)
-                elif options_info.flag_options.get("type") == bool:
+                elif options_info.kwargs.get("type") == bool:
                     flags.add(f"--no-{flag[2:]}")
 
         return cls(FrozenOrderedSet(flags), FrozenOrderedSet(short_flags))

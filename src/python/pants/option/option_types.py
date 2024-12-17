@@ -13,13 +13,15 @@ from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
-class OptionsInfo:
-    flag_names: tuple[str, ...]
-    flag_options: dict[str, Any]
+@dataclass(frozen=True, order=True)
+class OptionInfo:
+    """Registration info for a single option."""
+
+    args: tuple[str, ...]  # The *args in the registration.
+    kwargs: dict[str, Any]  # The **kwargs in the registration.
 
 
-def collect_options_info(cls: type) -> Iterator[OptionsInfo]:
+def collect_options_info(cls: type) -> Iterator[OptionInfo]:
     """Yields the ordered options info from the MRO of the provided class."""
 
     # NB: Since registration ordering matters (it impacts `help` output), we register these in
@@ -28,7 +30,7 @@ def collect_options_info(cls: type) -> Iterator[OptionsInfo]:
         for attrname in class_.__dict__.keys():
             # NB: We use attrname and getattr to trigger descriptors
             attr = getattr(cls, attrname)
-            if isinstance(attr, OptionsInfo):
+            if isinstance(attr, OptionInfo):
                 yield attr
 
 
@@ -186,7 +188,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         )
 
     @overload
-    def __get__(self, obj: None, objtype: Any) -> OptionsInfo | None:
+    def __get__(self, obj: None, objtype: Any) -> OptionInfo | None:
         ...
 
     @overload
@@ -197,7 +199,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         assert self._flag_names is not None
         if obj is None:
             if self._register_if(objtype):
-                return OptionsInfo(self._flag_names, self.get_flag_options(objtype))
+                return OptionInfo(self._flag_names, self.get_flag_options(objtype))
             return None
         long_name = self._flag_names[-1]
         option_value = getattr(obj.options, long_name[2:].replace("-", "_"))

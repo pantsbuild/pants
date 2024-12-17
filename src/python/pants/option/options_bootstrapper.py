@@ -100,9 +100,7 @@ class OptionsBootstrapper:
 
         for options_info in collect_options_info(BootstrapOptions):
             # Only use of Options.register?
-            bootstrap_options.register(
-                GLOBAL_SCOPE, *options_info.flag_names, **options_info.flag_options
-            )
+            bootstrap_options.register(GLOBAL_SCOPE, *options_info.args, **options_info.kwargs)
 
         return bootstrap_options
 
