@@ -157,14 +157,14 @@ def test_tag_inference_from_url() -> None:
     subsystem = create_subsystem(
         pbs.PBSPythonProviderSubsystem,
         known_python_versions=[
-            "3.10.13|linux_arm|abc123|123|https://github.com/indygreg/python-build-standalone/releases/download/20240224/cpython-3.10.13%2B20240224-aarch64-unknown-linux-gnu-install_only.tar.gz",
+            "3.10.13|linux_arm64|e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855|123|https://github.com/indygreg/python-build-standalone/releases/download/20240224/cpython-3.10.13%2B20240224-aarch64-unknown-linux-gnu-install_only.tar.gz",
         ],
     )
 
-    user_supplied_pbs_versions = subsystem.get_user_supplied_pbs_pythons(require_tag=False)
-    assert user_supplied_pbs_versions["3.10.13"]["20240224"]["linux_arm"] == pbs.PBSPythonInfo(
+    user_supplied_pbs_versions = subsystem.get_user_supplied_pbs_pythons()
+    assert user_supplied_pbs_versions["3.10.13"]["20240224"]["linux_arm64"] == pbs.PBSPythonInfo(
         url="https://github.com/indygreg/python-build-standalone/releases/download/20240224/cpython-3.10.13%2B20240224-aarch64-unknown-linux-gnu-install_only.tar.gz",
-        sha256="abc123",
+        sha256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         size=123,
     )
 
@@ -172,13 +172,13 @@ def test_tag_inference_from_url() -> None:
     subsystem = create_subsystem(
         pbs.PBSPythonProviderSubsystem,
         known_python_versions=[
-            "3.10.13|linux_arm|abc123|123|file:///releases/20240224/cpython.tar.gz",
+            "3.10.13|linux_arm64|e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855|123|file:///releases/20240224/cpython.tar.gz",
         ],
     )
     with pytest.raises(
-        ExternalToolError, match='the PBS release "tag" could not be inferred from the supplied URL'
+        ExternalToolError, match="no PBS release tag could be inferred from the URL"
     ):
-        _ = subsystem.get_user_supplied_pbs_pythons(require_tag=True)
+        _ = subsystem.get_user_supplied_pbs_pythons()
 
 
 def test_venv_pex_reconstruction(rule_runner):
@@ -221,22 +221,22 @@ def test_release_constraint_evaluation(rule_runner: RuleRunner) -> None:
     def make_platform_metadata():
         return {
             "linux_arm64": {
-                "sha256": "abc123",
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "size": 1,
                 "url": "foobar",
             },
             "linux_x86_64": {
-                "sha256": "abc123",
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "size": 1,
                 "url": "https://example.com/foo.zip",
             },
             "macos_arm64": {
-                "sha256": "abc123",
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "size": 1,
                 "url": "https://example.com/foo.zip",
             },
             "macos_x86_64": {
-                "sha256": "abc123",
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "size": 1,
                 "url": "https://example.com/foo.zip",
             },

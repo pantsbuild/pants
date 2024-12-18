@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import functools
 import json
+import logging
 import posixpath
 import re
 import textwrap
 import urllib
 import uuid
+from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Mapping, TypedDict, cast
+from typing import Iterable, Mapping, Sequence, TypedDict, cast
+
+from packaging.version import InvalidVersion
 
 from pants.backend.python.providers.python_build_standalone.constraints import (
     ConstraintParseError,
@@ -55,6 +59,8 @@ from pants.util.resources import read_sibling_resource
 from pants.util.strutil import softwrap
 from pants.version import Version
 
+logger = logging.getLogger(__name__)
+
 PBS_SANDBOX_NAME = ".python_build_standalone"
 PBS_NAMED_CACHE_NAME = "python_build_standalone"
 PBS_APPEND_ONLY_CACHES = FrozenDict({PBS_NAMED_CACHE_NAME: PBS_SANDBOX_NAME})
@@ -67,6 +73,220 @@ class PBSPythonInfo(TypedDict):
 
 
 PBSVersionsT = dict[str, dict[str, dict[str, PBSPythonInfo]]]
+
+
+@dataclass
+class _ParsedPBSPython:
+    py_version: Version
+    pbs_release_tag: Version
+    platform: Platform
+    url: str
+    sha256: str
+    size: int
+
+
+def _parse_py_version_and_pbs_release_tag(
+    version_and_tag: str,
+) -> tuple[Version | None, Version | None]:
+    version_and_tag = version_and_tag.strip()
+    if not version_and_tag:
+        return None, None
+
+    parts = version_and_tag.split("+", 2)
+    py_version: Version | None = None
+    pbs_release_tag: Version | None = None
+
+    if len(parts) >= 1:
+        try:
+            py_version = Version(parts[0])
+        except InvalidVersion:
+            raise ValueError(f"Version `{parts[0]}` is not a valid Python version.")
+
+    if len(parts) == 2:
+        try:
+            pbs_release_tag = Version(parts[1])
+        except InvalidVersion:
+            raise ValueError(f"PBS release tag `{parts[1]}` is not a valid version.")
+
+    return py_version, pbs_release_tag
+
+
+def _parse_pbs_url(url: str) -> tuple[Version, Version, Platform]:
+    parsed_url = urllib.parse.urlparse(urllib.parse.unquote(url))
+    base_path = posixpath.basename(parsed_url.path)
+
+    base_path_no_prefix = base_path.removeprefix("cpython-")
+    if base_path_no_prefix == base_path:
+        raise ValueError(
+            f"Unable to parse the provided URL since it does not have a cpython prefix as per the PBS naming convention: {url}"
+        )
+
+    base_path_parts = base_path_no_prefix.split("-", 1)
+    if len(base_path_parts) != 2:
+        raise ValueError(
+            f"Unable to parse the provided URL because it does not follow the PBS naming convention: {url}"
+        )
+
+    py_version, pbs_release_tag = _parse_py_version_and_pbs_release_tag(base_path_parts[0])
+    if not py_version or not pbs_release_tag:
+        raise ValueError(
+            "Unable to parse the Python version and PBS release tag from the provided URL "
+            f"because it does not follow the PBS naming convention: {url}"
+        )
+
+    platform: Platform
+    match base_path_parts[1].split("-"):
+        case ["x86_64", "unknown", "linux", "gnu", *_]:
+            platform = Platform.linux_x86_64
+        case ["aarch64", "unknown", "linux", "gnu", *_]:
+            platform = Platform.linux_arm64
+        case ["x86_64", "apple", "darwin", *_]:
+            platform = Platform.macos_x86_64
+        case ["aarch64", "apple", "darwin", *_]:
+            platform = Platform.macos_arm64
+        case _:
+            raise ValueError(
+                "Unable to parse the platfornm from the provided URL "
+                f"because it does not follow the PBS naming convention: {url}"
+            )
+
+    # assert platform is not None
+
+    return py_version, pbs_release_tag, platform
+
+
+def _parse_from_three_fields(parts: Sequence[str], orig_value: str) -> _ParsedPBSPython:
+    url, sha256, size = parts[0:2]
+
+    try:
+        py_version, pbs_release_tag, platform = _parse_pbs_url(url)
+    except ValueError as e:
+        raise ExternalToolError(
+            f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+            f"the value `{orig_value}` could not be parsed because the URL does not follow the "
+            f"PBS naming convention: {e}"
+        )
+
+    return _ParsedPBSPython(
+        py_version=py_version,
+        pbs_release_tag=pbs_release_tag,
+        platform=platform,
+        url=url,
+        sha256=sha256,
+        size=int(size),
+    )
+
+
+def _parse_from_five_fields(parts: Sequence[str], orig_value: str) -> _ParsedPBSPython:
+    py_version_and_tag_str, platform_str, sha256, filesize_str, url = (x.strip() for x in parts)
+
+    try:
+        maybe_py_version, maybe_pbs_release_tag = _parse_py_version_and_pbs_release_tag(
+            py_version_and_tag_str
+        )
+    except ValueError:
+        raise ExternalToolError(
+            f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+            f"the value `{orig_value}` declares version `{py_version_and_tag_str}` in the first field, "
+            "but it could not be parsed as a PBS release version."
+        )
+
+    if platform_str not in (
+        Platform.linux_x86_64.value,
+        Platform.linux_arm64.value,
+        Platform.macos_x86_64.value,
+        Platform.macos_arm64.value,
+    ):
+        raise ExternalToolError(
+            f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+            f"the value `{orig_value}` declares platforn `{platform_str}` in the second field, "
+            "but that value is not a known Pants platform. It must be one of "
+            "`linux_x86_64`, `linux_arm64`, `macos_x86_64`, or `macos_arm64`."
+        )
+    platform: Platform = Platform(platform_str)
+
+    if len(sha256) != 64 or not re.match("^[a-zA-Z0-9]+$", sha256):
+        raise ExternalToolError(
+            f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+            f"the value `{orig_value}` declares SHA256 checksum `{sha256}` in the third field, "
+            "but that value does not parse as a SHA256 checksum."
+        )
+
+    try:
+        filesize: int = int(filesize_str)
+    except ValueError:
+        raise ExternalToolError(
+            f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+            f"the value `{orig_value}` declares file size `{filesize_str}` in the fourth field, "
+            "but that value does not parse as an integer."
+        )
+
+    maybe_inferred_py_version: Version | None = None
+    maybe_inferred_pbs_release_tag: Version | None = None
+    maybe_inferred_platform: Platform | None = None
+    try:
+        (
+            maybe_inferred_py_version,
+            maybe_inferred_pbs_release_tag,
+            maybe_inferred_platform,
+        ) = _parse_pbs_url(url)
+    except ValueError:
+        pass
+
+    match maybe_py_version:
+        case None:
+            if maybe_inferred_py_version is None:
+                raise ExternalToolError(
+                    f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                    f"the value `{orig_value}` does not declare a version in the first field, and no version "
+                    "could be inferred from the URL."
+                )
+
+            maybe_py_version = maybe_inferred_py_version
+        case py_version:
+            if maybe_inferred_py_version is not None and py_version != maybe_inferred_py_version:
+                logger.warning(
+                    f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                    f"the value `{orig_value}` declares version `{py_version}` in the first field, but Pants inferred "
+                    f"version `{maybe_inferred_py_version}` from the URL."
+                )
+
+    match maybe_pbs_release_tag:
+        case None:
+            if maybe_inferred_pbs_release_tag is None:
+                raise ExternalToolError(
+                    f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                    f"the value `{orig_value}` does not declare a PBS release tag in the first field, and no PBS "
+                    "release tag could be inferred from the URL."
+                )
+
+            maybe_pbs_release_tag = maybe_inferred_pbs_release_tag
+        case pbs_release_tag:
+            if (
+                maybe_inferred_pbs_release_tag is not None
+                and pbs_release_tag != maybe_inferred_pbs_release_tag
+            ):
+                logger.warning(
+                    f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                    f"the value `{orig_value}` declares PBS release tag `{pbs_release_tag}` in the first field, but Pants inferred "
+                    f"PBS release tag `{maybe_inferred_pbs_release_tag}` from the URL."
+                )
+
+    if maybe_inferred_platform is not None and platform != maybe_inferred_platform:
+        logger.warning(
+            f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+            f"the value `{orig_value}` declares platform `{platform}` in the third field, but Pants inferred "
+            f"platform `{maybe_inferred_platform}` from the URL."
+        )
+
+    return _ParsedPBSPython(
+        py_version=maybe_py_version,
+        pbs_release_tag=maybe_pbs_release_tag,
+        platform=platform,
+        url=url,
+        sha256=sha256,
+        size=filesize,
+    )
 
 
 @functools.cache
@@ -166,68 +386,49 @@ class PBSPythonProviderSubsystem(Subsystem):
                 f"The `[{PBSPythonProviderSubsystem.options_scope}].release_constraints option` is not valid: {e}"
             ) from None
 
-    def get_user_supplied_pbs_pythons(self, require_tag: bool) -> PBSVersionsT:
-        extract_re = re.compile(r"^cpython-([0-9.]+)\+([0-9]+)-.*\.tar\.\w+$")
-
-        def extract_version_and_tag(url: str) -> tuple[str, str] | None:
-            parsed_url = urllib.parse.urlparse(urllib.parse.unquote(url))
-            base_path = posixpath.basename(parsed_url.path)
-
-            nonlocal extract_re
-            if m := extract_re.fullmatch(base_path):
-                return (m.group(1), m.group(2))
-
-            return None
-
+    def get_user_supplied_pbs_pythons(self) -> PBSVersionsT:
         user_supplied_pythons: dict[str, dict[str, dict[str, PBSPythonInfo]]] = {}
 
         for version_info in self.known_python_versions or []:
-            version_parts = version_info.split("|")
-            if len(version_parts) != 5:
+            version_parts = [x.strip() for x in version_info.split("|")]
+            if len(version_parts) not in (3, 5):
                 raise ExternalToolError(
                     f"Each value for the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option "
-                    "must be five values separated by a `|` character as follows: PYTHON_VERSION|PLATFORM|SHA256|FILE_SIZE|URL "
-                    f"\n\nInstead, the following value was provided: {version_info}"
+                    "must be a set of three or five values separated by `|` characters as follows:\n\n"
+                    "- 3 fields: URL|SHA256|FILE_SIZE\n\n"
+                    "- 5 fields: PYTHON_VERSION+PBS_RELEASE|PLATFORM|SHA256|FILE_SIZE|URL\n\n"
+                    "\n\nIf 3 fields are provided, Pants will attempt to infer values based on the URL which must "
+                    "follow the PBS naming conventions.\n\n"
+                    f"Instead, the following value was provided: {version_info}"
                 )
 
-            py_version, platform, sha256, filesize, url = (x.strip() for x in version_parts)
+            info = (
+                _parse_from_three_fields(version_parts, orig_value=version_info)
+                if len(version_parts) == 3
+                else _parse_from_five_fields(version_parts, orig_value=version_info)
+            )
 
-            tag: str | None = None
-            maybe_inferred_py_version_and_tag = extract_version_and_tag(url)
-            if maybe_inferred_py_version_and_tag:
-                inferred_py_version, inferred_tag = maybe_inferred_py_version_and_tag
-                if inferred_py_version != py_version:
-                    raise ExternalToolError(
-                        f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-                        f"the value `{version_info}` declares Python version `{py_version}` in the first field, but the URL"
-                        f"provided references Python version `{inferred_py_version}`. These must be the same."
-                    )
-                tag = inferred_tag
-
-            if tag is None:
-                raise ExternalToolError(
-                    f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-                    f'the PBS release "tag" could not be inferred from the supplied URL: {url}'
-                    "\n\nThis is an error because the option"
-                    f"`[{PBSPythonProviderSubsystem.options_scope}].require_inferrable_release_tag` is set to True."
-                )
+            py_version: str = str(info.py_version)
+            pbs_release_tag: str = str(info.pbs_release_tag)
 
             if py_version not in user_supplied_pythons:
                 user_supplied_pythons[py_version] = {}
-            if tag not in user_supplied_pythons[py_version]:
-                user_supplied_pythons[py_version][tag] = {}
+            if pbs_release_tag not in user_supplied_pythons[py_version]:
+                user_supplied_pythons[py_version][pbs_release_tag] = {}
 
-            pbs_python_info = PBSPythonInfo(url=url, sha256=sha256, size=int(filesize))
-            user_supplied_pythons[py_version][tag][platform] = pbs_python_info
+            pbs_python_info = PBSPythonInfo(url=info.url, sha256=info.sha256, size=info.size)
+
+            user_supplied_pythons[py_version][pbs_release_tag][
+                info.platform.value
+            ] = pbs_python_info
 
         return user_supplied_pythons
 
     def get_all_pbs_pythons(self) -> PBSVersionsT:
         all_pythons = load_pbs_pythons().copy()
 
-        user_supplied_pythons: PBSVersionsT = self.get_user_supplied_pbs_pythons(
-            require_tag=self.require_inferrable_release_tag
-        )
+        user_supplied_pythons: PBSVersionsT = self.get_user_supplied_pbs_pythons()
+
         for py_version, release_metadatas_for_py_version in user_supplied_pythons.items():
             for (
                 release_tag,
