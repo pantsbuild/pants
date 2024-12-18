@@ -253,7 +253,7 @@ def _choose_python(
     pbs_versions: Mapping[str, Mapping[str, Mapping[str, PBSPythonInfo]]],
     platform: Platform,
     release_constraints: ConstraintSatisfied,
-) -> tuple[str, PBSPythonInfo]:
+) -> tuple[str, Version, PBSPythonInfo]:
     """Choose the highest supported patchlevel of the lowest supported major/minor version
     consistent with any PBS release constraint."""
 
@@ -299,14 +299,14 @@ def _choose_python(
     # This also sorts by release tag in ascending order. So it chooses the highest available PBS
     # release for that chosen Python version.
     candidate_pbs_releases.sort(key=lambda x: (x[0], x[1]))
-    for i, (py_version_triplet, _pbs_version, metadata) in enumerate(candidate_pbs_releases):
+    for i, (py_version_triplet, pbs_version, metadata) in enumerate(candidate_pbs_releases):
         if (
             # Last candidate, we're good!
             i == len(candidate_pbs_releases) - 1
             # Next candidate is the next major/minor version, so this is the highest patchlevel.
             or candidate_pbs_releases[i + 1][0][0:2] != py_version_triplet[0:2]
         ):
-            return (".".join(map(str, py_version_triplet)), metadata)
+            return (".".join(map(str, py_version_triplet)), pbs_version, metadata)
 
     raise AssertionError("The loop should have returned the final item.")
 
@@ -327,7 +327,7 @@ async def get_python(
 ) -> PythonExecutable:
     versions_info = pbs_subsystem.get_all_pbs_pythons()
 
-    python_version, pbs_py_info = _choose_python(
+    python_version, _pbs_version, pbs_py_info = _choose_python(
         request.interpreter_constraints,
         python_setup.interpreter_versions_universe,
         versions_info,
