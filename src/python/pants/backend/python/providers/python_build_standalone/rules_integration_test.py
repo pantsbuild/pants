@@ -26,6 +26,7 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import RuleRunner, mock_console
+from pants.version import Version
 
 
 @pytest.fixture
@@ -161,11 +162,10 @@ def test_tag_inference_from_url() -> None:
     )
 
     user_supplied_pbs_versions = subsystem.get_user_supplied_pbs_pythons(require_tag=False)
-    assert user_supplied_pbs_versions["3.10.13"]["linux_arm"] == pbs.PBSPythonInfo(
+    assert user_supplied_pbs_versions["3.10.13"]["20240224"]["linux_arm"] == pbs.PBSPythonInfo(
         url="https://github.com/indygreg/python-build-standalone/releases/download/20240224/cpython-3.10.13%2B20240224-aarch64-unknown-linux-gnu-install_only.tar.gz",
         sha256="abc123",
         size=123,
-        tag="20240224",
     )
 
     # Confirm whether requiring tag inference results in an error.
@@ -218,28 +218,24 @@ def test_release_constraint_evaluation(rule_runner: RuleRunner) -> None:
     ics = InterpreterConstraints(["cpython==3.9.*"])
     universe = ["3.9"]
 
-    def make_version(tag: str):
+    def make_platform_metadata():
         return {
             "linux_arm64": {
-                "tag": tag,
                 "sha256": "abc123",
                 "size": 1,
                 "url": "foobar",
             },
             "linux_x86_64": {
-                "tag": tag,
                 "sha256": "abc123",
                 "size": 1,
                 "url": "https://example.com/foo.zip",
             },
             "macos_arm64": {
-                "tag": tag,
                 "sha256": "abc123",
                 "size": 1,
                 "url": "https://example.com/foo.zip",
             },
             "macos_x86_64": {
-                "tag": tag,
                 "sha256": "abc123",
                 "size": 1,
                 "url": "https://example.com/foo.zip",
@@ -247,16 +243,17 @@ def test_release_constraint_evaluation(rule_runner: RuleRunner) -> None:
         }
 
     pbs_versions = {
-        "3.9.18": make_version("20241001"),
-        "3.9.19": make_version("20241101"),
-        "3.9.20": make_version("20241201"),
+        "3.9.18": {"20241001": make_platform_metadata()},
+        "3.9.19": {"20241101": make_platform_metadata()},
+        "3.9.20": {"20241201": make_platform_metadata()},
     }
 
     platform = rule_runner.request(Platform, [])
 
     rc = ConstraintsList.parse(">=20241001,<20241201")
-    version, _info = pbs._choose_python(ics, universe, pbs_versions, platform, rc)
+    version, pbs_version, _info = pbs._choose_python(ics, universe, pbs_versions, platform, rc)
     assert version == "3.9.19"
+    assert pbs_version == Version("20241101")
 
     # Ensure that exception occurs if no version matches.
     rc = ConstraintsList.parse("==20250101")
@@ -264,7 +261,9 @@ def test_release_constraint_evaluation(rule_runner: RuleRunner) -> None:
         Exception,
         match="Failed to find a supported Python Build Standalone for Interpreter Constraint",
     ):
-        _version, _info = pbs._choose_python(ics, universe, pbs_versions, platform, rc)
+        _version, _pbs_version, _info = pbs._choose_python(
+            ics, universe, pbs_versions, platform, rc
+        )
 
     # Ensure that PBS versions with no tag metadata are filtered out so there is no "match".
     actual_pbs_versions = pbs.load_pbs_pythons()
@@ -273,4 +272,17 @@ def test_release_constraint_evaluation(rule_runner: RuleRunner) -> None:
         Exception,
         match="Failed to find a supported Python Build Standalone for Interpreter Constraint",
     ):
-        _version, _info = pbs._choose_python(ics, universe, actual_pbs_versions, platform, rc)
+        _version, _pbs_version, _info = pbs._choose_python(
+            ics, universe, actual_pbs_versions, platform, rc
+        )
+
+    # Ensure that the highest release for a particualr version is chosen.
+    pbs_versions = {
+        "3.9.18": {"20241001": make_platform_metadata()},
+        "3.9.19": {"20241101": make_platform_metadata(), "20241115": make_platform_metadata()},
+        "3.10.15": {"20241115": make_platform_metadata()},
+    }
+    rc = ConstraintsList.parse(">=20241001,<=20241201")
+    version, pbs_version, _info = pbs._choose_python(ics, universe, pbs_versions, platform, rc)
+    assert version == "3.9.19"
+    assert pbs_version == Version("20241115")
