@@ -69,9 +69,12 @@ async def create_archive(
         argv: tuple[str, ...] = (
             bash_binary.path,
             "-c",
+            # Note: The -A (--adjust-sfx) option causes zip to treat the given archive name as-is.
+            # This works even when archive isn't created as a self-extracting archive
+            #  see https://unix.stackexchange.com/a/557812
             softwrap(
                 f"""
-                {zip_binary.path} --names-stdin {shlex.quote(request.output_filename)}
+                {zip_binary.path} --adjust-sfx --names-stdin {shlex.quote(request.output_filename)}
                 < {FILE_LIST_FILENAME}
                 """
             ),
