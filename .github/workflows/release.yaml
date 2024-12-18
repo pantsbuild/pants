@@ -196,28 +196,20 @@ jobs:
     - release_info
     runs-on:
     - macos-13
+
+    strategy:
+      matrix:
+        python-version: [3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13]
     steps:
     - name: Check out code
       uses: actions/checkout@v4
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7 through 3.13
       uses: actions/setup-python@v5
       with:
-        python-version: '3.7
-
-          3.8
-
-          3.9
-
-          3.10
-
-          3.12
-
-          3.13
-
-          3.11'
+        python-version: ${{ matrix.python-version }}
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -395,6 +387,9 @@ jobs:
     - build_wheels_macos14_arm64
     - release_info
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13]
     steps:
     - name: Checkout Pants at Release Tag
       uses: actions/checkout@v4
@@ -402,22 +397,10 @@ jobs:
         fetch-depth: '0'
         fetch-tags: true
         ref: ${{ needs.release_info.outputs.build-ref }}
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7 through 3.13
       uses: actions/setup-python@v5
       with:
-        python-version: '3.7
-
-          3.8
-
-          3.9
-
-          3.10
-
-          3.12
-
-          3.13
-
-          3.11'
+        python-version: ${{ matrix.python-version }}
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:

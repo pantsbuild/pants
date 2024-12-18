@@ -6,27 +6,19 @@
 jobs:
   cache_comparison:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13]
     steps:
     - name: Check out code
       uses: actions/checkout@v4
       with:
         fetch-depth: 10
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7 through 3.13
       uses: actions/setup-python@v5
       with:
-        python-version: '3.7
-
-          3.8
-
-          3.9
-
-          3.10
-
-          3.12
-
-          3.13
-
-          3.11'
+        python-version: ${{ matrix.python-version }}
     - env:
         BASE_REF: ${{ github.event.inputs.base_ref }}
         BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
