@@ -100,7 +100,18 @@ Likewise, in a similar way you could enable strict linting globally and then cho
 
 You can set the field `skip_lint=True` on each `helm_chart` target to avoid linting it.
 
-#### Package
+#### Trivy
+
+Pants can run [Trivy](https://github.com/aquasecurity/trivy) on your Helm Charts and deployments. When run on a deployment, Pants run Trivy on the  rendered Helm Chart with the specified values.
+
+This must first be enabled by activating the Trivy backend:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages = ["pants.backend.experimental.helm.lint.trivy"]
+```
+
+### Package
 
 Packing helm charts is supported out of the box via the Pants' `package` goal. The final package will be saved as a `.tgz` file under the `dist` folder at your source root.
 
