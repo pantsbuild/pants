@@ -161,11 +161,10 @@ def test_tag_inference_from_url() -> None:
     )
 
     user_supplied_pbs_versions = subsystem.get_user_supplied_pbs_pythons(require_tag=False)
-    assert user_supplied_pbs_versions["3.10.13"]["linux_arm"] == pbs.PBSPythonInfo(
+    assert user_supplied_pbs_versions["3.10.13"]["20240224"]["linux_arm"] == pbs.PBSPythonInfo(
         url="https://github.com/indygreg/python-build-standalone/releases/download/20240224/cpython-3.10.13%2B20240224-aarch64-unknown-linux-gnu-install_only.tar.gz",
         sha256="abc123",
         size=123,
-        tag="20240224",
     )
 
     # Confirm whether requiring tag inference results in an error.
@@ -218,28 +217,24 @@ def test_release_constraint_evaluation(rule_runner: RuleRunner) -> None:
     ics = InterpreterConstraints(["cpython==3.9.*"])
     universe = ["3.9"]
 
-    def make_version(tag: str):
+    def make_platform_metadata():
         return {
             "linux_arm64": {
-                "tag": tag,
                 "sha256": "abc123",
                 "size": 1,
                 "url": "foobar",
             },
             "linux_x86_64": {
-                "tag": tag,
                 "sha256": "abc123",
                 "size": 1,
                 "url": "https://example.com/foo.zip",
             },
             "macos_arm64": {
-                "tag": tag,
                 "sha256": "abc123",
                 "size": 1,
                 "url": "https://example.com/foo.zip",
             },
             "macos_x86_64": {
-                "tag": tag,
                 "sha256": "abc123",
                 "size": 1,
                 "url": "https://example.com/foo.zip",
@@ -247,9 +242,9 @@ def test_release_constraint_evaluation(rule_runner: RuleRunner) -> None:
         }
 
     pbs_versions = {
-        "3.9.18": make_version("20241001"),
-        "3.9.19": make_version("20241101"),
-        "3.9.20": make_version("20241201"),
+        "3.9.18": {"20241001": make_platform_metadata()},
+        "3.9.19": {"20241101": make_platform_metadata()},
+        "3.9.20": {"20241201": make_platform_metadata()},
     }
 
     platform = rule_runner.request(Platform, [])

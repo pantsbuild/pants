@@ -64,28 +64,16 @@ class PBSPythonInfo(TypedDict):
     url: str
     sha256: str
     size: int
-    tag: str
+
+
+PBSVersionsT = dict[str, dict[str, dict[str, PBSPythonInfo]]]
 
 
 @functools.cache
-def load_pbs_pythons() -> dict[str, dict[str, PBSPythonInfo]]:
+def load_pbs_pythons() -> PBSVersionsT:
     versions_info = json.loads(read_sibling_resource(__name__, "versions_info.json"))
     pbs_release_metadata = versions_info["pythons"]
-
-    # Filter out any PBS releases for which we do not have `tag` metadata.
-    py_versions_to_delete: set[str] = set()
-    for py_version, platforms_for_ver in pbs_release_metadata.items():
-        all_have_tag = all(
-            platform_data.get("tag") is not None
-            for platform_name, platform_data in platforms_for_ver.items()
-        )
-        if not all_have_tag:
-            py_versions_to_delete.add(py_version)
-
-    for py_version_to_delete in py_versions_to_delete:
-        del pbs_release_metadata[py_version_to_delete]
-
-    return cast("dict[str, dict[str, PBSPythonInfo]]", pbs_release_metadata)
+    return cast("PBSVersionsT", pbs_release_metadata)
 
 
 class PBSPythonProviderSubsystem(Subsystem):
@@ -178,9 +166,7 @@ class PBSPythonProviderSubsystem(Subsystem):
                 f"The `[{PBSPythonProviderSubsystem.options_scope}].release_constraints option` is not valid: {e}"
             ) from None
 
-    def get_user_supplied_pbs_pythons(
-        self, require_tag: bool
-    ) -> dict[str, dict[str, PBSPythonInfo]]:
+    def get_user_supplied_pbs_pythons(self, require_tag: bool) -> PBSVersionsT:
         extract_re = re.compile(r"^cpython-([0-9.]+)\+([0-9]+)-.*\.tar\.\w+$")
 
         def extract_version_and_tag(url: str) -> tuple[str, str] | None:
@@ -193,7 +179,7 @@ class PBSPythonProviderSubsystem(Subsystem):
 
             return None
 
-        user_supplied_pythons: dict[str, dict[str, PBSPythonInfo]] = {}
+        user_supplied_pythons: dict[str, dict[str, dict[str, PBSPythonInfo]]] = {}
 
         for version_info in self.known_python_versions or []:
             version_parts = version_info.split("|")
@@ -218,7 +204,7 @@ class PBSPythonProviderSubsystem(Subsystem):
                     )
                 tag = inferred_tag
 
-            if require_tag and tag is None:
+            if tag is None:
                 raise ExternalToolError(
                     f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
                     f'the PBS release "tag" could not be inferred from the supplied URL: {url}'
@@ -228,25 +214,31 @@ class PBSPythonProviderSubsystem(Subsystem):
 
             if py_version not in user_supplied_pythons:
                 user_supplied_pythons[py_version] = {}
+            if tag not in user_supplied_pythons[py_version]:
+                user_supplied_pythons[py_version][tag] = {}
 
-            pbs_python_info = PBSPythonInfo(
-                url=url, sha256=sha256, size=int(filesize), tag=tag or ""
-            )
-            user_supplied_pythons[py_version][platform] = pbs_python_info
+            pbs_python_info = PBSPythonInfo(url=url, sha256=sha256, size=int(filesize))
+            user_supplied_pythons[py_version][tag][platform] = pbs_python_info
 
         return user_supplied_pythons
 
-    def get_all_pbs_pythons(self) -> dict[str, dict[str, PBSPythonInfo]]:
+    def get_all_pbs_pythons(self) -> PBSVersionsT:
         all_pythons = load_pbs_pythons().copy()
 
-        user_supplied_pythons = self.get_user_supplied_pbs_pythons(
+        user_supplied_pythons: PBSVersionsT = self.get_user_supplied_pbs_pythons(
             require_tag=self.require_inferrable_release_tag
         )
-        for py_version, platform_metadatas_for_py_version in user_supplied_pythons.items():
-            for platform_name, platform_metadata in platform_metadatas_for_py_version.items():
-                if py_version not in all_pythons:
-                    all_pythons[py_version] = {}
-                all_pythons[py_version][platform_name] = platform_metadata
+        for py_version, release_metadatas_for_py_version in user_supplied_pythons.items():
+            for (
+                release_tag,
+                platform_metadata_for_releases,
+            ) in release_metadatas_for_py_version.items():
+                for platform_name, platform_metadata in platform_metadata_for_releases.items():
+                    if py_version not in all_pythons:
+                        all_pythons[py_version] = {}
+                    if release_tag not in all_pythons[py_version]:
+                        all_pythons[py_version][release_tag] = {}
+                    all_pythons[py_version][release_tag][platform_name] = platform_metadata
 
         return all_pythons
 
@@ -258,7 +250,7 @@ class PBSPythonProvider(PythonProvider):
 def _choose_python(
     interpreter_constraints: InterpreterConstraints,
     universe: Iterable[str],
-    pbs_versions: Mapping[str, Mapping[str, PBSPythonInfo]],
+    pbs_versions: Mapping[str, Mapping[str, Mapping[str, PBSPythonInfo]]],
     platform: Platform,
     release_constraints: ConstraintSatisfied,
 ) -> tuple[str, PBSPythonInfo]:
@@ -266,7 +258,7 @@ def _choose_python(
     consistent with any PBS release constraint."""
 
     # Construct a list of candidate PBS releases.
-    candidate_pbs_releases: list[tuple[tuple[int, int, int], PBSPythonInfo]] = []
+    candidate_pbs_releases: list[tuple[tuple[int, int, int], Version, PBSPythonInfo]] = []
     supported_python_triplets = interpreter_constraints.enumerate_python_versions(universe)
     for triplet in supported_python_triplets:
         triplet_str = ".".join(map(str, triplet))
@@ -274,15 +266,15 @@ def _choose_python(
         if not pbs_version_metadata:
             continue
 
-        pbs_version_platform_metadata = pbs_version_metadata.get(platform.value)
-        if not pbs_version_platform_metadata:
-            continue
+        for tag, platform_metadata in pbs_version_metadata.items():
+            if not release_constraints.is_satisified(Version(tag)):
+                continue
 
-        tag = pbs_version_platform_metadata.get("tag")
-        if tag and not release_constraints.is_satisified(Version(tag)):
-            continue
+            pbs_version_platform_metadata = platform_metadata.get(platform.value)
+            if not pbs_version_platform_metadata:
+                continue
 
-        candidate_pbs_releases.append((triplet, pbs_version_platform_metadata))
+            candidate_pbs_releases.append((triplet, Version(tag), pbs_version_platform_metadata))
 
     if not candidate_pbs_releases:
         raise Exception(
@@ -303,15 +295,18 @@ def _choose_python(
     # Choose the highest supported patchlevel of the lowest supported major/minor version
     # by searching until the major/minor version increases or the search ends (in which case the
     # last candidate is the one).
-    candidate_pbs_releases.sort(key=lambda x: x[0])
-    for i, (version_triplet, metadata) in enumerate(candidate_pbs_releases):
+    #
+    # This also sorts by release tag in ascending order. So it chooses the highest available PBS
+    # release for that chosen Python version.
+    candidate_pbs_releases.sort(key=lambda x: (x[0], x[1]))
+    for i, (py_version_triplet, _pbs_version, metadata) in enumerate(candidate_pbs_releases):
         if (
             # Last candidate, we're good!
             i == len(candidate_pbs_releases) - 1
             # Next candidate is the next major/minor version, so this is the highest patchlevel.
-            or candidate_pbs_releases[i + 1][0][0:2] != version_triplet[0:2]
+            or candidate_pbs_releases[i + 1][0][0:2] != py_version_triplet[0:2]
         ):
-            return (".".join(map(str, version_triplet)), metadata)
+            return (".".join(map(str, py_version_triplet)), metadata)
 
     raise AssertionError("The loop should have returned the final item.")
 
