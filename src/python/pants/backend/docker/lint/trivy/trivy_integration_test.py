@@ -10,7 +10,7 @@ from pants.backend.docker.lint.trivy.rules import rules as trivy_docker_rules
 from pants.backend.docker.rules import rules as docker_rules
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.tools.trivy.rules import rules as trivy_rules
-from pants.backend.tools.trivy.testutil import assert_trivy_output, trivy_config
+from pants.backend.tools.trivy.testutil import assert_trivy_output, trivy_config, assert_trivy_success
 from pants.core.goals import package
 from pants.core.goals.lint import LintResult
 from pants.core.util_rules import source_files
@@ -80,8 +80,7 @@ def test_trivy_good(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    assert result.exit_code == 0
-    assert json.loads(result.stdout), "got nothing as output from trivy"
+    assert_trivy_success(result)
 
 
 def test_trivy_bad(rule_runner: RuleRunner) -> None:
