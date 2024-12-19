@@ -700,9 +700,11 @@ def _compare_expected_mocks(
             return MockRequestExceptionComparable(
                 category=f"Uncategorised of type {type(o).__qualname__}",
                 output_type=maybe_output_type.__name__ if maybe_output_type is not None else None,
-                input_types=tuple(e.__name__ for e in maybe_input_types)
-                if maybe_input_types is not None
-                else tuple(),
+                input_types=(
+                    tuple(e.__name__ for e in maybe_input_types)
+                    if maybe_input_types is not None
+                    else tuple()
+                ),
             )
 
         output_type = o.output_type.__name__
