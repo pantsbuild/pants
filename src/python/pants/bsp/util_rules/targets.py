@@ -355,12 +355,12 @@ async def generate_one_bsp_build_target_request(
     )
 
     # Classify the targets by the language backends that claim to provide metadata for them.
-    field_sets_by_request_type: dict[
-        type[BSPBuildTargetsMetadataRequest], OrderedSet[FieldSet]
-    ] = defaultdict(OrderedSet)
-    metadata_request_types: FrozenOrderedSet[
-        Type[BSPBuildTargetsMetadataRequest]
-    ] = union_membership.get(BSPBuildTargetsMetadataRequest)
+    field_sets_by_request_type: dict[type[BSPBuildTargetsMetadataRequest], OrderedSet[FieldSet]] = (
+        defaultdict(OrderedSet)
+    )
+    metadata_request_types: FrozenOrderedSet[Type[BSPBuildTargetsMetadataRequest]] = (
+        union_membership.get(BSPBuildTargetsMetadataRequest)
+    )
     metadata_request_types_by_lang_id: dict[str, type[BSPBuildTargetsMetadataRequest]] = {}
     for metadata_request_type in metadata_request_types:
         previous = metadata_request_types_by_lang_id.get(metadata_request_type.language_id)
@@ -577,12 +577,12 @@ async def resolve_one_dependency_module(
 ) -> ResolveOneDependencyModuleResult:
     targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
 
-    field_sets_by_request_type: dict[
-        Type[BSPDependencyModulesRequest], list[FieldSet]
-    ] = defaultdict(list)
-    dep_module_request_types: FrozenOrderedSet[
-        Type[BSPDependencyModulesRequest]
-    ] = union_membership.get(BSPDependencyModulesRequest)
+    field_sets_by_request_type: dict[Type[BSPDependencyModulesRequest], list[FieldSet]] = (
+        defaultdict(list)
+    )
+    dep_module_request_types: FrozenOrderedSet[Type[BSPDependencyModulesRequest]] = (
+        union_membership.get(BSPDependencyModulesRequest)
+    )
     for tgt in targets:
         for dep_module_request_type in dep_module_request_types:
             field_set_type = dep_module_request_type.field_set_type

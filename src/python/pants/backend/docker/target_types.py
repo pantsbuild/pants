@@ -335,8 +335,7 @@ class DockerBuildKitOptionField:
     """Mixin to indicate a BuildKit-specific option."""
 
     @abstractmethod
-    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
-        ...
+    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]: ...
 
     required_help = "This option requires BuildKit to be enabled via the Docker subsystem options."
 
