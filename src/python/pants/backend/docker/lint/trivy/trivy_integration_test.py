@@ -1,6 +1,5 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import json
 from textwrap import dedent
 
 import pytest
@@ -10,7 +9,11 @@ from pants.backend.docker.lint.trivy.rules import rules as trivy_docker_rules
 from pants.backend.docker.rules import rules as docker_rules
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.tools.trivy.rules import rules as trivy_rules
-from pants.backend.tools.trivy.testutil import assert_trivy_output, trivy_config, assert_trivy_success
+from pants.backend.tools.trivy.testutil import (
+    assert_trivy_output,
+    assert_trivy_success,
+    trivy_config,
+)
 from pants.core.goals import package
 from pants.core.goals.lint import LintResult
 from pants.core.util_rules import source_files

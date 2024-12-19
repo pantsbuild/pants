@@ -10,15 +10,23 @@ format: json
 
 
 def assert_trivy_output(
-    result: LintResult, expected_exit_code: int, target: str, scanner_type: str, expected_error_count: int
+    result: LintResult,
+    expected_exit_code: int,
+    target: str,
+    scanner_type: str,
+    expected_error_count: int,
 ):
     if result.exit_code != expected_exit_code:
-        raise AssertionError(f"Trivy process had incorrect exit code, expected={expected_exit_code}, actual={result.exit_code}, stdout={result.stdout}, stderr={result.stderr}")
+        raise AssertionError(
+            f"Trivy process had incorrect exit code, expected={expected_exit_code}, actual={result.exit_code}, stdout={result.stdout}, stderr={result.stderr}"
+        )
 
     try:
         report = json.loads(result.stdout)
     except json.decoder.JSONDecodeError as e:
-        raise AssertionError(f"Trivy output could not be parsed as JSON, stdout={result.stdout=}, stderr={result.stderr}") from e
+        raise AssertionError(
+            f"Trivy output could not be parsed as JSON, stdout={result.stdout=}, stderr={result.stderr}"
+        ) from e
 
     findings_by_target = {res["Target"]: res for res in report["Results"]}
     assert (
@@ -37,15 +45,13 @@ def assert_trivy_output(
         ), f"Did not find expected vulnerabilities found={found_count} expected={expected_error_count}"
 
 
-
-
 def assert_trivy_success(result: LintResult):
     if result.exit_code != 0:
-        raise AssertionError(
-            f"Trivy process was not successful, stdout={result.stdout}"
-        )
+        raise AssertionError(f"Trivy process was not successful, stdout={result.stdout}")
 
     try:
         json.loads(result.stdout)
     except json.decoder.JSONDecodeError as e:
-        raise AssertionError(f"Trivy output could not be parsed as JSON, stdout={result.stdout}, stderr={result.stderr}") from e
+        raise AssertionError(
+            f"Trivy output could not be parsed as JSON, stdout={result.stdout}, stderr={result.stderr}"
+        ) from e
