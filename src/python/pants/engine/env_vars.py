@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import re
 from dataclasses import dataclass
 from typing import Dict, Optional, Sequence
@@ -53,7 +54,8 @@ class CompleteEnvironmentVars(FrozenDict):
             if name_value_match:
                 check_and_set(name_value_match[1], name_value_match[2])
             elif shorthand_re.match(env_var):
-                check_and_set(env_var, self.get(env_var))
+                for name, value in self.get_or_match(env_var).items():
+                    check_and_set(name, value)
             else:
                 raise ValueError(
                     f"An invalid variable was requested via the --test-extra-env-var "
@@ -61,6 +63,14 @@ class CompleteEnvironmentVars(FrozenDict):
                 )
 
         return FrozenDict(env_var_subset)
+
+    def get_or_match(self, name_or_pattern: str) -> dict[str, str]:
+        """
+        Get the value of an envvar if it has an exact match, otherwise all fnmatches.
+        """
+        if name_or_pattern in self:
+            return {name_or_pattern: self.get(name_or_pattern)}
+        return {k: v for k, v in self.items() if fnmatch.fnmatch(k, name_or_pattern)}
 
 
 @dataclass(frozen=True)
