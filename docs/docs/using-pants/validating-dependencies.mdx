@@ -97,7 +97,7 @@ Dependency rules are configured in the BUILD files along with targets and any ot
 
 It may help to think about these terms in context of a sentence. For `__dependencies_rules__` it is "this X may only import from \<...\>", and for `__dependents_rules__` it is "this X may only be imported from \<...\>".
 
-For each dependency there may be up to 2 sets of rules consulted to determine if it should be `allowed` or `denied` (or just `warn`, see [Rule Actions](./key-concepts/targets-and-build-files.mdx#rule-actions)), one for each end of the dependency link. The rules themselves are merely [path globs](./key-concepts/targets-and-build-files.mdx#glob-syntax) applied in order until a matching rule is found. It is an error for there to not be any matching rule, if any rules are defined. That is, you may have a dependency without any rules and that will be allowed, but as soon as there are rules in play there must exist at least one that is a match for the dependency link that dictates the outcome. It is valid to declare either dependency rules or dependent rules you don't have to have both when using visibility rules.
+For each dependency there may be up to 2 sets of rules consulted to determine if it should be `allowed` or `denied` (or just `warn`, see [Rule Actions](#rule-actions)), one for each end of the dependency link. The rules themselves are merely [path globs](#glob-syntax) applied in order until a matching rule is found. It is an error for there to not be any matching rule, if any rules are defined. That is, you may have a dependency without any rules and that will be allowed, but as soon as there are rules in play there must exist at least one that is a match for the dependency link that dictates the outcome. It is valid to declare either dependency rules or dependent rules you don't have to have both when using visibility rules.
 
 :::caution There are no default rules
 When you setup a set of rules, it must be comprehensive or Pants will throw an error when it fails to find a matching rule for a dependency/dependent.
@@ -420,4 +420,4 @@ The rule action is specified as a prefix on the rule glob:
 
 - `!` - Sets the rule's action to `DENY`.
 - `?` - Sets the rule's action to `WARN`.
-- Any other value is part of the [rule glob](./key-concepts/targets-and-build-files.mdx#glob-syntax).
+- Any other value is part of the [rule glob](#glob-syntax).

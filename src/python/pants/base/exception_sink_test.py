@@ -55,6 +55,7 @@ def test_set_invalid_log_location():
         Platform.macos_x86_64: (
             "The provided log location path at '/' is not writable or could not be created: "
             "[Errno 21] Is a directory: '/'.",
+            "Error opening fatal error log streams for log location '/': [Errno 30] Read-only file system",
         ),
         Platform.linux_arm64: (
             "Error opening fatal error log streams for log location '/': [Errno 13] Permission "

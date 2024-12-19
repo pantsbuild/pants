@@ -218,6 +218,10 @@ pub enum ProcessCacheScope {
     Always,
     // Cached in all locations, but only if the process exits successfully.
     Successful,
+    // Cached only locally, regardless of success or failure.
+    LocalAlways,
+    // Cached only locally, but only if the process exits successfully.
+    LocalSuccessful,
     // Cached only in memory (i.e. memoized in pantsd), but never persistently, regardless of
     // success vs. failure.
     PerRestartAlways,
@@ -235,6 +239,8 @@ impl TryFrom<String> for ProcessCacheScope {
         match variant_candidate.to_lowercase().as_ref() {
             "always" => Ok(ProcessCacheScope::Always),
             "successful" => Ok(ProcessCacheScope::Successful),
+            "local_always" => Ok(ProcessCacheScope::LocalAlways),
+            "local_successful" => Ok(ProcessCacheScope::LocalSuccessful),
             "per_restart_always" => Ok(ProcessCacheScope::PerRestartAlways),
             "per_restart_successful" => Ok(ProcessCacheScope::PerRestartSuccessful),
             "per_session" => Ok(ProcessCacheScope::PerSession),
@@ -1025,8 +1031,10 @@ fn make_wrapper_for_append_only_caches(
         )
         .map_err(|err| format!("write! failed: {err:?}"))?;
         if let Some(parent) = path.parent() {
-            writeln!(&mut script, "/bin/mkdir -p '{}'", parent.to_string_lossy())
-                .map_err(|err| format!("write! failed: {err}"))?;
+            if !parent.as_os_str().is_empty() {
+                writeln!(&mut script, "/bin/mkdir -p '{}'", parent.to_string_lossy())
+                    .map_err(|err| format!("write! failed: {err}"))?;
+            }
         }
         writeln!(
             &mut script,

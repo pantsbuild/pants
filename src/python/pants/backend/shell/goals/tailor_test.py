@@ -34,7 +34,20 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def test_find_putative_targets(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "opt_tailor_sources,opt_tailor_tests,expects_sources,expects_tests",
+    [
+        pytest.param(False, True, False, True, id="sources disabled"),
+        pytest.param(True, False, True, False, id="tests disabled"),
+    ],
+)
+def test_find_putative_targets(
+    opt_tailor_sources,
+    opt_tailor_tests,
+    expects_sources,
+    expects_tests,
+    rule_runner: RuleRunner,
+) -> None:
     rule_runner.write_files(
         {
             f"src/sh/foo/{fp}": ""
@@ -48,6 +61,12 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
             )
         }
     )
+    rule_runner.set_options(
+        [
+            f"--shell-setup-tailor-sources={opt_tailor_sources}",
+            f"--shell-setup-tailor-shunit2-tests={opt_tailor_tests}",
+        ]
+    )
     pts = rule_runner.request(
         PutativeTargets,
         [
@@ -55,8 +74,9 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
             AllOwnedSources(["src/sh/foo/bar/baz1.sh", "src/sh/foo/bar/baz1_test.sh"]),
         ],
     )
-    assert (
-        PutativeTargets(
+    expected = []
+    if expects_sources:
+        expected.extend(
             [
                 PutativeTarget.for_target_type(
                     ShellSourcesGeneratorTarget,
@@ -70,6 +90,11 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     name=None,
                     triggering_sources=["baz2.sh", "baz3.sh"],
                 ),
+            ]
+        )
+    if expects_tests:
+        expected.extend(
+            [
                 PutativeTarget.for_target_type(
                     Shunit2TestsGeneratorTarget,
                     path="src/sh/foo/bar",
@@ -78,8 +103,8 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 ),
             ]
         )
-        == pts
-    )
+
+    assert PutativeTargets(expected) == pts
 
 
 def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:

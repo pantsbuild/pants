@@ -87,6 +87,7 @@ TEST_FLAGS = {
     "cpu": True,
     "cpuprofile": True,
     "failfast": False,
+    "fullpath": False,
     "fuzz": True,
     "fuzzminimizetime": True,
     "fuzztime": True,

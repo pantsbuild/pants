@@ -11,7 +11,7 @@ bytes = { workspace = true }
 futures = { workspace = true }
 grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
-hyper = { workspace = true, features = ["stream", "tcp"] }
+hyper = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
 prost = { workspace = true }
@@ -19,6 +19,7 @@ prost-types = { workspace = true }
 protos = { path = "../../protos" }
 testutil = { path = ".." }
 tokio = { workspace = true, features = ["time"] }
+tokio-stream = { workspace = true }
 tonic = { workspace = true }
 
 [lints]

@@ -98,7 +98,7 @@ class PythonGeneratingSourcesBase(MultipleSourcesField):
     expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
 
 
-class InterpreterConstraintsField(StringSequenceField):
+class InterpreterConstraintsField(StringSequenceField, AsyncFieldMixin):
     alias = "interpreter_constraints"
     help = help_text(
         f"""
@@ -123,6 +123,17 @@ class InterpreterConstraintsField(StringSequenceField):
 
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
+        if self.value and python_setup.warn_on_python2_usage:
+            # Side-step import cycle.
+            from pants.backend.python.util_rules.interpreter_constraints import (
+                warn_on_python2_usage_in_interpreter_constraints,
+            )
+
+            warn_on_python2_usage_in_interpreter_constraints(
+                self.value,
+                description_of_origin=f"the `{self.alias}` field on target at `{self.address}`",
+            )
+
         return python_setup.compatibility_or_constraints(self.value)
 
 
@@ -299,6 +310,12 @@ class ConsoleScript(MainSpecification):
 class Executable(MainSpecification):
     executable: str
 
+    @classmethod
+    def create(cls, address: Address, filename: str) -> Executable:
+        # spec_path is relative to the workspace. The rule is responsible for
+        # stripping the source root as needed.
+        return cls(os.path.join(address.spec_path, filename).lstrip(os.path.sep))
+
     def iter_pex_args(self) -> Iterator[str]:
         yield "--executable"
         # We do NOT yield self.executable or self.spec
@@ -407,9 +424,7 @@ class PexExecutableField(Field):
             return None
         if not isinstance(value, str):
             raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
-        # spec_path is relative to the workspace. The rule is responsible for
-        # stripping the source root as needed.
-        return Executable(os.path.join(address.spec_path, value).lstrip(os.path.sep))
+        return Executable.create(address, value)
 
 
 class PexArgsField(StringSequenceField):
@@ -482,11 +497,11 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
         You can give a list of multiple complete platforms to create a multiplatform PEX,
         meaning that the PEX will be executable in all of the supported environments.
 
-        Complete platforms should be addresses of `file` targets that point to files that contain
+        Complete platforms should be addresses of `file` or `resource` targets that point to files that contain
         complete platform JSON as described by Pex
         (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
 
-        See {doc_url('docs/python/overview/pex')} for details.
+        See {doc_url('docs/python/overview/pex#generating-the-complete_platforms-file')} for details on how to create this file.
         """
     )
 
@@ -585,26 +600,6 @@ class PexEmitWarningsField(TriBoolField):
         if self.value is None:
             return pex_binary_defaults.emit_warnings
 
-        return self.value
-
-
-class PexResolveLocalPlatformsField(TriBoolField):
-    alias = "resolve_local_platforms"
-    removal_version = "2.24.0.dev0"
-    removal_hint = softwrap(
-        f"""\
-        This {alias} field is no longer used now that the `platforms` field has been removed. Remove it.
-        """
-    )
-    help = help_text(
-        """
-        Now unused.
-        """
-    )
-
-    def value_or_global_default(self, pex_binary_defaults: PexBinaryDefaults) -> bool:
-        if self.value is None:
-            return pex_binary_defaults.resolve_local_platforms
         return self.value
 
 
@@ -739,7 +734,6 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexBinaryDependenciesField,
     PexCheckField,
     PexCompletePlatformsField,
-    PexResolveLocalPlatformsField,
     PexInheritPathField,
     PexStripEnvField,
     PexIgnoreErrorsField,
@@ -886,21 +880,6 @@ class PexBinaryDefaults(Subsystem):
         ),
         advanced=True,
     )
-    resolve_local_platforms = BoolOption(
-        default=False,
-        help=softwrap(
-            """
-            Now unused.
-            """
-        ),
-        removal_version="2.24.0.dev0",
-        removal_hint=softwrap(
-            """\
-            This `resolve_local_platforms` option is no longer used now that the `platforms` field has been removed. You can safely delete this setting.
-            """
-        ),
-        advanced=True,
-    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -932,6 +911,47 @@ class PythonTestSourceField(PythonSourceField):
 
 class PythonTestsDependenciesField(PythonDependenciesField):
     supports_transitive_excludes = True
+
+
+class PythonTestsEntryPointDependenciesField(DictStringToStringSequenceField):
+    alias = "entry_point_dependencies"
+    help = help_text(
+        lambda: f"""
+        Dependencies on entry point metadata of `{PythonDistribution.alias}` targets.
+
+        This is a dict where each key is a `{PythonDistribution.alias}` address
+        and the value is a list or tuple of entry point groups and/or entry points
+        on that target. The strings in the value list/tuple must be one of:
+        - "entry.point.group/entry-point-name" to depend on a named entry point
+        - "entry.point.group" (without a "/") to depend on an entry point group
+        - "*" to get all entry points on the target
+
+        For example:
+
+            {PythonTestsEntryPointDependenciesField.alias}={{
+                "//foo/address:dist_tgt": ["*"],  # all entry points
+                "bar:dist_tgt": ["console_scripts"],  # only from this group
+                "foo/bar/baz:dist_tgt": ["console_scripts/my-script"],  # a single entry point
+                "another:dist_tgt": [  # multiple entry points
+                    "console_scripts/my-script",
+                    "console_scripts/another-script",
+                    "entry.point.group/entry-point-name",
+                    "other.group",
+                    "gui_scripts",
+                ],
+            }}
+
+        Code for matching `entry_points` on `{PythonDistribution.alias}` targets
+        will be added as dependencies so that they are available on PYTHONPATH
+        during tests.
+
+        Plus, an `entry_points.txt` file will be generated in the sandbox so that
+        each of the `{PythonDistribution.alias}`s appear to be "installed". The
+        `entry_points.txt` file will only include the entry points requested on this
+        field. This allows the tests, or the code under test, to lookup entry points
+        metadata using something like `pkg_resources.iter_entry_points` from `setuptools`.
+        """
+    )
 
 
 # TODO This field class should extend from a core `TestTimeoutField` once the deprecated options in `pytest` get removed.
@@ -1008,6 +1028,8 @@ class SkipPythonTestsField(BoolField):
 
 _PYTHON_TEST_MOVED_FIELDS = (
     PythonTestsDependenciesField,
+    # This field is registered in the experimental backend for now.
+    # PythonTestsEntryPointDependenciesField,
     PythonResolveField,
     PythonRunGoalUseSandboxField,
     PythonTestsTimeoutField,
@@ -1635,7 +1657,7 @@ class LongDescriptionPathField(StringField):
 
 
 class PythonDistribution(Target):
-    alias = "python_distribution"
+    alias: ClassVar[str] = "python_distribution"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,

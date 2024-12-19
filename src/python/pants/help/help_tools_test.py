@@ -9,17 +9,20 @@ import pytest
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.help_tools import ToolHelpInfo
 from pants.help.maybe_color import MaybeColor
-from pants.option.config import Config
 from pants.option.global_options import GlobalOptions
-from pants.option.parser import Parser
+from pants.option.native_options import NativeOptionParser
+from pants.option.registrar import OptionRegistrar
 
 
 @pytest.fixture
-def parser() -> Parser:
-    return Parser(
-        env={},
-        config=Config.load([]),
-        scope_info=GlobalOptions.get_scope_info(),
+def registrar() -> OptionRegistrar:
+    return OptionRegistrar(scope=GlobalOptions.options_scope)
+
+
+@pytest.fixture
+def native_parser() -> NativeOptionParser:
+    return NativeOptionParser(
+        [], {}, [], allow_pantsrc=False, include_derivation=True, known_scopes_to_flags={}
     )
 
 
@@ -29,17 +32,19 @@ def extracter() -> HelpInfoExtracter:
 
 
 @pytest.fixture
-def tool_info(extracter, parser) -> ToolHelpInfo:
-    parser.register("version", typ=str, default="1.0")
-    parser.register("url-template", typ=str, default="https://download/{version}")
-    oshi = extracter.get_option_scope_help_info("Test description.", parser, False)
+def tool_info(extracter, registrar, native_parser) -> ToolHelpInfo:
+    registrar.register("--version", type=str, default="1.0")
+    registrar.register("--url-template", type=str, default="https://download/{version}")
+    oshi = extracter.get_option_scope_help_info(
+        "Test description.", registrar, native_parser, False
+    )
     tool_info = ToolHelpInfo.from_option_scope_help_info(oshi)
     assert tool_info is not None
     return tool_info
 
 
-def test_no_tool_help_info(extracter, parser) -> None:
-    oshi = extracter.get_option_scope_help_info("", parser, False)
+def test_no_tool_help_info(extracter, registrar, native_parser) -> None:
+    oshi = extracter.get_option_scope_help_info("", registrar, native_parser, False)
     assert ToolHelpInfo.from_option_scope_help_info(oshi) is None
 
 

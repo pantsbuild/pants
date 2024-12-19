@@ -28,7 +28,7 @@ from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_all_pythons_present,
-    skip_unless_python37_and_python39_present,
+    skip_unless_python38_and_python39_present,
 )
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
@@ -100,7 +100,7 @@ def assert_success(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(["CPython>=3.7,<4"]),
+    all_major_minor_python_versions(["CPython>=3.8,<4"]),
 )
 def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
@@ -156,27 +156,30 @@ def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-@skip_unless_python37_and_python39_present
+@skip_unless_python38_and_python39_present
 def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
-            f"{PACKAGE}/f.py": "'''docstring'''\ny = (x := '')\n",
+            f"{PACKAGE}/f.py": "'''docstring'''\ny = {} | {}\n",
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_sources(name='py37', interpreter_constraints=['CPython==3.7.*'])
+                python_sources(name='py38', interpreter_constraints=['CPython==3.8.*'])
                 python_sources(name='py39', interpreter_constraints=['CPython==3.9.*'])
                 """
             ),
         }
     )
 
-    py37_tgt = rule_runner.get_target(
-        Address(PACKAGE, target_name="py37", relative_file_path="f.py")
+    py38_tgt = rule_runner.get_target(
+        Address(PACKAGE, target_name="py38", relative_file_path="f.py")
     )
-    py37_result = run_pylint(rule_runner, [py37_tgt])
-    assert len(py37_result) == 1
-    assert py37_result[0].exit_code == 2
-    assert "invalid syntax (<unknown>, line 2) (syntax-error)" in py37_result[0].stdout
+    py38_result = run_pylint(rule_runner, [py38_tgt])
+    assert len(py38_result) == 1
+    assert py38_result[0].exit_code == 2
+    assert (
+        "E1131: unsupported operand type(s) for | (unsupported-binary-operation)"
+        in py38_result[0].stdout
+    )
 
     py39_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py39", relative_file_path="f.py")
@@ -186,15 +189,18 @@ def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     assert py39_result[0].exit_code == 0
     assert "Your code has been rated at 10.00/10" in py39_result[0].stdout.strip()
 
-    combined_result = run_pylint(rule_runner, [py37_tgt, py39_tgt])
+    combined_result = run_pylint(rule_runner, [py38_tgt, py39_tgt])
     assert len(combined_result) == 2
-    batched_py39_result, batched_py37_result = sorted(
+    batched_py39_result, batched_py38_result = sorted(
         combined_result, key=lambda result: result.exit_code
     )
 
-    assert batched_py37_result.exit_code == 2
-    assert batched_py37_result.partition_description == "['CPython==3.7.*']"
-    assert "invalid syntax (<unknown>, line 2) (syntax-error)" in batched_py37_result.stdout
+    assert batched_py38_result.exit_code == 2
+    assert batched_py38_result.partition_description == "['CPython==3.8.*']"
+    assert (
+        "E1131: unsupported operand type(s) for | (unsupported-binary-operation)"
+        in batched_py38_result.stdout
+    )
 
     assert batched_py39_result.exit_code == 0
     assert batched_py39_result.partition_description == "['CPython==3.9.*']"

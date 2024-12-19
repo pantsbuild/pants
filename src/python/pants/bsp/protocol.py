@@ -6,13 +6,16 @@ import logging
 from concurrent.futures import Future
 from typing import Any, BinaryIO, ClassVar, Protocol
 
-from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
-from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
+from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import-untyped]
+from pylsp_jsonrpc.exceptions import (  # type: ignore[import-untyped]
     JsonRpcException,
     JsonRpcInvalidRequest,
     JsonRpcMethodNotFound,
 )
-from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
+from pylsp_jsonrpc.streams import (  # type: ignore[import-untyped]
+    JsonRpcStreamReader,
+    JsonRpcStreamWriter,
+)
 
 from pants.bsp.context import BSPContext
 from pants.bsp.spec.notification import BSPNotification

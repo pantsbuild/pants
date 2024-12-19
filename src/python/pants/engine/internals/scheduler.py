@@ -28,6 +28,8 @@ from pants.engine.fs import (
     NativeDownloadFile,
     PathGlobs,
     PathGlobsAndRoot,
+    PathMetadataRequest,
+    PathMetadataResult,
     Paths,
     Snapshot,
     SymlinkEntry,
@@ -36,8 +38,10 @@ from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
+    NativeParsedDockerfileInfo,
     NativeParsedJavascriptDependencies,
     NativeParsedPythonDependencies,
+    ParsedJavascriptDependencyCandidate,
 )
 from pants.engine.internals.native_engine import (
     PyExecutionRequest,
@@ -152,6 +156,8 @@ class Scheduler:
         # Create the native Scheduler and Session.
         types = PyTypes(
             paths=Paths,
+            path_metadata_request=PathMetadataRequest,
+            path_metadata_result=PathMetadataResult,
             file_content=FileContent,
             file_entry=FileEntry,
             symlink_entry=SymlinkEntry,
@@ -176,6 +182,8 @@ class Scheduler:
             docker_resolve_image_result=DockerResolveImageResult,
             parsed_python_deps_result=NativeParsedPythonDependencies,
             parsed_javascript_deps_result=NativeParsedJavascriptDependencies,
+            parsed_dockerfile_info_result=NativeParsedDockerfileInfo,
+            parsed_javascript_deps_candidate_result=ParsedJavascriptDependencyCandidate,
         )
         remoting_options = PyRemotingOptions(
             provider=execution_options.remote_provider.value,

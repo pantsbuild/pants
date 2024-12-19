@@ -11,7 +11,7 @@ from typing import Iterable
 from pants.backend.javascript.lint.prettier.subsystem import Prettier
 from pants.backend.javascript.subsystems import nodejs_tool
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
-from pants.backend.javascript.target_types import JSSourceField
+from pants.backend.javascript.target_types import JSRuntimeSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
@@ -28,9 +28,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PrettierFmtFieldSet(FieldSet):
-    required_fields = (JSSourceField,)
+    required_fields = (JSRuntimeSourceField,)
 
-    sources: JSSourceField
+    sources: JSRuntimeSourceField
 
 
 class PrettierFmtRequest(FmtTargetsRequest):

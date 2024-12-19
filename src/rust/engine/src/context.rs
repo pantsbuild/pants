@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult};
+use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult, SubjectPath};
 use crate::python::{throw, Failure};
 use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
@@ -70,6 +70,7 @@ pub struct Core {
     pub http_client: reqwest::Client,
     pub local_cache: PersistentCache,
     pub vfs: PosixFS,
+    pub vfs_system: PosixFS,
     pub watcher: Option<Arc<InvalidationWatcher>>,
     pub build_root: PathBuf,
     pub local_parallelism: usize,
@@ -639,7 +640,9 @@ impl Core {
         .await?;
         log::debug!("Using {command_runners:?} for process execution.");
 
-        let graph = Arc::new(InvalidatableGraph(Graph::new(executor.clone())));
+        let graph = Arc::new(InvalidatableGraph {
+            graph: Graph::new(executor.clone()),
+        });
 
         // These certs are for downloads, not to be confused with the ones used for remoting.
         let ca_certs = Self::load_certificates(ca_certs_path)?;
@@ -685,8 +688,10 @@ impl Core {
             command_runners,
             http_client,
             local_cache,
-            vfs: PosixFS::new(&build_root, ignorer, executor)
+            vfs: PosixFS::new(&build_root, ignorer, executor.clone())
                 .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,
+            vfs_system: PosixFS::new(Path::new("/"), GitignoreStyleExcludes::empty(), executor)
+                .map_err(|e| format!("Could not initialize Vfs for local system: {e:?}"))?,
             build_root,
             watcher,
             local_parallelism: exec_strategy_opts.local_parallelism,
@@ -729,7 +734,9 @@ impl Core {
     }
 }
 
-pub struct InvalidatableGraph(Graph<NodeKey>);
+pub struct InvalidatableGraph {
+    graph: Graph<NodeKey>,
+}
 
 fn caller_to_logging_info(caller: InvalidateCaller) -> (Level, &'static str) {
     match caller {
@@ -748,7 +755,11 @@ impl Invalidatable for InvalidatableGraph {
         let InvalidationResult { cleared, dirtied } =
             self.invalidate_from_roots(false, move |node| {
                 if let Some(fs_subject) = node.fs_subject() {
-                    paths.contains(fs_subject)
+                    match fs_subject {
+                        SubjectPath::Workspace(relpath) => paths.contains(relpath.as_path()),
+                        // TODO: Invalidation not supported currently for local system paths.
+                        SubjectPath::LocalSystem(_) => false,
+                    }
                 } else {
                     false
                 }
@@ -784,7 +795,7 @@ impl Deref for InvalidatableGraph {
     type Target = Graph<NodeKey>;
 
     fn deref(&self) -> &Graph<NodeKey> {
-        &self.0
+        &self.graph
     }
 }
 
@@ -860,8 +871,14 @@ impl SessionCore {
             } else {
                 // There are no live or invalidated sources of this Digest. Directly fail.
                 return result.map_err(|e| {
+                    let suffix = if let Some(workunit_data) = workunit.workunit() {
+                        &format!(", with workunit: {:?}", workunit_data)
+                    } else {
+                        ""
+                    };
+
                     throw(format!(
-                        "Could not identify a process to backtrack to for: {e}"
+                        "Could not identify a process to backtrack to for: {e}{suffix}"
                     ))
                 });
             }

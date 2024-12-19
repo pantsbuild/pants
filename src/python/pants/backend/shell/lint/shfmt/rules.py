@@ -7,6 +7,7 @@ from pants.backend.shell.lint.shfmt.skip_field import SkipShfmtField
 from pants.backend.shell.lint.shfmt.subsystem import Shfmt
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.partitions import PartitionerType
@@ -15,6 +16,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -78,4 +80,5 @@ def rules():
     return [
         *collect_rules(),
         *ShfmtRequest.rules(),
+        UnionRule(ExportableTool, Shfmt),
     ]

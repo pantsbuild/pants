@@ -39,7 +39,7 @@ from pants.backend.shell.target_types import ShellSourcesGeneratorTarget, ShellS
 from pants.backend.shell.target_types import rules as shell_target_types_rules
 from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
-from pants.core.target_types import FilesGeneratorTarget
+from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.core.util_rules.environments import DockerEnvironmentTarget
 from pants.engine.addresses import Address
@@ -76,6 +76,7 @@ def create_rule_runner() -> RuleRunner:
             DockerEnvironmentTarget,
             DockerImageTarget,
             FilesGeneratorTarget,
+            FileTarget,
             PexBinary,
             ShellSourcesGeneratorTarget,
             ShellSourceTarget,
@@ -335,6 +336,65 @@ def test_from_image_build_arg_not_in_repo_issue_15585(rule_runner: RuleRunner) -
     )
 
 
+def test_build_args_for_copy(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "testprojects/src/docker/BUILD": dedent(
+                """\
+            docker_image()
+            file(name="file", source="file.txt")
+            file(name="file_as_arg", source="file_as_arg.txt")
+            """
+            ),
+            "testprojects/src/docker/Dockerfile": dedent(
+                """\
+            FROM		python:3.9
+
+            ARG PEX_BIN="testprojects/src/python:hello"
+            ARG PEX_BIN_DOTTED_PATH="testprojects.src.python/hello_dotted.pex"
+            ARG FILE_AS_ARG="testprojects/src/docker/file_as_arg.txt"
+
+            COPY		${PEX_BIN} /app/pex_bin
+            COPY		$PEX_BIN_DOTTED_PATH /app/pex_var
+            COPY		testprojects.src.python/hello_inline.pex /app/pex_bin_dotted_path
+            COPY		${FILE_AS_ARG} /app/
+            COPY		testprojects/src/docker/file.txt /app/
+            """
+            ),
+            "testprojects/src/docker/file_as_arg.txt": "",
+            "testprojects/src/docker/file.txt": "",
+            "testprojects/src/python/BUILD": dedent(
+                """\
+            pex_binary(name="hello", entry_point="hello.py")
+            pex_binary(name="hello_dotted", entry_point="hello.py")
+            pex_binary(name="hello_inline", entry_point="hello.py")
+            """
+            ),
+            "testprojects/src/python/hello.py": "",
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("testprojects/src/docker", target_name="docker"),
+        expected_files=[
+            "testprojects/src/docker/Dockerfile",
+            "testprojects/src/docker/file.txt",
+            "testprojects/src/docker/file_as_arg.txt",
+            "testprojects.src.python/hello_inline.pex",
+            "testprojects.src.python/hello_dotted.pex",
+            "testprojects.src.python/hello.pex",
+        ],
+        expected_interpolation_context={
+            "build_args": {
+                "FILE_AS_ARG": "testprojects/src/docker/file_as_arg.txt",
+                "PEX_BIN": "testprojects.src.python/hello.pex",
+            },
+            "tags": {"baseimage": "3.9", "stage0": "3.9"},
+        },
+    )
+
+
 def test_files_out_of_tree(rule_runner: RuleRunner) -> None:
     # src/a:img_A -> res/static:files
     rule_runner.write_files(
@@ -430,7 +490,6 @@ def test_packaged_pex_environment(rule_runner: RuleRunner) -> None:
     rule_runner.write_digest(context.digest, path_prefix="contents")
     with zipfile.ZipFile(os.path.join(rule_runner.build_root, "contents", pex_file), "r") as zf:
         assert json.loads(zf.read("PEX-INFO"))["distributions"].keys() == {
-            "psutil-5.9.2-cp37-cp37m-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
             "psutil-5.9.2-cp38-cp38-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
         }
 
@@ -727,6 +786,7 @@ def test_create_docker_build_context() -> None:
             source="test/Dockerfile",
             build_args=DockerBuildArgs.from_strings(),
             copy_source_paths=(),
+            copy_build_args=DockerBuildArgs.from_strings(),
             from_image_build_args=DockerBuildArgs.from_strings(),
             version_tags=("base latest", "stage1 1.2", "dev 2.0", "prod 2.0"),
         ),

@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import sys
 from dataclasses import dataclass
+from typing import Any
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
@@ -25,6 +26,7 @@ from pants.engine.streaming_workunit_handler import (
     WorkunitsCallbackFactories,
 )
 from pants.engine.unions import UnionMembership
+from pants.goal.auxiliary_goal import AuxiliaryGoal, AuxiliaryGoalContext
 from pants.goal.builtin_goal import BuiltinGoal
 from pants.goal.run_tracker import RunTracker
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler, GraphSession
@@ -103,6 +105,10 @@ class LocalPantsRunner:
         # Option values are usually computed lazily on demand, but command line options are
         # eagerly computed for validation.
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
+            # Verify CLI flags.
+            if not build_config.allow_unknown_options:
+                options.verify_args()
+
             for scope, values in options.scope_to_flags.items():
                 if values:
                     # Only compute values if there were any command line options presented.
@@ -119,7 +125,7 @@ class LocalPantsRunner:
             dynamic_remote_options, _ = DynamicRemoteOptions.from_options(
                 options, env, remote_auth_plugin_func=build_config.remote_auth_plugin_func
             )
-            bootstrap_options = options.bootstrap_option_values()
+            bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
             assert bootstrap_options is not None
             scheduler = EngineInitializer.setup_graph(
                 bootstrap_options, build_config, dynamic_remote_options, executor
@@ -211,13 +217,28 @@ class LocalPantsRunner:
         )
         return tuple(filter(bool, (wcf.callback_factory() for wcf in workunits_callback_factories)))
 
-    def _run_builtin_goal(self, builtin_goal: str) -> ExitCode:
-        scope_info = self.options.known_scope_to_info[builtin_goal]
+    def _run_builtin_or_auxiliary_goal(self, goal_name: str) -> ExitCode:
+        scope_info = self.options.known_scope_to_info[goal_name]
         assert scope_info.subsystem_cls
-        scoped_options = self.options.for_scope(builtin_goal)
+
+        scoped_options = self.options.for_scope(goal_name)
         goal = scope_info.subsystem_cls(scoped_options)
-        assert isinstance(goal, BuiltinGoal)
-        return goal.run(
+
+        def _run_builtin_goal(context: AuxiliaryGoalContext, goal: Any) -> ExitCode:
+            assert isinstance(goal, BuiltinGoal)
+            return goal.run(
+                build_config=context.build_config,
+                graph_session=context.graph_session,
+                options=context.options,
+                specs=context.specs,
+                union_membership=context.union_membership,
+            )
+
+        def _run_auxiliary_goal(context: AuxiliaryGoalContext, goal: Any) -> ExitCode:
+            assert isinstance(goal, AuxiliaryGoal)
+            return goal.run(context)
+
+        context = AuxiliaryGoalContext(
             build_config=self.build_config,
             graph_session=self.graph_session,
             options=self.options,
@@ -225,9 +246,19 @@ class LocalPantsRunner:
             union_membership=self.union_membership,
         )
 
+        if scope_info.is_builtin:
+            return _run_builtin_goal(context, goal)
+        elif scope_info.is_auxiliary:
+            return _run_auxiliary_goal(context, goal)
+        else:
+            raise AssertionError(
+                f"Probable builtin or auxiliary goal `{goal_name}` is not configured correctly. "
+                "Please report this error to the Pants team at https://github.com/pantsbuild/pants/issues/new/choose."
+            )
+
     def _run_inner(self) -> ExitCode:
-        if self.options.builtin_goal:
-            return self._run_builtin_goal(self.options.builtin_goal)
+        if self.options.builtin_or_auxiliary_goal:
+            return self._run_builtin_or_auxiliary_goal(self.options.builtin_or_auxiliary_goal)
 
         goals = tuple(self.options.goals)
         if not goals:

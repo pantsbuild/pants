@@ -1,7 +1,7 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use maplit::hashmap;
+use maplit::{hashmap, hashset};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -216,6 +216,7 @@ fn test_default_section_scalar() {
         99.88,
         ConfigReader::get_float,
     );
+    do_test("11", "22", "33", 11.0, 33.0, ConfigReader::get_float);
     do_test(
         "\"xx\"",
         "\"yy\"",
@@ -409,4 +410,69 @@ fn test_nonexistent_required_fromfile() {
 fn test_nonexistent_optional_fromfile() {
     let conf = config("[GLOBAL]\nfoo = '@?/does/not/exist'\n");
     assert!(conf.get_string(&option_id!("foo")).unwrap().is_none());
+}
+
+#[test]
+fn test_invalid_keys() {
+    let conf = config(
+        "[DEFAULT]\n\
+     field1 = 'something'\n\
+     [foo]\n\
+     field2 = 'bar'\n\
+     [bar]\n\
+     field3 = 42\n\
+     stringlist.add = ['apple']\n\
+     inline_table = { fruit = 'strawberry' }",
+    );
+
+    assert_eq!(
+        vec![
+            "Invalid table name [foo]".to_string(),
+            "Invalid option 'field3' under [bar]".to_string(),
+            "Invalid option 'stringlist' under [bar]".to_string(),
+        ],
+        conf.validate(&hashmap! {
+            "bar".to_string() => hashset! {"inline_table".to_string()},
+        })
+    );
+
+    assert_eq!(
+        vec![
+            "Invalid table name [foo]".to_string(),
+            "Invalid option 'field3' under [bar]".to_string(),
+        ],
+        conf.validate(&hashmap! {
+            "bar".to_string() => hashset! {"stringlist".to_string(), "inline_table".to_string()},
+        })
+    );
+
+    assert_eq!(
+        vec!["Invalid table name [foo]".to_string(),],
+        conf.validate(&hashmap! {
+            "bar".to_string() => hashset! {
+                    "field3".to_string(), "stringlist".to_string(), "inline_table".to_string()
+                },
+        })
+    );
+
+    assert_eq!(
+        vec!["Invalid option 'field3' under [bar]".to_string(),],
+        conf.validate(&hashmap! {
+            "foo".to_string() => hashset! {"field2".to_string()},
+            "bar".to_string() => hashset! {
+                    "stringlist".to_string(), "inline_table".to_string()
+                },
+        })
+    );
+
+    let empty: Vec<String> = vec![];
+    assert_eq!(
+        empty,
+        conf.validate(&hashmap! {
+            "foo".to_string() => hashset! {"field2".to_string()},
+            "bar".to_string() => hashset! {
+                    "field3".to_string(), "stringlist".to_string(), "inline_table".to_string()
+                },
+        })
+    );
 }

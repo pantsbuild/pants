@@ -103,7 +103,9 @@ def test_export_venv_new_codepath(
     )
 
     format_flag = f"--export-py-resolve-format={py_resolve_format.value}"
-    hermetic_flags = [] if py_hermetic_scripts else ["--export-py-hermetic-scripts=false"]
+    hermetic_flags = (
+        [] if py_hermetic_scripts else ["--export-py-non-hermetic-scripts-in-resolve=['a', 'b']"]
+    )
     rule_runner.set_options(
         [
             *pants_args_for_python_lockfiles,
@@ -241,7 +243,7 @@ def test_export_codegen_outputs():
             "--python-resolves={'test-resolve': 'test-resolve.lock'}",
             "--source-root-patterns=src/python",
             "--export-resolve=test-resolve",
-            "--export-py-generated-sources",
+            "--export-py-generated-sources-in-resolve=['test-resolve']",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
@@ -249,12 +251,32 @@ def test_export_codegen_outputs():
     rule_runner.write_files(
         {
             "test-resolve.lock": "",
+            # Case #1
+            # `foo`` package exports `an-input.py` file as a generated source.
             "src/python/foo/BUILD": dedent(
-                """\
-            codegen_target(name="codegen", source="an-input", resolve="test-resolve")
-            """
+                """
+                codegen_target(
+                  name="codegen",
+                  source="an-input",
+                  resolve="test-resolve"
+                )
+                """
             ),
             "src/python/foo/an-input": "print('Hello World!')\n",
+            # Case #2
+            # The local `ansicolors`` package exports `ansicolors-input.py` file as a generated source.
+            # The local `ansicolors package clashes with the 3rd party dep `ansicolors``.
+            # This is an edge case.
+            "src/python/ansicolors/BUILD": dedent(
+                """
+                codegen_target(
+                  name="codegen",
+                  source="ansicolors-input",
+                  resolve="test-resolve"
+                )
+                """
+            ),
+            "src/python/ansicolors/ansicolors-input": "print('Hello World!')\n",
         }
     )
 
@@ -265,3 +287,7 @@ def test_export_codegen_outputs():
     export_snapshot = rule_runner.request(Snapshot, [export_result.digest])
     assert any(p.endswith("__pants_codegen__/codegen_setup.py") for p in export_snapshot.files)
     assert any(p.endswith("__pants_codegen__/foo/an-input.py") for p in export_snapshot.files)
+    assert any(
+        p.endswith("__pants_codegen__/ansicolors/ansicolors-input.py")
+        for p in export_snapshot.files
+    )

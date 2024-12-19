@@ -1,14 +1,19 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::iter::{once, Once};
 use std::path::{Path, PathBuf};
 
-use fnv::FnvHashSet as HashSet;
+use fnv::{FnvBuildHasher, FnvHashMap as HashMap, FnvHashSet as HashSet};
+use itertools::Either;
 use serde_derive::{Deserialize, Serialize};
 use tree_sitter::{Node, Parser};
 
-use protos::gen::pants::cache::JavascriptInferenceMetadata;
+use crate::code;
+use protos::gen::pants::cache::{
+    javascript_inference_metadata::ImportPattern, JavascriptInferenceMetadata,
+};
 
-use crate::javascript::import_pattern::imports_from_patterns;
+use crate::javascript::import_pattern::{imports_from_patterns, Import};
 use crate::javascript::util::normalize_path;
 
 mod import_pattern;
@@ -18,10 +23,68 @@ include!(concat!(env!("OUT_DIR"), "/javascript/constants.rs"));
 include!(concat!(env!("OUT_DIR"), "/javascript/visitor.rs"));
 include!(concat!(env!("OUT_DIR"), "/javascript_impl_hash.rs"));
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ParsedJavascriptDependencies {
+    pub imports: HashMap<String, JavascriptImportInfo>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct JavascriptImportInfo {
     pub file_imports: HashSet<String>,
     pub package_imports: HashSet<String>,
+}
+
+impl JavascriptImportInfo {
+    fn from_sets(file_imports: HashSet<String>, package_imports: HashSet<String>) -> Self {
+        JavascriptImportInfo {
+            file_imports,
+            package_imports,
+        }
+    }
+
+    #[cfg(test)]
+    fn new<F: AsRef<str>, T: AsRef<str>>(
+        file_imports: impl IntoIterator<Item = F>,
+        package_imports: impl IntoIterator<Item = T>,
+    ) -> Self {
+        JavascriptImportInfo::from_sets(
+            file_imports
+                .into_iter()
+                .map(|s| s.as_ref().to_string())
+                .collect(),
+            package_imports
+                .into_iter()
+                .map(|s| s.as_ref().to_string())
+                .collect(),
+        )
+    }
+}
+
+fn patterns_as_lookup(patterns: Vec<ImportPattern>) -> HashMap<String, Vec<String>> {
+    patterns
+        .into_iter()
+        .map(|pattern| (pattern.pattern, pattern.replacements))
+        .collect()
+}
+
+fn placed_at_root(package_root: &str, string: &str) -> bool {
+    !package_root.is_empty() && string.starts_with(package_root)
+}
+
+fn is_relative_specifier(string: &str) -> bool {
+    string.starts_with(['.', '/'])
+}
+
+fn match_and_extend_with_config_candidates(
+    string: String,
+    paths: &HashMap<String, Vec<String>>,
+    config_root: Option<&str>,
+) -> Either<Once<Import>, impl Iterator<Item = Import>> {
+    if let Some(imports) = config_root.map(|root| imports_from_patterns(root, paths, &string)) {
+        Either::Right(imports.into_iter().chain(once(Import::UnMatched(string))))
+    } else {
+        Either::Left(once(Import::UnMatched(string)))
+    }
 }
 
 pub fn get_dependencies(
@@ -29,31 +92,46 @@ pub fn get_dependencies(
     filepath: PathBuf,
     metadata: JavascriptInferenceMetadata,
 ) -> Result<ParsedJavascriptDependencies, String> {
-    let patterns = metadata
-        .import_patterns
-        .into_iter()
-        .map(|pattern| (pattern.pattern, pattern.replacements))
-        .collect();
+    let import_patterns = patterns_as_lookup(metadata.import_patterns);
+    let paths = patterns_as_lookup(metadata.paths);
+
     let mut collector = ImportCollector::new(contents);
     collector.collect();
-    let (relative_files, packages): (HashSet<String>, HashSet<String>) = collector
-        .imports
-        .into_iter()
-        .flat_map(|import| imports_from_patterns(&metadata.package_root, &patterns, import))
-        .partition(|import| {
-            import.starts_with('.')
-                || import.starts_with('/')
-                || (!metadata.package_root.is_empty() && import.starts_with(&metadata.package_root))
-        });
-    Ok(ParsedJavascriptDependencies {
-        file_imports: normalize_from_path(&metadata.package_root, filepath, relative_files),
-        package_imports: packages,
-    })
+    let mut imports =
+        HashMap::with_capacity_and_hasher(collector.imports.len(), FnvBuildHasher::default());
+    for import in collector.imports {
+        let (relative_files, packages) =
+            imports_from_patterns(&metadata.package_root, &import_patterns, &import)
+                .into_iter()
+                .flat_map(|import| match import {
+                    Import::UnMatched(string) if !is_relative_specifier(&string) => {
+                        match_and_extend_with_config_candidates(
+                            string,
+                            &paths,
+                            metadata.config_root.as_deref(),
+                        )
+                    }
+                    matched => Either::Left(once(matched)),
+                })
+                .flatten()
+                .partition(|import| {
+                    is_relative_specifier(import) || placed_at_root(&metadata.package_root, import)
+                });
+        imports.insert(
+            import,
+            JavascriptImportInfo::from_sets(
+                normalize_from_path(&metadata.package_root, &filepath, relative_files),
+                packages,
+            ),
+        );
+    }
+
+    Ok(ParsedJavascriptDependencies { imports })
 }
 
 fn normalize_from_path(
     root: &str,
-    filepath: PathBuf,
+    filepath: &Path,
     file_imports: HashSet<String>,
 ) -> HashSet<String> {
     let directory = filepath.parent().unwrap_or(Path::new(""));
@@ -63,7 +141,7 @@ fn normalize_from_path(
             let path = Path::new(&string);
             if path.has_root() {
                 string
-            } else if path.starts_with(root) && !root.is_empty() {
+            } else if placed_at_root(root, &string) {
                 normalize_path(path).map_or(string, |path| path.to_string_lossy().to_string())
             } else {
                 normalize_path(&directory.join(path))
@@ -99,7 +177,7 @@ impl ImportCollector<'_> {
     }
 
     fn code_at(&self, range: tree_sitter::Range) -> &str {
-        &self.code[range.start_byte..range.end_byte]
+        code::at_range(self.code, range)
     }
 
     fn is_pragma_ignored(&self, node: Node) -> bool {

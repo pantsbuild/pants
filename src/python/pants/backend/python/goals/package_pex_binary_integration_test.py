@@ -254,46 +254,9 @@ def pex_executable(rule_runner: PythonRuleRunner) -> str:
     return os.path.join(rule_runner.build_root, expected_pex_relpath)
 
 
-def test_resolve_local_platforms(pex_executable: str, rule_runner: PythonRuleRunner) -> None:
-    complete_current_platform = subprocess.run(
-        args=[pex_executable, "interpreter", "inspect", "-mt"],
-        env=dict(PEX_MODULE="pex.cli", **os.environ),
-        stdout=subprocess.PIPE,
-    ).stdout
-
-    # N.B.: ansicolors 1.0.2 is available sdist-only on PyPI, so resolving it requires using a
-    # local interpreter.
-    rule_runner.write_files(
-        {
-            "src/py/project/app.py": "import colors",
-            "src/py/project/platform.json": complete_current_platform,
-            "src/py/project/BUILD": dedent(
-                """\
-                python_requirement(name="ansicolors", requirements=["ansicolors==1.0.2"])
-                file(name="platform", source="platform.json")
-                pex_binary(
-                    dependencies=[":ansicolors"],
-                    complete_platforms=[":platform"],
-                    resolve_local_platforms=True,
-                )
-                """
-            ),
-        }
-    )
-    tgt = rule_runner.get_target(Address("src/py/project"))
-    field_set = PexBinaryFieldSet.create(tgt)
-    result = rule_runner.request(BuiltPackage, [field_set])
-    assert len(result.artifacts) == 1
-    expected_pex_relpath = "src.py.project/project.pex"
-    assert expected_pex_relpath == result.artifacts[0].relpath
-
-    rule_runner.write_digest(result.digest)
-    executable = os.path.join(rule_runner.build_root, expected_pex_relpath)
-    subprocess.run([executable], check=True)
-
-
 @skip_unless_python38_present
-def test_complete_platforms(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize("target_type", ["files", "resources"])
+def test_complete_platforms(rule_runner: PythonRuleRunner, target_type: str) -> None:
     linux_complete_platform = pkgutil.get_data(__name__, "platform-linux-py38.json")
     assert linux_complete_platform is not None
 
@@ -305,9 +268,9 @@ def test_complete_platforms(rule_runner: PythonRuleRunner) -> None:
             "src/py/project/platform-linux-py38.json": linux_complete_platform,
             "src/py/project/platform-mac-py38.json": mac_complete_platform,
             "src/py/project/BUILD": dedent(
-                """\
+                f"""\
                 python_requirement(name="p537", requirements=["p537==1.0.6"])
-                files(name="platforms", sources=["platform*.json"])
+                {target_type}(name="platforms", sources=["platform*.json"])
                 pex_binary(
                     dependencies=[":p537"],
                     complete_platforms=[":platforms"],

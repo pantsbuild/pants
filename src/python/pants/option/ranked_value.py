@@ -33,6 +33,18 @@ class Rank(Enum):
             return NotImplemented
         return self._rank < other._rank
 
+    def description(self) -> Optional[str]:
+        """The source descriptions used to display option value derivation to users."""
+        # These specific strings are for compatibility with the legacy parser's tests.
+        # We may revisit them once that is gone.
+        if self == Rank.CONFIG:
+            return "from config"
+        if self == Rank.ENVIRONMENT:
+            return "from an env var"
+        if self == Rank.FLAG:
+            return "from command-line flag"
+        return None
+
 
 Value = Union[str, int, float, None, Dict, Enum, List]
 ValueAndDetails = Tuple[Optional[Value], Optional[str]]

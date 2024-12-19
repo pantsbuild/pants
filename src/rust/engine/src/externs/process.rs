@@ -4,13 +4,14 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+use process_execution::{Platform, ProcessExecutionEnvironment, ProcessExecutionStrategy};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyAssertionError, PyValueError};
 use pyo3::prelude::*;
 
-use process_execution::{Platform, ProcessExecutionEnvironment, ProcessExecutionStrategy};
+use crate::python::PyComparedBool;
 
-pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyProcessExecutionEnvironment>()?;
 
     Ok(())
@@ -25,6 +26,15 @@ pub struct PyProcessExecutionEnvironment {
 #[pymethods]
 impl PyProcessExecutionEnvironment {
     #[new]
+    #[pyo3(signature = (
+        *,
+        platform,
+        remote_execution,
+        remote_execution_extra_platform_properties,
+        execute_in_workspace,
+        environment_name,
+        docker_image
+    ))]
     fn __new__(
         platform: String,
         remote_execution: bool,
@@ -72,15 +82,15 @@ impl PyProcessExecutionEnvironment {
 
     fn __richcmp__(
         &self,
-        other: &PyProcessExecutionEnvironment,
+        other: &Bound<'_, PyProcessExecutionEnvironment>,
         op: CompareOp,
-        py: Python,
-    ) -> PyObject {
-        match op {
-            CompareOp::Eq => (self == other).into_py(py),
-            CompareOp::Ne => (self != other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+    ) -> PyComparedBool {
+        let other = other.borrow();
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other),
+            CompareOp::Ne => Some(*self != *other),
+            _ => None,
+        })
     }
 
     #[getter]

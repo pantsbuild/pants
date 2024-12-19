@@ -50,7 +50,8 @@ class Collection(Tuple[T, ...]):
     # Unlike in Python 2 we must explicitly implement __hash__ since we explicitly implement __eq__
     # per the Python 3 data model.
     # See: https://docs.python.org/3/reference/datamodel.html#object.__hash__
-    __hash__ = Tuple.__hash__
+    def __hash__(self):
+        return super().__hash__()
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({list(self)})"

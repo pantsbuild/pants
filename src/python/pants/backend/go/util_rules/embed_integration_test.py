@@ -27,7 +27,7 @@ from pants.backend.go.util_rules import (
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult, get_filtered_environment
-from pants.core.target_types import ResourceTarget
+from pants.core.target_types import ResourcesGeneratorTarget, ResourceTarget
 from pants.core.util_rules import source_files
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -55,6 +55,7 @@ def rule_runner() -> RuleRunner:
             GoModTarget,
             GoPackageTarget,
             ResourceTarget,
+            ResourcesGeneratorTarget,
         ],
     )
     rule_runner.set_options(["--go-test-args=-v -bench=."], env_inherit={"PATH"})
@@ -336,6 +337,97 @@ def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
         env_inherit={"PATH"},
     )
 
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
+    _assert_test_result_success(result)
+
+
+def test_embed_with_all_prefix(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                go_mod(name='mod')
+                go_package(name='pkg', dependencies=[":resources"])
+                resources(name='resources', sources=['r/**'])
+                """
+            ),
+            "go.mod": dedent(
+                """\
+                module go.example.com/foo
+                go 1.17
+                """
+            ),
+            "r/_foo/hello.txt": "hello",
+            "r/_foo/.another-config.txt": "world",
+            "r/xyzzy.txt": "another",
+            "r/.config.txt": "some-config-file",
+            "foo.go": dedent(
+                """\
+                package foo
+                """
+            ),
+            "foo_test.go": dedent(
+                """\
+                package foo
+                import (
+                    "embed"
+                    "errors"
+                    "os"
+                    "testing"
+                )
+
+                //go:embed all:r
+                var allResources embed.FS
+
+                //go:embed r
+                var resources embed.FS
+
+                func assertFileContent(t *testing.T, fsys embed.FS, name string, content string) {
+                    t.Helper()
+
+                    rawContent, err := fsys.ReadFile(name)
+                    if err != nil {
+                        t.Error(err)
+                        return
+                    }
+
+                    if string(rawContent) != content {
+                        t.Errorf("read %v = %q, want %q", name, rawContent, content)
+                    }
+                }
+
+                func assertFileDoesNotExist(t *testing.T, fsys embed.FS, name string) {
+                    _, err := fsys.ReadFile(name)
+                    if err == nil {
+                        t.Errorf("expected file %v to not exist but it actually exists", name)
+                        return
+                    }
+
+                    if !errors.Is(err, os.ErrNotExist) {
+                        t.Error(err)
+                    }
+                }
+
+                func TestAllResources(t *testing.T) {
+                    assertFileContent(t, allResources, "r/_foo/hello.txt", "hello")
+                    assertFileContent(t, allResources, "r/_foo/.another-config.txt", "world")
+                    assertFileContent(t, allResources, "r/xyzzy.txt", "another")
+                    assertFileContent(t, allResources, "r/.config.txt", "some-config-file")
+                }
+
+                func TestResources(t *testing.T) {
+                    assertFileDoesNotExist(t, resources, "r/_foo/hello.txt")
+                    assertFileDoesNotExist(t, resources, "r/_foo/.another-config.txt")
+                    assertFileContent(t, resources, "r/xyzzy.txt", "another")
+                    assertFileDoesNotExist(t, resources, "r/.config.txt")
+                }
+                """
+            ),
+        }
+    )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     result = rule_runner.request(
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]

@@ -30,6 +30,7 @@ from pants.engine.target import (
     IntField,
     InvalidFieldChoiceException,
     InvalidFieldException,
+    InvalidFieldMemberTypeException,
     InvalidFieldTypeException,
     InvalidGeneratedTargetException,
     InvalidTargetException,
@@ -44,6 +45,7 @@ from pants.engine.target import (
     StringField,
     StringSequenceField,
     Target,
+    TupleSequenceField,
     ValidNumbers,
     _validate_origin_sources_blocks,
     generate_file_based_overrides_field_help_message,
@@ -805,6 +807,25 @@ def test_sequence_field() -> None:
     # All elements must be the expected type.
     with pytest.raises(InvalidFieldTypeException):
         Example([CustomObject(), 1, CustomObject()], addr)
+
+
+def test_tuple_sequence_field() -> None:
+    class Example(TupleSequenceField):
+        alias = "example"
+        expected_element_type = str
+        expected_element_count = -1
+        expected_type_description = "an iterable of n-tuples of strings"
+        expected_element_type_description = "n-tuple of strings"
+
+    addr = Address("", target_name="example")
+    assert Example([("hello", "world")], addr).value == (("hello", "world"),)
+    assert Example(None, addr).value is None
+    with pytest.raises(InvalidFieldTypeException):
+        Example("strings are technically iterable...", addr)
+    with pytest.raises(InvalidFieldMemberTypeException):
+        Example(["strings are technically iterable..."], addr)
+    with pytest.raises(InvalidFieldMemberTypeException):
+        Example([("hello", 0, "world")], addr)
 
 
 def test_string_sequence_field() -> None:

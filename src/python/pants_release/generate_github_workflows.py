@@ -8,7 +8,7 @@ import difflib
 import os
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, ReprEnum
 from pathlib import Path
 from textwrap import dedent  # noqa: PNT20
 from typing import Any, Dict, Sequence, cast
@@ -17,7 +17,31 @@ import toml
 import yaml
 from pants_release.common import die
 
-from pants.util.strutil import softwrap
+
+def action(name: str) -> str:
+    version_map = {
+        "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
+        "cache": "actions/cache@v4",
+        "checkout": "actions/checkout@v4",
+        "download-artifact": "actions/download-artifact@v4",
+        "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
+        "rust-cache": "benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a",
+        "setup-go": "actions/setup-go@v5",
+        "setup-java": "actions/setup-java@v4",
+        "setup-node": "actions/setup-node@v4",
+        "setup-protoc": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
+        "setup-python": "actions/setup-python@v5",
+        "slack-github-action": "slackapi/slack-github-action@v1.24.0",
+        "upload-artifact": "actions/upload-artifact@v4",
+    }
+    try:
+        return version_map[name]
+    except KeyError as e:
+        raise ValueError(
+            f"Requested github action '{name}' does not have a version configured.\n"
+            f"Current known versions: {version_map}"
+        ) from e
+
 
 HEADER = dedent(
     """\
@@ -36,17 +60,29 @@ Env = Dict[str, str]
 class Platform(Enum):
     LINUX_X86_64 = "Linux-x86_64"
     LINUX_ARM64 = "Linux-ARM64"
-    MACOS10_15_X86_64 = "macOS10-15-x86_64"
-    # the oldest version of macOS supported by GitHub self-hosted runners
-    MACOS12_X86_64 = "macOS12-x86_64"
-    MACOS11_ARM64 = "macOS11-ARM64"
+    MACOS13_X86_64 = "macOS13-x86_64"
+    MACOS14_ARM64 = "macOS14-ARM64"
 
 
-GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS12_X86_64}
-SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
+GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS13_X86_64, Platform.MACOS14_ARM64}
+SELF_HOSTED = {Platform.LINUX_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
+
+# We don't specify a patch version so that we get the latest, which comes pre-installed:
+#  https://github.com/actions/setup-python#available-versions-of-python
+# NOTE: The last entry becomes the default
+_BASE_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.13", "3.11"]
+
+PYTHON_VERSIONS_PER_PLATFORM = {
+    Platform.LINUX_X86_64: _BASE_PYTHON_VERSIONS,
+    Platform.MACOS13_X86_64: _BASE_PYTHON_VERSIONS,
+    # Python 3.7 or 3.8 aren't supported directly on arm64 macOS
+    Platform.MACOS14_ARM64: [v for v in _BASE_PYTHON_VERSIONS if v not in ("3.7", "3.8")],
+    # These runners have Python already installed
+    Platform.LINUX_ARM64: None,
+}
 
 
 def gha_expr(expr: str) -> str:
@@ -80,12 +116,8 @@ NATIVE_FILES = [
     f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so.metadata",
 ]
 
-# We don't specify a patch version so that we get the latest, which comes pre-installed:
-#  https://github.com/actions/setup-python#available-versions-of-python
-PYTHON_VERSION = "3.9"
-
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
-DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true'"
+DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true'"
 IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 
 # NB: This overrides `pants.ci.toml`.
@@ -147,29 +179,6 @@ def classify_changes() -> Jobs:
     }
 
 
-def ensure_category_label() -> Sequence[Step]:
-    """Check that exactly one category label is present on a pull request."""
-    return [
-        {
-            "if": "github.event_name == 'pull_request'",
-            "name": "Ensure category label",
-            "uses": "mheap/github-action-required-labels@v4.0.0",
-            "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
-            "with": {
-                "mode": "exactly",
-                "count": 1,
-                "labels": softwrap(
-                    """
-                    category:new feature, category:user api change,
-                    category:plugin api change, category:performance, category:bugfix,
-                    category:documentation, category:internal
-                    """
-                ),
-            },
-        }
-    ]
-
-
 def ensure_release_notes() -> Sequence[Step]:
     """Check that a PR either has release notes, or a category:internal or release-notes:not-
     required label."""
@@ -180,7 +189,7 @@ def ensure_release_notes() -> Sequence[Step]:
             # out via a label.
             "if": "github.event_name == 'pull_request' && !needs.classify_changes.outputs.notes",
             "name": "Ensure appropriate label",
-            "uses": "mheap/github-action-required-labels@v4.0.0",
+            "uses": action("github-action-required-labels"),
             "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
             "with": {
                 "mode": "minimum",
@@ -220,7 +229,7 @@ def checkout(
         # We need to fetch a few commits back, to be able to access HEAD^2 in the PR case.
         {
             "name": "Check out code",
-            "uses": "actions/checkout@v3",
+            "uses": action("checkout"),
             "with": {
                 **fetch_depth_opt,
                 **({"ref": ref} if ref else {}),
@@ -319,18 +328,21 @@ def install_rustup() -> Step:
     }
 
 
-def install_python(version: str) -> Step:
+def install_pythons(versions: list[str]) -> Step:
+    # See:
+    # https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md#specifying-multiple-pythonpypy-versions
+    # This is a list expressed as a newline delimited string instead of a... list
     return {
-        "name": f"Set up Python {version}",
-        "uses": "actions/setup-python@v4",
-        "with": {"python-version": version},
+        "name": f"Set up Python {', '.join(versions)}",
+        "uses": action("setup-python"),
+        "with": {"python-version": "\n".join(versions)},
     }
 
 
 def install_node(version: str) -> Step:
     return {
         "name": f"Set up Node {version}",
-        "uses": "actions/setup-node@v3",
+        "uses": action("setup-node"),
         "with": {"node-version": version},
     }
 
@@ -338,7 +350,7 @@ def install_node(version: str) -> Step:
 def install_jdk() -> Step:
     return {
         "name": "Install AdoptJDK",
-        "uses": "actions/setup-java@v3",
+        "uses": action("setup-java"),
         "with": {
             "distribution": "adopt",
             "java-version": "11",
@@ -349,8 +361,15 @@ def install_jdk() -> Step:
 def install_go() -> Step:
     return {
         "name": "Install Go",
-        "uses": "actions/setup-go@v3",
+        "uses": action("setup-go"),
         "with": {"go-version": "1.19.5"},
+    }
+
+
+def install_python_headers_in_manylinux_container() -> Step:
+    return {
+        "name": "Install Python headers",
+        "run": "yum install -y python3.11-devel",
     }
 
 
@@ -360,7 +379,7 @@ def install_go() -> Step:
 def install_protoc() -> Step:
     return {
         "name": "Install Protoc",
-        "uses": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
+        "uses": action("setup-protoc"),
         "with": {
             "version": "23.x",
             "repo-token": "${{ secrets.GITHUB_TOKEN }}",
@@ -401,30 +420,31 @@ class Helper:
         # any platform-specific labels, so we don't run on future GH-hosted
         # platforms without realizing it.
         ret = ["self-hosted"] if self.platform in SELF_HOSTED else []
-        if self.platform == Platform.MACOS12_X86_64:
-            ret += ["macos-12"]
-        elif self.platform == Platform.MACOS11_ARM64:
-            ret += ["macOS-11-ARM64"]
-        elif self.platform == Platform.MACOS10_15_X86_64:
-            ret += ["macOS-10.15-X64"]
+        if self.platform == Platform.MACOS13_X86_64:
+            ret += ["macos-13"]
+        elif self.platform == Platform.MACOS14_ARM64:
+            ret += ["macos-14"]
         elif self.platform == Platform.LINUX_X86_64:
-            ret += ["ubuntu-20.04"]
+            ret += ["ubuntu-22.04"]
         elif self.platform == Platform.LINUX_ARM64:
-            ret += ["Linux", "ARM64"]
+            ret += [
+                "runs-on",
+                "runner=4cpu-linux-arm64",
+                "image=ubuntu22-full-arm64-python3.7-3.13",
+                "run-id=${{ github.run_id }}",
+            ]
         else:
             raise ValueError(f"Unsupported platform: {self.platform_name()}")
         return ret
 
     def platform_env(self):
         ret = {}
-        if self.platform in {Platform.MACOS10_15_X86_64, Platform.MACOS12_X86_64}:
+        if self.platform in {Platform.MACOS13_X86_64}:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
             # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
             ret["ARCHFLAGS"] = "-arch x86_64"
-        if self.platform == Platform.MACOS11_ARM64:
+        if self.platform in {Platform.MACOS14_ARM64}:
             ret["ARCHFLAGS"] = "-arch arm64"
-        if self.platform == Platform.LINUX_ARM64:
-            ret["PANTS_CONFIG_FILES"] = "+['pants.ci.toml','pants.ci.aarch64.toml']"
         if self.platform == Platform.LINUX_X86_64:
             # Currently we run Linux x86_64 CI on GitHub Actions-hosted hardware, and
             # these are weak dual-core machines. Default parallelism on those machines
@@ -435,25 +455,13 @@ class Helper:
             ret["PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM"] = "1"
         return ret
 
-    def maybe_append_cargo_test_parallelism(self, cmd: str) -> str:
-        if self.platform == Platform.LINUX_ARM64:
-            # TODO: The ARM64 runner has enough cores to reliably trigger #18191 using
-            # our default settings. We lower parallelism here as a bandaid to work around
-            # #18191 until it can be resolved.
-            return f"{cmd} --test-threads=8"
-        return cmd
-
     def wrap_cmd(self, cmd: str) -> str:
-        if self.platform == Platform.MACOS11_ARM64:
-            # The self-hosted M1 runner is an X86_64 binary that runs under Rosetta,
-            # so we have to explicitly change the arch for the subprocesses it spawns.
-            return f"arch -arm64 {cmd}"
         return cmd
 
     def native_binaries_upload(self) -> Step:
         return {
             "name": "Upload native binaries",
-            "uses": "actions/upload-artifact@v3",
+            "uses": action("upload-artifact"),
             "with": {
                 "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
                 "path": "\n".join(NATIVE_FILES),
@@ -464,7 +472,7 @@ class Helper:
         return [
             {
                 "name": "Download native binaries",
-                "uses": "actions/download-artifact@v3",
+                "uses": action("download-artifact"),
                 "with": {
                     "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
                     "path": NATIVE_FILES_COMMON_PREFIX,
@@ -485,7 +493,7 @@ class Helper:
             },
             {
                 "name": "Cache Rust toolchain",
-                "uses": "actions/cache@v3",
+                "uses": action("cache"),
                 "with": {
                     "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
                     "key": f"{self.platform_name()}-rustup-{hash_files('src/rust/engine/rust-toolchain')}-v2",
@@ -493,7 +501,7 @@ class Helper:
             },
             {
                 "name": "Cache Cargo",
-                "uses": "benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1",
+                "uses": action("rust-cache"),
                 "with": {
                     # If set, replaces the job id in the cache key, so that the cache is stable across jobs.
                     # If we don't set this, each job may restore from a previous job's cache entry (via a
@@ -523,7 +531,7 @@ class Helper:
             },
             {
                 "name": "Cache native engine",
-                "uses": "actions/cache@v3",
+                "uses": action("cache"),
                 "with": {
                     "path": "\n".join(NATIVE_FILES),
                     "key": f"{self.platform_name()}-engine-{gha_expr('steps.get-engine-hash.outputs.hash')}-v1",
@@ -531,31 +539,17 @@ class Helper:
             },
         ]
 
-    def setup_primary_python(self) -> Sequence[Step]:
+    def setup_pythons(self) -> Sequence[Step]:
         ret = []
-        # We pre-install Python on our self-hosted platforms.
-        # We must set it up on Github-hosted platforms.
-        if self.platform in GITHUB_HOSTED:
-            ret.append(install_python(PYTHON_VERSION))
-        return ret
-
-    def expose_all_pythons(self) -> Sequence[Step]:
-        ret = []
-        # Self-hosted runners already have all relevant pythons exposed on their PATH, so we
-        # only use this action on the GitHub-hosted platforms.
-        if self.platform in GITHUB_HOSTED:
-            ret.append(
-                {
-                    "name": "Expose Pythons",
-                    "uses": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
-                }
-            )
+        versions = PYTHON_VERSIONS_PER_PLATFORM[self.platform]
+        if versions is not None:
+            ret.append(install_pythons(versions))
         return ret
 
     def bootstrap_pants(self) -> Sequence[Step]:
         return [
             *checkout(),
-            *self.setup_primary_python(),
+            *self.setup_pythons(),
             *self.bootstrap_caches(),
             {
                 "name": "Bootstrap Pants",
@@ -584,12 +578,13 @@ class Helper:
     def upload_log_artifacts(self, name: str) -> Step:
         return {
             "name": "Upload pants.log",
-            "uses": "actions/upload-artifact@v3",
+            "uses": action("upload-artifact"),
             "if": "always()",
             "continue-on-error": True,
             "with": {
                 "name": f"logs-{name.replace('/', '_')}-{self.platform_name()}",
                 "path": ".pants.d/workdir/*.log",
+                "overwrite": "true",
             },
         }
 
@@ -648,11 +643,7 @@ def bootstrap_jobs(
         # We pass --tests to skip doc tests because our generated protos contain
         # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
         # pass on GHA MacOS containers.
-        step_cmd = helper.wrap_cmd(
-            helper.maybe_append_cargo_test_parallelism(
-                "./cargo test --locked --tests -- --nocapture"
-            )
-        )
+        step_cmd = helper.wrap_cmd("./cargo test --locked --tests -- --nocapture")
     elif rust_testing == RustTesting.ALL:
         human_readable_job_name += ", test and lint Rust"
         human_readable_step_name = "Test and lint Rust"
@@ -662,9 +653,7 @@ def bootstrap_jobs(
         step_cmd = "\n".join(
             [
                 "./build-support/bin/check_rust_pre_commit.sh",
-                helper.maybe_append_cargo_test_parallelism(
-                    "./cargo test --locked --all --tests --benches -- --nocapture"
-                ),
+                "./cargo test --locked --all --tests --benches -- --nocapture",
                 "./cargo doc",
             ]
         )
@@ -748,15 +737,15 @@ def test_jobs(
             *checkout(),
             *(launch_bazel_remote() if with_remote_caching else []),
             install_jdk(),
+            install_go(),
             *(
-                [install_go(), download_apache_thrift()]
+                [download_apache_thrift()]
                 if helper.platform == Platform.LINUX_X86_64
                 # Other platforms either don't run those tests, or have the binaries
                 # preinstalled on the self-hosted runners.
                 else []
             ),
-            *helper.setup_primary_python(),
-            *helper.expose_all_pythons(),
+            *helper.setup_pythons(),
             *helper.native_binaries_download(),
             {
                 "name": human_readable_step_name,
@@ -810,8 +799,8 @@ def linux_arm64_test_jobs() -> Jobs:
     return jobs
 
 
-def macos12_x86_64_test_jobs() -> Jobs:
-    helper = Helper(Platform.MACOS12_X86_64)
+def macos13_x86_64_test_jobs() -> Jobs:
+    helper = Helper(Platform.MACOS13_X86_64)
     jobs = {
         helper.job_name("bootstrap_pants"): bootstrap_jobs(
             helper,
@@ -838,13 +827,9 @@ def build_wheels_job(
     # the code, install rustup and expose Pythons.
     # TODO: Apply rust caching here.
     if platform == Platform.LINUX_X86_64:
-        container = {"image": "quay.io/pypa/manylinux2014_x86_64:latest"}
+        container = {"image": "quay.io/pypa/manylinux_2_28_x86_64:latest"}
     elif platform == Platform.LINUX_ARM64:
-        # Unfortunately Equinix do not support the CentOS 7 image on the hardware we've been
-        # generously given by the Works on ARM program. So we have to build in this image.
-        container = {
-            "image": "ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf",
-        }
+        container = {"image": "quay.io/pypa/manylinux_2_28_aarch64:latest"}
     else:
         container = None
 
@@ -859,6 +844,10 @@ def build_wheels_job(
                     echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
                     echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
                     echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
+                    echo "/opt/python/cp310-cp310/bin" >> $GITHUB_PATH
+                    echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
+                    echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
+                    echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
                     """
                 ),
             },
@@ -866,7 +855,7 @@ def build_wheels_job(
     else:
         initial_steps = [
             *checkout(ref=for_deploy_ref),
-            *helper.expose_all_pythons(),
+            *helper.setup_pythons(),
             # NB: We only cache Rust, but not `native_engine.so` and the Pants
             # virtualenv. This is because we must build both these things with
             # multiple Python versions, whereas that caching assumes only one primary
@@ -886,6 +875,7 @@ def build_wheels_job(
             **({"needs": needs} if needs else {}),
             "timeout-minutes": 90,
             "env": {
+                "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION": bool(container),
                 **DISABLE_REMOTE_CACHE_ENV,
                 # If we're not deploying these wheels, build in debug mode, which allows for
                 # incremental compilation across wheels. If this becomes too slow in CI, most likely
@@ -896,7 +886,11 @@ def build_wheels_job(
             "steps": [
                 *initial_steps,
                 install_protoc(),  # for prost crate
-                *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
+                *(
+                    [install_python_headers_in_manylinux_container()]
+                    if platform == Platform.LINUX_ARM64
+                    else [install_go()]
+                ),
                 {
                     "name": "Build wheels",
                     "run": "./pants run src/python/pants_release/release.py -- build-wheels",
@@ -980,20 +974,14 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
     return {
         **build_wheels_job(Platform.LINUX_X86_64, for_deploy_ref, needs),
         **build_wheels_job(Platform.LINUX_ARM64, for_deploy_ref, needs),
-        **build_wheels_job(Platform.MACOS10_15_X86_64, for_deploy_ref, needs),
-        **build_wheels_job(Platform.MACOS11_ARM64, for_deploy_ref, needs),
+        **build_wheels_job(Platform.MACOS13_X86_64, for_deploy_ref, needs),
+        **build_wheels_job(Platform.MACOS14_ARM64, for_deploy_ref, needs),
     }
 
 
 def test_workflow_jobs() -> Jobs:
     linux_x86_64_helper = Helper(Platform.LINUX_X86_64)
     jobs: dict[str, Any] = {
-        "check_labels": {
-            "name": "Ensure PR has a category label",
-            "runs-on": linux_x86_64_helper.runs_on(),
-            "if": IS_PANTS_OWNER,
-            "steps": ensure_category_label(),
-        },
         "check_release_notes": {
             "name": "Ensure PR has release notes",
             "runs-on": linux_x86_64_helper.runs_on(),
@@ -1004,7 +992,7 @@ def test_workflow_jobs() -> Jobs:
     }
     jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
-    jobs.update(**macos12_x86_64_test_jobs())
+    jobs.update(**macos13_x86_64_test_jobs())
     jobs.update(**build_wheels_jobs())
     jobs.update(
         {
@@ -1017,7 +1005,7 @@ def test_workflow_jobs() -> Jobs:
                 "steps": [
                     *checkout(),
                     *launch_bazel_remote(),
-                    *linux_x86_64_helper.setup_primary_python(),
+                    *linux_x86_64_helper.setup_pythons(),
                     *linux_x86_64_helper.native_binaries_download(),
                     {
                         "name": "Lint",
@@ -1093,8 +1081,7 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             "timeout-minutes": 90,
             "steps": [
                 *checkout(),
-                *helper.setup_primary_python(),
-                *helper.expose_all_pythons(),
+                *helper.setup_pythons(),
                 {
                     "name": "Prepare cache comparison",
                     "run": dedent(
@@ -1218,7 +1205,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             "steps": [
                 {
                     "name": "Checkout Pants at Release Tag",
-                    "uses": "actions/checkout@v3",
+                    "uses": action("checkout"),
                     "with": {
                         # N.B.: We need the last few edits to VERSION. Instead of guessing, just
                         # clone the repo, we're not so big as to need to optimize this.
@@ -1227,8 +1214,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         "fetch-tags": True,
                     },
                 },
-                *helper.setup_primary_python(),
-                *helper.expose_all_pythons(),
+                *helper.setup_pythons(),
                 *helper.bootstrap_caches(),
                 {
                     "name": "Generate announcement",
@@ -1241,7 +1227,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 },
                 {
                     "name": "Announce to Slack",
-                    "uses": "slackapi/slack-github-action@v1.24.0",
+                    "uses": action("slack-github-action"),
                     "with": {
                         "channel-id": "C18RRR4JK",
                         "payload-file-path": "${{ runner.temp }}/slack_announcement.json",
@@ -1250,7 +1236,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 },
                 {
                     "name": "Announce to pants-devel",
-                    "uses": "dawidd6/action-send-mail@v3.8.0",
+                    "uses": action("action-send-mail"),
                     "with": {
                         # Note: Email is sent from the dedicated account pants.announce@gmail.com.
                         # The EMAIL_CONNECTION_URL should be of the form:
@@ -1324,7 +1310,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     return jobs, inputs
 
 
-class DefaultGoals(str, Enum):
+class DefaultGoals(str, ReprEnum):
     tailor_update_build_files = "tailor --check update-build-files --check ::"
     lint_check = "lint check ::"
     test = "test ::"
@@ -1565,7 +1551,7 @@ def public_repos() -> PublicReposOutput:
             "permissions": {},
             "steps": [
                 *checkout(repository=repo.name, **repo.checkout_options),
-                install_python(repo.python_version),
+                install_pythons([repo.python_version]),
                 *([install_go()] if repo.install_go else []),
                 *([install_node(repo.node_version)] if repo.node_version else []),
                 *([download_apache_thrift()] if repo.install_thrift else []),
@@ -1687,7 +1673,7 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
             # NB: This always() condition is critical, as it ensures that this job is run even if
             #   jobs it depends on are skipped.
             "if": "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
-            "needs": ["classify_changes", "check_labels", "check_release_notes"] + sorted(pr_jobs),
+            "needs": ["classify_changes", "check_release_notes"] + sorted(pr_jobs),
             "outputs": {"merge_ok": f"{gha_expr('steps.set_merge_ok.outputs.merge_ok')}"},
             "steps": [
                 {
@@ -1729,7 +1715,7 @@ def generate() -> dict[Path, str]:
     pr_jobs = test_workflow_jobs()
     pr_jobs.update(**classify_changes())
     for key, val in pr_jobs.items():
-        if key in {"check_labels", "classify_changes", "check_release_notes"}:
+        if key in {"classify_changes", "check_release_notes"}:
             continue
         needs = val.get("needs", [])
         if isinstance(needs, str):

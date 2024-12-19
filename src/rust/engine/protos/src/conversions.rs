@@ -18,7 +18,7 @@ impl From<hashing::Digest> for crate::gen::build::bazel::remote::execution::v2::
     }
 }
 
-impl<'a> TryFrom<&'a crate::gen::build::bazel::remote::execution::v2::Digest> for hashing::Digest {
+impl TryFrom<&crate::gen::build::bazel::remote::execution::v2::Digest> for hashing::Digest {
     type Error = String;
 
     fn try_from(

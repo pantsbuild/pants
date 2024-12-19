@@ -10,8 +10,10 @@ Created as part of the release process.
 + Alan Velasco
 + Alex Bancroft
 + Alex Schmitt
++ Alexander Heldt
 + Alexander Johnson
 + Alexander Kuhn-Regnier
++ Alexandre Viau
 + Alexey Tereshenkov
 + Alisha Parveen
 + Andreas Stenius
@@ -27,6 +29,7 @@ Created as part of the release process.
 + Bardur Arantsson
 + Bastian Wegge
 + Ben Limmer
++ Benjamin Dabelow
 + Benjy Weinberger
 + Berkay Öztürk
 + Bill Farner
@@ -35,6 +38,7 @@ Created as part of the release process.
 + Bob Gregory
 + Borja Lorente
 + Brandon Milton
++ Brandon Novick
 + Brian Larson
 + Brian Wickman
 + Bruno Bieth
@@ -68,6 +72,7 @@ Created as part of the release process.
 + Dan Harrison
 + Daniel Anderson
 + Daniel Bentley
++ Daniel Cavazos
 + Daniel Goldman
 + Daniel Moran
 + Daniel Peebles
@@ -75,6 +80,7 @@ Created as part of the release process.
 + Danny McClanahan
 + Dave Brewster
 + David Katz
++ David Singleton
 + David Taylor
 + David Turner
 + Derek Young
@@ -121,6 +127,7 @@ Created as part of the release process.
 + Guy Marom
 + Harley Cooper
 + HeetVekariya
++ Henri Parfait
 + Henry Fuller
 + Herbert Rusznak
 + Huon Wilson
@@ -163,10 +170,12 @@ Created as part of the release process.
 + John Basila
 + John Chee
 + John Gallagher
++ John Granström
 + John Ioannidis
 + John Sirois
 + John Townsend
 + Jon Boulle
++ Jonas Rauber
 + Jonas Stendahl
 + Jonathan Coveney
 + Jonathan D. Simms
@@ -191,6 +200,7 @@ Created as part of the release process.
 + Kevin Sweeney
 + Koki Nishihara
 + Kris Wilson
++ Krishna Vudata
 + Krishnan Chandra
 + Kushal Dave
 + Kyle Derr
@@ -202,6 +212,7 @@ Created as part of the release process.
 + Lei Wang
 + Leo Kim
 + Lex Spoon
++ Li Li
 + Liam Deacon
 + Liam Wilson
 + Luc Cary
@@ -244,6 +255,7 @@ Created as part of the release process.
 + Mohamed Abdi
 + Morten Hauge
 + Moses Nakamura
++ Muhammad Tsany Qudsi
 + Nadav Samet
 + Nathan Levesque
 + Navneeth Jayendran
@@ -276,6 +288,7 @@ Created as part of the release process.
 + Pierre Chevalier
 + Pierre DAL-PRA
 + Qicheng Ma
++ Rahul Mehta
 + Ramon Buckland
 + Raph Estrada
 + Raúl Cuza
@@ -310,6 +323,7 @@ Created as part of the release process.
 + Stu Hood
 + Subin Kim
 + Suresh Joshi
++ Sven Widén
 + Tal Amuyal
 + Tansy Arron-Walker
 + Ted Dziuba
@@ -328,6 +342,7 @@ Created as part of the release process.
 + Tom Dimiduk
 + Tom Dyas
 + Tom Howland
++ Tom Most
 + Tom Solberg
 + Tomasz Godzik
 + Tomasz Pasternak
@@ -352,6 +367,7 @@ Created as part of the release process.
 + Yoav Alon
 + Yuhan GUO
 + Yujie Chen
++ achrafmam2
 + andreaimprovised
 + azban
 + bianca rosa
@@ -362,6 +378,7 @@ Created as part of the release process.
 + gyudoza
 + hephex
 + jgartdele/del
++ lukevmorris
 + offsetcyan
 + okcleary
 + olivercoleman-switchdin
@@ -372,4 +389,5 @@ Created as part of the release process.
 + twunderlich-grapl
 + wimax-grapl
 + yjabri
++ Éric Jacob
 + Ólafur Páll Geirsson

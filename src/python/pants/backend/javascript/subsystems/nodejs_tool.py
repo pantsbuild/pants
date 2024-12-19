@@ -12,6 +12,7 @@ from pants.backend.javascript.install_node_package import (
     InstalledNodePackageRequest,
 )
 from pants.backend.javascript.nodejs_project_environment import NodeJsProjectEnvironmentProcess
+from pants.backend.javascript.package_manager import PackageManager
 from pants.backend.javascript.resolve import FirstPartyNodePackageResolves, NodeJSProjectResolves
 from pants.backend.javascript.subsystems.nodejs import NodeJS, NodeJSToolProcess
 from pants.engine.internals.native_engine import Digest, MergeDigests
@@ -97,14 +98,10 @@ class NodeJSToolRequest:
 
 async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
     nodejs = await Get(NodeJS)
-    dl_and_execute_args = {
-        "npm": ("exec", "--yes", "--"),
-        "pnpm": ("dlx",),
-        "yarn": ("dlx", "--quiet"),
-    }
 
     pkg_manager_version = nodejs.package_managers.get(nodejs.package_manager)
-    if pkg_manager_version is None:
+    pkg_manager_and_version = nodejs.default_package_manager
+    if pkg_manager_version is None or pkg_manager_and_version is None:
         # Occurs when a user configures a custom package manager but without a resolve.
         # Corepack requires a package.json to make a decision on a "good known release".
         raise ValueError(
@@ -116,19 +113,21 @@ async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
                 """
             )
         )
+    pkg_manager = PackageManager.from_string(pkg_manager_and_version)
+
     return await Get(
         Process,
         NodeJSToolProcess(
-            nodejs.package_manager,
-            pkg_manager_version,
-            args=(*dl_and_execute_args[nodejs.package_manager], request.tool, *request.args),
+            pkg_manager.name,
+            pkg_manager.version,
+            args=(*pkg_manager.download_and_execute_args, request.tool, *request.args),
             description=request.description,
             input_digest=request.input_digest,
             output_files=request.output_files,
             output_directories=request.output_directories,
             append_only_caches=request.append_only_caches,
             timeout_seconds=request.timeout_seconds,
-            extra_env=FrozenDict({"PNPM_HOME": "{chroot}/._pnpm_home", **request.extra_env}),
+            extra_env=FrozenDict({**pkg_manager.extra_env, **request.extra_env}),
         ),
     )
 
@@ -150,18 +149,13 @@ async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Pr
     installed = await Get(
         InstalledNodePackage, InstalledNodePackageRequest(package_for_resolve.address)
     )
-    execute_args = {
-        "npm": ("exec", "--no", "--"),
-        "pnpm": ("exec",),
-        "yarn": ("--silent", "exec", "--"),
-    }
     request_tool_without_version = request.tool.partition("@")[0]
     return await Get(
         Process,
         NodeJsProjectEnvironmentProcess(
             env=installed.project_env,
             args=(
-                *execute_args[project.package_manager],
+                *project.package_manager.execute_args,
                 request_tool_without_version,
                 *request.args,
             ),

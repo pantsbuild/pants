@@ -20,6 +20,8 @@ extend-ignore:
   NIC102,
   # Unnecessary dict call - rewrite as a literal
   C408,
+  # Temporarily exclude during Python upgrade
+  E721
 
 [flake8:local-plugins]
 extension =

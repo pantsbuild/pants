@@ -9,6 +9,7 @@ publish = false
 protos = { path = "../../protos" }
 mock = { path = "../mock" }
 clap = { workspace = true, features = ["derive"] }
+tokio = { workspace = true }
 
 [lints]
 workspace = true

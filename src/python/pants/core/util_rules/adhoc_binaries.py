@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
 
 from pants.core.subsystems.python_bootstrap import PythonBootstrapSubsystem
-from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary, SystemBinariesSubsystem, TarBinary
 from pants.engine.fs import DownloadFile
 from pants.engine.internals.native_engine import Digest, FileDigest
@@ -49,7 +49,7 @@ class _DownloadPythonBuildStandaloneBinaryRequest:
 
 @rule
 async def get_python_for_scripts(env_tgt: EnvironmentTarget) -> PythonBuildStandaloneBinary:
-    if env_tgt.val is None or isinstance(env_tgt.val, LocalEnvironmentTarget):
+    if env_tgt.can_access_local_system_paths:
         return PythonBuildStandaloneBinary(sys.executable)
 
     result = await Get(_PythonBuildStandaloneBinary, _DownloadPythonBuildStandaloneBinaryRequest())

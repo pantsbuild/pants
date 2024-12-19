@@ -9,12 +9,16 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use deepsize::DeepSizeOf;
-use fs::{self, Dir, DirectoryDigest, DirectoryListing, File, Link, Vfs};
+use fs::{
+    self, Dir, DirectoryDigest, DirectoryListing, File, Link, PathMetadata, RelativePath, Vfs,
+};
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use graph::{Node, NodeError};
 use internment::Intern;
 use process_execution::{self, ProcessCacheScope};
 use pyo3::prelude::{PyAny, Python};
+use pyo3::types::{PyAnyMethods, PyTypeMethods};
+use pyo3::Bound;
 use rule_graph::{DependencyKey, Query};
 use store::{self, StoreFileByDigest};
 use workunit_store::{in_workunit, Level};
@@ -29,6 +33,7 @@ use crate::tasks::Rule;
 mod digest_file;
 mod downloaded_file;
 mod execute_process;
+mod path_metadata;
 mod read_link;
 mod root;
 mod run_id;
@@ -41,6 +46,7 @@ mod task;
 pub use self::digest_file::DigestFile;
 pub use self::downloaded_file::DownloadedFile;
 pub use self::execute_process::{ExecuteProcess, ProcessResult};
+pub use self::path_metadata::PathMetadata as PathMetadataNode;
 pub use self::read_link::{LinkDest, ReadLink};
 pub use self::root::Root;
 pub use self::run_id::RunId;
@@ -91,11 +97,28 @@ pub type NodeResult<T> = Result<T, Failure>;
 #[async_trait]
 impl Vfs<Failure> for Context {
     async fn read_link(&self, link: &Link) -> Result<PathBuf, Failure> {
-        Ok(self.get(ReadLink(link.clone())).await?.0)
+        let subject_path =
+            SubjectPath::new_workspace(&link.path).map_err(|e| Self::mk_error(&e))?;
+        Ok(self
+            .get(ReadLink {
+                link: link.clone(),
+                subject_path,
+            })
+            .await?
+            .0)
     }
 
     async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, Failure> {
-        self.get(Scandir(dir)).await
+        let subject_path = SubjectPath::new_workspace(&dir.0).map_err(|e| Self::mk_error(&e))?;
+        self.get(Scandir { dir, subject_path }).await
+    }
+
+    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, Failure> {
+        let subject_path = {
+            let relpath = RelativePath::new(&path).map_err(|e| Self::mk_error(&e))?;
+            SubjectPath::Workspace(relpath)
+        };
+        self.get(PathMetadataNode::new(subject_path)?).await
     }
 
     fn is_ignored(&self, stat: &fs::Stat) -> bool {
@@ -113,7 +136,12 @@ impl StoreFileByDigest<Failure> for Context {
         file: File,
     ) -> future::BoxFuture<'static, Result<hashing::Digest, Failure>> {
         let context = self.clone();
-        async move { context.get(DigestFile(file)).await }.boxed()
+        async move {
+            let subject_path =
+                SubjectPath::new_workspace(&file.path).map_err(|e| Self::mk_error(&e))?;
+            context.get(DigestFile { file, subject_path }).await
+        }
+        .boxed()
     }
 }
 
@@ -192,12 +220,12 @@ fn select_reentry(
     .boxed()
 }
 
-pub fn lift_directory_digest(digest: &PyAny) -> Result<DirectoryDigest, String> {
+pub fn lift_directory_digest(digest: &Bound<'_, PyAny>) -> Result<DirectoryDigest, String> {
     let py_digest: externs::fs::PyDigest = digest.extract().map_err(|e| format!("{e}"))?;
     Ok(py_digest.0)
 }
 
-pub fn lift_file_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
+pub fn lift_file_digest(digest: &Bound<'_, PyAny>) -> Result<hashing::Digest, String> {
     let py_file_digest: externs::fs::PyFileDigest = digest.extract().map_err(|e| format!("{e}"))?;
     Ok(py_file_digest.0)
 }
@@ -226,6 +254,7 @@ pub enum NodeKey {
     ExecuteProcess(Box<ExecuteProcess>),
     ReadLink(ReadLink),
     Scandir(Scandir),
+    PathMetadata(PathMetadataNode),
     Root(Box<Root>),
     Snapshot(Snapshot),
     SessionValues(SessionValues),
@@ -233,12 +262,59 @@ pub enum NodeKey {
     Task(Box<Task>),
 }
 
-impl NodeKey {
-    pub fn fs_subject(&self) -> Option<&Path> {
+#[derive(Clone, Debug, Hash, PartialEq, Eq, DeepSizeOf)]
+pub enum SubjectPath {
+    /// Filesystem path in the workspace and relative to the buildroot.
+    Workspace(RelativePath),
+
+    /// Absolute filesystem path in the local system.
+    LocalSystem(PathBuf),
+}
+
+impl SubjectPath {
+    pub fn new_workspace<P: AsRef<Path>>(path: P) -> Result<Self, String> {
+        let path = path.as_ref().to_path_buf();
+        let relpath = RelativePath::new(&path)?;
+        Ok(Self::Workspace(relpath))
+    }
+
+    pub fn new_system<P: AsRef<Path>>(path: P) -> Result<Self, String> {
+        let path = path.as_ref().to_path_buf();
+        if path.is_absolute() {
+            Ok(Self::LocalSystem(path))
+        } else {
+            Err(format!(
+                "System path was not absolute, got `{}`",
+                path.display()
+            ))
+        }
+    }
+
+    pub fn parent(&self) -> Result<Option<Self>, String> {
         match self {
-            NodeKey::DigestFile(s) => Some(s.0.path.as_path()),
-            NodeKey::ReadLink(s) => Some((s.0).path.as_path()),
-            NodeKey::Scandir(s) => Some((s.0).0.as_path()),
+            SubjectPath::Workspace(relpath) => match relpath.parent() {
+                Some(parent_relpath) => Ok(Some(Self::new_workspace(parent_relpath)?)),
+                None => Ok(None),
+            },
+            SubjectPath::LocalSystem(path) => match path.parent() {
+                Some(parent_path) => Ok(Some(Self::new_system(parent_path)?)),
+                None => Ok(None),
+            },
+        }
+    }
+}
+
+impl NodeKey {
+    /// Returns filesystem path (if any) in which this node is interested. Any changes to that path
+    /// will invalidate the applicable graph node.
+    ///
+    /// See `fs_path_to_watch` for where the filesystem watch is actually placed.
+    pub fn fs_subject(&self) -> Option<&SubjectPath> {
+        match self {
+            NodeKey::DigestFile(s) => Some(&s.subject_path),
+            NodeKey::ReadLink(s) => Some(&s.subject_path),
+            NodeKey::Scandir(s) => Some(&s.subject_path),
+            NodeKey::PathMetadata(fs) => Some(&fs.subject_path),
 
             // Not FS operations:
             // Explicitly listed so that if people add new NodeKeys they need to consider whether their
@@ -251,6 +327,26 @@ impl NodeKey {
             | &NodeKey::Snapshot { .. }
             | &NodeKey::Task { .. }
             | &NodeKey::DownloadedFile { .. } => None,
+        }
+    }
+
+    /// Returns the filesystem path where the inotify watch should be attached.
+    ///
+    /// This is not the same as `fs_subject`. There is a difference between the path on which to place the filesystem
+    /// watch and the path which actually invalidates this node. This is necessary because in the existing inotify logic,
+    /// if the path does not exist, then trying to place a watch on the path will fail with a "file not found" error.
+    pub fn fs_path_to_watch(&self) -> Option<SubjectPath> {
+        match self {
+            // For `PathMetadata`, watch the parent directory so that nonexistence of the path can be monitored
+            // since creation/deletion events occur on the parent directory.
+            NodeKey::PathMetadata(fs) => fs
+                .subject_path
+                .parent()
+                .clone()
+                .expect("Internal: Should always be able to get parent path."),
+
+            // For all other node types, attach the watch to the actual path since the path is assumed or known to exist.
+            _ => self.fs_subject().cloned(),
         }
     }
 
@@ -281,6 +377,7 @@ impl NodeKey {
             NodeKey::DownloadedFile(..) => "downloaded_file",
             NodeKey::ReadLink(..) => "read_link",
             NodeKey::Scandir(..) => "scandir",
+            NodeKey::PathMetadata(..) => "path_metadata",
             NodeKey::Root(..) => "root",
             NodeKey::SessionValues(..) => "session_values",
             NodeKey::RunId(..) => "run_id",
@@ -301,7 +398,7 @@ impl NodeKey {
 
                 let displayable_param_names: Vec<_> = Python::with_gil(|py| {
                     Self::engine_aware_params(context, py, &task.params)
-                        .filter_map(|k| EngineAwareParameter::debug_hint((*k.value).as_ref(py)))
+                        .filter_map(|k| EngineAwareParameter::debug_hint(k.value.bind(py)))
                         .collect()
                 });
 
@@ -322,15 +419,18 @@ impl NodeKey {
                 // NB: See Self::workunit_level for more information on why this is prefixed.
                 Some(format!("Scheduling: {}", epr.process.description))
             }
-            NodeKey::DigestFile(DigestFile(File { path, .. })) => {
-                Some(format!("Fingerprinting: {}", path.display()))
-            }
-            NodeKey::ReadLink(ReadLink(Link { path, .. })) => {
-                Some(format!("Reading link: {}", path.display()))
-            }
-            NodeKey::Scandir(Scandir(Dir(path))) => {
+            NodeKey::DigestFile(DigestFile {
+                file: File { path, .. },
+                ..
+            }) => Some(format!("Fingerprinting: {}", path.display())),
+            NodeKey::ReadLink(ReadLink {
+                link: Link { path, .. },
+                ..
+            }) => Some(format!("Reading link: {}", path.display())),
+            NodeKey::Scandir(Scandir { dir: Dir(path), .. }) => {
                 Some(format!("Reading directory: {}", path.display()))
             }
+            NodeKey::PathMetadata(fs) => Some(format!("Checking path: {}", fs.path().display())),
             NodeKey::DownloadedFile(..)
             | NodeKey::Root(..)
             | NodeKey::SessionValues(..)
@@ -339,15 +439,27 @@ impl NodeKey {
     }
 
     async fn maybe_watch(&self, context: &Context) -> NodeResult<()> {
-        if let Some((path, watcher)) = self.fs_subject().zip(context.core.watcher.as_ref()) {
-            let abs_path = context.core.build_root.join(path);
-            watcher
-                .watch(abs_path)
-                .map_err(|e| Context::mk_error(&e))
-                .await
-        } else {
-            Ok(())
-        }
+        let Some((Some(watcher), abs_path)) = (match self.fs_path_to_watch() {
+            Some(SubjectPath::Workspace(path)) => {
+                let abs_path = if path.starts_with(&context.core.build_root) {
+                    path.to_path_buf()
+                } else {
+                    context.core.build_root.join(path)
+                };
+                Some((context.core.watcher.as_ref(), abs_path))
+            }
+
+            // TODO: Local filesystem watching to come (but requires some refactoring of the watch code).
+            Some(SubjectPath::LocalSystem(_)) => None,
+            None => None,
+        }) else {
+            return Ok(());
+        };
+
+        watcher
+            .watch(abs_path)
+            .map_err(|e| Context::mk_error(&e))
+            .await
     }
 
     ///
@@ -362,7 +474,7 @@ impl NodeKey {
         params.keys().filter(move |key| {
             key.type_id()
                 .as_py_type(py)
-                .is_subclass(engine_aware_param_ty)
+                .is_subclass(&engine_aware_param_ty)
                 .unwrap_or(false)
         })
     }
@@ -392,7 +504,7 @@ impl Node for NodeKey {
                 if let Some(params) = maybe_params {
                     Python::with_gil(|py| {
                         Self::engine_aware_params(&context, py, params)
-                            .flat_map(|k| EngineAwareParameter::metadata((*k.value).as_ref(py)))
+                            .flat_map(|k| EngineAwareParameter::metadata(k.value.bind(py)))
                             .collect()
                     })
                 } else {
@@ -418,6 +530,9 @@ impl Node for NodeKey {
                     NodeKey::ReadLink(n) => n.run_node(context).await.map(NodeOutput::LinkDest),
                     NodeKey::Scandir(n) => {
                         n.run_node(context).await.map(NodeOutput::DirectoryListing)
+                    }
+                    NodeKey::PathMetadata(n) => {
+                        n.run_node(context).await.map(NodeOutput::PathMetadata)
                     }
                     NodeKey::Root(n) => n.run_node(context).await.map(NodeOutput::Value),
                     NodeKey::Snapshot(n) => n.run_node(context).await.map(NodeOutput::Snapshot),
@@ -462,6 +577,11 @@ impl Node for NodeKey {
         match self {
             NodeKey::Task(s) => s.task.cacheable,
             &NodeKey::SessionValues(_) | &NodeKey::RunId(_) => false,
+            NodeKey::PathMetadata(PathMetadataNode { subject_path, .. }) => match subject_path {
+                SubjectPath::Workspace(_) => true,
+                // TODO: Do not cache system path metadata lookups until we have filesystem watch support.
+                SubjectPath::LocalSystem(_) => false,
+            },
             _ => true,
         }
     }
@@ -470,8 +590,12 @@ impl Node for NodeKey {
         match (self, output) {
             (NodeKey::ExecuteProcess(ref ep), NodeOutput::ProcessResult(ref process_result)) => {
                 match ep.process.cache_scope {
-                    ProcessCacheScope::Always | ProcessCacheScope::PerRestartAlways => true,
-                    ProcessCacheScope::Successful | ProcessCacheScope::PerRestartSuccessful => {
+                    ProcessCacheScope::Always
+                    | ProcessCacheScope::LocalAlways
+                    | ProcessCacheScope::PerRestartAlways => true,
+                    ProcessCacheScope::Successful
+                    | ProcessCacheScope::LocalSuccessful
+                    | ProcessCacheScope::PerRestartSuccessful => {
                         process_result.result.exit_code == 0
                     }
                     ProcessCacheScope::PerSession => false,
@@ -479,7 +603,7 @@ impl Node for NodeKey {
             }
             (NodeKey::Task(ref t), NodeOutput::Value(ref v)) if t.task.engine_aware_return_type => {
                 Python::with_gil(|py| {
-                    EngineAwareReturnType::is_cacheable((**v).as_ref(py)).unwrap_or(true)
+                    EngineAwareReturnType::is_cacheable(v.bind(py)).unwrap_or(true)
                 })
             }
             _ => true,
@@ -514,24 +638,21 @@ impl Node for NodeKey {
 impl Display for NodeKey {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         match self {
-            NodeKey::DigestFile(s) => write!(f, "DigestFile({})", s.0.path.display()),
+            NodeKey::DigestFile(s) => write!(f, "DigestFile({})", s.file.path.display()),
             NodeKey::DownloadedFile(s) => write!(f, "DownloadedFile({})", s.0),
             NodeKey::ExecuteProcess(s) => {
                 write!(f, "Process({})", s.process.description)
             }
-            NodeKey::ReadLink(s) => write!(f, "ReadLink({})", (s.0).path.display()),
-            NodeKey::Scandir(s) => write!(f, "Scandir({})", (s.0).0.display()),
+            NodeKey::ReadLink(s) => write!(f, "ReadLink({})", s.link.path.display()),
+            NodeKey::Scandir(s) => write!(f, "Scandir({})", s.dir.0.display()),
+            NodeKey::PathMetadata(s) => write!(f, "PathMetadata({})", s.path().display()),
             NodeKey::Root(s) => write!(f, "{}", s.product),
             NodeKey::Task(task) => {
                 let params = {
                     Python::with_gil(|py| {
                         task.params
                             .keys()
-                            .filter_map(|k| {
-                                EngineAwareParameter::debug_hint(
-                                    k.to_value().clone_ref(py).into_ref(py),
-                                )
-                            })
+                            .filter_map(|k| EngineAwareParameter::debug_hint(k.to_value().bind(py)))
                             .collect::<Vec<_>>()
                     })
                 };
@@ -565,6 +686,7 @@ pub enum NodeOutput {
     Snapshot(store::Snapshot),
     DirectoryListing(Arc<DirectoryListing>),
     LinkDest(LinkDest),
+    PathMetadata(Option<fs::PathMetadata>),
     ProcessResult(Box<ProcessResult>),
     Value(Value),
 }
@@ -586,7 +708,10 @@ impl NodeOutput {
                 digests.push(p.result.stderr_digest);
                 digests
             }
-            NodeOutput::DirectoryListing(_) | NodeOutput::LinkDest(_) | NodeOutput::Value(_) => {
+            NodeOutput::DirectoryListing(_)
+            | NodeOutput::LinkDest(_)
+            | NodeOutput::Value(_)
+            | NodeOutput::PathMetadata(_) => {
                 vec![]
             }
         }

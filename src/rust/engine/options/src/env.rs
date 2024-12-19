@@ -1,6 +1,7 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::any::Any;
 use std::collections::HashMap;
 use std::env;
 use std::ffi::OsString;
@@ -111,6 +112,10 @@ impl From<&Env> for Vec<(String, String)> {
 impl OptionsSource for EnvReader {
     fn display(&self, id: &OptionId) -> String {
         Self::env_var_names(id).pop().unwrap()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {

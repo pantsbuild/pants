@@ -2,13 +2,15 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::path::PathBuf;
 
-include!(concat!(env!("OUT_DIR"), "/python/constants.rs"));
-include!(concat!(env!("OUT_DIR"), "/python/visitor.rs"));
-include!(concat!(env!("OUT_DIR"), "/python_impl_hash.rs"));
-
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use serde_derive::{Deserialize, Serialize};
 use tree_sitter::Parser;
+
+use crate::code;
+
+include!(concat!(env!("OUT_DIR"), "/python/constants.rs"));
+include!(concat!(env!("OUT_DIR"), "/python/visitor.rs"));
+include!(concat!(env!("OUT_DIR"), "/python_impl_hash.rs"));
 
 #[derive(Serialize, Deserialize)]
 pub struct ParsedPythonDependencies {
@@ -97,7 +99,7 @@ impl ImportCollector<'_> {
     }
 
     fn code_at(&self, range: tree_sitter::Range) -> &str {
-        &self.code[range.start_byte..range.end_byte]
+        code::at_range(self.code, range)
     }
 
     fn string_at(&self, range: tree_sitter::Range) -> &str {

@@ -10,6 +10,7 @@ python_tests(
     sources=["*_test.py", "!scheduler_integration_test.py"],
     timeout=90,
     overrides={
+        "engine_test.py": {"dependencies": ["//BUILD_ROOT:files"]},
         "platform_rules_test.py": {"tags": ["platform_specific_behavior"], "timeout": 120},
     },
 )

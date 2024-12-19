@@ -13,7 +13,7 @@ use testutil_mock::{StubCAS, StubCASBuilder};
 use crate::externs::fs::{PyDigest, PyFileDigest};
 use crate::externs::scheduler::PyExecutor;
 
-pub fn register(m: &PyModule) -> PyResult<()> {
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyStubCAS>()?;
     m.add_class::<PyStubCASBuilder>()?;
     Ok(())
@@ -41,13 +41,16 @@ impl PyStubCASBuilder {
         Ok(PyStubCASBuilder(self.0.clone()))
     }
 
-    fn build(&mut self, py_executor: &PyExecutor) -> PyResult<PyStubCAS> {
+    fn build(&mut self, py_executor: &Bound<'_, PyExecutor>) -> PyResult<PyStubCAS> {
         let mut builder_opt = self.0.lock();
         let builder = builder_opt
             .take()
             .ok_or_else(|| PyAssertionError::new_err("Unable to unwrap StubCASBuilder"))?;
         // NB: A Tokio runtime must be used when building StubCAS.
-        py_executor.0.enter(|| Ok(PyStubCAS(builder.build())))
+        py_executor
+            .borrow()
+            .0
+            .block_on(async move { Ok(PyStubCAS(builder.build().await)) })
     }
 }
 
@@ -57,7 +60,7 @@ struct PyStubCAS(StubCAS);
 #[pymethods]
 impl PyStubCAS {
     #[classmethod]
-    fn builder(_cls: &PyType) -> PyStubCASBuilder {
+    fn builder(_cls: &Bound<'_, PyType>) -> PyStubCASBuilder {
         let builder = Arc::new(Mutex::new(Some(StubCAS::builder())));
         PyStubCASBuilder(builder)
     }
@@ -67,7 +70,7 @@ impl PyStubCAS {
         self.0.address()
     }
 
-    fn remove(&self, digest: &PyAny) -> PyResult<bool> {
+    fn remove(&self, digest: &Bound<'_, PyAny>) -> PyResult<bool> {
         let digest = digest
             .extract::<PyFileDigest>()
             .map(|fd| fd.0)
