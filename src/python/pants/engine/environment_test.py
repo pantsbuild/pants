@@ -37,3 +37,18 @@ def test_invalid_variable() -> None:
         "An invalid variable was requested via the --test-extra-env-var mechanism: 3INVALID"
         in str(exc)
     )
+
+
+def test_envvar_fnmatch() -> None:
+    """Test fnmatch patterns correctly pull in all matching envvars"""
+
+    pants_env = CompleteEnvironmentVars({
+        "LETTER_C": "prefix_char_match",
+        "LETTER_PI": "prefix",
+    })
+
+    char_match = pants_env.get_subset(["LETTER_?"])
+    assert char_match == {"LETTER_C": "prefix_char_match"}
+
+    multichar_match = pants_env.get_subset(["LETTER_*"])
+    assert multichar_match == {"LETTER_C": "prefix_char_match", "LETTER_PI": "prefix"}
