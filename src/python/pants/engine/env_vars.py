@@ -65,9 +65,7 @@ class CompleteEnvironmentVars(FrozenDict):
         return FrozenDict(env_var_subset)
 
     def get_or_match(self, name_or_pattern: str) -> dict[str, str]:
-        """
-        Get the value of an envvar if it has an exact match, otherwise all fnmatches.
-        """
+        """Get the value of an envvar if it has an exact match, otherwise all fnmatches."""
         if name_or_pattern in self:
             return {name_or_pattern: self.get(name_or_pattern)}
         return {k: v for k, v in self.items() if fnmatch.fnmatch(k, name_or_pattern)}
