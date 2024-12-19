@@ -52,10 +52,6 @@ def rule_runner(standard_deployment: StandardDeployment) -> RuleRunner:
         }
     )
     rule_runner.write_files(trivy_deployment.files)
-    # # test changing severity
-    # rule_runner.set_options([
-    #     "--trivy-severity=CRITICAL"
-    # ])
 
     return rule_runner
 
