@@ -341,9 +341,11 @@ class PBSPythonProviderSubsystem(Subsystem):
             f"""
             Known versions to verify downloads against.
 
-            Each element is a pipe-separated string of `version|platform|sha256|length|url`, where:
+            Each element is a pipe-separated string of either `py_version+pbs_release_tag|platform|sha256|length|url` or
+            `url|sha256|length`, where:
 
-            - `version` is the version string
+            - `py_version` is the Python version string
+            - `pbs_release_tag` is the PBS release tag (i.e., the PBS-specific version)
             - `platform` is one of `[{','.join(Platform.__members__.keys())}]`
             - `sha256` is the 64-character hex representation of the expected sha256
                 digest of the download file, as emitted by `shasum -a 256`
@@ -351,9 +353,13 @@ class PBSPythonProviderSubsystem(Subsystem):
                 `wc -c`
             - `url` is the download URL to the `.tar.gz` archive
 
-            E.g., `3.1.2|macos_x86_64|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813|https://<URL>`.
+            E.g., `3.1.2|macos_x86_64|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813|https://<URL>`
+            or `https://<URL>|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
 
-            Values are space-stripped, so pipes can be indented for readability if necessary.
+            Values are space-stripped, so pipes can be indented for readability if necessary. If the three field
+            format is used, then Pants will infer the `py_version`, `pbs_release_tag`, and `platform` fields from
+            the URL. With the five field format, one or more of `py_version`, `pbs_release_tag`, and `platform`
+            may be left blank if Pants can infer the field from the URL.
 
             Additionally, any versions you specify here will override the default Pants metadata for
             that version.
