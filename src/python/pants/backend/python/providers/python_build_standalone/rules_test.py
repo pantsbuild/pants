@@ -7,6 +7,7 @@ import pytest
 
 from pants.backend.python.providers.python_build_standalone.rules import (
     _parse_from_five_fields,
+    _parse_from_three_fields,
     _parse_pbs_url,
     _parse_py_version_and_pbs_release_tag,
     _ParsedPBSPython,
@@ -47,6 +48,29 @@ def test_parse_pbs_url() -> None:
     with pytest.raises(ValueError, match="Unable to parse the platfornm"):
         _parse_pbs_url(
             "https://example.com/cpython-3.12.4%2B20240205-s390-unknown-linux-gnu-install_only_stripped.tar.gz"
+        )
+
+
+def test_parse_from_three_fields() -> None:
+    def invoke(s: str) -> _ParsedPBSPython:
+        parts = s.split("|")
+        return _parse_from_three_fields(parts, orig_value=s)
+
+    result1 = invoke(
+        "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-x86_64-unknown-linux-gnu-install_only.tar.gz|f885f3d011ab08e4d9521a7ae2662e9e0073acc0305a1178984b5a1cf057309a|26767987"
+    )
+    assert result1 == _ParsedPBSPython(
+        py_version=Version("3.9.16"),
+        pbs_release_tag=Version("20221220"),
+        platform=Platform.linux_x86_64,
+        url="https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-x86_64-unknown-linux-gnu-install_only.tar.gz",
+        sha256="f885f3d011ab08e4d9521a7ae2662e9e0073acc0305a1178984b5a1cf057309a",
+        size=26767987,
+    )
+
+    with pytest.raises(ExternalToolError, match="since it does not have a cpython prefix"):
+        invoke(
+            "https://dl.example.com/cpython.tar.gz|f885f3d011ab08e4d9521a7ae2662e9e0073acc0305a1178984b5a1cf057309a|26767987"
         )
 
 
