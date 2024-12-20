@@ -92,7 +92,7 @@ def _parse_py_version_and_pbs_release_tag(
     if not version_and_tag:
         return None, None
 
-    parts = version_and_tag.split("+", 2)
+    parts = version_and_tag.split("+", 1)
     py_version: Version | None = None
     pbs_release_tag: Version | None = None
 
