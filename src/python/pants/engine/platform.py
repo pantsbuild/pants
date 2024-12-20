@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pants.util.osutil import get_normalized_arch_name, get_normalized_os_name
 
@@ -15,7 +15,7 @@ class PlatformError(Exception):
     """
 
 
-class Platform(Enum):
+class Platform(StrEnum):
     linux_arm64 = "linux_arm64"
     linux_x86_64 = "linux_x86_64"
     macos_arm64 = "macos_arm64"
