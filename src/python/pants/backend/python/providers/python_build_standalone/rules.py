@@ -150,8 +150,6 @@ def _parse_pbs_url(url: str) -> tuple[Version, Version, Platform]:
                 f"because it does not follow the PBS naming convention: {url}"
             )
 
-    # assert platform is not None
-
     return py_version, pbs_release_tag, platform
 
 
