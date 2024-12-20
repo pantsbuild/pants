@@ -49,7 +49,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.errors import OptionsError
 from pants.option.global_options import NamedCachesDirOption
-from pants.option.option_types import BoolOption, StrListOption, StrOption
+from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
@@ -370,18 +370,6 @@ class PBSPythonProviderSubsystem(Subsystem):
             manner to Python interpreter constraints: e.g., `>=20241201` or `>=20241201,<20250101`.
             """
         ),
-    )
-
-    require_inferrable_release_tag = BoolOption(
-        default=False,
-        help=textwrap.dedent(
-            """
-            Normally, Pants will try to infer the PBS release "tag" from URLs supplied to the
-            `--python-build-standalone-known-python-versions` option. If this option is True,
-            then it is an error if Pants cannot infer the tag from the URL.
-            """
-        ),
-        advanced=True,
     )
 
     @memoized_property
