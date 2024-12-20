@@ -236,44 +236,42 @@ def _parse_from_five_fields(parts: Sequence[str], orig_value: str) -> _ParsedPBS
     except ValueError:
         maybe_inferred_platform = None
 
-    match maybe_py_version:
-        case None:
-            if maybe_inferred_py_version is None:
-                raise ExternalToolError(
-                    f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-                    f"the value `{orig_value}` does not declare a version in the first field, and no version "
-                    "could be inferred from the URL."
-                )
+    if maybe_py_version is None:
+        if maybe_inferred_py_version is None:
+            raise ExternalToolError(
+                f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                f"the value `{orig_value}` does not declare a version in the first field, and no version "
+                "could be inferred from the URL."
+            )
 
-            maybe_py_version = maybe_inferred_py_version
-        case py_version:
-            if maybe_inferred_py_version is not None and py_version != maybe_inferred_py_version:
-                logger.warning(
-                    f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-                    f"the value `{orig_value}` declares version `{py_version}` in the first field, but Pants inferred "
-                    f"version `{maybe_inferred_py_version}` from the URL."
-                )
+        maybe_py_version = maybe_inferred_py_version
+    else:
+        if maybe_inferred_py_version is not None and maybe_py_version != maybe_inferred_py_version:
+            logger.warning(
+                f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                f"the value `{orig_value}` declares version `{maybe_py_version}` in the first field, but Pants inferred "
+                f"version `{maybe_inferred_py_version}` from the URL."
+            )
 
-    match maybe_pbs_release_tag:
-        case None:
-            if maybe_inferred_pbs_release_tag is None:
-                raise ExternalToolError(
-                    f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-                    f"the value `{orig_value}` does not declare a PBS release tag in the first field, and no PBS "
-                    "release tag could be inferred from the URL."
-                )
+    if maybe_pbs_release_tag is None:
+        if maybe_inferred_pbs_release_tag is None:
+            raise ExternalToolError(
+                f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                f"the value `{orig_value}` does not declare a PBS release tag in the first field, and no PBS "
+                "release tag could be inferred from the URL."
+            )
 
-            maybe_pbs_release_tag = maybe_inferred_pbs_release_tag
-        case pbs_release_tag:
-            if (
-                maybe_inferred_pbs_release_tag is not None
-                and pbs_release_tag != maybe_inferred_pbs_release_tag
-            ):
-                logger.warning(
-                    f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-                    f"the value `{orig_value}` declares PBS release tag `{pbs_release_tag}` in the first field, but Pants inferred "
-                    f"PBS release tag `{maybe_inferred_pbs_release_tag}` from the URL."
-                )
+        maybe_pbs_release_tag = maybe_inferred_pbs_release_tag
+    else:
+        if (
+            maybe_inferred_pbs_release_tag is not None
+            and maybe_pbs_release_tag != maybe_inferred_pbs_release_tag
+        ):
+            logger.warning(
+                f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                f"the value `{orig_value}` declares PBS release tag `{maybe_pbs_release_tag}` in the first field, but Pants inferred "
+                f"PBS release tag `{maybe_inferred_pbs_release_tag}` from the URL."
+            )
 
     if maybe_platform is None:
         if maybe_inferred_platform is None:
