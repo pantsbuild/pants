@@ -189,19 +189,23 @@ def _parse_from_five_fields(parts: Sequence[str], orig_value: str) -> _ParsedPBS
             "but it could not be parsed as a PBS release version."
         )
 
-    if platform_str not in (
+    maybe_platform: Platform | None = None
+    if not platform_str:
+        pass
+    elif platform_str in (
         Platform.linux_x86_64.value,
         Platform.linux_arm64.value,
         Platform.macos_x86_64.value,
         Platform.macos_arm64.value,
     ):
+        maybe_platform = Platform(platform_str)
+    else:
         raise ExternalToolError(
             f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
             f"the value `{orig_value}` declares platforn `{platform_str}` in the second field, "
             "but that value is not a known Pants platform. It must be one of "
             "`linux_x86_64`, `linux_arm64`, `macos_x86_64`, or `macos_arm64`."
         )
-    platform: Platform = Platform(platform_str)
 
     if len(sha256) != 64 or not re.match("^[a-zA-Z0-9]+$", sha256):
         raise ExternalToolError(
@@ -223,13 +227,12 @@ def _parse_from_five_fields(parts: Sequence[str], orig_value: str) -> _ParsedPBS
     maybe_inferred_pbs_release_tag: Version | None = None
     maybe_inferred_platform: Platform | None = None
     try:
-        (
-            maybe_inferred_py_version,
-            maybe_inferred_pbs_release_tag,
-            maybe_inferred_platform,
-        ) = _parse_pbs_url(url)
+        v1, v2, p = _parse_pbs_url(url)
+        maybe_inferred_py_version = v1
+        maybe_inferred_pbs_release_tag = v2
+        maybe_inferred_platform = p
     except ValueError:
-        pass
+        maybe_inferred_platform = None
 
     match maybe_py_version:
         case None:
@@ -270,17 +273,27 @@ def _parse_from_five_fields(parts: Sequence[str], orig_value: str) -> _ParsedPBS
                     f"PBS release tag `{maybe_inferred_pbs_release_tag}` from the URL."
                 )
 
-    if maybe_inferred_platform is not None and platform != maybe_inferred_platform:
-        logger.warning(
-            f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-            f"the value `{orig_value}` declares platform `{platform}` in the third field, but Pants inferred "
-            f"platform `{maybe_inferred_platform}` from the URL."
-        )
+    if maybe_platform is None:
+        if maybe_inferred_platform is None:
+            raise ExternalToolError(
+                f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                f"the value `{orig_value}` does not declare a platform in the second field, and no platform "
+                "could be inferred from the URL."
+            )
+
+        maybe_platform = maybe_inferred_platform
+    else:
+        if maybe_inferred_platform is not None and maybe_platform != maybe_inferred_platform:
+            logger.warning(
+                f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                f"the value `{orig_value}` declares platform `{maybe_platform}` in the second field, but Pants inferred "
+                f"platform `{maybe_inferred_platform}` from the URL."
+            )
 
     return _ParsedPBSPython(
         py_version=maybe_py_version,
         pbs_release_tag=maybe_pbs_release_tag,
-        platform=platform,
+        platform=maybe_platform,
         url=url,
         sha256=sha256,
         size=filesize,

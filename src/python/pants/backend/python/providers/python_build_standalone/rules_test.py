@@ -6,9 +6,12 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.python.providers.python_build_standalone.rules import (
+    _parse_from_five_fields,
     _parse_pbs_url,
     _parse_py_version_and_pbs_release_tag,
+    _ParsedPBSPython,
 )
+from pants.core.util_rules.external_tool import ExternalToolError
 from pants.engine.platform import Platform
 from pants.version import Version
 
@@ -45,3 +48,57 @@ def test_parse_pbs_url() -> None:
         _parse_pbs_url(
             "https://example.com/cpython-3.12.4%2B20240205-s390-unknown-linux-gnu-install_only_stripped.tar.gz"
         )
+
+
+def test_parse_from_five_fields() -> None:
+    def invoke(s: str) -> _ParsedPBSPython:
+        parts = s.split("|")
+        return _parse_from_five_fields(parts, orig_value=s)
+
+    result1 = invoke(
+        "3.9.16|linux_x86_64|f885f3d011ab08e4d9521a7ae2662e9e0073acc0305a1178984b5a1cf057309a|26767987|https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-x86_64-unknown-linux-gnu-install_only.tar.gz"
+    )
+    assert result1 == _ParsedPBSPython(
+        py_version=Version("3.9.16"),
+        pbs_release_tag=Version("20221220"),
+        platform=Platform.linux_x86_64,
+        url="https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-x86_64-unknown-linux-gnu-install_only.tar.gz",
+        sha256="f885f3d011ab08e4d9521a7ae2662e9e0073acc0305a1178984b5a1cf057309a",
+        size=26767987,
+    )
+
+    with pytest.raises(
+        ExternalToolError,
+        match="does not declare a version in the first field, and no version could be inferred from the URL",
+    ):
+        invoke(
+            "||e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855|123|https://dl.example.com/cpython.tar.gz"
+        )
+
+    with pytest.raises(
+        ExternalToolError,
+        match="does not declare a PBS release tag in the first field, and no PBS release tag could be inferred from the URL",
+    ):
+        invoke(
+            "3.10.1||e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855|123|https://dl.example.com/cpython.tar.gz"
+        )
+
+    with pytest.raises(
+        ExternalToolError,
+        match="does not declare a platform in the second field, and no platform could be inferred from the URL",
+    ):
+        invoke(
+            "3.10.1+20240601||e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855|123|https://dl.example.com/cpython.tar.gz"
+        )
+
+    result2 = invoke(
+        "3.10.1+20240601|linux_x86_64|e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855|123|https://dl.example.com/cpython.tar.gz"
+    )
+    assert result2 == _ParsedPBSPython(
+        py_version=Version("3.10.1"),
+        pbs_release_tag=Version("20240601"),
+        platform=Platform.linux_x86_64,
+        url="https://dl.example.com/cpython.tar.gz",
+        sha256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        size=123,
+    )
