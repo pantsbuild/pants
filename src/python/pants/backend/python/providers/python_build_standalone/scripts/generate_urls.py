@@ -42,12 +42,37 @@ def _compute_sha256(url):
     return sha256_hash.hexdigest()
 
 
+def scrape_release(release, scraped_releases, asset_map, sha256_map):
+    scraped_releases.add(release.tag_name)
+    assets = release.get_assets()
+    for asset in assets:
+        # NB: From https://python-build-standalone.readthedocs.io/en/latest/running.html#obtaining-distributions
+        # > Casual users will likely want to use the install_only archive,
+        # > as most users do not need the build artifacts present in the full archive.
+        is_applicable = any(
+            f"{machine}-{osname}-install_only" in asset.name
+            for machine, osname in itertools.product(
+                ["aarch64", "x86_64"], ["apple-darwin", "unknown-linux-gnu"]
+            )
+        )
+        if not is_applicable:
+            continue
+
+        is_checksum = asset.name.endswith(".sha256")
+        if is_checksum:
+            shasum = requests.get(asset.browser_download_url).text.strip()
+            sha256_map[asset.name.removesuffix(".sha256")] = shasum
+        else:
+            asset_map[asset.name] = asset
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--scrape-all-releases", dest="scrape_all_releases", action="store_true")
     parser.add_argument(
         "--scrape-release", metavar="RELEASE", dest="scrape_releases", action="append"
     )
+    parser.add_argument("-v", "--verbose", action="store_true")
     options = parser.parse_args()
 
     print("Starting to scrape GitHub PBS releases.")
@@ -69,32 +94,20 @@ def main() -> None:
         tag_name = release.tag_name
 
         if (
-            tag_name not in scraped_releases
-            or options.scrape_all_releases
-            or tag_name in options.scrape_releases
+            options.scrape_all_releases
+            or (options.scrape_releases and tag_name in options.scrape_releases)
+            or (not options.scrape_releases and tag_name not in scraped_releases)
         ):
             print(f"Scraping release tag `{tag_name}`.")
-            scraped_releases.add(release.tag_name)
-            assets = release.get_assets()
-            for asset in assets:
-                # NB: From https://python-build-standalone.readthedocs.io/en/latest/running.html#obtaining-distributions
-                # > Casual users will likely want to use the install_only archive,
-                # > as most users do not need the build artifacts present in the full archive.
-                is_applicable = any(
-                    f"{machine}-{osname}-install_only" in asset.name
-                    for machine, osname in itertools.product(
-                        ["aarch64", "x86_64"], ["apple-darwin", "unknown-linux-gnu"]
-                    )
-                )
-                if not is_applicable:
-                    continue
-
-                is_checksum = asset.name.endswith(".sha256")
-                if is_checksum:
-                    shasum = requests.get(asset.browser_download_url).text.strip()
-                    sha256_map[asset.name.removesuffix(".sha256")] = shasum
-                else:
-                    asset_map[asset.name] = asset
+            scrape_release(
+                release=release,
+                scraped_releases=scraped_releases,
+                asset_map=asset_map,
+                sha256_map=sha256_map,
+            )
+        else:
+            if options.verbose:
+                print(f"Skipped release tag `{tag_name}.")
 
     print("Finished scraping releases.")
 
@@ -110,6 +123,8 @@ def main() -> None:
         python_version, pbs_release_tag = matched_versions.groups()[1:3]
         if python_version not in pythons_dict:
             pythons_dict[python_version] = {}
+        if pbs_release_tag not in pythons_dict[python_version]:
+            pythons_dict[python_version][pbs_release_tag] = {}
 
         name_parts = asset.name.replace("darwin", "macos").replace("aarch64", "arm64").split("-")
         pants_platform_tag = f"{name_parts[4]}_{name_parts[2]}"
@@ -117,11 +132,10 @@ def main() -> None:
         if sha256sum is None:
             sha256sum = _compute_sha256(asset.browser_download_url)
 
-        pythons_dict[python_version][pants_platform_tag] = {
+        pythons_dict[python_version][pbs_release_tag][pants_platform_tag] = {
             "url": asset.browser_download_url,
             "sha256": sha256sum,
             "size": asset.size,
-            "tag": pbs_release_tag,
         }
 
     VERSIONS_PATH.write_text(json.dumps(versions_info, sort_keys=True, indent=2))

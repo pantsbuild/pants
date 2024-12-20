@@ -389,4 +389,5 @@ Created as part of the release process.
 + twunderlich-grapl
 + wimax-grapl
 + yjabri
++ Éric Jacob
 + Ólafur Páll Geirsson
