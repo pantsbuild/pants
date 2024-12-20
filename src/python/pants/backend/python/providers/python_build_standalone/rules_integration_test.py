@@ -143,8 +143,8 @@ def test_additional_versions(rule_runner, mock_empty_versions_resource):
             "--python-build-standalone-python-provider-known-python-versions=["
             + "'3.9.16|linux_arm64|75f3d10ae8933e17bf27e8572466ff8a1e7792f521d33acba578cc8a25d82e0b|24540128|https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-aarch64-unknown-linux-gnu-install_only.tar.gz',"
             + "'3.9.16|macos_arm64|73bad3a610a0ff14166fbd5045cd186084bd2ce99edd2c6327054509e790b9ab|16765350|https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-aarch64-apple-darwin-install_only.tar.gz',"
-            + "'3.9.16|linux_x86_64|f885f3d011ab08e4d9521a7ae2662e9e0073acc0305a1178984b5a1cf057309a|26767987|https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-x86_64-unknown-linux-gnu-install_only.tar.gz',"
-            + "'3.9.16|macos_x86_64|69331e93656b179fcbfec0d506dfca11d899fe5dced990b28915e41755ce215c|17151321|https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-x86_64-apple-darwin-install_only.tar.gz',"
+            + "'https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-x86_64-unknown-linux-gnu-install_only.tar.gz|f885f3d011ab08e4d9521a7ae2662e9e0073acc0305a1178984b5a1cf057309a|26767987',"
+            + "'https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-x86_64-apple-darwin-install_only.tar.gz|69331e93656b179fcbfec0d506dfca11d899fe5dced990b28915e41755ce215c|17151321',"
             + "]"
         ],
     )
