@@ -1,27 +1,34 @@
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 
 from pants.backend.docker.goals.package_image import DockerPackageFieldSet
+from pants.backend.k8s.k8s_subsystem import K8sSubsystem
+from pants.backend.k8s.kubectl_subsystem import KubectlBinary, KubectlOptions
+from pants.backend.k8s.targets import (
+    K8sBundleContextField,
+    K8sBundleDependenciesField,
+    K8sBundleSourcesField,
+    K8sSourceField,
+)
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import DependenciesRequest, HydratedSources, HydrateSourcesRequest, SourcesField, Targets
+from pants.engine.target import (
+    DependenciesRequest,
+    HydratedSources,
+    HydrateSourcesRequest,
+    SourcesField,
+    Targets,
+)
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
-
-from experimental.k8s.k8s_subsystem import K8sSubsystem
-from experimental.k8s.kubectl_subsystem import KubectlBinary, KubectlOptions
-from experimental.k8s.targets import (
-    K8sBundleContextField,
-    K8sBundleDependenciesField,
-    K8sBundleSourcesField,
-    K8sSourceField,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -42,16 +49,22 @@ class DeployK8sBundleFieldSet(DeployFieldSet):
 async def run_k8s_deploy(
     field_set: DeployK8sBundleFieldSet,
     kubectl: KubectlBinary,
-    options: KubectlOptions,
+    kubectl_subsystem: KubectlOptions,
     k8s_subsystem: K8sSubsystem,
 ) -> DeployProcess:
     context = field_set.context.value
-    assert context is not None
-    context = context if options.pass_context else None
-    if context is not None and context not in options.available_contexts:
-        raise ValueError(f"context {context} is not listed in `[kubectl].available_contexts`")
+    if context is None:
+        raise ValueError(f"Missing `{K8sBundleContextField.alias}` field")
 
-    dependencies = await Get(Targets, UnparsedAddressInputs, field_set.sources.to_unparsed_address_inputs())
+    context = context if kubectl_subsystem.pass_context else None
+    if context is not None and context not in k8s_subsystem.available_contexts:
+        raise ValueError(
+            f"Context `{context}` is not listed in `[{K8sSubsystem.options_scope}].available_contexts`"
+        )
+
+    dependencies = await Get(
+        Targets, UnparsedAddressInputs, field_set.sources.to_unparsed_address_inputs()
+    )
     file_sources = await MultiGet(
         Get(
             HydratedSources,
@@ -71,16 +84,14 @@ async def run_k8s_deploy(
         Get(Targets, DependenciesRequest(field_set.dependencies)),
     )
 
-    if k8s_subsystem.publish_dependencies:
-        publish_targets = [tgt for tgt in target_dependencies if DockerPackageFieldSet.is_applicable(tgt)]
-    else:
-        publish_targets = []
+    publish_targets = [
+        tgt for tgt in target_dependencies if DockerPackageFieldSet.is_applicable(tgt)
+    ]
 
-    # TODO use KubectlOptions.EnvironmentAware
     env = await Get(
         EnvironmentVars,
         EnvironmentVarsRequest,
-        EnvironmentVarsRequest(requested=["HOME", "KUBECONFIG", "KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"]),
+        EnvironmentVarsRequest(requested=kubectl_subsystem.extra_env_vars),
     )
 
     process = InteractiveProcess.from_process(
