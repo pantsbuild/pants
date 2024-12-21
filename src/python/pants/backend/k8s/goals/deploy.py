@@ -7,8 +7,9 @@ from dataclasses import dataclass
 
 from pants.backend.docker.goals.package_image import DockerPackageFieldSet
 from pants.backend.k8s.k8s_subsystem import K8sSubsystem
-from pants.backend.k8s.kubectl_subsystem import KubectlBinary, KubectlOptions
-from pants.backend.k8s.targets import (
+from pants.backend.k8s.kubectl_subsystem import KubectlOptions
+from pants.backend.k8s.kubectl_tool import KubectlBinary
+from pants.backend.k8s.target_types import (
     K8sBundleContextField,
     K8sBundleDependenciesField,
     K8sBundleSourcesField,
