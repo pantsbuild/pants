@@ -27,6 +27,7 @@ from pants.backend.python.register import target_types as python_target_types
 from pants.core.goals.test import rules as test_rules
 from pants.core.util_rules.config_files import rules as config_files_rules
 from pants.engine.addresses import Address, Addresses
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -63,14 +64,13 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def _assert_generated_files(
+def _get_generated_files(
     rule_runner: RuleRunner,
     address: Address,
     *,
-    expected_files: Iterable[str],
     source_roots: Iterable[str] | None = None,
     extra_args: Iterable[str] = (),
-) -> None:
+) -> tuple[str, ...]:
     args = []
     if source_roots:
         args.append(f"--source-root-patterns={repr(source_roots)}")
@@ -85,9 +85,7 @@ def _assert_generated_files(
         GeneratedSources,
         [GeneratePythonFromOpenAPIRequest(protocol_sources.snapshot, tgt)],
     )
-
-    # We only assert expected files are a subset of all generated since the generator creates a lot of support classes
-    assert set(generated_sources.snapshot.files) == set(expected_files)
+    return generated_sources.snapshot.files
 
 
 def test_skip_generate_python(rule_runner: RuleRunner) -> None:
@@ -99,7 +97,9 @@ def test_skip_generate_python(rule_runner: RuleRunner) -> None:
     )
 
     def assert_gen(address: Address, expected: Iterable[str]) -> None:
-        _assert_generated_files(rule_runner, address, expected_files=expected)
+        generated_files = _get_generated_files(rule_runner, address)
+        # We only assert expected files are a subset of all generated since the generator creates a lot of support classes
+        assert set(generated_files) == set(expected)
 
     tgt_address = Address("", target_name="petstore")
     assert_gen(tgt_address, [])
@@ -152,9 +152,9 @@ def test_generate_python_sources(rule_runner: RuleRunner, requirements_text: str
     )
 
     def assert_gen(address: Address, expected: Iterable[str]) -> None:
-        _assert_generated_files(
-            rule_runner, address, source_roots=["src/openapi"], expected_files=expected
-        )
+        generated_files = _get_generated_files(rule_runner, address, source_roots=["src/openapi"])
+        # We only assert expected files are a subset of all generated since the generator creates a lot of support classes
+        assert set(generated_files) == set(expected)
 
     tgt_address = Address("src/openapi", target_name="petstore")
     assert_gen(
@@ -259,9 +259,9 @@ def test_generate_python_sources_with_a_different_generator(
     )
 
     def assert_gen(address: Address, expected: Iterable[str]) -> None:
-        _assert_generated_files(
-            rule_runner, address, source_roots=["src/openapi"], expected_files=expected
-        )
+        generated_files = _get_generated_files(rule_runner, address, source_roots=["src/openapi"])
+        # We only assert expected files are a subset of all generated since the generator creates a lot of support classes
+        assert set(generated_files) == set(expected)
 
     tgt_address = Address("src/openapi", target_name="petstore")
     assert_gen(
@@ -287,6 +287,34 @@ def test_generate_python_sources_with_a_different_generator(
         Addresses, [DependenciesRequest(tgt[OpenApiDocumentDependenciesField])]
     )
     assert runtime_dependencies
+
+
+def test_openapi_generator_name_validation(rule_runner: RuleRunner, requirements_text: str):
+    rule_runner.write_files(
+        {
+            "3rdparty/python/default.lock": resources.files(__package__)
+            .joinpath("openapi.test.lock")
+            .read_text(),
+            "3rdparty/python/BUILD": requirements_text,
+            "src/openapi/BUILD": dedent(
+                """\
+                openapi_document(
+                    name="petstore",
+                    source="petstore_spec.yaml",
+                    python_generator_name="python-xxx",
+                )
+            """
+            ),
+            "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
+        }
+    )
+
+    address = Address("src/openapi", target_name="petstore")
+    with pytest.raises(
+        ExecutionError,
+        match="ValueError: OpenAPI generator `python-xxx` is not found, available generators: ",
+    ):
+        _get_generated_files(rule_runner, address, source_roots=["src/openapi"])
 
 
 def test_generate_python_sources_using_custom_package_name(
@@ -316,9 +344,9 @@ def test_generate_python_sources_using_custom_package_name(
     )
 
     def assert_gen(address: Address, expected: Iterable[str]) -> None:
-        _assert_generated_files(
-            rule_runner, address, source_roots=["src/openapi"], expected_files=expected
-        )
+        generated_files = _get_generated_files(rule_runner, address, source_roots=["src/openapi"])
+        # We only assert expected files are a subset of all generated since the generator creates a lot of support classes
+        assert set(generated_files) == set(expected)
 
     assert_gen(
         Address("src/openapi", target_name="petstore"),

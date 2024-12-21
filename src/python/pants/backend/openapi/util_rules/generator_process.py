@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import dataclasses
+import re
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Iterable, Iterator, Mapping
 
 from pants.backend.openapi.subsystems import openapi_generator
 from pants.backend.openapi.subsystems.openapi_generator import OpenAPIGenerator
@@ -78,6 +79,13 @@ class OpenAPIGeneratorNames:
     names: tuple[str, ...]
 
 
+def _parse_names(stdout: str) -> Iterator[str]:
+    regex = re.compile(r"^ *- (?P<name>[^ ]+)")
+    for line in stdout.splitlines():
+        if (match := regex.match(line)) is not None:
+            yield match.group("name")
+
+
 @rule
 async def get_openapi_generator_names(
     subsystem: OpenAPIGenerator, jdk: InternalJdk
@@ -97,7 +105,7 @@ async def get_openapi_generator_names(
 
     jvm_process = JvmProcess(
         jdk=jdk,
-        argv=[_GENERATOR_CLASS_NAME, "list", "-a"],
+        argv=[_GENERATOR_CLASS_NAME, "list"],
         classpath_entries=classpath_entries,
         input_digest=EMPTY_DIGEST,
         extra_immutable_input_digests=immutable_input_digests,
@@ -106,13 +114,22 @@ async def get_openapi_generator_names(
         cache_scope=ProcessCacheScope.SUCCESSFUL,
     )
     result = await Get(ProcessResult, JvmProcess, jvm_process)
-    return OpenAPIGeneratorNames(names=tuple(result.stdout.decode("utf-8").split()))
+    return OpenAPIGeneratorNames(names=tuple(_parse_names(result.stdout.decode("utf-8"))))
 
 
 @rule
 async def openapi_generator_process(
-    request: OpenAPIGeneratorProcess, jdk: InternalJdk, subsystem: OpenAPIGenerator
+    request: OpenAPIGeneratorProcess,
+    jdk: InternalJdk,
+    subsystem: OpenAPIGenerator,
+    generator_names: OpenAPIGeneratorNames,
 ) -> Process:
+    if request.generator_name not in generator_names.names:
+        names = ", ".join(f"`{name}`" for name in generator_names.names)
+        raise ValueError(
+            f"OpenAPI generator `{request.generator_name}` is not found, available generators: {names}"
+        )
+
     tool_classpath = await Get(
         ToolClasspath, ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(subsystem))
     )
