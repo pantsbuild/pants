@@ -7,8 +7,7 @@ from dataclasses import dataclass
 
 from pants.backend.docker.goals.package_image import DockerPackageFieldSet
 from pants.backend.k8s.k8s_subsystem import K8sSubsystem
-from pants.backend.k8s.kubectl_subsystem import KubectlOptions
-from pants.backend.k8s.kubectl_tool import KubectlBinary
+from pants.backend.k8s.kubectl_subsystem import Kubectl
 from pants.backend.k8s.target_types import (
     K8sBundleContextField,
     K8sBundleDependenciesField,
@@ -19,6 +18,7 @@ from pants.core.goals.deploy import DeployFieldSet, DeployProcess
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import MergeDigests, Snapshot
+from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -49,15 +49,15 @@ class DeployK8sBundleFieldSet(DeployFieldSet):
 @rule(desc="Run k8s deploy process", level=LogLevel.DEBUG)
 async def run_k8s_deploy(
     field_set: DeployK8sBundleFieldSet,
-    kubectl: KubectlBinary,
-    kubectl_subsystem: KubectlOptions,
+    kubectl: Kubectl,
     k8s_subsystem: K8sSubsystem,
+    platform: Platform,
 ) -> DeployProcess:
     context = field_set.context.value
     if context is None:
         raise ValueError(f"Missing `{K8sBundleContextField.alias}` field")
 
-    context = context if kubectl_subsystem.pass_context else None
+    context = context if kubectl.pass_context else None
     if context is not None and context not in k8s_subsystem.available_contexts:
         raise ValueError(
             f"Context `{context}` is not listed in `[{K8sSubsystem.options_scope}].available_contexts`"
@@ -92,12 +92,13 @@ async def run_k8s_deploy(
     env = await Get(
         EnvironmentVars,
         EnvironmentVarsRequest,
-        EnvironmentVarsRequest(requested=kubectl_subsystem.extra_env_vars),
+        EnvironmentVarsRequest(requested=kubectl.extra_env_vars),
     )
 
     process = InteractiveProcess.from_process(
         kubectl.apply_configs(
             snapshot.files,
+            platform=platform,
             input_digest=snapshot.digest,
             env=env,
             context=context,
