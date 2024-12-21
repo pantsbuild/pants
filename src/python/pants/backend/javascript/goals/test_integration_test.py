@@ -118,6 +118,7 @@ def given_package_json(
     )
 
 
+@pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "test_script, package_json_target",
     [

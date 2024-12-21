@@ -76,7 +76,8 @@ impl crate::CommandRunner for CommandRunner {
         workunit: &mut RunningWorkunit,
         req: Process,
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-        let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always;
+        let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always
+            || req.cache_scope == ProcessCacheScope::LocalAlways;
         let key = CacheKey {
             digest: Some(
                 crate::get_digest(

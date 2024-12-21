@@ -62,6 +62,7 @@ def _assert_build_package(rule_runner: RuleRunner, *, chart_name: str, chart_ver
     assert result.artifacts[0].info
 
 
+@pytest.mark.platform_specific_behavior
 def test_helm_package(rule_runner: RuleRunner) -> None:
     chart_name = "foo"
     chart_version = "0.1.0"

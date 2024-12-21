@@ -39,6 +39,7 @@ def get_snapshot(rule_runner: RuleRunner, digest: Digest) -> Snapshot:
     return rule_runner.request(Snapshot, [digest])
 
 
+@pytest.mark.platform_specific_behavior
 def test_export_node_modules(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--export-resolve=nodejs-default"], env_inherit={"PATH"})
     rule_runner.write_files(

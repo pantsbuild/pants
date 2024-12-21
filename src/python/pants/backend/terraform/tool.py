@@ -22,19 +22,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Tuple
 
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
     TemplatedExternalTool,
 )
-from pants.core.util_rules.system_binaries import BinaryShims, BinaryShimsRequest, GetentBinary
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, StrListOption
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
@@ -390,6 +391,9 @@ class TerraformTool(TemplatedExternalTool):
         advanced=True,
     )
 
+    def generate_exe(self, plat: Platform) -> str:
+        return "./terraform"
+
     @property
     def plugin_cache_dir(self) -> str:
         return "__terraform_filesystem_mirror"
@@ -415,7 +419,6 @@ class TerraformProcess:
 async def setup_terraform_process(
     request: TerraformProcess,
     terraform: TerraformTool,
-    getent_binary: GetentBinary,
     platform: Platform,
 ) -> Process:
     downloaded_terraform = await Get(
@@ -425,17 +428,10 @@ async def setup_terraform_process(
     )
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(terraform.extra_env_vars))
 
-    extra_bins = await Get(
-        BinaryShims,
-        BinaryShimsRequest,
-        BinaryShimsRequest.for_paths(getent_binary, rationale="download terraform providers"),
-    )
-
     path = []
     user_path = env.get("PATH")
     if user_path:
         path.append(user_path)
-    path.append(extra_bins.path_component)
 
     env = EnvironmentVars(
         {
@@ -447,7 +443,6 @@ async def setup_terraform_process(
 
     immutable_input_digests = {
         "__terraform": downloaded_terraform.digest,
-        **extra_bins.immutable_input_digests,
     }
 
     def prepend_paths(paths: Tuple[str, ...]) -> Tuple[str, ...]:
@@ -467,4 +462,8 @@ async def setup_terraform_process(
 
 
 def rules():
-    return [*collect_rules(), *external_tool.rules()]
+    return [
+        *collect_rules(),
+        *external_tool.rules(),
+        UnionRule(ExportableTool, TerraformTool),
+    ]

@@ -63,7 +63,7 @@ class Target:
     target_type: str = strawberry.field(
         description="The target type, such as `python_sources` or `pex_binary` etc."
     )
-    fields: JSONScalar = strawberry.field(
+    fields: JSONScalar = strawberry.field(  # type: ignore[valid-type]
         description=softwrap(
             """
             The targets field values. This has the same structure as the JSON output from the `peek`
@@ -78,7 +78,7 @@ class Target:
         address = json.pop("address")
         target_type = json.pop("target_type")
         fields = json
-        return cls(address=address, target_type=target_type, fields=fields)
+        return cls(address=address, target_type=target_type, fields=fields)  # type: ignore[call-arg]
 
 
 @strawberry.input(

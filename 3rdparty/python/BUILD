@@ -28,6 +28,12 @@ python_requirements(
     resolve="pytest",
 )
 
+python_requirements(
+    name="pbs-script",
+    source="pbs-script-requirements.txt",
+    resolve="pbs-script",
+)
+
 __dependents_rules__(
     (  # Only the explorer server may depend on these libraries
         (

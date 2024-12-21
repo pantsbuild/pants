@@ -13,13 +13,15 @@ from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
-class OptionsInfo:
-    flag_names: tuple[str, ...]
-    flag_options: dict[str, Any]
+@dataclass(frozen=True, order=True)
+class OptionInfo:
+    """Registration info for a single option."""
+
+    args: tuple[str, ...]  # The *args in the registration.
+    kwargs: dict[str, Any]  # The **kwargs in the registration.
 
 
-def collect_options_info(cls: type) -> Iterator[OptionsInfo]:
+def collect_options_info(cls: type) -> Iterator[OptionInfo]:
     """Yields the ordered options info from the MRO of the provided class."""
 
     # NB: Since registration ordering matters (it impacts `help` output), we register these in
@@ -28,7 +30,7 @@ def collect_options_info(cls: type) -> Iterator[OptionsInfo]:
         for attrname in class_.__dict__.keys():
             # NB: We use attrname and getattr to trigger descriptors
             attr = getattr(cls, attrname)
-            if isinstance(attr, OptionsInfo):
+            if isinstance(attr, OptionInfo):
                 yield attr
 
 
@@ -57,7 +59,7 @@ _RegisterIfFuncT = Callable[[_SubsystemType], Any]
 
 
 def _eval_maybe_dynamic(val: _MaybeDynamicT[_DefaultT], subsystem_cls: _SubsystemType) -> _DefaultT:
-    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[no-any-return]
+    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[return-value]
 
 
 class _OptionBase(Generic[_OptT, _DefaultT]):
@@ -186,7 +188,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         )
 
     @overload
-    def __get__(self, obj: None, objtype: Any) -> OptionsInfo | None:
+    def __get__(self, obj: None, objtype: Any) -> OptionInfo | None:
         ...
 
     @overload
@@ -197,7 +199,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         assert self._flag_names is not None
         if obj is None:
             if self._register_if(objtype):
-                return OptionsInfo(self._flag_names, self.get_flag_options(objtype))
+                return OptionInfo(self._flag_names, self.get_flag_options(objtype))
             return None
         long_name = self._flag_names[-1]
         option_value = getattr(obj.options, long_name[2:].replace("-", "_"))
@@ -247,7 +249,7 @@ class _ListOptionBase(
     ):
         default = default or []
         instance = super().__new__(
-            cls,  # type: ignore[arg-type]
+            cls,
             flag_name,
             default=default,  # type: ignore[arg-type]
             help=help,
@@ -765,9 +767,9 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
         fingerprint: bool | None = None,
     ):
         return super().__new__(
-            cls,  # type: ignore[arg-type]
+            cls,
             flag_name,
-            default=default,  # type: ignore[arg-type]
+            default=default,
             help=help,
             register_if=register_if,
             advanced=advanced,
@@ -798,8 +800,8 @@ class SkipOption(BoolOption[bool]):
         goals = (goal,) + other_goals
         invocation_str = " and ".join([f"`{bin_name()} {goal}`" for goal in goals])
         return super().__new__(
-            cls,  # type: ignore[arg-type]
-            default=False,  # type: ignore[arg-type]
+            cls,
+            default=False,
             help=lambda subsystem_cls: (
                 f"If true, don't use {subsystem_cls.name} when running {invocation_str}."
             ),
@@ -823,7 +825,7 @@ class ArgsListOption(ShellStrListOption):
         if extra_help:
             extra_help = "\n\n" + extra_help
         instance = super().__new__(
-            cls,  # type: ignore[arg-type]
+            cls,
             help=(
                 lambda subsystem_cls: softwrap(
                     f"""

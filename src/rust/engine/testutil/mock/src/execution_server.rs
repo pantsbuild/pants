@@ -12,7 +12,6 @@ use std::time::Duration;
 use std::time::Instant;
 
 use futures::{FutureExt, Stream};
-use grpc_util::hyper_util::AddrIncomingWithStream;
 use hashing::Digest;
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -30,6 +29,7 @@ use remexec::{
     CacheCapabilities, ExecuteRequest, ExecutionCapabilities, GetActionResultRequest,
     GetCapabilitiesRequest, ServerCapabilities, UpdateActionResultRequest, WaitExecutionRequest,
 };
+use tokio_stream::wrappers::TcpListenerStream;
 use tonic::metadata::MetadataMap;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
@@ -122,20 +122,18 @@ impl TestServer {
     ///                      If a GetOperation request is received whose name is not equal to this
     ///                      MockExecution's name, or more requests are received than stub responses
     ///                      are available for, an error will be returned.
-    pub fn new(mock_execution: MockExecution, port: Option<u16>) -> TestServer {
+    pub async fn new(mock_execution: MockExecution, port: Option<u16>) -> TestServer {
         let mock_responder = MockResponder::new(mock_execution);
         let mock_responder2 = mock_responder.clone();
 
-        let addr = format!("127.0.0.1:{}", port.unwrap_or(0))
-            .parse()
-            .expect("failed to parse IP address");
-        let incoming = hyper::server::conn::AddrIncoming::bind(&addr).expect("failed to bind port");
-        let local_addr = incoming.local_addr();
-        let incoming = AddrIncomingWithStream(incoming);
+        let addr_str = format!("127.0.0.1:{}", port.unwrap_or(0));
+        let listener = tokio::net::TcpListener::bind(addr_str).await.unwrap();
+        let local_addr = listener.local_addr().unwrap();
 
         let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();
 
         tokio::spawn(async move {
+            let incoming_stream = TcpListenerStream::new(listener);
             let mut server = Server::builder();
             let router = server
                 .add_service(ExecutionServer::new(mock_responder2.clone()))
@@ -144,7 +142,7 @@ impl TestServer {
                 .add_service(ActionCacheServer::new(mock_responder2));
 
             router
-                .serve_with_incoming_shutdown(incoming, shutdown_receiver.map(drop))
+                .serve_with_incoming_shutdown(incoming_stream, shutdown_receiver.map(drop))
                 .await
                 .unwrap();
         });

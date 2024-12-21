@@ -35,6 +35,10 @@ class ProcessCacheScope(Enum):
     ALWAYS = "always"
     # Cached in all locations, but only if the process exits successfully.
     SUCCESSFUL = "successful"
+    # Cached only locally, regardless of success or failure.
+    LOCAL_ALWAYS = "local_always"
+
+    LOCAL_SUCCESSFUL = "local_successful"
     # Cached only in memory (i.e. memoized in pantsd), but never persistently, regardless of
     # success vs. failure.
     PER_RESTART_ALWAYS = "per_restart_always"
@@ -331,8 +335,25 @@ def fallible_to_exec_result_or_raise(
     )
 
 
+# fallible_to_exec_result_or_raise directly converts a FallibleProcessResult
+# to a ProcessResult, or raises an exception if the process failed.
+# Its name makes sense when you already have a FallibleProcessResult in hand.
+#
+# But, it is common to want to execute a process and automatically raise an exception
+# on process error. The execute_process_or_raise() alias below facilitates this idiom:
+#
+# result = await execute_process_or_raise(
+#         **implicitly(
+#             Process(...) # Or something that some other rule can convert to a Process.
+#         )
+#     )
+# Where the execute_process() intrinsic is invoked implicitly to create a FallibleProcessResult.
+# This is simply a better name for the same rule, when invoked in this use case.
+execute_process_or_raise = fallible_to_exec_result_or_raise
+
+
 @rule
-async def run_proc_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
+async def execute_process_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
     results: List[FallibleProcessResult] = []
     for attempt in range(0, req.attempts):
         proc = dataclasses.replace(req.proc, attempt=attempt)

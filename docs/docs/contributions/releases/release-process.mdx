@@ -77,7 +77,7 @@ The release commit is the commit that bumps the VERSION string. For `dev`/`a0` r
 
 ### Bump the VERSION
 
-From the `main` branch, run `pants --no-watch-filesystem --no-pantsd run src/python/pants_release/start_release.py -- --new 2.99.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
+From the `main` branch, run `pants run src/python/pants_release/start_release.py -- --new 2.9.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
 
 This will create a pull request that:
 
@@ -186,5 +186,5 @@ values are added.
 
 From time to time, a release will fail. It's a complex process. The first thing to do after you've
 exhausted your knowledge and debugging skills or patience is to contact others. You might reach out
-to the development or maintainers channels on Pantbuild Slack in the absence of other ideas about
+to the development or maintainers channels on Pantsbuild Slack in the absence of other ideas about
 whom to ask for help.

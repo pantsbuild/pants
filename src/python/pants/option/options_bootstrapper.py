@@ -13,12 +13,11 @@ from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 from pants.base.build_environment import get_buildroot, get_default_pants_config_file, pants_version
 from pants.base.exceptions import BuildConfigurationError
 from pants.engine.unions import UnionMembership
-from pants.option.alias import CliAlias
 from pants.option.config import Config
-from pants.option.custom_types import DictValueComponent, ListValueComponent
+from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import BootstrapOptions, GlobalOptions
 from pants.option.option_types import collect_options_info
-from pants.option.options import NativeOptionsValidation, Options
+from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import read_file
@@ -39,7 +38,6 @@ class OptionsBootstrapper:
     bootstrap_args: tuple[str, ...]
     args: tuple[str, ...]
     config: Config
-    alias: CliAlias
 
     def __repr__(self) -> str:
         env = {pair[0]: pair[1] for pair in self.env_tuples}
@@ -97,17 +95,12 @@ class OptionsBootstrapper:
             config=config,
             known_scope_infos=[GlobalOptions.get_scope_info()],
             args=args,
-            # We ignore validation to ensure bootstrapping succeeds.
-            # The bootstrap options will be validated anyway when we parse the full options.
-            native_options_validation=NativeOptionsValidation.ignore,
             native_options_config_discovery=False,
         )
 
         for options_info in collect_options_info(BootstrapOptions):
             # Only use of Options.register?
-            bootstrap_options.register(
-                GLOBAL_SCOPE, *options_info.flag_names, **options_info.flag_options
-            )
+            bootstrap_options.register(GLOBAL_SCOPE, *options_info.args, **options_info.kwargs)
 
         return bootstrap_options
 
@@ -124,6 +117,7 @@ class OptionsBootstrapper:
           absolute paths. Production use-cases should pass True to allow options values to make the
           decision of whether to respect pantsrc files.
         """
+        args = tuple(args)
         with warnings.catch_warnings(record=True):
             # We can't use pants.engine.fs.FileContent here because it would cause a circular dep.
             @dataclass(frozen=True)
@@ -165,15 +159,6 @@ class OptionsBootstrapper:
                 env=env,
             )
 
-            # Finally, we expand any aliases and re-populate the bootstrap args, in case there
-            # were any from aliases.
-            # stuhood: This could potentially break the rust client when aliases are used:
-            # https://github.com/pantsbuild/pants/pull/13228#discussion_r728223889
-            alias_vals = post_bootstrap_config.get("cli", "alias")
-            val = DictValueComponent.merge([DictValueComponent.create(v) for v in alias_vals]).val
-            alias = CliAlias.from_dict(val)
-
-            args = alias.expand_args(tuple(args))
             bargs = cls._get_bootstrap_args(args)
 
             # We need to set this env var to allow various static help strings to reference the
@@ -199,7 +184,6 @@ class OptionsBootstrapper:
                 bootstrap_args=bargs,
                 args=args,
                 config=post_bootstrap_config,
-                alias=alias,
             )
 
     @classmethod
@@ -259,7 +243,6 @@ class OptionsBootstrapper:
             args=self.args,
             bootstrap_option_values=bootstrap_option_values,
             allow_unknown_options=allow_unknown_options,
-            native_options_validation=bootstrap_option_values.native_options_validation,
             native_options_config_discovery=False,
         )
 
@@ -314,9 +297,6 @@ class OptionsBootstrapper:
             allow_unknown_options=build_configuration.allow_unknown_options,
         )
         GlobalOptions.validate_instance(options.for_global_scope())
-        self.alias.check_name_conflicts(
-            options.known_scope_to_info, options.known_scope_to_scoped_args
-        )
         return options
 
 

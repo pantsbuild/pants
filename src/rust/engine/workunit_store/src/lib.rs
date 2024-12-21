@@ -889,6 +889,10 @@ impl RunningWorkunit {
         }
     }
 
+    pub fn workunit(&self) -> Option<&Workunit> {
+        self.workunit.as_ref()
+    }
+
     pub fn record_observation(&self, metric: ObservationMetric, value: u64) {
         self.store.record_observation(metric, value);
     }

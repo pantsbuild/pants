@@ -11,13 +11,13 @@ use std::time::SystemTime;
 
 use nix::unistd::execv;
 use strum::VariantNames;
-use strum_macros::{AsRefStr, EnumString, EnumVariantNames};
+use strum_macros::{AsRefStr, EnumString, VariantNames};
 
 use options::{option_id, render_choice, Args, BuildRoot, Env, OptionParser};
 use pantsd::find_pantsd;
 
 // TODO(John Sirois): Maybe consolidate with PythonLogLevel in src/rust/engine/logging/src/lib.rs.
-#[derive(AsRefStr, EnumString, EnumVariantNames)]
+#[derive(AsRefStr, EnumString, VariantNames)]
 #[strum(serialize_all = "snake_case")]
 enum PythonLogLevel {
     Trace,
@@ -32,7 +32,7 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
     let (env, dropped) = Env::capture_lossy();
     let env_items = (&env).into();
     let argv = env::args().collect::<Vec<_>>();
-    let options_parser = OptionParser::new(Args::argv(), env, None, true, false, None)?;
+    let options_parser = OptionParser::new(Args::argv(), env, None, true, false, None, None)?;
 
     let use_pantsd = options_parser.parse_bool(&option_id!("pantsd"), true)?;
     if !use_pantsd.value {
@@ -96,10 +96,8 @@ fn try_execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> 
 }
 
 fn execv_fallback_client(pants_server: OsString) -> Infallible {
-    if let Err(exit_code) = try_execv_fallback_client(pants_server) {
-        std::process::exit(exit_code);
-    }
-    unreachable!()
+    let Err(exit_code) = try_execv_fallback_client(pants_server);
+    std::process::exit(exit_code);
 }
 
 // The value is taken from this C precedent:
@@ -122,6 +120,8 @@ const PANTS_NO_NATIVE_CLIENT: &str = "PANTS_NO_NATIVE_CLIENT";
 
 #[tokio::main]
 async fn main() {
+    grpc_util::initialize().expect("grpc_util init");
+
     let start = SystemTime::now();
     let no_native_client =
         matches!(env::var_os(PANTS_NO_NATIVE_CLIENT), Some(value) if !value.is_empty());

@@ -1,6 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
@@ -12,6 +12,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -92,4 +93,4 @@ async def count_loc(
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), UnionRule(ExportableTool, SuccinctCodeCounter))

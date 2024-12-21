@@ -13,6 +13,8 @@ use process_execution::{
     ProcessResultSource,
 };
 use pyo3::prelude::{PyAny, Python};
+use pyo3::pybacked::PyBackedStr;
+use pyo3::Bound;
 use store::{self, Store, StoreError};
 use workunit_store::{
     Metric, ObservationMetric, RunningWorkunit, UserMetadataItem, WorkunitMetadata,
@@ -36,16 +38,20 @@ impl ExecuteProcess {
         value: &Value,
     ) -> Result<InputDigests, StoreError> {
         let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
-            let value = (**value).as_ref(py);
-            let input_files = lift_directory_digest(externs::getattr(value, "input_digest")?)
-                .map_err(|err| format!("Error parsing input_digest {err}"))?;
-            let immutable_inputs =
-                externs::getattr_from_str_frozendict::<&PyAny>(value, "immutable_input_digests")
-                    .into_iter()
-                    .map(|(path, digest)| {
-                        Ok((RelativePath::new(path)?, lift_directory_digest(digest)?))
-                    })
-                    .collect::<Result<BTreeMap<_, _>, String>>()?;
+            let value = value.bind(py);
+            let input_files = {
+                let input_files_py_value: Bound<'_, PyAny> =
+                    externs::getattr(value, "input_digest")?;
+                lift_directory_digest(&input_files_py_value)
+                    .map_err(|err| format!("Error parsing input_digest {err}"))?
+            };
+            let immutable_inputs = externs::getattr_from_str_frozendict::<Bound<PyAny>>(
+                value,
+                "immutable_input_digests",
+            )
+            .into_iter()
+            .map(|(path, digest)| Ok((RelativePath::new(path)?, lift_directory_digest(&digest)?)))
+            .collect::<Result<BTreeMap<_, _>, String>>()?;
             let use_nailgun = externs::getattr::<Vec<String>>(value, "use_nailgun")?
                 .into_iter()
                 .map(RelativePath::new)
@@ -65,7 +71,7 @@ impl ExecuteProcess {
     }
 
     fn lift_process_fields(
-        value: &PyAny,
+        value: &Bound<'_, PyAny>,
         input_digests: InputDigests,
         process_config: externs::process::PyProcessExecutionEnvironment,
     ) -> Result<Process, StoreError> {
@@ -98,12 +104,15 @@ impl ExecuteProcess {
 
         let py_level = externs::getattr(value, "level")?;
 
-        let level = externs::val_to_log_level(py_level)?;
+        let level = externs::val_to_log_level(&py_level)?;
 
         let append_only_caches =
-            externs::getattr_from_str_frozendict::<&str>(value, "append_only_caches")
+            externs::getattr_from_str_frozendict::<PyBackedStr>(value, "append_only_caches")
                 .into_iter()
-                .map(|(name, dest)| Ok((CacheName::new(name)?, RelativePath::new(dest)?)))
+                .map(|(name, dest)| {
+                    let path: &str = dest.as_ref();
+                    Ok((CacheName::new(name)?, RelativePath::new(path)?))
+                })
                 .collect::<Result<_, String>>()?;
 
         let jdk_home = externs::getattr_as_optional_string(value, "jdk_home")
@@ -117,8 +126,8 @@ impl ExecuteProcess {
         let concurrency_available: usize = externs::getattr(value, "concurrency_available")?;
 
         let cache_scope: ProcessCacheScope = {
-            let cache_scope_enum = externs::getattr(value, "cache_scope")?;
-            externs::getattr::<String>(cache_scope_enum, "name")?.try_into()?
+            let cache_scope_enum: Bound<'_, PyAny> = externs::getattr(value, "cache_scope")?;
+            externs::getattr::<String>(&cache_scope_enum, "name")?.try_into()?
         };
 
         let remote_cache_speculation_delay = std::time::Duration::from_millis(
@@ -156,7 +165,7 @@ impl ExecuteProcess {
     ) -> Result<Self, StoreError> {
         let input_digests = Self::lift_process_input_digests(store, &value).await?;
         let process = Python::with_gil(|py| {
-            Self::lift_process_fields((*value).as_ref(py), input_digests, process_config)
+            Self::lift_process_fields(value.bind(py), input_digests, process_config)
         })?;
         Ok(Self { process })
     }

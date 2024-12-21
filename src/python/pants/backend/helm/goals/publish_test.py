@@ -125,7 +125,7 @@ def test_helm_push_no_charts_when_registries_are_not_set(rule_runner: RuleRunner
 def test_helm_skip_push(rule_runner: RuleRunner) -> None:
     _declare_targets(rule_runner)
 
-    registries = {"internal": {"address": "oci://www.example.com/internal", "default": "true"}}
+    registries = {"internal": {"address": "oci://www.example.com/internal", "default": True}}
     chart_metadata = HelmChartMetadata("foo-chart", "0.1.0")
     result, _ = _run_publish(
         rule_runner, Address("src/skip-push"), chart_metadata, registries=registries
@@ -143,7 +143,7 @@ def test_helm_skip_push(rule_runner: RuleRunner) -> None:
 def test_helm_push_use_default_registries(rule_runner: RuleRunner) -> None:
     _declare_targets(rule_runner)
 
-    registries = {"internal": {"address": "oci://www.example.com", "default": "true"}}
+    registries = {"internal": {"address": "oci://www.example.com", "default": True}}
     chart_metadata = HelmChartMetadata("missing-registries", "0.2.0")
     result, helm = _run_publish(
         rule_runner, Address("src/missing-registries"), chart_metadata, registries=registries

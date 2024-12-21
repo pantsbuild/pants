@@ -59,7 +59,7 @@ GOOD_FILE = """\
 package org.pantsbuild.example
 
 open class Foo {
-    val CONSTANT = "Constant changes"
+    val constant = "Constant changes"
 }
 """
 
@@ -67,7 +67,7 @@ BAD_FILE = """\
 package org.pantsbuild.example
 
 open class Bar {
-val CONSTANT = "Constant changes"
+val constant = "Constant changes"
 }
 """
 
@@ -75,7 +75,7 @@ FIXED_BAD_FILE = """\
 package org.pantsbuild.example
 
 open class Bar {
-    val CONSTANT = "Constant changes"
+    val constant = "Constant changes"
 }
 """
 

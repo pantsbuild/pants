@@ -329,7 +329,7 @@ def help_text(val: str | Callable[[], str]) -> str | Callable[[], str]:
     if isinstance(val, str):
         return softwrap(val)
     else:
-        return lambda: softwrap(val())  # type: ignore[operator]
+        return lambda: softwrap(val())
 
 
 P = ParamSpec("P")

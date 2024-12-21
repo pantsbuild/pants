@@ -21,8 +21,9 @@ from pants.engine.internals.specs_rules import (
     AmbiguousImplementationsException,
     TooManyTargetsException,
 )
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, Rule, _uncacheable_rule, collect_rules, goal_rule, rule
+from pants.engine.intrinsics import run_interactive_process
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import Get, Rule, _uncacheable_rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     BoolField,
     FieldSet,
@@ -254,8 +255,7 @@ async def run(
             )
         )
 
-    result = await Effect(
-        InteractiveProcessResult,
+    result = await run_interactive_process(
         InteractiveProcess(
             argv=(*request.args, *run_subsystem.args),
             env={**complete_env, **request.extra_env},
@@ -265,7 +265,7 @@ async def run(
             keep_sandboxes=global_options.keep_sandboxes,
             immutable_input_digests=request.immutable_input_digests,
             append_only_caches=request.append_only_caches,
-        ),
+        )
     )
 
     return Run(result.exit_code)

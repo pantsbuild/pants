@@ -105,6 +105,10 @@ class LocalPantsRunner:
         # Option values are usually computed lazily on demand, but command line options are
         # eagerly computed for validation.
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
+            # Verify CLI flags.
+            if not build_config.allow_unknown_options:
+                options.verify_args()
+
             for scope, values in options.scope_to_flags.items():
                 if values:
                     # Only compute values if there were any command line options presented.
@@ -121,7 +125,7 @@ class LocalPantsRunner:
             dynamic_remote_options, _ = DynamicRemoteOptions.from_options(
                 options, env, remote_auth_plugin_func=build_config.remote_auth_plugin_func
             )
-            bootstrap_options = options.bootstrap_option_values()
+            bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
             assert bootstrap_options is not None
             scheduler = EngineInitializer.setup_graph(
                 bootstrap_options, build_config, dynamic_remote_options, executor

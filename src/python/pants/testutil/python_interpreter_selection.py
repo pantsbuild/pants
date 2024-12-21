@@ -22,6 +22,8 @@ PY_36 = "3.6"
 PY_37 = "3.7"
 PY_38 = "3.8"
 PY_39 = "3.9"
+PY_310 = "3.10"
+PY_311 = "3.11"
 
 
 def has_python_version(version):
@@ -100,6 +102,16 @@ def skip_unless_python39_present(func):
     return skip_unless_all_pythons_present(PY_39)(func)
 
 
+def skip_unless_python310_present(func):
+    """A test skip decorator that only runs a test method if python3.10 is present."""
+    return skip_unless_all_pythons_present(PY_310)(func)
+
+
+def skip_unless_python311_present(func):
+    """A test skip decorator that only runs a test method if python3.11 is present."""
+    return skip_unless_all_pythons_present(PY_311)(func)
+
+
 def skip_unless_python27_and_python3_present(func):
     """A test skip decorator that only runs a test method if python2.7 and python3 are present."""
     return skip_unless_all_pythons_present(PY_27, PY_3)(func)
@@ -130,9 +142,8 @@ def all_major_minor_python_versions(
     """
     versions = InterpreterConstraints(constraints).partition_into_major_minor_versions(
         # Please update this when new stable Python versions are released to CI.
-        interpreter_universe=["2.7", "3.6", "3.7", "3.8", "3.9"]
+        interpreter_universe=["2.7", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
     )
-
     return tuple(
         pytest.param(
             version,

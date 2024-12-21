@@ -1,15 +1,14 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::convert::AsRef;
-use std::ops::Deref;
+use std::convert::Infallible;
 use std::sync::Arc;
 use std::{fmt, hash};
 
 use deepsize::{known_deep_size, DeepSizeOf};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyType};
-use pyo3::{FromPyObject, IntoPy, ToPyObject};
+use pyo3::types::{PyBool, PyDict, PyType};
+use pyo3::FromPyObject;
 use smallvec::SmallVec;
 
 use hashing::Digest;
@@ -131,40 +130,44 @@ unsafe impl Send for TypeId {}
 unsafe impl Sync for TypeId {}
 
 impl TypeId {
-    pub fn new(py_type: &PyType) -> Self {
-        py_type.into()
+    pub fn new(py_type: &Bound<'_, PyType>) -> Self {
+        Self(py_type.as_type_ptr())
     }
 
-    pub fn as_py_type<'py>(&self, py: Python<'py>) -> &'py PyType {
-        // NB: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
+    pub fn as_py_type<'py>(&self, py: Python<'py>) -> Bound<'py, PyType> {
+        // SAFETY: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
         // type is not unloaded. That is true today, but would not be if we implemented support for hot
         // reloading of plugins.
-        unsafe { PyType::from_type_ptr(py, self.0) }
+        unsafe {
+            PyType::from_borrowed_type_ptr(py, self.0)
+                .as_borrowed()
+                .to_owned()
+        }
     }
 
     pub fn is_union(&self) -> bool {
-        Python::with_gil(|py| externs::is_union(py, self.as_py_type(py)).unwrap())
+        Python::with_gil(|py| externs::is_union(py, &self.as_py_type(py)).unwrap())
     }
 
     pub fn union_in_scope_types(&self) -> Option<Vec<TypeId>> {
         Python::with_gil(|py| {
-            externs::union_in_scope_types(py, self.as_py_type(py))
+            externs::union_in_scope_types(py, &self.as_py_type(py))
                 .unwrap()
-                .map(|types| types.into_iter().map(TypeId::new).collect())
+                .map(|types| {
+                    types
+                        .into_iter()
+                        .map(|t| TypeId::new(&t.as_borrowed()))
+                        .collect()
+                })
         })
-    }
-}
-
-impl From<&PyType> for TypeId {
-    fn from(py_type: &PyType) -> Self {
-        TypeId(py_type.as_type_ptr())
     }
 }
 
 impl fmt::Debug for TypeId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         Python::with_gil(|py| {
-            let name = self.as_py_type(py).name().unwrap();
+            let type_bound = self.as_py_type(py);
+            let name = type_bound.name().unwrap();
             write!(f, "{name}")
         })
     }
@@ -194,7 +197,7 @@ impl Function {
     /// The function represented as `path.to.module:lineno:func_name`.
     pub fn full_name(&self) -> String {
         let (module, name, line_no) = Python::with_gil(|py| {
-            let obj = (*self.0.value).as_ref(py);
+            let obj = self.0.value.bind(py);
             let module: String = externs::getattr(obj, "__module__").unwrap();
             let name: String = externs::getattr(obj, "__name__").unwrap();
             // NB: this is a custom dunder method that Python code should populate before sending the
@@ -252,10 +255,10 @@ impl fmt::Display for Key {
     }
 }
 
-impl<'source> FromPyObject<'source> for Key {
-    fn extract(obj: &'source PyAny) -> PyResult<Self> {
+impl<'py> FromPyObject<'py> for Key {
+    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = obj.py();
-        externs::INTERNS.key_insert(py, obj.into_py(py))
+        externs::INTERNS.key_insert(py, obj.to_owned().unbind())
     }
 }
 
@@ -307,6 +310,11 @@ impl Value {
             Err(arc_handle) => arc_handle.clone_ref(py),
         }
     }
+
+    /// Bind this value to the given Python GIL context as a `pyo3::Bound` smart pointer.
+    pub fn bind<'py>(&self, py: Python<'py>) -> &Bound<'py, PyAny> {
+        self.0.bind(py)
+    }
 }
 
 impl workunit_store::Value for Value {
@@ -317,30 +325,16 @@ impl workunit_store::Value for Value {
 
 impl PartialEq for Value {
     fn eq(&self, other: &Value) -> bool {
-        Python::with_gil(|py| externs::equals((*self.0).as_ref(py), (*other.0).as_ref(py)))
+        Python::with_gil(|py| externs::equals(self.bind(py), other.0.bind(py)))
     }
 }
 
 impl Eq for Value {}
 
-impl Deref for Value {
-    type Target = PyObject;
-
-    fn deref(&self) -> &PyObject {
-        &self.0
-    }
-}
-
-impl AsRef<PyObject> for Value {
-    fn as_ref(&self) -> &PyObject {
-        &self.0
-    }
-}
-
 impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let repr = Python::with_gil(|py| {
-            let obj = (*self.0).as_ref(py);
+            let obj = self.0.bind(py);
             externs::val_to_str(obj)
         });
         write!(f, "{repr}")
@@ -353,16 +347,20 @@ impl fmt::Display for Value {
     }
 }
 
-impl<'source> FromPyObject<'source> for Value {
-    fn extract(obj: &'source PyAny) -> PyResult<Self> {
-        let py = obj.py();
-        Ok(obj.into_py(py).into())
+impl<'py> FromPyObject<'py> for Value {
+    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+        Ok(Value::new(obj.to_owned().unbind()))
     }
 }
 
-impl ToPyObject for &Value {
-    fn to_object(&self, py: Python) -> PyObject {
-        self.0.clone_ref(py)
+impl<'py> IntoPyObject<'py> for &Value {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>; // Maybe consider `Borrowed` instead of `Bound` to optimize reference counting?
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        let py_any = self.0.clone_ref(py);
+        Ok(py_any.into_bound(py))
     }
 }
 
@@ -381,9 +379,21 @@ impl From<PyObject> for Value {
     }
 }
 
-impl IntoPy<PyObject> for &Value {
-    fn into_py(self, py: Python) -> PyObject {
-        (*self.0).as_ref(py).into_py(py)
+impl<'py, T> From<&Bound<'py, T>> for Value {
+    fn from(value: &Bound<'py, T>) -> Self {
+        Value::new(value.to_owned().into_any().unbind())
+    }
+}
+
+impl<'py, T> From<Bound<'py, T>> for Value {
+    fn from(py_value: Bound<'py, T>) -> Self {
+        Value::from(&py_value)
+    }
+}
+
+impl<'a, 'py, T> From<Borrowed<'a, 'py, T>> for Value {
+    fn from(value: Borrowed<'a, 'py, T>) -> Self {
+        Value::from(value.as_any())
     }
 }
 
@@ -463,7 +473,7 @@ impl Failure {
                 }) => {
                     // Preserve tracebacks (both engine and python) from upstream error by using any existing
                     // engine traceback and restoring the original python exception cause.
-                    py_err.set_cause(py, Some(PyErr::from_value((*val.0).as_ref(py))));
+                    py_err.set_cause(py, Some(PyErr::from_value(val.0.bind(py).to_owned())));
                     (
             format!(
               "{python_traceback}\nDuring handling of the above exception, another exception occurred:\n\n"
@@ -479,8 +489,8 @@ impl Failure {
 
         let maybe_ptraceback = py_err
             .traceback(py)
-            .map(|traceback| traceback.to_object(py));
-        let val = Value::from(py_err.into_py(py));
+            .map(|traceback| traceback.into_pyobject(py).unwrap());
+        let val = Value::from(py_err.into_pyobject(py).unwrap());
         let python_traceback = if let Some(tb) = maybe_ptraceback {
             let locals = PyDict::new(py);
             locals
@@ -489,15 +499,15 @@ impl Failure {
             locals.set_item("tb", tb).unwrap();
             locals.set_item("val", &val).unwrap();
             py.eval(
-                "''.join(traceback.format_exception(None, value=val, tb=tb))",
+                c"''.join(traceback.format_exception(None, value=val, tb=tb))",
                 None,
-                Some(locals),
+                Some(&locals),
             )
             .unwrap()
             .extract::<String>()
             .unwrap()
         } else {
-            Self::native_traceback(&externs::val_to_str((*val).as_ref(py)))
+            Self::native_traceback(&externs::val_to_str(val.bind(py)))
         };
         Failure::Throw {
             val,
@@ -536,7 +546,7 @@ impl fmt::Display for Failure {
             }
             Failure::Throw { val, .. } => {
                 let repr = Python::with_gil(|py| {
-                    let obj = (*val.0).as_ref(py);
+                    let obj = val.0.bind(py);
                     externs::val_to_str(obj)
                 });
                 write!(f, "{repr}")
@@ -588,4 +598,65 @@ pub fn throw(msg: String) -> Failure {
         python_traceback,
         engine_traceback: Vec::new(),
     })
+}
+
+/// A tri-state boolean value for use with `__richcmp__` dunder method implementations. The type
+/// represents not only `true` and `false` (via `Some(value`), but also the `NotImplemented` value
+/// (via `None``) which `__richcmp__` methods may return when a particular comparison operator is
+/// not supported.
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[repr(transparent)]
+pub struct PyComparedBool(pub Option<bool>);
+
+impl From<Option<bool>> for PyComparedBool {
+    fn from(value: Option<bool>) -> Self {
+        Self(value)
+    }
+}
+
+impl<'py> IntoPyObject<'py> for PyComparedBool {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        Ok(match self.0 {
+            Some(value) => PyBool::new(py, value).to_owned().into_any(),
+            None => py.NotImplemented().into_bound(py),
+        })
+    }
+}
+
+#[cfg(test)]
+mod pycomparedbool_tests {
+    use super::PyComparedBool;
+    use pyo3::{types::PyAnyMethods, IntoPyObject, Python};
+
+    #[test]
+    fn pycomparedbool_conversion_tests() {
+        pyo3::prepare_freethreaded_python();
+
+        Python::with_gil(|py| {
+            assert_eq!(
+                PyComparedBool(Some(true))
+                    .into_pyobject(py)
+                    .unwrap()
+                    .extract::<bool>()
+                    .unwrap(),
+                true
+            );
+            assert_eq!(
+                PyComparedBool(Some(false))
+                    .into_pyobject(py)
+                    .unwrap()
+                    .extract::<bool>()
+                    .unwrap(),
+                false
+            );
+            assert!(PyComparedBool(None)
+                .into_pyobject(py)
+                .unwrap()
+                .is(&py.NotImplemented()),);
+        })
+    }
 }

@@ -65,7 +65,7 @@ class DockerBuildTargetStageError(ValueError):
     pass
 
 
-class DockerImageOptionValueError(ValueError):
+class DockerImageOptionValueError(InterpolationError):
     pass
 
 
@@ -526,6 +526,8 @@ def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: byte
                     r"(writing image (?P<digest>sha256:\S+))",
                     # BuildKit with containerd-snapshotter output.
                     r"(exporting manifest list (?P<manifest_list>sha256:\S+))",
+                    # BuildKit with containerd-snapshotter output and no attestation.
+                    r"(exporting manifest (?P<manifest>sha256:\S+))",
                     # Docker output.
                     r"(Successfully built (?P<short_id>\S+))",
                 ),
@@ -548,6 +550,7 @@ def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: byte
                     image_id_match.group("digest")
                     or image_id_match.group("short_id")
                     or image_id_match.group("manifest_list")
+                    or image_id_match.group("manifest")
                 )
                 return image_id
 

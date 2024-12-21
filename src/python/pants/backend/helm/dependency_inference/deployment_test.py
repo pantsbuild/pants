@@ -62,7 +62,10 @@ def rule_runner() -> RuleRunner:
             *process.rules(),
             *stripped_source_files.rules(),
             *tool.rules(),
-            QueryRule(FirstPartyHelmDeploymentMapping, (FirstPartyHelmDeploymentMappingRequest,)),
+            QueryRule(
+                FirstPartyHelmDeploymentMapping,
+                (FirstPartyHelmDeploymentMappingRequest,),
+            ),
             QueryRule(HelmDeploymentReport, (AnalyseHelmDeploymentRequest,)),
             QueryRule(InferredDependencies, (InferHelmDeploymentDependenciesRequest,)),
         ],
@@ -102,7 +105,8 @@ def test_deployment_dependencies_report(rule_runner: RuleRunner) -> None:
 
     source_root_patterns = ("/src/*",)
     rule_runner.set_options(
-        [f"--source-root-patterns={repr(source_root_patterns)}"], env_inherit=PYTHON_BOOTSTRAP_ENV
+        [f"--source-root-patterns={repr(source_root_patterns)}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
     target = rule_runner.get_target(Address("src/deployment", target_name="foo"))
@@ -230,13 +234,17 @@ def test_resolve_relative_docker_addresses_to_deployment(
 
     def make_request():
         return rule_runner.request(
-            FirstPartyHelmDeploymentMapping, [FirstPartyHelmDeploymentMappingRequest(field_set)]
+            FirstPartyHelmDeploymentMapping,
+            [FirstPartyHelmDeploymentMappingRequest(field_set)],
         )
 
     if correct_target_name:
         expected = [
             (":myapp0", Address("src/deployment", target_name="myapp0")),
-            ("//src/deployment:myapp1", Address("src/deployment", target_name="myapp1")),
+            (
+                "//src/deployment:myapp1",
+                Address("src/deployment", target_name="myapp1"),
+            ),
             ("./subdir:myapp2", Address("src/deployment/subdir", target_name="myapp2")),
         ]
         assert list(make_request().indexed_docker_addresses.values()) == expected
@@ -245,6 +253,16 @@ def test_resolve_relative_docker_addresses_to_deployment(
         with pytest.raises(ExecutionError) as e:
             make_request()
         assert isinstance(e.value.wrapped_exceptions[0], UnownedDependencyError)
+
+
+def do_resolve(resolver, image_ref):
+    """Perform the image resolution, raise any errors, and reset the resolver."""
+    try:
+        res = resolver.image_ref_to_actual_address(image_ref)
+        resolver.report_errors()
+        return res
+    finally:
+        resolver.errors = []
 
 
 def test_resolving_docker_image() -> None:
@@ -280,43 +298,80 @@ def test_resolving_docker_image() -> None:
         },
     )
 
-    def do_resolve(image_ref):
-        """Perform the image resolution, raise any errors, and reset the resolver."""
-        try:
-            res = resolver.image_ref_to_actual_address(image_ref)
-            resolver.report_errors()
-            return res
-        finally:
-            resolver.errors = []
-
     assert (
-        do_resolve("busybox:latest") is None
+        do_resolve(resolver, "busybox:latest") is None
     ), "image in known 3rd party should have no resolution"
 
     with pytest.raises(UnownedDependencyError):
         # image not in known 3rd party should have no resolution
-        do_resolve("python:latest")
+        do_resolve(resolver, "python:latest")
 
-    assert do_resolve(valid_target) == (
+    assert do_resolve(resolver, valid_target) == (
         valid_target,
         Address("testprojects/src/helm/deployment", target_name="myapp"),
     ), "A valid target should resolve correctly"
 
     with pytest.raises(UnownedDependencyError):
         # an invalid target that looks like a normal target should not resolve
-        do_resolve(image_with_target_name)
+        do_resolve(resolver, image_with_target_name)
 
     with pytest.raises(UnownedDependencyError):
         # something that is obviously a Pants target that isn't found should not resolve
-        do_resolve(target_not_found)
+        do_resolve(resolver, target_not_found)
 
     with pytest.raises(UnownedDependencyError):
         # a target which is not a docker_image should not resolve
-        do_resolve(target_wrong_type)
+        do_resolve(resolver, target_wrong_type)
 
     assert (
-        do_resolve(docker_with_registry) is None
+        do_resolve(resolver, docker_with_registry) is None
     ), "image with registry in known 3rd party should have no resolution"
+
+
+def test_resolving_docker_image_globs() -> None:
+    valid_target = "testprojects/src/helm/deployment:myapp"
+    docker_with_registry = "quay.io/kiwigrid/k8s-sidecar:1.14.2"
+    docker_with_registry_char_match = "c.letter.of.the.day/cookie"
+    docker_with_registry_char_no_match = "pi.letter.of.the.day/pie"
+
+    resolver = ImageReferenceResolver(
+        create_subsystem(
+            HelmInferSubsystem,
+            unowned_dependency_behavior=UnownedHelmDependencyUsage.RaiseError,
+            external_docker_images=["busybox", "quay.io/*", "?.letter.of.the.day/*"],
+        ),
+        {
+            "busybox:latest": MaybeAddress(val=ResolveError("short error")),
+            "python:latest": MaybeAddress(val=ResolveError("short error")),
+            valid_target: MaybeAddress(
+                val=Address("testprojects/src/helm/deployment", target_name="myapp")
+            ),
+            docker_with_registry: MaybeAddress(val=ResolveError("short error")),
+            docker_with_registry_char_match: MaybeAddress(val=ResolveError("short error")),
+            docker_with_registry_char_no_match: MaybeAddress(val=ResolveError("short error")),
+        },
+        {
+            Address("testprojects/src/helm/deployment", target_name="myapp"),
+        },
+    )
+
+    assert (
+        do_resolve(resolver, "busybox:latest") is None
+    ), "image in known 3rd party should have no resolution"
+
+    with pytest.raises(UnownedDependencyError):
+        # image not in known 3rd party should have no resolution
+        do_resolve(resolver, "python:latest")
+
+    assert do_resolve(resolver, valid_target) == (
+        valid_target,
+        Address("testprojects/src/helm/deployment", target_name="myapp"),
+    ), "A valid target should resolve correctly"
+
+    assert do_resolve(resolver, docker_with_registry) is None
+    assert do_resolve(resolver, docker_with_registry_char_match) is None
+    with pytest.raises(UnownedDependencyError):
+        do_resolve(resolver, docker_with_registry_char_no_match)
 
 
 def test_resolving_docker_image_no_thirdparty() -> None:
@@ -377,7 +432,8 @@ def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
     expected_dependency_addr = Address("src/image", target_name="myapp")
 
     mapping = rule_runner.request(
-        FirstPartyHelmDeploymentMapping, [FirstPartyHelmDeploymentMappingRequest(field_set)]
+        FirstPartyHelmDeploymentMapping,
+        [FirstPartyHelmDeploymentMappingRequest(field_set)],
     )
     assert list(mapping.indexed_docker_addresses.values()) == [
         (expected_image_ref, expected_dependency_addr)
@@ -433,6 +489,63 @@ def test_disambiguate_docker_dependency(rule_runner: RuleRunner) -> None:
     source_root_patterns = ("/", "src/*")
     rule_runner.set_options(
         [f"--source-root-patterns={repr(source_root_patterns)}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    deployment_addr = Address("src/deployment", target_name="foo")
+    tgt = rule_runner.get_target(deployment_addr)
+
+    inferred_dependencies = rule_runner.request(
+        InferredDependencies,
+        [InferHelmDeploymentDependenciesRequest(HelmDeploymentFieldSet.create(tgt))],
+    )
+
+    # Assert only the Helm chart dependency has been inferred
+    assert len(inferred_dependencies.include) == 1
+    assert set(inferred_dependencies.include) == {Address("src/mychart")}
+
+
+def test_dont_infer_docker_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/mychart/BUILD": "helm_chart()",
+            "src/mychart/Chart.yaml": HELM_CHART_FILE,
+            "src/mychart/values.yaml": HELM_VALUES_FILE,
+            "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "src/mychart/templates/pod.yaml": dedent(
+                """\
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: {{ template "fullname" . }}
+                  labels:
+                    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+                spec:
+                  containers:
+                    - name: myapp-container
+                      image: registry/image:latest
+                """
+            ),
+            "src/deployment/BUILD": dedent(
+                """\
+                helm_deployment(
+                    name="foo",
+                    chart="//src/mychart",
+                )
+                """
+            ),
+            "src/docker/BUILD": "docker_image(name='latest')",
+            "src/docker/Dockerfile": "FROM busybox:1.28",
+        }
+    )
+
+    source_root_patterns = ("/", "src/*")
+    rule_runner.set_options(
+        [
+            f"--source-root-patterns={repr(source_root_patterns)}",
+            "--no-helm-infer-deployment-dependencies",
+            "--helm-infer-unowned-dependency-behavior=error",
+        ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 

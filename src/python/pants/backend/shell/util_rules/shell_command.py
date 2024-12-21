@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     RunShellCommandWorkdirField,
+    ShellCommandCacheScopeField,
     ShellCommandCommandField,
     ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
@@ -19,6 +20,7 @@ from pants.backend.shell.target_types import (
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
+    ShellCommandOutputsMatchMode,
     ShellCommandPathEnvModifyModeField,
     ShellCommandRunnableDependenciesField,
     ShellCommandSourcesField,
@@ -154,10 +156,13 @@ async def _prepare_process_request_from_target(
 
     append_only_caches = {
         **merged_extras.append_only_caches,
-        **(shell_command.get(ShellCommandNamedCachesField).value or {}),
+        **(shell_command.get(ShellCommandNamedCachesField).value or {}),  # type: ignore[dict-item]
     }
 
     cache_scope = env_target.default_cache_scope
+    maybe_override_cache_scope = shell_command.get(ShellCommandCacheScopeField).enum_value
+    if maybe_override_cache_scope is not None:
+        cache_scope = maybe_override_cache_scope
 
     workspace_invalidation_globs: PathGlobs | None = None
     workspace_invalidation_sources = (
@@ -170,6 +175,8 @@ async def _prepare_process_request_from_target(
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin=f"`{ShellCommandWorkspaceInvalidationSourcesField.alias}` for `shell_command` target at `{shell_command.address}`",
         )
+
+    outputs_match_mode = shell_command.get(ShellCommandOutputsMatchMode).enum_value
 
     return AdhocProcessRequest(
         description=description,
@@ -191,6 +198,8 @@ async def _prepare_process_request_from_target(
         workspace_invalidation_globs=workspace_invalidation_globs,
         cache_scope=cache_scope,
         use_working_directory_as_base_for_output_captures=env_target.use_working_directory_as_base_for_output_captures,
+        outputs_match_error_behavior=outputs_match_mode.glob_match_error_behavior,
+        outputs_match_conjunction=outputs_match_mode.glob_expansion_conjunction,
     )
 
 

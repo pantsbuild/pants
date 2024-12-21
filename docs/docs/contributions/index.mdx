@@ -104,20 +104,6 @@ Bad titles:
 
 Then, include a description. You can use the default template if you'd like, or use a normal description instead. Link to any corresponding GitHub issues.
 
-Finally—if you have the permissions—add exactly one of the following labels to your PR. Otherwise, a maintainer will do this for you:
-
-- `category:new feature` for new features
-- `category:user api change` for changes that affect how end-users interact with Pants
-- `category:plugin api change` for changes that affect how plugin authors interact with Pants internals
-- `category:performance` for changes focused on improving performance
-- `category:bugfix` for bugfixes
-- `category:documentation` for documentation changes, including logging and help messages
-- `category:internal` for miscellaneous, internal-facing changes
-
-Pick the first of these that applies to your change. I.e., if you have modified the user API in a change that also improves performance, use `category:user api change`.
-
-These labels are used to generate the changelist for each release.
-
 :::note Tip: Review your own PR
 It is often helpful to other reviewers if you proactively review your own code. Specifically, add comments to parts where you want extra attention.
 
@@ -175,3 +161,5 @@ We have guidance to walk us through this, so it's not a problem to forget. Pull 
 
 - the PR release notes, by having changes in `docs/notes/`
 - someone has opted out, by labelling the PR with `release-notes:not-required` or `category:internal` (the latter means that release notes are optional for all `category:internal` PRs).
+
+For minor releases, all GitHub release description will simply list all the commits save those with `release-notes:not-required` or `category:internal`.

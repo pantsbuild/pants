@@ -134,7 +134,7 @@ class ExportPluginOptions:
             """
         ),
         advanced=True,
-        removal_version="2.24.0.dev0",
+        removal_version="2.26.0.dev0",
         removal_hint=softwrap(
             """
             Use `--export-py-non-hermetic-scripts-in-resolve` instead.
@@ -411,6 +411,7 @@ async def python_codegen_export_setup() -> _ExportPythonCodegenSetup:
                     content=textwrap.dedent(
                         f"""\
                         import os
+                        import shutil
                         import site
                         import sys
 
@@ -424,7 +425,10 @@ async def python_codegen_export_setup() -> _ExportPythonCodegenSetup:
                         for item in os.listdir(codegen_dir):
                             if item == "{_ExportPythonCodegenSetup.SCRIPT_NAME}":
                                 continue
-                            os.rename(os.path.join(codegen_dir, item), os.path.join(site_packages_dir, item))
+                            src = os.path.join(codegen_dir, item)
+                            dest = os.path.join(site_packages_dir, item)
+                            shutil.copytree(src, dest, dirs_exist_ok=True)
+                            shutil.rmtree(src)
                         """
                     ).encode(),
                 )

@@ -9,6 +9,10 @@ How to configure which Python version(s) your project should use.
 
 ## Setting the default Python version
 
+:::note Proactive Python 2.7 support ends in Pants v2.24.x and later versions
+Pants v2.23.x is the last Pants release series which will be regularly tested with Python 2.7. Python 2.7 is [no longer supported by its maintainers as of 1 January 2020](https://www.python.org/doc/sunset-python-2/). While Pants may continue to work with Python 2.7 in the near term, as of Pants v2.24.x, Pants will no longer officially support use of Python 2.7, and, consequently, will no longer be proactively tested with Python 2.7 in CI. Contributions to fix issues with Python 2.7 support will continue to be accepted, but will depend on any community contributions and will not consitute continued official support for Python 2.7.
+:::
+
 Configure your default Python interpreter compatibility constraints in `pants.toml` like this:
 
 ```toml title="pants.toml"

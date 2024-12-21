@@ -279,9 +279,7 @@ Scenario = namedtuple(
                 kwargs=dict(ignore_unknown_fields=True),
                 expected_defaults={
                     "test_type_1": _determenistic_parametrize_group_keys(
-                        {
-                            **ParametrizeDefault("splat", description="splat-desc")  # type: ignore[list-item]
-                        }
+                        {**ParametrizeDefault("splat", description="splat-desc")}
                     )
                 },
             ),
