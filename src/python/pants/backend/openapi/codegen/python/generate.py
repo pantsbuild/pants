@@ -315,7 +315,7 @@ async def infer_openapi_python_dependencies(
     addresses, missing_requirements = [], []
     for runtime_dependency in compiled_sources.runtime_dependencies:
         project_name = runtime_dependency.project_name
-        address = requirements_to_addresses.get(project_name)
+        address = requirements_to_addresses.get(project_name.lower())
         if address is not None:
             addresses.append(address)
         else:

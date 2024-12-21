@@ -82,7 +82,8 @@ def _assert_generated_files(
         HydratedSources, [HydrateSourcesRequest(tgt[OpenApiDocumentField])]
     )
     generated_sources = rule_runner.request(
-        GeneratedSources, [GeneratePythonFromOpenAPIRequest(protocol_sources.snapshot, tgt)]
+        GeneratedSources,
+        [GeneratePythonFromOpenAPIRequest(protocol_sources.snapshot, tgt)],
     )
 
     # We only assert expected files are a subset of all generated since the generator creates a lot of support classes
@@ -181,6 +182,103 @@ def test_generate_python_sources(rule_runner: RuleRunner, requirements_text: str
             "src/openapi/test/test_pet.py",
             "src/openapi/test/test_pets.py",
             "src/openapi/test/test_pets_api.py",
+        ],
+    )
+
+    tgt = rule_runner.get_target(tgt_address)
+    runtime_dependencies = rule_runner.request(
+        Addresses, [DependenciesRequest(tgt[OpenApiDocumentDependenciesField])]
+    )
+    assert runtime_dependencies
+
+
+@pytest.fixture
+def fastapi_requirements_text() -> str:
+    return dedent(
+        """\
+        python_requirement(name="jinja2", requirements=["jinja2"])
+        python_requirement(name="markupsafe", requirements=["markupsafe"])
+        python_requirement(name="pyyaml", requirements=["pyyaml"])
+        python_requirement(name="rx", requirements=["rx"])
+        python_requirement(name="aiofiles", requirements=["aiofiles"])
+        python_requirement(name="aniso8601", requirements=["aniso8601"])
+        python_requirement(name="async-exit-stack", requirements=["async-exit-stack"])
+        python_requirement(name="async-generator", requirements=["async-generator"])
+        python_requirement(name="certifi", requirements=["certifi"])
+        python_requirement(name="chardet", requirements=["chardet"])
+        python_requirement(name="click", requirements=["click"])
+        python_requirement(name="dnspython", requirements=["dnspython"])
+        python_requirement(name="email-validator", requirements=["email-validator"])
+        python_requirement(name="fastapi", requirements=["fastapi"])
+        python_requirement(name="graphene", requirements=["graphene"])
+        python_requirement(name="graphql-core", requirements=["graphql-core"])
+        python_requirement(name="graphql-relay", requirements=["graphql-relay"])
+        python_requirement(name="h11", requirements=["h11"])
+        python_requirement(name="httptools", requirements=["httptools"])
+        python_requirement(name="idna", requirements=["idna"])
+        python_requirement(name="itsdangerous", requirements=["itsdangerous"])
+        python_requirement(name="orjson", requirements=["orjson"])
+        python_requirement(name="promise", requirements=["promise"])
+        python_requirement(name="pydantic", requirements=["pydantic"])
+        python_requirement(name="python-dotenv", requirements=["python-dotenv"])
+        python_requirement(name="python-multipart", requirements=["python-multipart"])
+        python_requirement(name="requests", requirements=["requests"])
+        python_requirement(name="six", requirements=["six"])
+        python_requirement(name="starlette", requirements=["starlette"])
+        python_requirement(name="typing-extensions", requirements=["typing-extensions"])
+        python_requirement(name="ujson", requirements=["ujson"])
+        python_requirement(name="urllib3", requirements=["urllib3"])
+        python_requirement(name="uvicorn", requirements=["uvicorn"])
+        python_requirement(name="uvloop", requirements=["uvloop"])
+        python_requirement(name="watchgod", requirements=["watchgod"])
+        python_requirement(name="websockets", requirements=["websockets"])
+    """
+    )
+
+
+def test_generate_python_sources_with_a_different_generator(
+    rule_runner: RuleRunner, fastapi_requirements_text: str
+) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/python/default.lock": resources.files(__package__)
+            .joinpath("openapi.test.lock")
+            .read_text(),
+            "3rdparty/python/BUILD": fastapi_requirements_text,
+            "src/openapi/BUILD": dedent(
+                """\
+                openapi_document(
+                    name="petstore",
+                    source="petstore_spec.yaml",
+                    python_generator_name="python-fastapi",
+                )
+            """
+            ),
+            "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
+        }
+    )
+
+    def assert_gen(address: Address, expected: Iterable[str]) -> None:
+        _assert_generated_files(
+            rule_runner, address, source_roots=["src/openapi"], expected_files=expected
+        )
+
+    tgt_address = Address("src/openapi", target_name="petstore")
+    assert_gen(
+        tgt_address,
+        [
+            # The list might change because it depends on openapi template.
+            # TODO Vendor template?
+            "src/openapi/src/openapi_server/apis/__init__.py",
+            "src/openapi/src/openapi_server/apis/pets_api.py",
+            "src/openapi/src/openapi_server/main.py",
+            "src/openapi/src/openapi_server/models/__init__.py",
+            "src/openapi/src/openapi_server/models/error.py",
+            "src/openapi/src/openapi_server/models/extra_models.py",
+            "src/openapi/src/openapi_server/models/pet.py",
+            "src/openapi/src/openapi_server/security_api.py",
+            "src/openapi/tests/conftest.py",
+            "src/openapi/tests/test_pets_api.py",
         ],
     )
 

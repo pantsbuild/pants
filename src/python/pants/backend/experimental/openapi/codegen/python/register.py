@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
-from pants.backend.experimental.python.register import rules as python_rules
-from pants.backend.experimental.python.register import target_types as python_target_types
 from pants.backend.experimental.openapi.register import rules as openapi_rules
 from pants.backend.experimental.openapi.register import target_types as openapi_target_types
+from pants.backend.experimental.python.register import rules as python_rules
+from pants.backend.experimental.python.register import target_types as python_target_types
 from pants.backend.openapi.codegen.python.rules import rules as openapi_python_codegen_rules
 
 

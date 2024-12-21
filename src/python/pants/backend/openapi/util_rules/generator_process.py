@@ -10,7 +10,8 @@ from typing import Iterable, Mapping
 from pants.backend.openapi.subsystems import openapi_generator
 from pants.backend.openapi.subsystems.openapi_generator import OpenAPIGenerator
 from pants.engine.fs import Digest
-from pants.engine.process import Process, ProcessCacheScope
+from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.jvm import jdk_rules, non_jvm_dependencies
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
@@ -70,6 +71,42 @@ class OpenAPIGeneratorProcess:
 
 
 _GENERATOR_CLASS_NAME = "org.openapitools.codegen.OpenAPIGenerator"
+
+
+@dataclass(frozen=True)
+class OpenAPIGeneratorNames:
+    names: tuple[str, ...]
+
+
+@rule
+async def get_openapi_generator_names(
+    subsystem: OpenAPIGenerator, jdk: InternalJdk
+) -> OpenAPIGeneratorNames:
+    tool_classpath = await Get(
+        ToolClasspath, ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(subsystem))
+    )
+
+    toolcp_relpath = "__toolcp"
+    immutable_input_digests = {
+        toolcp_relpath: tool_classpath.digest,
+    }
+
+    classpath_entries = [
+        *tool_classpath.classpath_entries(toolcp_relpath),
+    ]
+
+    jvm_process = JvmProcess(
+        jdk=jdk,
+        argv=[_GENERATOR_CLASS_NAME, "list", "-a"],
+        classpath_entries=classpath_entries,
+        input_digest=EMPTY_DIGEST,
+        extra_immutable_input_digests=immutable_input_digests,
+        extra_jvm_options=subsystem.jvm_options,
+        description="Get openapi generator names.",
+        cache_scope=ProcessCacheScope.SUCCESSFUL,
+    )
+    result = await Get(ProcessResult, JvmProcess, jvm_process)
+    return OpenAPIGeneratorNames(names=tuple(result.stdout.decode("utf-8").split()))
 
 
 @rule
