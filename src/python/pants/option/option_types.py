@@ -188,12 +188,10 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         )
 
     @overload
-    def __get__(self, obj: None, objtype: Any) -> OptionInfo | None:
-        ...
+    def __get__(self, obj: None, objtype: Any) -> OptionInfo | None: ...
 
     @overload
-    def __get__(self, obj: object, objtype: Any) -> _OptT | _DefaultT:
-        ...
+    def __get__(self, obj: object, objtype: Any) -> _OptT | _DefaultT: ...
 
     def __get__(self, obj, objtype):
         assert self._flag_names is not None
@@ -463,8 +461,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-    ) -> EnumOption[_EnumT, _EnumT]:
-        ...
+    ) -> EnumOption[_EnumT, _EnumT]: ...
 
     # N.B. This has an additional param: `enum_type`.
     @overload  # Case: dynamic default
@@ -488,8 +485,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-    ) -> EnumOption[_EnumT, _EnumT]:
-        ...
+    ) -> EnumOption[_EnumT, _EnumT]: ...
 
     # N.B. This has an additional param: `enum_type`.
     @overload  # Case: default is `None`
@@ -513,8 +509,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-    ) -> EnumOption[_EnumT, None]:
-        ...
+    ) -> EnumOption[_EnumT, None]: ...
 
     def __new__(
         cls,
@@ -606,8 +601,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-    ) -> EnumListOption[_EnumT]:
-        ...
+    ) -> EnumListOption[_EnumT]: ...
 
     # N.B. This has an additional param: `enum_type`.
     @overload  # Case: dynamic default
@@ -631,8 +625,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-    ) -> EnumListOption[_EnumT]:
-        ...
+    ) -> EnumListOption[_EnumT]: ...
 
     # N.B. This has an additional param: `enum_type`.
     @overload  # Case: implicit default
@@ -655,8 +648,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-    ) -> EnumListOption[_EnumT]:
-        ...
+    ) -> EnumListOption[_EnumT]: ...
 
     def __new__(
         cls,

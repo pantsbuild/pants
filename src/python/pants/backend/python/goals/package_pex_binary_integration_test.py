@@ -215,9 +215,11 @@ def test_layout(rule_runner: PythonRuleRunner, layout: PexLayout) -> None:
     rule_runner.write_digest(result.digest)
     executable = os.path.join(
         rule_runner.build_root,
-        expected_pex_relpath
-        if PexLayout.ZIPAPP is layout
-        else os.path.join(expected_pex_relpath, "__main__.py"),
+        (
+            expected_pex_relpath
+            if PexLayout.ZIPAPP is layout
+            else os.path.join(expected_pex_relpath, "__main__.py")
+        ),
     )
     stdout = dedent(
         """\

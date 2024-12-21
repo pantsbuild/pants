@@ -52,9 +52,11 @@ class ScalaBuildTarget(BSPData):
             scala_binary_version=d["scalaBinaryVersion"],
             platform=d["platform"],
             jars=tuple(d.get("jars", [])),
-            jvm_build_target=JvmBuildTarget.from_json_dict(d["jvmBuildTarget"])
-            if "jvmBuildTarget" in d
-            else None,
+            jvm_build_target=(
+                JvmBuildTarget.from_json_dict(d["jvmBuildTarget"])
+                if "jvmBuildTarget" in d
+                else None
+            ),
         )
 
     def to_json_dict(self):

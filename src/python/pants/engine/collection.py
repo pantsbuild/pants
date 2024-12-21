@@ -26,12 +26,10 @@ class Collection(Tuple[T, ...]):
     """
 
     @overload  # type: ignore[override]  # noqa: F811
-    def __getitem__(self, index: int) -> T:
-        ...
+    def __getitem__(self, index: int) -> T: ...
 
     @overload  # noqa: F811
-    def __getitem__(self, index: slice) -> Collection[T]:
-        ...
+    def __getitem__(self, index: slice) -> Collection[T]: ...
 
     def __getitem__(self, index: int | slice) -> T | Collection[T]:  # noqa: F811
         result = super().__getitem__(index)

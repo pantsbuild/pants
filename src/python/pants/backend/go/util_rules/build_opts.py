@@ -214,23 +214,29 @@ async def go_extract_build_options_from_target(
                 "the `[go-test].force_race` option is in effect",
             ),
             (
-                test_target_fields.test_race.value,
-                f"{GoTestRaceDetectorEnabledField.alias}={test_target_fields.test_race.value} on target `{request.address}`",
-            )
-            if test_target_fields
-            else None,
+                (
+                    test_target_fields.test_race.value,
+                    f"{GoTestRaceDetectorEnabledField.alias}={test_target_fields.test_race.value} on target `{request.address}`",
+                )
+                if test_target_fields
+                else None
+            ),
             (
-                target_fields.race.value,
-                f"{GoRaceDetectorEnabledField.alias}={target_fields.race.value} on target `{request.address}`",
-            )
-            if target_fields
-            else None,
+                (
+                    target_fields.race.value,
+                    f"{GoRaceDetectorEnabledField.alias}={target_fields.race.value} on target `{request.address}`",
+                )
+                if target_fields
+                else None
+            ),
             (
-                go_mod_target_fields.race.value,
-                f"{GoRaceDetectorEnabledField.alias}={go_mod_target_fields.race.value} on target `{request.address}`",
-            )
-            if go_mod_target_fields
-            else None,
+                (
+                    go_mod_target_fields.race.value,
+                    f"{GoRaceDetectorEnabledField.alias}={go_mod_target_fields.race.value} on target `{request.address}`",
+                )
+                if go_mod_target_fields
+                else None
+            ),
             (False, "default"),
         ]
     )
@@ -250,23 +256,29 @@ async def go_extract_build_options_from_target(
                 "the `[go-test].force_msan` option is in effect",
             ),
             (
-                test_target_fields.test_msan.value,
-                f"{GoTestMemorySanitizerEnabledField.alias}={test_target_fields.test_msan.value} on target `{request.address}`",
-            )
-            if test_target_fields
-            else None,
+                (
+                    test_target_fields.test_msan.value,
+                    f"{GoTestMemorySanitizerEnabledField.alias}={test_target_fields.test_msan.value} on target `{request.address}`",
+                )
+                if test_target_fields
+                else None
+            ),
             (
-                target_fields.msan.value,
-                f"{GoMemorySanitizerEnabledField.alias}={target_fields.msan.value} on target `{request.address}`",
-            )
-            if target_fields
-            else None,
+                (
+                    target_fields.msan.value,
+                    f"{GoMemorySanitizerEnabledField.alias}={target_fields.msan.value} on target `{request.address}`",
+                )
+                if target_fields
+                else None
+            ),
             (
-                go_mod_target_fields.msan.value,
-                f"{GoMemorySanitizerEnabledField.alias}={go_mod_target_fields.msan.value} on target `{request.address}`",
-            )
-            if go_mod_target_fields
-            else None,
+                (
+                    go_mod_target_fields.msan.value,
+                    f"{GoMemorySanitizerEnabledField.alias}={go_mod_target_fields.msan.value} on target `{request.address}`",
+                )
+                if go_mod_target_fields
+                else None
+            ),
             (False, "default"),
         ]
     )
@@ -286,23 +298,29 @@ async def go_extract_build_options_from_target(
                 "the `[go-test].force_asan` option is in effect",
             ),
             (
-                test_target_fields.test_asan.value,
-                f"{GoTestAddressSanitizerEnabledField.alias}={test_target_fields.test_asan.value} on target `{request.address}`",
-            )
-            if test_target_fields
-            else None,
+                (
+                    test_target_fields.test_asan.value,
+                    f"{GoTestAddressSanitizerEnabledField.alias}={test_target_fields.test_asan.value} on target `{request.address}`",
+                )
+                if test_target_fields
+                else None
+            ),
             (
-                target_fields.asan.value,
-                f"{GoAddressSanitizerEnabledField.alias}={target_fields.asan.value} on target `{request.address}`",
-            )
-            if target_fields
-            else None,
+                (
+                    target_fields.asan.value,
+                    f"{GoAddressSanitizerEnabledField.alias}={target_fields.asan.value} on target `{request.address}`",
+                )
+                if target_fields
+                else None
+            ),
             (
-                go_mod_target_fields.asan.value,
-                f"{GoAddressSanitizerEnabledField.alias}={go_mod_target_fields.asan.value} on target `{request.address}`",
-            )
-            if go_mod_target_fields
-            else None,
+                (
+                    go_mod_target_fields.asan.value,
+                    f"{GoAddressSanitizerEnabledField.alias}={go_mod_target_fields.asan.value} on target `{request.address}`",
+                )
+                if go_mod_target_fields
+                else None
+            ),
             (False, "default"),
         ]
     )
