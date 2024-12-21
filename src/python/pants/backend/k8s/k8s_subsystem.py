@@ -23,10 +23,10 @@ class K8sSubsystem(Subsystem):
             context will be validated against this list.
 
             You have to explicitly provide the list, because it will be shared
-            with people using the pants repo. We can't parse the KUBE_CONFIG
-            env var because different people might have different private
-            clusters, e.g. minikube or kind, which means pants validation will
-            give different results.
+            with people using the pants repo. We can't parse the KUBECONFIG env
+            var because different people might have different private clusters,
+            e.g. minikube or kind, which means pants validation will give
+            different results.
             """
         ),
     )
