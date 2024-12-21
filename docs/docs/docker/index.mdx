@@ -396,17 +396,32 @@ It can help to simulate a hermetic environment by using `env -i`. With credentia
 
 :::
 
-## Linting Dockerfiles with Hadolint
+## Linting Dockerfiles
 
-Pants can run [Hadolint](https://github.com/hadolint/hadolint) on your Dockerfiles to check for errors and mistakes:
+Once Docker linting backends are enabled, lint Dockerfiles with
 
 ```
 ❯ pants lint src/docker/hw/Dockerfile
 ```
 
+
+### Linting Dockerfiles with Hadolint
+
+Pants can run [Hadolint](https://github.com/hadolint/hadolint) on your Dockerfiles to check for errors and mistakes.
 This must first be enabled by activating the Hadolint backend:
 
 ```toml title="pants.toml"
 [GLOBAL]
 backend_packages = ["pants.backend.docker.lint.hadolint"]
 ```
+
+### Linting Dockerfiles with Trivy
+
+Pants can run [Trivy](https://github.com/aquasecurity/trivy) on your Dockerfiles to check for security vulnerabilities.
+This must first be enabled by activating the Trivy backend:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages = ["pants.backend.docker.lint.trivy"]
+```
+
