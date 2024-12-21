@@ -309,7 +309,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         self.options = options
 
     def __eq__(self, other: Any) -> bool:
-        if type(self) != type(other):
+        if type(self) != type(other):  # noqa: E721
             return False
         return bool(self.options == other.options)
 

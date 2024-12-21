@@ -29,7 +29,7 @@ class Rank(Enum):
         return member
 
     def __lt__(self, other: Any) -> bool:
-        if type(other) != Rank:
+        if type(other) != Rank:  # noqa: E721
             return NotImplemented
         return self._rank < other._rank
 

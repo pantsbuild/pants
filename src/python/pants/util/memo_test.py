@@ -214,7 +214,7 @@ def test_instancemethod_application_degenerate_eq():
             return hash(type)
 
         def __eq__(self, other):
-            return type(self) == type(other)
+            return type(self) == type(other)  # noqa: E721
 
     foo1 = Foo(3)
     foo2 = Foo(4)
