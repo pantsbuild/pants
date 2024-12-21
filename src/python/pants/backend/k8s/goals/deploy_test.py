@@ -15,6 +15,7 @@ from pants.backend.k8s.kubectl_subsystem import Kubectl
 from pants.backend.k8s.target_types import K8sBundleTarget, K8sSourceTargetGenerator
 from pants.core.goals.deploy import DeployProcess
 from pants.engine.addresses import Address
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.platform import Platform
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -60,7 +61,7 @@ def test_run_k8s_deploy(rule_runner: RuleRunner) -> None:
             "src/k8s/BUILD": dedent(
                 """\
                 k8s_sources()
-                k8s_bundle(name="pod", dependencies=["pod.yaml"], context="local")
+                k8s_bundle(name="pod", sources=("src/k8s/pod.yaml",), context="local")
             """
             ),
             "src/k8s/pod.yaml": dedent(
@@ -73,9 +74,7 @@ def test_run_k8s_deploy(rule_runner: RuleRunner) -> None:
     )
 
     deploy_process = _get_process(
-        rule_runner,
-        "src/k8s",
-        "pod",
+        rule_runner, "src/k8s", "pod", args=("--k8s-available-contexts=['local']",)
     )
 
     kubectl = rule_runner.request(Kubectl, [])
@@ -84,5 +83,40 @@ def test_run_k8s_deploy(rule_runner: RuleRunner) -> None:
     assert deploy_process.process
     assert deploy_process.process.process.argv == (
         kubectl.generate_exe(platform),
+        "--context",
+        "local",
         "apply",
+        "-o",
+        "yaml",
+        "-f",
+        "src/k8s/pod.yaml",
     )
+
+
+def test_context_validation(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/k8s/BUILD": dedent(
+                """\
+                k8s_sources()
+                k8s_bundle(name="pod", sources=("src/k8s/pod.yaml",), context="local")
+            """
+            ),
+            "src/k8s/pod.yaml": dedent(
+                """\
+                apiVersion: v1
+                kind: Pod
+            """
+            ),
+        }
+    )
+
+    with pytest.raises(
+        ExecutionError,
+        match=r"ValueError: Context `local` is not listed in `\[k8s\].available_contexts`",
+    ):
+        _get_process(
+            rule_runner,
+            "src/k8s",
+            "pod",
+        )
