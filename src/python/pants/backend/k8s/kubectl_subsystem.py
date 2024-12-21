@@ -1,14 +1,20 @@
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Optional
 
-from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
-from pants.core.util_rules.system_binaries import BinaryPath, BinaryPathRequest, BinaryPaths
+from pants.core.util_rules.system_binaries import (
+    BinaryPath,
+    BinaryPathRequest,
+    BinaryPaths,
+    BinaryPathTest,
+)
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
-from pants.option.option_types import BoolOption, ShellStrListOption, StrListOption
+from pants.option.option_types import BoolOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
@@ -21,14 +27,6 @@ class KubectlOptions(Subsystem):
     options_scope = "kubectl"
     help = "Kubernetes command line tool"
 
-    available_contexts = StrListOption(
-        default=[],
-        help=softwrap(
-            """
-            List of available contexts for `kubectl` command.
-            """
-        ),
-    )
     pass_context = BoolOption(
         default=True,
         help=softwrap(
@@ -37,28 +35,16 @@ class KubectlOptions(Subsystem):
             """
         ),
     )
-
-    class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
-        _env_vars = ShellStrListOption(
-            help=softwrap(
-                """
-                Environment variables to set for `kubectl` invocations.
-
-                Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
-                or just `ENV_VAR` to copy the value from Pants's own environment.
-                """
-            ),
-            advanced=True,
-        )
-        executable_search_paths_help = softwrap(
+    extra_env_vars = StrListOption(
+        help=softwrap(
             """
-            The PATH value that will be used to find the kubectl binary.
+            Additional environment variables that would be made available to all Helm processes
+            or during value interpolation.
             """
-        )
-
-        @property
-        def env_vars(self) -> tuple[str, ...]:
-            return tuple(sorted(set(self._env_vars)))
+        ),
+        default=["HOME", "KUBECONFIG", "KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"],
+        advanced=True,
+    )
 
 
 @dataclass(frozen=True)
@@ -72,7 +58,7 @@ class KubectlBinary(BinaryPath):
         env: Optional[Mapping[str, str]] = None,
         context: Optional[str] = None,
     ) -> Process:
-        argv = (self.path,)
+        argv: tuple[str, ...] = (self.path,)
 
         if context is not None:
             argv += ("--context", context)
@@ -97,11 +83,13 @@ async def get_kubectl(kubectl_options_env_aware: KubectlOptions.EnvironmentAware
     request = BinaryPathRequest(
         binary_name="kubectl",
         search_path=search_path,
-        # TODO test=BinaryPathTest(args=["version", "--output=json"]),
+        test=BinaryPathTest(args=["version", "--output=json"]),
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     logger.debug("kubectl path %s", paths.first_path)
-    first_path = paths.first_path_or_raise(request, rationale="interact with the kubernetes cluster")
+    first_path = paths.first_path_or_raise(
+        request, rationale="interact with the kubernetes cluster"
+    )
 
     return KubectlBinary(first_path.path, first_path.fingerprint)
 

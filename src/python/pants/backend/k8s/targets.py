@@ -1,3 +1,7 @@
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+from typing import ClassVar
+
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -13,12 +17,12 @@ from pants.util.strutil import help_text
 
 
 class K8sSourceField(SingleSourceField):
-    expected_file_extensions: tuple[str, ...] = (".yml", ".yaml")
+    expected_file_extensions: ClassVar[tuple[str, ...]] = (".yml", ".yaml")
 
 
 class K8sSourcesField(MultipleSourcesField):
     default = ("*.yaml", "*.yml")
-    expected_file_extensions: tuple[str, ...] = (".yml", ".yaml")
+    expected_file_extensions: ClassVar[tuple[str, ...]] = (".yml", ".yaml")
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['example.yaml', 'new_*.yaml', '!old_ignore.yaml']`"
     )
