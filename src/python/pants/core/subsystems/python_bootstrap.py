@@ -29,7 +29,7 @@ from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
-_PBS_URL_TEMPLATE = "https://github.com/indygreg/python-build-standalone/releases/download/20241008/cpython-3.11.10+20241008-{}-install_only.tar.gz"
+_PBS_URL_TEMPLATE = "https://github.com/astral-sh/python-build-standalone/releases/download/20241008/cpython-3.11.10+20241008-{}-install_only.tar.gz"
 
 
 class PythonBootstrapSubsystem(Subsystem):
