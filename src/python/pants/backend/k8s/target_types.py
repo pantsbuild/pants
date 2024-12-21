@@ -68,7 +68,7 @@ class K8sBundleSourcesField(SpecialCasedDependencies):
 class K8sBundleContextField(StringField):
     alias = "context"
     required = True
-    help = "The kubectl context to use for publishing."
+    help = "The kubectl context to use for deploy."
 
 
 class K8sBundleDependenciesField(Dependencies):
