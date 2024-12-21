@@ -229,12 +229,13 @@ def _parse_from_five_fields(parts: Sequence[str], orig_value: str) -> _ParsedPBS
     maybe_inferred_pbs_release_tag: Version | None = None
     maybe_inferred_platform: Platform | None = None
     try:
-        v1, v2, p = _parse_pbs_url(url)
-        maybe_inferred_py_version = v1
-        maybe_inferred_pbs_release_tag = v2
-        maybe_inferred_platform = p
+        (
+            maybe_inferred_py_version,
+            maybe_inferred_pbs_release_tag,
+            maybe_inferred_platform,
+        ) = _parse_pbs_url(url)
     except ValueError:
-        maybe_inferred_platform = None
+        pass
 
     if maybe_py_version is None:
         if maybe_inferred_py_version is None:
