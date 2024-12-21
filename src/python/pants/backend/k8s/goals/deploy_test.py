@@ -8,14 +8,14 @@ from typing import Iterable, Mapping
 
 import pytest
 
-from pants.backend.k8s import k8s_subsystem, kubectl_tool
+from pants.backend.k8s import k8s_subsystem, kubectl_subsystem
 from pants.backend.k8s.goals.deploy import DeployK8sBundleFieldSet
 from pants.backend.k8s.goals.deploy import rules as k8s_deploy_rules
-from pants.backend.k8s.kubectl_tool import KubectlBinary
+from pants.backend.k8s.kubectl_subsystem import Kubectl
 from pants.backend.k8s.target_types import K8sBundleTarget, K8sSourceTargetGenerator
 from pants.core.goals.deploy import DeployProcess
 from pants.engine.addresses import Address
-from pants.engine.environment import EnvironmentName
+from pants.engine.platform import Platform
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -29,8 +29,9 @@ def rule_runner() -> RuleRunner:
         rules=[
             *k8s_deploy_rules(),
             *k8s_subsystem.rules(),
-            *kubectl_tool.rules(),
-            QueryRule(KubectlBinary, (EnvironmentName,)),
+            *kubectl_subsystem.rules(),
+            QueryRule(Kubectl, ()),
+            QueryRule(Platform, ()),
             QueryRule(DeployProcess, (DeployK8sBundleFieldSet,)),
         ],
     )
@@ -77,38 +78,11 @@ def test_run_k8s_deploy(rule_runner: RuleRunner) -> None:
         "pod",
     )
 
-    kubectl = rule_runner.request(KubectlBinary, [])
+    kubectl = rule_runner.request(Kubectl, [])
+    platform = rule_runner.request(Platform, [])
 
     assert deploy_process.process
     assert deploy_process.process.process.argv == (
-        helm.path,
-        "upgrade",
-        "foo",
-        "mychart",
-        "--description",
-        '"Foo deployment"',
-        "--namespace",
-        f"uat-{expected_ns_suffix}",
-        "--skip-crds",
-        "--no-hooks",
-        "--post-renderer",
-        "./post_renderer_wrapper.sh",
-        "--values",
-        ",".join(
-            [f"__values/src/deployment/{filename}" for filename in expected_value_files_order]
-        ),
-        "--set",
-        "key=foo",
-        "--set",
-        "amount=300",
-        "--set",
-        'long_string="This is a long string"',
-        "--set",
-        f"build_number={expected_build_number}",
-        "--install",
-        "--timeout",
-        "150s",
-        "--kubeconfig",
-        "./kubeconfig",
-        "--create-namespace",
+        kubectl.generate_exe(platform),
+        "apply",
     )
