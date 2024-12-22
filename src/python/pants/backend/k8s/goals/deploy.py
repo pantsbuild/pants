@@ -15,11 +15,16 @@ from pants.backend.k8s.target_types import (
     K8sSourceField,
 )
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess
+from pants.core.util_rules.external_tool import (
+    DownloadedExternalTool,
+    ExternalToolRequest,
+)
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import MergeDigests, Snapshot
+from pants.engine.internals.native_engine import Digest
 from pants.engine.platform import Platform
-from pants.engine.process import InteractiveProcess
+from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
@@ -29,6 +34,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -44,6 +50,15 @@ class DeployK8sBundleFieldSet(DeployFieldSet):
     sources: K8sBundleSourcesField
     context: K8sBundleContextField
     dependencies: K8sBundleDependenciesField
+
+
+@dataclass(frozen=True)
+class KubectlApply:
+    paths: tuple[str, ...]
+    input_digest: Digest
+    platform: Platform
+    env: FrozenDict[str, str] | None = None
+    context: str | None = None
 
 
 @rule(desc="Run k8s deploy process", level=LogLevel.DEBUG)
@@ -96,12 +111,15 @@ async def run_k8s_deploy(
     )
 
     process = InteractiveProcess.from_process(
-        kubectl.apply_configs(
-            snapshot.files,
-            platform=platform,
-            input_digest=snapshot.digest,
-            env=env,
-            context=context,
+        await Get(
+            Process,
+            KubectlApply(
+                snapshot.files,
+                platform=platform,
+                input_digest=snapshot.digest,
+                env=env,
+                context=context,
+            ),
         )
     )
 
@@ -112,6 +130,36 @@ async def run_k8s_deploy(
         publish_dependencies=tuple(publish_targets),
         process=process,
         description=description,
+    )
+
+
+@rule
+async def kubectl_apply_process(
+    request: KubectlApply, platform: Platform, kubectl: Kubectl
+) -> Process:
+    argv: tuple[str, ...] = (kubectl.generate_exe(platform),)
+
+    if request.context is not None:
+        argv += ("--context", request.context)
+
+    argv += ("apply", "-o", "yaml")
+
+    for path in request.paths:
+        argv += ("-f", path)
+
+    kubectl_tool = await Get(
+        DownloadedExternalTool, ExternalToolRequest, kubectl.get_request(platform)
+    )
+    digest = await Get(
+        Digest, MergeDigests([kubectl_tool.digest, request.input_digest])
+    )
+
+    return Process(
+        argv=argv,
+        input_digest=digest,
+        cache_scope=ProcessCacheScope.PER_SESSION,
+        description=f"Applying kubernetes config {request.paths}",
+        env=request.env,
     )
 
 
