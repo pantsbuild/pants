@@ -35,7 +35,7 @@ your .yaml files.
 
 For example, create a file `src/k8s/configmap.yaml`:
 
-```yaml
+```yaml title="src/k8s/configmap.yaml"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -57,5 +57,55 @@ pants tailor src/k8s:
 ```
 Created src/k8s/BUILD:
   - Add k8s_sources target k8s
+```
+
+## Deploying objects to a cluster
+
+We'll be using a local [kind](https://kind.sigs.k8s.io/) cluster throughout the
+tutorial. First, spin up a cluster:
+
+```bash
+kind create cluster
+```
+```
+Creating cluster "kind" ...
+ ✓ Ensuring node image (kindest/node:v1.25.3) 🖼 
+ ✓ Preparing nodes 📦  
+ ✓ Writing configuration 📜 
+ ✓ Starting control-plane 🕹️ 
+ ✓ Installing CNI 🔌 
+ ✓ Installing StorageClass 💾 
+Set kubectl context to "kind-kind"
+```
+
+Second, configure the list of available contexts in `pants.toml`:
+
+```toml title="pants.toml"
+...
+
+[k8s]
+available_contexts = [
+  "kind-kind",
+]
+```
+
+Third, create a deployable target `k8s_bundle` in `src/k8s/BUILD`:
+
+```python title="src/k8s/BUILD"
+k8s_sources()
+k8s_bundle(
+    name="configmap",
+    sources=("src/k8s/configmap.yaml",),
+    context="kind-kind",
+)
+```
+
+Now you can deploy the target:
+
+```bash
+pants experimental-deploy src/k8s:configmap
+```
+```
+✓ src/k8s:configmap deployed to context kind-kind
 ```
 
