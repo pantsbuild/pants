@@ -43,7 +43,7 @@ class K8sSourceTarget(Target):
     help = "A single k8s object spec file."
 
 
-class K8sSourceTargetGenerator(TargetFilesGenerator):
+class K8sSourcesTargetGenerator(TargetFilesGenerator):
     alias = "k8s_sources"
     generated_target_cls = K8sSourceTarget
 
@@ -88,6 +88,6 @@ class K8sBundleTarget(Target):
 def target_types():
     return [
         K8sSourceTarget,
-        K8sSourceTargetGenerator,
+        K8sSourcesTargetGenerator,
         K8sBundleTarget,
     ]

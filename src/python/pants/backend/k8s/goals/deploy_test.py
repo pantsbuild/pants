@@ -12,7 +12,7 @@ from pants.backend.k8s import k8s_subsystem, kubectl_subsystem
 from pants.backend.k8s.goals.deploy import DeployK8sBundleFieldSet
 from pants.backend.k8s.goals.deploy import rules as k8s_deploy_rules
 from pants.backend.k8s.kubectl_subsystem import Kubectl
-from pants.backend.k8s.target_types import K8sBundleTarget, K8sSourceTargetGenerator
+from pants.backend.k8s.target_types import K8sBundleTarget, K8sSourcesTargetGenerator
 from pants.core.goals.deploy import DeployProcess
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
@@ -24,7 +24,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         target_types=[
-            K8sSourceTargetGenerator,
+            K8sSourcesTargetGenerator,
             K8sBundleTarget,
         ],
         rules=[
