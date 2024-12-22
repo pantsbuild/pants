@@ -31,4 +31,5 @@ pex_binary(
     dependencies=[
         "src/python/pants/backend/k8s/kubectl_subsystem.py",
     ],
+    execution_mode="venv",
 )
