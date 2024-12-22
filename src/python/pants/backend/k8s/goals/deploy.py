@@ -15,10 +15,7 @@ from pants.backend.k8s.target_types import (
     K8sSourceField,
 )
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
-)
+from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import MergeDigests, Snapshot
@@ -150,9 +147,7 @@ async def kubectl_apply_process(
     kubectl_tool = await Get(
         DownloadedExternalTool, ExternalToolRequest, kubectl.get_request(platform)
     )
-    digest = await Get(
-        Digest, MergeDigests([kubectl_tool.digest, request.input_digest])
-    )
+    digest = await Get(Digest, MergeDigests([kubectl_tool.digest, request.input_digest]))
 
     return Process(
         argv=argv,

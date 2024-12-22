@@ -172,9 +172,7 @@ class Kubectl(TemplatedExternalTool):
         advanced=True,
     )
 
-    class EnvironmentAware(
-        ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware
-    ):
+    class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
         executable_search_paths_help = softwrap(
             """
             The PATH value that will be used to find kubectl binary.
