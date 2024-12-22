@@ -15,3 +15,47 @@ issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our
 Slack](/community/getting-help)!
 :::
 
+## Initial setup
+
+First, activate the relevant backend in `pants.toml`:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages = [
+  ...
+  "pants.backend.experimental.k8s",
+  ...
+]
+```
+
+The Kubernetes backend adds [`k8s_source`](../../reference/targets/k8s_source.mdx) and
+[`k8s_sources`](../../reference/targets/k8s_sources.mdx) target types for Kubernetes object
+files. The `tailor` goal will automatically generate the targets for
+your .yaml files.
+
+For example, create a file `src/k8s/configmap.yaml`:
+
+```yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-defaults-conf
+data:
+  spark-defaults.conf: |
+    spark.driver.memory=1g
+    spark.executor.cores=1
+    spark.executor.instances=1
+    spark.executor.memory=2g
+```
+
+Now run:
+
+```bash
+pants tailor src/k8s:
+```
+```
+Created src/k8s/BUILD:
+  - Add k8s_sources target k8s
+```
+

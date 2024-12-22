@@ -3,7 +3,7 @@
 import logging
 
 from pants.engine.rules import collect_rules
-from pants.option.option_types import StrListOption
+from pants.option.option_types import BoolOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -29,6 +29,16 @@ class K8sSubsystem(Subsystem):
             different results.
             """
         ),
+    )
+
+    tailor_source_targets = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            If true, add `k8s_sources` targets with the `tailor` goal.
+            """
+        ),
+        advanced=True,
     )
 
 
