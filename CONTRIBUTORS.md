@@ -1,8 +1,8 @@
-Created by running `build-support/bin/contributors.sh`.
+Created as part of the release process.
 
++ Adam Retter
 + Alan Paulin
 + Alexander Johnson
-+ Alyssa Pohahau
 + Andrew Hamilton
 + Andy Reitz
 + Antoine Tollenaere
@@ -10,6 +10,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Bill Farner
 + Brian Larson
 + Brian Wickman
++ Caspar Krieger
 + Chris Aniszczyk
 + Chris Burroughs
 + Chris Chen
@@ -34,11 +35,14 @@ Created by running `build-support/bin/contributors.sh`.
 + Evan Jones
 + Fedor Korotkov
 + Florian Leibert
++ Fredrik Ekholdt
 + Gabriel Gonzalez
 + Garrett Malmquist
++ Grzegorz Kossakowski
 + Harley Cooper
 + Hwasung Lee
 + Igor Morozov
++ Ikai Lan
 + Itay Donanhirsh
 + Ity Kaul
 + Jackson Davis
@@ -60,6 +64,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Jon Boulle
 + Jonathan Coveney
 + Jonathan Sokolowski
++ Josh Suereth
 + Joshua Cohen
 + Joshua Humphries
 + Justin Trobec
@@ -94,8 +99,11 @@ Created by running `build-support/bin/contributors.sh`.
 + Oliver Gould
 + Patrick Lawson
 + Paul Groudas
++ Paul Phillips
 + Peiyu Wang
 + Peter Seibel
++ Peter Vlugter
++ Pierre DAL-PRA
 + Qicheng Ma
 + Ryan Williams
 + Sameer Brenn
@@ -118,3 +126,4 @@ Created by running `build-support/bin/contributors.sh`.
 + Ugo Di Girolamo
 + Wei An
 + Yi Cheng
++ eugene yokota
