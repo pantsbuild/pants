@@ -1,3 +1,9 @@
+"""Script to fetch external tool versions.
+
+Example:
+
+pants run build-support/bin:external-tool-versions -- --tool pants.backend.k8s.kubectl_subsystem:Kubectl > list.txt
+"""
 import argparse
 import hashlib
 from multiprocessing.pool import ThreadPool
@@ -13,12 +19,6 @@ import logging
 import requests
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class Version:
-    version: str
-    platform: str
 
 
 @dataclass(frozen=True)
@@ -46,15 +46,14 @@ def format_string_to_regex(format_string: str) -> re.Pattern:
     return re.compile("".join(result_regex))
 
 
-def get_k8s_versions(url_template: str) -> Iterator[Version]:
-    path_template = urlparse(url_template).path
-    logger.info("path template: %s", path_template)
+def fetch_text(url: str) -> str:
+    response = requests.get(url)
+    return response.text
 
-    regex = format_string_to_regex(path_template)
-    logger.info("path regex: %s", regex)
 
-    response = requests.get("https://cdn.dl.k8s.io/", allow_redirects=True)
-    root = ET.fromstring(response.text)
+def _parse_k8s_xml(text: str) -> Iterator[str]:
+    regex = re.compile(r"release\/stable-(?P<version>[0-9\.]+).txt")
+    root = ET.fromstring(text)
     tag = "{http://doc.s3.amazonaws.com/2006-03-01}"
     for item in root.iter(f"{tag}Contents"):
         key_element = item.find(f"{tag}Key")
@@ -62,33 +61,41 @@ def get_k8s_versions(url_template: str) -> Iterator[Version]:
             raise RuntimeError("Failed to parse xml, did it change?")
 
         key = key_element.text
-        if match := regex.match(f"/{key}"):
-            version = match.group("version")
-            platform = match.group("platform")
-            yield Version(version=version, platform=platform)
+        if regex.match(key):
+            yield f"https://cdn.dl.k8s.io/{key}"
 
 
-DOMAIN_TO_VERSIONS_MAPPING: dict[str, Callable[[str], Iterator[Version]]] = {
+def get_k8s_versions(url_template: str, pool: ThreadPool) -> Iterator[str]:
+    response = requests.get("https://cdn.dl.k8s.io/", allow_redirects=True)
+    urls = _parse_k8s_xml(response.text)
+    for v in pool.imap_unordered(fetch_text, urls):
+        yield v.strip().lstrip("v")
+
+
+DOMAIN_TO_VERSIONS_MAPPING: dict[str, Callable[[str, ThreadPool], Iterator[str]]] = {
     # TODO github.com
     "dl.k8s.io": get_k8s_versions,
 }
 
 
-def fetch_version(url_template: str, version: Version) -> VersionHash:
-    url = url_template.format(version=version.version, platform=version.platform)
-    response = requests.get(url)
+def fetch_version(url_template: str, version: str, platform: str) -> VersionHash | None:
+    url = url_template.format(version=version, platform=platform)
+    response = requests.get(url, allow_redirects=True)
+    if response.status_code != 200:
+        logger.error("failed to fetch version: %s\n%s", version, response.text)
+        return None
+
     size = len(response.content)
     sha256 = hashlib.sha256(response.content)
     return VersionHash(
-        version=version.version,
-        platform=version.platform,
+        version=version,
+        platform=platform,
         size=size,
         sha256=sha256.hexdigest(),
     )
 
 
 def main():
-    logging.basicConfig(level="INFO", format="%(message)s")
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-t",
@@ -107,34 +114,55 @@ def main():
         default=16,
         help="Thread pool size",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Verbose output",
+    )
 
     args = parser.parse_args()
+
+    level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(level=level, format="%(message)s")
 
     module_string, class_name = args.tool.split(":")
     module = importlib.import_module(module_string)
     cls = getattr(module, class_name)
 
     platforms = args.platforms.split(",")
-    mapped_platforms = set(cls.default_url_platform_mapping.get(p) for p in platforms)
+    platform_mapping = cls.default_url_platform_mapping
+    mapped_platforms = set(platform_mapping.get(p) for p in platforms)
 
     domain = urlparse(cls.default_url_template).netloc
     get_versions = DOMAIN_TO_VERSIONS_MAPPING[domain]
     pool = ThreadPool(processes=args.workers)
     results = []
-    for version in get_versions(cls.default_url_template):
-        if version.platform not in mapped_platforms:
-            continue
+    for version in get_versions(cls.default_url_template, pool):
+        for platform in mapped_platforms:
+            logger.debug("fetching version: %s %s", version, platform)
+            results.append(
+                pool.apply_async(
+                    fetch_version, args=(cls.default_url_template, version, platform)
+                )
+            )
 
-        logger.info("fetching version: %s", version)
-        results.append(
-            pool.apply_async(
-                fetch_version,
-                args=(cls.default_url_template, version),
+    backward_platform_mapping = {v: k for k, v in platform_mapping.items()}
+    for result in results:
+        v = result.get(60)
+        if v is None:
+            continue
+        print(
+            "|".join(
+                [
+                    v.version,
+                    backward_platform_mapping[v.platform],
+                    v.sha256,
+                    str(v.size),
+                ]
             )
         )
-
-    for result in results:
-        print(result.get(60))
 
 
 if __name__ == "__main__":
