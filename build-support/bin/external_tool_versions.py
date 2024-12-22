@@ -1,3 +1,5 @@
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 """Script to fetch external tool versions.
 
 Example:
@@ -6,16 +8,16 @@ pants run build-support/bin:external-tool-versions -- --tool pants.backend.k8s.k
 """
 import argparse
 import hashlib
-from multiprocessing.pool import ThreadPool
+import importlib
+import logging
 import re
-from dataclasses import dataclass
 import xml.etree.ElementTree as ET
 from collections.abc import Callable, Iterator
-import importlib
+from dataclasses import dataclass
+from multiprocessing.pool import ThreadPool
 from string import Formatter
 from urllib.parse import urlparse
 
-import logging
 import requests
 
 logger = logging.getLogger(__name__)
@@ -133,7 +135,7 @@ def main():
 
     platforms = args.platforms.split(",")
     platform_mapping = cls.default_url_platform_mapping
-    mapped_platforms = set(platform_mapping.get(p) for p in platforms)
+    mapped_platforms = {platform_mapping.get(p) for p in platforms}
 
     domain = urlparse(cls.default_url_template).netloc
     get_versions = DOMAIN_TO_VERSIONS_MAPPING[domain]
@@ -143,9 +145,7 @@ def main():
         for platform in mapped_platforms:
             logger.debug("fetching version: %s %s", version, platform)
             results.append(
-                pool.apply_async(
-                    fetch_version, args=(cls.default_url_template, version, platform)
-                )
+                pool.apply_async(fetch_version, args=(cls.default_url_template, version, platform))
             )
 
     backward_platform_mapping = {v: k for k, v in platform_mapping.items()}
