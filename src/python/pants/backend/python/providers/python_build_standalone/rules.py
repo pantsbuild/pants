@@ -136,7 +136,13 @@ def _parse_pbs_url(url: str) -> tuple[Version, Version, Platform]:
 
     platform: Platform
     match base_path_parts[1].split("-"):
-        case ["x86_64", "unknown", "linux", "gnu" | "musl", *_]:
+        case [
+            "x86_64" | "x86_64_v2" | "x86_64_v3" | "x86_64_v4",
+            "unknown",
+            "linux",
+            "gnu" | "musl",
+            *_,
+        ]:
             platform = Platform.linux_x86_64
         case ["aarch64", "unknown", "linux", "gnu", *_]:
             platform = Platform.linux_arm64
