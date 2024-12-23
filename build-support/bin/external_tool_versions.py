@@ -63,7 +63,7 @@ def _parse_k8s_xml(text: str) -> Iterator[str]:
             raise RuntimeError("Failed to parse xml, did it change?")
 
         key = key_element.text
-        if regex.match(key):
+        if key and regex.match(key):
             yield f"https://cdn.dl.k8s.io/{key}"
 
 
