@@ -45,7 +45,7 @@ def test_parse_pbs_url() -> None:
             "https://example.com/cpython-3.12.4-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
         )
 
-    with pytest.raises(ValueError, match="Unable to parse the platfornm"):
+    with pytest.raises(ValueError, match="Unable to parse the platform"):
         _parse_pbs_url(
             "https://example.com/cpython-3.12.4%2B20240205-s390-unknown-linux-gnu-install_only_stripped.tar.gz"
         )

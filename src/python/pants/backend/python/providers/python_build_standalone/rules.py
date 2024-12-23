@@ -152,7 +152,7 @@ def _parse_pbs_url(url: str) -> tuple[Version, Version, Platform]:
             platform = Platform.macos_arm64
         case _:
             raise ValueError(
-                "Unable to parse the platfornm from the provided URL "
+                "Unable to parse the platform from the provided URL "
                 f"because it does not follow the PBS naming convention: {url}"
             )
 
