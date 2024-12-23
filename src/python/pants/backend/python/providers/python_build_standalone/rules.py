@@ -170,8 +170,7 @@ def _parse_from_three_fields(parts: Sequence[str], orig_value: str) -> _ParsedPB
     except ValueError as e:
         raise ExternalToolError(
             f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-            f"the value `{orig_value}` could not be parsed because the URL does not follow the "
-            f"PBS naming convention: {e}"
+            f"the value `{orig_value}` could not be parsed: {e}"
         )
 
     return _ParsedPBSPython(
