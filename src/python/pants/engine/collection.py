@@ -42,7 +42,7 @@ class Collection(Tuple[T, ...]):
     def __eq__(self, other: Any) -> bool:
         if self is other:
             return True
-        return type(self) == type(other) and super().__eq__(other)
+        return type(self) is type(other) and super().__eq__(other)
 
     def __ne__(self, other: Any) -> bool:
         # We must explicitly override to provide the inverse of _our_ __eq__ and not get the
