@@ -57,7 +57,7 @@ def test_parse_from_three_fields() -> None:
         return _parse_from_three_fields(parts, orig_value=s)
 
     result1 = invoke(
-        "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-x86_64-unknown-linux-gnu-install_only.tar.gz|f885f3d011ab08e4d9521a7ae2662e9e0073acc0305a1178984b5a1cf057309a|26767987"
+        "f885f3d011ab08e4d9521a7ae2662e9e0073acc0305a1178984b5a1cf057309a|26767987|https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-x86_64-unknown-linux-gnu-install_only.tar.gz"
     )
     assert result1 == _ParsedPBSPython(
         py_version=Version("3.9.16"),
@@ -70,7 +70,7 @@ def test_parse_from_three_fields() -> None:
 
     with pytest.raises(ExternalToolError, match="since it does not have a cpython prefix"):
         invoke(
-            "https://dl.example.com/cpython.tar.gz|f885f3d011ab08e4d9521a7ae2662e9e0073acc0305a1178984b5a1cf057309a|26767987"
+            "f885f3d011ab08e4d9521a7ae2662e9e0073acc0305a1178984b5a1cf057309a|26767987|https://dl.example.com/cpython.tar.gz"
         )
 
 

@@ -163,7 +163,7 @@ def _parse_pbs_url(url: str) -> tuple[Version, Version, Platform]:
 
 def _parse_from_three_fields(parts: Sequence[str], orig_value: str) -> _ParsedPBSPython:
     assert len(parts) == 3
-    url, sha256, size = parts
+    sha256, size, url = parts
 
     try:
         py_version, pbs_release_tag, platform = _parse_pbs_url(url)
@@ -338,7 +338,7 @@ class PBSPythonProviderSubsystem(Subsystem):
             Known versions to verify downloads against.
 
             Each element is a pipe-separated string of either `py_version+pbs_release_tag|platform|sha256|length|url` or
-            `url|sha256|length`, where:
+            `sha256|length|url`, where:
 
             - `py_version` is the Python version string
             - `pbs_release_tag` is the PBS release tag (i.e., the PBS-specific version)
