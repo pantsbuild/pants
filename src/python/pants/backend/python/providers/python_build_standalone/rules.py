@@ -12,7 +12,7 @@ import urllib
 import uuid
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Mapping, Sequence, TypedDict, cast
+from typing import Iterable, Mapping, Sequence, TypedDict, TypeVar, cast
 
 from packaging.version import InvalidVersion
 
@@ -64,6 +64,8 @@ logger = logging.getLogger(__name__)
 PBS_SANDBOX_NAME = ".python_build_standalone"
 PBS_NAMED_CACHE_NAME = "python_build_standalone"
 PBS_APPEND_ONLY_CACHES = FrozenDict({PBS_NAMED_CACHE_NAME: PBS_SANDBOX_NAME})
+
+_T = TypeVar("_T")  # Define type variable "T"
 
 
 class PBSPythonInfo(TypedDict):
@@ -243,59 +245,47 @@ def _parse_from_five_fields(parts: Sequence[str], orig_value: str) -> _ParsedPBS
     except ValueError:
         pass
 
-    if maybe_py_version is None:
-        if maybe_inferred_py_version is None:
-            raise ExternalToolError(
-                f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-                f"the value `{orig_value}` does not declare a version in the first field, and no version "
-                "could be inferred from the URL."
-            )
+    def _validate_inferred(
+        *, explicit: _T | None, inferred: _T | None, description: str, field_pos: str
+    ) -> _T:
+        if explicit is None:
+            if inferred is None:
+                raise ExternalToolError(
+                    f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                    f"the value `{orig_value}` does not declare a {description} in the {field_pos} field, and no {description} "
+                    "could be inferred from the URL."
+                )
+            else:
+                return inferred
+        else:
+            if inferred is not None and explicit != inferred:
+                logger.warning(
+                    f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
+                    f"the value `{orig_value}` declares {description} `{explicit}` in the {field_pos} field, but Pants inferred "
+                    f"{description} `{inferred}` from the URL."
+                )
+            return explicit
 
-        maybe_py_version = maybe_inferred_py_version
-    else:
-        if maybe_inferred_py_version is not None and maybe_py_version != maybe_inferred_py_version:
-            logger.warning(
-                f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-                f"the value `{orig_value}` declares version `{maybe_py_version}` in the first field, but Pants inferred "
-                f"version `{maybe_inferred_py_version}` from the URL."
-            )
+    maybe_py_version = _validate_inferred(
+        explicit=maybe_py_version,
+        inferred=maybe_inferred_py_version,
+        description="version",
+        field_pos="first",
+    )
 
-    if maybe_pbs_release_tag is None:
-        if maybe_inferred_pbs_release_tag is None:
-            raise ExternalToolError(
-                f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-                f"the value `{orig_value}` does not declare a PBS release tag in the first field, and no PBS "
-                "release tag could be inferred from the URL."
-            )
+    maybe_pbs_release_tag = _validate_inferred(
+        explicit=maybe_pbs_release_tag,
+        inferred=maybe_inferred_pbs_release_tag,
+        description="PBS release tag",
+        field_pos="first",
+    )
 
-        maybe_pbs_release_tag = maybe_inferred_pbs_release_tag
-    else:
-        if (
-            maybe_inferred_pbs_release_tag is not None
-            and maybe_pbs_release_tag != maybe_inferred_pbs_release_tag
-        ):
-            logger.warning(
-                f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-                f"the value `{orig_value}` declares PBS release tag `{maybe_pbs_release_tag}` in the first field, but Pants inferred "
-                f"PBS release tag `{maybe_inferred_pbs_release_tag}` from the URL."
-            )
-
-    if maybe_platform is None:
-        if maybe_inferred_platform is None:
-            raise ExternalToolError(
-                f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-                f"the value `{orig_value}` does not declare a platform in the second field, and no platform "
-                "could be inferred from the URL."
-            )
-
-        maybe_platform = maybe_inferred_platform
-    else:
-        if maybe_inferred_platform is not None and maybe_platform != maybe_inferred_platform:
-            logger.warning(
-                f"While parsing the `[{PBSPythonProviderSubsystem.options_scope}].known_python_versions` option, "
-                f"the value `{orig_value}` declares platform `{maybe_platform}` in the second field, but Pants inferred "
-                f"platform `{maybe_inferred_platform}` from the URL."
-            )
+    maybe_platform = _validate_inferred(
+        explicit=maybe_platform,
+        inferred=maybe_inferred_platform,
+        description="platform",
+        field_pos="second",
+    )
 
     return _ParsedPBSPython(
         py_version=maybe_py_version,
