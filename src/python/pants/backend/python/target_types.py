@@ -164,6 +164,10 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         return resolve
 
 
+class PrefixedPythonResolveField(PythonResolveField):
+    alias = "python_resolve"
+
+
 class PythonRunGoalUseSandboxField(TriBoolField):
     alias = "run_goal_use_sandbox"
     help = help_text(
@@ -1339,7 +1343,7 @@ class PythonRequirementTypeStubModulesField(StringSequenceField):
 
 
 def normalize_module_mapping(
-    mapping: Mapping[str, Iterable[str]] | None
+    mapping: Mapping[str, Iterable[str]] | None,
 ) -> FrozenDict[str, tuple[str, ...]]:
     return FrozenDict({canonicalize_project_name(k): tuple(v) for k, v in (mapping or {}).items()})
 

@@ -19,9 +19,7 @@ extend-ignore:
   # Implicitly concatenated bytes literals over multiple lines
   NIC102,
   # Unnecessary dict call - rewrite as a literal
-  C408,
-  # Temporarily exclude during Python upgrade
-  E721
+  C408
 
 [flake8:local-plugins]
 extension =

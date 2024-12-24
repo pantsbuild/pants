@@ -83,7 +83,7 @@ def main() -> None:
     scraped_releases = set(versions_info["scraped_releases"])
 
     github = _github()
-    pbs_repo = github.get_repo("indygreg/python-build-standalone")
+    pbs_repo = github.get_repo("astral-sh/python-build-standalone")
     print("Downloading PBS release metadata.")
     releases = pbs_repo.get_releases()
     print("Downloaded PBS release metadata.")
