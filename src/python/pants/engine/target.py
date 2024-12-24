@@ -1850,7 +1850,7 @@ class ValidNumbers(Enum):
         if num is None or self == self.all:  # type: ignore[comparison-overlap]
             return
         if self == self.positive_and_zero:  # type: ignore[comparison-overlap]
-            if num < 0:  # type: ignore[unreachable]
+            if num < 0:
                 raise InvalidFieldException(
                     f"The {repr(alias)} field in target {address} must be greater than or equal to "
                     f"zero, but was set to `{num}`."
