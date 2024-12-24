@@ -4,7 +4,6 @@
 import pytest
 
 from pants.engine.unions import UnionMembership
-from pants.option.config import Config
 from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, StrListOption
 from pants.option.option_value_container import OptionValueContainer
@@ -67,11 +66,10 @@ def test_register_options_blessed(caplog) -> None:
         options_scope = "good-to-go"
 
     options = Options.create(
-        env={},
-        config=Config.load([]),
-        known_scope_infos=[GoodToGo.get_scope_info()],
         args=["./pants"],
-        bootstrap_option_values=None,
+        env={},
+        config_sources=[],
+        known_scope_infos=[GoodToGo.get_scope_info()],
     )
     GoodToGo.register_options_on_scope(options, UnionMembership({}))
 
@@ -89,11 +87,10 @@ def test_register_plugin_options() -> None:
         contents = StrListOption(help="brrrrr")
 
     options = Options.create(
-        env={},
-        config=Config.load([]),
-        known_scope_infos=[Electrical.get_scope_info()],
         args=["./pants"],
-        bootstrap_option_values=None,
+        env={},
+        config_sources=[],
+        known_scope_infos=[Electrical.get_scope_info()],
     )
     Electrical.register_options_on_scope(
         options,

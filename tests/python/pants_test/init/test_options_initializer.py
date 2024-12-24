@@ -13,8 +13,8 @@ from pants.testutil import rule_runner
 class OptionsInitializerTest(unittest.TestCase):
     def test_invalid_version(self) -> None:
         options_bootstrapper = OptionsBootstrapper.create(
-            env={},
             args=["--backend-packages=[]", "--pants-version=99.99.9999"],
+            env={},
             allow_pantsrc=False,
         )
 
@@ -26,8 +26,8 @@ class OptionsInitializerTest(unittest.TestCase):
     def test_global_options_validation(self) -> None:
         # Specify an invalid combination of options.
         ob = OptionsBootstrapper.create(
-            env={},
             args=["--backend-packages=[]", "--no-watch-filesystem", "--loop"],
+            env={},
             allow_pantsrc=False,
         )
         env = CompleteEnvironmentVars({})
