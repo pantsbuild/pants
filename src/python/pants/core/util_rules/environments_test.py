@@ -335,7 +335,7 @@ def test_resolve_environment_names(rule_runner: RuleRunner) -> None:
 
 
 def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> None:
-    # We can't monkeypatch the Platform with RuleRunner, so instead use run_run_with_mocks.
+    # We can't monkeypatch the Platform with RuleRunner, so instead use run_rule_with_mocks.
     def get_env_name(
         env_tgt: Target, platform: Platform, *, docker_execution: bool = True
     ) -> str | None:
