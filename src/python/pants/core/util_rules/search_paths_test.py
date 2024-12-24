@@ -92,9 +92,9 @@ def rule_runner() -> RuleRunner:
     ),
 )
 def test_validated_search_paths(
-    env_tgt_type: type[LocalEnvironmentTarget]
-    | type[DockerEnvironmentTarget]
-    | type[RemoteEnvironmentTarget],
+    env_tgt_type: (
+        type[LocalEnvironmentTarget] | type[DockerEnvironmentTarget] | type[RemoteEnvironmentTarget]
+    ),
     search_paths: tuple[str],
     is_default: bool,
     expected: tuple[str] | type[ValueError],

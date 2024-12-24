@@ -44,11 +44,11 @@ def test_find_unique_interpreter_constraints() -> None:
         return await _find_all_unique_interpreter_constraints(
             python_setup,
             AnotherMockFieldSet,
-            extra_constraints_per_tgt=[
-                InterpreterConstraintsField([extra_fields_ic], Address("foo"))
-            ]
-            if request.include_extra_fields
-            else [],
+            extra_constraints_per_tgt=(
+                [InterpreterConstraintsField([extra_fields_ic], Address("foo"))]
+                if request.include_extra_fields
+                else []
+            ),
         )
 
     rule_runner = RuleRunner(
