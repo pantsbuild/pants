@@ -24,7 +24,6 @@ from pants.engine.internals.native_engine import MergeDigests as MergeDigests
 from pants.engine.internals.native_engine import PathMetadata, PathNamespace
 from pants.engine.internals.native_engine import RemovePrefix as RemovePrefix
 from pants.engine.internals.native_engine import Snapshot as Snapshot
-from pants.engine.rules import QueryRule
 from pants.util.frozendict import FrozenDict
 
 if TYPE_CHECKING:
@@ -365,6 +364,9 @@ class PathMetadataResult:
 
 
 def rules():
+    # Avoids an import cycle.
+    from pants.engine.rules import QueryRule
+
     return (
         QueryRule(Digest, (CreateDigest,)),
         QueryRule(Digest, (PathGlobs,)),

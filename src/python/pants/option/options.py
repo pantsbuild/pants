@@ -11,8 +11,8 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
+from pants.engine.fs import FileContent
 from pants.option.arg_splitter import ArgSplitter
-from pants.option.config import ConfigSource
 from pants.option.errors import (
     ConfigValidationError,
     MutuallyExclusiveOptionError,
@@ -119,7 +119,7 @@ class Options:
         *,
         args: Sequence[str],
         env: Mapping[str, str],
-        config_sources: Sequence[ConfigSource] | None,
+        config_sources: Sequence[FileContent] | None,
         known_scope_infos: Sequence[ScopeInfo],
         extra_specs: Sequence[str] = tuple(),
         allow_unknown_options: bool = False,

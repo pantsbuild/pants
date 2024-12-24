@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence, Tuple
 
 from pants.base.build_environment import get_buildroot
+from pants.engine.fs import FileContent
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PyConfigSource
-from pants.option.config import ConfigSource
 from pants.option.custom_types import _flatten_shlexed_list, dir_option, file_option, shell_str
 from pants.option.errors import BooleanOptionNameWithNo, OptionsError, ParseError
 from pants.option.option_types import OptionInfo
@@ -60,7 +60,7 @@ class NativeOptionParser:
         self,
         args: Optional[Sequence[str]],
         env: Mapping[str, str],
-        config_sources: Optional[Sequence[ConfigSource]],
+        config_sources: Optional[Sequence[FileContent]],
         allow_pantsrc: bool,
         include_derivation: bool,
         known_scopes_to_flags: dict[str, frozenset[str]],

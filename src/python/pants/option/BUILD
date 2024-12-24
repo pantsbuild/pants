@@ -7,7 +7,6 @@ python_tests(
     name="tests",
     overrides={
         (
-            "config_test.py",
             "options_test.py",
             "options_bootstrapper_test.py",
             "subsystem_test.py",
