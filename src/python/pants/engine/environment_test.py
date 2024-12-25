@@ -46,6 +46,8 @@ def test_envvar_fnmatch() -> None:
         {
             "LETTER_C": "prefix_char_match",
             "LETTER_PI": "prefix",
+            "LETTER_P*": "exact_match_with_glob",
+            "letter_lower": "case-sensitive",
         }
     )
 
@@ -53,4 +55,14 @@ def test_envvar_fnmatch() -> None:
     assert char_match == {"LETTER_C": "prefix_char_match"}
 
     multichar_match = pants_env.get_subset(["LETTER_*"])
-    assert multichar_match == {"LETTER_C": "prefix_char_match", "LETTER_PI": "prefix"}
+    assert multichar_match == {
+        "LETTER_C": "prefix_char_match",
+        "LETTER_PI": "prefix",
+        "LETTER_P*": "exact_match_with_glob",
+    }
+
+    exact_match_with_glob = pants_env.get_subset(["LETTER_P*"])
+    assert exact_match_with_glob == {"LETTER_P*": "exact_match_with_glob"}
+
+    case_sensitive = pants_env.get_subset(["LETTER_LOWER"])
+    assert case_sensitive == {}
