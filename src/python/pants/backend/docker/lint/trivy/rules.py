@@ -1,8 +1,9 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
+from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.target_types import DockerImageSourceField, DockerImageTarget
 from pants.backend.tools.trivy.rules import RunTrivyRequest, run_trivy
 from pants.backend.tools.trivy.subsystem import SkipTrivyField, Trivy
@@ -12,7 +13,7 @@ from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.addresses import Addresses
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -52,11 +53,9 @@ def command_args():
 
 @rule(desc="Lint Docker image with Trivy", level=LogLevel.DEBUG)
 async def run_trivy_docker(
-    request: TrivyDockerRequest.Batch[TrivyDockerRequest, Any],
+    request: TrivyDockerRequest.Batch[TrivyDockerFieldSet, Any],
 ) -> LintResult:
-    assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
     addrs = tuple(e.address for e in request.elements)
-
     tgts = await Get(Targets, Addresses(addrs))
 
     field_sets_per_tgt = await Get(
@@ -65,15 +64,17 @@ async def run_trivy_docker(
     [field_set] = field_sets_per_tgt.field_sets
 
     package = await Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+    built_image: BuiltDockerImage = cast(BuiltDockerImage, package.artifacts[0])
     r = await run_trivy(
         RunTrivyRequest(
             command="image",
             command_args=command_args(),
             scanners=(),
-            target=package.artifacts[0].image_id,
+            target=built_image.image_id,
             input_digest=EMPTY_DIGEST,
-            description=f"Run Trivy on docker image {','.join(package.artifacts[0].tags)}",
-        )
+            description=f"Run Trivy on docker image {','.join(built_image.tags)}",
+        ),
+        **implicitly(),
     )
 
     return LintResult.create(request, r)

@@ -15,7 +15,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.intrinsics import execute_process, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.global_options import KeepSandboxes
 from pants.util.logging import LogLevel
@@ -87,7 +87,8 @@ async def run_trivy(
             env=env,
             description=request.description,
             level=LogLevel.DEBUG,
-        )
+        ),
+        **implicitly(),
     )
     return result
 
