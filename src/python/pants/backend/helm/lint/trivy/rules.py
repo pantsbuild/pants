@@ -24,7 +24,7 @@ from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
 
@@ -61,7 +61,8 @@ async def run_trivy_on_helm(
             target=".",  # the charts are rendered to the local directory
             input_digest=request.rendered_files.snapshot.digest,
             description=f"Run Trivy on Helm files for {request.field_set.address}",
-        )
+        ),
+        **implicitly(),
     )
 
     return r
@@ -114,12 +115,14 @@ class TrivyLintHelmChartRequest(TrivyLintHelmRequest):
 
 @rule(desc="Lint Helm chart with Trivy", level=LogLevel.DEBUG)
 async def run_trivy_on_helm_chart(
-    request: TrivyLintHelmChartRequest.Batch[TrivyLintHelmChartRequest, Any],
+    request: TrivyLintHelmChartRequest.Batch[TrivyLintHelmChartFieldSet, Any],
 ) -> LintResult:
     assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
     [field_set] = request.elements
 
-    rendered_files = await Get(RenderedHelmFiles, RenderHelmChartRequest(field_set))
+    rendered_files: RenderedHelmFiles = await Get(
+        RenderedHelmFiles, RenderHelmChartRequest(field_set)
+    )
     r = await run_trivy_on_helm(RunTrivyOnHelmRequest(field_set, rendered_files))
 
     return LintResult.create(request, r)

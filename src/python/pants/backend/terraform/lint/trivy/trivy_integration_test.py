@@ -20,7 +20,7 @@ from pants.backend.tools.trivy.rules import rules as trivy_rules
 from pants.backend.tools.trivy.testutil import assert_trivy_output, trivy_config
 from pants.core.goals.lint import LintResult
 from pants.core.util_rules import source_files
-from pants.core.util_rules.partitions import PartitionMetadata
+from pants.core.util_rules.partitions import _EmptyMetadata
 from pants.engine.internals.native_engine import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -83,7 +83,9 @@ def test_lint_deployment(rule_runner) -> None:
         LintResult,
         [
             TrivyLintTerraformDeploymentRequest.Batch(
-                "trivy", (TerraformDeploymentFieldSet.create(tgt),), PartitionMetadata
+                "trivy",
+                (TerraformDeploymentFieldSet.create(tgt),),
+                partition_metadata=_EmptyMetadata(),
             )
         ],
     )
@@ -100,7 +102,7 @@ def test_lint_module(rule_runner) -> None:
         LintResult,
         [
             TrivyLintTerraformModuleRequest.Batch(
-                "trivy", (TerraformFieldSet.create(tgt),), PartitionMetadata
+                "trivy", (TerraformFieldSet.create(tgt),), partition_metadata=_EmptyMetadata()
             )
         ],
     )

@@ -23,7 +23,7 @@ from pants.core.util_rules.source_files import SourceFilesRequest, determine_sou
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.intrinsics import merge_digests
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, SourcesField, Target
 from pants.util.logging import LogLevel
 
@@ -47,7 +47,8 @@ class RunTrivyOnTerraformRequest:
 @rule
 async def run_trivy_on_terraform(req: RunTrivyOnTerraformRequest) -> FallibleProcessResult:
     fs = req.field_set
-    tf = await terraform_init(terraform_fieldset_to_init_request(fs))
+    # Each subclass of TrivyTerraformFieldSet is a subclass of either TerraformDeploymentFieldSet or TerraformFieldSet
+    tf = await terraform_init(terraform_fieldset_to_init_request(fs))  # type: ignore
     command_args = []
 
     if isinstance(fs, TerraformDeploymentFieldSet):
@@ -76,7 +77,8 @@ async def run_trivy_on_terraform(req: RunTrivyOnTerraformRequest) -> FalliblePro
             target=tf.chdir,
             input_digest=input_digest,
             description=f"Run Trivy on terraform deployment {fs.address}",
-        )
+        ),
+        **implicitly(),
     )
 
 
@@ -93,7 +95,7 @@ class TrivyLintTerraformDeploymentRequest(TrivyLintTerraformRequest):
 
 @rule(desc="Lint Terraform deployment with Trivy", level=LogLevel.DEBUG)
 async def run_trivy_on_terraform_deployment(
-    request: TrivyLintTerraformDeploymentRequest.Batch[TrivyLintTerraformDeploymentRequest, Any]
+    request: TrivyLintTerraformDeploymentRequest.Batch[TrivyLintTerraformDeploymentFieldSet, Any]
 ) -> LintResult:
     assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
     [fs] = request.elements
@@ -114,7 +116,7 @@ class TrivyLintTerraformModuleRequest(TrivyLintTerraformRequest):
 
 @rule(desc="Lint Terraform module with Trivy", level=LogLevel.DEBUG)
 async def run_trivy_on_terraform_module(
-    request: TrivyLintTerraformModuleRequest.Batch[TrivyLintTerraformModuleRequest, Any]
+    request: TrivyLintTerraformModuleRequest.Batch[TrivyLintTerraformModuleFieldSet, Any]
 ) -> LintResult:
     assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
     [fs] = request.elements
