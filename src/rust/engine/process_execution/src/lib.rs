@@ -1051,9 +1051,8 @@ fn make_wrapper_for_append_only_caches(
         }
         writeln!(
             &mut script,
-            "/bin/ln -s '{}/{}' '{}'",
-            base_path,
-            cache_name.name(),
+            "/bin/ln -s {} {}",
+            &cache_path,
             quote_path(path.as_path())?
         )
         .map_err(|err| format!("write! failed: {err}"))?;
