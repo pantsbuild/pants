@@ -1045,7 +1045,7 @@ fn make_wrapper_for_append_only_caches(
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
                 let parent_quoted = quote_path(parent)?;
-                writeln!(&mut script, "/bin/mkdir -p '{}'", &parent_quoted)
+                writeln!(&mut script, "/bin/mkdir -p {}", &parent_quoted)
                     .map_err(|err| format!("write! failed: {err}"))?;
             }
         }
@@ -1064,16 +1064,18 @@ fn make_wrapper_for_append_only_caches(
     // field on the `ExecuteRequest` so that this wrapper script can operate in the input root
     // first.
     if let Some(path) = working_directory {
+        let quoted_path =
+            shlex::try_quote(path).map_err(|e| format!("Failed to convert path: {e}"))?;
         writeln!(
             &mut script,
             concat!(
-                "cd '{0}'\n",
+                "cd {0}\n",
                 "if [ \"$?\" != 0 ]; then\n",
-                "  echo \"pants-wrapper: Failed to change working directory to: {0}\" 1>&2\n",
+                "  echo \"pants-wrapper: Failed to change working directory to: \" {0} 1>&2\n",
                 "  exit 1\n",
                 "fi\n",
             ),
-            path
+            quoted_path
         )
         .map_err(|err| format!("write! failed: {err}"))?;
     }
