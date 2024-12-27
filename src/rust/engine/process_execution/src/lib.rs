@@ -1021,6 +1021,15 @@ fn make_wrapper_for_append_only_caches(
     let mut script = String::new();
     writeln!(&mut script, "#!/bin/sh").map_err(|err| format!("write! failed: {err:?}"))?;
 
+    fn quote_path(path: &Path) -> Result<String, String> {
+        let as_str = path
+            .to_str()
+            .ok_or_else(|| "Failed to convert path".to_string())?;
+        let quoted =
+            shlex::try_quote(as_str).map_err(|e| format!("Failed to convert path: {e}"))?;
+        Ok(quoted.to_string())
+    }
+
     // Setup the append-only caches.
     for (cache_name, path) in caches {
         let cache_path = {
@@ -1028,19 +1037,15 @@ fn make_wrapper_for_append_only_caches(
             p.push(base_path);
             p.push(cache_name.name());
 
-            shlex::try_quote(
-                p.to_str()
-                    .ok_or_else(|| "Failed to convert path".to_string())?,
-            )
-            .map_err(|e| format!("Failed to convert path: {e}"))?
-            .to_string()
+            quote_path(&p)?
         };
         writeln!(&mut script, "/bin/mkdir -p {cache_path}",)
             .map_err(|err| format!("write! failed: {err:?}"))?;
 
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
-                writeln!(&mut script, "/bin/mkdir -p '{}'", parent.to_string_lossy())
+                let parent_quoted = quote_path(&parent)?;
+                writeln!(&mut script, "/bin/mkdir -p '{}'", &parent_quoted)
                     .map_err(|err| format!("write! failed: {err}"))?;
             }
         }
@@ -1049,7 +1054,7 @@ fn make_wrapper_for_append_only_caches(
             "/bin/ln -s '{}/{}' '{}'",
             base_path,
             cache_name.name(),
-            path.as_path().to_string_lossy()
+            quote_path(path.as_path())?
         )
         .map_err(|err| format!("write! failed: {err}"))?;
     }
