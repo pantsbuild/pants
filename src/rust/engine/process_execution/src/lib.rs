@@ -1044,7 +1044,7 @@ fn make_wrapper_for_append_only_caches(
 
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
-                let parent_quoted = quote_path(&parent)?;
+                let parent_quoted = quote_path(parent)?;
                 writeln!(&mut script, "/bin/mkdir -p '{}'", &parent_quoted)
                     .map_err(|err| format!("write! failed: {err}"))?;
             }
