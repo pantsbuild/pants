@@ -161,22 +161,25 @@ fn process_result_metadata_time_saved_from_cache() {
 
 #[tokio::test]
 async fn test_make_wrapper_for_append_only_caches_success() {
+    const CACHE_NAME: &str = "test_cache";
+    const SUBDIR_NAME: &str = "a subdir"; // Space intentionally included to test shell quoting.
+
     let mut caches = BTreeMap::new();
     caches.insert(
-        CacheName::new("test_cache".into()).unwrap(),
+        CacheName::new(CACHE_NAME.into()).unwrap(),
         RelativePath::new("foo").unwrap(),
     );
 
     let dummy_caches_base_path = TempDir::new().unwrap();
     let dummy_sandbox_path = TempDir::new().unwrap();
-    tokio::fs::create_dir_all(dummy_sandbox_path.path().join("a-subdir"))
+    tokio::fs::create_dir_all(dummy_sandbox_path.path().join(SUBDIR_NAME))
         .await
         .unwrap();
 
     let script_content = make_wrapper_for_append_only_caches(
         &caches,
         dummy_caches_base_path.path().to_str().unwrap(),
-        Some("a-subdir"),
+        Some(SUBDIR_NAME),
     )
     .unwrap();
 
@@ -204,11 +207,11 @@ async fn test_make_wrapper_for_append_only_caches_success() {
         panic!("Wrapper script failed to run: {}", output.status);
     }
 
-    let cache_dir_path = dummy_caches_base_path.path().join("test_cache");
+    let cache_dir_path = dummy_caches_base_path.path().join(CACHE_NAME);
     let cache_dir_metadata = tokio::fs::metadata(&cache_dir_path).await.unwrap();
     assert!(
         cache_dir_metadata.is_dir(),
-        "test_cache directory exists in caches base path"
+        "`test_cache` directory exists in caches base path"
     );
 
     let cache_symlink_path = dummy_sandbox_path.path().join("foo");
@@ -223,7 +226,7 @@ async fn test_make_wrapper_for_append_only_caches_success() {
     assert_eq!(&link_target, &cache_dir_path);
 
     let test_file_metadata =
-        tokio::fs::metadata(dummy_sandbox_path.path().join("a-subdir/file.txt"))
+        tokio::fs::metadata(dummy_sandbox_path.path().join(SUBDIR_NAME).join("file.txt"))
             .await
             .unwrap();
     assert!(
