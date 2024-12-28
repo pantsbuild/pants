@@ -22,7 +22,6 @@ from packaging.version import Version
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import CodeRemovedError, warn_or_error
 from pants.engine.fs import FileContent
-from pants.option.config import ConfigSource
 from pants.option.custom_types import UnsetBool, file_option, shell_str, target_option
 from pants.option.errors import (
     BooleanConversionError,
@@ -451,7 +450,7 @@ def test_scope_deprecation(caplog) -> None:
 def _create_config(
     config: dict[str, dict[str, str]] | None = None,
     config2: dict[str, dict[str, str]] | None = None,
-) -> List[ConfigSource]:
+) -> List[FileContent]:
     return [
         FileContent("test_config.toml", toml.dumps(config or {}).encode()),
         FileContent("test_config2.toml", toml.dumps(config2 or {}).encode()),
