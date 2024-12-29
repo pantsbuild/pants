@@ -1013,61 +1013,66 @@ pub struct EntireExecuteRequest {
     pub input_root_digest: DirectoryDigest,
 }
 
-fn make_wrapper_for_append_only_caches(
+fn quote_path(path: &Path) -> Result<String, String> {
+    let as_str = path
+        .to_str()
+        .ok_or_else(|| "Failed to convert path".to_string())?;
+    let quoted = shlex::try_quote(as_str).map_err(|e| format!("Failed to convert path: {e}"))?;
+    Ok(quoted.to_string())
+}
+
+/// Check supplied parameters from an execution request and create a wrapper script if a wrapper script
+/// is needed.
+// TODO: Support `{chroot}` replacement in environment variables and not just program arguments.
+fn maybe_make_wrapper_script(
     caches: &BTreeMap<CacheName, RelativePath>,
-    base_path: &str,
+    append_only_caches_base_path: Option<&str>,
     working_directory: Option<&str>,
-) -> Result<String, String> {
-    let mut script = String::new();
-    writeln!(&mut script, "#!/bin/sh").map_err(|err| format!("write! failed: {err:?}"))?;
+    sandbox_root_token: Option<&str>,
+) -> Result<Option<String>, String> {
+    let caches_fragment = match append_only_caches_base_path {
+        Some(base_path) if !caches.is_empty() => {
+            let mut fragment = String::new();
+            for (cache_name, path) in caches {
+                let cache_path = {
+                    let mut p = PathBuf::new();
+                    p.push(base_path);
+                    p.push(cache_name.name());
 
-    fn quote_path(path: &Path) -> Result<String, String> {
-        let as_str = path
-            .to_str()
-            .ok_or_else(|| "Failed to convert path".to_string())?;
-        let quoted =
-            shlex::try_quote(as_str).map_err(|e| format!("Failed to convert path: {e}"))?;
-        Ok(quoted.to_string())
-    }
+                    quote_path(&p)?
+                };
+                writeln!(&mut fragment, "/bin/mkdir -p {cache_path}",)
+                    .map_err(|err| format!("write! failed: {err:?}"))?;
 
-    // Setup the append-only caches.
-    for (cache_name, path) in caches {
-        let cache_path = {
-            let mut p = PathBuf::new();
-            p.push(base_path);
-            p.push(cache_name.name());
-
-            quote_path(&p)?
-        };
-        writeln!(&mut script, "/bin/mkdir -p {cache_path}",)
-            .map_err(|err| format!("write! failed: {err:?}"))?;
-
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                let parent_quoted = quote_path(parent)?;
-                writeln!(&mut script, "/bin/mkdir -p {}", &parent_quoted)
-                    .map_err(|err| format!("write! failed: {err}"))?;
+                if let Some(parent) = path.parent() {
+                    if !parent.as_os_str().is_empty() {
+                        let parent_quoted = quote_path(parent)?;
+                        writeln!(&mut fragment, "/bin/mkdir -p {}", &parent_quoted)
+                            .map_err(|err| format!("write! failed: {err}"))?;
+                    }
+                }
+                writeln!(
+                    &mut fragment,
+                    "/bin/ln -s {} {}",
+                    &cache_path,
+                    quote_path(path.as_path())?
+                )
+                .map_err(|err| format!("write! failed: {err}"))?;
             }
+            Some(fragment)
         }
-        writeln!(
-            &mut script,
-            "/bin/ln -s {} {}",
-            &cache_path,
-            quote_path(path.as_path())?
-        )
-        .map_err(|err| format!("write! failed: {err}"))?;
-    }
+        _ => None,
+    };
 
     // Change into any working directory.
     //
     // Note: When this wrapper script is in effect, Pants will not set the `working_directory`
     // field on the `ExecuteRequest` so that this wrapper script can operate in the input root
     // first.
-    if let Some(path) = working_directory {
+    let chdir_fragment = if let Some(path) = working_directory {
         let quoted_path =
             shlex::try_quote(path).map_err(|e| format!("Failed to convert path: {e}"))?;
-        writeln!(
-            &mut script,
+        Some(format!(
             concat!(
                 "cd {0}\n",
                 "if [ \"$?\" != 0 ]; then\n",
@@ -1076,13 +1081,50 @@ fn make_wrapper_for_append_only_caches(
                 "fi\n",
             ),
             quoted_path
-        )
-        .map_err(|err| format!("write! failed: {err}"))?;
+        ))
+    } else {
+        None
+    };
+
+    // Generate code to replace `{chroot}` markers if any are present in the command.
+    let sandbox_root_fragment = if let Some(token) = sandbox_root_token {
+        let fragment = format!(
+            concat!(
+                "sandbox_root=\"$(/bin/pwd)\"\n",
+                "args=(\"${{@//{0}/$sandbox_root}}\")\n",
+                "set -- \"${{args[@]}}\"\n",
+            ),
+            token
+        );
+        Some(fragment)
+    } else {
+        None
+    };
+
+    if caches_fragment.is_none() && sandbox_root_fragment.is_none() {
+        return Ok(None);
     }
 
-    // Finally, execute the process.
-    writeln!(&mut script, "exec \"$@\"").map_err(|err| format!("write! failed: {err:?}"))?;
-    Ok(script)
+    let script = {
+        let mut script = String::new();
+        writeln!(&mut script, "#!/bin/sh").map_err(|err| format!("write! failed: {err:?}"))?;
+        if let Some(sandbox_root_fragment) = sandbox_root_fragment {
+            writeln!(&mut script, "{sandbox_root_fragment}")
+                .map_err(|err| format!("write! failed: {err:?}"))?;
+        }
+        if let Some(caches_fragment) = caches_fragment {
+            writeln!(&mut script, "{caches_fragment}")
+                .map_err(|err| format!("write! failed: {err:?}"))?;
+        }
+        if let Some(chdir_fragment) = chdir_fragment {
+            writeln!(&mut script, "{chdir_fragment}")
+                .map_err(|err| format!("write! failed: {err:?}"))?;
+        }
+        writeln!(&mut script, "exec \"$@\"").map_err(|err| format!("write! failed: {err:?}"))?;
+        script
+    };
+
+    Ok(Some(script))
 }
 
 pub async fn make_execute_request(
@@ -1093,35 +1135,48 @@ pub async fn make_execute_request(
     append_only_caches_base_path: Option<&str>,
 ) -> Result<EntireExecuteRequest, String> {
     const WRAPPER_SCRIPT: &str = "./__pants_wrapper__";
+    const SANDBOX_ROOT_TOKEN: &str = "__PANTS_SANDBOX_ROOT__";
 
     // Implement append-only caches by running a wrapper script before the actual program
     // to be invoked in the remote environment.
-    let wrapper_script_digest_opt = match (append_only_caches_base_path, &req.append_only_caches) {
-        (Some(base_path), caches) if !caches.is_empty() => {
-            let script = make_wrapper_for_append_only_caches(
-                caches,
-                base_path,
-                req.working_directory.as_ref().and_then(|p| p.to_str()),
-            )?;
-            let digest = store
-                .store_file_bytes(Bytes::from(script), false)
-                .await
-                .map_err(|err| {
-                    format!("Failed to store wrapper script for remote execution: {err}")
-                })?;
-            let path = RelativePath::new(Path::new(WRAPPER_SCRIPT))?;
-            let snapshot = store.snapshot_of_one_file(path, digest, true).await?;
-            let directory_digest = DirectoryDigest::new(snapshot.digest, snapshot.tree);
-            Some(directory_digest)
-        }
-        _ => None,
+    let wrapper_script_content_opt = {
+        let sandbox_root_token = req
+            .argv
+            .iter()
+            .any(|arg| arg.contains("{chroot}"))
+            .then_some(SANDBOX_ROOT_TOKEN);
+        maybe_make_wrapper_script(
+            &req.append_only_caches,
+            append_only_caches_base_path,
+            req.working_directory.as_ref().and_then(|p| p.to_str()),
+            sandbox_root_token,
+        )?
+    };
+    let wrapper_script_digest_opt = if let Some(script) = wrapper_script_content_opt {
+        let digest = store
+            .store_file_bytes(Bytes::from(script), false)
+            .await
+            .map_err(|err| format!("Failed to store wrapper script for remote execution: {err}"))?;
+
+        let path = RelativePath::new(Path::new(WRAPPER_SCRIPT))?;
+        let snapshot = store.snapshot_of_one_file(path, digest, true).await?;
+        let directory_digest = DirectoryDigest::new(snapshot.digest, snapshot.tree);
+        Some(directory_digest)
+    } else {
+        None
     };
 
     let arguments = match &wrapper_script_digest_opt {
         Some(_) => {
             let mut args = Vec::with_capacity(req.argv.len() + 1);
             args.push(WRAPPER_SCRIPT.to_string());
-            args.extend(req.argv.iter().cloned());
+            for orig_arg in &req.argv {
+                if orig_arg.contains("{chroot}") {
+                    args.push(orig_arg.replace("{chroot}", SANDBOX_ROOT_TOKEN));
+                } else {
+                    args.push(orig_arg.clone());
+                }
+            }
             args
         }
         None => req.argv.clone(),
