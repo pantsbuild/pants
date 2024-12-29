@@ -1021,27 +1021,39 @@ fn make_wrapper_for_append_only_caches(
     let mut script = String::new();
     writeln!(&mut script, "#!/bin/sh").map_err(|err| format!("write! failed: {err:?}"))?;
 
+    fn quote_path(path: &Path) -> Result<String, String> {
+        let as_str = path
+            .to_str()
+            .ok_or_else(|| "Failed to convert path".to_string())?;
+        let quoted =
+            shlex::try_quote(as_str).map_err(|e| format!("Failed to convert path: {e}"))?;
+        Ok(quoted.to_string())
+    }
+
     // Setup the append-only caches.
     for (cache_name, path) in caches {
-        writeln!(
-            &mut script,
-            "/bin/mkdir -p '{}/{}'",
-            base_path,
-            cache_name.name()
-        )
-        .map_err(|err| format!("write! failed: {err:?}"))?;
+        let cache_path = {
+            let mut p = PathBuf::new();
+            p.push(base_path);
+            p.push(cache_name.name());
+
+            quote_path(&p)?
+        };
+        writeln!(&mut script, "/bin/mkdir -p {cache_path}",)
+            .map_err(|err| format!("write! failed: {err:?}"))?;
+
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
-                writeln!(&mut script, "/bin/mkdir -p '{}'", parent.to_string_lossy())
+                let parent_quoted = quote_path(parent)?;
+                writeln!(&mut script, "/bin/mkdir -p {}", &parent_quoted)
                     .map_err(|err| format!("write! failed: {err}"))?;
             }
         }
         writeln!(
             &mut script,
-            "/bin/ln -s '{}/{}' '{}'",
-            base_path,
-            cache_name.name(),
-            path.as_path().to_string_lossy()
+            "/bin/ln -s {} {}",
+            &cache_path,
+            quote_path(path.as_path())?
         )
         .map_err(|err| format!("write! failed: {err}"))?;
     }
@@ -1052,16 +1064,18 @@ fn make_wrapper_for_append_only_caches(
     // field on the `ExecuteRequest` so that this wrapper script can operate in the input root
     // first.
     if let Some(path) = working_directory {
+        let quoted_path =
+            shlex::try_quote(path).map_err(|e| format!("Failed to convert path: {e}"))?;
         writeln!(
             &mut script,
             concat!(
-                "cd '{0}'\n",
+                "cd {0}\n",
                 "if [ \"$?\" != 0 ]; then\n",
-                "  echo \"pants-wrapper: Failed to change working directory to: {0}\" 1>&2\n",
+                "  echo \"pants-wrapper: Failed to change working directory to: \" {0} 1>&2\n",
                 "  exit 1\n",
                 "fi\n",
             ),
-            path
+            quoted_path
         )
         .map_err(|err| format!("write! failed: {err}"))?;
     }
