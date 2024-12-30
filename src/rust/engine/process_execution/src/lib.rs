@@ -1107,7 +1107,13 @@ fn maybe_make_wrapper_script(
 
     let script = {
         let mut script = String::new();
-        writeln!(&mut script, "#!/bin/sh").map_err(|err| format!("write! failed: {err:?}"))?;
+
+        let shebang = match sandbox_root_fragment {
+            Some(_) => "/bin/bash", // the array features need bash and not just plain old /bin/sh
+            _ => "/bin/sh",
+        };
+        writeln!(&mut script, "#!{shebang}").map_err(|err| format!("write! failed: {err:?}"))?;
+
         if let Some(sandbox_root_fragment) = sandbox_root_fragment {
             writeln!(&mut script, "{sandbox_root_fragment}")
                 .map_err(|err| format!("write! failed: {err:?}"))?;
@@ -1120,7 +1126,9 @@ fn maybe_make_wrapper_script(
             writeln!(&mut script, "{chdir_fragment}")
                 .map_err(|err| format!("write! failed: {err:?}"))?;
         }
+
         writeln!(&mut script, "exec \"$@\"").map_err(|err| format!("write! failed: {err:?}"))?;
+
         script
     };
 
