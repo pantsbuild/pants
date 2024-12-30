@@ -242,14 +242,9 @@ async fn wrapper_script_supports_append_only_caches() {
 async fn wrapper_script_supports_sandbox_root_replacements_in_args() {
     let caches = BTreeMap::new();
 
-    let script_content = maybe_make_wrapper_script(
-        &caches,
-        None,
-        None,
-        Some("__ROOT__"),
-    )
-    .unwrap()
-    .unwrap();
+    let script_content = maybe_make_wrapper_script(&caches, None, None, Some("__ROOT__"))
+        .unwrap()
+        .unwrap();
 
     let dummy_sandbox_path = TempDir::new().unwrap();
     let script_path = dummy_sandbox_path.path().join("wrapper");
