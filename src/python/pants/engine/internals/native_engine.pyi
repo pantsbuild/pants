@@ -662,8 +662,16 @@ class PyOptionId:
         self, *components: str, scope: str | None = None, switch: str | None = None
     ) -> None: ...
 
+class PySplitArgs:
+    pass
+
+class PyArgSplitter:
+    def __init__(self, build_root: str, known_goals: list[str]) -> None: ...
+
 class PyConfigSource:
     def __init__(self, path: str, content: bytes) -> None: ...
+
+    def split_args(self, args: list[str]) -> PySplitArgs: ...
 
 # See src/rust/engine/src/externs/options.rs for the Rust-side versions of these types.
 T = TypeVar("T")
