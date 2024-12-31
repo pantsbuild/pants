@@ -1178,13 +1178,11 @@ pub async fn make_execute_request(
         Some(_) => {
             let mut args = Vec::with_capacity(req.argv.len() + 1);
             args.push(WRAPPER_SCRIPT.to_string());
-            for orig_arg in &req.argv {
-                if orig_arg.contains("{chroot}") {
-                    args.push(orig_arg.replace("{chroot}", SANDBOX_ROOT_TOKEN));
-                } else {
-                    args.push(orig_arg.clone());
-                }
-            }
+            args.extend(
+                req.argv
+                    .iter()
+                    .map(|orig_arg| orig_arg.replace("{chroot}", SANDBOX_ROOT_TOKEN)),
+            );
             args
         }
         None => req.argv.clone(),
