@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use std::fs::Permissions;
 use std::hash::{Hash, Hasher};
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
 
@@ -17,7 +18,7 @@ use tempfile::TempDir;
 use workunit_store::RunId;
 
 use crate::{
-    make_wrapper_for_append_only_caches, CacheName, Platform, Process, ProcessExecutionEnvironment,
+    maybe_make_wrapper_script, CacheName, Platform, Process, ProcessExecutionEnvironment,
     ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource,
 };
 
@@ -160,7 +161,7 @@ fn process_result_metadata_time_saved_from_cache() {
 }
 
 #[tokio::test]
-async fn test_make_wrapper_for_append_only_caches_success() {
+async fn wrapper_script_supports_append_only_caches() {
     const CACHE_NAME: &str = "test_cache";
     const SUBDIR_NAME: &str = "a subdir"; // Space intentionally included to test shell quoting.
 
@@ -176,11 +177,13 @@ async fn test_make_wrapper_for_append_only_caches_success() {
         .await
         .unwrap();
 
-    let script_content = make_wrapper_for_append_only_caches(
+    let script_content = maybe_make_wrapper_script(
         &caches,
-        dummy_caches_base_path.path().to_str().unwrap(),
+        dummy_caches_base_path.path().to_str(),
         Some(SUBDIR_NAME),
+        None,
     )
+    .unwrap()
     .unwrap();
 
     let script_path = dummy_sandbox_path.path().join("wrapper");
@@ -233,4 +236,48 @@ async fn test_make_wrapper_for_append_only_caches_success() {
         test_file_metadata.is_file(),
         "script wrote a file into a sudirectory (since script changed the working directory)"
     );
+}
+
+#[tokio::test]
+async fn wrapper_script_supports_sandbox_root_replacements_in_args() {
+    let caches = BTreeMap::new();
+
+    let script_content = maybe_make_wrapper_script(&caches, None, None, Some("__ROOT__"))
+        .unwrap()
+        .unwrap();
+
+    let dummy_sandbox_path = TempDir::new().unwrap();
+    let script_path = dummy_sandbox_path.path().join("wrapper");
+    tokio::fs::write(&script_path, script_content.as_bytes())
+        .await
+        .unwrap();
+    tokio::fs::set_permissions(&script_path, Permissions::from_mode(0o755))
+        .await
+        .unwrap();
+
+    let mut cmd = tokio::process::Command::new("./wrapper");
+    cmd.args(&[
+        "/bin/sh",
+        "-c",
+        "echo xyzzy > foo.txt && echo __ROOT__/foo.txt",
+    ]);
+    cmd.current_dir(dummy_sandbox_path.path());
+    cmd.stdin(Stdio::null());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    let child = cmd.spawn().unwrap();
+    let output = child.wait_with_output().await.unwrap();
+    if output.status.code() != Some(0) {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        println!("stdout:{}\n\nstderr: {}", &stdout, &stderr);
+        panic!("Wrapper script failed to run: {}", output.status);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let content = tokio::fs::read_to_string(Path::new(stdout.trim()))
+        .await
+        .unwrap();
+    assert_eq!(content, "xyzzy\n");
 }
