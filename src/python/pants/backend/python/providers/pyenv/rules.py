@@ -16,7 +16,7 @@ from pants.core.util_rules.external_tool import (
     TemplatedExternalTool,
 )
 from pants.core.util_rules.external_tool import rules as external_tools_rules
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -67,11 +67,10 @@ class PyenvPythonProviderSubsystem(TemplatedExternalTool):
     class EnvironmentAware:
         installation_extra_env_vars = StrListOption(
             help=softwrap(
-                """
+                f"""
                 Additional environment variables to include when running `pyenv install`.
 
-                Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-                `ENV_VAR` to copy the value of a variable in Pants's own environment.
+                {EXTRA_ENV_VARS_USAGE_HELP}
 
                 This is especially useful if you want to use an optimized Python (E.g. setting
                 `PYTHON_CONFIGURE_OPTS='--enable-optimizations --with-lto'` and

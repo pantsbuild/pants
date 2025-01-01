@@ -25,6 +25,7 @@ from pants.core.target_types import (
 from pants.core.util_rules import stripped_source_files
 from pants.engine import fs
 from pants.engine.collection import Collection, DeduplicatedCollection
+from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP
 from pants.engine.fs import (
     CreateDigest,
     DigestContents,
@@ -416,11 +417,10 @@ class NodeBuildScriptExtraEnvVarsField(StringSequenceField):
     required = False
     default = ()
     help = help_text(
-        """
+        f"""
         Additional environment variables to include in environment when running a build script process.
 
-        Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-        `ENV_VAR` to copy the value of a variable in Pants's own environment.
+        {EXTRA_ENV_VARS_USAGE_HELP}
         """
     )
 

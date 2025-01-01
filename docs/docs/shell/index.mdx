@@ -302,11 +302,11 @@ To force your tests to run again, rather than reading from the cache, run `pants
 
 Test runs are _hermetic_, meaning that they are stripped of the parent `pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
 
-To add any arbitrary environment variable back to the process, use the option `extra_env_vars` in the `[test]` options scope. You can hardcode a value for the option, or leave off a value to "allowlist" it and read from the parent `pants` process's environment.
+To add any arbitrary environment variable back to the process, use the option `extra_env_vars` in the `[test]` options scope. You can specify a value with the form `"VAR1=hardcoded_value"` or read it from the parent `pants` process's environment with the form `VAR2`. `fnmatch` globs like `"VAR_PREFIXED_*"` can be used to read multiple environment variables.
 
 ```toml title="pants.toml"
 [test]
-extra_env_vars = ["VAR1", "VAR2=hardcoded_value"]
+extra_env_vars = ["VAR1=hardcoded_value", "VAR2", "VAR_PREFIXED_*"]
 ```
 
 Use `[bash-setup].executable_search_paths` to change the `$PATH` env var used during test runs. You can use the special string `"<PATH>"` to read the value from the parent `pants` process's environment.

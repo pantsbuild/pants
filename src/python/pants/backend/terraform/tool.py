@@ -29,7 +29,7 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
@@ -359,8 +359,10 @@ class TerraformTool(TemplatedExternalTool):
 
     extra_env_vars = StrListOption(
         help=softwrap(
-            """
+            f"""
             Additional environment variables that would be made available to all Terraform processes.
+
+            {EXTRA_ENV_VARS_USAGE_HELP}
             """
         ),
         advanced=True,
