@@ -172,7 +172,7 @@ def assert_chroot_error(
         )
     ex = excinfo.value
     assert len(ex.wrapped_exceptions) == 1
-    assert type(ex.wrapped_exceptions[0]) == exc_cls
+    assert type(ex.wrapped_exceptions[0]) is exc_cls
 
 
 def test_use_existing_setup_script(chroot_rule_runner) -> None:
@@ -1167,7 +1167,7 @@ def assert_owner_error(rule_runner, owned: Address, exc_cls: type[Exception]):
         )
     ex = excinfo.value
     assert len(ex.wrapped_exceptions) == 1
-    assert type(ex.wrapped_exceptions[0]) == exc_cls
+    assert type(ex.wrapped_exceptions[0]) is exc_cls
 
 
 def assert_no_owner(rule_runner: PythonRuleRunner, owned: Address):

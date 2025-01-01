@@ -23,8 +23,7 @@ class ConstraintParseError(Exception):
 
 
 class ConstraintSatisfied(Protocol):
-    def is_satisified(self, version: Version) -> bool:
-        ...
+    def is_satisified(self, version: Version) -> bool: ...
 
 
 class Constraint(ConstraintSatisfied):

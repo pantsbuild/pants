@@ -9,6 +9,7 @@ from typing import ClassVar
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.adhoc_process_support import PathEnvModifyMode
 from pants.core.util_rules.environments import EnvironmentField
+from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP
 from pants.engine.fs import GlobExpansionConjunction
 from pants.engine.process import ProcessCacheScope
 from pants.engine.target import (
@@ -191,11 +192,10 @@ class AdhocToolTimeoutField(IntField):
 class AdhocToolExtraEnvVarsField(StringSequenceField):
     alias: ClassVar[str] = "extra_env_vars"
     help = help_text(
-        """
+        f"""
         Additional environment variables to provide to the process.
 
-        Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-        `ENV_VAR` to copy the value of a variable in Pants's own environment.
+        {EXTRA_ENV_VARS_USAGE_HELP}
         """
     )
 

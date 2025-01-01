@@ -56,8 +56,7 @@ logger = logging.getLogger(__name__)
 class Dictable(Protocol):
     """Make possible to avoid adding concrete types to serialize objects."""
 
-    def asdict(self) -> Mapping[str, Any]:
-        ...
+    def asdict(self) -> Mapping[str, Any]: ...
 
 
 class PeekSubsystem(Outputting, GoalSubsystem):

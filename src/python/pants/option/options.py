@@ -11,8 +11,8 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
+from pants.engine.fs import FileContent
 from pants.option.arg_splitter import ArgSplitter
-from pants.option.config import Config
 from pants.option.errors import (
     ConfigValidationError,
     MutuallyExclusiveOptionError,
@@ -116,26 +116,26 @@ class Options:
     @classmethod
     def create(
         cls,
-        env: Mapping[str, str],
-        config: Config,
-        known_scope_infos: Iterable[ScopeInfo],
+        *,
         args: Sequence[str],
-        bootstrap_option_values: OptionValueContainer | None = None,
+        env: Mapping[str, str],
+        config_sources: Sequence[FileContent] | None,
+        known_scope_infos: Sequence[ScopeInfo],
+        extra_specs: Sequence[str] = tuple(),
         allow_unknown_options: bool = False,
-        native_options_config_discovery: bool = True,
+        allow_pantsrc: bool = True,
         include_derivation: bool = False,
     ) -> Options:
         """Create an Options instance.
 
-        :param env: a dict of environment variables.
-        :param config: data from a config file.
-        :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
         :param args: a list of cmd-line args; defaults to `sys.argv` if None is supplied.
-        :param bootstrap_option_values: An optional namespace containing the values of bootstrap
-               options. We can use these values when registering other options.
+        :param env: a dict of environment variables.
+        :param config_sources: sources of config data.
+        :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
+        :param extra_specs: Extra specs to add to those specified in the args (e.g., from --spec-files).
         :param allow_unknown_options: Whether to ignore or error on unknown cmd-line flags.
-        :param native_options_config_discovery: Whether to discover config files in the native
-            parser or use the ones supplied.
+        :param allow_pantsrc: Whether to read config from local .rc files. Typically
+          disabled in tests, for hermeticity.
         :param include_derivation: Whether to gather option value derivation information.
         """
         # We need registrars for all the intermediate scopes, so inherited option values
@@ -150,12 +150,11 @@ class Options:
             scope: registrar.known_scoped_args for scope, registrar in registrar_by_scope.items()
         }
 
-        config_to_pass = None if native_options_config_discovery else config.sources()
         native_parser = NativeOptionParser(
             args[1:],  # The native parser expects args without the sys.argv[0] binary name.
             env,
-            config_sources=config_to_pass,
-            allow_pantsrc=True,
+            config_sources=config_sources,
+            allow_pantsrc=allow_pantsrc,
             include_derivation=include_derivation,
             known_scopes_to_flags=known_scope_to_flags,
         )
@@ -163,6 +162,7 @@ class Options:
         splitter = ArgSplitter(complete_known_scope_infos, get_buildroot())
         # We take the cli alias-expanded args[1:] from the native parser.
         split_args = splitter.split_args([args[0], *native_parser.get_args()])
+        split_args.specs.extend(extra_specs)
 
         if split_args.passthru and len(split_args.goals) > 1:
             raise cls.AmbiguousPassthroughError(
@@ -176,15 +176,6 @@ class Options:
                     """
                 )
             )
-
-        if bootstrap_option_values:
-            spec_files = bootstrap_option_values.spec_files
-            if spec_files:
-                for spec_file in spec_files:
-                    with open(spec_file) as f:
-                        split_args.specs.extend(
-                            [line for line in [line.strip() for line in f] if line]
-                        )
 
         return cls(
             builtin_or_auxiliary_goal=split_args.builtin_or_auxiliary_goal,
@@ -278,7 +269,7 @@ class Options:
     def scope_to_flags(self) -> dict[str, list[str]]:
         return self._scope_to_flags
 
-    def verify_configs(self, global_config: Config) -> None:
+    def verify_configs(self) -> None:
         """Verify all loaded configs have correct scopes and options."""
 
         section_to_valid_options = {}
@@ -300,7 +291,6 @@ class Options:
                     """
                 )
             )
-        global_config.verify(section_to_valid_options)
 
     def get_args(self) -> tuple[str, ...]:
         return self._native_parser.get_args()
@@ -459,14 +449,11 @@ class Options:
                         )
                     )
             setattr(builder, dest, RankedValue(rank, val))
-        native_values = builder.build()
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
-            native_values_builder = native_values.to_builder()
-            self._check_and_apply_deprecations(scope, native_values_builder)
-            native_values = native_values_builder.build()
-        return native_values
+            self._check_and_apply_deprecations(scope, builder)
+        return builder.build()
 
     def get_fingerprintable_for_scope(
         self,
