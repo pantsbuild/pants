@@ -59,7 +59,7 @@ impl Provider {
                 TimeoutLayer::new()
                     .with_timeout(options.timeout)
                     // TimeoutLayer requires specifying a non-zero minimum transfer speed too.
-                    .with_speed(1),
+                    .with_io_timeout(options.timeout),
             )
             // TODO: RetryLayer doesn't seem to retry stores, but we should
             .layer(RetryLayer::new().with_max_times(options.retries + 1))
