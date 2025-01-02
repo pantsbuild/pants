@@ -238,12 +238,19 @@ class NfpmContentFileFieldSet(NfpmContentFieldSet):
     ) -> NfpmContent:
         source: str | None = self.source.file_path
         src: str | None = self.src.file_path
+        src_value: str | None = self.src.value
         dst: str = self.dst.value
         if source is not None and not src:
             # If defined, 'source' provides the default value for 'src'.
             src = source
+            src_value = self.source.value
         if src is None:  # src is NOT required; prepare to raise an error.
             raise self.InvalidTarget()
+        if src not in content_sandbox_files and src_value in content_sandbox_files:
+            # A field's file_path assumes the field's value is relative to the BUILD file.
+            # But, for packages the field's value can be relative to the build_root instead,
+            # because a package's output_path can be any arbitrary build_root relative path.
+            src = src_value
         sandbox_file: FileEntry | None = content_sandbox_files.get(src)
         if sandbox_file is None:
             raise self.SrcMissingFomSandbox()
