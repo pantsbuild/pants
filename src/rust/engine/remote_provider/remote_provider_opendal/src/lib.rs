@@ -58,7 +58,6 @@ impl Provider {
                 // TODO: record Metric::RemoteStoreRequestTimeouts for timeouts
                 TimeoutLayer::new()
                     .with_timeout(options.timeout)
-                    // TimeoutLayer requires specifying a non-zero minimum transfer speed too.
                     .with_io_timeout(options.timeout),
             )
             // TODO: RetryLayer doesn't seem to retry stores, but we should
