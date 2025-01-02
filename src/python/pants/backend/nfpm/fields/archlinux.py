@@ -107,9 +107,9 @@ class NfpmArchlinuxProvidesField(NfpmPackageRelationshipsField):
         Because the "baz" package implicitly provides its own name, this list
         should not include "baz".
 
-        - "foo"
-        - "bar=1.0.0"
-        - "libbaz.so=2"
+          - "foo"
+          - "bar=1.0.0"
+          - "libbaz.so=2"
 
         If several packages declare the same '{NfpmArchlinuxProvidesField.alias}',
         then they might need to declare that they conflict with each other
@@ -140,9 +140,9 @@ class NfpmArchlinuxDependsField(NfpmPackageRelationshipsField):
         The '{NfpmArchlinuxDependsField.alias}' field has install-time dependencies
         that can use version selectors (with one of `<`, `<=`, `=`, `>=`, `>`).
 
-        - "git"
-        - "tcpdump<5"
-        - "foobar>=1.8.0"
+          - "git"
+          - "tcpdump<5"
+          - "foobar>=1.8.0"
 
         WARNING: This is NOT the same as the 'dependencies' field!
         It does not accept pants-style dependencies like target addresses.

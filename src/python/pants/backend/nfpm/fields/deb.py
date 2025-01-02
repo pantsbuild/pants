@@ -200,8 +200,8 @@ class NfpmDebProvidesField(NfpmPackageRelationshipsField):
 
         For example, these declare virtual packages foo and bar.
 
-        - "foo"
-        - "bar (=1.0.0)"
+          - "foo"
+          - "bar (=1.0.0)"
 
         If several packages declare the same '{NfpmDebProvidesField.alias}',
         then they might need to declare that they conflict with each other
@@ -225,9 +225,9 @@ class NfpmDebDependsField(NfpmPackageRelationshipsField):
         in parentheses) or use `|` to specify package alternatives that equally
         satisfy a dependency.
 
-        - "git"
-        - "libc6 (>= 2.2.1)"
-        - "default-mta | mail-transport-agent"
+          - "git"
+          - "libc6 (>= 2.2.1)"
+          - "default-mta | mail-transport-agent"
 
         Make sure to include package dependencies of this package as well as any
         packages required by the `postinstall`, `postupgrade`, or `preremove` scripts.
@@ -314,8 +314,8 @@ class NfpmDebConflictsField(NfpmPackageRelationshipsField):
         foo (version 2.5 or less) and bar packages, so they must be uninstalled
         before this package can be installed.
 
-        - "foo (<2.6)"
-        - "bar"
+          - "foo (<2.6)"
+          - "bar"
 
         See: https://www.debian.org/doc/debian-policy/ch-relationships.html#conflicting-binary-packages-conflicts
         """
@@ -341,8 +341,8 @@ class NfpmDebBreaksField(NfpmPackageRelationshipsField):
         only if foo version 2.5 or less is installed and it breaks package bar
         no matter what version is installed.
 
-        - "foo (<2.6)"
-        - "bar"
+          - "foo (<2.6)"
+          - "bar"
 
         See: https://www.debian.org/doc/debian-policy/ch-relationships.html#packages-which-break-other-packages-breaks
         """

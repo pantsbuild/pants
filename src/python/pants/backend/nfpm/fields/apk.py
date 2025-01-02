@@ -58,9 +58,9 @@ class NfpmApkReplacesField(NfpmPackageRelationshipsField):
 
         This field takes a simple list of package names, like this:
 
-        - "bash"
-        - "git"
-        - "pkgconfig"
+          - "bash"
+          - "git"
+          - "pkgconfig"
 
         See:
         https://wiki.alpinelinux.org/wiki/Apk_spec#PKGINFO_Format
@@ -91,14 +91,14 @@ class NfpmApkProvidesField(NfpmPackageRelationshipsField):
 
         Here are some examples extracted a variety of random packages:
 
-        - "cmd:bash=5.2.15-r0"
-        - "cmd:git=2.38.5-r0"
-        - "cmd:gio=2.74.6-r0"
-        - "so:libgio-2.0.so.0=0.7400.6"
-        - "so:libglib-2.0.so.0=0.7400.6"
-        - "py3.10:pkgconfig=1.5.5-r1"
-        - "pc:libpkgconf=1.9.4"
-        - "pkgconfig=1"
+          - "cmd:bash=5.2.15-r0"
+          - "cmd:git=2.38.5-r0"
+          - "cmd:gio=2.74.6-r0"
+          - "so:libgio-2.0.so.0=0.7400.6"
+          - "so:libglib-2.0.so.0=0.7400.6"
+          - "py3.10:pkgconfig=1.5.5-r1"
+          - "pc:libpkgconf=1.9.4"
+          - "pkgconfig=1"
 
         See:
         https://wiki.alpinelinux.org/wiki/Apk_spec#PKGINFO_Format
@@ -138,19 +138,19 @@ class NfpmApkDependsField(NfpmPackageRelationshipsField):
 
         Example package dependencies (which do not have a prefix):
 
-        - "git"
-        - "git=2.40.1-r0"
+          - "git"
+          - "git=2.40.1-r0"
 
         Example absolute path dependencies (which start with `/`):
 
-        - "/bin/sh"
+          - "/bin/sh"
 
         Example shared object dependencies (which have a `so:` prefix):
 
-        - "so:libc.musl-x86_64.so.1"
-        - "so:libcurl.so.4"
-        - "so:libpcre2-8.so.0"
-        - "so:libz.so.1"
+          - "so:libc.musl-x86_64.so.1"
+          - "so:libcurl.so.4"
+          - "so:libpcre2-8.so.0"
+          - "so:libz.so.1"
 
         WARNING: This is NOT the same as the 'dependencies' field!
         It does not accept pants-style dependencies like target addresses.

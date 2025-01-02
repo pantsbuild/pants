@@ -158,9 +158,9 @@ class NfpmRpmProvidesField(NfpmPackageRelationshipsField):
         The list can include virtual package names and/or file paths. For example
         the `bash` package includes these in '{NfpmRpmProvidesField.alias}':
 
-        - "bash"
-        - "/bin/sh"
-        - "/bin/bash"
+          - "bash"
+          - "/bin/sh"
+          - "/bin/bash"
 
         This means another package could also provide alternative implementations for
         the "bash" package name and could provide "/bin/sh" and/or "/bin/bash".
@@ -185,9 +185,9 @@ class NfpmRpmDependsField(NfpmPackageRelationshipsField):
         use version selectors (with one of `<`, `<=`, `=`, `>=`, `>` surrounded by
         spaces), where the version is formatted: `[epoch:]version[-release]`
 
-        - "git"
-        - "bash < 5"
-        - "perl >= 9:5.00502-3"
+          - "git"
+          - "bash < 5"
+          - "perl >= 9:5.00502-3"
 
         The rpm file header uses the term "requires" for this. This field is
         named "{NfpmRpmDependsField.alias}" because that is the term used by nFPM.
@@ -290,24 +290,24 @@ class NfpmRpmCompressionField(StringField):
         Here are several gzip examples with and without the optional compression level
         (-1 means use the default level which is 5; 9 is the max).
 
-        '{NfpmRpmCompressionAlgorithm.gzip.value}:9'
-        '{NfpmRpmCompressionAlgorithm.gzip.value}:0'
-        '{NfpmRpmCompressionAlgorithm.gzip.value}:-1'
-        '{NfpmRpmCompressionAlgorithm.gzip.value}:5'
-        '{NfpmRpmCompressionAlgorithm.gzip.value}'
+          - '{NfpmRpmCompressionAlgorithm.gzip.value}:9'
+          - '{NfpmRpmCompressionAlgorithm.gzip.value}:0'
+          - '{NfpmRpmCompressionAlgorithm.gzip.value}:-1'
+          - '{NfpmRpmCompressionAlgorithm.gzip.value}:5'
+          - '{NfpmRpmCompressionAlgorithm.gzip.value}'
 
         Here are several zstd examples. Note that nFPM uses a library that  only
         defines four named compression levels, and then maps the zstd integer
         levels to those. You may specify the zstd level as an integer, or using
         these names: https://github.com/klauspost/compress/tree/master/zstd#status
 
-        '{NfpmRpmCompressionAlgorithm.zstd.value}:fastest'
-        '{NfpmRpmCompressionAlgorithm.zstd.value}:default'
-        '{NfpmRpmCompressionAlgorithm.zstd.value}:better'
-        '{NfpmRpmCompressionAlgorithm.zstd.value}:best'
-        '{NfpmRpmCompressionAlgorithm.zstd.value}:3'
-        '{NfpmRpmCompressionAlgorithm.zstd.value}:9'
-        '{NfpmRpmCompressionAlgorithm.zstd.value}'
+          - '{NfpmRpmCompressionAlgorithm.zstd.value}:fastest'
+          - '{NfpmRpmCompressionAlgorithm.zstd.value}:default'
+          - '{NfpmRpmCompressionAlgorithm.zstd.value}:better'
+          - '{NfpmRpmCompressionAlgorithm.zstd.value}:best'
+          - '{NfpmRpmCompressionAlgorithm.zstd.value}:3'
+          - '{NfpmRpmCompressionAlgorithm.zstd.value}:9'
+          - '{NfpmRpmCompressionAlgorithm.zstd.value}'
         """
     )
 
@@ -396,8 +396,8 @@ class NfpmRpmGhostContents(StringSequenceField):
         A list of files that this package owns, but that this package does not include.
 
         Examples of ghosted files include:
-        - A log file or a state file that does not exist until runtime.
-        - A binary that is managed by 'alternatives'.
+          - A log file or a state file that does not exist until runtime.
+          - A binary that is managed by 'alternatives'.
 
         RPM specs use the `%ghost` directive to list these ghosted files.
 
