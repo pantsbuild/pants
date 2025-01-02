@@ -326,48 +326,72 @@ def rule_runner() -> RuleRunner:
         pytest.param(
             "apk",
             NfpmApkPackageFieldSet,
-            ["codegen:generated", "contents:files", "package:package"],
+            [
+                "codegen:generated",
+                "contents:files",
+                "package:package",
+                "package:output_path_package",
+            ],
             {},
             {
                 "codegen/foobar.codegen.generated",
                 "contents/sandbox-file.txt",
                 "package/archive.tar",
+                "relative_to_build_root.tar",
             },
             id="apk-codegen-and-package",
         ),
         pytest.param(
             "archlinux",
             NfpmArchlinuxPackageFieldSet,
-            ["codegen:generated", "contents:files", "package:package"],
+            [
+                "codegen:generated",
+                "contents:files",
+                "package:package",
+                "package:output_path_package",
+            ],
             {},
             {
                 "codegen/foobar.codegen.generated",
                 "contents/sandbox-file.txt",
                 "package/archive.tar",
+                "relative_to_build_root.tar",
             },
             id="archlinux-codegen-and-package",
         ),
         pytest.param(
             "deb",
             NfpmDebPackageFieldSet,
-            ["codegen:generated", "contents:files", "package:package"],
+            [
+                "codegen:generated",
+                "contents:files",
+                "package:package",
+                "package:output_path_package",
+            ],
             {},
             {
                 "codegen/foobar.codegen.generated",
                 "contents/sandbox-file.txt",
                 "package/archive.tar",
+                "relative_to_build_root.tar",
             },
             id="deb-codegen-and-package",
         ),
         pytest.param(
             "rpm",
             NfpmRpmPackageFieldSet,
-            ["codegen:generated", "contents:files", "package:package"],
+            [
+                "codegen:generated",
+                "contents:files",
+                "package:package",
+                "package:output_path_package",
+            ],
             {},
             {
                 "codegen/foobar.codegen.generated",
                 "contents/sandbox-file.txt",
                 "package/archive.tar",
+                "relative_to_build_root.tar",
             },
             id="rpm-codegen-and-package",
         ),
@@ -457,6 +481,18 @@ def test_populate_nfpm_content_sandbox(
                     name="package",
                     src="archive.tar",
                     dst="/opt/foo/archive.tar",
+                    dependencies=[":archive"],
+                )
+                archive(
+                    name="output_path_archive",
+                    format="tar",
+                    output_path="relative_to_build_root.tar",
+                    files=[":file"],
+                )
+                nfpm_content_file(
+                    name="output_path_package",
+                    src="relative_to_build_root.tar",
+                    dst="/opt/foo/relative_to_build_root.tar",
                     dependencies=[":archive"],
                 )
                 """
