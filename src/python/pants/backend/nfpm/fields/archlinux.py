@@ -192,14 +192,14 @@ class NfpmArchlinuxScriptsField(NfpmPackageScriptsField):
         by adding a shell function for each of your script files where your script becomes
         the body of that function. These functions are:
 
-            | nFPM script | `.INSTALL` function |
-            +-------------+---------------------+
-            | preinstall  | pre_install         |
-            | postinstall | post_install        |
-            | preupgrade  | pre_upgrade         |
-            | postupgrade | post_upgrade        |
-            | preremove   | pre_remove          |
-            | postremove  | post_remove         |
+        | nFPM script | `.INSTALL` function |
+        +-------------+---------------------+
+        | preinstall  | pre_install         |
+        | postinstall | post_install        |
+        | preupgrade  | pre_upgrade         |
+        | postupgrade | post_upgrade        |
+        | preremove   | pre_remove          |
+        | postremove  | post_remove         |
 
         So, if you provide a `preinstall` script, the `.INSTALL` scriptlet would contain:
 

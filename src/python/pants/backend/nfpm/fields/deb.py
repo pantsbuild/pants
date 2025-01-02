@@ -388,15 +388,15 @@ class NfpmDebScriptsField(NfpmPackageScriptsField):
         The script types are the names used by nFPM. For reference, Debian
         uses the following file names instead:
 
-            | nFPM script | Debian file |
-            +-------------+-------------+
-            | preinstall  | preinst     |
-            | postinstall | postinst    |
-            | preremove   | prerm       |
-            | postremove  | postrm      |
-            | config      | config      |
-            | templates   | templates   |
-            | rules       | rules       |
+        | nFPM script | Debian file |
+        +-------------+-------------+
+        | preinstall  | preinst     |
+        | postinstall | postinst    |
+        | preremove   | prerm       |
+        | postremove  | postrm      |
+        | config      | config      |
+        | templates   | templates   |
+        | rules       | rules       |
 
         The `pre*` and `post*` scripts are used by `dpkg` at various stages of
         installing, upgrading, and removing the deb package.

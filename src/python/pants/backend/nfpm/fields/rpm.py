@@ -368,15 +368,15 @@ class NfpmRpmScriptsField(NfpmPackageScriptsField):
         uses the following scriptlet tag names instead and runs them before/after
         the indicated phase:
 
-            | nFPM term   | RPM scriptlet | RPM phase   |
-            +-------------+---------------+-------------+
-            | preinstall  | %pre          | install     |
-            | postinstall | %post         | install     |
-            | preremove   | %preun        | uninstall   |
-            | postremove  | %postun       | uninstall   |
-            | pretrans    | %pretrans     | transaction |
-            | posttrans   | %posttrans    | transaction |
-            | verify      | %verifyscript | verify      |
+        | nFPM term   | RPM scriptlet | RPM phase   |
+        +-------------+---------------+-------------+
+        | preinstall  | %pre          | install     |
+        | postinstall | %post         | install     |
+        | preremove   | %preun        | uninstall   |
+        | postremove  | %postun       | uninstall   |
+        | pretrans    | %pretrans     | transaction |
+        | posttrans   | %posttrans    | transaction |
+        | verify      | %verifyscript | verify      |
 
         Please consult the RPM docs to understand what is required of these scripts.
 

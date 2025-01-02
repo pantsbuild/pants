@@ -187,14 +187,14 @@ class NfpmApkScriptsField(NfpmPackageScriptsField):
         The script types are the terms used by nFPM. For reference, Alpine Linux
         uses the following terms in the APKBUILD file instead:
 
-            | nFPM term   | APKBUILD term  |
-            +-------------+----------------+
-            | preinstall  | pre-install    |
-            | postinstall | post-install   |
-            | preupgrade  | pre-upgrade    |
-            | postupgrade | post-upgrade   |
-            | preremove   | pre-deinstall  |
-            | postremove  | post-deinstall |
+        | nFPM term   | APKBUILD term  |
+        +-------------+----------------+
+        | preinstall  | pre-install    |
+        | postinstall | post-install   |
+        | preupgrade  | pre-upgrade    |
+        | postupgrade | post-upgrade   |
+        | preremove   | pre-deinstall  |
+        | postremove  | post-deinstall |
 
         Please consult the Alpine Linux docs to understand when `apk` will run
         each of these scripts, how it handles a failure, and what failure means
