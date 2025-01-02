@@ -493,7 +493,7 @@ def test_populate_nfpm_content_sandbox(
                     name="output_path_package",
                     src="relative_to_build_root.tar",
                     dst="/opt/foo/relative_to_build_root.tar",
-                    dependencies=[":archive"],
+                    dependencies=[":output_path_archive"],
                 )
                 """
             ),
