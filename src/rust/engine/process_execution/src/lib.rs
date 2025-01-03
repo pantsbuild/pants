@@ -1023,7 +1023,6 @@ fn quote_path(path: &Path) -> Result<String, String> {
 
 /// Check supplied parameters from an execution request and create a wrapper script if a wrapper script
 /// is needed.
-// TODO: Support `{chroot}` replacement in environment variables and not just program arguments.
 fn maybe_make_wrapper_script(
     caches: &BTreeMap<CacheName, RelativePath>,
     append_only_caches_base_path: Option<&str>,
@@ -1156,17 +1155,18 @@ pub async fn make_execute_request(
 ) -> Result<EntireExecuteRequest, String> {
     const WRAPPER_SCRIPT: &str = "./__pants_wrapper__";
     const SANDBOX_ROOT_TOKEN: &str = "__PANTS_SANDBOX_ROOT__";
+    const CHROOT_MARKER: &str = "{chroot}";
 
     // Implement append-only caches by running a wrapper script before the actual program
     // to be invoked in the remote environment.
     let wrapper_script_content_opt = {
-        let args_have_chroot_marker = req.argv.iter().any(|arg| arg.contains("{chroot}"));
+        let args_have_chroot_marker = req.argv.iter().any(|arg| arg.contains(CHROOT_MARKER));
 
         let env_vars_with_chroot_marker = req
             .env
             .iter()
             .filter_map(|(key, value)| {
-                if value.contains("{chroot}") {
+                if value.contains(CHROOT_MARKER) {
                     Some(key.to_owned())
                 } else {
                     None
@@ -1212,7 +1212,7 @@ pub async fn make_execute_request(
             args.extend(
                 req.argv
                     .iter()
-                    .map(|orig_arg| orig_arg.replace("{chroot}", SANDBOX_ROOT_TOKEN)),
+                    .map(|orig_arg| orig_arg.replace(CHROOT_MARKER, SANDBOX_ROOT_TOKEN)),
             );
             args
         }
@@ -1238,7 +1238,7 @@ pub async fn make_execute_request(
             .environment_variables
             .push(remexec::command::EnvironmentVariable {
                 name: name.to_string(),
-                value: value.replace("{chroot}", SANDBOX_ROOT_TOKEN),
+                value: value.replace(CHROOT_MARKER, SANDBOX_ROOT_TOKEN),
             });
     }
 
