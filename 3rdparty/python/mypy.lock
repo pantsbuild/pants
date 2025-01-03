@@ -26,6 +26,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "elide_unused_requires_dist": false,
   "excluded": [],
   "locked_resolves": [
     {
@@ -242,7 +243,7 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.24.3",
+  "pex_version": "2.27.1",
   "pip_version": "24.3.1",
   "prefer_older_binary": false,
   "requirements": [
