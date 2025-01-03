@@ -58,8 +58,7 @@ impl Provider {
                 // TODO: record Metric::RemoteStoreRequestTimeouts for timeouts
                 TimeoutLayer::new()
                     .with_timeout(options.timeout)
-                    // TimeoutLayer requires specifying a non-zero minimum transfer speed too.
-                    .with_speed(1),
+                    .with_io_timeout(options.timeout),
             )
             // TODO: RetryLayer doesn't seem to retry stores, but we should
             .layer(RetryLayer::new().with_max_times(options.retries + 1))
@@ -76,9 +75,8 @@ impl Provider {
         })
     }
 
-    pub fn fs(path: &str, scope: String, options: RemoteStoreOptions) -> Result<Provider, String> {
-        let mut builder = opendal::services::Fs::default();
-        builder.root(path).enable_path_check();
+    pub fn fs(scope: String, options: RemoteStoreOptions) -> Result<Provider, String> {
+        let builder = opendal::services::Fs::default();
         Provider::new(builder, scope, options)
     }
 
