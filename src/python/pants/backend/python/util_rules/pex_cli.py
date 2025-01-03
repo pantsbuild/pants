@@ -28,7 +28,7 @@ from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
-from pants.option.option_types import ArgsListOption
+from pants.option.option_types import ArgsListOption, BoolOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
@@ -71,6 +71,40 @@ class PexCli(TemplatedExternalTool):
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
         ]
+
+    use_scie_distribution = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            Use the SCIE-packaged distribution of the PEX tool instead of the PEX distribution.
+            """
+        ),
+    )
+
+
+class PexCliSCIE(TemplatedExternalTool):
+    options_scope = "pex-cli-scie"
+    name = "pex"
+    help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex). MODE CHANGE! SCIE!"
+
+    default_version = "2.27.1"
+    default_known_versions = [
+        "2.27.1|linux_arm64|08c3b6e5056486e9b7ba34da1e734c110ea3c60ea01ad08c9e1d49b519e92021|23813115",
+        "2.27.1|linux_x86_64|7d4361200d89d361ef1ff0187ea62ef89c12c45f23ff75ed2a652486a76f0b34|25587583",
+        "2.27.1|macos_arm64|d472a9b58dc250e58ac5298bfeaad391ad74ec0ac7a8c47ddff6b09bc4a70ac0|21640098",
+        "2.27.1|macos_x86_64|60e1dadb5a071db25f331790cdd19df86fc05c464b3220e8e26e8df290103104|22188797",
+    ]
+
+    default_url_template = (
+        "https://github.com/pex-tool/pex/releases/download/v{version}/pex-{platform}"
+    )
+    default_url_platform_mapping = {
+        "linux_arm64": "linux-aarch64",
+        "linux_x86_64": "linux-x86_64",
+        "macos_arm64": "macos-aarch64",
+        "macos_x86_64": "macos-x86_64",
+    }
+    version_constraints = ">=2.24.0,<3.0"
 
 
 @dataclass(frozen=True)
@@ -121,25 +155,62 @@ class PexCliProcess:
 
 
 class PexPEX(DownloadedExternalTool):
-    """The Pex PEX binary."""
+    """The Pex PEX distribution."""
+
+
+class PexSCIE(DownloadedExternalTool):
+    """The Pex SCIE binary."""
+
+
+@dataclass
+class PexCliTool:
+    digest: Digest
+    exe: str
+    is_scie: bool
 
 
 @rule
 async def download_pex_pex(pex_cli: PexCli, platform: Platform) -> PexPEX:
-    pex_pex = await Get(DownloadedExternalTool, ExternalToolRequest, pex_cli.get_request(platform))
-    return PexPEX(digest=pex_pex.digest, exe=pex_pex.exe)
+    tool = await Get(DownloadedExternalTool, ExternalToolRequest, pex_cli.get_request(platform))
+    return PexPEX(digest=tool.digest, exe=tool.exe)
+
+
+@rule
+async def download_pex_scie(pex_cli_scie: PexCliSCIE, platform: Platform) -> PexSCIE:
+    tool = await Get(
+        DownloadedExternalTool, ExternalToolRequest, pex_cli_scie.get_request(platform)
+    )
+    return PexSCIE(digest=tool.digest, exe=tool.exe)
+
+
+@rule
+async def downloadn_pex_cli_tool(pex_cli_subsystem: PexCli) -> PexCliTool:
+    if pex_cli_subsystem.use_scie_distribution:
+        pex_scie = await Get(PexSCIE)
+        return PexCliTool(
+            digest=pex_scie.digest,
+            exe=pex_scie.exe,
+            is_scie=True,
+        )
+    else:
+        pex_pex = await Get(PexPEX)
+        return PexCliTool(
+            digest=pex_pex.digest,
+            exe=pex_pex.exe,
+            is_scie=False,
+        )
 
 
 @rule
 async def setup_pex_cli_process(
     request: PexCliProcess,
-    pex_pex: PexPEX,
     pex_env: PexEnvironment,
     bootstrap_python: PythonBuildStandaloneBinary,
     python_native_code: PythonNativeCodeSubsystem.EnvironmentAware,
     global_options: GlobalOptions,
     pex_subsystem: PexSubsystem,
     pex_cli_subsystem: PexCli,
+    pex_cli_tool: PexCliTool,
     python_setup: PythonSetup,
 ) -> Process:
     tmpdir = ".tmp"
@@ -151,7 +222,7 @@ async def setup_pex_cli_process(
         gets.append(Get(Digest, CreateDigest((ca_certs_fc,))))
         cert_args = ["--cert", ca_certs_fc.path]
 
-    digests_to_merge = [pex_pex.digest]
+    digests_to_merge = [pex_cli_tool.digest]
     digests_to_merge.extend(await MultiGet(gets))
     if request.additional_input_digest:
         digests_to_merge.append(request.additional_input_digest)
@@ -203,7 +274,12 @@ async def setup_pex_cli_process(
     ]
 
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
-    normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args)
+    normalized_argv: tuple[str, ...]
+    if pex_cli_tool.is_scie:
+        normalized_argv = (pex_cli_tool.exe, "pex", *args)
+    else:
+        normalized_argv = complete_pex_env.create_argv(pex_cli_tool.exe, *args)
+
     env = {
         **complete_pex_env.environment_dict(python=bootstrap_python),
         **python_native_code.subprocess_env_vars,
