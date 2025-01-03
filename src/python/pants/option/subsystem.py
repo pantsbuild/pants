@@ -13,7 +13,7 @@ from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass
 from pants.option.errors import OptionsError
-from pants.option.option_types import OptionsInfo, collect_options_info
+from pants.option.option_types import OptionInfo, collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
@@ -118,12 +118,12 @@ class Subsystem(metaclass=_SubsystemMeta):
                 return default
 
             # Resolving an attribute on the class object will return the underlying descriptor.
-            # If the descriptor is an `OptionsInfo`, we can resolve it against the environment
+            # If the descriptor is an `OptionInfo`, we can resolve it against the environment
             # target.
-            if isinstance(v, OptionsInfo):
+            if isinstance(v, OptionInfo):
                 # If the value is not defined in the `EnvironmentTarget`, return the value
                 # from the options system.
-                override = resolve_environment_sensitive_option(v.flag_names[0], self)
+                override = resolve_environment_sensitive_option(v.args[0], self)
                 return override if override is not None else default
 
             # We should just return the default at this point.
@@ -134,12 +134,12 @@ class Subsystem(metaclass=_SubsystemMeta):
             from pants.core.util_rules.environments import resolve_environment_sensitive_option
 
             v = getattr(type(self), __name)
-            assert isinstance(v, OptionsInfo)
+            assert isinstance(v, OptionInfo)
 
             return (
                 # vars beginning with `_` are exposed as option names with the leading `_` stripped
                 self.options.is_default(__name.lstrip("_"))
-                and resolve_environment_sensitive_option(v.flag_names[0], self) is None
+                and resolve_environment_sensitive_option(v.args[0], self) is None
             )
 
     @classmethod
@@ -294,22 +294,22 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         plugin_option_containers = union_membership.get(cls.PluginOption)
         for options_info in collect_options_info(cls):
-            register(*options_info.flag_names, **options_info.flag_options)
+            register(*options_info.args, **options_info.kwargs)
         for options_info in collect_options_info(cls.EnvironmentAware):
-            register(*options_info.flag_names, environment_aware=True, **options_info.flag_options)
+            register(*options_info.args, environment_aware=True, **options_info.kwargs)
         for options_info in (
             option
             for container in plugin_option_containers
             for option in collect_options_info(container)
         ):
-            register(*options_info.flag_names, **options_info.flag_options)
+            register(*options_info.args, **options_info.kwargs)
 
     def __init__(self, options: OptionValueContainer) -> None:
         self.validate_scope()
         self.options = options
 
     def __eq__(self, other: Any) -> bool:
-        if type(self) != type(other):
+        if type(self) != type(other):  # noqa: E721
             return False
         return bool(self.options == other.options)
 

@@ -11,8 +11,8 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
+from pants.engine.fs import FileContent
 from pants.option.arg_splitter import ArgSplitter
-from pants.option.config import Config
 from pants.option.errors import (
     ConfigValidationError,
     MutuallyExclusiveOptionError,
@@ -116,26 +116,26 @@ class Options:
     @classmethod
     def create(
         cls,
-        env: Mapping[str, str],
-        config: Config,
-        known_scope_infos: Iterable[ScopeInfo],
+        *,
         args: Sequence[str],
-        bootstrap_option_values: OptionValueContainer | None = None,
+        env: Mapping[str, str],
+        config_sources: Sequence[FileContent] | None,
+        known_scope_infos: Sequence[ScopeInfo],
+        extra_specs: Sequence[str] = tuple(),
         allow_unknown_options: bool = False,
-        native_options_config_discovery: bool = True,
+        allow_pantsrc: bool = True,
         include_derivation: bool = False,
     ) -> Options:
         """Create an Options instance.
 
-        :param env: a dict of environment variables.
-        :param config: data from a config file.
-        :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
         :param args: a list of cmd-line args; defaults to `sys.argv` if None is supplied.
-        :param bootstrap_option_values: An optional namespace containing the values of bootstrap
-               options. We can use these values when registering other options.
+        :param env: a dict of environment variables.
+        :param config_sources: sources of config data.
+        :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
+        :param extra_specs: Extra specs to add to those specified in the args (e.g., from --spec-files).
         :param allow_unknown_options: Whether to ignore or error on unknown cmd-line flags.
-        :param native_options_config_discovery: Whether to discover config files in the native
-            parser or use the ones supplied.
+        :param allow_pantsrc: Whether to read config from local .rc files. Typically
+          disabled in tests, for hermeticity.
         :param include_derivation: Whether to gather option value derivation information.
         """
         # We need registrars for all the intermediate scopes, so inherited option values
@@ -150,12 +150,11 @@ class Options:
             scope: registrar.known_scoped_args for scope, registrar in registrar_by_scope.items()
         }
 
-        config_to_pass = None if native_options_config_discovery else config.sources()
         native_parser = NativeOptionParser(
             args[1:],  # The native parser expects args without the sys.argv[0] binary name.
             env,
-            config_sources=config_to_pass,
-            allow_pantsrc=True,
+            config_sources=config_sources,
+            allow_pantsrc=allow_pantsrc,
             include_derivation=include_derivation,
             known_scopes_to_flags=known_scope_to_flags,
         )
@@ -163,6 +162,7 @@ class Options:
         splitter = ArgSplitter(complete_known_scope_infos, get_buildroot())
         # We take the cli alias-expanded args[1:] from the native parser.
         split_args = splitter.split_args([args[0], *native_parser.get_args()])
+        split_args.specs.extend(extra_specs)
 
         if split_args.passthru and len(split_args.goals) > 1:
             raise cls.AmbiguousPassthroughError(
@@ -177,15 +177,6 @@ class Options:
                 )
             )
 
-        if bootstrap_option_values:
-            spec_files = bootstrap_option_values.spec_files
-            if spec_files:
-                for spec_file in spec_files:
-                    with open(spec_file) as f:
-                        split_args.specs.extend(
-                            [line for line in [line.strip() for line in f] if line]
-                        )
-
         return cls(
             builtin_or_auxiliary_goal=split_args.builtin_or_auxiliary_goal,
             goals=split_args.goals,
@@ -195,7 +186,6 @@ class Options:
             passthru=split_args.passthru,
             registrar_by_scope=registrar_by_scope,
             native_parser=native_parser,
-            bootstrap_option_values=bootstrap_option_values,
             known_scope_to_info=known_scope_to_info,
             allow_unknown_options=allow_unknown_options,
         )
@@ -210,7 +200,6 @@ class Options:
         passthru: list[str],
         registrar_by_scope: dict[str, OptionRegistrar],
         native_parser: NativeOptionParser,
-        bootstrap_option_values: OptionValueContainer | None,
         known_scope_to_info: dict[str, ScopeInfo],
         allow_unknown_options: bool = False,
     ) -> None:
@@ -226,7 +215,6 @@ class Options:
         self._passthru = passthru
         self._registrar_by_scope = registrar_by_scope
         self._native_parser = native_parser
-        self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
         self._allow_unknown_options = allow_unknown_options
 
@@ -281,7 +269,7 @@ class Options:
     def scope_to_flags(self) -> dict[str, list[str]]:
         return self._scope_to_flags
 
-    def verify_configs(self, global_config: Config) -> None:
+    def verify_configs(self) -> None:
         """Verify all loaded configs have correct scopes and options."""
 
         section_to_valid_options = {}
@@ -303,7 +291,6 @@ class Options:
                     """
                 )
             )
-        global_config.verify(section_to_valid_options)
 
     def get_args(self) -> tuple[str, ...]:
         return self._native_parser.get_args()
@@ -429,28 +416,26 @@ class Options:
         registrar = self.get_registrar(scope)
         scope_str = "global scope" if scope == GLOBAL_SCOPE else f"scope '{scope}'"
 
-        for args, kwargs in registrar.option_registrations_iter():
-            dest = kwargs["dest"]
-            val, rank = self._native_parser.get_value(
-                scope=scope, registration_args=args, registration_kwargs=kwargs
-            )
+        for option_info in registrar.option_registrations_iter():
+            dest = option_info.kwargs["dest"]
+            val, rank = self._native_parser.get_value(scope=scope, option_info=option_info)
             explicitly_set = rank > Rank.HARDCODED
 
             # If we explicitly set a deprecated but not-yet-expired option, warn about it.
             # Otherwise, raise a CodeRemovedError if the deprecation has expired.
-            removal_version = kwargs.get("removal_version", None)
+            removal_version = option_info.kwargs.get("removal_version", None)
             if removal_version is not None:
                 warn_or_error(
                     removal_version=removal_version,
                     entity=f"option '{dest}' in {scope_str}",
-                    start_version=kwargs.get("deprecation_start_version", None),
-                    hint=kwargs.get("removal_hint", None),
+                    start_version=option_info.kwargs.get("deprecation_start_version", None),
+                    hint=option_info.kwargs.get("removal_hint", None),
                     print_warning=explicitly_set,
                 )
 
             # If we explicitly set the option, check for mutual exclusivity.
             if explicitly_set:
-                mutex_dest = kwargs.get("mutually_exclusive_group")
+                mutex_dest = option_info.kwargs.get("mutually_exclusive_group")
                 mutex_map_key = mutex_dest or dest
                 mutex_map[mutex_map_key].append(dest)
                 if len(mutex_map[mutex_map_key]) > 1:
@@ -464,14 +449,11 @@ class Options:
                         )
                     )
             setattr(builder, dest, RankedValue(rank, val))
-        native_values = builder.build()
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
-            native_values_builder = native_values.to_builder()
-            self._check_and_apply_deprecations(scope, native_values_builder)
-            native_values = native_values_builder.build()
-        return native_values
+            self._check_and_apply_deprecations(scope, builder)
+        return builder.build()
 
     def get_fingerprintable_for_scope(
         self,
@@ -493,18 +475,18 @@ class Options:
         pairs = []
         registrar = self.get_registrar(scope)
         # Sort the arguments, so that the fingerprint is consistent.
-        for _, kwargs in sorted(registrar.option_registrations_iter()):
-            if not kwargs.get("fingerprint", True):
+        for option_info in sorted(registrar.option_registrations_iter()):
+            if not option_info.kwargs.get("fingerprint", True):
                 continue
-            if daemon_only and not kwargs.get("daemon", False):
+            if daemon_only and not option_info.kwargs.get("daemon", False):
                 continue
-            dest = kwargs["dest"]
+            dest = option_info.kwargs["dest"]
             val = self.for_scope(scope)[dest]
             # If we have a list then we delegate to the fingerprinting implementation of the members.
-            if is_list_option(kwargs):
-                val_type = kwargs.get("member_type", str)
+            if is_list_option(option_info.kwargs):
+                val_type = option_info.kwargs.get("member_type", str)
             else:
-                val_type = kwargs.get("type", str)
+                val_type = option_info.kwargs.get("type", str)
             pairs.append((dest, val_type, val))
         return pairs
 
@@ -512,14 +494,6 @@ class Options:
         # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,
         # Consider killing if tests consolidate on using TestOptions instead of the raw dicts.
         return self.for_scope(scope)
-
-    def bootstrap_option_values(self) -> OptionValueContainer | None:
-        """Return the option values for bootstrap options.
-
-        General code can also access these values in the global scope.  But option registration code
-        cannot, hence this special-casing of this small set of options.
-        """
-        return self._bootstrap_option_values
 
     def for_global_scope(self) -> OptionValueContainer:
         """Return the option values for the global scope.

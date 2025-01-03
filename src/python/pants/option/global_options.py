@@ -438,17 +438,16 @@ class DynamicRemoteOptions:
         prior_result: AuthPluginResult | None = None,
         remote_auth_plugin_func: Callable | None = None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
-        bootstrap_options = full_options.bootstrap_option_values()
-        assert bootstrap_options is not None
-        execution = cast(bool, bootstrap_options.remote_execution)
-        cache_read = cast(bool, bootstrap_options.remote_cache_read)
-        cache_write = cast(bool, bootstrap_options.remote_cache_write)
+        global_options = full_options.for_global_scope()
+        execution = cast(bool, global_options.remote_execution)
+        cache_read = cast(bool, global_options.remote_cache_read)
+        cache_write = cast(bool, global_options.remote_cache_write)
         if not (execution or cache_read or cache_write):
             return cls.disabled(), None
 
         sources = {
             str(remote_auth_plugin_func): bool(remote_auth_plugin_func),
-            "[GLOBAL].remote_oauth_bearer_token": bool(bootstrap_options.remote_oauth_bearer_token),
+            "[GLOBAL].remote_oauth_bearer_token": bool(global_options.remote_oauth_bearer_token),
         }
         enabled_sources = [name for name, enabled in sources.items() if enabled]
         if len(enabled_sources) > 1:
@@ -461,17 +460,17 @@ class DynamicRemoteOptions:
                     """
                 )
             )
-        if bootstrap_options.remote_oauth_bearer_token:
-            return cls._use_oauth_token(bootstrap_options), None
+        if global_options.remote_oauth_bearer_token:
+            return cls._use_oauth_token(global_options), None
         if remote_auth_plugin_func is not None:
             return cls._use_auth_plugin(
-                bootstrap_options,
+                global_options,
                 full_options=full_options,
                 env=env,
                 prior_result=prior_result,
                 remote_auth_plugin_func=remote_auth_plugin_func,
             )
-        return cls._use_no_auth(bootstrap_options), None
+        return cls._use_no_auth(global_options), None
 
     @classmethod
     def _use_no_auth(cls, bootstrap_options: OptionValueContainer) -> DynamicRemoteOptions:
@@ -2259,11 +2258,11 @@ class GlobalOptionsFlags:
         short_flags = set()
 
         for options_info in collect_options_info(BootstrapOptions):
-            for flag in options_info.flag_names:
+            for flag in options_info.args:
                 flags.add(flag)
                 if len(flag) == 2:
                     short_flags.add(flag)
-                elif options_info.flag_options.get("type") == bool:
+                elif options_info.kwargs.get("type") == bool:
                     flags.add(f"--no-{flag[2:]}")
 
         return cls(FrozenOrderedSet(flags), FrozenOrderedSet(short_flags))

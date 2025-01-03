@@ -258,7 +258,7 @@ humansize = "1.1"
 hyper = "1"
 hyper-rustls = "0.27"
 hyper-util = "0.1"
-ignore = { git = "https://github.com/pantsbuild/ripgrep.git", rev = "0f7e0fdd00ae528745a7fea24a320cae98235341" }
+ignore = "0.4.23"
 indexmap = { version = "1.9", features = ["std", "serde"] }
 indicatif = "0.17.8"
 internment = "0.6"
@@ -294,8 +294,8 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messa
 prost = "0.13"
 prost-build = "0.13"
 prost-types = "0.13"
-pyo3 = "0.23.2"
-pyo3-build-config = "0.23.2"
+pyo3 = "0.23.3"
+pyo3-build-config = "0.23.3"
 rand = "0.8"
 regex = "1"
 rlimit = "0.8"
@@ -334,7 +334,7 @@ url = "2.5"
 uuid = "1.8.0"
 walkdir = "2"
 webpki = "0.22"
-whoami = "1.4.1"
+whoami = "1.5.2"
 
 # NB: If a change to these versions requires cache busting, bump the version of
 # `src/rust/engine/dep_inference/Cargo.toml`.

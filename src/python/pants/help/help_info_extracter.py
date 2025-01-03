@@ -43,6 +43,7 @@ from pants.engine.rules import Rule, TaskRule
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule, is_union
 from pants.option.native_options import NativeOptionParser, parse_dest
+from pants.option.option_types import OptionInfo
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.ranked_value import Rank, RankedValue
@@ -276,9 +277,9 @@ class TargetTypeHelpInfo:
             fields=tuple(
                 TargetFieldHelpInfo.create(
                     field,
-                    provider=""
-                    if get_field_type_provider is None
-                    else get_field_type_provider(field),
+                    provider=(
+                        "" if get_field_type_provider is None else get_field_type_provider(field)
+                    ),
                 )
                 for field in fields
                 if not field.alias.startswith("_") and field.removal_version is None
@@ -1014,10 +1015,8 @@ class HelpInfoExtracter:
         basic_options = []
         advanced_options = []
         deprecated_options = []
-        for args, kwargs in registrar.option_registrations_iter():
-            derivation = native_parser.get_derivation(
-                scope=registrar.scope, registration_args=args, registration_kwargs=kwargs
-            )
+        for option_info in registrar.option_registrations_iter():
+            derivation = native_parser.get_derivation(registrar.scope, option_info)
             # Massage the derivation structure returned by the NativeOptionParser into an
             # OptionValueHistory as returned by the legacy parser.
             # TODO: Once we get rid of the legacy parser we can probably simplify by
@@ -1027,8 +1026,8 @@ class HelpInfoExtracter:
             # Adding this constant, empty history entry is silly, but it appears in the
             # legacy parser's results as an implementation artifact, and we want to be
             # consistent with its tests until we get rid of it.
-            is_list = kwargs.get("type") == list
-            is_dict = kwargs.get("type") == dict
+            is_list = option_info.kwargs.get("type") == list
+            is_dict = option_info.kwargs.get("type") == dict
             empty_val: list | dict | None = [] if is_list else {} if is_dict else None
             empty_details = "" if (is_list or is_dict) else None
             ranked_values.append(RankedValue(Rank.NONE, empty_val, empty_details))
@@ -1036,11 +1035,11 @@ class HelpInfoExtracter:
             for value, rank, details in derivation:
                 ranked_values.append(RankedValue(rank, value, details or empty_details))
             history = OptionValueHistory(tuple(ranked_values))
-            ohi = self.get_option_help_info(args, kwargs)
+            ohi = self.get_option_help_info(option_info)
             ohi = dataclasses.replace(ohi, value_history=history)
             if ohi.deprecation_active:
                 deprecated_options.append(ohi)
-            elif kwargs.get("advanced"):
+            elif option_info.kwargs.get("advanced"):
                 advanced_options.append(ohi)
             else:
                 basic_options.append(ohi)
@@ -1056,13 +1055,13 @@ class HelpInfoExtracter:
             deprecated=tuple(deprecated_options),
         )
 
-    def get_option_help_info(self, args, kwargs):
+    def get_option_help_info(self, option_info: OptionInfo) -> OptionHelpInfo:
         """Returns an OptionHelpInfo for the option registered with the given (args, kwargs)."""
         display_args = []
         scoped_cmd_line_args = []
         unscoped_cmd_line_args = []
 
-        for arg in args:
+        for arg in option_info.args:
             is_short_arg = len(arg) == 2
             unscoped_cmd_line_args.append(arg)
             if self._scope_prefix:
@@ -1071,7 +1070,7 @@ class HelpInfoExtracter:
                 scoped_arg = arg
             scoped_cmd_line_args.append(scoped_arg)
 
-            if OptionRegistrar.is_bool(kwargs):
+            if OptionRegistrar.is_bool(option_info.kwargs):
                 if is_short_arg:
                     display_args.append(scoped_arg)
                 else:
@@ -1080,18 +1079,18 @@ class HelpInfoExtracter:
                     scoped_cmd_line_args.append(f"--no-{sa_2}")
                     display_args.append(f"--[no-]{sa_2}")
             else:
-                metavar = self.compute_metavar(kwargs)
+                metavar = self.compute_metavar(option_info.kwargs)
                 separator = "" if is_short_arg else "="
                 display_args.append(f"{scoped_arg}{separator}{metavar}")
-                if kwargs.get("passthrough"):
-                    type_str = self.stringify_type(kwargs.get("member_type", str))
+                if option_info.kwargs.get("passthrough"):
+                    type_str = self.stringify_type(option_info.kwargs.get("member_type", str))
                     display_args.append(f"... -- [{type_str} [{type_str} [...]]]")
 
-        typ = kwargs.get("type", str)
-        default = self.compute_default(**kwargs)
-        help_msg = kwargs.get("help", "No help available.")
-        deprecation_start_version = kwargs.get("deprecation_start_version")
-        removal_version = kwargs.get("removal_version")
+        typ = option_info.kwargs.get("type", str)
+        default = self.compute_default(**option_info.kwargs)
+        help_msg = option_info.kwargs.get("help", "No help available.")
+        deprecation_start_version = option_info.kwargs.get("deprecation_start_version")
+        removal_version = option_info.kwargs.get("removal_version")
         deprecation_active = removal_version is not None and deprecated.is_deprecation_active(
             deprecation_start_version
         )
@@ -1106,10 +1105,10 @@ class HelpInfoExtracter:
             deprecated_message = (
                 f"{message_start}, {deprecated_tense} removed in version: {removal_version}."
             )
-        removal_hint = kwargs.get("removal_hint")
-        choices = self.compute_choices(kwargs)
+        removal_hint = option_info.kwargs.get("removal_hint")
+        choices = self.compute_choices(option_info.kwargs)
 
-        dest = parse_dest(*args, **kwargs)
+        dest = parse_dest(option_info)
         udest = dest.upper()
         if self._scope == GLOBAL_SCOPE:
             # Global options have 2-3 env var variants, e.g., --pants-workdir can be
@@ -1122,9 +1121,11 @@ class HelpInfoExtracter:
         else:
             env_var = f"PANTS_{_ENV_SANITIZER_RE.sub('_', self._scope.upper())}_{udest}"
 
-        target_field_name = f"{self._scope_prefix}_{option_field_name_for(args)}".replace("-", "_")
-        environment_aware = kwargs.get("environment_aware") is True
-        fromfile = kwargs.get("fromfile", False)
+        target_field_name = (
+            f"{self._scope_prefix}_{option_field_name_for(option_info.args)}".replace("-", "_")
+        )
+        environment_aware = option_info.kwargs.get("environment_aware") is True
+        fromfile = option_info.kwargs.get("fromfile", False)
 
         ret = OptionHelpInfo(
             display_args=tuple(display_args),

@@ -17,9 +17,10 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import pex
 from pants.core.goals.fix import FixResult, FixTargetsRequest
-from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.fs import Digest, DigestSubset, PathGlobs, RemovePrefix
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -96,7 +97,12 @@ async def ruff_lint(
         ruff,
         platform,
     )
-    return LintResult.create(request, result)
+    report_digest = await Get(
+        Digest,
+        DigestSubset(result.output_digest, PathGlobs([f"{REPORT_DIR}/**"])),
+    )
+    report = await Get(Digest, RemovePrefix(report_digest, REPORT_DIR))
+    return LintResult.create(request, result, report=report)
 
 
 def rules():

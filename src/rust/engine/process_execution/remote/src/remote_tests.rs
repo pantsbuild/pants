@@ -724,7 +724,7 @@ async fn make_execute_request_with_append_only_caches() {
         input_root_digest: Some(
             (Digest::new(
                 Fingerprint::from_hex_string(
-                    "92f5d2ff07cb6cdf4a70f2d6392781b482cd587b9dd69d6729ac73eb54110a69",
+                    "d6f65a7f56380de341fac43fcb4e2006fd0e716579325c4640ec11b7c040bb9c",
                 )
                 .unwrap(),
                 178,
@@ -739,7 +739,7 @@ async fn make_execute_request_with_append_only_caches() {
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "e4196db365556cbeed4941845f448cfafc1fabb76b3c476c3f378f358235d3c4",
+                    "d516c6b3b9781777486025ebc87cb4810bc7088dc45092a70a592d8ca74f48d8",
                 )
                 .unwrap(),
                 146,
@@ -752,7 +752,7 @@ async fn make_execute_request_with_append_only_caches() {
 
     let want_input_root_digest = DirectoryDigest::from_persisted_digest(Digest::new(
         Fingerprint::from_hex_string(
-            "92f5d2ff07cb6cdf4a70f2d6392781b482cd587b9dd69d6729ac73eb54110a69",
+            "d6f65a7f56380de341fac43fcb4e2006fd0e716579325c4640ec11b7c040bb9c",
         )
         .unwrap(),
         178,
