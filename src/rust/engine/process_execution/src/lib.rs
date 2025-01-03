@@ -1029,6 +1029,7 @@ fn maybe_make_wrapper_script(
     append_only_caches_base_path: Option<&str>,
     working_directory: Option<&str>,
     sandbox_root_token: Option<&str>,
+    env_vars_to_substitute: &[&str],
 ) -> Result<Option<String>, String> {
     let caches_fragment = match append_only_caches_base_path {
         Some(base_path) if !caches.is_empty() => {
@@ -1088,7 +1089,7 @@ fn maybe_make_wrapper_script(
 
     // Generate code to replace `{chroot}` markers if any are present in the command.
     let sandbox_root_fragment = if let Some(token) = sandbox_root_token {
-        let fragment = format!(
+        let mut fragment = format!(
             concat!(
                 "sandbox_root=\"$(/bin/pwd)\"\n",
                 "args=(\"${{@//{0}/$sandbox_root}}\")\n",
@@ -1096,6 +1097,17 @@ fn maybe_make_wrapper_script(
             ),
             token
         );
+        if !env_vars_to_substitute.is_empty() {
+            let env_vars_str = env_vars_to_substitute.join(" "); // TODO: shlex the strings
+            writeln!(&mut fragment, "for env_var in {env_vars_str}; do")
+                .map_err(|err| format!("write! failed: {err}"))?;
+            writeln!(
+                &mut fragment,
+                "  eval \"export $env_var=\\${{$env_var//{token}/$sandbox_root}}\""
+            )
+            .map_err(|err| format!("write! failed: {err}"))?;
+            writeln!(&mut fragment, "done").map_err(|err| format!("write! failed: {err}"))?;
+        }
         Some(fragment)
     } else {
         None
@@ -1148,16 +1160,35 @@ pub async fn make_execute_request(
     // Implement append-only caches by running a wrapper script before the actual program
     // to be invoked in the remote environment.
     let wrapper_script_content_opt = {
-        let sandbox_root_token = req
-            .argv
+        let args_have_chroot_marker = req.argv.iter().any(|arg| arg.contains("{chroot}"));
+
+        let env_vars_with_chroot_marker = req
+            .env
             .iter()
-            .any(|arg| arg.contains("{chroot}"))
-            .then_some(SANDBOX_ROOT_TOKEN);
+            .filter_map(|(key, value)| {
+                if value.contains("{chroot}") {
+                    Some(key.to_owned())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let env_var_with_chroot_marker_refs = env_vars_with_chroot_marker
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>();
+
+        let sandbox_root_token = (args_have_chroot_marker
+            || !env_vars_with_chroot_marker.is_empty())
+        .then_some(SANDBOX_ROOT_TOKEN);
+
         maybe_make_wrapper_script(
             &req.append_only_caches,
             append_only_caches_base_path,
             req.working_directory.as_ref().and_then(|p| p.to_str()),
             sandbox_root_token,
+            env_var_with_chroot_marker_refs.as_slice(),
         )?
     };
     let wrapper_script_digest_opt = if let Some(script) = wrapper_script_content_opt {
