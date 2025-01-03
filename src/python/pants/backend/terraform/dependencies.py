@@ -86,6 +86,7 @@ async def get_terraform_providers(
             output_directories=(".terraform",),
             description=init_process_description,
             chdir=req.chdir,
+            use_provider_cache=req.lockfile,
         ),
     )
     if fetched_deps.exit_code != 0:
