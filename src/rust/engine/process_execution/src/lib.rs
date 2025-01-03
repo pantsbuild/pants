@@ -1162,7 +1162,7 @@ pub async fn make_execute_request(
     let wrapper_script_content_opt = {
         let args_have_chroot_marker = req.argv.iter().any(|arg| arg.contains(CHROOT_MARKER));
 
-        let env_vars_with_chroot_marker = req
+        let mut env_vars_with_chroot_marker = req
             .env
             .iter()
             .filter_map(|(key, value)| {
@@ -1173,6 +1173,7 @@ pub async fn make_execute_request(
                 }
             })
             .collect::<Vec<_>>();
+        env_vars_with_chroot_marker.sort();
 
         let env_var_with_chroot_marker_refs = env_vars_with_chroot_marker
             .iter()
