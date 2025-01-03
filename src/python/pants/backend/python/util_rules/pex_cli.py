@@ -73,7 +73,7 @@ class PexCli(TemplatedExternalTool):
         ]
 
     use_scie_distribution = BoolOption(
-        default=False,
+        default=True,
         help=softwrap(
             """
             Use the SCIE-packaged distribution of the PEX tool instead of the PEX distribution.
