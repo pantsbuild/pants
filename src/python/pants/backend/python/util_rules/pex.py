@@ -28,7 +28,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import pex_cli, pex_requirements
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex_cli import PexCliProcess, maybe_log_pex_stderr
+from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX, maybe_log_pex_stderr
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
     PexEnvironment,
@@ -1366,6 +1366,22 @@ async def determine_venv_pex_resolve_info(venv_pex: VenvPex) -> PexResolveInfo:
             extra_env={"PEX_TOOLS": "1"},
             input_digest=venv_pex.digest,
             description=f"Determine distributions found in {venv_pex.pex_filename}",
+            level=LogLevel.DEBUG,
+        ),
+    )
+    return parse_repository_info(process_result.stdout.decode())
+
+
+@rule
+async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInfo:
+    process_result = await Get(
+        ProcessResult,
+        PexProcess(
+            pex=Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
+            argv=[pex.name, "repository", "info", "-v"],
+            input_digest=pex.digest,
+            extra_env={"PEX_MODULE": "pex.tools"},
+            description=f"Determine distributions found in {pex.name}",
             level=LogLevel.DEBUG,
         ),
     )
