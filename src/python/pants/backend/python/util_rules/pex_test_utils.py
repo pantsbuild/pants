@@ -20,7 +20,7 @@ from pants.backend.python.util_rules.pex import (
     VenvPex,
     VenvPexProcess,
 )
-from pants.backend.python.util_rules.pex_cli import PexSCIE
+from pants.backend.python.util_rules.pex_cli import PexPEX, PexSCIE
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, PexRequirements
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessResult
@@ -172,6 +172,7 @@ def create_pex_and_get_pex_info(
 
 def rules():
     return [
+        QueryRule(PexPEX, ()),
         QueryRule(PexSCIE, ()),
         QueryRule(Pex, (PexRequest,)),
         QueryRule(VenvPex, (PexRequest,)),

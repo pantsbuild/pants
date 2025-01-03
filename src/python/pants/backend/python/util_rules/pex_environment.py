@@ -218,8 +218,7 @@ class CompletePexEnvironment:
             if self._working_directory
             else pex_filepath
         )
-        # Use the SCIE exe path and then "pex" so we get the pex tool. (Other choices are "pex3" and "pex-tools".)
-        return (pex_relpath, "pex", *args)
+        return (self._pex_environment.bootstrap_python.path, pex_relpath, *args)
 
     def environment_dict(
         self, *, python: PythonExecutable | PythonBuildStandaloneBinary | None = None
