@@ -1028,7 +1028,7 @@ fn maybe_make_wrapper_script(
     append_only_caches_base_path: Option<&str>,
     working_directory: Option<&str>,
     sandbox_root_token: Option<&str>,
-    env_vars_to_substitute: &[&str],
+    env_vars_to_substitute: Vec<&str>,
 ) -> Result<Option<String>, String> {
     let caches_fragment = match append_only_caches_base_path {
         Some(base_path) if !caches.is_empty() => {
@@ -1097,7 +1097,8 @@ fn maybe_make_wrapper_script(
             token
         );
         if !env_vars_to_substitute.is_empty() {
-            let env_vars_str = env_vars_to_substitute.join(" "); // TODO: shlex the strings
+            let env_vars_str = shlex::try_join(env_vars_to_substitute)
+                .map_err(|e| format!("Failed to shell quote environment names: {e}"))?;
             writeln!(&mut fragment, "for env_var in {env_vars_str}; do")
                 .map_err(|err| format!("write! failed: {err}"))?;
             writeln!(
@@ -1189,7 +1190,7 @@ pub async fn make_execute_request(
             append_only_caches_base_path,
             req.working_directory.as_ref().and_then(|p| p.to_str()),
             sandbox_root_token,
-            env_var_with_chroot_marker_refs.as_slice(),
+            env_var_with_chroot_marker_refs,
         )?
     };
     let wrapper_script_digest_opt = if let Some(script) = wrapper_script_content_opt {

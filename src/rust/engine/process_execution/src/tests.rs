@@ -182,7 +182,7 @@ async fn wrapper_script_supports_append_only_caches() {
         dummy_caches_base_path.path().to_str(),
         Some(SUBDIR_NAME),
         None,
-        &[],
+        vec![],
     )
     .unwrap()
     .unwrap();
@@ -243,7 +243,7 @@ async fn wrapper_script_supports_append_only_caches() {
 async fn wrapper_script_supports_sandbox_root_replacements_in_args() {
     let caches = BTreeMap::new();
 
-    let script_content = maybe_make_wrapper_script(&caches, None, None, Some("__ROOT__"), &[])
+    let script_content = maybe_make_wrapper_script(&caches, None, None, Some("__ROOT__"), vec![])
         .unwrap()
         .unwrap();
 
@@ -287,10 +287,15 @@ async fn wrapper_script_supports_sandbox_root_replacements_in_args() {
 async fn wrapper_script_supports_sandbox_root_replacements_in_environmenbt() {
     let caches = BTreeMap::new();
 
-    let script_content =
-        maybe_make_wrapper_script(&caches, None, None, Some("__ROOT__"), &["TEST_FILE_PATH"])
-            .unwrap()
-            .unwrap();
+    let script_content = maybe_make_wrapper_script(
+        &caches,
+        None,
+        None,
+        Some("__ROOT__"),
+        vec!["TEST_FILE_PATH"],
+    )
+    .unwrap()
+    .unwrap();
 
     let dummy_sandbox_path = TempDir::new().unwrap();
     let script_path = dummy_sandbox_path.path().join("wrapper");
