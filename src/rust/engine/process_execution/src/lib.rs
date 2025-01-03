@@ -1238,7 +1238,7 @@ pub async fn make_execute_request(
             .environment_variables
             .push(remexec::command::EnvironmentVariable {
                 name: name.to_string(),
-                value: value.to_string(),
+                value: value.replace("{chroot}", SANDBOX_ROOT_TOKEN),
             });
     }
 
