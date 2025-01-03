@@ -1115,15 +1115,15 @@ fn maybe_make_wrapper_script(
         writeln!(&mut script, "#!{shebang}").map_err(|err| format!("write! failed: {err:?}"))?;
 
         if let Some(sandbox_root_fragment) = sandbox_root_fragment {
-            writeln!(&mut script, "{sandbox_root_fragment}")
+            write!(&mut script, "{sandbox_root_fragment}")
                 .map_err(|err| format!("write! failed: {err:?}"))?;
         }
         if let Some(caches_fragment) = caches_fragment {
-            writeln!(&mut script, "{caches_fragment}")
+            write!(&mut script, "{caches_fragment}")
                 .map_err(|err| format!("write! failed: {err:?}"))?;
         }
         if let Some(chdir_fragment) = chdir_fragment {
-            writeln!(&mut script, "{chdir_fragment}")
+            write!(&mut script, "{chdir_fragment}")
                 .map_err(|err| format!("write! failed: {err:?}"))?;
         }
 
