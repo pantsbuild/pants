@@ -415,7 +415,9 @@ class TerraformProcess:
     output_files: tuple[str, ...] = ()
     output_directories: tuple[str, ...] = ()
     chdir: str = "."  # directory for terraform's `-chdir` argument
-    use_provider_cache: bool = True  # The Terraform provider cache is not concurrency-safe for writes (ex generating lockfiles or initialising without a lockfile)
+    use_provider_cache: bool = (
+        True  # The Terraform provider cache is not concurrency-safe for writes (ex generating lockfiles or initialising without a lockfile)
+    )
 
 
 @rule
