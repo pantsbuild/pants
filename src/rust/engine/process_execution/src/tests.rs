@@ -182,6 +182,7 @@ async fn wrapper_script_supports_append_only_caches() {
         dummy_caches_base_path.path().to_str(),
         Some(SUBDIR_NAME),
         None,
+        vec![],
     )
     .unwrap()
     .unwrap();
@@ -242,7 +243,7 @@ async fn wrapper_script_supports_append_only_caches() {
 async fn wrapper_script_supports_sandbox_root_replacements_in_args() {
     let caches = BTreeMap::new();
 
-    let script_content = maybe_make_wrapper_script(&caches, None, None, Some("__ROOT__"))
+    let script_content = maybe_make_wrapper_script(&caches, None, None, Some("__ROOT__"), vec![])
         .unwrap()
         .unwrap();
 
@@ -276,6 +277,58 @@ async fn wrapper_script_supports_sandbox_root_replacements_in_args() {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
+    let content = tokio::fs::read_to_string(Path::new(stdout.trim()))
+        .await
+        .unwrap();
+    assert_eq!(content, "xyzzy\n");
+}
+
+#[tokio::test]
+async fn wrapper_script_supports_sandbox_root_replacements_in_environmenbt() {
+    let caches = BTreeMap::new();
+
+    let script_content = maybe_make_wrapper_script(
+        &caches,
+        None,
+        None,
+        Some("__ROOT__"),
+        vec!["TEST_FILE_PATH"],
+    )
+    .unwrap()
+    .unwrap();
+
+    let dummy_sandbox_path = TempDir::new().unwrap();
+    let script_path = dummy_sandbox_path.path().join("wrapper");
+    tokio::fs::write(&script_path, script_content.as_bytes())
+        .await
+        .unwrap();
+    tokio::fs::set_permissions(&script_path, Permissions::from_mode(0o755))
+        .await
+        .unwrap();
+
+    let mut cmd = tokio::process::Command::new("./wrapper");
+    cmd.args(&[
+        "/bin/sh",
+        "-c",
+        "echo xyzzy > $TEST_FILE_PATH && echo $TEST_FILE_PATH",
+    ]);
+    cmd.env("TEST_FILE_PATH", "__ROOT__/foo.txt");
+    cmd.current_dir(dummy_sandbox_path.path());
+    cmd.stdin(Stdio::null());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    let child = cmd.spawn().unwrap();
+    let output = child.wait_with_output().await.unwrap();
+    if output.status.code() != Some(0) {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        println!("stdout:{}\n\nstderr: {}", &stdout, &stderr);
+        panic!("Wrapper script failed to run: {}", output.status);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(!stdout.contains("__ROOT__"));
     let content = tokio::fs::read_to_string(Path::new(stdout.trim()))
         .await
         .unwrap();
