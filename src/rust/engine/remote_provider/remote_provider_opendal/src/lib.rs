@@ -160,9 +160,12 @@ impl Provider {
 
         match mode {
             LoadMode::Validate => {
-                let correct_digest = async_verified_copy(digest, false, &mut reader, destination)
-                    .await
-                    .map_err(|e| format!("failed to read {}: {}", path, e))?;
+                let correct_digest = match async_verified_copy(digest, false, &mut reader, destination)
+                    .await {
+                        Ok(correct_digest) => correct_digest,
+                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+                        Err(e) => return Err(format!("failed to read {}: {}", path, e)),
+                    };
 
                 if !correct_digest {
                     // TODO: include the actual digest here
@@ -170,9 +173,11 @@ impl Provider {
                 }
             }
             LoadMode::NoValidate => {
-                tokio::io::copy(&mut reader, destination)
-                    .await
-                    .map_err(|e| format!("failed to read {}: {}", path, e))?;
+                match tokio::io::copy(&mut reader, destination).await {
+                    Ok(result) => result,
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+                    Err(e) => return Err(format!("failed to read {}: {}", path, e)),
+                };
             }
         }
         Ok(true)
