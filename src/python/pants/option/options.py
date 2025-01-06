@@ -181,7 +181,6 @@ class Options:
             builtin_or_auxiliary_goal=split_args.builtin_or_auxiliary_goal,
             goals=split_args.goals,
             unknown_goals=split_args.unknown_goals,
-            scope_to_flags=split_args.scope_to_flags,
             specs=split_args.specs,
             passthru=split_args.passthru,
             registrar_by_scope=registrar_by_scope,
@@ -195,7 +194,6 @@ class Options:
         builtin_or_auxiliary_goal: str | None,
         goals: list[str],
         unknown_goals: list[str],
-        scope_to_flags: dict[str, list[str]],
         specs: list[str],
         passthru: list[str],
         registrar_by_scope: dict[str, OptionRegistrar],
@@ -210,7 +208,6 @@ class Options:
         self._builtin_or_auxiliary_goal = builtin_or_auxiliary_goal
         self._goals = goals
         self._unknown_goals = unknown_goals
-        self._scope_to_flags = scope_to_flags
         self._specs = specs
         self._passthru = passthru
         self._registrar_by_scope = registrar_by_scope
@@ -264,10 +261,6 @@ class Options:
             scope: registrar.known_scoped_args
             for scope, registrar in self._registrar_by_scope.items()
         }
-
-    @property
-    def scope_to_flags(self) -> dict[str, list[str]]:
-        return self._scope_to_flags
 
     def verify_configs(self) -> None:
         """Verify all loaded configs have correct scopes and options."""
