@@ -19,10 +19,11 @@ pub async fn choose_byte_store_provider(
             remote_provider_reapi::byte_store::Provider::new(options).await?,
         )),
         RemoteProvider::ExperimentalFile => {
-            if address.starts_with("file://") {
+            if let Some(path) = address.strip_prefix("file://") {
                 // It's a bit weird to support local "file://" for a 'remote' store... but this is handy for
                 // testing.
                 Ok(Arc::new(remote_provider_opendal::Provider::fs(
+                    path,
                     "byte-store".to_owned(),
                     options,
                 )?))
@@ -53,10 +54,11 @@ pub async fn choose_action_cache_provider(
             remote_provider_reapi::action_cache::Provider::new(options).await?,
         )),
         RemoteProvider::ExperimentalFile => {
-            if address.starts_with("file://") {
+            if let Some(path) = address.strip_prefix("file://") {
                 // It's a bit weird to support local "file://" for a 'remote' store... but this is handy for
                 // testing.
                 Ok(Arc::new(remote_provider_opendal::Provider::fs(
+                    path,
                     "action-cache".to_owned(),
                     options,
                 )?))
