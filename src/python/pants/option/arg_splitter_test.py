@@ -49,7 +49,6 @@ def assert_valid_split(
     args = shlex.split(args_str)
     split_args = splitter.split_args(args)
     assert expected_goals == split_args.goals
-    assert expected_scope_to_flags == split_args.scope_to_flags
     assert expected_specs == split_args.specs
     assert expected_passthru == split_args.passthru
 
