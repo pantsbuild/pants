@@ -282,12 +282,12 @@ async def setup_pex_cli_process(
         normalized_argv = complete_pex_env.create_argv(pex_cli_tool.exe, *args)
 
     # Build the environment for running the program.
-    env = {}
+    env: dict[str, str] = {}
     if not pex_cli_tool.is_scie:
         env.update(complete_pex_env.environment_dict(python=bootstrap_python))
     env.update(python_native_code.subprocess_env_vars)
     if request.extra_env:
-        env.update(request.extra_env)  # type: ignore[dict-item]
+        env.update(request.extra_env)
 
     # If a subcommand is used, we need to use the `pex3` console script.
     if request.subcommand:
