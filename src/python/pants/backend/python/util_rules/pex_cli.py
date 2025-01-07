@@ -276,17 +276,22 @@ async def setup_pex_cli_process(
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
     normalized_argv: tuple[str, ...]
     if pex_cli_tool.is_scie:
+        # TODO: Is there a neeed to select `pex3`?
         normalized_argv = (pex_cli_tool.exe, "pex", *args)
     else:
         normalized_argv = complete_pex_env.create_argv(pex_cli_tool.exe, *args)
 
-    env = {
-        **complete_pex_env.environment_dict(python=bootstrap_python),
-        **python_native_code.subprocess_env_vars,
-        **(request.extra_env or {}),  # type: ignore[dict-item]
-        # If a subcommand is used, we need to use the `pex3` console script.
-        **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
-    }
+    # Build the environment for running the program.
+    env = {}
+    if not pex_cli_tool.is_scie:
+        env.update(complete_pex_env.environment_dict(python=bootstrap_python))
+    env.update(python_native_code.subprocess_env_vars)
+    if request.extra_env:
+        env.update(request.extra_env)  # type: ignore[dict-item]
+
+    # If a subcommand is used, we need to use the `pex3` console script.
+    if request.subcommand:
+        env["PEX_SCRIPT"] = "pex3"  # TODO: This may require selecting "pex3" from the SCIE instead.
 
     return Process(
         normalized_argv,
