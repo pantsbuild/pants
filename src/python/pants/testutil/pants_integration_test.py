@@ -224,6 +224,7 @@ def run_pants(
     config: Mapping | None = None,
     extra_env: Env | None = None,
     stdin_data: bytes | str | None = None,
+    cleanup: bool = True,
 ) -> PantsResult:
     """Runs Pants in a subprocess.
 
@@ -235,7 +236,7 @@ def run_pants(
     :param extra_env: Set these env vars in the Pants process's environment.
     :param stdin_data: Make this data available to be read from the process's stdin.
     """
-    with temporary_workdir() as workdir:
+    with temporary_workdir(cleanup=cleanup) as workdir:
         return run_pants_with_workdir(
             command,
             workdir=workdir,
@@ -254,7 +255,7 @@ def run_pants(
 
 @contextmanager
 def setup_tmpdir(
-    files: Mapping[str, str], raw_files: Mapping[str, bytes] | None = None
+    files: Mapping[str, str], raw_files: Mapping[str, bytes] | None = None, cleanup: bool = True
 ) -> Iterator[str]:
     """Create a temporary directory with the given files and return the tmpdir (relative to the
     build root).
@@ -273,7 +274,7 @@ def setup_tmpdir(
 
     raw_files = raw_files or {}
 
-    with temporary_dir(root_dir=get_buildroot()) as tmpdir:
+    with temporary_dir(root_dir=get_buildroot(), cleanup=cleanup) as tmpdir:
         rel_tmpdir = os.path.relpath(tmpdir, get_buildroot())
         for path, content in files.items():
             safe_file_dump(

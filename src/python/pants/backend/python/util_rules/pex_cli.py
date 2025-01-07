@@ -285,6 +285,8 @@ async def setup_pex_cli_process(
     env: dict[str, str] = {}
     if not pex_cli_tool.is_scie:
         env.update(complete_pex_env.environment_dict(python=bootstrap_python))
+    else:
+        env.update(complete_pex_env.environment_dict(python=None))
     env.update(python_native_code.subprocess_env_vars)
     if request.extra_env:
         env.update(request.extra_env)
