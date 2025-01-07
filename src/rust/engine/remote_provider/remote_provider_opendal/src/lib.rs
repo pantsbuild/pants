@@ -160,8 +160,8 @@ impl Provider {
 
         match mode {
             LoadMode::Validate => {
-                let correct_digest = match async_verified_copy(digest, false, &mut reader, destination)
-                    .await {
+                let correct_digest =
+                    match async_verified_copy(digest, false, &mut reader, destination).await {
                         Ok(correct_digest) => correct_digest,
                         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
                         Err(e) => return Err(format!("failed to read {}: {}", path, e)),
