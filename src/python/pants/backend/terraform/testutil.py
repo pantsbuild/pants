@@ -56,7 +56,7 @@ def rule_runner_with_auto_approve() -> RuleRunner:
         preserve_tmpdirs=True,
     )
     # We have to forward "--auto-approve" to TF because `mock_console` is noninteractive
-    rule_runner.set_options(["--download-terraform-args='-auto-approve'"])
+    rule_runner.set_options(["--download-terraform-args='-auto-approve'", "--keep-sandboxes=on_failure", "-ldebug"])
     return rule_runner
 
 
