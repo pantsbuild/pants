@@ -213,6 +213,9 @@ async def setup_pex_cli_process(
     pex_cli_tool: PexCliTool,
     python_setup: PythonSetup,
 ) -> Process:
+    # if "Find interpreter for constraints" in request.description:
+    #     raise ValueError(f"request={request}; pex_env={pex_env}")
+
     tmpdir = ".tmp"
     gets: List[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
 
@@ -283,10 +286,11 @@ async def setup_pex_cli_process(
 
     # Build the environment for running the program.
     env: dict[str, str] = {}
-    if not pex_cli_tool.is_scie:
-        env.update(complete_pex_env.environment_dict(python=bootstrap_python))
-    else:
-        env.update(complete_pex_env.environment_dict(python=None))
+    env.update(complete_pex_env.environment_dict(python=bootstrap_python))
+    # if not pex_cli_tool.is_scie:
+    #     env.update(complete_pex_env.environment_dict(python=bootstrap_python))
+    # else:
+    #     env.update(complete_pex_env.environment_dict(python=None))
     env.update(python_native_code.subprocess_env_vars)
     if request.extra_env:
         env.update(request.extra_env)
@@ -295,7 +299,10 @@ async def setup_pex_cli_process(
     if request.subcommand:
         env["PEX_SCRIPT"] = "pex3"  # TODO: This may require selecting "pex3" from the SCIE instead.
 
-    return Process(
+    # if "Find interpreter for constraints" in request.description:
+    #     raise ValueError(f"normalized_argv={normalized_argv}; env={env}")
+
+    process = Process(
         normalized_argv,
         description=request.description,
         input_digest=input_digest,
@@ -307,6 +314,12 @@ async def setup_pex_cli_process(
         concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,
     )
+
+    # if "Find interpreter for constraints" in request.description:
+    #     raise ValueError(f"process={process}")
+    print(f"PEX CLI: process={process}")
+    
+    return process
 
 
 def maybe_log_pex_stderr(stderr: bytes, pex_verbosity: int) -> None:
