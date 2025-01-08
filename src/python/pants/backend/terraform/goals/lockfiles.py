@@ -132,6 +132,7 @@ async def generate_lockfile_from_sources(
             output_files=(".terraform.lock.hcl",),
             description=provider_lock_description,
             chdir=initialised_terraform.chdir,
+            use_provider_cache=False,  # Terraform downloads providers during lockfile generation, which will cause concurrent writes to the cache
         ),
     )
     if multiplatform_lockfile.exit_code != 0:
