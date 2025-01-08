@@ -193,22 +193,6 @@ def test_valid_arg_splits(
     )
 
 
-def test_descoping_qualified_flags(splitter: ArgSplitter) -> None:
-    assert_valid_split(
-        splitter,
-        "./pants check test --check-bar --no-test-baz foo/bar",
-        expected_goals=["check", "test"],
-        expected_specs=["foo/bar"],
-    )
-    # Qualified flags don't count as explicit goals.
-    assert_valid_split(
-        splitter,
-        "./pants check --test-bar foo/bar",
-        expected_goals=["check"],
-        expected_specs=["foo/bar"],
-    )
-
-
 def test_passthru_args(splitter: ArgSplitter) -> None:
     assert_valid_split(
         splitter,
@@ -225,22 +209,6 @@ def test_passthru_args(splitter: ArgSplitter) -> None:
         expected_goals=["check", "test"],
         expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
         expected_passthru=["passthru1", "passthru2", "-linfo"],
-    )
-
-
-def test_subsystem_flags(splitter: ArgSplitter) -> None:
-    # Global subsystem flag in global scope.
-    assert_valid_split(
-        splitter,
-        "./pants --jvm-options=-Dbar=baz test foo:bar",
-        expected_goals=["test"],
-        expected_specs=["foo:bar"],
-    )
-    assert_valid_split(
-        splitter,
-        "./pants test --reporting-template-dir=path foo:bar",
-        expected_goals=["test"],
-        expected_specs=["foo:bar"],
     )
 
 

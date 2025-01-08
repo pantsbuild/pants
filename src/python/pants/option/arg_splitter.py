@@ -97,19 +97,6 @@ class ArgSplitter:
         # We store in reverse order, for efficient popping off the end.
         self._unconsumed_args: list[str] = []
 
-        # We allow --scope-flag-name anywhere on the cmd line, as an alternative to ...
-        # scope --flag-name.
-
-        # We check for prefixes in reverse order, so we match the longest prefix first.
-        sorted_scope_infos = sorted(
-            (si for si in self._known_scope_infos if si.scope),
-            key=lambda si: si.scope,
-            reverse=True,
-        )
-
-        # List of pairs (prefix, ScopeInfo).
-        self._known_scoping_prefixes = [(f"{si.scope}-", si) for si in sorted_scope_infos]
-
     @staticmethod
     def _get_known_goal_scopes(
         known_scope_infos: Iterable[ScopeInfo],
@@ -246,22 +233,6 @@ class ArgSplitter:
             flag = self._unconsumed_args.pop()
             flags.append(flag)
         return flags
-
-    def _descope_flag(self, flag: str, default_scope: str) -> tuple[str, str]:
-        """If the flag is prefixed by its scope, extract the scope.
-
-        Otherwise assume it belongs to default_scope.
-
-        Returns a pair (scope, flag).
-        """
-        for scope_prefix, scope_info in self._known_scoping_prefixes:
-            for flag_prefix in ["--", "--no-"]:
-                prefix = flag_prefix + scope_prefix
-                if not flag.startswith(prefix):
-                    continue
-                return scope_info.scope, flag_prefix + flag[len(prefix) :]
-
-        return default_scope, flag
 
     def _at_flag(self) -> bool:
         if not self._unconsumed_args:
