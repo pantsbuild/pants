@@ -292,13 +292,18 @@ async def do_export(
         ):
             pex_args.insert(-1, "--non-hermetic-scripts")
 
+        args_for_pex_invocation: tuple[str, ...]
+        if pex_cli_tool.is_scie:
+            args_for_pex_invocation = (
+                os.path.join(tmpdir_under_digest_root, pex_cli_tool.exe),
+                "pex",
+                *pex_args,
+            )
+        else:
+            args_for_pex_invocation = complete_pex_env.create_argv(pex_args)
         post_processing_cmds = [
             PostProcessingCommand(
-                complete_pex_env.create_argv(
-                    os.path.join(tmpdir_under_digest_root, pex_cli_tool.exe),
-                    *(["pex"] if pex_cli_tool.is_scie else []),
-                    *pex_args,
-                ),
+                args_for_pex_invocation,
                 {
                     **complete_pex_env.environment_dict(python=requirements_pex.python),
                     "PEX_MODULE": "pex.tools",
