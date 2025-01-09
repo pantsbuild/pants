@@ -16,8 +16,8 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.rules import Get, collect_rules, goal_rule, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.option.config import Config
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 from pants.version import VERSION
 
@@ -131,10 +131,9 @@ async def check_default_tools(
                     SessionValues(
                         {
                             OptionsBootstrapper: OptionsBootstrapper(
-                                tuple(),
-                                ("./pants",),
-                                args,
-                                Config(tuple()),
+                                args=args,
+                                env=FrozenDict(),
+                                allow_pantsrc=False,
                             )
                         }
                     ),

@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import os.path
 from abc import ABC
-from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict, Iterable, Iterator, Sequence
+from typing import Iterable, Iterator, Sequence
 
 from pants.base.deprecated import warn_or_error
-from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.option.scope import ScopeInfo
 from pants.util.ordered_set import OrderedSet
 
 
@@ -25,7 +24,6 @@ class SplitArgs:
     builtin_or_auxiliary_goal: str | None  # Requested builtin goal (explicitly or implicitly).
     goals: list[str]  # Explicitly requested goals.
     unknown_goals: list[str]  # Any unknown goals.
-    scope_to_flags: dict[str, list[str]]  # Scope name -> list of flags in that scope.
     specs: list[str]  # The specifications for what to run against, e.g. the targets or files/dirs.
     passthru: list[str]  # Any remaining args specified after a -- separator.
 
@@ -99,19 +97,6 @@ class ArgSplitter:
         # We store in reverse order, for efficient popping off the end.
         self._unconsumed_args: list[str] = []
 
-        # We allow --scope-flag-name anywhere on the cmd line, as an alternative to ...
-        # scope --flag-name.
-
-        # We check for prefixes in reverse order, so we match the longest prefix first.
-        sorted_scope_infos = sorted(
-            (si for si in self._known_scope_infos if si.scope),
-            key=lambda si: si.scope,
-            reverse=True,
-        )
-
-        # List of pairs (prefix, ScopeInfo).
-        self._known_scoping_prefixes = [(f"{si.scope}-", si) for si in sorted_scope_infos]
-
     @staticmethod
     def _get_known_goal_scopes(
         known_scope_infos: Iterable[ScopeInfo],
@@ -131,23 +116,16 @@ class ArgSplitter:
         Returns a SplitArgs tuple.
         """
         goals: OrderedSet[str] = OrderedSet()
-        scope_to_flags: DefaultDict[str, list[str]] = defaultdict(list)
         specs: list[str] = []
         passthru: list[str] = []
         unknown_scopes: list[str] = []
         builtin_or_auxiliary_goal: str | None = None
-
-        def add_scope(s: str) -> None:
-            # Force the scope to appear, even if empty.
-            if s not in scope_to_flags:
-                scope_to_flags[s] = []
 
         def add_goal(scope: str) -> str:
             """Returns the scope name to assign flags to."""
             scope_info = self._known_goal_scopes.get(scope)
             if not scope_info:
                 unknown_scopes.append(scope)
-                add_scope(scope)
                 return scope
 
             nonlocal builtin_or_auxiliary_goal
@@ -161,7 +139,6 @@ class ArgSplitter:
                 builtin_or_auxiliary_goal = scope_info.scope
             else:
                 goals.add(scope_info.scope)
-            add_scope(scope_info.scope)
 
             # Use builtin/auxiliary goal as default scope for args.
             return builtin_or_auxiliary_goal or scope_info.scope
@@ -170,28 +147,15 @@ class ArgSplitter:
         # The first token is the binary name, so skip it.
         self._unconsumed_args.pop()
 
-        def assign_flag_to_scope(flg: str, default_scope: str) -> None:
-            flag_scope, descoped_flag = self._descope_flag(flg, default_scope=default_scope)
-            scope_to_flags[flag_scope].append(descoped_flag)
-
-        global_flags = self._consume_flags()
-        add_scope(GLOBAL_SCOPE)
-        for flag in global_flags:
-            assign_flag_to_scope(flag, GLOBAL_SCOPE)
-
+        self._consume_flags()
         scope, flags = self._consume_scope()
         while scope:
-            # `add_goal` returns the currently active scope to assign flags to.
-            scope = add_goal(scope)
-            for flag in flags:
-                assign_flag_to_scope(flag, GLOBAL_SCOPE if self.is_level_short_arg(flag) else scope)
+            add_goal(scope)
             scope, flags = self._consume_scope()
 
         while self._unconsumed_args and not self._at_standalone_double_dash():
             if self._at_flag():
-                arg = self._unconsumed_args.pop()
-                # We assume any args here are in global scope.
-                assign_flag_to_scope(arg, GLOBAL_SCOPE)
+                self._unconsumed_args.pop()
                 continue
 
             arg = self._unconsumed_args.pop()
@@ -228,7 +192,6 @@ class ArgSplitter:
             builtin_or_auxiliary_goal=builtin_or_auxiliary_goal,
             goals=list(goals),
             unknown_goals=unknown_scopes,
-            scope_to_flags=dict(scope_to_flags),
             specs=specs,
             passthru=passthru,
         )
@@ -270,22 +233,6 @@ class ArgSplitter:
             flag = self._unconsumed_args.pop()
             flags.append(flag)
         return flags
-
-    def _descope_flag(self, flag: str, default_scope: str) -> tuple[str, str]:
-        """If the flag is prefixed by its scope, extract the scope.
-
-        Otherwise assume it belongs to default_scope.
-
-        Returns a pair (scope, flag).
-        """
-        for scope_prefix, scope_info in self._known_scoping_prefixes:
-            for flag_prefix in ["--", "--no-"]:
-                prefix = flag_prefix + scope_prefix
-                if not flag.startswith(prefix):
-                    continue
-                return scope_info.scope, flag_prefix + flag[len(prefix) :]
-
-        return default_scope, flag
 
     def _at_flag(self) -> bool:
         if not self._unconsumed_args:

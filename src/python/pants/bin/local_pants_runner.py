@@ -102,21 +102,14 @@ class LocalPantsRunner:
         run_tracker = RunTracker(options_bootstrapper.args, options)
         native_engine.maybe_set_panic_handler()
 
-        # Option values are usually computed lazily on demand, but command line options are
-        # eagerly computed for validation.
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
             # Verify CLI flags.
             if not build_config.allow_unknown_options:
                 options.verify_args()
 
-            for scope, values in options.scope_to_flags.items():
-                if values:
-                    # Only compute values if there were any command line options presented.
-                    options.for_scope(scope)
-
         # Verify configs.
         if global_bootstrap_options.verify_config:
-            options.verify_configs(options_bootstrapper.config)
+            options.verify_configs()
 
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.

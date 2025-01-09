@@ -9,13 +9,13 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator, List, Mapping, Union, cast
+from typing import Any, Iterator, List, Mapping, Union, cast
 
 import pytest
+import toml
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
-from pants.option.config import TomlSerializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
 from pants.util.contextutil import temporary_dir
@@ -120,7 +120,7 @@ def run_pants_with_workdir_without_waiting(
     if config:
         toml_file_name = os.path.join(workdir, "pants.toml")
         with safe_open(toml_file_name, mode="w") as fp:
-            fp.write(TomlSerializer(config).serialize())
+            fp.write(_TomlSerializer(config).serialize())
         args.append(f"--pants-config-files={toml_file_name}")
 
     # The python backend requires setting ICs explicitly.
@@ -342,3 +342,53 @@ def _read_log(filename: str) -> Iterator[str]:
     with open(filename) as f:
         for line in f:
             yield line.rstrip()
+
+
+@dataclass(frozen=True)
+class _TomlSerializer:
+    """Convert a dictionary of option scopes -> Python values into TOML understood by Pants.
+
+    The constructor expects a dictionary of option scopes to their corresponding values as
+    represented in Python. For example:
+
+      {
+        "GLOBAL": {
+          "o1": True,
+          "o2": "hello",
+          "o3": [0, 1, 2],
+        },
+        "some-subsystem": {
+          "dict_option": {
+            "a": 0,
+            "b": 0,
+          },
+        },
+      }
+    """
+
+    parsed: Mapping[str, dict[str, int | float | str | bool | list | dict]]
+
+    def normalize(self) -> dict:
+        def normalize_section_value(option, option_value) -> tuple[str, Any]:
+            # With TOML, we store dict values as strings (for now).
+            if isinstance(option_value, dict):
+                option_value = str(option_value)
+            if option.endswith(".add"):
+                option = option.rsplit(".", 1)[0]
+                option_value = f"+{option_value!r}"
+            elif option.endswith(".remove"):
+                option = option.rsplit(".", 1)[0]
+                option_value = f"-{option_value!r}"
+            return option, option_value
+
+        return {
+            section: dict(
+                normalize_section_value(option, option_value)
+                for option, option_value in section_values.items()
+            )
+            for section, section_values in self.parsed.items()
+        }
+
+    def serialize(self) -> str:
+        toml_values = self.normalize()
+        return toml.dumps(toml_values)

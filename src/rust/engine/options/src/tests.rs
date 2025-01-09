@@ -637,3 +637,66 @@ fn test_validate_config() {
         },
     );
 }
+
+#[test]
+fn test_config_path_discovery() {
+    let buildroot = TempDir::new().unwrap();
+    File::create(buildroot.path().join("pants.toml")).unwrap();
+
+    let config_path_buf = buildroot.path().join("pants.other.toml");
+    let config_path = format!("{}", config_path_buf.display());
+    File::create(config_path_buf).unwrap();
+
+    // Setting from flag.
+    assert_eq!(
+        vec!["pants.other.toml"],
+        OptionParser::new(
+            Args::new(vec![format!("--pants-config-files=['{}']", config_path)]),
+            Env { env: hashmap! {} },
+            None,
+            false,
+            false,
+            Some(BuildRoot::find_from(buildroot.path()).unwrap()),
+            None,
+        )
+        .unwrap()
+        .get_config_file_paths()
+    );
+
+    // Setting to empty and then appending from flags.
+    assert_eq!(
+        vec!["pants.other.toml"],
+        OptionParser::new(
+            Args::new(vec![
+                "--pants-config-files=[]".to_string(),
+                format!("--pants-config-files={}", config_path)
+            ]),
+            Env { env: hashmap! {} },
+            None,
+            false,
+            false,
+            Some(BuildRoot::find_from(buildroot.path()).unwrap()),
+            None,
+        )
+        .unwrap()
+        .get_config_file_paths()
+    );
+
+    // Appending from env var.
+    assert_eq!(
+        vec!["pants.toml", "pants.other.toml"],
+        OptionParser::new(
+            Args::new([]),
+            Env {
+                env: hashmap! {"PANTS_CONFIG_FILES".to_string() => config_path.to_string()}
+            },
+            None,
+            false,
+            false,
+            Some(BuildRoot::find_from(buildroot.path()).unwrap()),
+            None,
+        )
+        .unwrap()
+        .get_config_file_paths()
+    );
+}

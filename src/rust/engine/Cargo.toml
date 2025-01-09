@@ -275,7 +275,7 @@ notify = { git = "https://github.com/pantsbuild/notify", rev = "276af0f3c5f300bf
 num_cpus = "1"
 num_enum = "0.5"
 once_cell = "1.20"
-opendal = { version = "0.41", default-features = false, features = [
+opendal = { version = "0.45.1", default-features = false, features = [
   "services-memory",
   "services-fs",
   "services-ghac",
@@ -334,7 +334,7 @@ url = "2.5"
 uuid = "1.8.0"
 walkdir = "2"
 webpki = "0.22"
-whoami = "1.4.1"
+whoami = "1.5.2"
 
 # NB: If a change to these versions requires cache busting, bump the version of
 # `src/rust/engine/dep_inference/Cargo.toml`.

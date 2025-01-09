@@ -26,12 +26,10 @@ class Collection(Tuple[T, ...]):
     """
 
     @overload  # type: ignore[override]  # noqa: F811
-    def __getitem__(self, index: int) -> T:
-        ...
+    def __getitem__(self, index: int) -> T: ...
 
     @overload  # noqa: F811
-    def __getitem__(self, index: slice) -> Collection[T]:
-        ...
+    def __getitem__(self, index: slice) -> Collection[T]: ...
 
     def __getitem__(self, index: int | slice) -> T | Collection[T]:  # noqa: F811
         result = super().__getitem__(index)
@@ -42,7 +40,7 @@ class Collection(Tuple[T, ...]):
     def __eq__(self, other: Any) -> bool:
         if self is other:
             return True
-        return type(self) == type(other) and super().__eq__(other)
+        return type(self) is type(other) and super().__eq__(other)
 
     def __ne__(self, other: Any) -> bool:
         # We must explicitly override to provide the inverse of _our_ __eq__ and not get the
