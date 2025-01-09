@@ -17,6 +17,7 @@ from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.backend.nfpm.fields.contents import NfpmContentFileSourceField, NfpmContentSrcField
 from pants.backend.nfpm.subsystem import NfpmSubsystem
 from pants.backend.nfpm.target_types import NfpmContentFile
+from pants.backend.nfpm.util_rules.inject_config import determine_injected_nfpm_package_fields
 from pants.core.goals.package import TraverseIfNotPackageTarget
 from pants.engine.fs import CreateDigest, FileContent, FileEntry
 from pants.engine.internals.graph import find_valid_field_sets
@@ -74,7 +75,12 @@ async def generate_nfpm_yaml(
 
     # Fist get the config that can be constructed from the target itself.
     nfpm_package_target = transitive_targets.roots[0]
-    config = request.field_set.nfpm_config(nfpm_package_target, default_mtime=default_mtime)
+    injected_fields = await determine_injected_nfpm_package_fields(
+        nfpm_package_target, union_membership
+    )
+    config = request.field_set.nfpm_config(
+        nfpm_package_target, injected_fields.field_values, default_mtime=default_mtime
+    )
 
     # Second, gather package contents from hydrated deps.
     contents: list[NfpmContent] = config["contents"]
