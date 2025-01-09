@@ -266,7 +266,7 @@ async def isolate_local_dist_pep660_wheels(
         Snapshot, DigestSubset(pep660_result.output, PathGlobs(["**/*.whl"]))
     )
 
-    wheels = tuple(wheels_snapshot.files)
+    wheels = tuple(sorted(wheels_snapshot.files))
 
     if not wheels:
         tgt = await Get(
@@ -281,7 +281,7 @@ async def isolate_local_dist_pep660_wheels(
                 code will be used directly from sources, without a distribution being built,
                 and any native extensions in it will not be built.
 
-                See {doc_url('python-distributions')} for details on how to set up a
+                See {doc_url('docs/python/overview/building-distributions')} for details on how to set up a
                 {tgt.target.alias} target to produce a wheel.
                 """
             )
@@ -306,7 +306,7 @@ async def isolate_local_dist_pep660_wheels(
     )
     provided_files = set(wheels_listing_result.stdout.decode().splitlines())
 
-    return LocalDistPEP660Wheels(wheels, wheels_snapshot.digest, frozenset(provided_files))
+    return LocalDistPEP660Wheels(wheels, wheels_snapshot.digest, frozenset(sorted(provided_files)))
 
 
 @dataclass(frozen=True)
@@ -357,7 +357,7 @@ async def sort_all_python_distributions_by_resolve(
                 break
         dists[resolve].append(dist)
     return ResolveSortedPythonDistributionTargets(
-        FrozenDict({resolve: tuple(targets) for resolve, targets in dists.items()})
+        FrozenDict({resolve: tuple(sorted(targets)) for resolve, targets in dists.items()})
     )
 
 

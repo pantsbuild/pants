@@ -31,6 +31,7 @@ from pants.backend.python.target_types import (
     PythonTestTarget,
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
+from pants.backend.python.util_rules.entry_points import rules as entry_points_rules
 from pants.engine.addresses import Address
 from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -74,6 +75,7 @@ def write_test_files(rule_runner: RuleRunner, extra_build_contents: str = ""):
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
+            *entry_points_rules(),
             *python_target_types_rules(),
             *stevedore_dep_rules(),
             QueryRule(AllStevedoreExtensionTargets, ()),

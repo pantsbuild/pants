@@ -71,6 +71,50 @@ def test_parses_projects(rule_runner: RuleRunner) -> None:
     assert {project.root_dir for project in projects} == {"src/js/foo", "src/js/bar"}
 
 
+@pytest.mark.parametrize(
+    ("package_manager", "expected_immutable_install_args"),
+    [
+        (None, ("clean-install",)),
+        ("npm@10.2.4", ("clean-install",)),
+        ("pnpm@9.5.0", ("install", "--frozen-lockfile")),
+        ("yarn@1.22.19", ("install", "--frozen-lockfile")),
+        ("yarn@2.4.3", ("install", "--immutable")),
+        ("yarn@3.6.4", ("install", "--immutable")),
+    ],
+)
+def test_immutable_install_args_property(
+    package_manager: None | str,
+    expected_immutable_install_args: tuple[str],
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/foo/BUILD": "package_json()",
+            "src/js/foo/package.json": given_package(
+                name="foo",
+                version="0.0.1",
+                package_manager=package_manager,
+            ),
+        }
+    )
+    projects = rule_runner.request(AllNodeJSProjects, [])
+    assert projects[0].immutable_install_args == expected_immutable_install_args
+
+
+def test_immutable_install_args_property_with_unsupported_package_manager(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/foo/BUILD": "package_json()",
+            "src/js/foo/package.json": given_package("foo", "0.0.1", package_manager="bar@2.4.3"),
+        }
+    )
+    expected_error = "Unsupported package manager: bar"
+    with engine_error(ValueError, contains=expected_error):
+        rule_runner.request(AllNodeJSProjects, [])
+
+
 def test_root_package_json_is_supported(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -99,7 +143,7 @@ def test_parses_project_with_workspaces(rule_runner: RuleRunner) -> None:
     [project] = rule_runner.request(AllNodeJSProjects, [])
     assert project.root_dir == "src/js"
     assert {workspace.name for workspace in project.workspaces} == {"egg", "ham", "spam"}
-    assert project.package_manager == "npm"
+    assert project.package_manager.name == "npm"
 
 
 def test_parses_project_with_nested_workspaces(rule_runner: RuleRunner) -> None:

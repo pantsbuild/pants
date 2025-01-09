@@ -91,7 +91,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
             dir/BUILD:1: Name 'FAKE' is not defined.
 
             {dym}If you expect to see more symbols activated in the below list, refer to
-            {doc_url('enabling-backends')} for all available backends to activate.
+            {doc_url('docs/using-pants/key-concepts/backends')} for all available backends to activate.
 
             All registered symbols: [{fmt_extra_sym}'__defaults__', '__dependencies_rules__',
             '__dependents_rules__', 'build_file_dir', 'caof', 'env', 'obj', 'prelude', 'tgt']
@@ -249,7 +249,7 @@ def test_unrecognized_symbol_in_prelude(
         Did you mean macro?
 
         If you expect to see more symbols activated in the below list, refer to
-        {doc_url('enabling-backends')} for all available backends to activate.
+        {doc_url('docs/using-pants/key-concepts/backends')} for all available backends to activate.
 
         All registered symbols: ['__defaults__', '__dependencies_rules__', '__dependents_rules__',
         'build_file_dir', 'caof', 'env', 'macro', 'obj']

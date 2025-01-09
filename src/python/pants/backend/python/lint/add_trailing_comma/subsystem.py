@@ -5,14 +5,16 @@ from __future__ import annotations
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.rules import collect_rules
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
 
 
 class AddTrailingComma(PythonToolBase):
     options_scope = "add-trailing-comma"
     name = "add-trailing-comma"
-    help = "The add-trailing-comma Python code formatter (https://github.com/asottile/add-trailing-comma)."
+    help_short = "The add-trailing-comma Python code formatter (https://github.com/asottile/add-trailing-comma)."
 
     default_main = ConsoleScript("add-trailing-comma")
     default_requirements = ["add-trailing-comma>=2.2.3,<3"]
@@ -29,4 +31,7 @@ class AddTrailingComma(PythonToolBase):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(ExportableTool, AddTrailingComma),
+    ]

@@ -6,13 +6,16 @@ import logging
 from concurrent.futures import Future
 from typing import Any, BinaryIO, ClassVar, Protocol
 
-from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
-from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
+from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import-untyped]
+from pylsp_jsonrpc.exceptions import (  # type: ignore[import-untyped]
     JsonRpcException,
     JsonRpcInvalidRequest,
     JsonRpcMethodNotFound,
 )
-from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
+from pylsp_jsonrpc.streams import (  # type: ignore[import-untyped]
+    JsonRpcStreamReader,
+    JsonRpcStreamWriter,
+)
 
 from pants.bsp.context import BSPContext
 from pants.bsp.spec.notification import BSPNotification
@@ -28,13 +31,11 @@ _logger = logging.getLogger(__name__)
 
 class BSPRequestTypeProtocol(Protocol):
     @classmethod
-    def from_json_dict(cls, d: dict[str, Any]) -> Any:
-        ...
+    def from_json_dict(cls, d: dict[str, Any]) -> Any: ...
 
 
 class BSPResponseTypeProtocol(Protocol):
-    def to_json_dict(self) -> dict[str, Any]:
-        ...
+    def to_json_dict(self) -> dict[str, Any]: ...
 
 
 @union(in_scope_types=[EnvironmentName])

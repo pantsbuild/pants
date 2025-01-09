@@ -66,8 +66,8 @@ class ProtobufSourceTarget(Target):
         A single Protobuf file used to generate various languages.
 
         See language-specific docs:
-            Python: {doc_url('protobuf-python')}
-            Go: {doc_url('protobuf-go')}
+            Python: {doc_url('docs/python/integrations/protobuf-and-grpc')}
+            Go: {doc_url('docs/go/integrations/protobuf')}
         """
     )
 

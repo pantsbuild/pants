@@ -18,7 +18,7 @@ from pants.backend.helm.target_types import (
 from pants.backend.helm.util_rules import post_renderer
 from pants.backend.helm.util_rules.post_renderer import HelmDeploymentPostRendererRequest
 from pants.backend.helm.util_rules.renderer import HelmDeploymentCmd, HelmDeploymentRequest
-from pants.core.goals.deploy import DeployFieldSet, DeployProcess
+from pants.core.goals.deploy import DeployFieldSet, DeployProcess, DeploySubsystem
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import DependenciesRequest, Targets
@@ -37,8 +37,11 @@ class DeployHelmDeploymentFieldSet(HelmDeploymentFieldSet, DeployFieldSet):
 
 @rule(desc="Run Helm deploy process", level=LogLevel.DEBUG)
 async def run_helm_deploy(
-    field_set: DeployHelmDeploymentFieldSet, helm_subsystem: HelmSubsystem
+    field_set: DeployHelmDeploymentFieldSet,
+    helm_subsystem: HelmSubsystem,
+    deploy_subsystem: DeploySubsystem,
 ) -> DeployProcess:
+    dry_run_args = ["--dry-run"] if deploy_subsystem.dry_run else []
     passthrough_args = helm_subsystem.valid_args(
         extra_help=softwrap(
             f"""
@@ -46,6 +49,8 @@ async def run_helm_deploy(
             Usage of fields is encouraged over passthrough arguments as that enables repeatable deployments.
 
             Please run `{bin_name()} help {HelmDeploymentTarget.alias}` for more information.
+
+            To use `--dry-run`, run `{bin_name()} experimental-deploy --dry-run ::`.
             """
         )
     )
@@ -68,6 +73,7 @@ async def run_helm_deploy(
                 "--install",
                 *(("--timeout", f"{field_set.timeout.value}s") if field_set.timeout.value else ()),
                 *passthrough_args,
+                *dry_run_args,
             ],
             post_renderer=post_renderer,
             description=f"Running Helm deployment: {field_set.address}",

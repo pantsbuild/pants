@@ -84,13 +84,15 @@ JAVA_LIB_SOURCE = dedent(
 )
 
 
-JAVA_LIB_JDK12_SOURCE = dedent(
+JAVA_LIB_JDK17_SOURCE = dedent(
     """
     package org.pantsbuild.example.lib;
 
+    import javax.lang.model.SourceVersion;
+
     public class ExampleLib {
         public static String hello() {
-            return "Hello!".indent(4);
+            return "Hello " + SourceVersion.RELEASE_17 + "!";
         }
     }
     """
@@ -188,12 +190,12 @@ def test_compile_jdk_specified_in_build_file(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'lib',
-                    jdk = 'adopt:1.12',
+                    jdk = 'temurin:1.17',
                 )
                 """
             ),
             "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
-            "ExampleLib.java": JAVA_LIB_JDK12_SOURCE,
+            "ExampleLib.java": JAVA_LIB_JDK17_SOURCE,
         }
     )
 
@@ -210,19 +212,19 @@ def test_compile_jdk_specified_in_build_file(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_compile_jdk_12_file_fails_with_jdk_11(rule_runner: RuleRunner) -> None:
+def test_compile_jdk_17_file_fails_with_jdk_11(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
                 java_sources(
                     name = 'lib',
-                    jdk = 'adopt:1.11',
+                    jdk = 'temurin:1.11.0.23',
                 )
                 """
             ),
             "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
-            "ExampleLib.java": JAVA_LIB_JDK12_SOURCE,
+            "ExampleLib.java": JAVA_LIB_JDK17_SOURCE,
         }
     )
 

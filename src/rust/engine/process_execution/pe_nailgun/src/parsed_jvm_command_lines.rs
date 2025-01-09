@@ -72,7 +72,7 @@ impl ParsedJVMCommandLines {
             .next()
             .filter(|e| ParsedJVMCommandLines::is_classpath_flag(e))
             .ok_or_else(|| "No classpath flag found.".to_string())
-            .map(|e| e.clone())?;
+            .cloned()?;
 
         let classpath_value = args_to_consume
             .next()
@@ -101,7 +101,7 @@ impl ParsedJVMCommandLines {
             .next()
             .filter(|e| !ParsedJVMCommandLines::is_flag(e))
             .ok_or_else(|| "No main class provided.".to_string())
-            .map(|e| e.clone())
+            .cloned()
     }
 
     fn parse_to_end(args_to_consume: &mut Iter<String>) -> Result<Vec<String>, String> {

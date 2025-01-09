@@ -57,6 +57,10 @@ async def _run_black(
             ),
             input_digest=input_digest,
             output_files=request.files,
+            # Note - the cache directory is not used by Pants,
+            # and we pass through a temporary directory to neutralize
+            # Black's caching behavior in favor of Pants' caching.
+            extra_env={"BLACK_CACHE_DIR": "__pants_black_cache"},
             concurrency_available=len(request.files),
             description=f"Run Black on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,

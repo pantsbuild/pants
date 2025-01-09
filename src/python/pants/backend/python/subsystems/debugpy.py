@@ -13,7 +13,7 @@ from pants.option.option_types import ArgsListOption
 class DebugPy(PythonToolBase):
     options_scope = "debugpy"
     name = options_scope
-    help = "An implementation of the Debug Adapter Protocol for Python (https://github.com/microsoft/debugpy)."
+    help_short = "An implementation of the Debug Adapter Protocol for Python (https://github.com/microsoft/debugpy)."
 
     default_main = EntryPoint("debugpy")
     default_requirements = ["debugpy>=1.6.5,<1.7"]

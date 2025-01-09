@@ -17,12 +17,18 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.errors import OptionsError
-from pants.option.global_options import DynamicRemoteOptions, GlobalOptions, RemoteProvider
+from pants.option.global_options import (
+    DynamicRemoteOptions,
+    ExecutionOptions,
+    GlobalOptions,
+    RemoteProvider,
+)
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil import rule_runner
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.pytest_util import no_exception
 from pants.util.dirutil import safe_mkdir_for
+from pants.version import VERSION
 
 
 def create_dynamic_remote_options(
@@ -43,7 +49,7 @@ def create_dynamic_remote_options(
         "--remote-instance-name=main",
     ]
     if token_path:
-        args.append(f"--remote-oauth-bearer-token-path={token_path}")
+        args.append(f"--remote-oauth-bearer-token=@{token_path}")
     if plugin:
         args.append(f"--backend-packages={plugin}")
     ob = create_options_bootstrapper(args)
@@ -56,7 +62,7 @@ def create_dynamic_remote_options(
     )[0]
 
 
-def test_dynamic_remote_options_oauth_bearer_token_path(tmp_path: Path) -> None:
+def test_dynamic_remote_options_oauth_bearer_token_with_path(tmp_path: Path) -> None:
     token_path = tmp_path / "token.txt"
     token_path.touch()
     token_path.write_text("my-token")
@@ -146,12 +152,30 @@ def test_execution_options_remote_addresses() -> None:
         create_dynamic_remote_options(address=f"https:://{host}")
 
 
+_DEFAULT_USER_AGENT = f"pants/{VERSION}"
+
+
+@pytest.mark.parametrize(
+    ("input", "expected"),
+    [
+        ({}, {"user-agent": _DEFAULT_USER_AGENT}),
+        ({"user-agent": "same case"}, {"user-agent": "same case"}),
+        ({"User-Agent": "title case"}, {"User-Agent": "title case"}),
+        ({"not-user-agent": "foo"}, {"user-agent": _DEFAULT_USER_AGENT, "not-user-agent": "foo"}),
+    ],
+)
+def test_execution_options_with_user_agent_should_match_table(
+    input: dict[str, str], expected: dict[str, str]
+) -> None:
+    assert ExecutionOptions.with_user_agent(input) == expected
+
+
 def test_invalidation_globs() -> None:
     # Confirm that an un-normalized relative path in the pythonpath is filtered out, and that an
     # empty entry (i.e.: a relative path for the current directory) doesn't cause an error.
     suffix = "something-ridiculous"
     ob = OptionsBootstrapper.create(
-        env={}, args=[f"--pythonpath=../{suffix}", "--pythonpath="], allow_pantsrc=False
+        args=[f"--pythonpath=../{suffix}", "--pythonpath="], env={}, allow_pantsrc=False
     )
     globs = GlobalOptions.compute_pantsd_invalidation_globs(
         get_buildroot(), ob.bootstrap_options.for_global_scope()

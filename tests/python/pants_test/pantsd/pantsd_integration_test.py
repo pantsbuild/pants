@@ -592,7 +592,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_sigint_kills_request_waiting_for_lock(self):
         """Test that, when a pailgun request is blocked waiting for another one to end, sending
         SIGINT to the blocked run will kill it."""
-        config = {"GLOBAL": {"pantsd_timeout_when_multiple_invocations": -1, "level": "debug"}}
+        config = {"GLOBAL": {"pantsd_timeout_when_multiple_invocations": -1.0, "level": "debug"}}
         with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
             # Run a process that will wait forever.
             first_run_handle, _, _, file_to_create = launch_waiter(workdir=workdir, config=config)

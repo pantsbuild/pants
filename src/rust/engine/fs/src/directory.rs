@@ -368,7 +368,7 @@ pub enum TypedPath<'a> {
     Dir(&'a Path),
 }
 
-impl<'a> Deref for TypedPath<'a> {
+impl Deref for TypedPath<'_> {
     type Target = Path;
 
     fn deref(&self) -> &Path {

@@ -11,7 +11,7 @@ files(
         "**/*.rs",
         "!**/*tests.rs",
         "**/*.proto",
-        ".cargo/config",
+        ".cargo/config.toml",
     ],
 )
 

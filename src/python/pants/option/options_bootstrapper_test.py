@@ -39,9 +39,9 @@ class TestOptionsBootstrapper:
                     fp.write(f"{k} = {repr(v)}\n")
             fp.close()
 
-            args = [*self._config_path(fp.name), *(args or [])]
-            bootstrapper = OptionsBootstrapper.create(env=env or {}, args=args, allow_pantsrc=False)
-            vals = bootstrapper.get_bootstrap_options().for_global_scope()
+            args = ["pants", *self._config_path(fp.name), *(args or [])]
+            bootstrapper = OptionsBootstrapper.create(args=args, env=env or {}, allow_pantsrc=False)
+            vals = bootstrapper.bootstrap_options.for_global_scope()
 
         vals_dict = {k: getattr(vals, k) for k in expected_entries}
         assert expected_entries == vals_dict
@@ -125,9 +125,9 @@ class TestOptionsBootstrapper:
                 )
             )
             fp.close()
-            args = ["--pants-workdir=/qux"] + self._config_path(fp.name)
+            args = ["pants", "--pants-workdir=/qux"] + self._config_path(fp.name)
             bootstrapper = OptionsBootstrapper.create(
-                env={"PANTS_DISTDIR": "/pear"}, args=args, allow_pantsrc=False
+                args=args, env={"PANTS_DISTDIR": "/pear"}, allow_pantsrc=False
             )
             opts = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
@@ -146,14 +146,19 @@ class TestOptionsBootstrapper:
         assert "/qux/baz" == opts.for_scope("foo").bar
         assert "/pear/banana" == opts.for_scope("fruit").apple
 
-    def test_bootstrapped_options_ignore_irrelevant_env(self) -> None:
-        included = "PANTS_DISTDIR"
-        excluded = "NON_PANTS_ENV"
+    def test_bootstrapped_options_include_all_env(self) -> None:
+        pants_option = "PANTS_DISTDIR"
+        not_a_pants_option = "NON_PANTS_ENV"
         bootstrapper = OptionsBootstrapper.create(
-            env={excluded: "pear", included: "banana"}, args=[], allow_pantsrc=False
+            args=["pants"],
+            env={not_a_pants_option: "pear", pants_option: "banana"},
+            allow_pantsrc=False,
         )
-        assert included in bootstrapper.env
-        assert excluded not in bootstrapper.env
+        assert pants_option in bootstrapper.env
+        # See https://github.com/pantsbuild/pants/pull/20956 for context.
+        # If we revisit and end up excluding env vars that aren't PANTS_* and aren't needed for
+        # interpolation in config, change this test to check that (and rename this test function).
+        assert not_a_pants_option in bootstrapper.env
 
     def test_create_bootstrapped_multiple_pants_config_files(self) -> None:
         """When given multiple config files, the later files should take precedence when options
@@ -161,8 +166,8 @@ class TestOptionsBootstrapper:
 
         def create_options_bootstrapper(*config_paths: str) -> OptionsBootstrapper:
             return OptionsBootstrapper.create(
+                args=["pants", *(f"--pants-config-files={cp}" for cp in config_paths)],
                 env={},
-                args=[f"--pants-config-files={cp}" for cp in config_paths],
                 allow_pantsrc=False,
             )
 
@@ -193,7 +198,7 @@ class TestOptionsBootstrapper:
                 dedent(
                     """\
                     [compile_apt]
-                    worker_count = 1
+                    worker_count = "1"
 
                     [fruit]
                     apple = "red"
@@ -204,7 +209,7 @@ class TestOptionsBootstrapper:
                 dedent(
                     """\
                     [compile_apt]
-                    worker_count = 2
+                    worker_count = "2"
                     """
                 )
             )
@@ -227,8 +232,8 @@ class TestOptionsBootstrapper:
     def test_options_pantsrc_files(self) -> None:
         def create_options_bootstrapper(*config_paths: str) -> OptionsBootstrapper:
             return OptionsBootstrapper.create(
+                args=["pants", *(f"--pantsrc-files={cp}" for cp in config_paths)],
                 env={},
-                args=[f"--pantsrc-files={cp}" for cp in config_paths],
                 allow_pantsrc=True,
             )
 
@@ -257,7 +262,7 @@ class TestOptionsBootstrapper:
     def test_full_options_caching(self) -> None:
         with temporary_file_path() as config:
             args = self._config_path(config)
-            bootstrapper = OptionsBootstrapper.create(env={}, args=args, allow_pantsrc=False)
+            bootstrapper = OptionsBootstrapper.create(args=args, env={}, allow_pantsrc=False)
 
             opts1 = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
@@ -300,12 +305,10 @@ class TestOptionsBootstrapper:
 
     def test_bootstrap_short_options(self) -> None:
         def parse_options(*args: str) -> OptionValueContainer:
-            full_args = [*args, *self._config_path(None)]
-            return (
-                OptionsBootstrapper.create(env={}, args=full_args, allow_pantsrc=False)
-                .get_bootstrap_options()
-                .for_global_scope()
-            )
+            full_args = ["pants", *args, *self._config_path(None)]
+            return OptionsBootstrapper.create(
+                args=full_args, env={}, allow_pantsrc=False
+            ).bootstrap_options.for_global_scope()
 
         # No short options passed - defaults presented.
         vals = parse_options()
@@ -324,71 +327,15 @@ class TestOptionsBootstrapper:
     def test_bootstrap_options_passthrough_dup_ignored(self) -> None:
         def parse_options(*args: str) -> OptionValueContainer:
             full_args = [*args, *self._config_path(None)]
-            return (
-                OptionsBootstrapper.create(env={}, args=full_args, allow_pantsrc=False)
-                .get_bootstrap_options()
-                .for_global_scope()
-            )
+            return OptionsBootstrapper.create(
+                args=full_args, env={}, allow_pantsrc=False
+            ).bootstrap_options.for_global_scope()
 
         vals = parse_options("main", "args", "-lwarn", "--", "-lerror")
         assert LogLevel.WARN == vals.level
 
         vals = parse_options("main", "args", "--", "-lerror")
         assert LogLevel.INFO == vals.level
-
-    def test_bootstrap_options_explicit_config_path(self) -> None:
-        def config_path(*args, **env):
-            return OptionsBootstrapper.get_config_file_paths(env, args)
-
-        assert ["/foo/bar/pants.toml"] == config_path(
-            "main", "args", "--pants-config-files=['/foo/bar/pants.toml']"
-        )
-
-        assert ["/from/env1", "/from/env2"] == config_path(
-            "main", "args", PANTS_CONFIG_FILES="['/from/env1', '/from/env2']"
-        )
-
-        assert ["/from/flag"] == config_path(
-            "main",
-            "args",
-            "-x",
-            "--pants-config-files=['/from/flag']",
-            "goal",
-            "--other-flag",
-            PANTS_CONFIG_FILES="['/from/env']",
-        )
-
-        # Test appending to the default.
-        assert [f"{get_buildroot()}/pants.toml", "/from/env", "/from/flag"] == config_path(
-            "main",
-            "args",
-            "-x",
-            "--pants-config-files=+['/from/flag']",
-            "goal",
-            "--other-flag",
-            PANTS_CONFIG_FILES="+['/from/env']",
-        )
-
-        # Test replacing the default, then appending.
-        assert ["/from/env", "/from/flag"] == config_path(
-            "main",
-            "args",
-            "-x",
-            "--pants-config-files=+['/from/flag']",
-            "goal",
-            "--other-flag",
-            PANTS_CONFIG_FILES="['/from/env']",
-        )
-
-        assert ["/from/flag"] == config_path(
-            "main",
-            "args",
-            "-x",
-            "--pants-config-files=['/from/flag']",
-            "goal",
-            "--other-flag",
-            PANTS_CONFIG_FILES="+['/from/env']",
-        )
 
     def test_setting_pants_config_in_config(self, tmp_path: Path) -> None:
         # Test that setting pants_config in the config file has no effect.
@@ -399,74 +346,12 @@ class TestOptionsBootstrapper:
         config2.write_text("[DEFAULT]\nlogdir = 'logdir2'\n")
 
         ob = OptionsBootstrapper.create(
-            env={}, args=[f"--pants-config-files=['{config1.as_posix()}']"], allow_pantsrc=False
+            args=["pants", f"--pants-config-files=['{config1.as_posix()}']"],
+            env={},
+            allow_pantsrc=False,
         )
-        logdir = ob.get_bootstrap_options().for_global_scope().logdir
+        logdir = ob.bootstrap_options.for_global_scope().logdir
         assert "logdir1" == logdir
-
-    def test_alias(self, tmp_path: Path) -> None:
-        config0 = tmp_path / "config0"
-        config0.write_text(
-            dedent(
-                """\
-                    [cli.alias]
-                    pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
-                    green = "lint test"
-                    """
-            )
-        )
-
-        config1 = tmp_path / "config1"
-        config1.write_text(
-            dedent(
-                """\
-                    [cli]
-                    alias.add = {green = "lint test --force check"}
-                    """
-            )
-        )
-
-        config2 = tmp_path / "config2"
-        config2.write_text(
-            dedent(
-                """\
-                    [cli]
-                    alias = "+{'shell': 'repl'}"
-                    """
-            )
-        )
-
-        config_arg = (
-            f"--pants-config-files=["
-            f"'{config0.as_posix()}','{config1.as_posix()}','{config2.as_posix()}']"
-        )
-        ob = OptionsBootstrapper.create(
-            env={}, args=[config_arg, "pyupgrade", "green"], allow_pantsrc=False
-        )
-        assert (
-            config_arg,
-            "--backend-packages=pants.backend.python.lint.pyupgrade",
-            "fmt",
-            "lint",
-            "test",
-            "--force",
-            "check",
-        ) == ob.args
-        assert (
-            "<ignored>",
-            config_arg,
-            "--backend-packages=pants.backend.python.lint.pyupgrade",
-        ) == ob.bootstrap_args
-
-        ob = OptionsBootstrapper.create(env={}, args=[config_arg, "shell"], allow_pantsrc=False)
-        assert (
-            config_arg,
-            "repl",
-        ) == ob.args
-        assert (
-            "<ignored>",
-            config_arg,
-        ) == ob.bootstrap_args
 
 
 def test_munge_bin_name():
@@ -483,3 +368,26 @@ def test_munge_bin_name():
     assert munge(os.path.join(build_root, "bin", "pants")) == "./bin/pants"
     assert munge("/foo/pants") == "pants"
     assert munge("/foo/bar/pants") == "pants"
+
+
+def test_file_spec_args() -> None:
+    with temporary_file(binary_mode=False) as tmp:
+        tmp.write(
+            dedent(
+                """
+                foo
+                bar
+                """
+            )
+        )
+        tmp.flush()
+        args = ["pants", f"--spec-files={tmp.name}", "compile", "morx:tgt", "fleem:tgt"]
+        options_bootstrapper = OptionsBootstrapper.create(args=args, env={}, allow_pantsrc=False)
+        options = options_bootstrapper.full_options_for_scopes(
+            known_scope_infos=[
+                ScopeInfo(""),
+            ],
+            union_membership=UnionMembership({}),
+        )
+        sorted_specs = sorted(options.specs)
+        assert ["bar", "fleem:tgt", "foo", "morx:tgt"] == sorted_specs

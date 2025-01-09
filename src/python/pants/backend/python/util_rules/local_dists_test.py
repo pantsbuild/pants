@@ -90,7 +90,6 @@ def test_build_local_dists(rule_runner: PythonRuleRunner) -> None:
     )
     request = LocalDistsPexRequest(
         addresses,
-        internal_only=True,
         sources=sources,
         interpreter_constraints=interpreter_constraints,
     )

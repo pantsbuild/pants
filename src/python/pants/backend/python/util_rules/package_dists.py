@@ -81,7 +81,12 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, union
-from pants.source.source_root import SourceRootsRequest, SourceRootsResult
+from pants.source.source_root import (
+    OptionalSourceRoot,
+    SourceRootRequest,
+    SourceRootsRequest,
+    SourceRootsResult,
+)
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -94,7 +99,7 @@ logger = logging.getLogger(__name__)
 
 class SetupPyError(Exception):
     def __init__(self, msg: str):
-        super().__init__(f"{msg} See {doc_url('python-distributions')}.")
+        super().__init__(f"{msg} See {doc_url('docs/python/overview/building-distributions')}.")
 
 
 class InvalidSetupPyArgs(SetupPyError):
@@ -116,7 +121,7 @@ class OwnershipError(SetupPyError):
         super().__init__(
             softwrap(
                 f"""
-                {msg} See {doc_url('python-distributions')} for
+                {msg} See {doc_url('docs/python/overview/building-distributions')} for
                 how python_sources targets are mapped to distributions.
                 """
             )
@@ -212,9 +217,15 @@ class SetupKwargs:
     """The keyword arguments to the `setup()` function in the generated `setup.py`."""
 
     _pickled_bytes: bytes
+    _overwrite_banned_keys: Tuple[str, ...]
 
     def __init__(
-        self, kwargs: Mapping[str, Any], *, address: Address, _allow_banned_keys: bool = False
+        self,
+        kwargs: Mapping[str, Any],
+        *,
+        address: Address,
+        _allow_banned_keys: bool = False,
+        _overwrite_banned_keys: Tuple[str, ...] = (),
     ) -> None:
         super().__init__()
         if "name" not in kwargs:
@@ -244,7 +255,9 @@ class SetupKwargs:
                             """
                         )
                     )
-
+        object.__setattr__(
+            self, "_overwrite_banned_keys", _overwrite_banned_keys if _overwrite_banned_keys else ()
+        )
         # We serialize with `pickle` so that is hashable. We don't use `FrozenDict` because it
         # would require that all values are immutable, and we may have lists and dictionaries as
         # values. It's too difficult/clunky to convert those all, then to convert them back out of
@@ -406,20 +419,27 @@ async def create_dist_build_request(
     )
 
     # Find the source roots for the build-time 1stparty deps (e.g., deps of setup.py).
-    source_roots_result = await Get(
-        SourceRootsResult,
-        SourceRootsRequest(
-            files=[],
-            dirs={
-                PurePath(tgt.address.spec_path)
-                for tgt in transitive_targets.closure
-                if tgt.has_field(PythonSourceField) or tgt.has_field(ResourceSourceField)
-            },
+    optional_dist_source_root, source_roots_result = await MultiGet(
+        Get(OptionalSourceRoot, SourceRootRequest.for_target(dist_tgt)),
+        Get(
+            SourceRootsResult,
+            SourceRootsRequest(
+                files=[],
+                dirs={
+                    PurePath(tgt.address.spec_path)
+                    for tgt in transitive_targets.closure
+                    if tgt.has_field(PythonSourceField) or tgt.has_field(ResourceSourceField)
+                },
+            ),
         ),
     )
-    path_to_root = source_roots_result.path_to_root
-    dist_source_root = next(iter(path_to_root.values())).path if path_to_root else "."
-    source_roots = tuple(sorted({sr.path for sr in path_to_root.values()}))
+
+    # We have to get `dist_source_root` independently from the other source roots because it is
+    # not a `python_source` target, and because `source_roots_result.path_to_root` is already sorted.
+    dist_source_root = (
+        optional_dist_source_root.source_root.path if optional_dist_source_root.source_root else "."
+    )
+    source_roots = tuple(sorted({sr.path for sr in source_roots_result.path_to_root.values()}))
 
     # Get any extra build-time environment (e.g., native extension requirements).
     build_env_requests = []
@@ -633,18 +653,35 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
             next(str(ic.specifier) for ic in request.interpreter_constraints),  # type: ignore[attr-defined]
         )
 
-    # NB: We are careful to not overwrite these values, but we also don't expect them to have been
-    # set. The user must have gone out of their way to use a `SetupKwargs` plugin, and to have
-    # specified `SetupKwargs(_allow_banned_keys=True)`.
+    # The cascading defaults here are for two levels of "I know what I'm
+    # doing. Normally the plugin will calculate the appropriate values.  If
+    # the user Really Knows what they are doing and has gone out of their way
+    # to use a `SetupKwargs` plugin, and to have also specified
+    # `SetupKwargs(_allow_banned_keys=True)`, then instead the values are
+    # merged.  If the user REALLY REALLY knows what they are doing, they can
+    # use `_overwrite_banned_keys=("the-key",)` in their plugin to use only
+    # their value for that key.
+    def _overwrite_value(key: str) -> bool:
+        return key in resolved_setup_kwargs._overwrite_banned_keys
+
     setup_kwargs.update(
         {
-            "packages": (*sources.packages, *(setup_kwargs.get("packages", []))),
+            "packages": (
+                *(sources.packages if not _overwrite_value("packages") else []),
+                *(setup_kwargs.get("packages", [])),
+            ),
             "namespace_packages": (
-                *sources.namespace_packages,
+                *(sources.namespace_packages if not _overwrite_value("namespace_packages") else []),
                 *setup_kwargs.get("namespace_packages", []),
             ),
-            "package_data": {**dict(sources.package_data), **setup_kwargs.get("package_data", {})},
-            "install_requires": (*requirements, *setup_kwargs.get("install_requires", [])),
+            "package_data": {
+                **dict(sources.package_data if not _overwrite_value("package_data") else {}),
+                **setup_kwargs.get("package_data", {}),
+            },
+            "install_requires": (
+                *(requirements if not _overwrite_value("install_requires") else []),
+                *setup_kwargs.get("install_requires", []),
+            ),
         }
     )
 
@@ -748,7 +785,7 @@ async def get_sources(
     file_targets = targets_with_sources_types(
         [FileSourceField], transitive_targets.closure, union_membership
     )
-    targets = Targets(itertools.chain((od.target for od in owned_deps), file_targets))
+    targets = Targets(sorted(itertools.chain((od.target for od in owned_deps), file_targets)))
 
     python_sources_request = PythonSourceFilesRequest(
         targets=targets, include_resources=False, include_files=False

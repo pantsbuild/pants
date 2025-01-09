@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -49,7 +50,7 @@ def test_warn_if_no_histograms() -> None:
     assert "Observation histogram summaries:" not in result.stderr
 
 
-def test_writing_to_output_file() -> None:
+def test_writing_to_output_file_plain_text() -> None:
     with setup_tmpdir({"src/py/app.py": "print(0)\n", "src/py/BUILD": "python_sources()"}):
         argv1 = [
             "--backend-packages=['pants.backend.python']",
@@ -77,3 +78,50 @@ def test_writing_to_output_file() -> None:
 
         for cmd in (argv1, argv2):
             assert " ".join(cmd) in output_file_contents
+
+
+def test_writing_to_output_file_json() -> None:
+    with setup_tmpdir({"src/py/app.py": "print(0)\n", "src/py/BUILD": "python_sources()"}):
+        argv1 = [
+            "--backend-packages=['pants.backend.python']",
+            "--plugins=hdrhistogram",
+            "--stats-log",
+            "--stats-memory-summary",
+            "--stats-format=jsonlines",
+            "--stats-output-file=stats.jsonl",
+            "roots",
+        ]
+        run_pants(argv1).assert_success()
+        argv2 = [
+            "--backend-packages=['pants.backend.python']",
+            "--plugins=hdrhistogram",
+            "--stats-log",
+            "--stats-memory-summary",
+            "--stats-format=jsonlines",
+            "--stats-output-file=stats.jsonl",
+            "list",
+            "::",
+        ]
+        run_pants(argv2).assert_success()
+        stats = []
+        with open("stats.jsonl") as fh:
+            for line in fh.readlines():
+                stats.append(json.loads(line))
+
+        assert len(stats) == 2
+
+        for obj in stats:
+            for key in (
+                "timestamp",
+                "command",
+                "counters",
+                "memory_summary",
+                "observation_histograms",
+            ):
+                assert obj.get(key) is not None
+
+            for field in ("name", "count"):
+                assert obj["counters"][0].get(field) is not None
+
+            for field in ("bytes", "count", "name"):
+                assert obj["memory_summary"][0].get(field) is not None

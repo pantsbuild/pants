@@ -22,13 +22,7 @@ from pants.backend.javascript.package_json import (
     OwningNodePackageRequest,
 )
 from pants.backend.javascript.subsystems.nodejstest import NodeJSTest
-from pants.backend.javascript.target_types import (
-    JSSourceField,
-    JSTestBatchCompatibilityTagField,
-    JSTestExtraEnvVarsField,
-    JSTestSourceField,
-    JSTestTimeoutField,
-)
+from pants.backend.javascript.target_types import JSRuntimeSourceField, JSTestRuntimeSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
 from pants.core.goals.test import (
@@ -37,10 +31,13 @@ from pants.core.goals.test import (
     CoverageReports,
     FilesystemCoverageReport,
     TestExtraEnv,
+    TestExtraEnvVarsField,
     TestFieldSet,
     TestRequest,
     TestResult,
+    TestsBatchCompatibilityTagField,
     TestSubsystem,
+    TestTimeoutField,
 )
 from pants.core.target_types import AssetSourceField
 from pants.core.util_rules import source_files
@@ -52,7 +49,12 @@ from pants.engine.fs import DigestSubset, GlobExpansionConjunction
 from pants.engine.internals import graph, platform_rules
 from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
+from pants.engine.process import (
+    Process,
+    ProcessCacheScope,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
+)
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -83,13 +85,13 @@ class JSCoverageDataCollection(CoverageDataCollection[JSCoverageData]):
 
 @dataclass(frozen=True)
 class JSTestFieldSet(TestFieldSet):
-    required_fields = (JSTestSourceField,)
+    required_fields = (JSTestRuntimeSourceField,)
 
-    batch_compatibility_tag: JSTestBatchCompatibilityTagField
-    source: JSTestSourceField
+    batch_compatibility_tag: TestsBatchCompatibilityTagField
+    source: JSTestRuntimeSourceField
     dependencies: Dependencies
-    timeout: JSTestTimeoutField
-    extra_env_vars: JSTestExtraEnvVarsField
+    timeout: TestTimeoutField
+    extra_env_vars: TestExtraEnvVarsField
 
 
 class JSTestRequest(TestRequest):
@@ -169,7 +171,7 @@ async def run_javascript_tests(
         SourceFilesRequest(
             (tgt.get(SourcesField) for tgt in transitive_tgts.closure),
             enable_codegen=True,
-            for_sources_types=[JSSourceField, AssetSourceField],
+            for_sources_types=[JSRuntimeSourceField, AssetSourceField],
         ),
     )
     merged_digest = await Get(Digest, MergeDigests([sources.snapshot.digest, installation.digest]))
@@ -207,7 +209,7 @@ async def run_javascript_tests(
             args=(
                 "run",
                 entry_point,
-                "--",
+                *installation.project_env.project.args_separator,
                 *sorted(relative_package_dir(file) for file in field_set_source_files.files),
                 *coverage_args,
             ),
@@ -228,13 +230,15 @@ async def run_javascript_tests(
     if test.force:
         process = dataclasses.replace(process, cache_scope=ProcessCacheScope.PER_SESSION)
 
-    result = await Get(FallibleProcessResult, Process, process)
+    results = await Get(
+        ProcessResultWithRetries, ProcessWithRetries(process, test.attempts_default)
+    )
     coverage_data: JSCoverageData | None = None
     if test.use_coverage:
         coverage_snapshot = await Get(
             Snapshot,
             DigestSubset(
-                result.output_digest,
+                results.last.output_digest,
                 test_script.coverage_globs(installation.project_env.relative_workspace_directory()),
             ),
         )
@@ -247,7 +251,7 @@ async def run_javascript_tests(
         )
 
     return TestResult.from_batched_fallible_process_result(
-        (result,), batch, test.output, coverage_data=coverage_data
+        results.results, batch, test.output, coverage_data=coverage_data
     )
 
 

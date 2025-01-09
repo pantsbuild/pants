@@ -39,7 +39,9 @@ def current_platform(
         if env_tgt.val.has_field(DockerPlatformField):
             return Platform(env_tgt.val[DockerPlatformField].normalized_value)
         if env_tgt.val.has_field(RemotePlatformField):
-            return Platform(env_tgt.val[RemotePlatformField].value)
+            remote_platform = env_tgt.val[RemotePlatformField].value
+            if remote_platform:
+                return Platform(remote_platform)
     return Platform.create_for_localhost()
 
 

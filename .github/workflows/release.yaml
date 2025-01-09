@@ -6,8 +6,9 @@
 jobs:
   build_wheels_linux_arm64:
     container:
-      image: ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf
+      image: quay.io/pypa/manylinux_2_28_aarch64:latest
     env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -16,11 +17,13 @@ jobs:
     - release_info
     runs-on:
     - self-hosted
-    - Linux
-    - ARM64
+    - runs-on
+    - runner=4cpu-linux-arm64
+    - image=ubuntu22-full-arm64-python3.7-3.13
+    - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -40,26 +43,35 @@ jobs:
 
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
+        echo "/opt/python/cp310-cp310/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
+
         '
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
-    - env:
-        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+    - name: Install Python headers
+      run: yum install -y python3.11-devel
+    - env: {}
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
-    - env:
-        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+    - env: {}
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-Linux-ARM64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
@@ -81,8 +93,9 @@ jobs:
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
-      image: quay.io/pypa/manylinux2014_x86_64:latest
+      image: quay.io/pypa/manylinux_2_28_x86_64:latest
     env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -90,10 +103,10 @@ jobs:
     needs:
     - release_info
     runs-on:
-    - ubuntu-20.04
+    - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -113,6 +126,14 @@ jobs:
 
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
+        echo "/opt/python/cp310-cp310/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
+
         '
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
@@ -120,7 +141,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - env:
@@ -134,9 +155,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: logs-wheels-and-pex-Linux-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
@@ -163,23 +185,39 @@ jobs:
         \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
         \ \\\n    --data-binary \"@$WHL\";\n"
     timeout-minutes: 90
-  build_wheels_macos10_15_x86_64:
+  build_wheels_macos13_x86_64:
     env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
-    name: Build wheels (macOS10-15-x86_64)
+    name: Build wheels (macOS13-x86_64)
     needs:
     - release_info
     runs-on:
-    - self-hosted
-    - macOS-10.15-X64
+    - macos-13
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -188,11 +226,11 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
-        key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
+        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.75.0-*
+        path: '~/.rustup/toolchains/1.83.0-*
 
           ~/.rustup/update-hashes
 
@@ -200,7 +238,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -211,7 +249,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - env:
@@ -225,9 +263,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: logs-wheels-and-pex-macOS10-15-x86_64
+        name: logs-wheels-and-pex-macOS13-x86_64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
@@ -247,23 +286,35 @@ jobs:
         \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
         \ \\\n    --data-binary \"@$WHL\";\n"
     timeout-minutes: 90
-  build_wheels_macos11_arm64:
+  build_wheels_macos14_arm64:
     env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
-    name: Build wheels (macOS11-ARM64)
+    name: Build wheels (macOS14-ARM64)
     needs:
     - release_info
     runs-on:
-    - self-hosted
-    - macOS-11-ARM64
+    - macos-14
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -272,11 +323,11 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
-        key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
+        key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.75.0-*
+        path: '~/.rustup/toolchains/1.83.0-*
 
           ~/.rustup/update-hashes
 
@@ -284,7 +335,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -295,7 +346,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
     - env:
@@ -309,9 +360,10 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: logs-wheels-and-pex-macOS11-ARM64
+        name: logs-wheels-and-pex-macOS14-ARM64
+        overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
@@ -339,23 +391,33 @@ jobs:
     needs:
     - build_wheels_linux_x86_64
     - build_wheels_linux_arm64
-    - build_wheels_macos10_15_x86_64
-    - build_wheels_macos11_arm64
+    - build_wheels_macos13_x86_64
+    - build_wheels_macos14_arm64
     - release_info
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Pants at Release Tag
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: '0'
         fetch-tags: true
         ref: ${{ needs.release_info.outputs.build-ref }}
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+        python-version: '3.7
+
+          3.8
+
+          3.9
+
+          3.10
+
+          3.12
+
+          3.13
+
+          3.11'
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -364,10 +426,10 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.75.0-*
+        path: '~/.rustup/toolchains/1.83.0-*
 
           ~/.rustup/update-hashes
 
@@ -375,7 +437,7 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -385,7 +447,7 @@ jobs:
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: 'src/python/pants/bin/native_client

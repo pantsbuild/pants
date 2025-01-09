@@ -67,6 +67,7 @@ pub struct NailgunPool {
 
 impl NailgunPool {
     pub fn new(workdir_base: PathBuf, size: usize, store: Store, executor: Executor) -> Self {
+        info!("Initializing Nailgun pool for {} processes...", size);
         NailgunPool {
             workdir_base,
             size,
@@ -285,9 +286,7 @@ fn spawn_and_read_port(
     workdir: PathBuf,
 ) -> Result<(std::process::Child, Port), String> {
     let cmd = process.argv[0].clone();
-    // TODO: This is an expensive operation, and thus we info! it.
-    //       If it becomes annoying, we can downgrade the logging to just debug!
-    info!(
+    debug!(
         "Starting new nailgun server with cmd: {:?}, args {:?}, in cwd {}",
         cmd,
         &process.argv[1..],
@@ -449,7 +448,10 @@ impl NailgunProcessFingerprint {
 /// A wrapper around a NailgunProcess checked out from the pool. If `release` is not called, the
 /// guard assumes cancellation, and kills the underlying process.
 ///
-pub struct BorrowedNailgunProcess(Option<NailgunProcessRef>, OwnedSemaphorePermit);
+pub struct BorrowedNailgunProcess(
+    Option<NailgunProcessRef>,
+    #[allow(dead_code)] OwnedSemaphorePermit,
+);
 
 impl BorrowedNailgunProcess {
     fn new(process: NailgunProcessRef, permit: OwnedSemaphorePermit) -> Self {

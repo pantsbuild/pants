@@ -38,6 +38,13 @@ By default, `--changed-since` will only run over files directly changed. Often, 
   test
 ```
 
+:::note Hint: Pants does not understand transitive third-party dependencies in this context.
+Changes to third-party dependencies (particularly, dependencies of dependencies) may not be
+surfaced as you expect via `--changed-*`. In particular, any change to a single dependency
+within a lockfile or a target generator (such as `python_requirements`) will consider all
+users of _any_ dependency changed, transitively.
+:::
+
 ## `filter` options
 
 Use filters to operate on only targets that match the predicate, e.g. only running Python tests.
@@ -98,7 +105,7 @@ python_tests(
 )
 ```
 
-You can then filter by tags with the global `--tag` [option](../../reference/global-options.mdx#section-tag), like this:
+You can then filter by tags with the global `--tag` [option](../../reference/global-options.mdx#tag), like this:
 
 ```bash
 pants --tag=integration_test list ::

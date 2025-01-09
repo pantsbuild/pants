@@ -18,20 +18,17 @@ class Shellcheck(TemplatedExternalTool):
     name = "Shellcheck"
     help = "A linter for shell scripts."
 
-    default_version = "v0.8.0"
+    default_version = "v0.10.0"
     default_known_versions = [
-        "v0.8.0|macos_arm64 |36dffd536b801c8bab2e9fa468163037e0c7f7e0a05298e5ad6299b4dde67e31|14525367",
-        "v0.8.0|macos_x86_64|4e93a76ee116b2f08c88e25011830280ad0d61615d8346364a4ea564b29be3f0|6310442",
-        "v0.8.0|linux_arm64 |8f4810485425636eadce2ec23441fd29d5b1b58d239ffda0a5faf8dd499026f5|4884430",
-        "v0.8.0|linux_x86_64|01d181787ffe63ebb0a2293f63bdc8455c5c30d3a6636320664bfa278424638f|2082242",
+        "v0.10.0|macos_arm64 |bbd2f14826328eee7679da7221f2bc3afb011f6a928b848c80c321f6046ddf81|7205756",
+        "v0.10.0|macos_x86_64|ef27684f23279d112d8ad84e0823642e43f838993bbb8c0963db9b58a90464c2|4371632",
+        "v0.10.0|linux_arm64 |324a7e89de8fa2aed0d0c28f3dab59cf84c6d74264022c00c22af665ed1a09bb|4291764",
+        "v0.10.0|linux_x86_64|6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87|2404716",
     ]
 
-    # We use this third party source since it has pre-compiled binaries for both x86 and aarch.
-    # It is recommended by shellcheck
-    # https://github.com/koalaman/shellcheck/blob/90d3172dfec30a7569f95b32479ae97af73b8b2e/README.md?plain=1#L236-L237
     default_url_template = (
-        "https://github.com/vscode-shellcheck/shellcheck-binaries/releases/download/{version}/shellcheck-"
-        "{version}.{platform}.tar.gz"
+        "https://github.com/koalaman/shellcheck/releases/download/{version}/shellcheck-"
+        "{version}.{platform}.tar.xz"
     )
     default_url_platform_mapping = {
         "macos_arm64": "darwin.aarch64",
@@ -55,7 +52,7 @@ class Shellcheck(TemplatedExternalTool):
     )
 
     def generate_exe(self, _: Platform) -> str:
-        return "./shellcheck"
+        return f"./shellcheck-{self.version}/shellcheck"
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
         # Refer to https://www.mankier.com/1/shellcheck#RC_Files for how config files are

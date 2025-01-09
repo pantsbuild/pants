@@ -13,7 +13,7 @@ from pants.backend.terraform.dependency_inference import (
 from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
 from pants.backend.terraform.tool import TerraformProcess, TerraformTool
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
-from pants.core.goals.deploy import DeployFieldSet, DeployProcess
+from pants.core.goals.deploy import DeployFieldSet, DeployProcess, DeploySubsystem
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.native_engine import Digest, MergeDigests
@@ -22,6 +22,7 @@ from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import SourcesField
 from pants.engine.unions import UnionRule
+from pants.option.global_options import KeepSandboxes
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,10 @@ class TerraformDeploymentRequest(EngineAwareParameter):
 
 @rule
 async def prepare_terraform_deployment(
-    request: TerraformDeploymentRequest, terraform_subsystem: TerraformTool
+    request: TerraformDeploymentRequest,
+    terraform_subsystem: TerraformTool,
+    deploy_subsystem: DeploySubsystem,
+    keep_sandboxes: KeepSandboxes,
 ) -> InteractiveProcess:
     initialised_terraform = await Get(
         TerraformInitResponse,
@@ -50,7 +54,8 @@ async def prepare_terraform_deployment(
         ),
     )
 
-    args = ["apply"]
+    terraform_command = "plan" if deploy_subsystem.dry_run else "apply"
+    args = [terraform_command]
 
     invocation_files = await Get(
         TerraformDeploymentInvocationFiles,
@@ -78,11 +83,11 @@ async def prepare_terraform_deployment(
         TerraformProcess(
             args=tuple(args),
             input_digest=with_vars,
-            description="Terraform apply",
+            description=f"Terraform {terraform_command}",
             chdir=initialised_terraform.chdir,
         ),
     )
-    return InteractiveProcess.from_process(process)
+    return InteractiveProcess.from_process(process, keep_sandboxes=keep_sandboxes)
 
 
 @rule(desc="Run Terraform deploy process", level=LogLevel.DEBUG)

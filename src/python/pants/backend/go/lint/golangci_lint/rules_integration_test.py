@@ -130,6 +130,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert lint_results[0].stderr == ""
 
 
+@pytest.mark.platform_specific_behavior
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

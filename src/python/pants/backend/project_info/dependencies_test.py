@@ -1,9 +1,11 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import json
 from functools import partial
 from textwrap import dedent
-from typing import List, Optional
+from typing import Any, List, Optional, Union
 
 import pytest
 
@@ -82,15 +84,18 @@ def create_targets(rule_runner: PythonRuleRunner) -> None:
 def assert_dependencies(
     rule_runner: PythonRuleRunner,
     *,
-    specs: List[str],
-    expected: List[str],
+    specs: list[str],
+    expected: Union[list[str], dict[str, Any]],
     transitive: bool = False,
+    output_file: Optional[str] = None,
     closed: bool = False,
     output_format: DependenciesOutputFormat = DependenciesOutputFormat.text,
 ) -> None:
     args = []
     if transitive:
         args.append("--transitive")
+    if output_file:
+        args.extend([f"--output-file={output_file}"])
     if closed:
         args.append("--closed")
     args.append(f"--format={output_format.value}")
@@ -98,10 +103,21 @@ def assert_dependencies(
     result = rule_runner.run_goal_rule(
         Dependencies, args=[*args, *specs], env_inherit={"PATH", "PYENV_ROOT", "HOME"}
     )
-    if output_format == DependenciesOutputFormat.text:
-        assert result.stdout.splitlines() == expected
-    elif output_format == DependenciesOutputFormat.json:
-        assert json.loads(result.stdout) == expected
+
+    if output_file is None:
+        if output_format == DependenciesOutputFormat.text:
+            assert result.stdout.splitlines() == expected
+        elif output_format == DependenciesOutputFormat.json:
+            assert json.loads(result.stdout) == expected
+    else:
+        assert not result.stdout
+        with rule_runner.pushd():
+            with open(output_file) as f:
+                if output_format == DependenciesOutputFormat.text:
+                    assert isinstance(expected, list)
+                    assert f.read().splitlines() == expected
+                elif output_format == DependenciesOutputFormat.json:
+                    assert json.load(f) == expected
 
 
 def test_no_target(rule_runner: PythonRuleRunner) -> None:
@@ -223,13 +239,20 @@ def test_python_dependencies(rule_runner: PythonRuleRunner) -> None:
         ],
         closed=True,
     )
+    assert_deps(
+        specs=["some/other/target:target"],
+        transitive=False,
+        output_file="dependencies.txt",
+        expected=["some/other/target/a.py"],
+    )
 
 
 def test_python_dependencies_output_format_json_direct_deps(rule_runner: PythonRuleRunner) -> None:
     create_targets(rule_runner)
+
     assert_deps = partial(
         assert_dependencies,
-        rule_runner,
+        rule_runner=rule_runner,
         output_format=DependenciesOutputFormat.json,
     )
 
@@ -336,15 +359,27 @@ def test_python_dependencies_output_format_json_direct_deps(rule_runner: PythonR
             ]
         },
     )
+    assert_deps(
+        specs=["some/target/a.py"],
+        transitive=False,
+        output_file="dependencies.json",
+        expected={
+            "some/target/a.py": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+            ]
+        },
+    )
 
 
 def test_python_dependencies_output_format_json_transitive_deps(
     rule_runner: PythonRuleRunner,
 ) -> None:
     create_targets(rule_runner)
+
     assert_deps = partial(
         assert_dependencies,
-        rule_runner,
+        rule_runner=rule_runner,
         output_format=DependenciesOutputFormat.json,
     )
 

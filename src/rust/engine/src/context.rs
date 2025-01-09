@@ -10,8 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::intrinsics::Intrinsics;
-use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult};
+use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult, SubjectPath};
 use crate::python::{throw, Failure};
 use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
@@ -37,6 +36,7 @@ use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
 use store::{self, ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store};
 use task_executor::Executor;
+use tokio::sync::RwLock;
 use watch::{Invalidatable, InvalidateCaller, InvalidationWatcher};
 use workunit_store::{Metric, RunningWorkunit};
 
@@ -61,7 +61,6 @@ pub struct Core {
     pub tasks: Tasks,
     pub rule_graph: RuleGraph<Rule>,
     pub types: Types,
-    pub intrinsics: Intrinsics,
     pub executor: Executor,
     store: Store,
     /// The CommandRunners to use for execution, in ascending order of reliability (for the purposes
@@ -71,6 +70,7 @@ pub struct Core {
     pub http_client: reqwest::Client,
     pub local_cache: PersistentCache,
     pub vfs: PosixFS,
+    pub vfs_system: PosixFS,
     pub watcher: Option<Arc<InvalidationWatcher>>,
     pub build_root: PathBuf,
     pub local_parallelism: usize,
@@ -201,6 +201,7 @@ impl Core {
         full_store: &Store,
         local_runner_store: &Store,
         executor: &Executor,
+        build_root: &Path,
         local_execution_root_dir: &Path,
         immutable_inputs: &ImmutableInputs,
         named_caches: &NamedCaches,
@@ -210,14 +211,38 @@ impl Core {
         exec_strategy_opts: &ExecutionStrategyOptions,
         remoting_opts: &RemotingOptions,
     ) -> Result<Arc<dyn CommandRunner>, String> {
-        let local_command_runner = local::CommandRunner::new(
+        // Lock shared between `local::CommandRunner` and `workspace::CommandRunner` to protect concurrent spawning
+        // of subprocesses.
+        let spawn_lock = Arc::new(RwLock::new(()));
+
+        let local_sandbox_command_runner = local::CommandRunner::new(
             local_runner_store.clone(),
             executor.clone(),
             local_execution_root_dir.to_path_buf(),
             named_caches.clone(),
             immutable_inputs.clone(),
             exec_strategy_opts.local_keep_sandboxes,
+            spawn_lock.clone(),
         );
+
+        // TODO: Consider whether to limit parallel execution and/or concurrency of in-workspace executions. (For example,
+        // wrapping in a `process_execution::bounded::CommandRunner` could be used to limit the number of concurrent
+        // workspace executions, but is not the only solution.)
+        let local_workspace_command_runner = process_execution::workspace::CommandRunner::new(
+            local_runner_store.clone(),
+            executor.clone(),
+            build_root.to_path_buf(),
+            local_execution_root_dir.to_path_buf(),
+            named_caches.clone(),
+            immutable_inputs.clone(),
+            spawn_lock,
+        );
+
+        let local_command_runner: Box<dyn CommandRunner> = Box::new(SwitchedCommandRunner::new(
+            local_workspace_command_runner,
+            local_sandbox_command_runner,
+            |req| req.execution_environment.strategy == ProcessExecutionStrategy::LocalInWorkspace,
+        ));
 
         let runner: Box<dyn CommandRunner> = if exec_strategy_opts.local_enable_nailgun {
             // We set the nailgun pool size to the number of instances that fit within the memory
@@ -381,6 +406,7 @@ impl Core {
         local_runner_store: &Store,
         executor: &Executor,
         local_cache: &PersistentCache,
+        build_root: &Path,
         local_execution_root_dir: &Path,
         immutable_inputs: &ImmutableInputs,
         named_caches: &NamedCaches,
@@ -394,6 +420,7 @@ impl Core {
             full_store,
             local_runner_store,
             executor,
+            build_root,
             local_execution_root_dir,
             immutable_inputs,
             named_caches,
@@ -491,7 +518,6 @@ impl Core {
         executor: Executor,
         tasks: Tasks,
         types: Types,
-        intrinsics: Intrinsics,
         build_root: PathBuf,
         ignore_patterns: Vec<String>,
         use_gitignore: bool,
@@ -601,6 +627,7 @@ impl Core {
             &store,
             &executor,
             &local_cache,
+            &build_root,
             &local_execution_root_dir,
             &immutable_inputs,
             &named_caches,
@@ -613,7 +640,9 @@ impl Core {
         .await?;
         log::debug!("Using {command_runners:?} for process execution.");
 
-        let graph = Arc::new(InvalidatableGraph(Graph::new(executor.clone())));
+        let graph = Arc::new(InvalidatableGraph {
+            graph: Graph::new(executor.clone()),
+        });
 
         // These certs are for downloads, not to be confused with the ones used for remoting.
         let ca_certs = Self::load_certificates(ca_certs_path)?;
@@ -654,14 +683,15 @@ impl Core {
             tasks,
             rule_graph,
             types,
-            intrinsics,
             executor: executor.clone(),
             store,
             command_runners,
             http_client,
             local_cache,
-            vfs: PosixFS::new(&build_root, ignorer, executor)
+            vfs: PosixFS::new(&build_root, ignorer, executor.clone())
                 .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,
+            vfs_system: PosixFS::new(Path::new("/"), GitignoreStyleExcludes::empty(), executor)
+                .map_err(|e| format!("Could not initialize Vfs for local system: {e:?}"))?,
             build_root,
             watcher,
             local_parallelism: exec_strategy_opts.local_parallelism,
@@ -704,7 +734,9 @@ impl Core {
     }
 }
 
-pub struct InvalidatableGraph(Graph<NodeKey>);
+pub struct InvalidatableGraph {
+    graph: Graph<NodeKey>,
+}
 
 fn caller_to_logging_info(caller: InvalidateCaller) -> (Level, &'static str) {
     match caller {
@@ -723,7 +755,11 @@ impl Invalidatable for InvalidatableGraph {
         let InvalidationResult { cleared, dirtied } =
             self.invalidate_from_roots(false, move |node| {
                 if let Some(fs_subject) = node.fs_subject() {
-                    paths.contains(fs_subject)
+                    match fs_subject {
+                        SubjectPath::Workspace(relpath) => paths.contains(relpath.as_path()),
+                        // TODO: Invalidation not supported currently for local system paths.
+                        SubjectPath::LocalSystem(_) => false,
+                    }
                 } else {
                     false
                 }
@@ -759,7 +795,7 @@ impl Deref for InvalidatableGraph {
     type Target = Graph<NodeKey>;
 
     fn deref(&self) -> &Graph<NodeKey> {
-        &self.0
+        &self.graph
     }
 }
 
@@ -835,8 +871,14 @@ impl SessionCore {
             } else {
                 // There are no live or invalidated sources of this Digest. Directly fail.
                 return result.map_err(|e| {
+                    let suffix = if let Some(workunit_data) = workunit.workunit() {
+                        &format!(", with workunit: {:?}", workunit_data)
+                    } else {
+                        ""
+                    };
+
                     throw(format!(
-                        "Could not identify a process to backtrack to for: {e}"
+                        "Could not identify a process to backtrack to for: {e}{suffix}"
                     ))
                 });
             }

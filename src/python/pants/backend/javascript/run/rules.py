@@ -45,11 +45,17 @@ async def run_node_build_script(
     target_env_vars = await Get(
         EnvironmentVars, EnvironmentVarsRequest(field_set.extra_env_vars.value or ())
     )
+
     process = await Get(
         Process,
         NodeJsProjectEnvironmentProcess(
             installation.project_env,
-            args=("--prefix", "{chroot}", "run", str(field_set.entry_point.value)),
+            args=(
+                *installation.package_manager.current_directory_args,
+                "{chroot}",
+                "run",
+                str(field_set.entry_point.value),
+            ),
             description=f"Running {str(field_set.entry_point.value)}.",
             input_digest=installation.digest,
             extra_env=target_env_vars,

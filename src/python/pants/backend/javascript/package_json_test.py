@@ -27,7 +27,7 @@ from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.engine.target import AllTargets
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.util.frozendict import FrozenDict
 
 
@@ -84,6 +84,18 @@ def test_parses_package_jsons(rule_runner: RuleRunner) -> None:
             snapshot=bar_package_snapshot,
         ),
     }
+
+
+def test_parse_package_json_without_name(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            # No name in package.json, should cause an error.
+            "src/js/package.json": json.dumps({"version": "0.0.1"}),
+        }
+    )
+    with engine_error(ValueError, contains="No package name found in package.json"):
+        rule_runner.request(AllPackageJson, [])
 
 
 def test_generates_third_party_node_package_targets(rule_runner: RuleRunner) -> None:

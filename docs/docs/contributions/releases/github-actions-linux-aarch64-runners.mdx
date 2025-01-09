@@ -1,0 +1,98 @@
+---
+    title: GitHub Actions aarch64 runners
+    sidebar_position: 3
+---
+
+---
+
+GitHub Actions does not have affordable hosted aarch64 runners.
+
+For a while we enjoyed hardware donated by the Works on ARM program, but that has now been terminated,
+so we instead rely on self-hosted EC2 instances.
+
+We use [Runs On](https://runs-on.com/) to simplify the management of these instances. Runs On monitors
+requests for runners, launches EC2 instances on the fly to satify those requests, and terminates them
+when the workflows complete.
+
+## The Custom AMI
+
+We configure Runs On to launch these instances with a custom AMI that pre-installs the Python interpreters
+needed to bootstrap and test Pants on aarch64. This custom AMI is built on top of the standard Runs On
+[Ubuntu 22 ARM64](runs-on-v2.2-ubuntu22-full-arm64-*) AMI.
+
+It may occasionally be necessary to update this AMI, for example to pick up updates to the underlying standard
+AMI. To do so manually:
+
+### Create a temporary EC2 instance on the standard AMI
+
+In the AWS web console, initiate creation of a temporary instance that we use just to build the custom AMI.
+
+- Any instance type will do, t4g.nano for example.
+- To select the base AMI for the instance, click on "Browse more AMIs", then the "Community AMIs" tab,
+then search for `runs-on-v2.2-ubuntu22-full-arm64` and pick the latest standard AMI, as described in
+the Runs On [images repo](https://github.com/runs-on/runner-images-for-aws).
+- Select `pantsbuild.org.bastion` as the instance's SSH keypair.
+- Allow the wizard to create a security group.
+- The default storage settings are fine.
+- Open the Advanced section, scroll all the way down, and set the instance's User Data to:
+
+```bash
+#!/bin/bash
+systemctl start ssh
+```
+
+to ensure that its SSH daemon runs on startup.
+
+- Click "Launch instance"
+
+### SSH into the temporary EC2 instance
+
+Once the instance is running, navigate to its details page and click on "Connect" to get SSH instructions.
+You will need the `pantsbuild.org.bastion` private key, which is in our 1Password account.
+
+### Install Pythons on the instance
+
+Once you are in a bash prompt on the instance, run the following:
+
+```bash
+sudo apt install -y software-properties-common
+sudo add-apt-repository -y ppa:deadsnakes/ppa
+sudo apt update
+sudo apt install -y \
+  python3.7 python3.7-dev python3.7-venv \
+  python3.8 python3.8-dev python3.8-venv \
+  python3.9 python3.9-dev python3.9-venv \
+  python3.10 python3.10-dev python3.10-venv \
+  python3.11 python3.11-dev python3.11-venv \
+  python3.12 python3.12-dev python3.12-venv \
+  python3.13 python3.13-dev python3.13-venv
+```
+
+to install the necessary Pythons.
+
+### Create an AMI from the instance
+
+From the instance's actions menu in the web console select "Images" and then "Create image".
+The image name doesn't strictly matter, but `ubuntu22-full-arm64-python3.7-3.13`
+is a good name for consistency (multiple AMIs may have the same name).
+
+### Terminate the temporary instance
+
+Once the AMI status shows as "Available", terminate the temporary instance and delete its security group
+(whose name will match launch-wizard-*).
+
+We hope to [automate the above via Packer](https://runs-on.com/guides/building-custom-ami-with-packer/) at some point.
+
+### Update the Runs On config
+
+Edit `.github/runs-on.yml` and update the `ami` field. Note that the logical image name in this file
+happens to be the same as the AMI name, but doesn't strictly have to be. This is the name that we
+target in the `runs-on` stanza of a CI job in `generate_github_workflows.py`.
+
+Note that the new AMI will only be used in PR CI jobs after the config change is merged into the
+target branch, so the CI job for the update itself will still use the old AMI.
+
+### Deregister the old AMI
+
+After the config update has been merged into `main` and any release branches it needs to be in,
+we can deregister the old AMI in the AWS web console, to avoid confusion.

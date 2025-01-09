@@ -1,10 +1,10 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.rules import collect_rules, rule
+from pants.core.goals.resolves import ExportableTool
+from pants.engine.rules import collect_rules
 from pants.engine.unions import UnionRule
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
+from pants.jvm.resolve.jvm_tool import JvmToolBase
 
 
 class OpenAPIGenerator(JvmToolBase):
@@ -19,19 +19,8 @@ class OpenAPIGenerator(JvmToolBase):
     )
 
 
-class OpenAPIGeneratorLockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = OpenAPIGenerator.options_scope
-
-
-@rule
-async def generate_openapi_generator_lockfile_request(
-    _: OpenAPIGeneratorLockfileSentinel, openapi_generator: OpenAPIGenerator
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(openapi_generator)
-
-
 def rules():
     return [
         *collect_rules(),
-        UnionRule(GenerateToolLockfileSentinel, OpenAPIGeneratorLockfileSentinel),
+        UnionRule(ExportableTool, OpenAPIGenerator),
     ]

@@ -23,15 +23,12 @@ from pants.backend.python.target_types import (
     MainSpecification,
     PexCompletePlatformsField,
     PexLayout,
-)
-from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
-from pants.backend.python.target_types import (
     PythonRequirementFindLinksField,
     PythonRequirementsField,
 )
 from pants.backend.python.util_rules import pex_cli, pex_requirements
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
+from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX, maybe_log_pex_stderr
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
     PexEnvironment,
@@ -54,7 +51,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     validate_metadata,
 )
 from pants.build_graph.address import Address
-from pants.core.target_types import FileSourceField
+from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.core.util_rules.stripped_source_files import rules as stripped_source_rules
@@ -66,8 +63,9 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
+from pants.engine.intrinsics import add_prefix
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
@@ -97,10 +95,6 @@ class PythonProvider:
 
 class PexPlatforms(DeduplicatedCollection[str]):
     sort_input = True
-
-    @classmethod
-    def create_from_platforms_field(cls, field: PythonPlatformsField) -> PexPlatforms:
-        return cls(field.value or ())
 
     def generate_pex_arg_list(self) -> list[str]:
         args = []
@@ -142,7 +136,13 @@ async def digest_complete_platform_addresses(
     original_files_sources = await MultiGet(
         Get(
             HydratedSources,
-            HydrateSourcesRequest(tgt.get(SourcesField), for_sources_types=(FileSourceField,)),
+            HydrateSourcesRequest(
+                tgt.get(SourcesField),
+                for_sources_types=(
+                    FileSourceField,
+                    ResourceSourceField,
+                ),
+            ),
         )
         for tgt in original_file_targets
     )
@@ -403,10 +403,7 @@ async def find_interpreter(
     )
     path, fingerprint = result.stdout.decode().strip().splitlines()
 
-    if pex_subsystem.verbosity > 0:
-        log_output = result.stderr.decode()
-        if log_output:
-            logger.info("%s", log_output)
+    maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 
     return PythonExecutable(path=path, fingerprint=fingerprint)
 
@@ -428,6 +425,7 @@ class _BuildPexPythonSetup:
     argv: list[str]
 
 
+@rule
 async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexPythonSetup:
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
@@ -519,6 +517,7 @@ async def get_req_strings(pex_reqs: PexRequirements) -> PexRequirementsInfo:
     return PexRequirementsInfo(tuple(sorted(req_strings)), tuple(sorted(find_links)))
 
 
+@rule
 async def _setup_pex_requirements(
     request: PexRequest, python_setup: PythonSetup
 ) -> _BuildPexRequirementsSetup:
@@ -653,7 +652,7 @@ async def build_pex(
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
 
-    if not request.interpreter_constraints:
+    if not request.python and not request.interpreter_constraints:
         # Blank ICs in the request means that the caller wants us to use the ICs configured
         # for the resolve (falling back to the global ICs).
         resolve_name = ""
@@ -675,17 +674,41 @@ async def build_pex(
                 ),
             )
 
+    source_dir_name = "source_files"
+
+    pex_python_setup_req = _determine_pex_python_and_platforms(request)
+    requirements_setup_req = _setup_pex_requirements(**implicitly({request: PexRequest}))
+    sources_digest_as_subdir_req = add_prefix(
+        AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
+    )
+    if isinstance(request.requirements, PexRequirements):
+        (
+            pex_python_setup,
+            requirements_setup,
+            sources_digest_as_subdir,
+            req_info,
+        ) = await concurrently(
+            pex_python_setup_req,
+            requirements_setup_req,
+            sources_digest_as_subdir_req,
+            get_req_strings(request.requirements),
+        )
+        req_strings = req_info.req_strings
+    else:
+        pex_python_setup, requirements_setup, sources_digest_as_subdir = await concurrently(
+            pex_python_setup_req,
+            requirements_setup_req,
+            sources_digest_as_subdir_req,
+        )
+        req_strings = ()
+
     argv = [
         "--output-file",
         request.output_filename,
-        "--no-emit-warnings",
         *request.additional_args,
     ]
 
-    pex_python_setup = await _determine_pex_python_and_platforms(request)
     argv.extend(pex_python_setup.argv)
-
-    source_dir_name = "source_files"
 
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())
@@ -709,13 +732,15 @@ async def build_pex(
     if request.pex_path:
         argv.extend(["--pex-path", ":".join(pex.name for pex in request.pex_path)])
 
+    if request.internal_only:
+        # An internal-only runs on a single machine, and pre-installing wheels is wasted work in
+        # that case (see https://github.com/pex-tool/pex/issues/2292#issuecomment-1854582647 for
+        # analysis).
+        argv.append("--no-pre-install-wheels")
+
     argv.append(f"--sources-directory={source_dir_name}")
-    sources_digest_as_subdir = await Get(
-        Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
-    )
 
     # Include any additional arguments and input digests required by the requirements.
-    requirements_setup = await _setup_pex_requirements(request, python_setup)
     argv.extend(requirements_setup.argv)
 
     merged_digest = await Get(
@@ -739,18 +764,13 @@ async def build_pex(
     else:
         output_directories = [request.output_filename]
 
-    req_strings = (
-        (await Get(PexRequirementsInfo, PexRequirements, request.requirements)).req_strings
-        if isinstance(request.requirements, PexRequirements)
-        else []
-    )
     result = await Get(
         ProcessResult,
         PexCliProcess(
             subcommand=(),
             extra_args=argv,
             additional_input_digest=merged_digest,
-            description=await _build_pex_description(request, req_strings, python_setup.resolves),
+            description=_build_pex_description(request, req_strings, python_setup.resolves),
             output_files=output_files,
             output_directories=output_directories,
             concurrency_available=requirements_setup.concurrency_available,
@@ -758,10 +778,7 @@ async def build_pex(
         ),
     )
 
-    if pex_subsystem.verbosity > 0:
-        log_output = result.stderr.decode()
-        if log_output:
-            logger.info("%s", log_output)
+    maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 
     digest = (
         await Get(
@@ -779,7 +796,7 @@ async def build_pex(
     )
 
 
-async def _build_pex_description(
+def _build_pex_description(
     request: PexRequest, req_strings: Sequence[str], resolve_to_lockfile: Mapping[str, str]
 ) -> str:
     if request.description:
@@ -1203,7 +1220,7 @@ class VenvPexProcess:
     level: LogLevel
     input_digest: Digest | None
     working_directory: str | None
-    extra_env: FrozenDict[str, str] | None
+    extra_env: FrozenDict[str, str]
     output_files: tuple[str, ...] | None
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
@@ -1236,7 +1253,7 @@ class VenvPexProcess:
         object.__setattr__(self, "level", level)
         object.__setattr__(self, "input_digest", input_digest)
         object.__setattr__(self, "working_directory", working_directory)
-        object.__setattr__(self, "extra_env", FrozenDict(extra_env) if extra_env else None)
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
         object.__setattr__(self, "output_files", tuple(output_files) if output_files else None)
         object.__setattr__(
             self, "output_directories", tuple(output_directories) if output_directories else None

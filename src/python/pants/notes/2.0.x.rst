@@ -1,0 +1,4 @@
+2.0.x Stable releases
+=====================
+
+These notes have moved to `docs/notes/2.0.x.md <../../../../docs/notes/2.0.x.md>`_

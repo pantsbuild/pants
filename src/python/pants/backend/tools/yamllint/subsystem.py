@@ -7,6 +7,7 @@ from typing import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import OrphanFilepathConfigBehavior
 from pants.engine.rules import Rule, collect_rules
 from pants.engine.unions import UnionRule
@@ -23,7 +24,7 @@ from pants.util.strutil import softwrap
 class Yamllint(PythonToolBase):
     name = "Yamllint"
     options_scope = "yamllint"
-    help = "A linter for YAML files (https://yamllint.readthedocs.io)"
+    help_short = "A linter for YAML files (https://yamllint.readthedocs.io)"
 
     default_main = ConsoleScript("yamllint")
     default_requirements = ["yamllint>=1.28.0,<2"]
@@ -73,4 +74,7 @@ class Yamllint(PythonToolBase):
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(ExportableTool, Yamllint),
+    ]

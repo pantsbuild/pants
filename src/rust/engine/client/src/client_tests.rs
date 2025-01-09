@@ -41,6 +41,8 @@ async fn test_client_fingerprint_mismatch() {
         None,
         true,
         false,
+        None,
+        None,
     )
     .unwrap();
     let error = pantsd::find_pantsd(&build_root, &options_parser)

@@ -43,7 +43,7 @@ class _ClassPropertyDescriptor:
             # Get the callable field for this object, which may be a property.
         callable_field = self.fget.__get__(obj, objtype)
         if getattr(self.fget.__func__, "__isabstractmethod__", False):
-            field_name = self.fget.__func__.fget.__name__  # type: ignore[attr-defined]
+            field_name = self.fget.__func__.fget.__name__  # type: ignore[union-attr]
             raise TypeError(
                 """\
 The classproperty '{func_name}' in type '{type_name}' was an abstractproperty, meaning that type \
@@ -122,8 +122,7 @@ class _ClassDecoratorWithSentinelAttribute(ABC):
     """
 
     @abstractmethod
-    def __call__(self, cls: Type) -> Type:
-        ...
+    def __call__(self, cls: Type) -> Type: ...
 
     def define_instance_of(self, obj: Type, **kwargs) -> Type:
         return type(obj.__name__, (obj,), {"_decorated_type_checkable_type": type(self), **kwargs})

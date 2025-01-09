@@ -123,7 +123,7 @@ class StreamingWorkunitContext:
                 if source is None:
                     # This is a thing, that may need investigating to be fully understood.
                     # merely patches over a crash here. See #18564.
-                    logger.warn(
+                    logger.warning(
                         softwrap(
                             f"""
                             Unknown source address for target: {target_spec}

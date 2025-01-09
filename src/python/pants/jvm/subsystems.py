@@ -100,6 +100,24 @@ class JvmSubsystem(Subsystem):
         ),
         advanced=True,
     )
+    deploy_jar_exclude_files = StrListOption(
+        default=[
+            # Signature files.
+            r"^META-INF/[^/]+\.SF$",
+            r"^META-INF/[^/]+\.DSA$",
+            r"^META-INF/[^/]+\.RSA$",
+            # interferes with Class-Path: see man jar for i option.
+            "META-INF/INDEX.LIST$",
+        ],
+        help=softwrap(
+            """
+            A list of patterns to exclude from all deploy jars.
+            An individual deploy_jar target can also exclude other files, in addition to these,
+            by setting its `exclude_files` field.
+            """
+        ),
+    )
+
     # See https://github.com/pantsbuild/pants/issues/14937 for discussion of one way to improve
     # our behavior around cancellation with nailgun.
     nailgun_remote_cache_speculation_delay = IntOption(

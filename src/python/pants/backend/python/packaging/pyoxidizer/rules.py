@@ -56,6 +56,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -133,7 +134,7 @@ async def package_pyoxidizer_binary(
                 The `{PyOxidizerTarget.alias}` target {field_set.address} must include
                 in its `dependencies` field at least one `python_distribution` target that produces a
                 `.whl` file. For example, if using `{GenerateSetupField.alias}=True`, then make sure
-                `{WheelField.alias}=True`. See {doc_url('python-distributions')}.
+                `{WheelField.alias}=True`. See {doc_url('docs/python/overview/building-distributions')}.
                 """
             )
         )
@@ -147,7 +148,7 @@ async def package_pyoxidizer_binary(
         config_template = digest_contents[0].content.decode("utf-8")
 
     config = PyOxidizerConfig(
-        executable_name=field_set.binary_name.value or field_set.address.target_name,
+        executable_name=field_set.binary_name.value_or_default(),
         entry_point=field_set.entry_point.value,
         wheels=wheel_paths,
         template=config_template,
@@ -188,10 +189,12 @@ async def package_pyoxidizer_binary(
     process_with_caching = dataclasses.replace(
         pex_process,
         argv=(bash.path, runner_script.path, *pex_process.argv),
-        append_only_caches={
-            **pex_process.append_only_caches,
-            "pyoxidizer": runner_script.CACHE_PATH,
-        },
+        append_only_caches=FrozenDict(
+            {
+                **pex_process.append_only_caches,
+                "pyoxidizer": runner_script.CACHE_PATH,
+            }
+        ),
     )
 
     result = await Get(ProcessResult, Process, process_with_caching)

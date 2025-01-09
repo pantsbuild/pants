@@ -16,7 +16,7 @@ def create_options_bootstrapper(
     args: Iterable[str] | None = None, *, env: Mapping[str, str] | None = None
 ) -> OptionsBootstrapper:
     return OptionsBootstrapper.create(
-        args=("--pants-config-files=[]", *(args or [])),
+        args=("pants", "--pants-config-files=[]", *(args or [])),
         env=env or {},
         allow_pantsrc=False,
     )

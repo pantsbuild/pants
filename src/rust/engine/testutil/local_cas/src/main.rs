@@ -6,7 +6,8 @@ use mock::StubCAS;
 use std::io;
 use std::io::Read;
 
-fn main() -> Result<(), String> {
+#[tokio::main]
+async fn main() -> Result<(), String> {
     env_logger::init();
     let mut stdin = io::stdin();
 
@@ -40,7 +41,8 @@ fn main() -> Result<(), String> {
                 .expect("port must be a non-negative number"),
         )
         .instance_name(matches.value_of("instance-name").unwrap().to_owned())
-        .build();
+        .build()
+        .await;
     println!("Started CAS at address: {}", cas.address());
     println!("Press enter to exit.");
     let _ = stdin.read(&mut [0_u8]).unwrap();

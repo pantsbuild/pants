@@ -784,7 +784,7 @@ pub struct WorkunitStoreHandle {
 }
 
 thread_local! {
-  static THREAD_WORKUNIT_STORE_HANDLE: RefCell<Option<WorkunitStoreHandle >> = RefCell::new(None)
+  static THREAD_WORKUNIT_STORE_HANDLE: RefCell<Option<WorkunitStoreHandle >> = const { RefCell::new(None) }
 }
 
 task_local! {
@@ -887,6 +887,10 @@ impl RunningWorkunit {
             store,
             workunit: Some(workunit),
         }
+    }
+
+    pub fn workunit(&self) -> Option<&Workunit> {
+        self.workunit.as_ref()
     }
 
     pub fn record_observation(&self, metric: ObservationMetric, value: u64) {

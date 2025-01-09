@@ -18,7 +18,14 @@ from pants.engine.target import AllUnexpandedTargets, UnexpandedTargets
 from pants.help.help_info_extracter import TargetTypeHelpInfo
 from pants.util.strutil import softwrap
 
-specs_parser = SpecsParser()
+_specs_parser: SpecsParser | None = None
+
+
+def _get_specs_parser() -> SpecsParser:
+    global _specs_parser
+    if _specs_parser is None:
+        _specs_parser = SpecsParser()
+    return _specs_parser
 
 
 @strawberry.type(description="Describes a target field type.")
@@ -56,7 +63,7 @@ class Target:
     target_type: str = strawberry.field(
         description="The target type, such as `python_sources` or `pex_binary` etc."
     )
-    fields: JSONScalar = strawberry.field(
+    fields: JSONScalar = strawberry.field(  # type: ignore[valid-type]
         description=softwrap(
             """
             The targets field values. This has the same structure as the JSON output from the `peek`
@@ -71,7 +78,7 @@ class Target:
         address = json.pop("address")
         target_type = json.pop("target_type")
         fields = json
-        return cls(address=address, target_type=target_type, fields=fields)
+        return cls(address=address, target_type=target_type, fields=fields)  # type: ignore[call-arg]
 
 
 @strawberry.input(
@@ -165,7 +172,7 @@ class QueryTargetsMixin:
     async def targets(self, info: Info, query: Optional[TargetsQuery] = None) -> List[Target]:
         req = GraphQLContext.request_state_from_info(info).product_request
         specs = (
-            specs_parser.parse_specs(
+            _get_specs_parser().parse_specs(
                 query.specs, description_of_origin="GraphQL targets `query.specs`"
             )
             if query is not None and query.specs

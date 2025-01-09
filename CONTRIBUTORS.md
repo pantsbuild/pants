@@ -1,6 +1,7 @@
 Created as part of the release process.
 
 + A. Alonso Dominguez
++ APL
 + Aaron Mitchell
 + Adam Chainz
 + Adam Retter
@@ -9,8 +10,10 @@ Created as part of the release process.
 + Alan Velasco
 + Alex Bancroft
 + Alex Schmitt
++ Alexander Heldt
 + Alexander Johnson
 + Alexander Kuhn-Regnier
++ Alexandre Viau
 + Alexey Tereshenkov
 + Alisha Parveen
 + Andreas Stenius
@@ -21,10 +24,12 @@ Created as part of the release process.
 + Antoine Tollenaere
 + Asher Foa
 + Aurelien Didier
++ Axel Goblet
 + Baptiste Gentholz
 + Bardur Arantsson
 + Bastian Wegge
 + Ben Limmer
++ Benjamin Dabelow
 + Benjy Weinberger
 + Berkay Öztürk
 + Bill Farner
@@ -33,6 +38,7 @@ Created as part of the release process.
 + Bob Gregory
 + Borja Lorente
 + Brandon Milton
++ Brandon Novick
 + Brian Larson
 + Brian Wickman
 + Bruno Bieth
@@ -48,6 +54,7 @@ Created as part of the release process.
 + Chris Heisterkamp
 + Chris Livingston
 + Chris Pesto
++ Chris Smith
 + Chris Targett
 + Chris Williams
 + Christoph Proeschel
@@ -65,6 +72,7 @@ Created as part of the release process.
 + Dan Harrison
 + Daniel Anderson
 + Daniel Bentley
++ Daniel Cavazos
 + Daniel Goldman
 + Daniel Moran
 + Daniel Peebles
@@ -72,9 +80,11 @@ Created as part of the release process.
 + Danny McClanahan
 + Dave Brewster
 + David Katz
++ David Singleton
 + David Taylor
 + David Turner
 + Derek Young
++ Dimitar Kovachev
 + Dimitrios Bariamis
 + Divij Rajkumar
 + Dominic Hamon
@@ -83,6 +93,7 @@ Created as part of the release process.
 + Drew Rothstein
 + Dumitru Daniliuc
 + Dylan Herman
++ Dương Đỗ Minh Châu
 + Ebube Chuba
 + Eitan Adler
 + Ekaterina Tyurina
@@ -98,6 +109,7 @@ Created as part of the release process.
 + Facetoe
 + Fatin H
 + Fedor Korotkov
++ Filip Nikolovski
 + Fiona Condone
 + Flo
 + Florian Leibert
@@ -115,6 +127,7 @@ Created as part of the release process.
 + Guy Marom
 + Harley Cooper
 + HeetVekariya
++ Henri Parfait
 + Henry Fuller
 + Herbert Rusznak
 + Huon Wilson
@@ -128,15 +141,19 @@ Created as part of the release process.
 + Itay Donanhirsh
 + Ity Kaul
 + JC (Jonathan Chen)
++ Jack Evans
++ Jack Zhao
 + Jackson Davis
 + Jacob Floyd
 + Jake Donham
++ Jake Zerrer
 + Jakub Bujny
 + James Bench
 + James Koch
 + James Mouradian
 + Jan Berkel
 + Jan Paul Erkelens
++ Jason Barnett
 + Jason Jackson
 + Jason Song
 + Jay Crumb
@@ -148,14 +165,17 @@ Created as part of the release process.
 + Joe Ennever
 + Joe Smith
 + Johan Oskarsson
++ Johan Sim Jian An
 + John Barry
 + John Basila
 + John Chee
 + John Gallagher
++ John Granström
 + John Ioannidis
 + John Sirois
 + John Townsend
 + Jon Boulle
++ Jonas Rauber
 + Jonas Stendahl
 + Jonathan Coveney
 + Jonathan D. Simms
@@ -175,10 +195,12 @@ Created as part of the release process.
 + Kaushik Srenevasan
 + Ken Howard
 + Ken Kawamoto
++ Kevin Oliveira
 + Kevin Oliver
 + Kevin Sweeney
 + Koki Nishihara
 + Kris Wilson
++ Krishna Vudata
 + Krishnan Chandra
 + Kushal Dave
 + Kyle Derr
@@ -190,6 +212,8 @@ Created as part of the release process.
 + Lei Wang
 + Leo Kim
 + Lex Spoon
++ Li Li
++ Liam Deacon
 + Liam Wilson
 + Luc Cary
 + Luca Clementi
@@ -231,6 +255,7 @@ Created as part of the release process.
 + Mohamed Abdi
 + Morten Hauge
 + Moses Nakamura
++ Muhammad Tsany Qudsi
 + Nadav Samet
 + Nathan Levesque
 + Navneeth Jayendran
@@ -238,6 +263,7 @@ Created as part of the release process.
 + Neil Sanchala
 + Nicholas Gustafson
 + Nicholas Santos
++ Nick Dellosa
 + Nik Shkrob
 + Nimrod Shlagman
 + Nitay Joffe
@@ -262,6 +288,8 @@ Created as part of the release process.
 + Pierre Chevalier
 + Pierre DAL-PRA
 + Qicheng Ma
++ Rahul Mehta
++ Ramon Buckland
 + Raph Estrada
 + Raúl Cuza
 + Rhuan Barreto
@@ -288,12 +316,14 @@ Created as part of the release process.
 + Shuo Li
 + Simeon Franklin
 + Simon Biggs
++ Sion Kang
 + Srikanth Kotagiri
 + Stefan Sauer
 + Stephan Erb
 + Stu Hood
 + Subin Kim
 + Suresh Joshi
++ Sven Widén
 + Tal Amuyal
 + Tansy Arron-Walker
 + Ted Dziuba
@@ -312,9 +342,11 @@ Created as part of the release process.
 + Tom Dimiduk
 + Tom Dyas
 + Tom Howland
++ Tom Most
 + Tom Solberg
 + Tomasz Godzik
 + Tomasz Pasternak
++ Tony Sherman
 + Travis Crawford
 + Troy Howard
 + Tushar Singh
@@ -335,19 +367,27 @@ Created as part of the release process.
 + Yoav Alon
 + Yuhan GUO
 + Yujie Chen
++ achrafmam2
 + andreaimprovised
 + azban
 + bianca rosa
 + billybecker
 + csqzhang
++ csteiner
 + eugene yokota
 + gyudoza
 + hephex
 + jgartdele/del
++ lukevmorris
 + offsetcyan
++ okcleary
 + olivercoleman-switchdin
 + philipp-sontag-by
++ purajit
++ ravi2024sk
 + sww
 + twunderlich-grapl
 + wimax-grapl
++ yjabri
++ Éric Jacob
 + Ólafur Páll Geirsson

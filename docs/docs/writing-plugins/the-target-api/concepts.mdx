@@ -196,3 +196,41 @@ class SyntheticExampleAllTargetsAtOnceRequest(SyntheticTargetsRequest):
 Any other default value for `path` should be considered invalid and yield undefined behaviour. (that is it may change without notice in future versions of Pants.)
 
 During rule execution, the `path` field of the `request` instance will hold the value for the path currently being parsed in case of a per directory mode of operation otherwise it will be `SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS`.
+
+## Adding information to pants peek output
+
+Sometimes you may have metadata for a target that cannot be encompassed by a field, e.g. if it depends on the content of a file or if it requires some rule resolution to be calculated.
+
+You can attach this data to the output of `pants peek` by subclassing the `HasAdditionalTargetDataFieldSet` union type and register it as a union member with `UnionRule(HasAdditionalTargetDataFieldSet, SubclassedType)`. Then, implement a rule that takes `SubclassedType` as input and returns an `AdditionalTargetData` object.
+
+```python
+from dataclasses import dataclass
+from pants.backend.project_info.peek import AdditionalTargetData, HasAdditionalTargetDataFieldSet
+from pants.engine.unions import UnionRule
+from pants.engine.rules import collect_rules, rule
+
+
+@dataclass(frozen=True)
+class MyCustomTargetFieldSet(HasAdditionalTargetDataFieldSet):
+    ...
+
+
+@rule
+async def attach_custom_target_data(field_set: MyCustomTargetFieldSet) -> AdditionalTargetData:
+    # You can return any json-serializable type for the second field
+    return AdditionalTargetData("my_custom_target_data", {"hello": "world"})
+
+
+def rules():
+    return (*collect_rules(), UnionRule(HasAdditionalTargetDataFieldSet, MyCustomTargetFieldSet))
+```
+
+Then, if you run `pants peek --include-additional-info my/custom:target` you will see an `additional_info` field which will contain the following JSON object:
+
+```json
+{
+    "my_custom_target_data": {
+        "hello": "world"
+    }
+}
+```

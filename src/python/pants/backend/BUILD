@@ -19,6 +19,8 @@ DEFAULT_DEPENDENTS_RULES = (
     "//tests/**",
     # Allow build-support to use what ever.
     "//build-support/**",
+    # Allow testprojects to use any backend.
+    "//testprojects/**",
     # Deny all others.
     "!*",
 )
@@ -34,9 +36,12 @@ __dependents_rules__(
             "[/build_files/fmt/black/register.py]",
             "[/build_files/fmt/ruff/register.py]",
             "[/build_files/fmt/yapf/register.py]",
+            "[/build_files/fmt/buildifier/rules.py]",
+            "[/build_files/fmt/buildifier/subsystem.py]",
             "[/python/lint/black/rules.py]",
             "[/python/lint/black/subsystem.py]",
-            "[/python/lint/ruff/rules.py]",
+            "[/python/lint/ruff/format/rules.py]",
+            "[/python/lint/ruff/check/rules.py]",
             "[/python/lint/ruff/subsystem.py]",
             "[/python/lint/yapf/rules.py]",
             "[/python/lint/yapf/subsystem.py]",

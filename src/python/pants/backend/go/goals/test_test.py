@@ -33,6 +33,8 @@ from pants.engine.addresses import Address
 from pants.engine.process import ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
+ATTEMPTS_DEFAULT_OPTION = 2
+
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -58,7 +60,10 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[GoModTarget, GoPackageTarget, FileTarget],
     )
-    rule_runner.set_options(["--go-test-args=-v -bench=."], env_inherit={"PATH"})
+    rule_runner.set_options(
+        ["--go-test-args=-v -bench=.", f"--test-attempts-default={ATTEMPTS_DEFAULT_OPTION}"],
+        env_inherit={"PATH"},
+    )
     return rule_runner
 
 
@@ -220,6 +225,7 @@ def test_internal_test_fails(rule_runner: RuleRunner) -> None:
     )
     assert result.exit_code == 1
     assert b"FAIL: TestAdd" in result.stdout_bytes
+    assert len(result.process_results) == ATTEMPTS_DEFAULT_OPTION
 
 
 def test_internal_test_with_test_main(rule_runner: RuleRunner) -> None:
@@ -332,6 +338,7 @@ def test_external_test_fails(rule_runner: RuleRunner) -> None:
     )
     assert result.exit_code == 1
     assert b"FAIL: TestAdd" in result.stdout_bytes
+    assert len(result.process_results) == ATTEMPTS_DEFAULT_OPTION
 
 
 def test_external_test_with_test_main(rule_runner: RuleRunner) -> None:
@@ -421,6 +428,7 @@ def test_both_internal_and_external_tests_fail(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 1
     assert b"FAIL: TestAddInternal" in result.stdout_bytes
     assert b"FAIL: TestAddExternal" in result.stdout_bytes
+    assert len(result.process_results) == ATTEMPTS_DEFAULT_OPTION
 
 
 @pytest.mark.no_error_if_skipped
@@ -706,3 +714,45 @@ def test_profile_options_write_results(rule_runner: RuleRunner) -> None:
         "test_runner",
         "trace.out",
     ]
+
+
+def test_external_test_with_use_coverage(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """
+                package foo
+                func Add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+            "foo/add_test.go": textwrap.dedent(
+                """
+                package foo_test
+                import (
+                  "foo"
+                  "testing"
+                )
+                func TestAdd(t *testing.T) {
+                  if foo.Add(2, 3) != 5 {
+                    t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    rule_runner.set_options(
+        [
+            "--test-use-coverage",
+        ],
+        env_inherit={"PATH"},
+    )
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
+    assert result.exit_code == 0

@@ -8,19 +8,26 @@ from typing import Iterable
 from pants.backend.openapi import dependency_inference
 from pants.backend.openapi.goals import tailor
 from pants.backend.openapi.target_types import (
+    OpenApiBundleTarget,
     OpenApiDocumentGeneratorTarget,
     OpenApiDocumentTarget,
     OpenApiSourceGeneratorTarget,
     OpenApiSourceTarget,
 )
 from pants.backend.openapi.target_types import rules as target_types_rules
+from pants.backend.openapi.util_rules import openapi_bundle
 from pants.engine.rules import Rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return [*dependency_inference.rules(), *tailor.rules(), *target_types_rules()]
+    return [
+        *dependency_inference.rules(),
+        *openapi_bundle.rules(),
+        *tailor.rules(),
+        *target_types_rules(),
+    ]
 
 
 def target_types() -> Iterable[type[Target]]:
@@ -29,4 +36,5 @@ def target_types() -> Iterable[type[Target]]:
         OpenApiDocumentGeneratorTarget,
         OpenApiSourceTarget,
         OpenApiSourceGeneratorTarget,
+        OpenApiBundleTarget,
     )

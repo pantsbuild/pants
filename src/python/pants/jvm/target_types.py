@@ -309,6 +309,8 @@ class JvmArtifactExclusion:
         result = self.group
         if self.artifact:
             result += f":{self.artifact}"
+        else:
+            result += ":*"
         return result
 
 

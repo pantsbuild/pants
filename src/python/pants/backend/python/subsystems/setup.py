@@ -60,6 +60,7 @@ class PythonSetup(Subsystem):
         "3.10",
         "3.11",
         "3.12",
+        "3.13",
     ]
 
     _interpreter_constraints = StrListOption(
@@ -76,8 +77,21 @@ class PythonSetup(Subsystem):
             constraint strings will be ORed together.
             """
         ),
-        advanced=True,
         metavar="<requirement>",
+    )
+
+    warn_on_python2_usage = BoolOption(
+        default=True,
+        advanced=True,
+        help=softwrap(
+            """\
+            True if Pants should generate a deprecation warning when Python 2.x is used in interpreter constraints.
+
+            As of Pants v2.24.x and later, Pants will no longer be tested regularly with Python 2.7.x. As such, going
+            forward, Pants may or may not work with Python 2.7. This option allows disabling the deprecation
+            warning announcing this policy change.
+            """
+        ),
     )
 
     @memoized_property
@@ -88,7 +102,7 @@ class PythonSetup(Subsystem):
             #  We'll probably want to find and modify all those tests to set an explicit IC, but
             #  that will take time.
             if "PYTEST_CURRENT_TEST" in os.environ:
-                return (">=3.7,<4",)
+                return (">=3.8,<4",)
             raise OptionsError(
                 softwrap(
                     f"""\
@@ -106,10 +120,24 @@ class PythonSetup(Subsystem):
                     if different parts of your codebase run against different python interpreter
                     versions in a single repo.
 
-                    See {doc_url("python-interpreter-compatibility")} for details.
+                    See {doc_url("docs/python/overview/interpreter-compatibility")} for details.
                     """
                 ),
             )
+
+        # Warn if Python 2.x is still in use. This warning should only be displayed once since this
+        # function is memoized.
+        if self.warn_on_python2_usage:
+            # Side-step import cycle.
+            from pants.backend.python.util_rules.interpreter_constraints import (
+                warn_on_python2_usage_in_interpreter_constraints,
+            )
+
+            warn_on_python2_usage_in_interpreter_constraints(
+                self._interpreter_constraints,
+                description_of_origin="the `[python].interpreter_constraints` option",
+            )
+
         return self._interpreter_constraints
 
     interpreter_versions_universe = StrListOption(
@@ -126,7 +154,7 @@ class PythonSetup(Subsystem):
             interpreter constraints, update `[python].interpreter_constraints`, the
             `interpreter_constraints` field, and relevant tool options like
             `[isort].interpreter_constraints` to tell Pants which interpreters your code
-            actually uses. See {doc_url('python-interpreter-compatibility')}.
+            actually uses. See {doc_url('docs/python/overview/interpreter-compatibility')}.
 
             All elements must be the minor and major Python version, e.g. `'2.7'` or `'3.10'`. Do
             not include the patch version.
@@ -187,7 +215,7 @@ class PythonSetup(Subsystem):
                 resolve with the `resolve` field.
 
             If a target can work with multiple resolves, you can either use the `parametrize`
-            mechanism or manually create a distinct target per resolve. See {doc_url("targets")}
+            mechanism or manually create a distinct target per resolve. See {doc_url("docs/using-pants/key-concepts/targets-and-build-files")}
             for information about `parametrize`.
 
             For example:
@@ -225,13 +253,13 @@ class PythonSetup(Subsystem):
         ),
     )
     pip_version = StrOption(
-        default="23.1.2",
+        default="24.2",
         help=softwrap(
             f"""
             Use this version of Pip for resolving requirements and generating lockfiles.
 
             The value used here must be one of the Pip versions supported by the underlying PEX
-            version. See {doc_url("pex")} for details.
+            version. See {doc_url("docs/python/overview/pex")} for details.
 
             N.B.: The `latest` value selects the latest of the choices listed by PEX which is not
             necessarily the latest Pip version released on PyPI.
@@ -579,6 +607,17 @@ class PythonSetup(Subsystem):
         for resolve, ics in self._resolves_to_interpreter_constraints.items():
             if resolve not in self.resolves:
                 unrecognized_resolves.append(resolve)
+            if ics and self.warn_on_python2_usage:
+                # Side-step import cycle.
+                from pants.backend.python.util_rules.interpreter_constraints import (
+                    warn_on_python2_usage_in_interpreter_constraints,
+                )
+
+                warn_on_python2_usage_in_interpreter_constraints(
+                    ics,
+                    description_of_origin=f"the `[python].resolves_to_interpreter_constraints` option for resolve {resolve}",
+                )
+
             result[resolve] = tuple(ics)
         if unrecognized_resolves:
             raise UnrecognizedResolveNamesError(

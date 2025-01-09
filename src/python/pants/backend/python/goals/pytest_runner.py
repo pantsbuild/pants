@@ -92,6 +92,7 @@ from pants.option.global_options import GlobalOptions
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import OrderedSet
 from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
@@ -112,6 +113,7 @@ class PytestPluginSetup:
     """
 
     digest: Digest = EMPTY_DIGEST
+    extra_sys_path: tuple[str, ...] = ()
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -243,7 +245,7 @@ async def validate_pytest_cov_included(_pytest: PyTest):
                 `{_pytest.install_from_resolve}` used to install pytest is missing
                 `pytest-cov`, which is needed to collect coverage data.
 
-                See {doc_url("python-test-goal#pytest-version-and-plugins")} for details
+                See {doc_url("docs/python/goals/test#pytest-version-and-plugins")} for details
                 on how to set up a custom resolve for use by pytest.
                 """
             )
@@ -311,7 +313,6 @@ async def setup_pytest_for_target(
         LocalDistsPex,
         LocalDistsPexRequest(
             addresses,
-            internal_only=True,
             interpreter_constraints=interpreter_constraints,
             sources=prepared_sources,
         ),
@@ -405,8 +406,14 @@ async def setup_pytest_for_target(
             )
         )
 
+    extra_sys_path = OrderedSet(
+        (
+            *prepared_sources.source_roots,
+            *(entry for plugin_setup in plugin_setups for entry in plugin_setup.extra_sys_path),
+        )
+    )
     extra_env = {
-        "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
+        "PEX_EXTRA_SYS_PATH": ":".join(extra_sys_path),
         **request.extra_env,
         **test_extra_env.env,
         # NOTE: field_set_extra_env intentionally after `test_extra_env` to allow overriding within

@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from pants.backend.javascript import package_json
-from pants.backend.javascript.goals import lockfile, tailor, test
+from pants.backend.javascript.goals import export, lockfile, tailor, test
 from pants.backend.javascript.package.rules import rules as package_rules
 from pants.backend.javascript.run.rules import rules as run_rules
 from pants.backend.javascript.subsystems import nodejs
@@ -15,6 +15,13 @@ from pants.backend.javascript.target_types import (
     JSSourceTarget,
     JSTestsGeneratorTarget,
     JSTestTarget,
+)
+from pants.backend.jsx.goals import tailor as jsx_tailor
+from pants.backend.jsx.target_types import (
+    JSXSourcesGeneratorTarget,
+    JSXSourceTarget,
+    JSXTestsGeneratorTarget,
+    JSXTestTarget,
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.rules import Rule
@@ -30,6 +37,8 @@ def rules() -> Iterable[Rule | UnionRule]:
         *package_rules(),
         *run_rules(),
         *test.rules(),
+        *export.rules(),
+        *jsx_tailor.rules(),
     )
 
 
@@ -39,6 +48,10 @@ def target_types() -> Iterable[type[Target]]:
         JSSourcesGeneratorTarget,
         JSTestTarget,
         JSTestsGeneratorTarget,
+        JSXSourceTarget,
+        JSXSourcesGeneratorTarget,
+        JSXTestTarget,
+        JSXTestsGeneratorTarget,
         *package_json.target_types(),
     )
 

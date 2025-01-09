@@ -748,6 +748,8 @@ impl<R: Rule> Builder<R> {
                 minimal_in_set.insert(node_id);
 
                 // But we ensure that its out_set is accurate before continuing.
+                // Note: Clippy wants us to use `clone_from`, but doing so fails because `graph` is borrowed as mutable already.
+                #[allow(clippy::assigning_clones)]
                 if node.out_set != node.in_set {
                     graph.node_weight_mut(node_id).unwrap().0.out_set =
                         graph[node_id].0.in_set.clone();
@@ -1136,7 +1138,7 @@ impl<R: Rule> Builder<R> {
                 // affect our identity) rather than dependents.
                 #[allow(clippy::comparison_chain)]
                 let chosen_edges = {
-                    let mut minimum_param_set_size = ::std::usize::MAX;
+                    let mut minimum_param_set_size = usize::MAX;
                     let mut chosen_edges = Vec::new();
                     for edge_ref in relevant_edge_refs {
                         let param_set_size = graph[edge_ref.target()].0.in_set.len();

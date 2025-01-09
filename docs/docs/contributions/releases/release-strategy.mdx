@@ -44,6 +44,17 @@ We try our best to write bug-free code, but, like everyone, we sometimes make mi
 If you encounter a bug, please gently let us know by opening a GitHub issue or messaging us on Slack. See [Community](/community/members).
 :::
 
+### Stable release managers
+
+Our weekly [release process](./release-process.mdx) is executed by a rotating "maintainer of the week" (MOTW). But because the entire stable release process (through `dev`s, to an `a`, past `rc`s, etc) can take 8 to 12 weeks, we additionally assign a release manager per stable release to have an overarching view and drive the manual steps of a release that are not covered by the weekly process.
+
+The release manager for a stable release is a maintainer chosen informally in Slack to run the upcoming release. They create or are assigned a stable release ticket ([example](https://github.com/pantsbuild/pants/issues/20578)). A stable release has some additional requirements, most of which are listed in the weekly release process steps, but which can require time outside of the weekly process:
+1. Writing (or [automating!](https://github.com/pantsbuild/pants/discussions/19247)) the creation of a release blog ([example](https://www.pantsbuild.org/blog/2024/03/27/pants-2-20))
+2. Tracking/triaging issues which block finalizing the release, in [its milestone](https://github.com/pantsbuild/pants/milestones). This should include rejecting or postponing non-blocking bug-fixes and cherry-picks, if they might delay finalising a release inappropriately.
+3. Occasionally running `rc` releases outside of the weekly release process in order to get feedback more quickly.
+    * For example: if a release-blocking issue is fixed shortly after the weekly release (meaning that it might be e.g. 6 days until the next `rc` is cut by the weekly process), the release manager might decide to cut another `rc` immediately.
+4. Deciding when to cut the stable release for a release branch, when all blockers are fixed, and there's been sufficient testing. The release can be cut by either letting the MOTW know, or by executing the release themselves.
+
 ## Release candidates
 
 `rc` releases are on track to being stable, but may still have some issues.

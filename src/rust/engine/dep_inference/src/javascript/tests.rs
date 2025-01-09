@@ -4,8 +4,8 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use crate::javascript::import_pattern::{imports_from_patterns, Pattern, StarMatch};
-use crate::javascript::{get_dependencies, ImportCollector};
+use crate::javascript::import_pattern::{imports_from_patterns, Import, Pattern, StarMatch};
+use crate::javascript::{get_dependencies, ImportCollector, JavascriptImportInfo};
 use javascript_inference_metadata::ImportPattern;
 use protos::gen::pants::cache::{javascript_inference_metadata, JavascriptInferenceMetadata};
 
@@ -21,8 +21,17 @@ fn assert_imports(code: &str, imports: &[&str]) {
 fn given_metadata(
     root: &str,
     pattern_replacements: HashMap<String, Vec<String>>,
+    config_root: Option<&str>,
+    path_patterns: HashMap<String, Vec<String>>,
 ) -> JavascriptInferenceMetadata {
     let import_patterns: Vec<ImportPattern> = pattern_replacements
+        .iter()
+        .map(|(key, value)| ImportPattern {
+            pattern: key.clone(),
+            replacements: value.clone(),
+        })
+        .collect();
+    let paths = path_patterns
         .iter()
         .map(|(key, value)| ImportPattern {
             pattern: key.clone(),
@@ -32,6 +41,8 @@ fn given_metadata(
     JavascriptInferenceMetadata {
         package_root: root.to_string(),
         import_patterns,
+        config_root: config_root.map(str::to_string),
+        paths,
     }
 }
 
@@ -45,12 +56,38 @@ fn assert_dependency_imports<'a>(
     let result = get_dependencies(code, PathBuf::from(file_path), metadata).unwrap();
     assert_eq!(
         HashSet::from_iter(file_imports.into_iter().map(|s| s.to_string())),
-        result.file_imports,
+        result
+            .imports
+            .values()
+            .flat_map(|val| val.file_imports.clone())
+            .collect::<HashSet<String>>(),
     );
     assert_eq!(
         HashSet::from_iter(package_imports.into_iter().map(|s| s.to_string())),
-        result.package_imports,
+        result
+            .imports
+            .into_values()
+            .flat_map(|val| val.package_imports)
+            .collect::<HashSet<String>>(),
     );
+}
+
+fn assert_dependency_candidates<'a>(
+    file_path: &str,
+    code: &str,
+    expected: impl IntoIterator<Item = (&'a str, JavascriptImportInfo)>,
+    metadata: JavascriptInferenceMetadata,
+) {
+    let result = get_dependencies(code, PathBuf::from(file_path), metadata).unwrap();
+
+    assert_eq!(
+        HashMap::from_iter(
+            expected
+                .into_iter()
+                .map(|(import, candidates)| (import.to_string(), candidates))
+        ),
+        result.imports
+    )
 }
 
 #[test]
@@ -260,7 +297,11 @@ fn adds_dir_to_file_imports() -> Result<(), Box<dyn std::error::Error>> {
         Default::default(),
     )?;
     assert_eq!(
-        result.file_imports,
+        result
+            .imports
+            .into_values()
+            .flat_map(|info| info.file_imports)
+            .collect::<HashSet<String>>(),
         HashSet::from_iter(["dir/file.js".to_string()])
     );
     Ok(())
@@ -273,7 +314,12 @@ fn root_level_files_have_no_dir() {
         r#"import a from "./file.js""#,
         ["file.js"],
         [],
-        given_metadata(Default::default(), Default::default()),
+        given_metadata(
+            Default::default(),
+            Default::default(),
+            None,
+            Default::default(),
+        ),
     )
 }
 
@@ -287,7 +333,12 @@ fn only_walks_one_dir_level_for_curdir() {
   "#,
         ["src/js/xes.mjs"],
         ["fs"],
-        given_metadata(Default::default(), Default::default()),
+        given_metadata(
+            Default::default(),
+            Default::default(),
+            None,
+            Default::default(),
+        ),
     )
 }
 
@@ -301,7 +352,12 @@ fn walks_two_dir_levels_for_pardir() {
   "#,
         ["src/js/xes.mjs"],
         ["fs"],
-        given_metadata(Default::default(), Default::default()),
+        given_metadata(
+            Default::default(),
+            Default::default(),
+            None,
+            Default::default(),
+        ),
     )
 }
 
@@ -314,7 +370,12 @@ fn silly_walking() {
   "#,
         ["src/xes.mjs"],
         [],
-        given_metadata(Default::default(), Default::default()),
+        given_metadata(
+            Default::default(),
+            Default::default(),
+            None,
+            Default::default(),
+        ),
     )
 }
 
@@ -327,7 +388,12 @@ fn imports_outside_of_provided_source_root_are_unchanged() {
   "#,
         ["../../xes.mjs"],
         [],
-        given_metadata(Default::default(), Default::default()),
+        given_metadata(
+            Default::default(),
+            Default::default(),
+            None,
+            Default::default(),
+        ),
     );
 
     assert_dependency_imports(
@@ -337,7 +403,12 @@ fn imports_outside_of_provided_source_root_are_unchanged() {
   "#,
         ["./../../../../lib2/xes.mjs"],
         [],
-        given_metadata(Default::default(), Default::default()),
+        given_metadata(
+            Default::default(),
+            Default::default(),
+            None,
+            Default::default(),
+        ),
     );
 }
 
@@ -353,6 +424,8 @@ fn subpath_package_import() {
         given_metadata(
             "",
             HashMap::from_iter([("#myChalk".to_string(), vec!["chalk".to_string()])]),
+            None,
+            Default::default(),
         ),
     );
 }
@@ -371,6 +444,65 @@ fn subpath_file_import() {
             HashMap::from_iter([(
                 "#nested/*.mjs".to_string(),
                 vec!["./src/lib/nested/*.mjs".to_string()],
+            )]),
+            None,
+            Default::default(),
+        ),
+    );
+}
+
+#[test]
+fn config_file_import() {
+    assert_dependency_imports(
+        "js/project/src/lib/index.js",
+        r#"
+    import stuff from 'lib/stuff';
+    "#,
+        ["js/project/src/lib/stuff"],
+        ["lib/stuff"],
+        given_metadata(
+            "js",
+            Default::default(),
+            Some("js/project"),
+            HashMap::from_iter([("*".to_string(), vec!["./src/*".to_string()])]),
+        ),
+    );
+}
+
+#[test]
+fn config_file_sharing_root_import() {
+    assert_dependency_imports(
+        "js/project/src/lib/index.js",
+        r#"
+    import stuff from 'lib/stuff';
+    "#,
+        ["js/project/src/lib/stuff"],
+        ["lib/stuff"],
+        given_metadata(
+            "js/project",
+            Default::default(),
+            Some("js/project"),
+            HashMap::from_iter([("*".to_string(), vec!["./src/*".to_string()])]),
+        ),
+    );
+}
+
+#[test]
+fn config_file_with_at_mapping_imports() {
+    assert_dependency_imports(
+        "js/project/src/app/index.js",
+        r#"
+    import { Button } from "@component/lib/button.js";
+    "#,
+        ["js/project/src/component/lib/button.js"],
+        ["@component/lib/button.js"],
+        given_metadata(
+            "js/project",
+            Default::default(),
+            Some("js/project"),
+            HashMap::from_iter([(
+                "@component/*".to_string(),
+                vec!["./src/component/*".to_string()],
             )]),
         ),
     );
@@ -394,6 +526,8 @@ fn polyfills() {
                     "./websockets-polyfill.js".to_string(),
                 ],
             )]),
+            None,
+            Default::default(),
         ),
     );
 }
@@ -463,10 +597,8 @@ fn trailing_star_pattern_mismatch() {
 
 #[test]
 fn star_only_pattern() {
-    // Users might do this.
-    // Nodejs / TS will crash on them later, so avoiding special casing seem ok.
     let pattern = Pattern::matches("*", "some-other-lib");
-    assert_eq!(pattern, Pattern::NoMatch)
+    assert_matches_with_star(pattern, "some-other-lib")
 }
 
 #[test]
@@ -520,11 +652,11 @@ fn replaces_groups() {
         "#internal/*.js".to_string(),
         vec!["./src/internal/*.js".to_string()],
     );
-    let imports = imports_from_patterns("dir", &patterns, "#internal/z.js".to_string());
+    let imports = imports_from_patterns("dir", &patterns, &"#internal/z.js");
 
     assert_eq!(
         imports,
-        HashSet::from_iter(["dir/src/internal/z.js".to_string()])
+        HashSet::from_iter([Import::Matched("dir/src/internal/z.js".to_string())])
     )
 }
 
@@ -541,10 +673,40 @@ fn longest_prefix_wins() {
         vec!["./src/things/*.js".to_string()],
     );
 
-    let imports = imports_from_patterns("dir", &patterns, "#internal/stuff/index.js".to_string());
+    let imports = imports_from_patterns("dir", &patterns, &"#internal/stuff/index.js");
 
     assert_eq!(
         imports,
-        HashSet::from_iter(["dir/src/stuff/index.js".to_string()])
+        HashSet::from_iter([Import::Matched("dir/src/stuff/index.js".to_string())])
     )
+}
+
+#[test]
+fn candidate_imports_from_config_and_imports() {
+    assert_dependency_candidates(
+        "js/project/src/lib/index.js",
+        r#"
+    import { relative, or, package } from 'lib/stuff';
+    import { subpath } from '#nested/index.js';
+    "#,
+        [
+            (
+                "lib/stuff",
+                JavascriptImportInfo::new(["js/project/src/lib/stuff"], ["lib/stuff"]),
+            ),
+            (
+                "#nested/index.js",
+                JavascriptImportInfo::new(["js/project/src/lib/nested/index.js"], [] as [&str; 0]),
+            ),
+        ],
+        given_metadata(
+            "js/project",
+            HashMap::from_iter([(
+                "#nested/*".to_string(),
+                vec!["./src/lib/nested/*".to_string()],
+            )]),
+            Some("js/project"),
+            HashMap::from_iter([("*".to_string(), vec!["./src/*".to_string()])]),
+        ),
+    );
 }

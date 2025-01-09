@@ -65,13 +65,12 @@ impl Metadata {
             .and_then(|(pid_metadata_path, value)| {
                 value
                     .parse()
-                    .map(|pid| {
+                    .inspect(|&pid| {
                         debug!(
                             "Parsed pid {pid} from {pid_metadata_path}.",
                             pid = pid,
                             pid_metadata_path = pid_metadata_path.display()
                         );
-                        pid
                     })
                     .map_err(|e| {
                         format!(
@@ -92,13 +91,12 @@ impl Metadata {
             .and_then(|(socket_metadata_path, value)| {
                 value
                     .parse()
-                    .map(|port| {
+                    .inspect(|&port| {
                         debug!(
                             "Parsed port {port} from {socket_metadata_path}.",
                             port = port,
                             socket_metadata_path = socket_metadata_path.display()
                         );
-                        port
                     })
                     .map_err(|e| {
                         format!(
@@ -297,10 +295,7 @@ pub fn fingerprint_compute(
                 Digest::update(&mut hasher, val.value.as_bytes());
             }
             OptionType::StringList(default) => {
-                let default = default.iter().map(|s| s.as_str()).collect::<Vec<_>>();
-                let val = options_parser
-                    .parse_string_list(&option.id, &default)?
-                    .value;
+                let val = options_parser.parse_string_list(&option.id, default)?.value;
                 for item in val {
                     Digest::update(&mut hasher, item.as_bytes());
                 }

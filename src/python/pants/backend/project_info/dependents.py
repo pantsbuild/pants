@@ -108,8 +108,6 @@ def find_dependents(
 class DependentsSubsystem(LineOriented, GoalSubsystem):
     name = "dependents"
     help = "List all targets that depend on any of the input files/targets."
-    deprecated_options_scope = "dependees"
-    deprecated_options_scope_removal_version = "2.23.0.dev0"
 
     transitive = BoolOption(
         default=False,
@@ -167,7 +165,8 @@ async def list_dependents_as_json(
         iterated_addresses.append(sorted([str(address) for address in dependents]))
     mapping = dict(zip([str(address) for address in addresses], iterated_addresses))
     output = json.dumps(mapping, indent=4)
-    console.print_stdout(output)
+    with dependents_subsystem.line_oriented(console) as print_stdout:
+        print_stdout(output)
 
 
 @goal_rule

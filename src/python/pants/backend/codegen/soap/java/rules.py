@@ -15,7 +15,7 @@ from pants.backend.codegen.soap.target_types import (
 )
 from pants.backend.java.target_types import JavaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -41,7 +41,7 @@ from pants.jvm import jdk_rules
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
@@ -50,10 +50,6 @@ from pants.util.logging import LogLevel
 class GenerateJavaFromWsdlRequest(GenerateSourcesRequest):
     input = WsdlSourceField
     output = JavaSourceField
-
-
-class JaxWsToolsLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = JaxWsTools.options_scope
 
 
 @dataclass(frozen=True)
@@ -111,7 +107,7 @@ async def compile_wsdl_source(
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
 
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, JaxWsToolsLockfileSentinel())
+    lockfile_request = GenerateJvmLockfileFromTool.create(jaxws)
     tool_classpath, subsetted_input_digest, empty_output_dir = await MultiGet(
         Get(
             ToolClasspath,
@@ -174,13 +170,6 @@ async def compile_wsdl_source(
     return CompiledWsdlSource(normalized_digest)
 
 
-@rule
-async def generate_jaxws_lockfile_request(
-    _: JaxWsToolsLockfileSentinel, jaxws: JaxWsTools
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(jaxws)
-
-
 def rules():
     return [
         *collect_rules(),
@@ -190,7 +179,7 @@ def rules():
         *jvm_tool.rules(),
         *jdk_rules.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromWsdlRequest),
-        UnionRule(GenerateToolLockfileSentinel, JaxWsToolsLockfileSentinel),
+        UnionRule(ExportableTool, JaxWsTools),
         WsdlSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         WsdlSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         WsdlSourceTarget.register_plugin_field(PrefixedJvmResolveField),

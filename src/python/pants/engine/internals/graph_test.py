@@ -13,6 +13,7 @@ from typing import Iterable, List, Set, Tuple, Type
 
 import pytest
 
+from pants.base.deprecated import warn_or_error
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import Address, Addresses, AddressInput, UnparsedAddressInputs
@@ -27,6 +28,7 @@ from pants.engine.internals.graph import (
     _DependencyMapping,
     _DependencyMappingRequest,
     _TargetParametrizations,
+    warn_deprecated_field_type,
 )
 from pants.engine.internals.native_engine import AddressParseException
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrizationsRequest
@@ -73,6 +75,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.util.docutil import bin_name
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -114,7 +117,8 @@ def resolve_field_default_factory(
 
 
 class MockMultipleSourcesField(MultipleSourcesField):
-    pass
+    deprecated_alias = "deprecated_sources"
+    deprecated_alias_removal_version = "9.9.9.dev0"
 
 
 class MockPluginField(StringField):
@@ -146,7 +150,7 @@ class MockTargetGenerator(TargetFilesGenerator):
     core_fields = (MockMultipleSourcesField, OverridesField)
     generated_target_cls = MockGeneratedTarget
     copied_fields = ()
-    moved_fields = (Dependencies, Tags, ResolveField)
+    moved_fields = (MockDependencies, Tags, ResolveField)
 
 
 @pytest.fixture
@@ -699,6 +703,32 @@ def test_deprecated_field_name(transitive_targets_rule_runner: RuleRunner, caplo
     transitive_targets_rule_runner.write_files({"BUILD": "target(name='t', deprecated_field=[])"})
     transitive_targets_rule_runner.get_target(Address("", target_name="t"))
     assert len(caplog.records) == 1
+    assert "Instead, use `dependencies`" in caplog.text
+
+
+def test_deprecated_field_name_on_generator_issue_20627(
+    transitive_targets_rule_runner: RuleRunner, caplog
+) -> None:
+    warn_deprecated_field_type.forget(MockDependencies)  # type: ignore[attr-defined]
+    warn_or_error.forget(  # type: ignore[attr-defined]
+        removal_version=MockDependencies.deprecated_alias_removal_version,
+        entity=f"the field name {MockDependencies.deprecated_alias}",
+        hint=(
+            f"Instead, use `{MockDependencies.alias}`, which behaves the same. Run `{bin_name()} "
+            "update-build-files` to automatically fix your BUILD files."
+        ),
+    )
+    transitive_targets_rule_runner.write_files(
+        {
+            "f1.txt": "",
+            "BUILD": "generator(name='t', deprecated_sources=['f1.txt'], deprecated_field=[])",
+        }
+    )
+    transitive_targets_rule_runner.get_target(
+        Address("", target_name="t", relative_file_path="f1.txt")
+    )
+    assert len(caplog.records) == 2
+    assert "Instead, use `sources`" in caplog.text
     assert "Instead, use `dependencies`" in caplog.text
 
 
@@ -1556,8 +1586,12 @@ def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
 @pytest.mark.parametrize(
     "field_content",
     [
-        "tagz=['tag']",
-        "tagz=parametrize(['tag1'], ['tag2'])",
+        "tagz=('tag',)",
+        # TODO: The documentation of `parametrize()`, and the type annotations in its
+        #  implementation in parametrize.py, imply that a positional arg must be
+        #  a string, and other arg types should be applied as kwargs, so it's unclear
+        #  why we expect this to work, and should revisit.
+        "tagz=parametrize(('tag1',), ('tag2',))",
     ],
 )
 def test_parametrize_16910(generated_targets_rule_runner: RuleRunner, field_content: str) -> None:
@@ -1622,6 +1656,55 @@ def test_parametrize_group_on_target_generator_20418(
             "demo:t@parametrize=b2": {
                 "demo/f1.ext:t@parametrize=b2",
                 "demo/f2.ext:t@parametrize=b2",
+            },
+        },
+    )
+
+
+def test_parametrize_explicit_dependencies_20739(
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo", target_name="tst"),
+        dedent(
+            """\
+            generator(
+              name='src',
+              sources=['src1.ext'],
+              **parametrize('b1', resolve='a'),
+              **parametrize('b2', resolve='b'),
+            )
+            generator(
+              name='tst',
+              sources=['tst1.ext'],
+              dependencies=['./src1.ext:src'],
+              **parametrize('b1', resolve='a'),
+              **parametrize('b2', resolve='b'),
+            )
+            """
+        ),
+        ["src1.ext", "tst1.ext"],
+        expected_dependencies={
+            "demo/src1.ext:src@parametrize=b1": set(),
+            "demo/src1.ext:src@parametrize=b2": set(),
+            "demo/tst1.ext:tst@parametrize=b1": {
+                "demo/src1.ext:src@parametrize=b1",
+            },
+            "demo/tst1.ext:tst@parametrize=b2": {
+                "demo/src1.ext:src@parametrize=b2",
+            },
+            "demo:src@parametrize=b1": {
+                "demo/src1.ext:src@parametrize=b1",
+            },
+            "demo:src@parametrize=b2": {
+                "demo/src1.ext:src@parametrize=b2",
+            },
+            "demo:tst@parametrize=b1": {
+                "demo/tst1.ext:tst@parametrize=b1",
+            },
+            "demo:tst@parametrize=b2": {
+                "demo/tst1.ext:tst@parametrize=b2",
             },
         },
     )
@@ -1693,14 +1776,14 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
         pass
 
     addr = Address("", target_name="lib")
-    sources_rule_runner.write_files({f: "" for f in ["f1.f95"]})
+    sources_rule_runner.write_files({"f1.f95": ""})
 
     valid_sources = SourcesSubclass(["*"], addr)
     hydrated_valid_sources = sources_rule_runner.request(
         HydratedSources,
         [HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass])],
     )
-    assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
+    assert hydrated_valid_sources.snapshot.files == ("BUILDROOT", "f1.f95")
     assert hydrated_valid_sources.sources_type == SourcesSubclass
 
     valid_single_sources = SingleSourceSubclass("f1.f95", addr)
@@ -1730,7 +1813,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
 
 def test_sources_unmatched_globs(sources_rule_runner: RuleRunner) -> None:
     sources_rule_runner.set_options(["--unmatched-build-file-globs=error"])
-    sources_rule_runner.write_files({f: "" for f in ["f1.f95"]})
+    sources_rule_runner.write_files({"f1.f95": ""})
     sources = MultipleSourcesField(["non_existent.f95"], Address("", target_name="lib"))
     with engine_error(contains="non_existent.f95"):
         sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(sources)])
@@ -1799,7 +1882,7 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         # We allow for 1 or 3 files
         expected_num_files = range(1, 4, 2)
 
-    sources_rule_runner.write_files({f: "" for f in ["f1.txt", "f2.txt", "f3.txt", "f4.txt"]})
+    sources_rule_runner.write_files(dict.fromkeys(["f1.txt", "f2.txt", "f3.txt", "f4.txt"], ""))
 
     def hydrate(sources_cls: Type[MultipleSourcesField], sources: Iterable[str]) -> HydratedSources:
         return sources_rule_runner.request(

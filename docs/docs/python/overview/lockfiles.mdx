@@ -150,8 +150,8 @@ A lockfile will contain dependencies for all requested Python versions. By defau
 You can use the following options to affect how the lockfile generator resolves dependencies for each resolve:
 
 - [\[python\].resolves_to_constraints_file](../../../reference/subsystems/python.mdx#resolves_to_constraints_file): For each resolve, a path to a [Pip constraints file](https://pip.pypa.io/en/stable/user_guide/#constraints-files) to use when resolving that lockfile.
-- [\[python\].resolve_to_no_binary](../../../reference/subsystems/python.mdx#resolve_to_no_binary): For each resolve, a list of projects that must only resolve to sdists and not wheels. Use the value `[":all:"]` to disable wheels for all packages.
-- [\[python\].resolve_to_only_binary](../../../reference/subsystems/python.mdx#resolve_to_only_binary): For each resolve, a list of projects that must only resolve to wheels and not sdists. Use the value `[":all:"]` to disable sdists for all packages.
+- [\[python\].resolves_to_no_binary](../../../reference/subsystems/python.mdx#resolves_to_no_binary): For each resolve, a list of projects that must only resolve to sdists and not wheels. Use the value `[":all:"]` to disable wheels for all packages.
+- [\[python\].resolves_to_only_binary](../../../reference/subsystems/python.mdx#resolves_to_only_binary): For each resolve, a list of projects that must only resolve to wheels and not sdists. Use the value `[":all:"]` to disable sdists for all packages.
 
 You can use the key `__default__` to set the value for all resolves at once.
 
@@ -184,7 +184,7 @@ It is strongly recommended that these tools be installed from a hermetic lockfil
 
 The only time you need to think about this is if you want to customize the tool requirements that Pants uses. This might be the case if you want to modify the version of a tool or add extra requirements (for example, tool plugins).
 
-If you want a tool to be installed from some resolve, instead of from the built-in lockfile, you set `install_from_resolve` and `requirements` on the tool's config section:
+Tools can also be installed from a specific resolve instead of from the built-in lockfile. This is useful for specifying a version of the tool and including extra packages. To do this, set `install_from_resolve` and `requirements` on the tool's config section:
 
 ```toml title="pants.toml"
 [python.resolves]
@@ -192,7 +192,7 @@ pytest = "3rdparty/python/pytest.lock"
 
 [pytest]
 install_from_resolve = "pytest"  # Use this resolve's lockfiles.
-requirements =["//3rdparty/python:pytest"]  # Use these requirements from the lockfile.
+requirements = ["//3rdparty/python:pytest"]  # Use these requirements from the lockfile.
 ```
 
 Then set up the resolve's inputs:
@@ -239,7 +239,7 @@ Rather than repeat the same requirement in two different resolves, you can point
 
 ```toml title="pants.toml"
 [pytest]
-install_from_resolve = python-default
+install_from_resolve = "python-default"
 ```
 
 Of course, you have to ensure that this resolve does in fact provide appropriate versions of the tool.
@@ -248,7 +248,7 @@ As above, you will want to point `requirements` to the subset of targets represe
 
 ```toml title="pants.toml"
 [pytest]
-install_from_resolve = python-default
+install_from_resolve = "python-default"
 
 requirements = [
   "//3rdparty/python#pytest",

@@ -6,7 +6,6 @@
 These are always activated and cannot be disabled.
 """
 from pants.backend.codegen import export_codegen_goal
-from pants.bsp.rules import rules as bsp_rules
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals import (
     check,
@@ -54,6 +53,7 @@ from pants.core.util_rules import (
 from pants.core.util_rules.environments import (
     DockerEnvironmentTarget,
     LocalEnvironmentTarget,
+    LocalWorkspaceEnvironmentTarget,
     RemoteEnvironmentTarget,
 )
 from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
@@ -85,7 +85,6 @@ def rules():
         *run.rules(),
         *tailor.rules(),
         *test.rules(),
-        *bsp_rules(),
         # util_rules
         *adhoc_binaries.rules(),
         *anonymous_telemetry.rules(),
@@ -113,6 +112,7 @@ def target_types():
         FileTarget,
         GenericTarget,
         LocalEnvironmentTarget,
+        LocalWorkspaceEnvironmentTarget,
         LockfilesGeneratorTarget,
         LockfileTarget,
         RelocatedFiles,

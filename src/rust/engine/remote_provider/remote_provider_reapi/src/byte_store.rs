@@ -230,7 +230,7 @@ impl Provider {
         let capabilities_fut = async {
             let mut request = remexec::GetCapabilitiesRequest::default();
             if let Some(s) = self.instance_name.as_ref() {
-                request.instance_name = s.clone();
+                request.instance_name.clone_from(s);
             }
 
             let mut client = self.capabilities_client.as_ref().clone();

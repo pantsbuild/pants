@@ -1,14 +1,20 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::fmt::Write;
+use std::io;
 use std::sync::Arc;
-use std::time::SystemTime;
 
-use rustls::client::{ServerCertVerified, ServerCertVerifier};
-use tokio_rustls::rustls::{Certificate, ClientConfig, Error, RootCertStore, ServerName};
+use rustls::{
+    client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
+    crypto::{verify_tls12_signature, verify_tls13_signature},
+    DigitallySignedStruct,
+};
+use rustls_pki_types::{CertificateDer, PrivateKeyDer, ServerName, UnixTime};
+use tokio_rustls::rustls::{ClientConfig, RootCertStore};
 
 #[derive(Default, Clone)]
 pub struct Config {
-    pub root_ca_certs: Option<Vec<Certificate>>,
+    pub root_ca_certs: Option<Vec<CertificateDer<'static>>>,
     pub mtls: Option<MtlsConfig>,
     pub certificate_check: CertificateCheck,
 }
@@ -20,10 +26,15 @@ impl Config {
         mtls: Option<(Buf, Buf)>,
     ) -> Result<Self, String> {
         let root_ca_certs = root_ca_certs
-            .map(|certs| {
-                let raw_certs = rustls_pemfile::certs(&mut std::io::Cursor::new(certs.as_ref()))
-                    .map_err(|e| format!("Failed to parse TLS certs data: {e:?}"))?;
-                Result::<_, String>::Ok(raw_certs.into_iter().map(rustls::Certificate).collect())
+            .map(|raw_certs| {
+                let certs: Vec<CertificateDer<'static>> =
+                    rustls_pemfile::certs(&mut std::io::Cursor::new(raw_certs.as_ref()))
+                        .try_fold(vec![], |mut xs, result| {
+                            xs.push(result?);
+                            Ok(xs)
+                        })
+                        .map_err(|e: io::Error| format!("Failed to parse TLS certs data: {e:?}"))?;
+                Result::<Vec<_>, String>::Ok(certs)
             })
             .transpose()?;
 
@@ -46,13 +57,16 @@ impl TryFrom<Config> for ClientConfig {
     /// crate if specific root CA certs were not given.
     fn try_from(config: Config) -> Result<Self, Self::Error> {
         // let tls_config = ClientConfig::builder().with_safe_defaults();
-        let tls_config = ClientConfig::builder().with_safe_defaults();
+        let tls_config = ClientConfig::builder();
 
         // Add the root certificate store.
         let tls_config = match config.certificate_check {
             CertificateCheck::DangerouslyDisabled => {
-                let tls_config = tls_config.with_custom_certificate_verifier(Arc::new(NoVerifier));
+                let tls_config = tls_config
+                    .dangerous()
+                    .with_custom_certificate_verifier(Arc::new(NoVerifier));
                 if let Some(MtlsConfig { cert_chain, key }) = config.mtls {
+                    let key = key.clone_key();
                     tls_config
                         .with_client_auth_cert(cert_chain, key)
                         .map_err(|err| {
@@ -68,25 +82,27 @@ impl TryFrom<Config> for ClientConfig {
 
                     match config.root_ca_certs {
                         Some(certs) => {
-                            for cert in &certs {
+                            for cert in certs.into_iter() {
                                 root_cert_store.add(cert).map_err(|e| {
                                     format!("failed adding CA cert to store: {e:?}")
                                 })?;
                             }
                         }
                         None => {
-                            let native_root_certs = rustls_native_certs::load_native_certs()
-                                .map_err(|err| {
-                                    format!(
-                "Could not discover root CA cert files to use TLS with remote caching and remote \
+                            let native_root_certs_result = rustls_native_certs::load_native_certs();
+                            if !native_root_certs_result.errors.is_empty() {
+                                let mut msg = String::from("Could not discover root CA cert files to use TLS with remote caching and remote \
             execution. Consider setting `--remote-ca-certs-path` instead to explicitly point to \
-            the correct PEM file.\n\n{err}",
-              )
-                                })?;
-
-                            for cert in native_root_certs {
-                                root_cert_store.add_parsable_certificates(&[cert.0]);
+            the correct PEM file. Error(s):\n\n");
+                                for error in &native_root_certs_result.errors {
+                                    write!(&mut msg, "{}\n\n", &error)
+                                        .expect("write into mutable string");
+                                }
+                                return Err(msg);
                             }
+
+                            root_cert_store
+                                .add_parsable_certificates(native_root_certs_result.certs);
                         }
                     }
 
@@ -94,6 +110,7 @@ impl TryFrom<Config> for ClientConfig {
                 };
 
                 if let Some(MtlsConfig { cert_chain, key }) = config.mtls {
+                    let key = key.clone_key();
                     tls_config
                         .with_client_auth_cert(cert_chain, key)
                         .map_err(|err| {
@@ -112,48 +129,33 @@ impl TryFrom<Config> for ClientConfig {
 #[derive(Clone)]
 pub struct MtlsConfig {
     /// DER bytes of the certificate used for mTLS.
-    pub cert_chain: Vec<rustls::Certificate>,
+    pub cert_chain: Vec<CertificateDer<'static>>,
     /// DER bytes of the private key used for mTLS.
-    pub key: rustls::PrivateKey,
+    pub key: Arc<PrivateKeyDer<'static>>,
 }
 
 impl MtlsConfig {
     pub fn from_pem_buffers(certs: &[u8], key: &[u8]) -> Result<Self, String> {
-        let cert_chain = rustls_pemfile::certs(&mut std::io::Cursor::new(certs))
-            .map_err(|e| format!("Failed to parse client authentication (mTLS) certs data: {e:?}"))?
-            .into_iter()
-            .map(rustls::Certificate)
-            .collect();
+        let cert_chain: Vec<CertificateDer<'static>> =
+            rustls_pemfile::certs(&mut std::io::Cursor::new(certs))
+                .try_fold(vec![], |mut certs, cert_result| {
+                    certs.push(cert_result?);
+                    Ok(certs)
+                })
+                .map_err(|e: std::io::Error| {
+                    format!("Failed to parse client authentication (mTLS) certs data: {e:?}")
+                })?;
 
-        let keys = rustls_pemfile::read_all(&mut std::io::Cursor::new(key))
-      .map_err(|e| format!("Failed to parse client authentication (mTLS) key data: {e:?}"))?
-      .into_iter()
-      .filter(|item| match item {
-        rustls_pemfile::Item::X509Certificate(_) => {
-          log::warn!("Found x509 certificate in client authentication (mTLS) key data. Ignoring.");
-          false
-        }
-        _ => true,
-      });
+        let key = rustls_pemfile::private_key(&mut std::io::Cursor::new(key))
+            .map_err(|e| format!("Failed to parse client authentication (mTLS) key data: {e:?}"))?
+            .ok_or_else(|| {
+                "No private key found in client authentication (mTLS) key data".to_owned()
+            })?;
 
-        let mut key = None;
-        for item in keys {
-            use rustls_pemfile::Item;
-
-            match item {
-                Item::RSAKey(buf) | Item::PKCS8Key(buf) | Item::ECKey(buf) => {
-                    key = Some(rustls::PrivateKey(buf))
-                }
-                Item::X509Certificate(_) => unreachable!("filtered above"),
-                _ => unreachable!("rustls_pemfile::read_all returned an unexpected item"),
-            }
-        }
-
-        let key = key.ok_or_else(|| {
-            "No private key found in client authentication (mTLS) key data".to_owned()
-        })?;
-
-        Ok(Self { cert_chain, key })
+        Ok(Self {
+            cert_chain,
+            key: Arc::new(key),
+        })
     }
 }
 
@@ -169,19 +171,53 @@ impl Default for CertificateCheck {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct NoVerifier;
 
 impl ServerCertVerifier for NoVerifier {
     fn verify_server_cert(
         &self,
-        _end_entity: &Certificate,
-        _intermediates: &[Certificate],
-        _server_name: &ServerName,
-        _scts: &mut dyn Iterator<Item = &[u8]>,
-        _ocsp_response: &[u8],
-        _now: SystemTime,
-    ) -> Result<ServerCertVerified, Error> {
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, rustls::Error> {
         Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        verify_tls12_signature(
+            message,
+            cert,
+            dss,
+            &rustls::crypto::aws_lc_rs::default_provider().signature_verification_algorithms,
+        )
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        verify_tls13_signature(
+            message,
+            cert,
+            dss,
+            &rustls::crypto::aws_lc_rs::default_provider().signature_verification_algorithms,
+        )
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        rustls::crypto::aws_lc_rs::default_provider()
+            .signature_verification_algorithms
+            .supported_schemes()
     }
 }
 
@@ -192,6 +228,8 @@ mod test {
 
     #[test]
     fn test_client_auth_cert_resolver_is_unconfigured_no_mtls() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
         let cert_pem = std::fs::read(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("test-certs")

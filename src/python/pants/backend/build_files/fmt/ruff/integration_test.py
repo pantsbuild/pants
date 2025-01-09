@@ -7,15 +7,13 @@ import pytest
 
 from pants.backend.build_files.fmt.ruff.register import RuffRequest
 from pants.backend.build_files.fmt.ruff.register import rules as ruff_build_rules
-from pants.backend.python.lint.ruff.rules import rules as ruff_fmt_rules
-from pants.backend.python.lint.ruff.subsystem import Ruff
+from pants.backend.python.lint.ruff.check.rules import rules as ruff_fmt_rules
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import config_files
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.native_engine import Snapshot
-from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -49,16 +47,10 @@ def run_ruff(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) ->
 
 
 @pytest.mark.platform_specific_behavior
-@pytest.mark.parametrize(
-    "major_minor_interpreter",
-    all_major_minor_python_versions(Ruff.default_interpreter_constraints),
-)
-def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"BUILD": 'python_sources(name="t")\n'})
-    interpreter_constraint = f"=={major_minor_interpreter}.*"
     fmt_result = run_ruff(
         rule_runner,
-        extra_args=[f"--ruff-interpreter-constraints=['{interpreter_constraint}']"],
     )
     assert "1 file left unchanged" in fmt_result.stdout
     assert fmt_result.output == rule_runner.make_snapshot({"BUILD": 'python_sources(name="t")\n'})

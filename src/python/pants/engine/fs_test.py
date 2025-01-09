@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Optional, Set, Union
+from typing import Any, Callable, Dict, Iterable, Optional, Set, Union
 
 import pytest
 
@@ -38,6 +38,8 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
+    PathMetadataRequest,
+    PathMetadataResult,
     RemovePrefix,
     Snapshot,
     SnapshotDiff,
@@ -45,6 +47,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.native_engine import PathMetadata, PathMetadataKind, PathNamespace
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, goal_rule, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -64,6 +67,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(Snapshot, [CreateDigest]),
             QueryRule(Snapshot, [DigestSubset]),
             QueryRule(Snapshot, [PathGlobs]),
+            QueryRule(PathMetadataResult, [PathMetadataRequest]),
         ],
         isolated_local_store=True,
     )
@@ -108,6 +112,8 @@ def setup_fs_test_tar(rule_runner: RuleRunner) -> None:
             └── 2
         c.ln -> a/b
         d.ln -> a
+
+    NB: The RuleRunner injects a BUILDROOT file in the build_root.
     """
     data = pkgutil.get_data("pants.engine.internals", "fs_test_data/fs_test.tar")
     assert data is not None
@@ -119,6 +125,7 @@ def setup_fs_test_tar(rule_runner: RuleRunner) -> None:
 
 
 FS_TAR_ALL_FILES = (
+    "BUILDROOT",  # injected by RuleRunner, not present in tar
     "4.txt",
     "a/3.txt",
     "a/4.txt.ln",
@@ -217,7 +224,10 @@ def test_path_globs_glob_pattern(rule_runner: RuleRunner) -> None:
     )
     assert_path_globs(rule_runner, ["*/0.txt"], expected_files=[], expected_dirs=[])
     assert_path_globs(
-        rule_runner, ["*"], expected_files=["4.txt"], expected_dirs=["a", "c.ln", "d.ln"]
+        rule_runner,
+        ["*"],
+        expected_files=["BUILDROOT", "4.txt"],
+        expected_dirs=["a", "c.ln", "d.ln"],
     )
     assert_path_globs(
         rule_runner,
@@ -298,7 +308,7 @@ def test_path_globs_ignore_pattern(rule_runner: RuleRunner) -> None:
     assert_path_globs(
         rule_runner,
         ["**", "!*.ln"],
-        expected_files=["4.txt", "a/3.txt", "a/b/1.txt", "a/b/2"],
+        expected_files=["BUILDROOT", "4.txt", "a/3.txt", "a/b/1.txt", "a/b/2"],
         expected_dirs=["a", "a/b"],
     )
 
@@ -314,7 +324,7 @@ def test_path_globs_ignore_sock(rule_runner: RuleRunner) -> None:
     assert_path_globs(
         rule_runner,
         ["**"],
-        expected_files=["non-sock.txt"],
+        expected_files=["BUILDROOT", "non-sock.txt"],
         expected_dirs=[],
     )
 
@@ -1066,6 +1076,9 @@ def test_download_body_error_retry(downloads_rule_runner: RuleRunner) -> None:
 
 def test_download_body_error_retry_eventually_fails(downloads_rule_runner: RuleRunner) -> None:
     # Returns one more error than the retry will allow.
+    downloads_rule_runner.set_options(
+        ["--file-downloads-max-attempts=4", "--file-downloads-retry-delay=0.001"]
+    )
     with http_server(stub_erroring_handler(5)) as port:
         with pytest.raises(Exception):
             _ = downloads_rule_runner.request(
@@ -1502,3 +1515,112 @@ def test_snapshot_diff(
     assert diff.their_unique_files == expected_diff.our_unique_files
     assert diff.their_unique_dirs == expected_diff.our_unique_dirs
     assert diff.changed_files == expected_diff.changed_files
+
+
+def retry_failed_assertions(
+    callable: Callable[[], Any], n: int, sleep_duration: float = 0.05
+) -> None:
+    """Retry the callable if any assertions failed.
+
+    This is used to handle any failures resulting from an external system not fully processing
+    certain events as expected.
+    """
+    last_exception: BaseException | None = None
+
+    while n > 0:
+        try:
+            callable()
+            return
+        except AssertionError as e:
+            last_exception = e
+            n -= 1
+            time.sleep(sleep_duration)
+            sleep_duration *= 2
+
+    assert last_exception is not None
+    raise last_exception
+
+
+def test_path_metadata_request_inside_buildroot(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo": b"xyzzy",
+            "sub-dir/bar": b"12345",
+        }
+    )
+    os.symlink("foo", os.path.join(rule_runner.build_root, "bar"))
+
+    def get_metadata(path: str) -> PathMetadata | None:
+        result = rule_runner.request(PathMetadataResult, [PathMetadataRequest(path)])
+        return result.metadata
+
+    m1 = get_metadata("foo")
+    assert m1 is not None
+    assert m1.path == "foo"
+    assert m1.kind == PathMetadataKind.FILE
+    assert m1.length == len(b"xyzzy")
+    assert m1.symlink_target is None
+
+    m2 = get_metadata("not-found")
+    assert m2 is None
+    (Path(rule_runner.build_root) / "not-found").write_bytes(b"is found")
+
+    def check_metadata_exists() -> None:
+        m3 = get_metadata("not-found")
+        assert m3 is not None
+
+    retry_failed_assertions(check_metadata_exists, 3)
+
+    m4 = get_metadata("bar")
+    assert m4 is not None
+    assert m4.path == "bar"
+    assert m4.kind == PathMetadataKind.SYMLINK
+    assert m4.length == 3
+    assert m4.symlink_target == "foo"
+
+    m5 = get_metadata("sub-dir")
+    assert m5 is not None
+    assert m5.path == "sub-dir"
+    assert m5.kind == PathMetadataKind.DIRECTORY
+    assert m5.symlink_target is None
+
+
+def test_path_metadata_request_outside_buildroot(rule_runner: RuleRunner) -> None:
+    with temporary_dir() as tmpdir:
+        assert not tmpdir.startswith(rule_runner.build_root)
+
+        def get_metadata(path: str) -> PathMetadata | None:
+            result = rule_runner.request(
+                PathMetadataResult,
+                [PathMetadataRequest(os.path.join(tmpdir, path), PathNamespace.SYSTEM)],
+            )
+            return result.metadata
+
+        base_path = Path(tmpdir)
+        (base_path / "foo").write_bytes(b"xyzzy")
+        (base_path / "sub-dir").mkdir(parents=True)
+        (base_path / "sub-dir" / "bar").write_bytes(b"12345")
+        os.symlink("foo", os.path.join(base_path, "bar"))
+
+        m1 = get_metadata("foo")
+        assert m1 is not None
+        assert m1.path == str(base_path / "foo")
+        assert m1.kind == PathMetadataKind.FILE
+        assert m1.length == len(b"xyzzy")
+        assert m1.symlink_target is None
+
+        m2 = get_metadata("not-found")
+        assert m2 is None
+
+        m4 = get_metadata("bar")
+        assert m4 is not None
+        assert m4.path == str(base_path / "bar")
+        assert m4.kind == PathMetadataKind.SYMLINK
+        assert m4.length == 3
+        assert m4.symlink_target == "foo"
+
+        m5 = get_metadata("sub-dir")
+        assert m5 is not None
+        assert m5.path == str(base_path / "sub-dir")
+        assert m5.kind == PathMetadataKind.DIRECTORY
+        assert m5.symlink_target is None

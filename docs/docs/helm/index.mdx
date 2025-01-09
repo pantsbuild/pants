@@ -352,6 +352,15 @@ If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will 
 
 Use the option `pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
 
+#### Retries
+
+Pants can automatically retry failed tests. This can help keep your builds passing even with flaky tests, like integration tests.
+
+```toml tab={"label":"pants.toml"}
+[test]
+attempts_default = 3
+```
+
 ## Publishing Helm charts
 
 Pants only supports publishing Helm charts to OCI registries, a feature that was made generally available in Helm 3.8.

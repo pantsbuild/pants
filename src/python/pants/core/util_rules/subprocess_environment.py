@@ -30,7 +30,7 @@ class SubprocessEnvironment(Subsystem):
                 Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
                 or just `ENV_VAR` to copy the value from Pants's own environment.
 
-                See {doc_url('options#addremove-semantics')} for how to add and remove Pants's
+                See {doc_url('docs/using-pants/key-concepts/options#addremove-semantics')} for how to add and remove Pants's
                 default for this option.
                 """
             ),

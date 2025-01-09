@@ -11,6 +11,7 @@ from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.core.util_rules.system_binaries import GitBinary
 from pants.engine.addresses import AddressInput
 from pants.engine.environment import EnvironmentName
+from pants.engine.internals.graph import FilesWithSourceBlocks
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.rules import QueryRule
@@ -19,6 +20,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.frozendict import FrozenDict
 from pants.vcs.changed import ChangedAddresses, ChangedOptions, ChangedRequest
 from pants.vcs.git import GitWorktreeRequest, MaybeGitWorktree
+from pants.vcs.hunk import TextBlocks
 
 logger = logging.getLogger(__name__)
 
@@ -69,10 +71,37 @@ def calculate_specs(
             "The `--changed-*` options are only available if Git is used for the repository."
         )
 
-    changed_files = tuple(changed_options.changed_files(maybe_git_worktree.git_worktree))
+    (files_with_sources_blocks,) = session.product_request(
+        FilesWithSourceBlocks, [Params(bootstrap_environment)]
+    )
+    changed_files = tuple(
+        file
+        for file in changed_options.changed_files(maybe_git_worktree.git_worktree)
+        # We want to exclude the file from the normal processing flow if it has associated
+        # targets with text blocks. These files are handled with special logic.
+        if file not in files_with_sources_blocks
+    )
     file_literal_specs = tuple(FileLiteralSpec(f) for f in changed_files)
 
-    changed_request = ChangedRequest(changed_files, changed_options.dependents)
+    sources_blocks = FrozenDict(
+        (
+            path,
+            # Hunk stores information about the old block and the new block.
+            # Here we only care about the final state, so we take `hunk.right`.
+            TextBlocks(hunk.right for hunk in hunks if hunk.right is not None),
+        )
+        for path, hunks in changed_options.diff_hunks(
+            maybe_git_worktree.git_worktree,
+            files_with_sources_blocks,
+        ).items()
+    )
+    logger.debug("changed text blocks: %s", sources_blocks)
+
+    changed_request = ChangedRequest(
+        sources=changed_files,
+        dependents=changed_options.dependents,
+        sources_blocks=sources_blocks,
+    )
     (changed_addresses,) = session.product_request(
         ChangedAddresses,
         [Params(changed_request, options_bootstrapper, bootstrap_environment)],
@@ -115,4 +144,5 @@ def rules():
         QueryRule(ChangedAddresses, [ChangedRequest, EnvironmentName]),
         QueryRule(GitBinary, [EnvironmentName]),
         QueryRule(MaybeGitWorktree, [GitWorktreeRequest, GitBinary, EnvironmentName]),
+        QueryRule(FilesWithSourceBlocks, [EnvironmentName]),
     ]

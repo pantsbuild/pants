@@ -7,10 +7,10 @@ Create a Cloud Function with Python.
 
 ---
 
-Pants can create a Google Cloud Function-compatible zip file from your Python code, allowing you to develop your functions in your repository.
+Pants can create a Google Cloud Function-compatible zip file or directory from your Python code, allowing you to develop your functions in your repository.
 
 :::note FYI: how Pants does this
-Under-the-hood, Pants uses the [PEX](https://github.com/pex-tool/pex) project, to select the appropriate third-party requirements and first-party sources and lay them out in a zip file, in the format recommended by Google Cloud Functions.
+Under-the-hood, Pants uses the [PEX](https://github.com/pex-tool/pex) project, to select the appropriate third-party requirements and first-party sources and lay them out in a zip file or directory, in the format recommended by Google Cloud Functions.
 :::
 
 ## Step 1: Activate the Python Google Cloud Function backend
@@ -33,7 +33,7 @@ First, add your Cloud function in a Python file like you would [normally do with
 
 Then, in your BUILD file, make sure that you have a `python_source` or `python_sources` target with the handler file included in the `sources` field. You can use [`pants tailor ::`](../../getting-started/initial-configuration.mdx#5-generate-build-files) to automate this.
 
-Add a `python_google_cloud_function` target and define the `runtime`, `handler`, and `type` fields. The `type` should be either `"event"` or `"http"`. The `runtime` should be one of the values from [https://cloud.google.com/functions/docs/concepts/python-runtime](https://cloud.google.com/functions/docs/concepts/python-runtime). The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
+Add a `python_google_cloud_function` target and define `handler` and `type` fields. The `type` should be either `"event"` or `"http"`.  The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
 
 For example:
 
@@ -43,7 +43,6 @@ python_sources(name="lib")
 
 python_google_cloud_function(
     name="cloud_function",
-    runtime="python38",
     # Pants will convert this to `project.google_cloud_function_example:example_handler`.
     handler="google_cloud_function_example.py:example_handler",
     type="event",
@@ -59,9 +58,83 @@ Pants will use [dependency inference](../../using-pants/key-concepts/targets-and
 
 You can optionally set the `output_path` field to change the generated zip file's path.
 
+:::tip Using layout
+Use [layout](../../../reference/targets/python_google_cloud_function.mdx#layout) to determine whether to build a `.zip` file or a directory
+:::
+
 :::caution Use `resource` instead of `file`
 `file` / `files` targets will not be included in the built Cloud Function because filesystem APIs like `open()` would not load them as expected. Instead, use the `resource` / `resources` target. See [Assets and archives](../../using-pants/assets-and-archives.mdx) for further explanation.
 :::
+
+### Specifying a runtime explicitly
+
+When building an Cloud function artifact, Pants and the underlying Pex tool need to know details about target runtime to be able to choose appropriate artifacts for third-party dependencies that have native code. These details can be inferred or provided in three ways, from highest precedence to lowest precedence:
+
+1. An explicit value for [the `complete_platforms` field](../../../reference/targets/python_google_cloud_function.mdx#complete_platforms). The "complete platforms" are the underlying source of truth.
+    ```python title="BUILD"
+    file(name="gcf-platform", source="gcf-platform.json")
+
+    python_google_cloud_function(
+        name="cloud_function",
+        handler="google_cloud_function_example.py:example_handler",
+        type="event",
+        # Explicit complete platforms:
+        complete_platforms=[":gcf-platform"],
+    )
+    ```
+
+    If needed, this file can be generated for a specific Cloud Function runtime using the function below:
+
+    ```python title="gcf-complete-platform-generator.py"
+    import subprocess
+    import json
+
+    import functions_framework
+
+    @functions_framework.http
+    def generate_pex_complete_platforms(request):
+        subprocess.run(
+            "python -m pip install --target=/tmp/pex pex",
+            shell=True,
+            check=True,
+        )
+        result = subprocess.run(
+            "PYTHONPATH=/tmp/pex /tmp/pex/bin/pex3 interpreter inspect --markers --tags",
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout
+    ```
+
+    If you run this function in the Cloud Function testing environment, it will print out a formatted JSON object to the console. You can then copy this JSON object and add it to a file named `gcf-platform.json`.
+
+2. An explicit value for [the `runtime` field](../../../reference/targets/python_google_cloud_function.mdx#runtime): Pants uses this to pick an appropriate "complete platforms" value, from options that Pants has pre-packaged. These are static exports from docker images provided by GCP, relying on the environment being relatively stable. (If Pants doesn't have an appropriate "complete platforms" default built-in, you will be prompted to use option 1 above.)
+    ```python title="BUILD"
+    python_google_cloud_function(
+        name="cloud_function",
+        handler="google_cloud_function_example.py:example_handler",
+        type="event",
+        # Explicit runtime, `complete_platforms` taken from Pants' built-in defaults:
+        runtime="python312",
+    )
+    ```
+3. Inferred from [the relevant interpreter constraints](../overview/interpreter-compatibility.mdx): the interpreter constraints may unambiguously imply a value for the `runtime` and thus `complete_platforms` fields. For example, `interpreter_constaints = ["==3.12.*"]` implies `runtime="python312"`. This only works with interpreter constraints that cover all patch versions of a given minor release series: `>=3.11,<3.13` is too wide (it covers both 3.11 and 3.12), while `==3.12.0` is too specific (GCF's `python312` runtime may not use that exact patch version).
+
+    ```toml tab={"label":"pants.toml"}
+    [python]
+    interpreter_constraints = ["==3.12.*"]
+    ```
+    ```python tab={"label":"project/BUILD"}
+    python_google_cloud_function(
+        name="cloud_function",
+        handler="google_cloud_function_example.py:example_handler",
+        type="event",
+        # `runtime` inferred and `complete_platforms` from built-in defaults
+    )
+    ```
+
+This guide is written using the last option, but you can add `runtime` or `complete_platforms` to any examples using the `python_google_cloud_function` target.
 
 ## Step 3: Run `package`
 
@@ -91,9 +164,15 @@ A better solution is to work with the dependencies to stop them from packaging f
 
 ## Step 4: Upload to Google Cloud
 
-You can use any of the various Google Cloud methods to upload your zip file, such as the Google Cloud console or the [Google Cloud CLI](https://cloud.google.com/functions/docs/deploying/filesystem#deploy_using_the_gcloud_tool).
+You can use any of the various Google Cloud methods to upload your zip file or directory, such as the Google Cloud console or the [Google Cloud CLI](https://cloud.google.com/functions/docs/deploying/filesystem#deploy_using_the_gcloud_tool).
 
-You must specify the handler as `handler`. This is a re-export of the function referred to by the `handler` field of the target.
+You must specify the `--entry-point` as `handler`. This is a re-export of the function referred to by the `handler` field of the target.
+
+For example, if using `layout="flat"`:
+
+```
+gcloud functions deploy --source=dist/project/cloud_function --entry-point=handler --trigger-topic=<TOPIC> --runtime=python38 <FUNCTION_NAME>
+```
 
 ## Advanced: Using PEX directly
 
@@ -109,8 +188,8 @@ python_sources()
 pex_binary(
     name="gcf",
     entry_point="gcf_example.py",
-    # specify an appropriate platform(s) for the targeted GCF runtime (complete_platforms works too)
-    platforms=["linux_x86_64-cp39-cp39"],
+    # specify an appropriate platform for the targeted GCF runtime:
+    complete_platforms=["path/to:platform-json-target"],
 )
 ```
 

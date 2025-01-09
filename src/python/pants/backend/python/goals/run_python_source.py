@@ -57,7 +57,7 @@ class PythonSourceFieldSet(RunFieldSet):
         if not all(part.isidentifier() for part in source_name.split(".")):
             # If the python source is not importable (python modules can't be named with '-'),
             # then it must be an executable script.
-            executable = Executable(self.source.value)
+            executable = Executable.create(self.address, self.source.value)
         else:
             # The module is importable, so entry_point will do the heavy lifting instead.
             executable = None

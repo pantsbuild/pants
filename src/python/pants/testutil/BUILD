@@ -14,7 +14,7 @@ python_distribution(
         description="Test support for writing Pants plugins.",
         classifiers=["Topic :: Software Development :: Testing"],
         # N.B.: Must match [python] interpreter_constraints in pants.toml.
-        python_requires="==3.9.*",
+        python_requires="==3.11.*",
     ),
 )
 
@@ -24,7 +24,6 @@ python_sources(
         "pants_integration_test.py": {
             "dependencies": ["//BUILD_ROOT:files", "src/python/pants/__main__.py"]
         },
-        "rule_runner.py": {"dependencies": ["//BUILD_ROOT:files"]},
     },
 )
 

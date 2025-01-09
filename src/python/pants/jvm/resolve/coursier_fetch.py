@@ -12,7 +12,7 @@ import os
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
-from typing import TYPE_CHECKING, Any, FrozenSet, Iterable, Iterator, List, Tuple
+from typing import TYPE_CHECKING, Any, Iterable, Iterator, List, Tuple
 
 import toml
 
@@ -65,6 +65,7 @@ from pants.jvm.target_types import (
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list, pluralize
 
 if TYPE_CHECKING:
@@ -99,7 +100,7 @@ class NoCompatibleResolve(Exception):
             f"{msg_prefix}:\n\n"
             f"{formatted_resolve_lists}\n\n"
             "Targets which will be merged onto the same classpath must share a resolve (from the "
-            f"[resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) field)."
+            f"[resolve]({doc_url('reference/targets/deploy_jar#resolve')}) field)."
         )
 
 
@@ -302,8 +303,8 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
 
 @dataclass(frozen=True)
 class CoursierResolveInfo:
-    coord_arg_strings: FrozenSet[str]
-    force_version_coord_arg_strings: FrozenSet[str]
+    coord_arg_strings: FrozenOrderedSet[str]
+    force_version_coord_arg_strings: FrozenOrderedSet[str]
     extra_args: tuple[str, ...]
     digest: Digest
 
@@ -394,17 +395,17 @@ async def prepare_coursier_resolve_info(
         ),
     )
 
-    coord_arg_strings = set()
-    force_version_coord_arg_strings = set()
-    for req in to_resolve:
+    coord_arg_strings: OrderedSet[str] = OrderedSet()
+    force_version_coord_arg_strings: OrderedSet[str] = OrderedSet()
+    for req in sorted(to_resolve, key=lambda ar: ar.coordinate):
         coord_arg_str = req.to_coord_arg_str()
         coord_arg_strings.add(coord_arg_str)
         if req.force_version:
             force_version_coord_arg_strings.add(coord_arg_str)
 
     return CoursierResolveInfo(
-        coord_arg_strings=frozenset(coord_arg_strings),
-        force_version_coord_arg_strings=frozenset(force_version_coord_arg_strings),
+        coord_arg_strings=FrozenOrderedSet(coord_arg_strings),
+        force_version_coord_arg_strings=FrozenOrderedSet(force_version_coord_arg_strings),
         digest=digest,
         extra_args=tuple(extra_args),
     )
@@ -778,16 +779,18 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
         lockfile_req = request.lockfile
         assert lockfile_req is not None
         regen_command = f"`{GenerateLockfilesSubsystem.name} --resolve={lockfile_req.resolve_name}`"
-        if lockfile_req.read_lockfile_dest == DEFAULT_TOOL_LOCKFILE:
-            lockfile_bytes = importlib.resources.read_binary(
-                *lockfile_req.default_lockfile_resource
+        if lockfile_req.lockfile == DEFAULT_TOOL_LOCKFILE:
+            lockfile_bytes = (
+                importlib.resources.files(lockfile_req.default_lockfile_resource[0])
+                .joinpath(lockfile_req.default_lockfile_resource[1])
+                .read_bytes()
             )
             resolution = CoursierResolvedLockfile.from_serialized(lockfile_bytes)
         else:
-            lockfile_snapshot = await Get(Snapshot, PathGlobs([lockfile_req.read_lockfile_dest]))
+            lockfile_snapshot = await Get(Snapshot, PathGlobs([lockfile_req.lockfile]))
             if not lockfile_snapshot.files:
                 raise ValueError(
-                    f"No lockfile found at {lockfile_req.read_lockfile_dest}, which is configured "
+                    f"No lockfile found at {lockfile_req.lockfile}, which is configured "
                     f"by the option {lockfile_req.lockfile_option_name}."
                     f"Run {regen_command} to generate it."
                 )
@@ -796,7 +799,7 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
                 CoursierResolvedLockfile,
                 CoursierResolveKey(
                     name=lockfile_req.resolve_name,
-                    path=lockfile_req.read_lockfile_dest,
+                    path=lockfile_req.lockfile,
                     digest=lockfile_snapshot.digest,
                 ),
             )
@@ -812,7 +815,7 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
             lockfile_inputs, LockfileContext.TOOL
         ):
             raise ValueError(
-                f"The lockfile {lockfile_req.read_lockfile_dest} (configured by the option "
+                f"The lockfile {lockfile_req.lockfile} (configured by the option "
                 f"{lockfile_req.lockfile_option_name}) was generated with different requirements "
                 f"than are currently set via {lockfile_req.artifact_option_name}. Run "
                 f"{regen_command} to regenerate the lockfile."

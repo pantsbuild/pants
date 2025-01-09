@@ -14,8 +14,11 @@ import pytest
 
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.subsystems.nodejs import (
+    CorepackToolDigest,
+    CorepackToolRequest,
     NodeJS,
     NodeJSBinaries,
+    NodeJSProcessEnvironment,
     _BinaryPathsPerVersion,
     _get_nvm_root,
     determine_nodejs_binaries,
@@ -32,9 +35,9 @@ from pants.core.util_rules.search_paths import (
     VersionManagerSearchPaths,
     VersionManagerSearchPathsRequest,
 )
-from pants.core.util_rules.system_binaries import BinaryNotFoundError, BinaryPath
+from pants.core.util_rules.system_binaries import BinaryNotFoundError, BinaryPath, BinaryShims
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
@@ -52,11 +55,41 @@ def rule_runner() -> RuleRunner:
             QueryRule(ProcessResult, [nodejs.NodeJSToolProcess]),
             QueryRule(NodeJSBinaries, ()),
             QueryRule(VersionManagerSearchPaths, (VersionManagerSearchPathsRequest,)),
+            QueryRule(CorepackToolDigest, (CorepackToolRequest,)),
         ],
         target_types=[JSSourcesGeneratorTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
+
+
+def get_snapshot(rule_runner: RuleRunner, digest: Digest) -> Snapshot:
+    return rule_runner.request(Snapshot, [digest])
+
+
+@pytest.mark.parametrize("package_manager", ["npm", "pnpm", "yarn"])
+def test_corepack_without_explicit_version_contains_installation(
+    rule_runner: RuleRunner, package_manager: str
+):
+    result = rule_runner.request(
+        CorepackToolDigest, [CorepackToolRequest(package_manager, version=None)]
+    )
+
+    snapshot = get_snapshot(rule_runner, result.digest)
+
+    assert f"._corepack_home/v1/{package_manager}" in snapshot.dirs
+
+
+@pytest.mark.parametrize("package_manager", ["npm@7.0.0", "pnpm@2.0.0", "yarn@1.0.0"])
+def test_corepack_with_explicit_version_contains_requested_installation(
+    rule_runner: RuleRunner, package_manager: str
+):
+    binary, version = package_manager.split("@")
+
+    result = rule_runner.request(CorepackToolDigest, [CorepackToolRequest(binary, version)])
+    snapshot = get_snapshot(rule_runner, result.digest)
+
+    assert f"._corepack_home/v1/{binary}/{version}" in snapshot.dirs
 
 
 def test_npm_process(rule_runner: RuleRunner):
@@ -295,3 +328,69 @@ def test_get_nvm_root(env: dict[str, str], expected_directory: str | None) -> No
         mock_gets=[MockGet(EnvironmentVars, (EnvironmentVarsRequest,), mock_environment_vars)],
     )
     assert result == expected_directory
+
+
+@pytest.mark.parametrize(
+    "extra_environment, expected",
+    [
+        pytest.param(
+            None,
+            {
+                "COREPACK_HOME": "{chroot}/._corepack_home",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v18",
+                "npm_config_cache": "npm_cache",
+            },
+            id="no_extra_environment",
+        ),
+        pytest.param(
+            {},
+            {
+                "COREPACK_HOME": "{chroot}/._corepack_home",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v18",
+                "npm_config_cache": "npm_cache",
+            },
+            id="empty_extra_environment",
+        ),
+        pytest.param(
+            {"PATH": "/usr/bin/"},
+            {
+                "COREPACK_HOME": "{chroot}/._corepack_home",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v18:/usr/bin/",
+                "npm_config_cache": "npm_cache",
+            },
+            id="extra_environment_extends_path",
+        ),
+        pytest.param(
+            {"PATH": "/usr/bin/", "SOME_VAR": "VAR"},
+            {
+                "COREPACK_HOME": "{chroot}/._corepack_home",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v18:/usr/bin/",
+                "npm_config_cache": "npm_cache",
+                "SOME_VAR": "VAR",
+            },
+            id="extra_environment_adds_to_environment",
+        ),
+        pytest.param(
+            {"npm_config_cache": "I am ignored"},
+            {
+                "COREPACK_HOME": "{chroot}/._corepack_home",
+                "PATH": "{chroot}/shim_cache:._corepack:__node/v18",
+                "npm_config_cache": "npm_cache",
+            },
+            id="extra_environment_cannot_override_some_vars",
+        ),
+    ],
+)
+def test_process_environment_variables_are_merged(
+    extra_environment: dict[str, str] | None, expected: dict[str, str]
+) -> None:
+    environment = NodeJSProcessEnvironment(
+        NodeJSBinaries("__node/v18"),
+        "npm_cache",
+        BinaryShims(EMPTY_DIGEST, "shim_cache"),
+        "._corepack_home",
+        "._corepack",
+        EnvironmentVars(),
+    )
+
+    assert environment.to_env_dict(extra_environment) == expected

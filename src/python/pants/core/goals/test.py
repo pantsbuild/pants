@@ -4,9 +4,13 @@
 from __future__ import annotations
 
 import itertools
+import json
 import logging
+import os
+import shlex
 from abc import ABC, ABCMeta
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from pathlib import PurePath
 from typing import Any, ClassVar, Iterable, Optional, Sequence, Tuple, TypeVar, cast
@@ -32,17 +36,13 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.session import RunId
-from pants.engine.process import (
-    FallibleProcessResult,
-    InteractiveProcess,
-    InteractiveProcessResult,
-    ProcessResultMetadata,
-)
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.intrinsics import run_interactive_process_in_environment
+from pants.engine.process import FallibleProcessResult, InteractiveProcess, ProcessResultMetadata
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -62,6 +62,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption, EnumOption, IntOption, StrListOption, StrOption
 from pants.util.collections import partition_sequentially
+from pants.util.dirutil import safe_open
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized, memoized_property
@@ -516,10 +517,10 @@ class TestSubsystem(GoalSubsystem):
     class EnvironmentAware:
         extra_env_vars = StrListOption(
             help=softwrap(
-                """
+                f"""
                 Additional environment variables to include in test processes.
-                Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-                `ENV_VAR` to copy the value of a variable in Pants's own environment.
+
+                {EXTRA_ENV_VARS_USAGE_HELP}
                 """
             ),
         )
@@ -663,6 +664,39 @@ class TestSubsystem(GoalSubsystem):
         ),
     )
 
+    show_rerun_command = BoolOption(
+        default="CI" in os.environ,
+        advanced=True,
+        help=softwrap(
+            f"""
+            If tests fail, show an appropriate `{bin_name()} {name} ...` invocation to rerun just
+            those tests.
+
+            This is to make it easy to run those tests on a new machine (for instance, run tests
+            locally if they fail in CI): caching of successful tests means that rerunning the exact
+            same command on the same machine will already automatically only rerun the failures.
+
+            This defaults to `True` when running in CI (as determined by the `CI` environment
+            variable being set) but `False` elsewhere.
+            """
+        ),
+    )
+    experimental_report_test_result_info = BoolOption(
+        default=False,
+        advanced=True,
+        help=softwrap(
+            """
+            Report information about the test results.
+
+            For now, it reports only the source from where the test results were fetched. When running tests,
+            they may be executed locally or remotely, but if there are results of previous runs available,
+            they may be retrieved from the local or remote cache, or be memoized. Knowing where the test
+            results come from might be useful when evaluating the efficiency of the cache and the nature of
+            the changes in the source code that may lead to frequent cache invalidations.
+            """
+        ),
+    )
+
     def report_dir(self, distdir: DistDir) -> PurePath:
         return PurePath(self._report_dir.format(distdir=distdir.relpath))
 
@@ -711,13 +745,12 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
 class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
     alias = "extra_env_vars"
     help = help_text(
-        """
-         Additional environment variables to include in test processes.
+        f"""
+        Additional environment variables to include in test processes.
 
-         Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-         `ENV_VAR` to copy the value of a variable in Pants's own environment.
+        {EXTRA_ENV_VARS_USAGE_HELP}
 
-         This will be merged with and override values from `[test].extra_env_vars`.
+        This will be merged with and override values from `[test].extra_env_vars`.
         """
     )
 
@@ -837,16 +870,20 @@ async def _run_debug_tests(
                 )
             )
 
-        debug_result = await Effect(
-            InteractiveProcessResult,
-            {
-                debug_request.process: InteractiveProcess,
-                environment_name: EnvironmentName,
-            },
+        debug_result = await run_interactive_process_in_environment(
+            debug_request.process, environment_name
         )
         if debug_result.exit_code != 0:
             exit_code = debug_result.exit_code
     return Test(exit_code)
+
+
+def _save_test_result_info_report_file(run_id: RunId, results: dict[str, dict]) -> None:
+    """Save a JSON file with the information about the test results."""
+    timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    obj = json.dumps({"timestamp": timestamp, "run_id": run_id, "info": results})
+    with safe_open(f"test_result_info_report_runid{run_id}_{timestamp}.json", "w") as fh:
+        fh.write(obj)
 
 
 @goal_rule
@@ -920,6 +957,8 @@ async def run_tests(
     exit_code = 0
     if results:
         console.print_stderr("")
+    if test_subsystem.experimental_report_test_result_info:
+        test_result_info = {}
     for result in sorted(results):
         if result.exit_code is None:
             # We end up here, e.g., if we implemented test discovery and found no tests.
@@ -929,7 +968,10 @@ async def run_tests(
         if result.result_metadata is None:
             # We end up here, e.g., if compilation failed during self-implemented test discovery.
             continue
-
+        if test_subsystem.experimental_report_test_result_info:
+            test_result_info[result.addresses[0].spec] = {
+                "source": result.result_metadata.source(run_id).value
+            }
         console.print_stderr(_format_test_summary(result, run_id, console))
 
         if result.extra_output and result.extra_output.files:
@@ -942,6 +984,10 @@ async def run_tests(
                 logger.info(
                     f"Wrote extra output from test `{result.addresses[0]}` to `{path_prefix}`."
                 )
+
+    rerun_command = _format_test_rerun_command(results)
+    if rerun_command and test_subsystem.show_rerun_command:
+        console.print_stderr(f"\n{rerun_command}")
 
     if test_subsystem.report:
         report_dir = test_subsystem.report_dir(distdir)
@@ -966,7 +1012,7 @@ async def run_tests(
         }
         coverage_collections = []
         for data_cls, data in itertools.groupby(all_coverage_data, lambda data: type(data)):
-            collection_cls = coverage_types_to_collection_types[data_cls]
+            collection_cls = coverage_types_to_collection_types[data_cls]  # type: ignore[index]
             coverage_collections.append(collection_cls(data))
         # We can create multiple reports for each coverage data (e.g., console, xml, html)
         coverage_reports_collections = await MultiGet(
@@ -990,9 +1036,8 @@ async def run_tests(
                 OpenFiles, OpenFilesRequest(coverage_report_files, error_if_open_not_found=False)
             )
             for process in open_files.processes:
-                _ = await Effect(
-                    InteractiveProcessResult,
-                    {process: InteractiveProcess, local_environment_name.val: EnvironmentName},
+                _ = await run_interactive_process_in_environment(
+                    process, local_environment_name.val
                 )
 
         for coverage_reports in coverage_reports_collections:
@@ -1008,6 +1053,9 @@ async def run_tests(
                 # coverage.py uses 2 to indicate failure due to insufficient coverage.
                 # We may as well follow suit in the general case, for all languages.
                 exit_code = 2
+
+    if test_subsystem.experimental_report_test_result_info:
+        _save_test_result_info_report_file(run_id, test_result_info)
 
     return Test(exit_code)
 
@@ -1064,6 +1112,19 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
     return f"{sigil} {result.description} {status}{attempt_msg} {elapsed_print}{source_desc}."
+
+
+def _format_test_rerun_command(results: Iterable[TestResult]) -> None | str:
+    failures = [result for result in results if result.exit_code not in (None, 0)]
+    if not failures:
+        return None
+
+    # format an invocation like `pants test path/to/first:address path/to/second:address ...`
+    addresses = sorted(shlex.quote(str(addr)) for result in failures for addr in result.addresses)
+    goal = f"{bin_name()} {TestSubsystem.name}"
+    invocation = " ".join([goal, *addresses])
+
+    return f"To rerun the failing tests, use:\n\n    {invocation}"
 
 
 @dataclass(frozen=True)

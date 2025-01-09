@@ -74,7 +74,7 @@ def test_can_not_auto_detect_source_root(rule_runner: RuleRunner) -> None:
         rule_runner.request(HelmChartRoot, [HelmChartRootRequest(field_set.chart)])
 
 
-def test_source_templates_are_always_included(rule_runner: RuleRunner) -> None:
+def test_standard_sources_are_always_included(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -86,9 +86,13 @@ def test_source_templates_are_always_included(rule_runner: RuleRunner) -> None:
             ),
             "Chart.yaml": HELM_CHART_FILE,
             "values.yaml": HELM_VALUES_FILE,
+            "values.schema.json": "",
+            "README.md": "",
+            "LICENSE": "",
             "crds/foo.yml": K8S_CRD_FILE,
             "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
             "templates/service.yaml": K8S_SERVICE_TEMPLATE,
+            "templates/NOTES.txt": "",
             "resource.xml": "",
             "file.txt": "",
         }
@@ -106,9 +110,13 @@ def test_source_templates_are_always_included(rule_runner: RuleRunner) -> None:
     )
 
     assert source_files.snapshot.files == (
+        "LICENSE",
+        "README.md",
         "crds/foo.yml",
+        "templates/NOTES.txt",
         "templates/_helpers.tpl",
         "templates/service.yaml",
+        "values.schema.json",
         "values.yaml",
     )
 

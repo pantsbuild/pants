@@ -3,10 +3,11 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::PathBuf;
 use std::str;
+use std::sync::Arc;
 use std::time::Duration;
 
 use maplit::hashset;
-use shell_quote::bash;
+use shell_quote::Bash;
 use tempfile::TempDir;
 
 use fs::EMPTY_DIRECTORY_DIGEST;
@@ -14,6 +15,7 @@ use store::{ImmutableInputs, Store};
 use testutil::data::{TestData, TestDirectory};
 use testutil::path::{find_bash, which};
 use testutil::{owned_string_vec, relative_paths};
+use tokio::sync::RwLock;
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
@@ -462,7 +464,7 @@ async fn test_directory_preservation() {
     assert!(rolands_path.exists());
 
     // Ensure the bash command line is provided.
-    let bytes_quoted_command_line = bash::escape(&bash_contents);
+    let bytes_quoted_command_line = Bash::quote_vec(&bash_contents);
     let quoted_command_line = str::from_utf8(&bytes_quoted_command_line).unwrap();
     assert!(std::fs::read_to_string(&run_script_path)
         .unwrap()
@@ -794,6 +796,7 @@ async fn run_command_locally_in_dir(
         named_caches,
         immutable_inputs,
         cleanup,
+        Arc::new(RwLock::new(())),
     );
     let original = runner.run(Context::default(), workunit, req).await?;
     let stdout_bytes = store
