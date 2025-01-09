@@ -66,6 +66,7 @@ Created as part of the release process.
 + Constantin Ponfick
 + Craig Schertz
 + Cristian Matache
++ D. Luke Nelson
 + Damon Revoe
 + Dan Davydov
 + Dan Fabulich
