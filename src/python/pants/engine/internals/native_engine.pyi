@@ -670,7 +670,6 @@ class PyArgSplitter:
 
 class PyConfigSource:
     def __init__(self, path: str, content: bytes) -> None: ...
-
     def split_args(self, args: list[str]) -> PySplitArgs: ...
 
 # See src/rust/engine/src/externs/options.rs for the Rust-side versions of these types.
