@@ -5,4 +5,9 @@ python_sources()
 
 python_tests(
     name="tests",
+    overrides={
+        "tfsec_integration_test.py": {
+            "tags": ["platform_specific_behavior"],
+        }
+    },
 )

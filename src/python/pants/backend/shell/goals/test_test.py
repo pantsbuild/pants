@@ -49,6 +49,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+@pytest.mark.platform_specific_behavior
 def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

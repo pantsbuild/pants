@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import logging
 import re
 from dataclasses import dataclass, field
@@ -130,9 +131,32 @@ class FirstPartyHelmDeploymentMapping:
     indexed_docker_addresses: FrozenYamlIndex[tuple[str, Address]]
 
 
+@dataclass(frozen=True)
+class _FirstPartyHelmDeploymentMappingRequest(EngineAwareParameter):
+    field_set: HelmDeploymentFieldSet
+
+
 @rule
 async def first_party_helm_deployment_mapping(
     request: FirstPartyHelmDeploymentMappingRequest,
+    helm_infer: HelmInferSubsystem,
+) -> FirstPartyHelmDeploymentMapping:
+    if not helm_infer.deployment_dependencies:
+        return FirstPartyHelmDeploymentMapping(
+            request.field_set.address,
+            FrozenYamlIndex.empty(),
+        )
+    # Use a small proxy rule to make sure we don't calculate AllDockerImageTargets
+    # if `[helm-infer].deployment_dependencies` is set to true.
+    return await Get(
+        FirstPartyHelmDeploymentMapping,
+        _FirstPartyHelmDeploymentMappingRequest(field_set=request.field_set),
+    )
+
+
+@rule
+async def _first_party_helm_deployment_mapping(
+    request: _FirstPartyHelmDeploymentMappingRequest,
     docker_targets: AllDockerImageTargets,
     helm_infer: HelmInferSubsystem,
 ) -> FirstPartyHelmDeploymentMapping:
@@ -233,17 +257,10 @@ class ImageReferenceResolver:
         else:
             image_name = parsed.group("repository")
 
-        # Putting this wildcard check after parsing
-        # will mean that we don't approve things that don't look like docker images.
-        if "*" in self.helm_infer.external_docker_images:
-            return True
-        if (
-            image_name in self.helm_infer.external_docker_images
-            or image_ref in self.helm_infer.external_docker_images
-        ):
-            return True
-
-        return False
+        return any(
+            (fnmatch.fnmatch(image_name, pattern) or fnmatch.fnmatch(image_ref, pattern))
+            for pattern in self.helm_infer.external_docker_images
+        )
 
     def _handle_missing_docker_image(self, message):
         self.errors.append(message)
@@ -286,23 +303,14 @@ async def inject_deployment_dependencies(
         DependenciesRequest(request.field_set.dependencies),
     )
 
-    if infer_subsystem.deployment_dependencies:
-        chart_address, explicitly_provided_deps, mapping = await MultiGet(
-            get_address,
-            get_explicit_deps,
-            Get(
-                FirstPartyHelmDeploymentMapping,
-                FirstPartyHelmDeploymentMappingRequest(request.field_set),
-            ),
-        )
-    else:
-        (chart_address, explicitly_provided_deps), mapping = (
-            await MultiGet(get_address, get_explicit_deps),
-            FirstPartyHelmDeploymentMapping(
-                request.field_set.address,
-                FrozenYamlIndex.empty(),
-            ),
-        )
+    chart_address, explicitly_provided_deps, mapping = await MultiGet(
+        get_address,
+        get_explicit_deps,
+        Get(
+            FirstPartyHelmDeploymentMapping,
+            FirstPartyHelmDeploymentMappingRequest(request.field_set),
+        ),
+    )
 
     dependencies: OrderedSet[Address] = OrderedSet()
     dependencies.add(chart_address)

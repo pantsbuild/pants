@@ -164,6 +164,7 @@ class AddressInput:
         directory, i.e. a target which leaves off `name`.
         """
         ...
+
     @property
     def spec(self) -> str: ...
     @property
@@ -179,6 +180,7 @@ class AddressInput:
     def file_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a file on disk."""
         ...
+
     def dir_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a directory on disk."""
         ...
@@ -214,6 +216,7 @@ class Address:
           them, this will always be relative.
         """
         ...
+
     @property
     def spec_path(self) -> str: ...
     @property
@@ -231,6 +234,7 @@ class Address:
     def is_parametrized_subset_of(self, other: Address) -> bool:
         """True if this Address is == to the given Address, but with a subset of its parameters."""
         ...
+
     @property
     def filename(self) -> str: ...
     @property
@@ -245,18 +249,21 @@ class Address:
         "relative" spec notation.
         """
         ...
+
     @property
     def path_safe_spec(self) -> str: ...
     def parametrize(self, parameters: Mapping[str, str], replace: bool = False) -> Address:
         """Creates a new Address with the given `parameters` merged or replaced over
         self.parameters."""
         ...
+
     def maybe_convert_to_target_generator(self) -> Address:
         """If this address is generated or parametrized, convert it to its generator target.
 
         Otherwise, return self unmodified.
         """
         ...
+
     def create_generated(self, generated_name: str) -> Address: ...
     def create_file(self, relative_file_path: str) -> Address: ...
     def debug_hint(self) -> str: ...
@@ -288,6 +295,7 @@ class _NoValue:
     def __bool__(self) -> bool:
         """NB: Always returns `False`."""
         ...
+
     def __repr__(self) -> str: ...
 
 # Marker for unspecified field values that should use the default value if applicable.
@@ -425,9 +433,7 @@ class Snapshot:
     @property
     def files(self) -> tuple[str, ...]: ...
     # Don't call this, call pants.engine.fs.SnapshotDiff instead
-    def _diff(
-        self, other: Snapshot
-    ) -> tuple[
+    def _diff(self, other: Snapshot) -> tuple[
         tuple[str, ...],
         tuple[str, ...],
         tuple[str, ...],
@@ -659,11 +665,14 @@ class PyOptionId:
 class PyConfigSource:
     def __init__(self, path: str, content: bytes) -> None: ...
 
+# See src/rust/engine/src/externs/options.rs for the Rust-side versions of these types.
 T = TypeVar("T")
-# A pair of (option value, rank). See src/python/pants/option/ranked_value.py.
-OptionValue = Tuple[Optional[T], int]
-OptionListValue = Tuple[list[T], int]
-OptionDictValue = Tuple[dict[str, Any], int]
+
+# List of tuples of (value, rank, details string).
+OptionValueDerivation = list[Tuple[T, int, str]]
+
+# A tuple (value, rank of value, optional derivation of value).
+OptionValue = Tuple[Optional[T], int, Optional[OptionValueDerivation]]
 
 class PyOptionParser:
     def __init__(
@@ -672,6 +681,8 @@ class PyOptionParser:
         env: dict[str, str],
         configs: Optional[Sequence[PyConfigSource]],
         allow_pantsrc: bool,
+        include_derivation: bool,
+        known_scopes_to_flags: Optional[dict[str, frozenset[str]]],
     ) -> None: ...
     def get_bool(self, option_id: PyOptionId, default: Optional[bool]) -> OptionValue[bool]: ...
     def get_int(self, option_id: PyOptionId, default: Optional[int]) -> OptionValue[int]: ...
@@ -679,17 +690,19 @@ class PyOptionParser:
     def get_string(self, option_id: PyOptionId, default: Optional[str]) -> OptionValue[str]: ...
     def get_bool_list(
         self, option_id: PyOptionId, default: list[bool]
-    ) -> OptionListValue[bool]: ...
-    def get_int_list(self, option_id: PyOptionId, default: list[int]) -> OptionListValue[int]: ...
+    ) -> OptionValue[list[bool]]: ...
+    def get_int_list(self, option_id: PyOptionId, default: list[int]) -> OptionValue[list[int]]: ...
     def get_float_list(
         self, option_id: PyOptionId, default: list[float]
-    ) -> OptionListValue[float]: ...
+    ) -> OptionValue[list[float]]: ...
     def get_string_list(
         self, option_id: PyOptionId, default: list[str]
-    ) -> OptionListValue[str]: ...
-    def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionDictValue: ...
+    ) -> OptionValue[list[str]]: ...
+    def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionValue[dict]: ...
+    def get_args(self) -> list[str]: ...
     def get_passthrough_args(self) -> Optional[list[str]]: ...
     def get_unconsumed_flags(self) -> dict[str, list[str]]: ...
+    def validate_config(self, valid_keys: dict[str, set[str]]) -> list[str]: ...
 
 # ------------------------------------------------------------------------------
 # Testutil

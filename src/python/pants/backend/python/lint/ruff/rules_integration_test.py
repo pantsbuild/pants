@@ -31,6 +31,7 @@ from pants.core.util_rules import config_files
 from pants.core.util_rules.partitions import _EmptyMetadata
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
+from pants.engine.fs import DigestContents
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -198,7 +199,7 @@ def test_skip_field(rule_runner: RuleRunner) -> None:
 
     fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
 
-    assert lint_result.exit_code == 1
+    assert lint_result.exit_code == 0
     assert fix_result.output == rule_runner.make_snapshot({})
     assert fix_result.did_change is False
     assert fmt_result.output == rule_runner.make_snapshot({})
@@ -224,7 +225,7 @@ def test_skip_check_field(rule_runner: RuleRunner) -> None:
 
     fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
 
-    assert lint_result.exit_code == 1
+    assert lint_result.exit_code == 0
     assert fix_result.output == rule_runner.make_snapshot({})
     assert fix_result.did_change is False
     assert fmt_result.output == rule_runner.make_snapshot(
@@ -294,3 +295,17 @@ def test_config_file(
     fix_result, lint_result, fmt_result = run_ruff(rule_runner, [tgt], extra_args=extra_args)
     assert lint_result.exit_code == bool(should_change)
     assert fix_result.did_change is should_change
+
+
+def test_report_file(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
+    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
+    fix_result, lint_result, fmt_result = run_ruff(
+        rule_runner,
+        [tgt],
+        extra_args=["--ruff-args='--output-file=reports/foo.txt'"],
+    )
+    assert lint_result.exit_code == 1
+    report_files = rule_runner.request(DigestContents, [lint_result.report])
+    assert len(report_files) == 1
+    assert "f.py:1:5: F541" in report_files[0].content.decode()

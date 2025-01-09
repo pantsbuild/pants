@@ -61,5 +61,5 @@ class Shfmt(TemplatedExternalTool):
         candidates = (os.path.join(d, ".editorconfig") for d in ("", *dirs))
         return ConfigFilesRequest(
             discovery=self.config_discovery,
-            check_content={fp: b"[*.sh]" for fp in candidates},
+            check_content=dict.fromkeys(candidates, b"[*.sh]"),
         )

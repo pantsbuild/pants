@@ -5,4 +5,11 @@ resource(name="lockfile", source="yamllint.lock")
 
 python_sources(dependencies=[":lockfile"])
 
-python_tests(name="tests")
+python_tests(
+    name="tests",
+    overrides={
+        "rules_integration_test.py": {
+            "tags": ["platform_specific_behavior"],
+        }
+    },
+)

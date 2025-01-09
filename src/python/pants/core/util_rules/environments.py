@@ -41,7 +41,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.option import custom_types
 from pants.option.global_options import GlobalOptions
-from pants.option.option_types import DictOption, OptionsInfo, collect_options_info
+from pants.option.option_types import DictOption, OptionInfo, collect_options_info
 from pants.option.subsystem import Subsystem
 from pants.util.enums import match
 from pants.util.frozendict import FrozenDict
@@ -482,7 +482,7 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
     error_cases = [
         (env_name, tgts, env_tgt.val)
         for ((env_name, tgts), env_tgt) in zip(env_names_and_targets, env_tgts)
-        if env_tgt.val is not None and not isinstance(env_tgt.val, LocalEnvironmentTarget)
+        if env_tgt.val is not None and not env_tgt.can_access_local_system_paths
     ]
 
     for env_name, tgts, env_tgt in error_cases:
@@ -592,7 +592,7 @@ class EnvironmentTarget:
         return True
 
     @property
-    def can_use_system_path_metadata_requests(self) -> bool:
+    def can_access_local_system_paths(self) -> bool:
         tgt = self.val
         if not tgt:
             return True
@@ -1160,12 +1160,12 @@ def option_field_name_for(flag_names: Sequence[str]) -> str:
 
 def _add_option_field_for(
     env_aware_t: type[Subsystem.EnvironmentAware],
-    option: OptionsInfo,
+    option: OptionInfo,
 ) -> Iterable[UnionRule]:
-    option_type: type = option.flag_options["type"]
+    option_type: type = option.kwargs["type"]
     scope = env_aware_t.subsystem.options_scope
 
-    snake_name = option_field_name_for(option.flag_names)
+    snake_name = option_field_name_for(option.args)
 
     # Note that there is not presently good support for enum options. `str`-backed enums should
     # be easy enough to add though...
@@ -1180,7 +1180,7 @@ def _add_option_field_for(
                 "to a `Field` subtype that supports your option's value type."
             )
     else:
-        member_type = option.flag_options["member_type"]
+        member_type = option.kwargs["member_type"]
         try:
             field_type = _LIST_OPTIONS[member_type]
         except KeyError:
@@ -1203,7 +1203,7 @@ def _add_option_field_for(
             "environment target is active."
         )
         subsystem = env_aware_t
-        option_name = option.flag_names[0]
+        option_name = option.args[0]
 
     setattr(OptionField, "__qualname__", f"{option_type.__qualname__}.{OptionField.__name__}")
 

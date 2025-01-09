@@ -32,7 +32,7 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
     let (env, dropped) = Env::capture_lossy();
     let env_items = (&env).into();
     let argv = env::args().collect::<Vec<_>>();
-    let options_parser = OptionParser::new(Args::argv(), env, None, true, false, None)?;
+    let options_parser = OptionParser::new(Args::argv(), env, None, true, false, None, None)?;
 
     let use_pantsd = options_parser.parse_bool(&option_id!("pantsd"), true)?;
     if !use_pantsd.value {
@@ -96,10 +96,8 @@ fn try_execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> 
 }
 
 fn execv_fallback_client(pants_server: OsString) -> Infallible {
-    if let Err(exit_code) = try_execv_fallback_client(pants_server) {
-        std::process::exit(exit_code);
-    }
-    unreachable!()
+    let Err(exit_code) = try_execv_fallback_client(pants_server);
+    std::process::exit(exit_code);
 }
 
 // The value is taken from this C precedent:

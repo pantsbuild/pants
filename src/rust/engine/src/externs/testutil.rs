@@ -50,7 +50,7 @@ impl PyStubCASBuilder {
         py_executor
             .borrow()
             .0
-            .enter(|| Ok(PyStubCAS(builder.build())))
+            .block_on(async move { Ok(PyStubCAS(builder.build().await)) })
     }
 }
 

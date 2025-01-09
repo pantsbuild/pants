@@ -106,7 +106,7 @@ class NfpmArchField(StringField):
         https://nfpm.goreleaser.com/goarch-to-pkg/
 
         Use one of these values unless you need nFPM to use your value as-is:
-        {", ".join(repr(arch.value) for arch in NfpmArch.__members__.values())}
+        `{" | ".join(repr(arch.value) for arch in NfpmArch.__members__.values())}`
         """
     )
 

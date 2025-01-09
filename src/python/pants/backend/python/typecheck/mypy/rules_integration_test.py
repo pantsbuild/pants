@@ -694,7 +694,7 @@ def test_determine_python_files() -> None:
     assert determine_python_files(["f.pyi"]) == ("f.pyi",)
     assert determine_python_files(["f.py", "f.pyi"]) == ("f.pyi",)
     assert determine_python_files(["f.pyi", "f.py"]) == ("f.pyi",)
-    assert determine_python_files(["f.json"]) == ()
+    assert determine_python_files(["script-without-extension"]) == ("script-without-extension",)
 
 
 def test_colors_and_formatting(rule_runner: PythonRuleRunner) -> None:

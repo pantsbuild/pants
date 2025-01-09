@@ -75,6 +75,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is False
 
 
+@pytest.mark.platform_specific_behavior
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"BUILD": BAD_FILE})
     fmt_result = run_buildifier(rule_runner)

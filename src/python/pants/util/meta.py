@@ -122,8 +122,7 @@ class _ClassDecoratorWithSentinelAttribute(ABC):
     """
 
     @abstractmethod
-    def __call__(self, cls: Type) -> Type:
-        ...
+    def __call__(self, cls: Type) -> Type: ...
 
     def define_instance_of(self, obj: Type, **kwargs) -> Type:
         return type(obj.__name__, (obj,), {"_decorated_type_checkable_type": type(self), **kwargs})

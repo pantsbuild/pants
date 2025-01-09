@@ -38,7 +38,6 @@ def assert_valid_split(
     args_str: str,
     *,
     expected_goals: list[str],
-    expected_scope_to_flags: dict[str, list[str]],
     expected_specs: list[str],
     expected_passthru: list[str] | None = None,
     expected_is_help: bool = False,
@@ -49,7 +48,6 @@ def assert_valid_split(
     args = shlex.split(args_str)
     split_args = splitter.split_args(args)
     assert expected_goals == split_args.goals
-    assert expected_scope_to_flags == split_args.scope_to_flags
     assert expected_specs == split_args.specs
     assert expected_passthru == split_args.passthru
 
@@ -115,7 +113,6 @@ def goal_split_test(command_line: str, **expected):
         command_line,
         {
             "expected_goals": ["test"],
-            "expected_scope_to_flags": {"": [], "test": []},
             **expected,
         },
     )
@@ -130,11 +127,6 @@ def goal_split_test(command_line: str, **expected):
             + " src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz",
             dict(
                 expected_goals=["check", "test"],
-                expected_scope_to_flags={
-                    "": ["--gg", "-ltrace"],
-                    "check": ["--long-flag", "--cc"],
-                    "test": ["--ii"],
-                },
                 expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
             ),
         ),
@@ -144,11 +136,6 @@ def goal_split_test(command_line: str, **expected):
             + " --another-global",
             dict(
                 expected_goals=["check", "test"],
-                expected_scope_to_flags={
-                    "": ["--fff=arg", "-ltrace", "--another-global"],
-                    "check": ["--gg-gg=arg-arg", "--long-flag"],
-                    "test": ["--iii"],
-                },
                 expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
             ),
         ),
@@ -157,7 +144,6 @@ def goal_split_test(command_line: str, **expected):
             "./pants check test foo::",
             dict(
                 expected_goals=["check", "test"],
-                expected_scope_to_flags={"": [], "check": [], "test": []},
                 expected_specs=["foo::"],
             ),
         ),
@@ -165,7 +151,6 @@ def goal_split_test(command_line: str, **expected):
             "./pants check test foo::",
             dict(
                 expected_goals=["check", "test"],
-                expected_scope_to_flags={"": [], "check": [], "test": []},
                 expected_specs=["foo::"],
             ),
         ),
@@ -173,7 +158,6 @@ def goal_split_test(command_line: str, **expected):
             "./pants check test:test",
             dict(
                 expected_goals=["check"],
-                expected_scope_to_flags={"": [], "check": []},
                 expected_specs=["test:test"],
             ),
         ),
@@ -194,7 +178,6 @@ def goal_split_test(command_line: str, **expected):
             "./pants test check.java",
             dict(
                 expected_goals=["test"],
-                expected_scope_to_flags={"": [], "test": []},
                 expected_specs=["check.java"],
             ),
         ),
@@ -210,30 +193,11 @@ def test_valid_arg_splits(
     )
 
 
-def test_descoping_qualified_flags(splitter: ArgSplitter) -> None:
-    assert_valid_split(
-        splitter,
-        "./pants check test --check-bar --no-test-baz foo/bar",
-        expected_goals=["check", "test"],
-        expected_scope_to_flags={"": [], "check": ["--bar"], "test": ["--no-baz"]},
-        expected_specs=["foo/bar"],
-    )
-    # Qualified flags don't count as explicit goals.
-    assert_valid_split(
-        splitter,
-        "./pants check --test-bar foo/bar",
-        expected_goals=["check"],
-        expected_scope_to_flags={"": [], "check": [], "test": ["--bar"]},
-        expected_specs=["foo/bar"],
-    )
-
-
 def test_passthru_args(splitter: ArgSplitter) -> None:
     assert_valid_split(
         splitter,
         "./pants test foo/bar -- -t 'this is the arg'",
         expected_goals=["test"],
-        expected_scope_to_flags={"": [], "test": []},
         expected_specs=["foo/bar"],
         expected_passthru=["-t", "this is the arg"],
     )
@@ -243,35 +207,8 @@ def test_passthru_args(splitter: ArgSplitter) -> None:
         + " --check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz --"
         + " passthru1 passthru2 -linfo",
         expected_goals=["check", "test"],
-        expected_scope_to_flags={
-            "": ["-lerror", "--fff=arg"],
-            "check": ["--gg-gg=arg-arg", "--long-flag"],
-            "test": ["--iii"],
-        },
         expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
         expected_passthru=["passthru1", "passthru2", "-linfo"],
-    )
-
-
-def test_subsystem_flags(splitter: ArgSplitter) -> None:
-    # Global subsystem flag in global scope.
-    assert_valid_split(
-        splitter,
-        "./pants --jvm-options=-Dbar=baz test foo:bar",
-        expected_goals=["test"],
-        expected_scope_to_flags={"": [], "jvm": ["--options=-Dbar=baz"], "test": []},
-        expected_specs=["foo:bar"],
-    )
-    assert_valid_split(
-        splitter,
-        "./pants test --reporting-template-dir=path foo:bar",
-        expected_goals=["test"],
-        expected_scope_to_flags={
-            "": [],
-            "reporting": ["--template-dir=path"],
-            "test": [],
-        },
-        expected_specs=["foo:bar"],
     )
 
 
@@ -286,11 +223,10 @@ def help_test(command_line: str, **expected):
     )
 
 
-def help_no_arguments_test(command_line: str, *scopes: str, **expected):
+def help_no_arguments_test(command_line: str, **expected):
     return help_test(
         command_line,
         expected_goals=[],
-        expected_scope_to_flags={scope: [] for scope in ("", *scopes)},
         expected_specs=[],
         **expected,
     )
@@ -300,119 +236,95 @@ def help_no_arguments_test(command_line: str, *scopes: str, **expected):
     "command_line, expected",
     [
         help_no_arguments_test("./pants"),
-        help_no_arguments_test("./pants help", "help"),
-        help_no_arguments_test("./pants -h", "help"),
-        help_no_arguments_test("./pants --help", "help"),
-        help_no_arguments_test(
-            "./pants help-advanced", "help-advanced", expected_help_advanced=True
-        ),
-        help_no_arguments_test(
-            "./pants --help-advanced", "help-advanced", expected_help_advanced=True
-        ),
-        help_no_arguments_test("./pants help-all", "help-all", expected_help_all=True),
+        help_no_arguments_test("./pants help"),
+        help_no_arguments_test("./pants -h"),
+        help_no_arguments_test("./pants --help"),
+        help_no_arguments_test("./pants help-advanced", expected_help_advanced=True),
+        help_no_arguments_test("./pants --help-advanced", expected_help_advanced=True),
+        help_no_arguments_test("./pants help-all", expected_help_all=True),
         help_test(
             "./pants --help-advanced --help",
             expected_goals=["help-advanced"],
-            expected_scope_to_flags={"": [], "help": [], "help-advanced": []},
             expected_specs=[],
             expected_help_advanced=False,
         ),
         help_test(
             "./pants --help --help-advanced --builtin-option --help-advanced-option",
             expected_goals=["help"],
-            expected_scope_to_flags={
-                "": [],
-                "help": [],
-                "help-advanced": ["--builtin-option", "--option"],
-            },
             expected_specs=[],
             expected_help_advanced=True,
         ),
         help_test(
             "./pants -f",
             expected_goals=[],
-            expected_scope_to_flags={"": []},
             expected_specs=["-f"],
         ),
         help_test(
             "./pants help check -x",
             expected_goals=["check"],
-            expected_scope_to_flags={"": [], "help": [], "check": []},
             expected_specs=["-x"],
         ),
         help_test(
             "./pants check -h",
             expected_goals=["check"],
-            expected_scope_to_flags={"": [], "check": [], "help": []},
             expected_specs=[],
         ),
         help_test(
             "./pants -linfo check -h",
             expected_goals=["check"],
-            expected_scope_to_flags={"": ["-linfo"], "check": [], "help": []},
             expected_specs=[],
         ),
         help_test(
             "./pants check -h -linfo",
             expected_goals=["check"],
-            expected_scope_to_flags={"": ["-linfo"], "check": [], "help": []},
             expected_specs=[],
         ),
         help_test(
             "./pants check --help test",
             expected_goals=["check", "test"],
-            expected_scope_to_flags={"": [], "check": [], "help": [], "test": []},
             expected_specs=[],
         ),
         help_test(
             "./pants test src/foo/bar:baz -h",
             expected_goals=["test"],
-            expected_scope_to_flags={"": [], "test": [], "help": []},
             expected_specs=["src/foo/bar:baz"],
         ),
         help_test(
             "./pants test src/foo/bar:baz --help",
             expected_goals=["test"],
-            expected_scope_to_flags={"": [], "test": [], "help": []},
             expected_specs=["src/foo/bar:baz"],
         ),
         help_test(
             "./pants --help test src/foo/bar:baz",
             expected_goals=["test"],
-            expected_scope_to_flags={"": [], "test": [], "help": []},
             expected_specs=["src/foo/bar:baz"],
         ),
         help_test(
             "./pants test --help src/foo/bar:baz",
             expected_goals=["test"],
-            expected_scope_to_flags={"": [], "test": [], "help": []},
             expected_specs=["src/foo/bar:baz"],
         ),
         help_test(
             "./pants check --help-advanced test",
             expected_goals=["check", "test"],
-            expected_scope_to_flags={"": [], "check": [], "help-advanced": [], "test": []},
             expected_specs=[],
             expected_help_advanced=True,
         ),
         help_test(
             "./pants help-advanced check",
             expected_goals=["check"],
-            expected_scope_to_flags={"": [], "check": [], "help-advanced": []},
             expected_specs=[],
             expected_help_advanced=True,
         ),
         help_test(
             "./pants check help-all test --help",
             expected_goals=["check", "test", "help-all"],
-            expected_scope_to_flags={"": [], "check": [], "help": [], "help-all": [], "test": []},
             expected_specs=[],
             expected_help_all=False,
         ),
         help_test(
             "./pants bsp --help",
             expected_goals=["bsp"],
-            expected_scope_to_flags={"": [], "help": [], "bsp": []},
             expected_specs=[],
         ),
     ],

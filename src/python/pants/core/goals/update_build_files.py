@@ -400,10 +400,9 @@ class FormatWithRuffRequest(RewrittenBuildFileRequest):
 
 @rule
 async def format_build_file_with_ruff(
-    request: FormatWithRuffRequest, ruff: Ruff
+    request: FormatWithRuffRequest, ruff: Ruff, platform: Platform
 ) -> RewrittenBuildFile:
     input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
-    ruff_ics = await get_lockfile_interpreter_constraints(ruff)
     result = await _run_ruff_fmt(
         RuffRequest.Batch(
             Ruff.options_scope,
@@ -412,7 +411,7 @@ async def format_build_file_with_ruff(
             snapshot=input_snapshot,
         ),
         ruff,
-        ruff_ics,
+        platform,
     )
     output_content = await Get(DigestContents, Digest, result.output.digest)
 
@@ -476,9 +475,9 @@ async def maybe_rename_deprecated_targets(
     return RewrittenBuildFile(
         request.path,
         tuple(new_content.content.decode("utf-8").splitlines()),
-        change_descriptions=("Renamed deprecated targets",)
-        if old_bytes != new_content.content
-        else (),
+        change_descriptions=(
+            ("Renamed deprecated targets",) if old_bytes != new_content.content else ()
+        ),
     )
 
 
@@ -504,9 +503,9 @@ async def maybe_rename_deprecated_fields(
     return RewrittenBuildFile(
         request.path,
         tuple(new_content.content.decode("utf-8").splitlines()),
-        change_descriptions=("Renamed deprecated fields",)
-        if old_bytes != new_content.content
-        else (),
+        change_descriptions=(
+            ("Renamed deprecated fields",) if old_bytes != new_content.content else ()
+        ),
     )
 
 

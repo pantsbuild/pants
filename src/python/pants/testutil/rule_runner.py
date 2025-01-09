@@ -544,12 +544,10 @@ class RuleRunner:
         return path
 
     @overload
-    def write_files(self, files: Mapping[str, str | bytes]) -> tuple[str, ...]:
-        ...
+    def write_files(self, files: Mapping[str, str | bytes]) -> tuple[str, ...]: ...
 
     @overload
-    def write_files(self, files: Mapping[PurePath, str | bytes]) -> tuple[str, ...]:
-        ...
+    def write_files(self, files: Mapping[PurePath, str | bytes]) -> tuple[str, ...]: ...
 
     def write_files(
         self, files: Mapping[PurePath, str | bytes] | Mapping[str, str | bytes]
@@ -596,7 +594,7 @@ class RuleRunner:
 
         :API: public
         """
-        return self.make_snapshot({fp: "" for fp in files})
+        return self.make_snapshot(dict.fromkeys(files, ""))
 
     def get_target(self, address: Address) -> Target:
         """Find the target for a given address.
@@ -671,7 +669,7 @@ class MockGet(Generic[_O]):
 @dataclass(frozen=True)
 class MockRequestExceptionComparable:
     category: Union[Literal["Get"], Literal["Effect"], str]
-    output_type: str
+    output_type: str | None
     input_types: tuple[str, ...]
 
     def __str__(self):
@@ -702,9 +700,11 @@ def _compare_expected_mocks(
             return MockRequestExceptionComparable(
                 category=f"Uncategorised of type {type(o).__qualname__}",
                 output_type=maybe_output_type.__name__ if maybe_output_type is not None else None,
-                input_types=tuple(e.__name__ for e in maybe_input_types)
-                if maybe_input_types is not None
-                else tuple(),
+                input_types=(
+                    tuple(e.__name__ for e in maybe_input_types)
+                    if maybe_input_types is not None
+                    else tuple()
+                ),
             )
 
         output_type = o.output_type.__name__

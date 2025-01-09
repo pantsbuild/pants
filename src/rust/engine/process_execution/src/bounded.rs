@@ -313,7 +313,7 @@ impl Permit<'_> {
     }
 }
 
-impl<'a> Drop for Permit<'a> {
+impl Drop for Permit<'_> {
     fn drop(&mut self) {
         let mut state = self.state.lock();
         state.available_ids.push_back(self.task.id);

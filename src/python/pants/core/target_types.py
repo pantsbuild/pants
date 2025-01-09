@@ -277,12 +277,14 @@ class AssetSourceField(SingleSourceField):
         filename = (
             self.value
             if isinstance(self.value, str)
-            else self.value.filename
-            if isinstance(self.value, http_source)
-            else next(
-                source["filename"]
-                for source in dataclasses.asdict(self.value).values()
-                if source is not None
+            else (
+                self.value.filename
+                if isinstance(self.value, http_source)
+                else next(
+                    source["filename"]
+                    for source in dataclasses.asdict(self.value).values()
+                    if source is not None
+                )
             )
         )
         return os.path.join(self.address.spec_path, filename)

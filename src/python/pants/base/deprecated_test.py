@@ -69,7 +69,7 @@ def test_deprecated_function_invalid() -> None:
     with pytest.raises(BadDecoratorNestingError):
 
         class Test:
-            @deprecated(FUTURE_VERSION)  # type: ignore[misc]
+            @deprecated(FUTURE_VERSION)  # type: ignore[prop-decorator]
             @property
             def prop(this):
                 pass

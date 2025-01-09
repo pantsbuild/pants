@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Callable, Iterable, Iterator, Mapping, Protocol, Sequence, Tuple, Type, cast
 
 from pants.core.goals.resolves import ExportableTool
-from pants.engine.collection import Collection
+from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
@@ -105,12 +105,14 @@ class KnownUserResolveNames:
 
 
 @union(in_scope_types=[EnvironmentName])
-class RequestedUserResolveNames(Collection[str]):
+class RequestedUserResolveNames(DeduplicatedCollection[str]):
     """The user resolves requested for a particular language ecosystem.
 
     Each language ecosystem should set up a subclass and register it with a UnionRule. Implement a
     rule that goes from the subclass -> UserGenerateLockfiles.
     """
+
+    sort_input = True
 
 
 class PackageVersion(Protocol):
@@ -121,17 +123,13 @@ class PackageVersion(Protocol):
     step taken.
     """
 
-    def __eq__(self, other) -> bool:
-        ...
+    def __eq__(self, other) -> bool: ...
 
-    def __gt__(self, other) -> bool:
-        ...
+    def __gt__(self, other) -> bool: ...
 
-    def __lt__(self, other) -> bool:
-        ...
+    def __lt__(self, other) -> bool: ...
 
-    def __str__(self) -> str:
-        ...
+    def __str__(self) -> str: ...
 
 
 PackageName = str

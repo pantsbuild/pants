@@ -27,7 +27,7 @@ async fn smoke_test_from_options_reapi_provider() {
     let roland = TestData::roland();
     let empty = TestData::empty();
 
-    let cas = new_cas(10);
+    let cas = new_cas(10).await;
 
     let store = ByteStore::from_options(RemoteStoreOptions {
         provider: RemoteProvider::Reapi,

@@ -438,17 +438,16 @@ class DynamicRemoteOptions:
         prior_result: AuthPluginResult | None = None,
         remote_auth_plugin_func: Callable | None = None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
-        bootstrap_options = full_options.bootstrap_option_values()
-        assert bootstrap_options is not None
-        execution = cast(bool, bootstrap_options.remote_execution)
-        cache_read = cast(bool, bootstrap_options.remote_cache_read)
-        cache_write = cast(bool, bootstrap_options.remote_cache_write)
+        global_options = full_options.for_global_scope()
+        execution = cast(bool, global_options.remote_execution)
+        cache_read = cast(bool, global_options.remote_cache_read)
+        cache_write = cast(bool, global_options.remote_cache_write)
         if not (execution or cache_read or cache_write):
             return cls.disabled(), None
 
         sources = {
             str(remote_auth_plugin_func): bool(remote_auth_plugin_func),
-            "[GLOBAL].remote_oauth_bearer_token": bool(bootstrap_options.remote_oauth_bearer_token),
+            "[GLOBAL].remote_oauth_bearer_token": bool(global_options.remote_oauth_bearer_token),
         }
         enabled_sources = [name for name, enabled in sources.items() if enabled]
         if len(enabled_sources) > 1:
@@ -461,17 +460,17 @@ class DynamicRemoteOptions:
                     """
                 )
             )
-        if bootstrap_options.remote_oauth_bearer_token:
-            return cls._use_oauth_token(bootstrap_options), None
+        if global_options.remote_oauth_bearer_token:
+            return cls._use_oauth_token(global_options), None
         if remote_auth_plugin_func is not None:
             return cls._use_auth_plugin(
-                bootstrap_options,
+                global_options,
                 full_options=full_options,
                 env=env,
                 prior_result=prior_result,
                 remote_auth_plugin_func=remote_auth_plugin_func,
             )
-        return cls._use_no_auth(bootstrap_options), None
+        return cls._use_no_auth(global_options), None
 
     @classmethod
     def _use_no_auth(cls, bootstrap_options: OptionValueContainer) -> DynamicRemoteOptions:
@@ -679,7 +678,7 @@ class ExecutionOptions:
             process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
             # Remote store setup.
             remote_store_address=dynamic_remote_options.store_address,
-            remote_store_headers=dynamic_remote_options.store_headers,
+            remote_store_headers=cls.with_user_agent(dynamic_remote_options.store_headers),
             remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
             remote_store_rpc_concurrency=dynamic_remote_options.store_rpc_concurrency,
@@ -691,11 +690,18 @@ class ExecutionOptions:
             remote_cache_rpc_timeout_millis=bootstrap_options.remote_cache_rpc_timeout_millis,
             # Remote execution setup.
             remote_execution_address=dynamic_remote_options.execution_address,
-            remote_execution_headers=dynamic_remote_options.execution_headers,
+            remote_execution_headers=cls.with_user_agent(dynamic_remote_options.execution_headers),
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             remote_execution_rpc_concurrency=dynamic_remote_options.execution_rpc_concurrency,
             remote_execution_append_only_caches_base_path=bootstrap_options.remote_execution_append_only_caches_base_path,
         )
+
+    @classmethod
+    def with_user_agent(cls, headers: dict[str, str]) -> dict[str, str]:
+        has_user_agent = any(k.lower() == "user-agent" for k in headers.keys())
+        if has_user_agent:
+            return headers
+        return {"user-agent": f"pants/{VERSION}"} | headers
 
 
 @dataclass(frozen=True)
@@ -766,9 +772,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_graceful_shutdown_timeout=3,
     # Remote store setup.
     remote_store_address=None,
-    remote_store_headers={
-        "user-agent": f"pants/{VERSION}",
-    },
+    remote_store_headers={},
     remote_store_chunk_bytes=1024 * 1024,
     remote_store_rpc_retries=2,
     remote_store_rpc_concurrency=128,
@@ -780,9 +784,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_cache_rpc_timeout_millis=1500,
     # Remote execution setup.
     remote_execution_address=None,
-    remote_execution_headers={
-        "user-agent": f"pants/{VERSION}",
-    },
+    remote_execution_headers={},
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
     remote_execution_rpc_concurrency=128,
     remote_execution_append_only_caches_base_path=None,
@@ -982,6 +984,8 @@ class BootstrapOptions:
     )
     native_options_validation = EnumOption(
         default=NativeOptionsValidation.warning,
+        removal_version="2.26.0.dev0",
+        removal_hint="The legacy parser has been removed so this option has no effect.",
         help=softwrap(
             """
             Pants is switching its option parsing system from a legacy parser written in Python
@@ -1805,6 +1809,22 @@ class BootstrapOptions:
             {doc_url("community/getting-help")}.
             """
         ),
+        removal_version="2.26.0.dev0",
+        removal_hint='Upgrade your operating system or write `allow_deprecated_macos_versions = ["10", "11"]` instead.',
+    )
+
+    allow_deprecated_macos_versions = StrListOption(
+        default=[],
+        advanced=True,
+        help=softwrap(
+            f"""
+            Silence warnings/errors about running Pants on these versions of macOS. Pants only supports
+            recent versions of macOS. You can try running on older versions, but it may or may not work.
+
+            If you have questions or concerns about this, please reach out to us at
+            {doc_url("community/getting-help")}.
+            """
+        ),
     )
 
 
@@ -2238,11 +2258,11 @@ class GlobalOptionsFlags:
         short_flags = set()
 
         for options_info in collect_options_info(BootstrapOptions):
-            for flag in options_info.flag_names:
+            for flag in options_info.args:
                 flags.add(flag)
                 if len(flag) == 2:
                     short_flags.add(flag)
-                elif options_info.flag_options.get("type") == bool:
+                elif options_info.kwargs.get("type") == bool:
                     flags.add(f"--no-{flag[2:]}")
 
         return cls(FrozenOrderedSet(flags), FrozenOrderedSet(short_flags))

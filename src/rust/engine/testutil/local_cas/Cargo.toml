@@ -9,6 +9,7 @@ publish = false
 mock = { path = "../mock" }
 clap = { workspace = true }
 env_logger = { workspace = true }
+tokio = { workspace = true }
 
 [lints]
 workspace = true

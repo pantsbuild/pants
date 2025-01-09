@@ -13,13 +13,15 @@ from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
-class OptionsInfo:
-    flag_names: tuple[str, ...]
-    flag_options: dict[str, Any]
+@dataclass(frozen=True, order=True)
+class OptionInfo:
+    """Registration info for a single option."""
+
+    args: tuple[str, ...]  # The *args in the registration.
+    kwargs: dict[str, Any]  # The **kwargs in the registration.
 
 
-def collect_options_info(cls: type) -> Iterator[OptionsInfo]:
+def collect_options_info(cls: type) -> Iterator[OptionInfo]:
     """Yields the ordered options info from the MRO of the provided class."""
 
     # NB: Since registration ordering matters (it impacts `help` output), we register these in
@@ -28,7 +30,7 @@ def collect_options_info(cls: type) -> Iterator[OptionsInfo]:
         for attrname in class_.__dict__.keys():
             # NB: We use attrname and getattr to trigger descriptors
             attr = getattr(cls, attrname)
-            if isinstance(attr, OptionsInfo):
+            if isinstance(attr, OptionInfo):
                 yield attr
 
 
@@ -57,7 +59,7 @@ _RegisterIfFuncT = Callable[[_SubsystemType], Any]
 
 
 def _eval_maybe_dynamic(val: _MaybeDynamicT[_DefaultT], subsystem_cls: _SubsystemType) -> _DefaultT:
-    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[no-any-return]
+    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[return-value]
 
 
 class _OptionBase(Generic[_OptT, _DefaultT]):
@@ -186,18 +188,16 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         )
 
     @overload
-    def __get__(self, obj: None, objtype: Any) -> OptionsInfo | None:
-        ...
+    def __get__(self, obj: None, objtype: Any) -> OptionInfo | None: ...
 
     @overload
-    def __get__(self, obj: object, objtype: Any) -> _OptT | _DefaultT:
-        ...
+    def __get__(self, obj: object, objtype: Any) -> _OptT | _DefaultT: ...
 
     def __get__(self, obj, objtype):
         assert self._flag_names is not None
         if obj is None:
             if self._register_if(objtype):
-                return OptionsInfo(self._flag_names, self.get_flag_options(objtype))
+                return OptionInfo(self._flag_names, self.get_flag_options(objtype))
             return None
         long_name = self._flag_names[-1]
         option_value = getattr(obj.options, long_name[2:].replace("-", "_"))
@@ -461,8 +461,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-    ) -> EnumOption[_EnumT, _EnumT]:
-        ...
+    ) -> EnumOption[_EnumT, _EnumT]: ...
 
     # N.B. This has an additional param: `enum_type`.
     @overload  # Case: dynamic default
@@ -486,8 +485,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-    ) -> EnumOption[_EnumT, _EnumT]:
-        ...
+    ) -> EnumOption[_EnumT, _EnumT]: ...
 
     # N.B. This has an additional param: `enum_type`.
     @overload  # Case: default is `None`
@@ -511,8 +509,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-    ) -> EnumOption[_EnumT, None]:
-        ...
+    ) -> EnumOption[_EnumT, None]: ...
 
     def __new__(
         cls,
@@ -604,8 +601,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-    ) -> EnumListOption[_EnumT]:
-        ...
+    ) -> EnumListOption[_EnumT]: ...
 
     # N.B. This has an additional param: `enum_type`.
     @overload  # Case: dynamic default
@@ -629,8 +625,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-    ) -> EnumListOption[_EnumT]:
-        ...
+    ) -> EnumListOption[_EnumT]: ...
 
     # N.B. This has an additional param: `enum_type`.
     @overload  # Case: implicit default
@@ -653,8 +648,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-    ) -> EnumListOption[_EnumT]:
-        ...
+    ) -> EnumListOption[_EnumT]: ...
 
     def __new__(
         cls,

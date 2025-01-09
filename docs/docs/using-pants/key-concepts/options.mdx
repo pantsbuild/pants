@@ -358,9 +358,8 @@ pants --scope-option="@path/to/file.json"
 :::caution Gotcha: If you modify the value file, you must manually restart pantsd
 Until we resolve [this issue](https://github.com/pantsbuild/pants/issues/10360), changing
 the value in a file used with the `@` syntax as described above will not invalidate the build.
-For now, if such a file changes you will have to restart the Pants daemon manually. You can
-do so by `kill`ing it (after using `ps -ef | grep pantsd` to find its pid), or by running
-Pants once with `--no-pantsd`.
+For now, if such a file changes you will have to stop pantsd so that it will be restarted on
+the next invocation of pants. To do so, run `rm -r .pants.d/pids/` in the build root.
 :::
 
 ## `.pants.rc` file
